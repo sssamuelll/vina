@@ -5,11 +5,13 @@ import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import './Workspace.css';
 
 export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
+  useKeyboardShortcuts();
 
   return (
     <div className="workspace">
