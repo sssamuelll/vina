@@ -7,6 +7,7 @@ import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
+import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
@@ -17,6 +18,7 @@ export default function Workspace() {
   const { viewMode } = useSelector((s: RootState) => s.editor);
   const project = useSelector((s: RootState) => s.project);
   const [, forceUpdate] = useState(0);
+  const [showTemplates, setShowTemplates] = useState(false);
   useKeyboardShortcuts();
 
   // Load from localStorage on mount
@@ -59,6 +61,14 @@ export default function Workspace() {
             style={{ fontSize: 16, padding: '2px 6px', opacity: canRedo() ? 1 : 0.3 }}
           >↷</button>
         </div>
+        <button
+          className="toolbar-btn template-btn"
+          onClick={() => setShowTemplates(true)}
+          title="Pattern Templates"
+          style={{ fontSize: 13, padding: '4px 10px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
+        >
+          + Template
+        </button>
         <div className="view-toggle">
           <button
             className={viewMode === '2d' ? 'active' : ''}
@@ -105,6 +115,9 @@ export default function Workspace() {
         {/* Right: Properties panel */}
         <PropertiesPanel />
       </div>
+
+      {/* Template Library Modal */}
+      <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
     </div>
   );
 }
