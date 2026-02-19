@@ -13,15 +13,70 @@
   display: flex;
   align-items: center;
   padding: 0 16px;
-  gap: 24px;
+  gap: 16px;
   flex-shrink: 0;
 }
 
 .workspace-logo {
   font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
+  font-weight: 500;
   color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+}
+
+.toolbar-separator {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+}
+
+.undo-redo-toolbar {
+  display: flex;
+  gap: 4px;
+}
+
+.toolbar-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toolbar-btn:hover {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+}
+
+.toolbar-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.toolbar-btn:disabled:hover {
+  background: none;
+  color: var(--text-secondary);
+}
+
+.undo-btn, .redo-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.template-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+  gap: 6px;
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+
+.template-btn:hover {
+  border-color: var(--accent);
 }
 
 .view-toggle {
@@ -55,6 +110,13 @@
 
 /* ─── Body ─── */
 .workspace-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+.workspace-main {
   flex: 1;
   display: flex;
   overflow: hidden;
@@ -110,4 +172,65 @@
 
 .viewport-divider:hover {
   background: var(--accent);
+}
+
+/* ─── Copilot Toggle Bar ─── */
+.copilot-toggle-bar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: var(--copilot-toggle-width);
+  height: 100%;
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.copilot-toggle-bar.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.copilot-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  padding: 8px 4px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.copilot-toggle-btn:hover {
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+/* ─── Copilot Column ─── */
+.copilot-column {
+  width: var(--copilot-width);
+  height: 100%;
+  transition: all 0.2s ease;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.copilot-column.collapsed {
+  width: 0;
+  border-left: none;
+}
+
+.copilot-column.expanded {
+  width: var(--copilot-width);
 }

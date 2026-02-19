@@ -20,13 +20,19 @@ function saveAgentConfig(config: AgentConfig) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
 
-export default function CopilotPanel() {
+interface CopilotPanelProps {
+  isColumn?: boolean;
+  onClose?: () => void;
+}
+
+export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanelProps = {}) {
   const dispatch = useDispatch<AppDispatch>();
   const project = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
 
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -107,30 +113,68 @@ export default function CopilotPanel() {
     setShowSettings(false);
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        className="copilot-toggle"
-        onClick={() => setIsOpen(true)}
-        title="AI Copilot (Ctrl+K)"
-      >
-        <span className="copilot-icon">✨</span>
-      </button>
-    );
+  // For non-column mode (legacy floating), return the old behavior
+  if (!isColumn) {
+    if (!isOpen) {
+      return (
+        <button
+          className="copilot-toggle"
+          onClick={() => setIsOpen(true)}
+          title="AI Copilot (Ctrl+K)"
+        >
+          <span className="copilot-icon">✨</span>
+        </button>
+      );
+    }
   }
 
+  // For column mode, always render the panel
   return (
-    <div className="copilot-panel">
+    <div className={`copilot-panel ${isColumn ? 'column-mode' : ''} ${isFullscreen ? 'fullscreen' : ''}`}>
       <div className="copilot-header">
         <div className="copilot-title">
-          <span className="copilot-icon-sm">✨</span>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2L10 6H14L11 9L12 14L8 11L4 14L5 9L2 6H6L8 2Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
+          </svg>
           <span>Copilot</span>
           <span className="copilot-agent-badge">{agentConfig.name}</span>
         </div>
         <div className="copilot-header-actions">
-          <button className="copilot-btn-sm" onClick={() => setShowSettings(!showSettings)} title="Settings">⚙</button>
-          <button className="copilot-btn-sm" onClick={() => setMessages([])} title="Clear chat">🗑</button>
-          <button className="copilot-btn-sm" onClick={() => setIsOpen(false)} title="Close">✕</button>
+          {isColumn && (
+            <button 
+              className="copilot-btn-sm" 
+              onClick={() => setIsFullscreen(!isFullscreen)} 
+              title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                {isFullscreen ? (
+                  <path d="M4 2V4H2M10 2V4H8M8 10V8H10M2 10V8H4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                ) : (
+                  <path d="M2 4V2H4M8 2H10V4M10 8V10H8M4 10H2V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                )}
+              </svg>
+            </button>
+          )}
+          <button className="copilot-btn-sm" onClick={() => setShowSettings(!showSettings)} title="Settings">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M6 7.5A1.5 1.5 0 1 0 6 4.5A1.5 1.5 0 0 0 6 7.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
+              <path d="M9.73 7.27A.75.75 0 0 0 9.8 6.6L10.85 5.55A.75.75 0 0 0 10.85 4.45L9.8 3.4A.75.75 0 0 0 9.73 2.73L8.68 2.18A.75.75 0 0 0 7.82 2.27L6.77 2.82A.75.75 0 0 0 6.23 2.82L5.18 2.27A.75.75 0 0 0 4.32 2.18L3.27 2.73A.75.75 0 0 0 3.2 3.4L2.15 4.45A.75.75 0 0 0 2.15 5.55L3.2 6.6A.75.75 0 0 0 3.27 7.27L4.32 7.82A.75.75 0 0 0 5.18 7.73L6.23 7.18A.75.75 0 0 0 6.77 7.18L7.82 7.73A.75.75 0 0 0 8.68 7.82L9.73 7.27Z" stroke="currentColor" strokeWidth="1" fill="none"/>
+            </svg>
+          </button>
+          <button className="copilot-btn-sm" onClick={() => setMessages([])} title="Clear chat">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
+          <button 
+            className="copilot-btn-sm" 
+            onClick={isColumn ? onClose : () => setIsOpen(false)} 
+            title="Close"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </button>
         </div>
       </div>
 

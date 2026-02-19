@@ -20,6 +20,7 @@ export default function Workspace() {
   const project = useSelector((s: RootState) => s.project);
   const [, forceUpdate] = useState(0);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showCopilot, setShowCopilot] = useState(false);
   useKeyboardShortcuts();
 
   // Load from localStorage on mount
@@ -46,30 +47,43 @@ export default function Workspace() {
       {/* Top toolbar */}
       <header className="workspace-toolbar">
         <div className="workspace-logo">OpenClo</div>
-        <div className="undo-redo-toolbar" style={{ display: 'flex', gap: 4 }}>
+        <div className="toolbar-separator" />
+        <div className="undo-redo-toolbar">
           <button
-            className="toolbar-btn"
+            className="toolbar-btn undo-btn"
             onClick={handleUndo}
             disabled={!canUndo()}
             title="Undo (Ctrl+Z)"
-            style={{ fontSize: 16, padding: '2px 6px', opacity: canUndo() ? 1 : 0.3 }}
-          >↶</button>
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M4 7H12C13.105 7 14 7.895 14 9C14 10.105 13.105 11 12 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M6.5 4.5L4 7L6.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
           <button
-            className="toolbar-btn"
+            className="toolbar-btn redo-btn"
             onClick={handleRedo}
             disabled={!canRedo()}
             title="Redo (Ctrl+Shift+Z)"
-            style={{ fontSize: 16, padding: '2px 6px', opacity: canRedo() ? 1 : 0.3 }}
-          >↷</button>
+          >
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M12 7H4C2.895 7 2 7.895 2 9C2 10.105 2.895 11 4 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M9.5 4.5L12 7L9.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
         </div>
+        <div className="toolbar-separator" />
         <button
           className="toolbar-btn template-btn"
           onClick={() => setShowTemplates(true)}
           title="Pattern Templates"
-          style={{ fontSize: 13, padding: '4px 10px', background: 'var(--accent)', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 600 }}
         >
-          + Template
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M6 2V10M2 6H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          Templates
         </button>
+        <div className="toolbar-separator" />
         <div className="view-toggle">
           <button
             className={viewMode === '2d' ? 'active' : ''}
@@ -96,32 +110,48 @@ export default function Workspace() {
         {/* Left: 2D tools */}
         {viewMode !== '3d' && <Toolbar2D />}
 
-        {/* Viewports */}
-        <div className="viewports">
-          {(viewMode === '2d' || viewMode === 'split') && (
-            <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
-              <div className="viewport-label">PATTERN</div>
-              <PatternEditor />
-            </div>
-          )}
-          {viewMode === 'split' && <div className="viewport-divider" />}
-          {(viewMode === '3d' || viewMode === 'split') && (
-            <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
-              <div className="viewport-label">3D VIEW</div>
-              <Viewport3D />
-            </div>
-          )}
+        {/* Main content area */}
+        <div className="workspace-main">
+          {/* Viewports */}
+          <div className="viewports">
+            {(viewMode === '2d' || viewMode === 'split') && (
+              <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
+                <div className="viewport-label">PATTERN</div>
+                <PatternEditor />
+              </div>
+            )}
+            {viewMode === 'split' && <div className="viewport-divider" />}
+            {(viewMode === '3d' || viewMode === 'split') && (
+              <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
+                <div className="viewport-label">3D VIEW</div>
+                <Viewport3D />
+              </div>
+            )}
+          </div>
+
+          {/* Right: Properties panel */}
+          <PropertiesPanel />
         </div>
 
-        {/* Right: Properties panel */}
-        <PropertiesPanel />
+        {/* Copilot toggle */}
+        <div className={`copilot-toggle-bar ${showCopilot ? 'hidden' : ''}`}>
+          <button
+            className="copilot-toggle-btn"
+            onClick={() => setShowCopilot(true)}
+            title="AI Copilot (Ctrl+K)"
+          >
+            AI
+          </button>
+        </div>
+
+        {/* Copilot column */}
+        <div className={`copilot-column ${showCopilot ? 'expanded' : 'collapsed'}`}>
+          <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
+        </div>
       </div>
 
       {/* Template Library Modal */}
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
-
-      {/* AI Copilot */}
-      <CopilotPanel />
     </div>
   );
 }

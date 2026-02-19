@@ -1,18 +1,18 @@
 .toolbar2d {
-  width: 44px;
+  width: var(--toolbar2d-width);
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 0;
+  padding: 8px 4px;
   gap: 2px;
   flex-shrink: 0;
 }
 
 .tool-btn {
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -21,16 +21,19 @@
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.12s;
+  position: relative;
 }
 
 .tool-btn .tool-icon {
-  font-size: 16px;
   color: var(--text-secondary);
   line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .tool-btn:hover {
-  background: var(--bg-panel);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .tool-btn:hover .tool-icon {
@@ -38,9 +41,21 @@
 }
 
 .tool-btn.active {
-  background: var(--accent-dim);
+  background: none;
+}
+
+.tool-btn.active::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
 }
 
 .tool-btn.active .tool-icon {
-  color: var(--accent);
+  color: white;
 }

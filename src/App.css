@@ -21,9 +21,12 @@
   --border-light: #4a4a4a;
 
   /* ─── Spacing ─── */
-  --toolbar-height: 48px;
-  --panel-width: 280px;
+  --toolbar-height: 44px;
+  --panel-width: 300px;
   --divider-width: 4px;
+  --toolbar2d-width: 42px;
+  --copilot-width: 380px;
+  --copilot-toggle-width: 28px;
 
   /* ─── Typography ─── */
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;

@@ -4,14 +4,57 @@
   border-left: 1px solid var(--border);
   overflow-y: auto;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.properties-panel.collapsed {
+  width: 0;
+  border-left: none;
+  overflow: hidden;
+}
+
+.properties-panel.expanded {
+  width: var(--panel-width);
+}
+
+.panel-toggle-btn {
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 32px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-right: none;
+  border-radius: 6px 0 0 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  z-index: 10;
+}
+
+.panel-toggle-btn:hover {
+  background: var(--bg-panel);
+  color: var(--text-primary);
+}
+
+.panel-content {
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  height: 100%;
+  overflow-y: auto;
 }
 
 .panel-section {
-  padding: 12px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -19,13 +62,50 @@
   border-bottom: none;
 }
 
+.panel-section-header {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.panel-section-header:hover {
+  background: var(--bg-panel);
+  margin: 0 -12px;
+  padding-left: 12px;
+  padding-right: 12px;
+  border-radius: 6px;
+}
+
 .panel-title {
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 1.5px;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  margin-bottom: 10px;
+  font-family: 'Inter', sans-serif;
+}
+
+.panel-section-header svg {
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.panel-section-header svg.collapsed {
+  transform: rotate(-90deg);
+}
+
+.panel-section-header svg.expanded {
+  transform: rotate(0deg);
+}
+
+.panel-section-content {
+  padding-bottom: 12px;
 }
 
 .panel-field {
@@ -244,6 +324,32 @@ select.panel-input {
   background: rgba(231, 76, 60, 0.15);
 }
 
+/* Panel buttons */
+.panel-button-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.panel-icon-btn {
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.panel-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--accent);
+}
+
 /* Export buttons */
 .export-buttons {
   display: flex;
@@ -261,9 +367,50 @@ select.panel-input {
   cursor: pointer;
   transition: all 0.15s;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
 
 .export-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: var(--accent);
+}
+
+/* File and URL inputs with proper styling */
+.file-field {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+}
+
+.file-label {
+  font-size: 10px !important;
+  color: var(--text-muted) !important;
+}
+
+.file-status {
+  font-size: 10px !important;
+  color: var(--accent) !important;
+}
+
+.url-field {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 6px !important;
+  margin-top: 8px !important;
+}
+
+.url-label {
+  font-size: 10px !important;
+  color: var(--text-muted) !important;
+}
+
+.url-input {
+  width: 100% !important;
+}
+
+.measurements-section {
+  margin-top: 12px !important;
 }
