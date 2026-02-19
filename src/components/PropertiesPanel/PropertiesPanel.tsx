@@ -1,12 +1,12 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl } from '../../store/projectSlice';
-import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection } from '../../store/editorSlice';
+import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam } from '../../store/projectSlice';
+import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam } from '../../store/editorSlice';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
   const dispatch = useDispatch();
-  const { pieces, fabrics, avatar, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
+  const { pieces, seams, fabrics, avatar, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
 
@@ -79,6 +79,36 @@ export default function PropertiesPanel() {
             <label>Fabrics</label>
             <span>{fabrics.length}</span>
           </div>
+        </section>
+      )}
+
+      {/* Seams */}
+      {seams.length > 0 && (
+        <section className="panel-section">
+          <h3 className="panel-title">Seams ({seams.length})</h3>
+          {seams.map(seam => {
+            const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
+            const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
+            const isSelected = editor.selectedSeamId === seam.id;
+            return (
+              <div
+                key={seam.id}
+                className={`seam-item ${isSelected ? 'selected' : ''}`}
+                onClick={() => dispatch(selectSeam(seam.id))}
+              >
+                <span className="seam-label">
+                  {pA?.name || '?'} ↔ {pB?.name || '?'}
+                </span>
+                <span className="seam-type">{seam.type}</span>
+                <button
+                  className="seam-delete"
+                  onClick={(e) => { e.stopPropagation(); dispatch(removeSeam(seam.id)); }}
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
         </section>
       )}
 

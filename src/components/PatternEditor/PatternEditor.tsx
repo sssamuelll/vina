@@ -1,10 +1,11 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { addPiece, movePiece } from '../../store/projectSlice';
-import { selectPiece, clearSelection, setZoom2D, setPan2D } from '../../store/editorSlice';
-import { PatternPiece, PathCommand, Point2D } from '../../types/types';
+import { addPiece, movePiece, addSeam } from '../../store/projectSlice';
+import { selectPiece, clearSelection, setZoom2D, setPan2D, selectSeam } from '../../store/editorSlice';
+import { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
 import { usePenTool } from './usePenTool';
+import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
 import './PatternEditor.css';
 
 /** Convert PathCommand array to SVG path string */
@@ -19,7 +20,7 @@ const ANCHOR_RADIUS = 4;
 export default function PatternEditor() {
   const svgRef = useRef<SVGSVGElement>(null);
   const dispatch = useDispatch();
-  const { pieces } = useSelector((s: RootState) => s.project);
+  const { pieces, seams } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
   const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, gridSize } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
@@ -40,13 +41,21 @@ export default function PatternEditor() {
 
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete);
 
-  // Keyboard events for pen tool
+  const handleSeamComplete = useCallback((seam: Omit<Seam, 'id'>) => {
+    const fullSeam: Seam = { ...seam, id: `seam-${Date.now()}` };
+    dispatch(addSeam(fullSeam));
+    dispatch(selectSeam(fullSeam.id));
+  }, [dispatch]);
+
+  const seamTool = useSeamTool(zoom2D, pan2D, pieces, handleSeamComplete);
+
+  // Keyboard events for pen/seam tool
   useEffect(() => {
-    if (activeTool !== 'pen') return;
-    const handler = pen.handleKeyDown;
+    if (activeTool !== 'pen' && activeTool !== 'seam') return;
+    const handler = activeTool === 'pen' ? pen.handleKeyDown : seamTool.handleKeyDown;
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown]);
+  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown]);
 
   // Zoom with wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -84,6 +93,11 @@ export default function PatternEditor() {
 
     if (activeTool === 'pen') {
       pen.handleMouseDown(e);
+      return;
+    }
+
+    if (activeTool === 'seam') {
+      seamTool.handleMouseDown(e);
       return;
     }
 
@@ -143,7 +157,11 @@ export default function PatternEditor() {
     if (activeTool === 'pen') {
       pen.handleMouseMove(e);
     }
-  }, [activeTool, zoom2D, pen, dispatch]);
+
+    if (activeTool === 'seam') {
+      seamTool.handleMouseMove(e);
+    }
+  }, [activeTool, zoom2D, pen, seamTool, dispatch]);
 
   const handleMouseUp = useCallback(() => {
     panRef.current = null;
@@ -159,6 +177,7 @@ export default function PatternEditor() {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
       case 'select': return dragRef.current ? 'grabbing' : 'default';
+      case 'seam': return 'crosshair';
       case 'measure': return 'crosshair';
       default: return 'crosshair';
     }
@@ -293,6 +312,107 @@ export default function PatternEditor() {
             );
           })}
 
+          {/* ─── Seam connections ─── */}
+          {seams.map(seam => {
+            const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
+            const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
+            if (!pieceA || !pieceB) return null;
+            const epA = getEdgeEndpoints(pieceA.outline, seam.pieceA.edgeStart);
+            const epB = getEdgeEndpoints(pieceB.outline, seam.pieceB.edgeStart);
+            if (!epA || !epB) return null;
+            const midA = {
+              x: (epA.start.x + epA.end.x) / 2 + pieceA.position.x,
+              y: (epA.start.y + epA.end.y) / 2 + pieceA.position.y,
+            };
+            const midB = {
+              x: (epB.start.x + epB.end.x) / 2 + pieceB.position.x,
+              y: (epB.start.y + epB.end.y) / 2 + pieceB.position.y,
+            };
+            const isSelected = editor.selectedSeamId === seam.id;
+            return (
+              <g key={seam.id} className="seam-connection">
+                {/* Edge highlight on piece A */}
+                <line
+                  x1={epA.start.x + pieceA.position.x} y1={epA.start.y + pieceA.position.y}
+                  x2={epA.end.x + pieceA.position.x} y2={epA.end.y + pieceA.position.y}
+                  stroke={isSelected ? '#ff6b6b' : '#e74c3c'}
+                  strokeWidth={2.5 / zoom2D}
+                  strokeLinecap="round"
+                />
+                {/* Edge highlight on piece B */}
+                <line
+                  x1={epB.start.x + pieceB.position.x} y1={epB.start.y + pieceB.position.y}
+                  x2={epB.end.x + pieceB.position.x} y2={epB.end.y + pieceB.position.y}
+                  stroke={isSelected ? '#ff6b6b' : '#e74c3c'}
+                  strokeWidth={2.5 / zoom2D}
+                  strokeLinecap="round"
+                />
+                {/* Dashed line connecting midpoints */}
+                <line
+                  x1={midA.x} y1={midA.y}
+                  x2={midB.x} y2={midB.y}
+                  stroke={isSelected ? '#ff6b6b' : '#e74c3c'}
+                  strokeWidth={1 / zoom2D}
+                  strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
+                  opacity={0.6}
+                />
+                {/* Midpoint dots */}
+                <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} fill="#e74c3c" />
+                <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} fill="#e74c3c" />
+              </g>
+            );
+          })}
+
+          {/* ─── Seam tool: edge highlights ─── */}
+          {activeTool === 'seam' && (
+            <g className="seam-tool-wip">
+              {/* First selected edge */}
+              {seamTool.firstEdge && (() => {
+                const piece = pieces.find(p => p.id === seamTool.firstEdge!.pieceId);
+                if (!piece) return null;
+                const ep = getEdgeEndpoints(piece.outline, seamTool.firstEdge!.edgeIndex);
+                if (!ep) return null;
+                return (
+                  <line
+                    x1={ep.start.x + piece.position.x} y1={ep.start.y + piece.position.y}
+                    x2={ep.end.x + piece.position.x} y2={ep.end.y + piece.position.y}
+                    stroke="#2ecc71"
+                    strokeWidth={3 / zoom2D}
+                    strokeLinecap="round"
+                  />
+                );
+              })()}
+              {/* Hovered edge */}
+              {seamTool.hoveredEdge && (() => {
+                const piece = pieces.find(p => p.id === seamTool.hoveredEdge!.pieceId);
+                if (!piece) return null;
+                const ep = getEdgeEndpoints(piece.outline, seamTool.hoveredEdge!.edgeIndex);
+                if (!ep) return null;
+                return (
+                  <line
+                    x1={ep.start.x + piece.position.x} y1={ep.start.y + piece.position.y}
+                    x2={ep.end.x + piece.position.x} y2={ep.end.y + piece.position.y}
+                    stroke={seamTool.firstEdge ? '#3498db' : '#2ecc71'}
+                    strokeWidth={2.5 / zoom2D}
+                    strokeLinecap="round"
+                    opacity={0.7}
+                  />
+                );
+              })()}
+              {/* Guide line from first edge to hovered */}
+              {seamTool.firstEdge && seamTool.hoveredEdge && seamTool.firstEdge.pieceId !== seamTool.hoveredEdge.pieceId && (
+                <line
+                  x1={seamTool.firstEdge.midpoint.x} y1={seamTool.firstEdge.midpoint.y}
+                  x2={seamTool.hoveredEdge.midpoint.x} y2={seamTool.hoveredEdge.midpoint.y}
+                  stroke="#2ecc71"
+                  strokeWidth={1 / zoom2D}
+                  strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
+                  opacity={0.5}
+                />
+              )}
+            </g>
+          )}
+
           {/* ─── Pen tool: work-in-progress path ─── */}
           {activeTool === 'pen' && pen.nodes.length > 0 && (
             <g className="pen-wip">
@@ -394,6 +514,34 @@ export default function PatternEditor() {
             fontFamily="Inter, sans-serif"
           >
             Select the Pen tool (P) to draw pattern pieces
+          </text>
+        )}
+
+        {/* Seam tool hint */}
+        {activeTool === 'seam' && !seamTool.firstEdge && (
+          <text
+            x="50%"
+            y="50%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="rgba(0,0,0,0.2)"
+            fontSize="13"
+            fontFamily="Inter, sans-serif"
+          >
+            Click an edge on piece A · Then click an edge on piece B · Esc to cancel
+          </text>
+        )}
+        {activeTool === 'seam' && seamTool.firstEdge && (
+          <text
+            x="50%"
+            y="95%"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="rgba(46, 204, 113, 0.5)"
+            fontSize="12"
+            fontFamily="Inter, sans-serif"
+          >
+            Edge A selected — now click an edge on a different piece
           </text>
         )}
 

@@ -192,3 +192,54 @@ select.panel-input {
 .file-input::file-selector-button:hover {
   background: var(--border-light);
 }
+
+/* Seam items */
+.seam-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s;
+}
+
+.seam-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.seam-item.selected {
+  background: rgba(231, 76, 60, 0.15);
+}
+
+.seam-label {
+  flex: 1;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seam-type {
+  font-size: 9px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.seam-delete {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.seam-delete:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.15);
+}
