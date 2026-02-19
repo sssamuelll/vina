@@ -1,63 +1,10 @@
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid } from '@react-three/drei';
+import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import PieceMesh from './PieceMesh';
+import Mannequin from './Mannequin';
 import './Viewport3D.css';
-
-/** Placeholder mannequin */
-function Mannequin() {
-  const mat = <meshStandardMaterial color="#b8a99a" roughness={0.85} />;
-  return (
-    <group>
-      {/* Head */}
-      <mesh position={[0, 1.68, 0]}>
-        <sphereGeometry args={[0.11, 16, 16]} />
-        {mat}
-      </mesh>
-      {/* Neck */}
-      <mesh position={[0, 1.54, 0]}>
-        <cylinderGeometry args={[0.05, 0.06, 0.08, 12]} />
-        {mat}
-      </mesh>
-      {/* Torso upper */}
-      <mesh position={[0, 1.32, 0]}>
-        <capsuleGeometry args={[0.18, 0.28, 8, 16]} />
-        {mat}
-      </mesh>
-      {/* Torso lower */}
-      <mesh position={[0, 0.95, 0]}>
-        <capsuleGeometry args={[0.15, 0.2, 8, 16]} />
-        {mat}
-      </mesh>
-      {/* Hips */}
-      <mesh position={[0, 0.75, 0]}>
-        <capsuleGeometry args={[0.19, 0.1, 8, 16]} />
-        {mat}
-      </mesh>
-      {/* Left arm */}
-      <mesh position={[-0.28, 1.25, 0]} rotation={[0, 0, 0.15]}>
-        <capsuleGeometry args={[0.04, 0.5, 8, 12]} />
-        {mat}
-      </mesh>
-      {/* Right arm */}
-      <mesh position={[0.28, 1.25, 0]} rotation={[0, 0, -0.15]}>
-        <capsuleGeometry args={[0.04, 0.5, 8, 12]} />
-        {mat}
-      </mesh>
-      {/* Left leg */}
-      <mesh position={[-0.09, 0.38, 0]}>
-        <capsuleGeometry args={[0.065, 0.5, 8, 12]} />
-        {mat}
-      </mesh>
-      {/* Right leg */}
-      <mesh position={[0.09, 0.38, 0]}>
-        <capsuleGeometry args={[0.065, 0.5, 8, 12]} />
-        {mat}
-      </mesh>
-    </group>
-  );
-}
 
 /** Distribute pieces around the mannequin */
 function getPosition(index: number, total: number): [number, number, number] {
@@ -79,15 +26,16 @@ export default function Viewport3D() {
 
   return (
     <div className="viewport3d">
-      <Canvas camera={{ position: [0, 1.2, 2.5], fov: 45 }} shadows>
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[5, 5, 5]} intensity={0.7} castShadow />
-        <directionalLight position={[-3, 4, -2]} intensity={0.3} />
-        <hemisphereLight args={['#b1e1ff', '#b97a20', 0.2]} />
+      <Canvas camera={{ position: [0, 0.8, 2.8], fov: 35 }} shadows>
+        {/* Studio lighting */}
+        <ambientLight intensity={0.35} />
+        <directionalLight position={[3, 5, 4]} intensity={0.9} castShadow shadow-mapSize={1024} />
+        <directionalLight position={[-2, 3, -1]} intensity={0.25} />
+        <hemisphereLight args={['#dde4ee', '#8b7355', 0.25]} />
 
         <Mannequin />
 
-        {/* Render pattern pieces as 3D meshes */}
+        {/* Pattern pieces as 3D meshes */}
         {pieces.map((piece, i) => (
           <PieceMesh
             key={piece.id}
@@ -98,6 +46,15 @@ export default function Viewport3D() {
           />
         ))}
 
+        {/* Floor shadow */}
+        <ContactShadows
+          position={[0, 0, 0]}
+          opacity={0.4}
+          scale={3}
+          blur={2}
+          far={2}
+        />
+
         <Grid
           args={[10, 10]}
           cellSize={0.1}
@@ -106,16 +63,16 @@ export default function Viewport3D() {
           sectionSize={1}
           sectionThickness={1}
           sectionColor="#444"
-          fadeDistance={8}
-          position={[0, 0, 0]}
+          fadeDistance={6}
+          position={[0, -0.001, 0]}
         />
 
         <OrbitControls
           enableDamping
           dampingFactor={0.05}
-          minDistance={0.8}
-          maxDistance={6}
-          target={[0, 1, 0]}
+          minDistance={0.6}
+          maxDistance={5}
+          target={[0, 0.75, 0]}
         />
       </Canvas>
 
