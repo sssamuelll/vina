@@ -12,8 +12,8 @@
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 16px;
-  gap: 16px;
+  padding: 0 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -22,17 +22,23 @@
   font-weight: 500;
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
+  user-select: none;
 }
 
 .toolbar-separator {
   width: 1px;
-  height: 24px;
+  height: 20px;
   background: var(--border);
+  flex-shrink: 0;
+}
+
+.toolbar-spacer {
+  flex: 1;
 }
 
 .undo-redo-toolbar {
   display: flex;
-  gap: 4px;
+  gap: 2px;
 }
 
 .toolbar-btn {
@@ -48,12 +54,12 @@
 }
 
 .toolbar-btn:hover {
-  background: var(--bg-panel);
+  background: rgba(255,255,255,0.06);
   color: var(--text-primary);
 }
 
 .toolbar-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.25;
   cursor: default;
 }
 
@@ -68,8 +74,8 @@
 }
 
 .template-btn {
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: 5px 12px;
+  font-size: 12px;
   gap: 6px;
   border: 1px solid var(--border);
   font-weight: 500;
@@ -77,6 +83,21 @@
 
 .template-btn:hover {
   border-color: var(--accent);
+}
+
+/* Copilot button in toolbar */
+.copilot-toolbar-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  gap: 5px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+
+.copilot-toolbar-btn.active {
+  color: var(--accent);
+  background: var(--accent-dim);
+  border-color: rgba(74, 158, 255, 0.2);
 }
 
 .view-toggle {
@@ -108,24 +129,18 @@
   color: #fff;
 }
 
-/* ─── Body ─── */
+/* ─── Body: flex row, no overlap ─── */
 .workspace-body {
   flex: 1;
   display: flex;
   overflow: hidden;
-  position: relative;
 }
 
-.workspace-main {
+/* ─── Editors (viewports) ─── */
+.editors {
   flex: 1;
   display: flex;
-  overflow: hidden;
-}
-
-/* ─── Viewports ─── */
-.viewports {
-  flex: 1;
-  display: flex;
+  min-width: 0;
   position: relative;
 }
 
@@ -134,13 +149,8 @@
   overflow: hidden;
 }
 
-.viewport.full {
-  width: 100%;
-}
-
-.viewport.half {
-  width: 50%;
-}
+.viewport.full { width: 100%; }
+.viewport.half { width: 50%; }
 
 .viewport-label {
   position: absolute;
@@ -155,13 +165,8 @@
   pointer-events: none;
 }
 
-.viewport-2d {
-  background: var(--bg-canvas);
-}
-
-.viewport-3d {
-  background: var(--bg-primary);
-}
+.viewport-2d { background: var(--bg-canvas); }
+.viewport-3d { background: var(--bg-primary); }
 
 .viewport-divider {
   width: var(--divider-width);
@@ -174,63 +179,13 @@
   background: var(--accent);
 }
 
-/* ─── Copilot Toggle Bar ─── */
-.copilot-toggle-bar {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: var(--copilot-toggle-width);
-  height: 100%;
-  background: var(--bg-secondary);
-  border-left: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.copilot-toggle-bar.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.copilot-toggle-btn {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  writing-mode: vertical-lr;
-  text-orientation: mixed;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  cursor: pointer;
-  padding: 8px 4px;
-  border-radius: 6px;
-  transition: all 0.15s;
-}
-
-.copilot-toggle-btn:hover {
-  color: var(--accent);
-  background: var(--accent-dim);
-}
-
 /* ─── Copilot Column ─── */
 .copilot-column {
-  width: var(--copilot-width);
-  height: 100%;
-  transition: all 0.2s ease;
-  background: var(--bg-panel);
-  border-left: 1px solid var(--border);
-  overflow: hidden;
+  width: 360px;
   flex-shrink: 0;
-}
-
-.copilot-column.collapsed {
-  width: 0;
-  border-left: none;
-}
-
-.copilot-column.expanded {
-  width: var(--copilot-width);
+  border-left: 1px solid var(--border);
+  background: var(--bg-panel);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }

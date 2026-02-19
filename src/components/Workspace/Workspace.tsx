@@ -14,6 +14,23 @@ import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO'
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import './Workspace.css';
 
+/**
+ * Layout (VS Code style):
+ * ┌──────────────────────────────────────────────────────┐
+ * │ Toolbar                                              │
+ * ├────┬─────────────────────────┬──────────┬────────────┤
+ * │Act.│      Editors            │Properties│  Copilot   │
+ * │Bar │  (2D / 3D / Split)      │  Panel   │  (toggle)  │
+ * │    │                         │          │            │
+ * └────┴─────────────────────────┴──────────┴────────────┘
+ * 
+ * Everything is flex — no overlapping, no absolute.
+ * Activity Bar (tools) = always visible, 42px
+ * Properties = collapsible, 280px
+ * Copilot = collapsible, 360px
+ * Editors = flex: 1 (fills remaining)
+ */
+
 export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
@@ -23,61 +40,53 @@ export default function Workspace() {
   const [showCopilot, setShowCopilot] = useState(false);
   useKeyboardShortcuts();
 
-  // Load from localStorage on mount
   useEffect(() => {
     const saved = loadFromLocalStorage();
-    if (saved) {
-      dispatch(loadProject(saved));
-    }
+    if (saved) dispatch(loadProject(saved));
   }, [dispatch]);
 
-  // Auto-save every 30s
   useEffect(() => {
-    const interval = setInterval(() => {
-      saveToLocalStorage(project);
-    }, 30000);
+    const interval = setInterval(() => saveToLocalStorage(project), 30000);
     return () => clearInterval(interval);
   }, [project]);
 
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
   const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
 
+  // Ctrl+K to toggle copilot
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowCopilot(v => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
   return (
     <div className="workspace">
-      {/* Top toolbar */}
+      {/* ─── Top Toolbar ─── */}
       <header className="workspace-toolbar">
         <div className="workspace-logo">OpenClo</div>
         <div className="toolbar-separator" />
         <div className="undo-redo-toolbar">
-          <button
-            className="toolbar-btn undo-btn"
-            onClick={handleUndo}
-            disabled={!canUndo()}
-            title="Undo (Ctrl+Z)"
-          >
+          <button className="toolbar-btn undo-btn" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 7H12C13.105 7 14 7.895 14 9C14 10.105 13.105 11 12 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M4 7H12C13.1 7 14 7.9 14 9C14 10.1 13.1 11 12 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <path d="M6.5 4.5L4 7L6.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
-          <button
-            className="toolbar-btn redo-btn"
-            onClick={handleRedo}
-            disabled={!canRedo()}
-            title="Redo (Ctrl+Shift+Z)"
-          >
+          <button className="toolbar-btn redo-btn" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M12 7H4C2.895 7 2 7.895 2 9C2 10.105 2.895 11 4 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M12 7H4C2.9 7 2 7.9 2 9C2 10.1 2.9 11 4 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
               <path d="M9.5 4.5L12 7L9.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </button>
         </div>
         <div className="toolbar-separator" />
-        <button
-          className="toolbar-btn template-btn"
-          onClick={() => setShowTemplates(true)}
-          title="Pattern Templates"
-        >
+        <button className="toolbar-btn template-btn" onClick={() => setShowTemplates(true)} title="Pattern Templates">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path d="M6 2V10M2 6H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
@@ -85,72 +94,60 @@ export default function Workspace() {
         </button>
         <div className="toolbar-separator" />
         <div className="view-toggle">
-          <button
-            className={viewMode === '2d' ? 'active' : ''}
-            onClick={() => dispatch(setViewMode('2d'))}
-          >
-            2D
-          </button>
-          <button
-            className={viewMode === 'split' ? 'active' : ''}
-            onClick={() => dispatch(setViewMode('split'))}
-          >
-            Split
-          </button>
-          <button
-            className={viewMode === '3d' ? 'active' : ''}
-            onClick={() => dispatch(setViewMode('3d'))}
-          >
-            3D
-          </button>
+          {(['2d', 'split', '3d'] as const).map(v => (
+            <button key={v} className={viewMode === v ? 'active' : ''} onClick={() => dispatch(setViewMode(v))}>
+              {v === '2d' ? '2D' : v === 'split' ? 'Split' : '3D'}
+            </button>
+          ))}
         </div>
+
+        {/* Right side of toolbar */}
+        <div className="toolbar-spacer" />
+        <button
+          className={`toolbar-btn copilot-toolbar-btn ${showCopilot ? 'active' : ''}`}
+          onClick={() => setShowCopilot(v => !v)}
+          title="AI Copilot (Ctrl+K)"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 2L10 6H14L11 9L12 14L8 11L4 14L5 9L2 6H6L8 2Z" stroke="currentColor" strokeWidth="1.2" fill={showCopilot ? 'currentColor' : 'none'}/>
+          </svg>
+          Copilot
+        </button>
       </header>
 
+      {/* ─── Body: Activity Bar | Editors | Properties | Copilot ─── */}
       <div className="workspace-body">
-        {/* Left: 2D tools */}
+        {/* Activity Bar (left tools) */}
         {viewMode !== '3d' && <Toolbar2D />}
 
-        {/* Main content area */}
-        <div className="workspace-main">
-          {/* Viewports */}
-          <div className="viewports">
-            {(viewMode === '2d' || viewMode === 'split') && (
-              <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
-                <div className="viewport-label">PATTERN</div>
-                <PatternEditor />
-              </div>
-            )}
-            {viewMode === 'split' && <div className="viewport-divider" />}
-            {(viewMode === '3d' || viewMode === 'split') && (
-              <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
-                <div className="viewport-label">3D VIEW</div>
-                <Viewport3D />
-              </div>
-            )}
+        {/* Editors (viewports) */}
+        <div className="editors">
+          {(viewMode === '2d' || viewMode === 'split') && (
+            <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
+              <div className="viewport-label">PATTERN</div>
+              <PatternEditor />
+            </div>
+          )}
+          {viewMode === 'split' && <div className="viewport-divider" />}
+          {(viewMode === '3d' || viewMode === 'split') && (
+            <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
+              <div className="viewport-label">3D VIEW</div>
+              <Viewport3D />
+            </div>
+          )}
+        </div>
+
+        {/* Properties Panel (right sidebar) */}
+        <PropertiesPanel />
+
+        {/* Copilot Panel (far right, toggleable) */}
+        {showCopilot && (
+          <div className="copilot-column">
+            <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
           </div>
-
-          {/* Right: Properties panel */}
-          <PropertiesPanel />
-        </div>
-
-        {/* Copilot toggle */}
-        <div className={`copilot-toggle-bar ${showCopilot ? 'hidden' : ''}`}>
-          <button
-            className="copilot-toggle-btn"
-            onClick={() => setShowCopilot(true)}
-            title="AI Copilot (Ctrl+K)"
-          >
-            AI
-          </button>
-        </div>
-
-        {/* Copilot column */}
-        <div className={`copilot-column ${showCopilot ? 'expanded' : 'collapsed'}`}>
-          <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
-        </div>
+        )}
       </div>
 
-      {/* Template Library Modal */}
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
     </div>
   );
