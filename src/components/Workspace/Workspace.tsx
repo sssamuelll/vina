@@ -31,6 +31,16 @@ import './Workspace.css';
  * Editors = flex: 1 (fills remaining)
  */
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [breakpoint]);
+  return isMobile;
+}
+
 export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
@@ -38,6 +48,7 @@ export default function Workspace() {
   const [, forceUpdate] = useState(0);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showCopilot, setShowCopilot] = useState(false);
+  const isMobile = useIsMobile();
   useKeyboardShortcuts();
 
   useEffect(() => {
@@ -64,6 +75,19 @@ export default function Workspace() {
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  if (isMobile) {
+    return (
+      <div className="workspace mobile">
+        <header className="workspace-toolbar mobile-toolbar">
+          <div className="workspace-logo">OpenClo</div>
+        </header>
+        <div className="mobile-chat">
+          <CopilotPanel isColumn={true} />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="workspace">

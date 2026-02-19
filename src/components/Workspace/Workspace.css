@@ -179,6 +179,27 @@
   background: var(--accent);
 }
 
+/* ─── Mobile: Chat-only ─── */
+.workspace.mobile {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.mobile-toolbar {
+  height: 48px;
+  min-height: 48px;
+  justify-content: center;
+}
+
+.mobile-chat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 /* ─── Copilot Column ─── */
 .copilot-column {
   width: 360px;

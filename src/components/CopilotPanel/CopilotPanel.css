@@ -352,3 +352,63 @@
 
 /* Legacy floating mode (unused but kept for compat) */
 .copilot-toggle { display: none; }
+
+/* ─── Mobile ─── */
+@media (max-width: 768px) {
+  .copilot-panel {
+    border-left: none;
+  }
+
+  .copilot-header {
+    padding: 10px 16px;
+  }
+
+  .copilot-messages {
+    padding: 16px;
+  }
+
+  .copilot-input-area {
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .copilot-input {
+    font-size: 16px;
+    padding: 10px 14px;
+    border-radius: 20px;
+  }
+
+  .copilot-send {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    font-size: 16px;
+  }
+
+  .copilot-msg-content {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .copilot-empty {
+    padding: 48px 24px;
+  }
+
+  .copilot-empty-title {
+    font-size: 18px;
+  }
+
+  .copilot-empty-hint {
+    font-size: 13px;
+  }
+
+  .copilot-setup-btn {
+    font-size: 14px;
+    padding: 10px 20px;
+  }
+
+  .copilot-suggestion {
+    font-size: 13px;
+    padding: 8px 14px;
+  }
+}
