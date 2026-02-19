@@ -9,6 +9,24 @@
 
 import { AgentConfig, CopilotContext, CopilotResponse, DEFAULT_SYSTEM_PROMPT } from './protocol';
 
+// ─── Server-side Agent (via local server API) ───
+
+export async function sendViaServer(context: CopilotContext): Promise<CopilotResponse> {
+  const baseUrl = window.location.origin;
+  const response = await fetch(`${baseUrl}/api/copilot`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ context }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Server error ${response.status}: ${text}`);
+  }
+
+  return response.json();
+}
+
 // ─── HTTP Agent ───
 
 async function sendHTTP(config: AgentConfig, context: CopilotContext): Promise<CopilotResponse> {
