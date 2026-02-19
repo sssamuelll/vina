@@ -8,7 +8,7 @@ import { usePenTool } from './usePenTool';
 import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
-import { useNodeEditor, EditableNode, NodeRef } from './useNodeEditor';
+import { useNodeEditor, NodeRef } from './useNodeEditor';
 import { useMeasureTool } from './useMeasureTool';
 import './PatternEditor.css';
 
@@ -649,7 +649,6 @@ export default function PatternEditor() {
               {measureTool.measurements.map(m => {
                 const mx = (m.startPoint.x + m.endPoint.x) / 2;
                 const my = (m.startPoint.y + m.endPoint.y) / 2;
-                const angle = Math.atan2(m.endPoint.y - m.startPoint.y, m.endPoint.x - m.startPoint.x) * 180 / Math.PI;
                 const label = measureTool.formatDistance(m.distance);
                 return (
                   <g key={m.id}>

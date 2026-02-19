@@ -283,7 +283,7 @@ export function generateSkirtBack(m: BodyMeasurements, lengthCm = 60): PatternPi
 // PANTS BLOCK (basic trouser)
 // ═══════════════════════════════════════════════════════
 
-export function generatePantsFront(m: BodyMeasurements, lengthCm?: number): PatternPiece {
+export function generatePantsFront(m: BodyMeasurements, _lengthCm?: number): PatternPiece {
   const waistQ = mm(m.waist) / 4 + 5;
   const hipQ = mm(m.hips) / 4 + 5;
   const inseamL = mm(m.inseam);
@@ -370,7 +370,6 @@ export function generateCollar(m: BodyMeasurements, standH = 3, collarH = 5): Pa
   const halfNeck = mm(d.neckCirc) / 2 + 10;
   const standHmm = mm(standH);
   const collarHmm = mm(collarH);
-  const totalH = standHmm + collarHmm;
 
   const outline: PathCommand[] = [
     M(0, standHmm),

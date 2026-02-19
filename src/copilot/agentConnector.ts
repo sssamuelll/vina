@@ -106,6 +106,12 @@ async function sendWS(config: AgentConfig, context: CopilotContext): Promise<Cop
   });
 }
 
+/** Strip id/createdAt/updatedAt from a generated piece for create_piece command */
+function stripPiece(p: any): Omit<import('../types/types').PatternPiece, 'id' | 'createdAt' | 'updatedAt'> {
+  const { id, createdAt, updatedAt, ...rest } = p;
+  return rest;
+}
+
 // ─── Built-in Agent (offline, template-based) ───
 
 async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promise<CopilotResponse> {
@@ -120,8 +126,8 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
     return {
       message: `Generated bodice block (front + back) for ${m.chest}cm chest, ${m.waist}cm waist.`,
       commands: [
-        { type: 'create_piece', piece: { ...back, id: undefined as any } },
-        { type: 'create_piece', piece: { ...front, id: undefined as any } },
+        { type: 'create_piece', piece: stripPiece(back) },
+        { type: 'create_piece', piece: stripPiece(front) },
       ],
     };
   }
@@ -133,7 +139,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
     return {
       message: `Generated sleeve for ${m.armLength}cm arm length.`,
       commands: [
-        { type: 'create_piece', piece: { ...sleeve, id: undefined as any } },
+        { type: 'create_piece', piece: stripPiece(sleeve) },
       ],
     };
   }
@@ -146,8 +152,8 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
     return {
       message: `Generated A-line skirt (front + back) for ${m.waist}cm waist, ${m.hips}cm hips.`,
       commands: [
-        { type: 'create_piece', piece: { ...front, id: undefined as any } },
-        { type: 'create_piece', piece: { ...back, id: undefined as any } },
+        { type: 'create_piece', piece: stripPiece(front) },
+        { type: 'create_piece', piece: stripPiece(back) },
       ],
     };
   }
@@ -160,8 +166,8 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
     return {
       message: `Generated trouser block (front + back) for ${m.waist}cm waist, ${m.inseam}cm inseam.`,
       commands: [
-        { type: 'create_piece', piece: { ...front, id: undefined as any } },
-        { type: 'create_piece', piece: { ...back, id: undefined as any } },
+        { type: 'create_piece', piece: stripPiece(front) },
+        { type: 'create_piece', piece: stripPiece(back) },
       ],
     };
   }
@@ -173,7 +179,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
     return {
       message: `Generated shirt collar.`,
       commands: [
-        { type: 'create_piece', piece: { ...collar, id: undefined as any } },
+        { type: 'create_piece', piece: stripPiece(collar) },
       ],
     };
   }
@@ -184,7 +190,6 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
     const piece = context.project.pieces.find(p => p.id === selectedId);
 
     if (piece && (msg.includes('longer') || msg.includes('más largo') || msg.includes('alargar'))) {
-      const amount = extractNumber(msg) || 20; // default 20mm
       return {
         message: `I'll need an AI agent connected to modify piece outlines. Connect one via Settings → Agent Configuration.`,
         commands: [],
@@ -205,13 +210,6 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
   };
 }
 
-function extractNumber(text: string): number | null {
-  const match = text.match(/(\d+)\s*(mm|cm|milímetro|centímetro)?/);
-  if (!match) return null;
-  const n = parseInt(match[1]);
-  if (match[2] === 'cm' || match[2] === 'centímetro') return n * 10;
-  return n;
-}
 
 // ─── Response Validation ───
 
