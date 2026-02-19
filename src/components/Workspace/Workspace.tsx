@@ -1,23 +1,64 @@
+import { useEffect, useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { setViewMode } from '../../store/editorSlice';
+import { setViewMode, undo, redo } from '../../store/editorSlice';
+import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
+import { canUndo, canRedo } from '../../store/undoMiddleware';
 import './Workspace.css';
 
 export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
+  const project = useSelector((s: RootState) => s.project);
+  const [, forceUpdate] = useState(0);
   useKeyboardShortcuts();
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const saved = loadFromLocalStorage();
+    if (saved) {
+      dispatch(loadProject(saved));
+    }
+  }, [dispatch]);
+
+  // Auto-save every 30s
+  useEffect(() => {
+    const interval = setInterval(() => {
+      saveToLocalStorage(project);
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [project]);
+
+  const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
+  const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
 
   return (
     <div className="workspace">
       {/* Top toolbar */}
       <header className="workspace-toolbar">
         <div className="workspace-logo">OpenClo</div>
+        <div className="undo-redo-toolbar" style={{ display: 'flex', gap: 4 }}>
+          <button
+            className="toolbar-btn"
+            onClick={handleUndo}
+            disabled={!canUndo()}
+            title="Undo (Ctrl+Z)"
+            style={{ fontSize: 16, padding: '2px 6px', opacity: canUndo() ? 1 : 0.3 }}
+          >↶</button>
+          <button
+            className="toolbar-btn"
+            onClick={handleRedo}
+            disabled={!canRedo()}
+            title="Redo (Ctrl+Shift+Z)"
+            style={{ fontSize: 16, padding: '2px 6px', opacity: canRedo() ? 1 : 0.3 }}
+          >↷</button>
+        </div>
         <div className="view-toggle">
           <button
             className={viewMode === '2d' ? 'active' : ''}

@@ -8,6 +8,7 @@ import { usePenTool } from './usePenTool';
 import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
+import { useNodeEditor, EditableNode, NodeRef } from './useNodeEditor';
 import './PatternEditor.css';
 
 /** Convert PathCommand array to SVG path string */
@@ -63,13 +64,20 @@ export default function PatternEditor() {
 
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
 
-  // Keyboard events for pen/seam tool
+  // Node editor (double-click to edit nodes)
+  const nodeEditor = useNodeEditor(zoom2D, pan2D);
+
+  // Keyboard events for pen/seam/node-editor
   useEffect(() => {
-    if (activeTool !== 'pen' && activeTool !== 'seam') return;
-    const handler = activeTool === 'pen' ? pen.handleKeyDown : seamTool.handleKeyDown;
+    const handlers: ((e: KeyboardEvent) => void)[] = [];
+    if (activeTool === 'pen') handlers.push(pen.handleKeyDown);
+    if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
+    if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
+    if (handlers.length === 0) return;
+    const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown]);
+  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown]);
 
   // Zoom with wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -95,6 +103,16 @@ export default function PatternEditor() {
   // Pan with middle mouse / hand tool
   const panRef = useRef<{ startMouse: Point2D; startPan: Point2D } | null>(null);
 
+  // Double-click handler for entering node edit mode
+  const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (activeTool !== 'select') return;
+    const target = e.target as SVGElement;
+    const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
+    if (pieceId) {
+      nodeEditor.enterNodeEdit(pieceId);
+    }
+  }, [activeTool, nodeEditor]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Middle mouse = pan always
     if (e.button === 1) {
@@ -103,6 +121,12 @@ export default function PatternEditor() {
         startPan: { ...pan2D },
       };
       return;
+    }
+
+    // Node editor takes priority when active
+    if (nodeEditor.isEditing && activeTool === 'select') {
+      const handled = nodeEditor.handleMouseDown(e);
+      if (handled) return;
     }
 
     if (activeTool === 'pen') {
@@ -141,7 +165,6 @@ export default function PatternEditor() {
         dispatch(selectPiece(pieceId));
         const piece = pieces.find(p => p.id === pieceId);
         if (piece) {
-          
           dragRef.current = {
             pieceId,
             startMouse: { x: e.clientX, y: e.clientY },
@@ -152,7 +175,7 @@ export default function PatternEditor() {
         dispatch(clearSelection());
       }
     }
-  }, [activeTool, pan2D, pen, dispatch, pieces]);
+  }, [activeTool, pan2D, pen, dispatch, pieces, nodeEditor]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     // Panning
@@ -176,6 +199,12 @@ export default function PatternEditor() {
         y: dragRef.current.startPos.y + dy,
       }));
       return;
+    }
+
+    // Node editor
+    if (nodeEditor.isEditing && activeTool === 'select') {
+      const handled = nodeEditor.handleMouseMove(e);
+      if (handled) return;
     }
 
     if (activeTool === 'pen') {
@@ -204,7 +233,10 @@ export default function PatternEditor() {
     if (activeTool === 'grainline') {
       grainlineTool.handleMouseUp();
     }
-  }, [activeTool, pen, grainlineTool]);
+    if (nodeEditor.isEditing) {
+      nodeEditor.handleMouseUp();
+    }
+  }, [activeTool, pen, grainlineTool, nodeEditor]);
 
   // Cursor based on tool
   const getCursor = () => {
@@ -233,6 +265,7 @@ export default function PatternEditor() {
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
         onContextMenu={e => e.preventDefault()}
       >
@@ -588,6 +621,75 @@ export default function PatternEditor() {
             </g>
           )}
         </g>
+
+        {/* ─── Node Editor: editable anchor points & handles ─── */}
+          {nodeEditor.isEditing && nodeEditor.editingPieceId && (() => {
+            const piece = pieces.find(p => p.id === nodeEditor.editingPieceId);
+            if (!piece) return null;
+            const isNodeSelected = (ref: NodeRef) =>
+              nodeEditor.selectedNode &&
+              nodeEditor.selectedNode.commandIndex === ref.commandIndex &&
+              nodeEditor.selectedNode.pointType === ref.pointType;
+            const isNodeHovered = (ref: NodeRef) =>
+              nodeEditor.hoveredNode &&
+              nodeEditor.hoveredNode.commandIndex === ref.commandIndex &&
+              nodeEditor.hoveredNode.pointType === ref.pointType;
+
+            return (
+              <g className="node-editor" transform={`translate(${piece.position.x}, ${piece.position.y})`}>
+                {nodeEditor.nodes.map((node, i) => (
+                  <g key={i}>
+                    {/* Control handle lines + circles */}
+                    {node.cp1 && (
+                      <>
+                        <line
+                          x1={node.position.x} y1={node.position.y}
+                          x2={node.cp1.x} y2={node.cp1.y}
+                          stroke="rgba(255, 107, 107, 0.5)"
+                          strokeWidth={0.8 / zoom2D}
+                        />
+                        <rect
+                          x={node.cp1.x - 3.5 / zoom2D}
+                          y={node.cp1.y - 3.5 / zoom2D}
+                          width={7 / zoom2D}
+                          height={7 / zoom2D}
+                          fill={isNodeSelected({ ...node.ref, pointType: 'cp2' }) ? '#ff6b6b' : '#fff'}
+                          stroke="#ff6b6b"
+                          strokeWidth={1 / zoom2D}
+                          style={{ cursor: 'move' }}
+                          rx={1 / zoom2D}
+                        />
+                      </>
+                    )}
+
+                    {/* Anchor point */}
+                    <circle
+                      cx={node.position.x}
+                      cy={node.position.y}
+                      r={4.5 / zoom2D}
+                      fill={isNodeSelected(node.ref) ? '#ffd700' : isNodeHovered(node.ref) ? '#6bb3ff' : '#4a9eff'}
+                      stroke="#fff"
+                      strokeWidth={1.2 / zoom2D}
+                      style={{ cursor: 'move' }}
+                    />
+                  </g>
+                ))}
+              </g>
+            );
+          })()}
+        </g>
+
+        {/* Node editor hint */}
+        {nodeEditor.isEditing && (
+          <text
+            x="50%" y="98%"
+            textAnchor="middle" dominantBaseline="auto"
+            fill="rgba(255, 215, 0, 0.5)"
+            fontSize="11" fontFamily="Inter, sans-serif"
+          >
+            Editing nodes — Drag to move · Esc to exit
+          </text>
+        )}
 
         {/* Empty state */}
         {pieces.length === 0 && activeTool !== 'pen' && (

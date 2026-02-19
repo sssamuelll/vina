@@ -56,6 +56,9 @@ const projectSlice = createSlice({
   name: 'project',
   initialState,
   reducers: {
+    restoreState(_state, action: PayloadAction<any>) {
+      return action.payload;
+    },
     loadProject(state, action: PayloadAction<OpenCloProject>) {
       const p = action.payload;
       state.id = p.id;
@@ -158,7 +161,7 @@ const projectSlice = createSlice({
 });
 
 export const {
-  loadProject, setProjectName,
+  restoreState, loadProject, setProjectName,
   addPiece, updatePiece, removePiece, movePiece, rotatePiece, addInternalLine, setInternalLine,
   addSeam, removeSeam,
   addFabric, updateFabric,

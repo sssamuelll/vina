@@ -1,16 +1,21 @@
+import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam } from '../../store/projectSlice';
-import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam } from '../../store/editorSlice';
+import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam, setProjectName, loadProject } from '../../store/projectSlice';
+import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
+import { downloadProjectFile, uploadProjectFile } from '../../utils/projectIO';
+import { canUndo, canRedo } from '../../store/undoMiddleware';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
   const dispatch = useDispatch();
-  const { pieces, seams, fabrics, avatar, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
+  const project = useSelector((s: RootState) => s.project);
+  const { pieces, seams, fabrics, avatar, avatarMode, avatarModelUrl, name: projectName, isDirty } = project;
   const editor = useSelector((s: RootState) => s.editor);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
+  const [, forceUpdate] = useState(0);
 
   const handleDeletePiece = () => {
     if (selectedPiece) {
@@ -19,8 +24,58 @@ export default function PropertiesPanel() {
     }
   };
 
+  const handleSave = useCallback(() => {
+    downloadProjectFile(project);
+  }, [project]);
+
+  const handleLoad = useCallback(async () => {
+    try {
+      const proj = await uploadProjectFile();
+      dispatch(loadProject(proj));
+    } catch { /* cancelled */ }
+  }, [dispatch]);
+
+  const handleNew = useCallback(() => {
+    if (isDirty && !window.confirm('You have unsaved changes. Create new project?')) return;
+    dispatch(loadProject({
+      id: 'new-project-' + Date.now(),
+      name: 'Untitled Project',
+      pieces: [],
+      seams: [],
+      fabrics: [{ id: 'default-cotton', name: 'Cotton', color: '#e8e4df', weight: 150, stretch: 0.05, stiffness: 0.4, friction: 0.5 }],
+      avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 170, chest: 90, waist: 70, hips: 95, shoulder: 40, armLength: 60, inseam: 80 } },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }));
+  }, [dispatch, isDirty]);
+
+  const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
+  const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
+
   return (
     <div className="properties-panel">
+      {/* Project Management */}
+      <section className="panel-section">
+        <h3 className="panel-title">Project</h3>
+        <div className="panel-field">
+          <label>Name</label>
+          <input
+            type="text"
+            className="panel-input"
+            value={projectName}
+            onChange={e => dispatch(setProjectName(e.target.value))}
+          />
+        </div>
+        <div className="export-buttons" style={{ marginTop: 8 }}>
+          <button className="export-btn" onClick={handleSave} title="Save project file">💾 Save</button>
+          <button className="export-btn" onClick={handleLoad} title="Load project file">📂 Load</button>
+          <button className="export-btn" onClick={handleNew} title="New project">📄 New</button>
+        </div>
+        <div className="export-buttons" style={{ marginTop: 4 }}>
+          <button className="export-btn" onClick={handleUndo} disabled={!canUndo()} style={{ opacity: canUndo() ? 1 : 0.3 }} title="Undo">↶ Undo</button>
+          <button className="export-btn" onClick={handleRedo} disabled={!canRedo()} style={{ opacity: canRedo() ? 1 : 0.3 }} title="Redo">↷ Redo</button>
+        </div>
+      </section>
       {/* Piece properties */}
       {selectedPiece ? (
         <section className="panel-section">

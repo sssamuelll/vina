@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { setActiveTool, clearSelection } from '../store/editorSlice';
+import { setActiveTool, clearSelection, undo, redo } from '../store/editorSlice';
 import { removePiece } from '../store/projectSlice';
 import { Tool2D } from '../types/types';
 
@@ -30,6 +30,18 @@ export function useKeyboardShortcuts() {
       if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPieceIds.length > 0) {
         selectedPieceIds.forEach(id => dispatch(removePiece(id)));
         dispatch(clearSelection());
+        return;
+      }
+
+      // Undo/Redo
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        dispatch(undo());
+        return;
+      }
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'z' && e.shiftKey || e.key === 'y')) {
+        e.preventDefault();
+        dispatch(redo());
         return;
       }
 

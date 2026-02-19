@@ -65,6 +65,9 @@ const editorSlice = createSlice({
     toggleSimulation(state) {
       state.simulationRunning = !state.simulationRunning;
     },
+    // These are intercepted by undoMiddleware — they never actually modify editor state
+    undo() {},
+    redo() {},
   },
 });
 
@@ -74,6 +77,7 @@ export const {
   setZoom2D, setPan2D,
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, setGridSize,
   toggleSimulation,
+  undo, redo,
 } = editorSlice.actions;
 
 export default editorSlice.reducer;
