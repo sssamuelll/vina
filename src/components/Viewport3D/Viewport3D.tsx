@@ -1,4 +1,4 @@
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import { useSelector } from 'react-redux';
@@ -26,15 +26,8 @@ export default function Viewport3D() {
   const { pieces, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
   const { simulationRunning, selectedPieceIds } = useSelector((s: RootState) => s.editor);
 
-  // Delay visibility so Three.js Canvas can calculate correct aspect ratio before showing
-  const [ready, setReady] = useState(false);
-  useEffect(() => {
-    const timer = setTimeout(() => setReady(true), 150);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
-    <div className="viewport3d" style={{ opacity: ready ? 1 : 0, transition: 'opacity 0.2s ease' }}>
+    <div className="viewport3d">
       <Canvas camera={{ position: [0, 0.8, 2.8], fov: 35 }} shadows>
         {/* Studio lighting */}
         <ambientLight intensity={0.35} />

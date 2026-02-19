@@ -170,10 +170,22 @@
   background: var(--border);
   cursor: col-resize;
   flex-shrink: 0;
+  transition: background 0.15s ease;
+  position: relative;
 }
 
 .viewport-divider:hover {
   background: var(--accent);
+}
+
+/* Wider hit area for easier grabbing */
+.viewport-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
 }
 
 /* ─── Mobile: Chat-only ─── */
@@ -216,8 +228,8 @@
 }
 
 /* ─── Viewports ─── */
-.viewport.full { width: 100%; }
-.viewport.half { width: 50%; }
+.viewport.full { flex: 1; }
+.viewport.half { flex-shrink: 0; }
 
 /* ─── Copilot Column (slide in/out from right) ─── */
 .copilot-column {

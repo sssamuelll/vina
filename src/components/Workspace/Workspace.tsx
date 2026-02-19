@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setViewMode, undo, redo } from '../../store/editorSlice';
@@ -13,23 +13,6 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import './Workspace.css';
-
-/**
- * Layout (VS Code style):
- * ┌──────────────────────────────────────────────────────┐
- * │ Toolbar                                              │
- * ├────┬─────────────────────────┬──────────┬────────────┤
- * │Act.│      Editors            │Properties│  Copilot   │
- * │Bar │  (2D / 3D / Split)      │  Panel   │  (toggle)  │
- * │    │                         │          │            │
- * └────┴─────────────────────────┴──────────┴────────────┘
- * 
- * Everything is flex — no overlapping, no absolute.
- * Activity Bar (tools) = always visible, 42px
- * Properties = collapsible, 280px
- * Copilot = collapsible, 360px
- * Editors = flex: 1 (fills remaining)
- */
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
@@ -50,6 +33,52 @@ export default function Workspace() {
   const [showCopilot, setShowCopilot] = useState(false);
   const isMobile = useIsMobile();
   useKeyboardShortcuts();
+
+  // ─── Split ratio (draggable divider) ───
+  const [splitRatio, setSplitRatio] = useState(0.5); // 0..1, fraction for 2D
+  const editorsRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+
+  // ─── Hide 3D during view mode transitions ───
+  const [viewport3dVisible, setViewport3dVisible] = useState(true);
+  const prevViewMode = useRef(viewMode);
+
+  useEffect(() => {
+    if (prevViewMode.current !== viewMode) {
+      // Hide 3D content during transition
+      setViewport3dVisible(false);
+      const timer = setTimeout(() => setViewport3dVisible(true), 200);
+      prevViewMode.current = viewMode;
+      return () => clearTimeout(timer);
+    }
+  }, [viewMode]);
+
+  // ─── Divider drag handlers ───
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current || !editorsRef.current) return;
+      const rect = editorsRef.current.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const ratio = Math.max(0.15, Math.min(0.85, x / rect.width));
+      setSplitRatio(ratio);
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, []);
 
   useEffect(() => {
     const saved = loadFromLocalStorage();
@@ -88,6 +117,10 @@ export default function Workspace() {
       </div>
     );
   }
+
+  // Calculate viewport styles for split mode
+  const splitStyle2D = viewMode === 'split' ? { width: `${splitRatio * 100}%` } : undefined;
+  const splitStyle3D = viewMode === 'split' ? { width: `${(1 - splitRatio) * 100}%` } : undefined;
 
   return (
     <div className="workspace">
@@ -146,19 +179,40 @@ export default function Workspace() {
           <Toolbar2D />
         </div>
 
-        {/* Editors (viewports) — crossfade transitions */}
-        <div className="editors">
+        {/* Editors (viewports) with draggable divider */}
+        <div className="editors" ref={editorsRef}>
           {(viewMode === '2d' || viewMode === 'split') && (
-            <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
+            <div
+              className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}
+              style={splitStyle2D}
+            >
               <div className="viewport-label">PATTERN</div>
               <PatternEditor />
             </div>
           )}
-          {viewMode === 'split' && <div className="viewport-divider" />}
+          {viewMode === 'split' && (
+            <div
+              className="viewport-divider"
+              onMouseDown={handleDividerMouseDown}
+            />
+          )}
           {(viewMode === '3d' || viewMode === 'split') && (
-            <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
+            <div
+              className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}
+              style={splitStyle3D}
+            >
               <div className="viewport-label">3D VIEW</div>
-              <Viewport3D />
+              <div
+                className="viewport-3d-content"
+                style={{
+                  opacity: viewport3dVisible ? 1 : 0,
+                  transition: 'opacity 0.15s ease',
+                  width: '100%',
+                  height: '100%',
+                }}
+              >
+                <Viewport3D />
+              </div>
             </div>
           )}
         </div>
