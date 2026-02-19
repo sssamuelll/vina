@@ -1,11 +1,13 @@
 import { useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { addPiece, movePiece, addSeam } from '../../store/projectSlice';
+import { addPiece, movePiece, addSeam, addInternalLine, setInternalLine } from '../../store/projectSlice';
 import { selectPiece, clearSelection, setZoom2D, setPan2D, selectSeam } from '../../store/editorSlice';
-import { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
+import { PatternPiece, PathCommand, Point2D, Seam, InternalLine } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
+import { useNotchTool } from './useNotchTool';
+import { useGrainlineTool } from './useGrainlineTool';
 import './PatternEditor.css';
 
 /** Convert PathCommand array to SVG path string */
@@ -48,6 +50,18 @@ export default function PatternEditor() {
   }, [dispatch]);
 
   const seamTool = useSeamTool(zoom2D, pan2D, pieces, handleSeamComplete);
+
+  const handleNotchAdd = useCallback((pieceId: string, notch: InternalLine) => {
+    dispatch(addInternalLine({ pieceId, line: notch }));
+  }, [dispatch]);
+
+  const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd);
+
+  const handleGrainlineSet = useCallback((pieceId: string, grainline: InternalLine) => {
+    dispatch(setInternalLine({ pieceId, line: grainline }));
+  }, [dispatch]);
+
+  const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
 
   // Keyboard events for pen/seam tool
   useEffect(() => {
@@ -98,6 +112,16 @@ export default function PatternEditor() {
 
     if (activeTool === 'seam') {
       seamTool.handleMouseDown(e);
+      return;
+    }
+
+    if (activeTool === 'notch') {
+      notchTool.handleMouseDown(e);
+      return;
+    }
+
+    if (activeTool === 'grainline') {
+      grainlineTool.handleMouseDown(e);
       return;
     }
 
@@ -161,7 +185,15 @@ export default function PatternEditor() {
     if (activeTool === 'seam') {
       seamTool.handleMouseMove(e);
     }
-  }, [activeTool, zoom2D, pen, seamTool, dispatch]);
+
+    if (activeTool === 'notch') {
+      notchTool.handleMouseMove(e);
+    }
+
+    if (activeTool === 'grainline') {
+      grainlineTool.handleMouseMove(e);
+    }
+  }, [activeTool, zoom2D, pen, seamTool, notchTool, grainlineTool, dispatch]);
 
   const handleMouseUp = useCallback(() => {
     panRef.current = null;
@@ -169,7 +201,10 @@ export default function PatternEditor() {
     if (activeTool === 'pen') {
       pen.handleMouseUp();
     }
-  }, [activeTool, pen]);
+    if (activeTool === 'grainline') {
+      grainlineTool.handleMouseUp();
+    }
+  }, [activeTool, pen, grainlineTool]);
 
   // Cursor based on tool
   const getCursor = () => {
@@ -178,6 +213,8 @@ export default function PatternEditor() {
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
       case 'select': return dragRef.current ? 'grabbing' : 'default';
       case 'seam': return 'crosshair';
+      case 'notch': return 'crosshair';
+      case 'grainline': return 'crosshair';
       case 'measure': return 'crosshair';
       default: return 'crosshair';
     }
@@ -413,6 +450,56 @@ export default function PatternEditor() {
             </g>
           )}
 
+          {/* ─── Notch tool: hover preview ─── */}
+          {activeTool === 'notch' && notchTool.hoveredPoint && (
+            <g className="notch-preview">
+              <line
+                x1={notchTool.hoveredPoint.point.x - notchTool.hoveredPoint.normal.x * 4}
+                y1={notchTool.hoveredPoint.point.y - notchTool.hoveredPoint.normal.y * 4}
+                x2={notchTool.hoveredPoint.point.x + notchTool.hoveredPoint.normal.x * 8}
+                y2={notchTool.hoveredPoint.point.y + notchTool.hoveredPoint.normal.y * 8}
+                stroke="#ff9800"
+                strokeWidth={2 / zoom2D}
+                strokeLinecap="round"
+                opacity={0.7}
+              />
+              <circle
+                cx={notchTool.hoveredPoint.point.x}
+                cy={notchTool.hoveredPoint.point.y}
+                r={3 / zoom2D}
+                fill="#ff9800"
+                opacity={0.5}
+              />
+            </g>
+          )}
+
+          {/* ─── Grainline tool: drag preview ─── */}
+          {activeTool === 'grainline' && grainlineTool.isDragging && grainlineTool.startPoint && grainlineTool.endPoint && grainlineTool.pieceId && (() => {
+            const piece = pieces.find(p => p.id === grainlineTool.pieceId);
+            if (!piece) return null;
+            const sx = grainlineTool.startPoint!.x + piece.position.x;
+            const sy = grainlineTool.startPoint!.y + piece.position.y;
+            const ex = grainlineTool.endPoint!.x + piece.position.x;
+            const ey = grainlineTool.endPoint!.y + piece.position.y;
+            // Arrow head
+            const dx = ex - sx, dy = ey - sy;
+            const len = Math.hypot(dx, dy);
+            if (len < 2) return null;
+            const ux = dx / len, uy = dy / len;
+            const arrowSize = 6 / zoom2D;
+            return (
+              <g className="grainline-preview">
+                <line x1={sx} y1={sy} x2={ex} y2={ey}
+                  stroke="#6bff6b" strokeWidth={1.5 / zoom2D} opacity={0.8} />
+                {/* Arrow head */}
+                <polygon
+                  points={`${ex},${ey} ${ex - ux * arrowSize + uy * arrowSize * 0.5},${ey - uy * arrowSize - ux * arrowSize * 0.5} ${ex - ux * arrowSize - uy * arrowSize * 0.5},${ey - uy * arrowSize + ux * arrowSize * 0.5}`}
+                  fill="#6bff6b" opacity={0.8}
+                />
+              </g>
+            );
+          })()}
+
           {/* ─── Pen tool: work-in-progress path ─── */}
           {activeTool === 'pen' && pen.nodes.length > 0 && (
             <g className="pen-wip">
@@ -514,6 +601,22 @@ export default function PatternEditor() {
             fontFamily="Inter, sans-serif"
           >
             Select the Pen tool (P) to draw pattern pieces
+          </text>
+        )}
+
+        {/* Notch tool hint */}
+        {activeTool === 'notch' && pieces.length > 0 && (
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
+            fill="rgba(0,0,0,0.2)" fontSize="13" fontFamily="Inter, sans-serif">
+            Click on a piece edge to place a notch mark
+          </text>
+        )}
+
+        {/* Grainline tool hint */}
+        {activeTool === 'grainline' && pieces.length > 0 && (
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
+            fill="rgba(0,0,0,0.2)" fontSize="13" fontFamily="Inter, sans-serif">
+            Click and drag inside a piece to set grain direction
           </text>
         )}
 
