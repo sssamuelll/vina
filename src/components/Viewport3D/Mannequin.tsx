@@ -38,8 +38,6 @@ function buildProfile(m: {
   const shoulderY = h * 0.82;
   const neckBaseY = h * 0.85;
   const neckTopY = h * 0.90;
-  const headCenterY = h * 0.94;
-  const headTopY = h;
   const bottomY = h * 0.42;
 
   // Build smooth profile with intermediate points

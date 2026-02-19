@@ -1,6 +1,6 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, AvatarMode } from '../../store/projectSlice';
+import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl } from '../../store/projectSlice';
 import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection } from '../../store/editorSlice';
 import './PropertiesPanel.css';
 

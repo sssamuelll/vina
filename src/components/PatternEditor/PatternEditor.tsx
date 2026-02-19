@@ -103,8 +103,7 @@ export default function PatternEditor() {
         dispatch(selectPiece(pieceId));
         const piece = pieces.find(p => p.id === pieceId);
         if (piece) {
-          const svg = svgRef.current!;
-          const rect = svg.getBoundingClientRect();
+          
           dragRef.current = {
             pieceId,
             startMouse: { x: e.clientX, y: e.clientY },
