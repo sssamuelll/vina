@@ -32,7 +32,7 @@ function useIsMobile(breakpoint = 768) {
  *   4. Wait for Three.js to recalculate (150ms)
  *   5. Fade in 3D (300ms)
  */
-type TransitionPhase = 'idle' | 'fading-out' | 'switching' | 'fading-in';
+type TransitionPhase = 'idle' | 'fading-out' | 'switching' | 'resizing' | 'fading-in';
 
 export default function Workspace() {
   const dispatch = useDispatch();
@@ -68,21 +68,25 @@ export default function Workspace() {
     }
   }, [viewMode, phase, dispatch]);
 
-  // Phase machine
+  // Phase machine:
+  // fading-out (300ms) → switching (instant) → resizing (400ms CSS width anim + 300ms settle) → fading-in (300ms)
   useEffect(() => {
     if (phase === 'fading-out') {
-      // Wait for CSS fade-out (300ms)
       const t = setTimeout(() => setPhase('switching'), 320);
       return () => clearTimeout(t);
     }
     if (phase === 'switching' && pendingMode) {
       dispatch(setViewMode(pendingMode));
-      // Wait for layout + Three.js resize
-      const t = setTimeout(() => setPhase('fading-in'), 150);
+      // Immediately move to resizing — CSS will animate the widths
+      const t = setTimeout(() => setPhase('resizing'), 20);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'resizing') {
+      // Wait for CSS width transition (400ms) + Three.js recalc (300ms)
+      const t = setTimeout(() => setPhase('fading-in'), 750);
       return () => clearTimeout(t);
     }
     if (phase === 'fading-in') {
-      // Wait for CSS fade-in (300ms)
       const t = setTimeout(() => {
         setPhase('idle');
         setPendingMode(null);
@@ -158,8 +162,15 @@ export default function Workspace() {
     );
   }
 
-  const splitStyle2D = viewMode === 'split' ? { width: `${splitRatio * 100}%` } : undefined;
-  const splitStyle3D = viewMode === 'split' ? { width: `${(1 - splitRatio) * 100}%` } : undefined;
+  // Explicit widths so CSS can transition between states
+  const getViewportWidth = (which: '2d' | '3d') => {
+    if (viewMode === 'split') {
+      return which === '2d' ? `${splitRatio * 100}%` : `${(1 - splitRatio) * 100}%`;
+    }
+    if (viewMode === '2d') return which === '2d' ? '100%' : '0%';
+    if (viewMode === '3d') return which === '2d' ? '0%' : '100%';
+    return '0%';
+  };
 
   return (
     <div className="workspace">
@@ -214,11 +225,11 @@ export default function Workspace() {
           <Toolbar2D />
         </div>
 
-        {/* All viewports always in DOM — CSS controls visibility */}
+        {/* All viewports always in DOM — widths animate via CSS transition */}
         <div className="editors" ref={editorsRef}>
           <div
-            className={`viewport viewport-2d ${viewMode === '2d' ? 'full' : viewMode === 'split' ? 'split-pane' : 'hidden-viewport'}`}
-            style={splitStyle2D}
+            className={`viewport viewport-2d ${viewMode === '2d' || viewMode === 'split' ? '' : 'hidden-viewport'}`}
+            style={{ width: getViewportWidth('2d') }}
           >
             <div className="viewport-label">PATTERN</div>
             <PatternEditor />
@@ -229,8 +240,8 @@ export default function Workspace() {
           )}
 
           <div
-            className={`viewport viewport-3d ${viewMode === '3d' ? 'full' : viewMode === 'split' ? 'split-pane' : 'hidden-viewport'}`}
-            style={splitStyle3D}
+            className={`viewport viewport-3d ${viewMode === '3d' || viewMode === 'split' ? '' : 'hidden-viewport'}`}
+            style={{ width: getViewportWidth('3d') }}
           >
             <div className="viewport-label">3D VIEW</div>
             <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>

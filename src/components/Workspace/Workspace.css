@@ -228,20 +228,13 @@
 }
 
 /* ─── Viewports ─── */
-.viewport.full {
-  flex: 1;
-  min-width: 0;
-}
-
-.viewport.split-pane {
-  flex-shrink: 0;
-  min-width: 0;
+.viewport {
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .viewport.hidden-viewport {
-  width: 0;
+  width: 0 !important;
   min-width: 0;
-  flex: 0;
   overflow: hidden;
   pointer-events: none;
 }
