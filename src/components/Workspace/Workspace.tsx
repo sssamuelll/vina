@@ -148,15 +148,19 @@ export default function Workspace() {
 
         {/* Editors (viewports) — crossfade transitions */}
         <div className="editors">
-          <div className={`viewport viewport-2d ${viewMode === '2d' ? 'full' : viewMode === 'split' ? 'half' : 'gone'}`}>
-            <div className="viewport-label">PATTERN</div>
-            <PatternEditor />
-          </div>
-          <div className={`viewport-divider ${viewMode === 'split' ? 'visible' : 'hidden'}`} />
-          <div className={`viewport viewport-3d ${viewMode === '3d' ? 'full' : viewMode === 'split' ? 'half' : 'gone'}`}>
-            <div className="viewport-label">3D VIEW</div>
-            <Viewport3D />
-          </div>
+          {(viewMode === '2d' || viewMode === 'split') && (
+            <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
+              <div className="viewport-label">PATTERN</div>
+              <PatternEditor />
+            </div>
+          )}
+          {viewMode === 'split' && <div className="viewport-divider" />}
+          {(viewMode === '3d' || viewMode === 'split') && (
+            <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
+              <div className="viewport-label">3D VIEW</div>
+              <Viewport3D />
+            </div>
+          )}
         </div>
 
         {/* Properties Panel (right sidebar) */}

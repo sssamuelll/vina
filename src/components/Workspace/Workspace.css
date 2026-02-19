@@ -215,28 +215,9 @@
   opacity: 0;
 }
 
-/* ─── Viewport transitions ─── */
-.viewport {
-  transition: flex 0.3s ease, opacity 0.3s ease;
-}
-
-.viewport.full { flex: 1; opacity: 1; }
-.viewport.half { flex: 0.5; opacity: 1; }
-.viewport.gone { flex: 0; opacity: 0; overflow: hidden; width: 0; min-width: 0; }
-
-.viewport-divider {
-  transition: width 0.3s ease, opacity 0.3s ease;
-}
-
-.viewport-divider.visible {
-  width: var(--divider-width);
-  opacity: 1;
-}
-
-.viewport-divider.hidden {
-  width: 0;
-  opacity: 0;
-}
+/* ─── Viewports ─── */
+.viewport.full { width: 100%; }
+.viewport.half { width: 50%; }
 
 /* ─── Copilot Column (slide in/out from right) ─── */
 .copilot-column {

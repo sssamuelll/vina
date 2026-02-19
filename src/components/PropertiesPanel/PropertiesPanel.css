@@ -121,8 +121,10 @@
   overflow: hidden;
 }
 
-.panel-section-content {
-  padding-bottom: 12px;
+.panel-section-content::after {
+  content: '';
+  display: block;
+  height: 12px;
 }
 
 .panel-field {
