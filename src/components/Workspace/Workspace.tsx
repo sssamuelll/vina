@@ -39,19 +39,34 @@ export default function Workspace() {
   const editorsRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  // ─── Hide 3D during view mode transitions ───
+  // ─── Sequenced view mode transitions: hide 3D → change layout → show 3D ───
   const [viewport3dVisible, setViewport3dVisible] = useState(true);
-  const prevViewMode = useRef(viewMode);
+  const transitioningRef = useRef(false);
 
-  useEffect(() => {
-    if (prevViewMode.current !== viewMode) {
-      // Hide 3D content during transition
-      setViewport3dVisible(false);
-      const timer = setTimeout(() => setViewport3dVisible(true), 200);
-      prevViewMode.current = viewMode;
-      return () => clearTimeout(timer);
+  const handleViewModeChange = useCallback((newMode: '2d' | 'split' | '3d') => {
+    if (newMode === viewMode || transitioningRef.current) return;
+
+    const involves3d = viewMode !== '2d' || newMode !== '2d';
+    if (!involves3d) {
+      dispatch(setViewMode(newMode));
+      return;
     }
-  }, [viewMode]);
+
+    transitioningRef.current = true;
+    // Step 1: hide 3D
+    setViewport3dVisible(false);
+
+    // Step 2: after fade out completes, change layout
+    setTimeout(() => {
+      dispatch(setViewMode(newMode));
+
+      // Step 3: after layout settles, show 3D
+      setTimeout(() => {
+        setViewport3dVisible(true);
+        transitioningRef.current = false;
+      }, 100);
+    }, 180);
+  }, [viewMode, dispatch]);
 
   // ─── Divider drag handlers ───
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
@@ -152,7 +167,7 @@ export default function Workspace() {
         <div className="toolbar-separator" />
         <div className="view-toggle">
           {(['2d', 'split', '3d'] as const).map(v => (
-            <button key={v} className={viewMode === v ? 'active' : ''} onClick={() => dispatch(setViewMode(v))}>
+            <button key={v} className={viewMode === v ? 'active' : ''} onClick={() => handleViewModeChange(v)}>
               {v === '2d' ? '2D' : v === 'split' ? 'Split' : '3D'}
             </button>
           ))}
@@ -206,7 +221,7 @@ export default function Workspace() {
                 className="viewport-3d-content"
                 style={{
                   opacity: viewport3dVisible ? 1 : 0,
-                  transition: 'opacity 0.15s ease',
+                  transition: viewport3dVisible ? 'opacity 0.2s ease' : 'opacity 0.12s ease',
                   width: '100%',
                   height: '100%',
                 }}
