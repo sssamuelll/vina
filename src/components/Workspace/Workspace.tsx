@@ -24,6 +24,16 @@ function useIsMobile(breakpoint = 768) {
   return isMobile;
 }
 
+/**
+ * Sequenced view transition:
+ *   1. Fade out 3D (300ms)
+ *   2. Wait until fade complete
+ *   3. Change layout (viewMode)
+ *   4. Wait for Three.js to recalculate (150ms)
+ *   5. Fade in 3D (300ms)
+ */
+type TransitionPhase = 'idle' | 'fading-out' | 'switching' | 'fading-in';
+
 export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
@@ -35,38 +45,54 @@ export default function Workspace() {
   useKeyboardShortcuts();
 
   // ─── Split ratio (draggable divider) ───
-  const [splitRatio, setSplitRatio] = useState(0.5); // 0..1, fraction for 2D
+  const [splitRatio, setSplitRatio] = useState(0.5);
   const editorsRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  // ─── Sequenced view mode transitions: hide 3D → change layout → show 3D ───
-  const [viewport3dVisible, setViewport3dVisible] = useState(true);
-  const transitioningRef = useRef(false);
+  // ─── Sequenced 3D transition ───
+  const [phase, setPhase] = useState<TransitionPhase>('idle');
+  const [pendingMode, setPendingMode] = useState<'2d' | 'split' | '3d' | null>(null);
 
   const handleViewModeChange = useCallback((newMode: '2d' | 'split' | '3d') => {
-    if (newMode === viewMode || transitioningRef.current) return;
+    if (newMode === viewMode || phase !== 'idle') return;
 
-    const involves3d = viewMode !== '2d' || newMode !== '2d';
-    if (!involves3d) {
+    // If 3D is involved (currently showing or will show), do sequenced transition
+    const has3dNow = viewMode === '3d' || viewMode === 'split';
+    const will3d = newMode === '3d' || newMode === 'split';
+
+    if (has3dNow || will3d) {
+      setPendingMode(newMode);
+      setPhase('fading-out');
+    } else {
       dispatch(setViewMode(newMode));
-      return;
     }
+  }, [viewMode, phase, dispatch]);
 
-    transitioningRef.current = true;
-    // Step 1: hide 3D
-    setViewport3dVisible(false);
+  // Phase machine
+  useEffect(() => {
+    if (phase === 'fading-out') {
+      // Wait for CSS fade-out (300ms)
+      const t = setTimeout(() => setPhase('switching'), 320);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'switching' && pendingMode) {
+      dispatch(setViewMode(pendingMode));
+      // Wait for layout + Three.js resize
+      const t = setTimeout(() => setPhase('fading-in'), 150);
+      return () => clearTimeout(t);
+    }
+    if (phase === 'fading-in') {
+      // Wait for CSS fade-in (300ms)
+      const t = setTimeout(() => {
+        setPhase('idle');
+        setPendingMode(null);
+      }, 320);
+      return () => clearTimeout(t);
+    }
+  }, [phase, pendingMode, dispatch]);
 
-    // Step 2: after fade out completes, change layout
-    setTimeout(() => {
-      dispatch(setViewMode(newMode));
-
-      // Step 3: after layout settles, show 3D
-      setTimeout(() => {
-        setViewport3dVisible(true);
-        transitioningRef.current = false;
-      }, 100);
-    }, 180);
-  }, [viewMode, dispatch]);
+  // 3D opacity: visible only when idle or fading-in
+  const show3d = phase === 'idle' || phase === 'fading-in';
 
   // ─── Divider drag handlers ───
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
@@ -108,7 +134,6 @@ export default function Workspace() {
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
   const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
 
-  // Ctrl+K to toggle copilot
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -133,13 +158,11 @@ export default function Workspace() {
     );
   }
 
-  // Calculate viewport styles for split mode
   const splitStyle2D = viewMode === 'split' ? { width: `${splitRatio * 100}%` } : undefined;
   const splitStyle3D = viewMode === 'split' ? { width: `${(1 - splitRatio) * 100}%` } : undefined;
 
   return (
     <div className="workspace">
-      {/* ─── Top Toolbar ─── */}
       <header className="workspace-toolbar">
         <div className="workspace-logo">OpenClo</div>
         <div className="toolbar-separator" />
@@ -173,7 +196,6 @@ export default function Workspace() {
           ))}
         </div>
 
-        {/* Right side of toolbar */}
         <div className="toolbar-spacer" />
         <button
           className={`toolbar-btn copilot-toolbar-btn ${showCopilot ? 'active' : ''}`}
@@ -187,55 +209,38 @@ export default function Workspace() {
         </button>
       </header>
 
-      {/* ─── Body: Activity Bar | Editors | Properties | Copilot ─── */}
       <div className="workspace-body">
-        {/* Activity Bar (left tools) — always in DOM, animated */}
         <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
           <Toolbar2D />
         </div>
 
-        {/* Editors (viewports) with draggable divider */}
+        {/* All viewports always in DOM — CSS controls visibility */}
         <div className="editors" ref={editorsRef}>
-          {(viewMode === '2d' || viewMode === 'split') && (
-            <div
-              className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}
-              style={splitStyle2D}
-            >
-              <div className="viewport-label">PATTERN</div>
-              <PatternEditor />
-            </div>
-          )}
+          <div
+            className={`viewport viewport-2d ${viewMode === '2d' ? 'full' : viewMode === 'split' ? 'split-pane' : 'hidden-viewport'}`}
+            style={splitStyle2D}
+          >
+            <div className="viewport-label">PATTERN</div>
+            <PatternEditor />
+          </div>
+
           {viewMode === 'split' && (
-            <div
-              className="viewport-divider"
-              onMouseDown={handleDividerMouseDown}
-            />
+            <div className="viewport-divider" onMouseDown={handleDividerMouseDown} />
           )}
-          {(viewMode === '3d' || viewMode === 'split') && (
-            <div
-              className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}
-              style={splitStyle3D}
-            >
-              <div className="viewport-label">3D VIEW</div>
-              <div
-                className="viewport-3d-content"
-                style={{
-                  opacity: viewport3dVisible ? 1 : 0,
-                  transition: viewport3dVisible ? 'opacity 0.2s ease' : 'opacity 0.12s ease',
-                  width: '100%',
-                  height: '100%',
-                }}
-              >
-                <Viewport3D />
-              </div>
+
+          <div
+            className={`viewport viewport-3d ${viewMode === '3d' ? 'full' : viewMode === 'split' ? 'split-pane' : 'hidden-viewport'}`}
+            style={splitStyle3D}
+          >
+            <div className="viewport-label">3D VIEW</div>
+            <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
+              <Viewport3D />
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Properties Panel (right sidebar) */}
         <PropertiesPanel />
 
-        {/* Copilot Panel (far right, toggleable) — always in DOM */}
         <div className={`copilot-column ${showCopilot ? 'open' : 'closed'}`}>
           <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
         </div>
