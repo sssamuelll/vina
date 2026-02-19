@@ -6,7 +6,8 @@ import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGr
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadProjectFile, uploadProjectFile } from '../../utils/projectIO';
-import { canUndo, canRedo } from '../../store/undoMiddleware';
+// canUndo/canRedo available if needed
+// import { canUndo, canRedo } from '../../store/undoMiddleware';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -20,7 +21,7 @@ export default function PropertiesPanel() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     project: false,
     piece: false,
-    avatar: false,
+    avatar: true,
     display: false,
     export: false,
     simulation: false,
@@ -58,8 +59,8 @@ export default function PropertiesPanel() {
     }));
   }, [dispatch, isDirty]);
 
-  const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
-  const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
+  // Undo/redo handled by top toolbar
+  void undo; void redo; void forceUpdate;
 
   const toggleSection = useCallback((sectionId: string) => {
     setCollapsedSections(prev => ({
@@ -86,6 +87,38 @@ export default function PropertiesPanel() {
           />
         </svg>
       </button>
+
+      {isPanelCollapsed && (
+        <div className="panel-icons">
+          <button className="panel-icon-shortcut" title="Project" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, project: false })); }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2H12V14H4V2Z" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M6 5H10M6 8H10" stroke="currentColor" strokeWidth="1"/></svg>
+          </button>
+          {selectedPiece && (
+            <button className="panel-icon-shortcut" title="Piece" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, piece: false })); }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4L8 2L13 4L13 12L8 14L3 12Z" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+            </button>
+          )}
+          {seams.length > 0 && (
+            <button className="panel-icon-shortcut" title="Seams" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, seams: false })); }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2"/></svg>
+            </button>
+          )}
+          <button className="panel-icon-shortcut" title="Avatar" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, avatar: false })); }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M4 14C4 11.2 5.8 9 8 9C10.2 9 12 11.2 12 14" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+          </button>
+          <button className="panel-icon-shortcut" title="Display" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, display: false })); }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8C2 8 5 3 8 3C11 3 14 8 14 8C14 8 11 13 8 13C5 13 2 8 2 8Z" stroke="currentColor" strokeWidth="1.2" fill="none"/><circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+          </button>
+          {pieces.length > 0 && (
+            <button className="panel-icon-shortcut" title="Export" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, export: false })); }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3V10M5 7L8 10L11 7M3 13H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          )}
+          <button className="panel-icon-shortcut" title="Simulation" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, simulation: false })); }}>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 3L12 8L5 13V3Z" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+          </button>
+        </div>
+      )}
 
       {!isPanelCollapsed && (
         <div className="panel-content">
