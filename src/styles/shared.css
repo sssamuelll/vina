@@ -1,0 +1,260 @@
+/* ═══════════════════════════════════════════
+   OpenClo — Shared UI Utilities
+   Common patterns extracted from components.
+   Import in App.css, use classes everywhere.
+   ═══════════════════════════════════════════ */
+
+/* ─── Buttons ─── */
+
+/* Small icon button (header actions, close, settings) */
+.btn-icon {
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+
+.btn-icon:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+
+.btn-icon:disabled:hover {
+  background: none;
+  color: var(--text-secondary);
+}
+
+/* Bordered button with label (toolbar actions) */
+.btn-bordered {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.btn-bordered:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+/* Accent button (primary actions) */
+.btn-accent {
+  padding: 8px 16px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-accent:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Danger button (delete, destructive) */
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+
+.btn-danger:hover {
+  border-color: rgba(255, 107, 107, 0.4);
+  color: var(--seam-color);
+  background: rgba(255, 107, 107, 0.08);
+}
+
+/* ─── Inputs ─── */
+
+.input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.input:focus {
+  border-color: var(--accent);
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.input-narrow {
+  width: 64px;
+  text-align: right;
+}
+
+/* ─── Toggle (checkbox label) ─── */
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+/* ─── Section header (collapsible panel sections) ─── */
+
+.section-header {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.section-header:hover .section-title {
+  color: var(--text-primary);
+}
+
+.section-title {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+}
+
+.section-chevron {
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.section-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+/* ─── Pill toggle (view mode, avatar mode) ─── */
+
+.pill-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.pill-toggle button {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pill-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.pill-toggle button.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* ─── Field row (label + value side by side) ─── */
+
+.field-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 0;
+  font-size: 12px;
+}
+
+.field-row label {
+  color: var(--text-secondary);
+}
+
+/* ─── Unit suffix ─── */
+
+.input-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.unit-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ─── Separator ─── */
+
+.separator {
+  width: 1px;
+  height: 20px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+/* ─── Panel (sidebar container) ─── */
+
+.panel-bg {
+  background: var(--bg-secondary);
+  border-left: 1px solid var(--border);
+}
+
+/* ─── Scrollable content area ─── */
+
+.scroll-y {
+  overflow-y: auto;
+}
+
+.scroll-y::-webkit-scrollbar { width: 6px; }
+.scroll-y::-webkit-scrollbar-track { background: transparent; }
+.scroll-y::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 3px; }

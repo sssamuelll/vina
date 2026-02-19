@@ -1,6 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { executeCommands } from '../copilot/commandExecutor';
-import { PatternPiece, CopilotCommand } from '../types/types';
+import { PatternPiece } from '../types/types';
 
 // Mock dispatch
 function createMockDispatch() {

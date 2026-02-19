@@ -1,3 +1,5 @@
+@import './styles/shared.css';
+
 :root {
   /* ─── Colors ─── */
   --bg-primary: #1a1a1a;
@@ -19,6 +21,11 @@
 
   --border: #3a3a3a;
   --border-light: #4a4a4a;
+
+  /* ─── Common patterns (reusable via var()) ─── */
+  --btn-bg-hover: rgba(255, 255, 255, 0.06);
+  --btn-bg-active: rgba(255, 255, 255, 0.12);
+  --btn-transition: color 0.15s, background 0.15s, border-color 0.15s;
 
   /* ─── Spacing ─── */
   --toolbar-height: 44px;

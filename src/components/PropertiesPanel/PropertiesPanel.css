@@ -36,7 +36,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
   z-index: 10;
 }
 
@@ -62,6 +62,7 @@
   border-bottom: none;
 }
 
+/* Section headers — delegate to shared patterns */
 .panel-section-header {
   width: 100%;
   background: none;
@@ -71,7 +72,6 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
 .panel-section-header:hover .panel-title {
@@ -84,7 +84,6 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-muted);
-  font-family: 'Inter', sans-serif;
 }
 
 .panel-section-header svg {
@@ -94,10 +93,6 @@
 
 .panel-section-header svg.collapsed {
   transform: rotate(-90deg);
-}
-
-.panel-section-header svg.expanded {
-  transform: rotate(0deg);
 }
 
 .panel-section-content {
@@ -145,7 +140,7 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
 }
 
 .sim-button:hover {
@@ -212,7 +207,7 @@ select.panel-input {
   font-weight: 500;
   letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
 }
 
 .panel-delete:hover {
@@ -240,7 +235,7 @@ select.panel-input {
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
 }
 
 .mode-btn:hover {
@@ -259,7 +254,7 @@ select.panel-input {
 }
 
 .file-input::file-selector-button {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--btn-bg-hover);
   border: 1px solid var(--border);
   border-radius: 4px;
   color: var(--text-secondary);
@@ -268,7 +263,7 @@ select.panel-input {
   font-weight: 500;
   cursor: pointer;
   margin-right: 8px;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
 }
 
 .file-input::file-selector-button:hover {
@@ -338,19 +333,19 @@ select.panel-input {
 .panel-icon-btn {
   width: 32px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--btn-bg-hover);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .panel-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--btn-bg-active);
   border-color: var(--accent);
 }
 
@@ -361,12 +356,12 @@ select.panel-input {
   align-items: center;
   gap: 4px;
   padding: 8px 4px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--btn-bg-hover);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
 }
 
 .panel-labeled-btn span {
@@ -377,7 +372,7 @@ select.panel-input {
 }
 
 .panel-labeled-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--btn-bg-hover);
   border-color: var(--accent);
   color: var(--text-primary);
 }
@@ -395,13 +390,13 @@ select.panel-input {
 .export-btn {
   flex: 1;
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--btn-bg-hover);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
   font-size: 12px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--btn-transition);
   text-align: center;
   display: flex;
   align-items: center;
@@ -410,7 +405,7 @@ select.panel-input {
 }
 
 .export-btn:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--btn-bg-active);
   border-color: var(--accent);
 }
 

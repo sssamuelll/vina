@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, {
   addPiece, updatePiece, removePiece, movePiece, rotatePiece,
-  addSeam, removeSeam, addInternalLine, setInternalLine,
+  addSeam, addInternalLine, setInternalLine,
   setProjectName, loadProject, updateMeasurements,
   setAvatarMode, setAvatarModelUrl,
 } from '../store/projectSlice';
