@@ -2,6 +2,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam } from '../../store/projectSlice';
 import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam } from '../../store/editorSlice';
+import { downloadDXF } from '../../utils/exportDXF';
+import { downloadPDF } from '../../utils/exportPDF';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -211,6 +213,29 @@ export default function PropertiesPanel() {
           Snap to grid
         </label>
       </section>
+
+      {/* Export */}
+      {pieces.length > 0 && (
+        <section className="panel-section">
+          <h3 className="panel-title">Export</h3>
+          <div className="export-buttons">
+            <button
+              className="export-btn"
+              onClick={() => downloadDXF(pieces)}
+              title="Download DXF for cutting plotters"
+            >
+              📐 DXF
+            </button>
+            <button
+              className="export-btn"
+              onClick={() => downloadPDF(pieces)}
+              title="Download PDF at 1:1 scale"
+            >
+              📄 PDF
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Simulation */}
       <section className="panel-section">
