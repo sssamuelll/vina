@@ -243,16 +243,6 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
               </svg>
               Configure Agent
             </button>
-            <div className="copilot-empty-divider">
-              <span>or try built-in templates</span>
-            </div>
-            <div className="copilot-suggestions">
-              {['Generate a bodice block', 'Create a sleeve', 'Generate A-line skirt'].map(s => (
-                <button key={s} className="copilot-suggestion" onClick={() => handleSendText(s)}>
-                  {s}
-                </button>
-              ))}
-            </div>
           </div>
         )}
         {messages.length === 0 && agentConfig.type !== 'builtin' && (
@@ -285,25 +275,27 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="copilot-input-area">
-        <input
-          ref={inputRef}
-          type="text"
-          className="copilot-input"
-          placeholder="Type a message..."
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-        />
-        <button
-          className="copilot-send"
-          onClick={handleSend}
-          disabled={!input.trim() || isLoading}
-        >
-          →
-        </button>
-      </div>
+      {agentConfig.type !== 'builtin' && (
+        <div className="copilot-input-area">
+          <input
+            ref={inputRef}
+            type="text"
+            className="copilot-input"
+            placeholder="Type a message..."
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+          />
+          <button
+            className="copilot-send"
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+          >
+            →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
