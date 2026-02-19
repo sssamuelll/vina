@@ -29,10 +29,8 @@ export default function Viewport3D() {
   // Delay visibility so Three.js Canvas can calculate correct aspect ratio before showing
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      requestAnimationFrame(() => setReady(true));
-    });
-    return () => cancelAnimationFrame(raf);
+    const timer = setTimeout(() => setReady(true), 150);
+    return () => clearTimeout(timer);
   }, []);
 
   return (
