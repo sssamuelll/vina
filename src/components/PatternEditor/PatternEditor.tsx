@@ -9,6 +9,7 @@ import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useNodeEditor, EditableNode, NodeRef } from './useNodeEditor';
+import { useMeasureTool } from './useMeasureTool';
 import './PatternEditor.css';
 
 /** Convert PathCommand array to SVG path string */
@@ -67,17 +68,26 @@ export default function PatternEditor() {
   // Node editor (double-click to edit nodes)
   const nodeEditor = useNodeEditor(zoom2D, pan2D);
 
+  // Measure tool
+  const measureTool = useMeasureTool(zoom2D, pan2D);
+
+  // Clear measurements when switching away from measure tool
+  useEffect(() => {
+    if (activeTool !== 'measure') measureTool.clear();
+  }, [activeTool]);
+
   // Keyboard events for pen/seam/node-editor
   useEffect(() => {
     const handlers: ((e: KeyboardEvent) => void)[] = [];
     if (activeTool === 'pen') handlers.push(pen.handleKeyDown);
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
+    if (activeTool === 'measure') handlers.push(measureTool.handleKeyDown);
     if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown]);
+  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown]);
 
   // Zoom with wheel
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -146,6 +156,11 @@ export default function PatternEditor() {
 
     if (activeTool === 'grainline') {
       grainlineTool.handleMouseDown(e);
+      return;
+    }
+
+    if (activeTool === 'measure') {
+      measureTool.handleMouseDown(e);
       return;
     }
 
@@ -222,7 +237,11 @@ export default function PatternEditor() {
     if (activeTool === 'grainline') {
       grainlineTool.handleMouseMove(e);
     }
-  }, [activeTool, zoom2D, pen, seamTool, notchTool, grainlineTool, dispatch]);
+
+    if (activeTool === 'measure') {
+      measureTool.handleMouseMove(e);
+    }
+  }, [activeTool, zoom2D, pen, seamTool, notchTool, grainlineTool, measureTool, dispatch]);
 
   const handleMouseUp = useCallback(() => {
     panRef.current = null;
@@ -624,6 +643,77 @@ export default function PatternEditor() {
             </g>
           )}
 
+          {/* ─── Measure tool: measurement lines ─── */}
+          {activeTool === 'measure' && (
+            <g className="measure-lines">
+              {measureTool.measurements.map(m => {
+                const mx = (m.startPoint.x + m.endPoint.x) / 2;
+                const my = (m.startPoint.y + m.endPoint.y) / 2;
+                const angle = Math.atan2(m.endPoint.y - m.startPoint.y, m.endPoint.x - m.startPoint.x) * 180 / Math.PI;
+                const label = measureTool.formatDistance(m.distance);
+                return (
+                  <g key={m.id}>
+                    <line
+                      x1={m.startPoint.x} y1={m.startPoint.y}
+                      x2={m.endPoint.x} y2={m.endPoint.y}
+                      stroke="#9c27b0" strokeWidth={1.5 / zoom2D}
+                      strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
+                    />
+                    <circle cx={m.startPoint.x} cy={m.startPoint.y} r={3 / zoom2D} fill="#9c27b0" />
+                    <circle cx={m.endPoint.x} cy={m.endPoint.y} r={3 / zoom2D} fill="#9c27b0" />
+                    <g transform={`translate(${mx}, ${my})`}>
+                      <rect
+                        x={-label.length * 3 / zoom2D} y={-7 / zoom2D}
+                        width={label.length * 6 / zoom2D} height={14 / zoom2D}
+                        rx={7 / zoom2D} fill="rgba(0,0,0,0.75)"
+                      />
+                      <text
+                        textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={10 / zoom2D}
+                        fontFamily="Inter, sans-serif" pointerEvents="none"
+                      >
+                        {label}
+                      </text>
+                    </g>
+                  </g>
+                );
+              })}
+              {/* Guide line from current start to cursor */}
+              {measureTool.currentStart && measureTool.cursorPos && (() => {
+                const s = measureTool.currentStart;
+                const c = measureTool.cursorPos;
+                const d = Math.hypot(c.x - s.x, c.y - s.y);
+                const label = measureTool.formatDistance(d);
+                const mx = (s.x + c.x) / 2;
+                const my = (s.y + c.y) / 2;
+                return (
+                  <>
+                    <line
+                      x1={s.x} y1={s.y} x2={c.x} y2={c.y}
+                      stroke="#9c27b0" strokeWidth={1 / zoom2D}
+                      strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`} opacity={0.6}
+                    />
+                    <circle cx={s.x} cy={s.y} r={3 / zoom2D} fill="#9c27b0" />
+                    <g transform={`translate(${mx}, ${my})`}>
+                      <rect
+                        x={-label.length * 3 / zoom2D} y={-7 / zoom2D}
+                        width={label.length * 6 / zoom2D} height={14 / zoom2D}
+                        rx={7 / zoom2D} fill="rgba(0,0,0,0.6)"
+                      />
+                      <text
+                        textAnchor="middle" dominantBaseline="central"
+                        fill="#fff" fontSize={10 / zoom2D}
+                        fontFamily="Inter, sans-serif" pointerEvents="none"
+                      >
+                        {label}
+                      </text>
+                    </g>
+                  </>
+                );
+              })()}
+            </g>
+          )}
+
           {/* ─── Node Editor: editable anchor points & handles ─── */}
           {nodeEditor.isEditing && nodeEditor.editingPieceId && (() => {
             const piece = pieces.find(p => p.id === nodeEditor.editingPieceId);
@@ -753,6 +843,13 @@ export default function PatternEditor() {
         )}
 
         {/* Pen tool hint */}
+        {activeTool === 'measure' && measureTool.measurements.length === 0 && !measureTool.currentStart && (
+          <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
+            fill="rgba(0,0,0,0.2)" fontSize="13" fontFamily="Inter, sans-serif">
+            Click two points to measure distance · Esc to clear · Delete to remove last
+          </text>
+        )}
+
         {activeTool === 'pen' && pen.nodes.length === 0 && (
           <text
             x="50%"
