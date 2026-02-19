@@ -8,6 +8,7 @@ import Viewport3D from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
+import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
@@ -118,6 +119,9 @@ export default function Workspace() {
 
       {/* Template Library Modal */}
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
+
+      {/* AI Copilot */}
+      <CopilotPanel />
     </div>
   );
 }
