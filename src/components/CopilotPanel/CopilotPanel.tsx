@@ -141,9 +141,11 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
         <button
           className="copilot-toggle"
           onClick={() => setIsOpen(true)}
-          title="AI Copilot (Ctrl+K)"
+          title="Chat (Ctrl+K)"
         >
-          <span className="copilot-icon">✨</span>
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
+            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+          </svg>
         </button>
       );
     }
@@ -155,10 +157,10 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       <div className="copilot-header">
         <div className="copilot-title">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2L10 6H14L11 9L12 14L8 11L4 14L5 9L2 6H6L8 2Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
+            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
           </svg>
-          <span>Copilot</span>
-          <span className="copilot-agent-badge">{agentConfig.name}</span>
+          <span>Chat</span>
+          {agentConfig.type !== 'builtin' && <span className="copilot-agent-badge">{agentConfig.name}</span>}
         </div>
         <div className="copilot-header-actions">
           {isColumn && (
@@ -225,12 +227,40 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       )}
 
       <div className="copilot-messages">
-        {messages.length === 0 && (
+        {messages.length === 0 && agentConfig.type === 'builtin' && (
           <div className="copilot-empty">
-            <p>Hi, I'm your pattern copilot.</p>
-            <p className="copilot-empty-hint">Quick actions:</p>
+            <svg className="copilot-empty-icon" width="40" height="40" viewBox="0 0 16 16" fill="none">
+              <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="var(--text-muted)" strokeWidth="0.8" fill="none"/>
+            </svg>
+            <p className="copilot-empty-title">Connect an AI agent</p>
+            <p className="copilot-empty-hint">
+              OpenClo works with any AI agent — Claude, GPT, local models, or your own. 
+              Connect one to get pattern generation, editing assistance, and intelligent suggestions.
+            </p>
+            <button className="copilot-setup-btn" onClick={() => setShowSettings(true)}>
+              <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
+                <path d="M6 7.5A1.5 1.5 0 1 0 6 4.5A1.5 1.5 0 0 0 6 7.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
+              </svg>
+              Configure Agent
+            </button>
+            <div className="copilot-empty-divider">
+              <span>or try built-in templates</span>
+            </div>
             <div className="copilot-suggestions">
-              {['Generate a bodice block', 'Create a sleeve', 'Generate A-line skirt', 'Genera un pantalón'].map(s => (
+              {['Generate a bodice block', 'Create a sleeve', 'Generate A-line skirt'].map(s => (
+                <button key={s} className="copilot-suggestion" onClick={() => handleSendText(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {messages.length === 0 && agentConfig.type !== 'builtin' && (
+          <div className="copilot-empty">
+            <p>Connected to <strong>{agentConfig.name}</strong></p>
+            <p className="copilot-empty-hint">Ask anything about your patterns:</p>
+            <div className="copilot-suggestions">
+              {['Generate a bodice block', 'Create a sleeve', 'Adjust the waist by -2cm', 'Add seam allowance to all'].map(s => (
                 <button key={s} className="copilot-suggestion" onClick={() => handleSendText(s)}>
                   {s}
                 </button>
@@ -260,7 +290,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
           ref={inputRef}
           type="text"
           className="copilot-input"
-          placeholder="Ask the copilot..."
+          placeholder="Type a message..."
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}

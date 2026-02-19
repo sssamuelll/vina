@@ -106,12 +106,12 @@ export default function Workspace() {
         <button
           className={`toolbar-btn copilot-toolbar-btn ${showCopilot ? 'active' : ''}`}
           onClick={() => setShowCopilot(v => !v)}
-          title="AI Copilot (Ctrl+K)"
+          title="Chat (Ctrl+K)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M8 2L10 6H14L11 9L12 14L8 11L4 14L5 9L2 6H6L8 2Z" stroke="currentColor" strokeWidth="1.2" fill={showCopilot ? 'currentColor' : 'none'}/>
+            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="currentColor" strokeWidth="1.2" fill={showCopilot ? 'currentColor' : 'none'}/>
           </svg>
-          Copilot
+          Chat
         </button>
       </header>
 
