@@ -118,22 +118,24 @@ export default function PropertiesPanel() {
                   />
                 </div>
                 <div className="panel-button-row">
-                  <button className="panel-icon-btn" onClick={handleSave} title="Save project file">
+                  <button className="panel-labeled-btn" onClick={handleSave}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <path d="M10 1H3C2.45 1 2 1.45 2 2V12C2 12.55 2.45 13 3 13H11C11.55 13 12 12.55 12 12V4L10 1Z" stroke="currentColor" strokeWidth="1" fill="none"/>
                       <path d="M8.5 1V5H4.5V1M8.5 9V13H4.5V9H8.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
                     </svg>
+                    <span>Save</span>
                   </button>
-                  <button className="panel-icon-btn" onClick={handleLoad} title="Load project file">
+                  <button className="panel-labeled-btn" onClick={handleLoad}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                       <path d="M2 11V3C2 2.45 2.45 2 3 2H6L8 4H11C11.55 4 12 4.45 12 5V11C12 11.55 11.55 12 11 12H3C2.45 12 2 11.55 2 11Z" stroke="currentColor" strokeWidth="1" fill="none"/>
                     </svg>
+                    <span>Open</span>
                   </button>
-                  <button className="panel-icon-btn" onClick={handleNew} title="New project">
+                  <button className="panel-labeled-btn" onClick={handleNew}>
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M9 2H3C2.45 2 2 2.45 2 3V11C2 11.55 2.45 12 3 12H11C11.55 12 12 11.55 12 11V5L9 2Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                      <path d="M9 2V5H12" stroke="currentColor" strokeWidth="1" fill="none"/>
+                      <path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
                     </svg>
+                    <span>New</span>
                   </button>
                 </div>
               </div>

@@ -206,20 +206,23 @@ select.panel-input {
 
 .panel-delete {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 10px;
   padding: 6px;
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.3);
+  background: transparent;
+  border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--seam-color);
-  font-size: 11px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .panel-delete:hover {
-  background: var(--seam-color);
-  color: #fff;
+  border-color: rgba(255, 107, 107, 0.4);
+  color: var(--seam-color);
+  background: rgba(255, 107, 107, 0.08);
 }
 
 .avatar-mode-toggle {
@@ -255,22 +258,27 @@ select.panel-input {
 
 .file-input {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  width: 100%;
 }
 
 .file-input::file-selector-button {
-  background: var(--bg-panel);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border);
   border-radius: 4px;
-  color: var(--text-primary);
-  padding: 4px 10px;
-  font-size: 11px;
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  font-size: 10px;
+  font-weight: 500;
   cursor: pointer;
   margin-right: 8px;
+  transition: all 0.15s;
 }
 
 .file-input::file-selector-button:hover {
-  background: var(--border-light);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 /* Seam items */
@@ -348,6 +356,38 @@ select.panel-input {
 .panel-icon-btn:hover {
   background: rgba(255, 255, 255, 0.12);
   border-color: var(--accent);
+}
+
+.panel-labeled-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.panel-labeled-btn span {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.panel-labeled-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.panel-labeled-btn:hover span {
+  color: var(--text-secondary);
 }
 
 /* Export buttons */

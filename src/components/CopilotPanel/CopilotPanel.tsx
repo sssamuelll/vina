@@ -92,6 +92,27 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     }
   }, [input, isLoading, project, editor, messages, agentConfig, dispatch]);
 
+  const handleSendText = useCallback(async (text: string) => {
+    if (!text.trim() || isLoading) return;
+    const userMsg: CopilotMessage = { role: 'user', content: text, timestamp: Date.now() };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsLoading(true);
+    try {
+      const context = buildCopilotContext(project, editor, text, messages);
+      const response = await sendToAgent(agentConfig, context);
+      const { executed, errors } = executeCommands(response.commands, dispatch, project.pieces);
+      let content = response.message;
+      if (errors.length > 0) content += `\n⚠️ ${errors.join(', ')}`;
+      if (executed > 0) content += `\n✅ ${executed} action${executed > 1 ? 's' : ''} applied`;
+      setMessages(prev => [...prev, { role: 'assistant', content, commands: response.commands, timestamp: Date.now() }]);
+    } catch (e: any) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `❌ ${e.message}`, timestamp: Date.now() }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, project, editor, messages, agentConfig, dispatch]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -163,7 +184,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
           </button>
           <button className="copilot-btn-sm" onClick={() => setMessages([])} title="Clear chat">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+              <path d="M2 3H10M4 3V2H8V3M3 3V10C3 10.5 3.5 11 4 11H8C8.5 11 9 10.5 9 10V3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
             </svg>
           </button>
           <button 
@@ -206,11 +227,11 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       <div className="copilot-messages">
         {messages.length === 0 && (
           <div className="copilot-empty">
-            <p>👋 Hi! I'm your pattern copilot.</p>
-            <p className="copilot-empty-hint">Try:</p>
+            <p>Hi, I'm your pattern copilot.</p>
+            <p className="copilot-empty-hint">Quick actions:</p>
             <div className="copilot-suggestions">
               {['Generate a bodice block', 'Create a sleeve', 'Generate A-line skirt', 'Genera un pantalón'].map(s => (
-                <button key={s} className="copilot-suggestion" onClick={() => { setInput(s); }}>
+                <button key={s} className="copilot-suggestion" onClick={() => handleSendText(s)}>
                   {s}
                 </button>
               ))}
