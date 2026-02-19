@@ -240,6 +240,9 @@ export default function PatternEditor() {
 
   // Cursor based on tool
   const getCursor = () => {
+    if (nodeEditor.isEditing) {
+      return nodeEditor.hoveredNode ? 'move' : 'default';
+    }
     switch (activeTool) {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
@@ -620,9 +623,8 @@ export default function PatternEditor() {
               )}
             </g>
           )}
-        </g>
 
-        {/* ─── Node Editor: editable anchor points & handles ─── */}
+          {/* ─── Node Editor: editable anchor points & handles ─── */}
           {nodeEditor.isEditing && nodeEditor.editingPieceId && (() => {
             const piece = pieces.find(p => p.id === nodeEditor.editingPieceId);
             if (!piece) return null;
