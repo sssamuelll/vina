@@ -87,3 +87,57 @@
   background: var(--seam-color);
   color: #fff;
 }
+
+.panel-input {
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  width: 120px;
+}
+
+.panel-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.panel-input.narrow {
+  width: 64px;
+  text-align: right;
+}
+
+select.panel-input {
+  cursor: pointer;
+}
+
+.panel-input-unit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.unit {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.panel-delete {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px;
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  border-radius: 4px;
+  color: var(--seam-color);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.panel-delete:hover {
+  background: var(--seam-color);
+  color: #fff;
+}

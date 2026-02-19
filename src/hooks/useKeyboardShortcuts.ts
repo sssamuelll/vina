@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { setActiveTool } from '../store/editorSlice';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../store';
+import { setActiveTool, clearSelection } from '../store/editorSlice';
+import { removePiece } from '../store/projectSlice';
 import { Tool2D } from '../types/types';
 
 const SHORTCUTS: Record<string, Tool2D> = {
@@ -17,19 +19,26 @@ const SHORTCUTS: Record<string, Tool2D> = {
 
 export function useKeyboardShortcuts() {
   const dispatch = useDispatch();
+  const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Don't trigger when typing in inputs
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      // Delete selected pieces
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPieceIds.length > 0) {
+        selectedPieceIds.forEach(id => dispatch(removePiece(id)));
+        dispatch(clearSelection());
+        return;
+      }
+
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const tool = SHORTCUTS[e.key.toLowerCase()];
       if (tool) {
         dispatch(setActiveTool(tool));
       }
-
-      // Space = temporary hand tool (handled separately in PatternEditor)
     };
 
     window.addEventListener('keydown', handler);

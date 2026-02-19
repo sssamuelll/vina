@@ -1,6 +1,7 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid } from '../../store/editorSlice';
+import { updatePiece, removePiece, updateMeasurements } from '../../store/projectSlice';
+import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection } from '../../store/editorSlice';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -8,6 +9,13 @@ export default function PropertiesPanel() {
   const { pieces, fabrics, avatar } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
+
+  const handleDeletePiece = () => {
+    if (selectedPiece) {
+      dispatch(removePiece(selectedPiece.id));
+      dispatch(clearSelection());
+    }
+  };
 
   return (
     <div className="properties-panel">
@@ -17,16 +25,48 @@ export default function PropertiesPanel() {
           <h3 className="panel-title">Piece</h3>
           <div className="panel-field">
             <label>Name</label>
-            <span>{selectedPiece.name}</span>
+            <input
+              type="text"
+              className="panel-input"
+              value={selectedPiece.name}
+              onChange={e => dispatch(updatePiece({ ...selectedPiece, name: e.target.value, updatedAt: new Date() }))}
+            />
           </div>
           <div className="panel-field">
-            <label>Seam Allowance</label>
-            <span>{selectedPiece.seamAllowance} mm</span>
+            <label>Seam (mm)</label>
+            <input
+              type="number"
+              className="panel-input narrow"
+              value={selectedPiece.seamAllowance}
+              min={0}
+              max={50}
+              onChange={e => dispatch(updatePiece({ ...selectedPiece, seamAllowance: Number(e.target.value), updatedAt: new Date() }))}
+            />
           </div>
           <div className="panel-field">
             <label>Fabric</label>
-            <span>{fabrics.find(f => f.id === selectedPiece.fabricId)?.name || 'None'}</span>
+            <select
+              className="panel-input"
+              value={selectedPiece.fabricId || ''}
+              onChange={e => dispatch(updatePiece({ ...selectedPiece, fabricId: e.target.value || undefined, updatedAt: new Date() }))}
+            >
+              <option value="">None</option>
+              {fabrics.map(f => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
           </div>
+          <div className="panel-field">
+            <label>Mirror</label>
+            <input
+              type="checkbox"
+              checked={selectedPiece.mirrored}
+              onChange={() => dispatch(updatePiece({ ...selectedPiece, mirrored: !selectedPiece.mirrored, updatedAt: new Date() }))}
+            />
+          </div>
+          <button className="panel-delete" onClick={handleDeletePiece}>
+            ✕ Delete Piece
+          </button>
         </section>
       ) : (
         <section className="panel-section">
@@ -45,25 +85,23 @@ export default function PropertiesPanel() {
       {/* Avatar */}
       <section className="panel-section">
         <h3 className="panel-title">Avatar</h3>
-        <div className="panel-field">
-          <label>Height</label>
-          <span>{avatar.measurements.height} cm</span>
-        </div>
-        <div className="panel-field">
-          <label>Chest</label>
-          <span>{avatar.measurements.chest} cm</span>
-        </div>
-        <div className="panel-field">
-          <label>Waist</label>
-          <span>{avatar.measurements.waist} cm</span>
-        </div>
-        <div className="panel-field">
-          <label>Hips</label>
-          <span>{avatar.measurements.hips} cm</span>
-        </div>
+        {(['height', 'chest', 'waist', 'hips', 'shoulder', 'armLength', 'inseam'] as const).map(key => (
+          <div className="panel-field" key={key}>
+            <label>{key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}</label>
+            <div className="panel-input-unit">
+              <input
+                type="number"
+                className="panel-input narrow"
+                value={avatar.measurements[key]}
+                onChange={e => dispatch(updateMeasurements({ [key]: Number(e.target.value) }))}
+              />
+              <span className="unit">cm</span>
+            </div>
+          </div>
+        ))}
       </section>
 
-      {/* Display options */}
+      {/* Display */}
       <section className="panel-section">
         <h3 className="panel-title">Display</h3>
         <label className="panel-toggle">

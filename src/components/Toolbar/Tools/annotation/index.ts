@@ -1,1 +1,0 @@
-export { CommentTool } from './CommentTool';
