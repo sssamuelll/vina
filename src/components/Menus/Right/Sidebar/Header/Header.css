@@ -1,0 +1,70 @@
+.userIconContainer{
+    padding: 7px;
+    border-radius: 50%;
+    width: 10px;
+    height: 10px;
+    text-align: center;
+    align-items: center;
+    border: 1px solid #444;
+    background-color: #FFCD29;
+}
+
+.userIcon{
+    position: relative;
+    bottom: 5px;
+    font-size: 13px;
+    color: #000000;
+    cursor: pointer;
+
+}
+
+.userContainer{
+    padding-left: 10px;
+    display: flex;
+    flex-direction: row;
+    gap: 5px;
+}
+
+.shareButton{
+    padding: 7px 9px;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #0D99FF;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.shareButtonContainer{
+    padding-right: 10px;
+}
+
+.arrowIcon{
+    cursor:pointer;
+}
+
+.rightRow{
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-top: 23px;
+    padding: 0 10px;
+}
+
+.rightTitle{
+    font-size: 10px;
+    font-weight: 600;
+    align-content: center;
+}
+
+.ZoomContainer{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+    
+}
+.zoomButton{
+    font-size: 10px;
+    font-weight: 600;
+}

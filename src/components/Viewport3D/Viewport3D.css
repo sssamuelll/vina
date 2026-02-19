@@ -1,0 +1,26 @@
+.viewport3d {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.viewport3d canvas {
+  display: block;
+}
+
+.sim-status {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+}
+
+.sim-status.running {
+  color: #6bff6b;
+}

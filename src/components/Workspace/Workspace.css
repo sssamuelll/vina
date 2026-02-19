@@ -1,0 +1,113 @@
+.workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* ─── Top Toolbar ─── */
+.workspace-toolbar {
+  height: var(--toolbar-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 24px;
+  flex-shrink: 0;
+}
+
+.workspace-logo {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+}
+
+.view-toggle {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.view-toggle button {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.view-toggle button:hover {
+  color: var(--text-primary);
+}
+
+.view-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ─── Body ─── */
+.workspace-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ─── Viewports ─── */
+.viewports {
+  flex: 1;
+  display: flex;
+  position: relative;
+}
+
+.viewport {
+  position: relative;
+  overflow: hidden;
+}
+
+.viewport.full {
+  width: 100%;
+}
+
+.viewport.half {
+  width: 50%;
+}
+
+.viewport-label {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  z-index: 10;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.viewport-2d {
+  background: var(--bg-canvas);
+}
+
+.viewport-3d {
+  background: var(--bg-primary);
+}
+
+.viewport-divider {
+  width: var(--divider-width);
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+
+.viewport-divider:hover {
+  background: var(--accent);
+}

@@ -1,0 +1,22 @@
+/* components/Common/Modal.css */
+.custom-modal {
+    position: fixed;
+    background-color: #1E1E1E;
+    color: #FFF;
+    border-radius: 8px;
+    padding: 8px 0;
+    width: 220px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 1px rgba(255,255,255,0.2);
+    z-index: 1000;
+    font-size: 13px;
+  }
+  
+  .custom-modal > div {
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  
+  .custom-modal > div:hover {
+    background-color: #2C2C2C;
+  }
+  

@@ -1,0 +1,21 @@
+.canvasContainer {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .canvas {
+    display: block;
+    background: whitesmoke;
+    
+  }
+  
+  .permanent-layer {
+    z-index: 1;
+  }
+  
+  .transient-layer {
+    background-color: transparent !important;
+    z-index: 2;
+    pointer-events: auto;
+  }
+

@@ -1,0 +1,24 @@
+.pattern-editor {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  cursor: crosshair;
+}
+
+.pattern-svg {
+  display: block;
+}
+
+.pattern-piece {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.pattern-piece:hover path:first-child {
+  fill: rgba(74, 158, 255, 0.2);
+}
+
+.pattern-piece.selected path:first-child {
+  stroke: var(--selected);
+  stroke-width: 2;
+}

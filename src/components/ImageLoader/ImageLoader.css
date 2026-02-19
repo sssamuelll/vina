@@ -1,0 +1,33 @@
+.image-loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  .load-image-button {
+    padding: 8px 15px;
+    background-color: #0D99FF;
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: background-color 0.2s ease-in-out;
+    border: none;
+  }
+  
+  .load-image-button:hover {
+    background-color: #007bff;
+  }
+  
+  .loaded-image {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    margin-top: 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  }
+  

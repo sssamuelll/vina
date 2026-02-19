@@ -1,0 +1,37 @@
+.markersContainer{
+    padding: 10px;
+}
+
+.markersTitle{
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    padding-bottom: 10px;
+    padding: 0 10px;
+    cursor: default;
+}
+
+.markersList{
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding-top: 10px;
+}
+
+.marker{
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px;
+    border-radius: 5px;
+}
+
+.markerIcon{
+    padding-left: 10px;
+}
+
+.marker:hover{
+    background-color: #383838;
+}
