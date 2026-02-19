@@ -17,20 +17,10 @@ jobs:
       - run: npm run build
 
       - name: Deploy to server
-        uses: easingthemes/ssh-deploy@v5
-        with:
-          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          REMOTE_HOST: 13.48.46.19
-          REMOTE_USER: ubuntu
-          SOURCE: dist/
-          TARGET: /tmp/openclo-deploy/
-
-      - name: Activate deploy
-        uses: appleboy/ssh-action@v1
-        with:
-          host: 13.48.46.19
-          username: ubuntu
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          script: |
-            sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/
-            sudo chown -R www-data:www-data /var/www/openclo/
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          rsync -azP --delete -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=no" dist/ ubuntu@13.48.46.19:/tmp/openclo-deploy/
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@13.48.46.19 "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
+          rm -f ~/.ssh/key
