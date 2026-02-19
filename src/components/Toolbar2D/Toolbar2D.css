@@ -44,16 +44,21 @@
   background: none;
 }
 
-.tool-btn.active::before {
+.tool-btn::before {
   content: '';
   position: absolute;
   left: -4px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) scaleY(0);
   width: 3px;
   height: 20px;
   background: var(--accent);
   border-radius: 0 2px 2px 0;
+  transition: transform 0.15s ease;
+}
+
+.tool-btn.active::before {
+  transform: translateY(-50%) scaleY(1);
 }
 
 .tool-btn.active .tool-icon {

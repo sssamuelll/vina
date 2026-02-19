@@ -7,6 +7,20 @@
   justify-content: center;
   z-index: 100;
   backdrop-filter: blur(4px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.template-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.template-overlay.closed {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s cubic-bezier(0.4, 0, 1, 1);
 }
 
 .template-library {
@@ -17,6 +31,17 @@
   max-height: 80vh;
   overflow-y: auto;
   position: relative;
+  transform: scale(0.95);
+  transition: transform 0.2s cubic-bezier(0, 0, 0.2, 1);
+}
+
+.template-overlay.open .template-library {
+  transform: scale(1);
+}
+
+.template-overlay.closed .template-library {
+  transform: scale(0.95);
+  transition: transform 0.15s cubic-bezier(0.4, 0, 1, 1);
 }
 
 .template-header {

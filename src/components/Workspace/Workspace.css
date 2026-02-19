@@ -149,9 +149,6 @@
   overflow: hidden;
 }
 
-.viewport.full { width: 100%; }
-.viewport.half { width: 50%; }
-
 .viewport-label {
   position: absolute;
   top: 8px;
@@ -200,13 +197,66 @@
   overflow: hidden;
 }
 
-/* ─── Copilot Column ─── */
+/* ─── Toolbar2D Wrapper (slide in/out) ─── */
+.toolbar2d-wrapper {
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toolbar2d-wrapper.visible {
+  width: var(--toolbar2d-width);
+  opacity: 1;
+}
+
+.toolbar2d-wrapper.hidden {
+  width: 0;
+  opacity: 0;
+}
+
+/* ─── Viewport transitions ─── */
+.viewport {
+  transition: flex 0.3s ease, opacity 0.3s ease;
+}
+
+.viewport.full { flex: 1; opacity: 1; }
+.viewport.half { flex: 0.5; opacity: 1; }
+.viewport.gone { flex: 0; opacity: 0; overflow: hidden; width: 0; min-width: 0; }
+
+.viewport-divider {
+  transition: width 0.3s ease, opacity 0.3s ease;
+}
+
+.viewport-divider.visible {
+  width: var(--divider-width);
+  opacity: 1;
+}
+
+.viewport-divider.hidden {
+  width: 0;
+  opacity: 0;
+}
+
+/* ─── Copilot Column (slide in/out from right) ─── */
 .copilot-column {
-  width: 360px;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
   background: var(--bg-panel);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.copilot-column.open {
+  width: 360px;
+  opacity: 1;
+}
+
+.copilot-column.closed {
+  width: 0;
+  opacity: 0;
+  border-left-color: transparent;
 }

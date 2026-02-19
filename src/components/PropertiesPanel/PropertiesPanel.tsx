@@ -139,7 +139,7 @@ export default function PropertiesPanel() {
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            {!collapsedSections.project && (
+            <div className={`panel-section-body ${collapsedSections.project ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
                 <div className="panel-field">
                   <label>Name</label>
@@ -172,7 +172,7 @@ export default function PropertiesPanel() {
                   </button>
                 </div>
               </div>
-            )}
+            </div>
           </section>
           {/* Piece properties */}
           {selectedPiece && (
@@ -192,7 +192,7 @@ export default function PropertiesPanel() {
                   <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              {!collapsedSections.piece && (
+              <div className={`panel-section-body ${collapsedSections.piece ? 'collapsed' : ''}`}>
                 <div className="panel-section-content">
                   <div className="panel-field">
                     <label>Name</label>
@@ -239,7 +239,7 @@ export default function PropertiesPanel() {
                     Delete Piece
                   </button>
                 </div>
-              )}
+              </div>
             </section>
           )}
 
@@ -261,7 +261,7 @@ export default function PropertiesPanel() {
                   <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              {!collapsedSections.seams && (
+              <div className={`panel-section-body ${collapsedSections.seams ? 'collapsed' : ''}`}>
                 <div className="panel-section-content">
                   {seams.map(seam => {
                     const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
@@ -289,7 +289,7 @@ export default function PropertiesPanel() {
                     );
                   })}
                 </div>
-              )}
+              </div>
             </section>
           )}
 
@@ -310,7 +310,7 @@ export default function PropertiesPanel() {
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            {!collapsedSections.avatar && (
+            <div className={`panel-section-body ${collapsedSections.avatar ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
         <div className="avatar-mode-toggle">
           <button
@@ -390,7 +390,7 @@ export default function PropertiesPanel() {
                   </div>
                 )}
               </div>
-            )}
+            </div>
           </section>
 
           {/* Display */}
@@ -410,7 +410,7 @@ export default function PropertiesPanel() {
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            {!collapsedSections.display && (
+            <div className={`panel-section-body ${collapsedSections.display ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
                 <label className="panel-toggle">
                   <input type="checkbox" checked={editor.showSeamAllowance} onChange={() => dispatch(toggleSeamAllowance())} />
@@ -425,7 +425,7 @@ export default function PropertiesPanel() {
                   Snap to grid
                 </label>
               </div>
-            )}
+            </div>
           </section>
 
           {/* Export */}
@@ -446,7 +446,7 @@ export default function PropertiesPanel() {
                   <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
               </button>
-              {!collapsedSections.export && (
+              <div className={`panel-section-body ${collapsedSections.export ? 'collapsed' : ''}`}>
                 <div className="panel-section-content">
                   <div className="export-buttons">
                     <button
@@ -473,7 +473,7 @@ export default function PropertiesPanel() {
                     </button>
                   </div>
                 </div>
-              )}
+              </div>
             </section>
           )}
 
@@ -494,7 +494,7 @@ export default function PropertiesPanel() {
                 <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </button>
-            {!collapsedSections.simulation && (
+            <div className={`panel-section-body ${collapsedSections.simulation ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
                 <button
                   className={`sim-button ${editor.simulationRunning ? 'running' : ''}`}
@@ -503,7 +503,7 @@ export default function PropertiesPanel() {
                   {editor.simulationRunning ? 'Pause Simulation' : 'Start Simulation'}
                 </button>
               </div>
-            )}
+            </div>
           </section>
         </div>
       )}

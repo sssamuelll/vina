@@ -52,6 +52,16 @@
   gap: 4px;
   height: 100%;
   overflow-y: auto;
+  animation: panelFadeIn 0.2s ease;
+}
+
+@keyframes panelFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.panel-icons {
+  animation: panelFadeIn 0.2s ease;
 }
 
 .panel-section {
@@ -93,6 +103,22 @@
 
 .panel-section-header svg.collapsed {
   transform: rotate(-90deg);
+}
+
+.panel-section-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.2s ease;
+  overflow: hidden;
+}
+
+.panel-section-body.collapsed {
+  grid-template-rows: 0fr;
+}
+
+.panel-section-body > .panel-section-content {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel-section-content {

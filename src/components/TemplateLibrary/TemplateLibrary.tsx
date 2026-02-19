@@ -14,8 +14,6 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
   const dispatch = useDispatch();
   const avatar = useSelector((s: RootState) => s.project.avatar);
 
-  if (!isOpen) return null;
-
   const handleGenerate = (template: PatternTemplate) => {
     const pieces = template.generate(avatar.measurements);
     pieces.forEach(piece => {
@@ -29,7 +27,7 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
   };
 
   return (
-    <div className="template-overlay" onClick={onClose}>
+    <div className={`template-overlay ${isOpen ? 'open' : 'closed'}`} onClick={onClose}>
       <div className="template-library" onClick={e => e.stopPropagation()}>
         <div className="template-header">
           <h2>Pattern Templates</h2>

@@ -141,35 +141,31 @@ export default function Workspace() {
 
       {/* ─── Body: Activity Bar | Editors | Properties | Copilot ─── */}
       <div className="workspace-body">
-        {/* Activity Bar (left tools) */}
-        {viewMode !== '3d' && <Toolbar2D />}
+        {/* Activity Bar (left tools) — always in DOM, animated */}
+        <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
+          <Toolbar2D />
+        </div>
 
-        {/* Editors (viewports) */}
+        {/* Editors (viewports) — crossfade transitions */}
         <div className="editors">
-          {(viewMode === '2d' || viewMode === 'split') && (
-            <div className={`viewport viewport-2d ${viewMode === 'split' ? 'half' : 'full'}`}>
-              <div className="viewport-label">PATTERN</div>
-              <PatternEditor />
-            </div>
-          )}
-          {viewMode === 'split' && <div className="viewport-divider" />}
-          {(viewMode === '3d' || viewMode === 'split') && (
-            <div className={`viewport viewport-3d ${viewMode === 'split' ? 'half' : 'full'}`}>
-              <div className="viewport-label">3D VIEW</div>
-              <Viewport3D />
-            </div>
-          )}
+          <div className={`viewport viewport-2d ${viewMode === '2d' ? 'full' : viewMode === 'split' ? 'half' : 'gone'}`}>
+            <div className="viewport-label">PATTERN</div>
+            <PatternEditor />
+          </div>
+          <div className={`viewport-divider ${viewMode === 'split' ? 'visible' : 'hidden'}`} />
+          <div className={`viewport viewport-3d ${viewMode === '3d' ? 'full' : viewMode === 'split' ? 'half' : 'gone'}`}>
+            <div className="viewport-label">3D VIEW</div>
+            <Viewport3D />
+          </div>
         </div>
 
         {/* Properties Panel (right sidebar) */}
         <PropertiesPanel />
 
-        {/* Copilot Panel (far right, toggleable) */}
-        {showCopilot && (
-          <div className="copilot-column">
-            <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
-          </div>
-        )}
+        {/* Copilot Panel (far right, toggleable) — always in DOM */}
+        <div className={`copilot-column ${showCopilot ? 'open' : 'closed'}`}>
+          <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
+        </div>
       </div>
 
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />

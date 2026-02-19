@@ -74,6 +74,21 @@
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
   flex-shrink: 0;
+  animation: settingsSlideDown 0.2s ease;
+  overflow: hidden;
+}
+
+@keyframes settingsSlideDown {
+  from {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    max-height: 300px;
+    opacity: 1;
+  }
 }
 
 .copilot-settings h4 {
