@@ -1,9 +1,11 @@
+import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
+import AvatarModel from './AvatarModel';
 import './Viewport3D.css';
 
 /** Distribute pieces around the mannequin */
@@ -21,7 +23,7 @@ function getPosition(index: number, total: number): [number, number, number] {
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
 export default function Viewport3D() {
-  const { pieces } = useSelector((s: RootState) => s.project);
+  const { pieces, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
   const { simulationRunning, selectedPieceIds } = useSelector((s: RootState) => s.editor);
 
   return (
@@ -33,7 +35,13 @@ export default function Viewport3D() {
         <directionalLight position={[-2, 3, -1]} intensity={0.25} />
         <hemisphereLight args={['#dde4ee', '#8b7355', 0.25]} />
 
-        <Mannequin />
+        {/* Avatar: dress form or loaded 3D model */}
+        {avatarMode === 'dressform' && <Mannequin />}
+        {avatarMode === 'model' && avatarModelUrl && (
+          <Suspense fallback={null}>
+            <AvatarModel url={avatarModelUrl} />
+          </Suspense>
+        )}
 
         {/* Pattern pieces as 3D meshes */}
         {pieces.map((piece, i) => (

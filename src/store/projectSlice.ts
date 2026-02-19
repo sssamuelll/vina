@@ -26,6 +26,8 @@ const defaultFabric: Fabric = {
   friction: 0.5,
 };
 
+export type AvatarMode = 'dressform' | 'model';
+
 interface ProjectState {
   id: string;
   name: string;
@@ -33,6 +35,8 @@ interface ProjectState {
   seams: Seam[];
   fabrics: Fabric[];
   avatar: Avatar;
+  avatarMode: AvatarMode;
+  avatarModelUrl: string | null;
   isDirty: boolean;
 }
 
@@ -43,6 +47,8 @@ const initialState: ProjectState = {
   seams: [],
   fabrics: [defaultFabric],
   avatar: defaultAvatar,
+  avatarMode: 'dressform',
+  avatarModelUrl: null,
   isDirty: false,
 };
 
@@ -125,6 +131,13 @@ const projectSlice = createSlice({
     updateMeasurements(state, action: PayloadAction<Partial<Avatar['measurements']>>) {
       state.avatar.measurements = { ...state.avatar.measurements, ...action.payload };
     },
+    setAvatarMode(state, action: PayloadAction<AvatarMode>) {
+      state.avatarMode = action.payload;
+    },
+    setAvatarModelUrl(state, action: PayloadAction<string | null>) {
+      state.avatarModelUrl = action.payload;
+      if (action.payload) state.avatarMode = 'model';
+    },
   },
 });
 
@@ -133,7 +146,7 @@ export const {
   addPiece, updatePiece, removePiece, movePiece, rotatePiece,
   addSeam, removeSeam,
   addFabric, updateFabric,
-  updateAvatar, updateMeasurements,
+  updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;
 
 export default projectSlice.reducer;

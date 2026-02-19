@@ -1,12 +1,12 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, updateMeasurements } from '../../store/projectSlice';
+import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, AvatarMode } from '../../store/projectSlice';
 import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection } from '../../store/editorSlice';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
   const dispatch = useDispatch();
-  const { pieces, fabrics, avatar } = useSelector((s: RootState) => s.project);
+  const { pieces, fabrics, avatar, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
 
@@ -85,20 +85,84 @@ export default function PropertiesPanel() {
       {/* Avatar */}
       <section className="panel-section">
         <h3 className="panel-title">Avatar</h3>
-        {(['height', 'chest', 'waist', 'hips', 'shoulder', 'armLength', 'inseam'] as const).map(key => (
-          <div className="panel-field" key={key}>
-            <label>{key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}</label>
-            <div className="panel-input-unit">
-              <input
-                type="number"
-                className="panel-input narrow"
-                value={avatar.measurements[key]}
-                onChange={e => dispatch(updateMeasurements({ [key]: Number(e.target.value) }))}
-              />
-              <span className="unit">cm</span>
-            </div>
+        <div className="avatar-mode-toggle">
+          <button
+            className={`mode-btn ${avatarMode === 'dressform' ? 'active' : ''}`}
+            onClick={() => dispatch(setAvatarMode('dressform'))}
+          >
+            Dress Form
+          </button>
+          <button
+            className={`mode-btn ${avatarMode === 'model' ? 'active' : ''}`}
+            onClick={() => {
+              if (avatarModelUrl) dispatch(setAvatarMode('model'));
+            }}
+            style={{ opacity: avatarModelUrl ? 1 : 0.4 }}
+          >
+            3D Model
+          </button>
+        </div>
+
+        {/* Load GLB/GLTF */}
+        <div className="panel-field" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
+          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            Load GLB / GLTF avatar
+          </label>
+          <input
+            type="file"
+            accept=".glb,.gltf"
+            className="file-input"
+            onChange={e => {
+              const file = e.target.files?.[0];
+              if (file) {
+                const url = URL.createObjectURL(file);
+                dispatch(setAvatarModelUrl(url));
+              }
+            }}
+          />
+          {avatarModelUrl && (
+            <span style={{ fontSize: 10, color: 'var(--accent)' }}>✓ Model loaded</span>
+          )}
+        </div>
+
+        {/* URL input for remote models */}
+        <div className="panel-field" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6, marginTop: 8 }}>
+          <label style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+            Or paste URL (ReadyPlayerMe, MakeHuman...)
+          </label>
+          <input
+            type="text"
+            className="panel-input"
+            style={{ width: '100%' }}
+            placeholder="https://...model.glb"
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                const url = (e.target as HTMLInputElement).value.trim();
+                if (url) dispatch(setAvatarModelUrl(url));
+              }
+            }}
+          />
+        </div>
+
+        {/* Measurements (always visible, used for dress form) */}
+        {avatarMode === 'dressform' && (
+          <div style={{ marginTop: 12 }}>
+            {(['height', 'chest', 'waist', 'hips', 'shoulder', 'armLength', 'inseam'] as const).map(key => (
+              <div className="panel-field" key={key}>
+                <label>{key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}</label>
+                <div className="panel-input-unit">
+                  <input
+                    type="number"
+                    className="panel-input narrow"
+                    value={avatar.measurements[key]}
+                    onChange={e => dispatch(updateMeasurements({ [key]: Number(e.target.value) }))}
+                  />
+                  <span className="unit">cm</span>
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </section>
 
       {/* Display */}
