@@ -16,7 +16,7 @@ interface ToolHooks {
   nodeEditor: {
     isEditing: boolean;
     hoveredNode: unknown;
-    enterNodeEdit: (pieceId: string) => void;
+    enterNodeEdit: (pieceId: string, selectedNode?: NodeRef) => void;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
@@ -140,13 +140,14 @@ export function useEditorInteractions(
         const piece = pieces.find(p => p.id === pieceId);
         if (piece) {
           // Check if click is on an anchor point of the currently selected piece
-          const selectedPieceIds = new Set(
-            (target.ownerSVGElement?.querySelectorAll('.pattern-piece.selected') || [])
-              .map(el => el.getAttribute('data-piece-id'))
-              .filter(Boolean)
-          );
+          const selectedEls = target.ownerSVGElement?.querySelectorAll('.pattern-piece.selected');
+          const selectedIds = new Set<string>();
+          selectedEls?.forEach(el => {
+            const id = el.getAttribute('data-piece-id');
+            if (id) selectedIds.add(id);
+          });
           
-          if (selectedPieceIds.has(pieceId)) {
+          if (selectedIds.has(pieceId)) {
             const clickedNode = findClickedAnchorPoint(e, piece);
             if (clickedNode) {
               // Enter node editing mode with this node selected

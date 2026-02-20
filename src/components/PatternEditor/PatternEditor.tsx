@@ -116,6 +116,8 @@ export default function PatternEditor() {
             penDistance={pen.lastPointDistance}
             rectPreview={rectTool.previewRect}
             rectDimensions={rectTool.rectDimensions}
+            firstEdge={seamTool.firstEdge}
+            hoveredEdge={seamTool.hoveredEdge}
             lineStart={lineTool.startPoint}
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}
