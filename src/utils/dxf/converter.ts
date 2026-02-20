@@ -10,6 +10,15 @@ import {
 
 // ─── Entity → PathCommand[] conversion ───
 
+/**
+ * Convert a single DXF entity to an array of SVG-style path commands.
+ *
+ * Supports LINE, LWPOLYLINE, POLYLINE (with bulge arcs), SPLINE, ARC, and CIRCLE.
+ * Unsupported entity types return an empty array.
+ *
+ * @param entity - The DXF entity to convert
+ * @returns Array of path commands representing the entity geometry
+ */
 export function entityToPath(entity: DXFEntity): PathCommand[] {
   switch (entity.type) {
     case 'LINE': return lineToPath(entity.data as DXFLineData);
@@ -183,6 +192,17 @@ function transformPath(cmds: PathCommand[], insert: DXFInsertData): PathCommand[
 
 // ─── Main Converter ───
 
+/**
+ * Convert a parsed DXF document into OpenClo pattern pieces.
+ *
+ * If the document contains blocks, each block becomes a piece (with INSERT
+ * transforms applied). Otherwise, all entities are treated as a single piece.
+ * Entities are classified by AAMA layer role: cut lines form the outline,
+ * while notch, grainline, and draw layers become internal lines.
+ *
+ * @param doc - Parsed DXF document from {@link parseDXF}
+ * @returns Array of pattern pieces with outlines, internals, and metadata
+ */
 export function dxfToPatternPieces(doc: DXFDocument): PatternPiece[] {
   const pieces: PatternPiece[] = [];
 

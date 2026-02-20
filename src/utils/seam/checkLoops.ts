@@ -3,7 +3,17 @@ import { lineIntersection, pointOnLine, ACCURACY } from './geometry';
 
 /**
  * Remove self-intersecting loops from an offset polygon.
- * Port of Seamly2D's CheckLoops.
+ *
+ * Iteratively detects edge-to-edge intersections and removes the loop
+ * between them by splicing in the intersection point. Also handles
+ * overlapping parallel segments. Repeats until no more loops are found.
+ *
+ * @remarks
+ * Port of Seamly2D's CheckLoops algorithm. Commonly needed after generating
+ * seam allowance offsets, which can produce self-intersections at sharp corners.
+ *
+ * @param points - Polygon vertices (may contain self-intersecting loops)
+ * @returns Cleaned polygon with all self-intersecting loops removed
  */
 export function checkLoops(points: Point2D[]): Point2D[] {
   if (points.length < 3) return [...points];

@@ -4,6 +4,12 @@ import { flattenPath } from '../seam/index';
 
 // ─── Geometry Helpers ───
 
+/**
+ * Compute the axis-aligned bounding box of a set of 2D points.
+ *
+ * @param points - Array of 2D points
+ * @returns Object with `minX`, `minY`, `maxX`, `maxY`, `width`, and `height`
+ */
 export function computeBBox(points: Point2D[]): {
   minX: number; minY: number; maxX: number; maxY: number; width: number; height: number;
 } {
@@ -17,6 +23,14 @@ export function computeBBox(points: Point2D[]): {
   return { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY };
 }
 
+/**
+ * Compute the area of a pattern piece outline using the shoelace formula.
+ *
+ * The outline path commands are first flattened to discrete points.
+ *
+ * @param outline - Path commands defining the piece outline
+ * @returns Absolute area in square units (always positive)
+ */
 export function computeArea(outline: PathCommand[]): number {
   const pts = flattenPath(outline);
   if (pts.length < 3) return 0;
@@ -45,6 +59,13 @@ function mirrorPoints(points: Point2D[]): Point2D[] {
   return points.map(p => ({ x: -p.x, y: p.y }));
 }
 
+/**
+ * Compute the bounding box dimensions of a set of points after rotation.
+ *
+ * @param points - Original 2D points
+ * @param angleDeg - Rotation angle in degrees
+ * @returns Width, height, and min-corner offsets of the rotated bounding box
+ */
 export function rotateBBox(points: Point2D[], angleDeg: number): {
   width: number; height: number; offsetX: number; offsetY: number;
 } {
@@ -55,6 +76,21 @@ export function rotateBBox(points: Point2D[], angleDeg: number): {
 
 // ─── Skyline Algorithm ───
 
+/**
+ * Find the best placement position for a piece on the skyline.
+ *
+ * Scans all skyline segments to find the leftmost, lowest position where
+ * the piece fits within sheet bounds (respecting margin and gap).
+ *
+ * @param skyline - Current skyline segments representing occupied vertical space
+ * @param pieceW - Width of the piece bounding box
+ * @param pieceH - Height of the piece bounding box
+ * @param sheetW - Total sheet width
+ * @param sheetH - Total sheet height
+ * @param margin - Sheet edge margin
+ * @param gap - Minimum gap between pieces
+ * @returns Best position `{ x, y, score }` or `null` if the piece doesn't fit
+ */
 export function findBestPosition(
   skyline: SkylineSegment[],
   pieceW: number,
@@ -108,6 +144,15 @@ export function findBestPosition(
   return best;
 }
 
+/**
+ * Update the skyline after placing a piece, splitting and merging segments as needed.
+ *
+ * @param skyline - Current skyline segments
+ * @param x - X position of the placed piece
+ * @param width - Width of the placed piece
+ * @param newY - New Y height at the placed region (top of the piece)
+ * @returns Updated skyline segments, sorted by X and merged where adjacent segments share the same Y
+ */
 export function updateSkyline(
   skyline: SkylineSegment[],
   x: number,
@@ -168,6 +213,33 @@ interface PreparedPiece {
   bboxH: number;
 }
 
+/**
+ * Nest (bin-pack) pattern pieces onto rectangular sheets using a skyline algorithm.
+ *
+ * Pieces are sorted by the chosen strategy, then placed one by one onto sheets.
+ * Each piece is tried at multiple rotation angles (and optionally mirrored) to
+ * find the most compact placement. New sheets are added as needed.
+ *
+ * @remarks
+ * Uses a bottom-left skyline heuristic: for each piece variant (rotation × mirror),
+ * the algorithm finds the lowest Y position across all skyline segments where the
+ * piece bounding box fits within the sheet.
+ *
+ * @param pieces - Pattern pieces to nest
+ * @param options - Nesting options (sheet size, gap, rotation step, sort strategy, etc.)
+ * @returns A {@link NestingResult} with placements, sheet count, utilization ratio, and unplaced piece IDs
+ *
+ * @example
+ * ```ts
+ * const result = nestPieces(pieces, {
+ *   sheet: { width: 150, height: 300, margin: 1 },
+ *   gap: 0.5,
+ *   rotationStep: 90,
+ *   allowMirror: false,
+ *   sortStrategy: 'area-desc',
+ * });
+ * ```
+ */
 export function nestPieces(
   pieces: PatternPiece[],
   options: NestingOptions,

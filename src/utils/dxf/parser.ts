@@ -300,6 +300,22 @@ function int(pairs: GroupPair[], code: number): number {
 
 // ─── Main Parser ───
 
+/**
+ * Parse a DXF ASCII file into a structured {@link DXFDocument}.
+ *
+ * Supports R12 and R2000+ formats. Extracts header variables, layer definitions,
+ * block definitions, and entities (LINE, LWPOLYLINE, POLYLINE, SPLINE, ARC,
+ * CIRCLE, TEXT/MTEXT, INSERT).
+ *
+ * @param content - Raw DXF file content as a string
+ * @returns Parsed document with header, layers, blocks, and entities
+ *
+ * @example
+ * ```ts
+ * const doc = parseDXF(dxfString);
+ * console.log(doc.layers.map(l => l.name));
+ * ```
+ */
 export function parseDXF(content: string): DXFDocument {
   const lines = content.split(/\r?\n/);
   const pairs = parseGroupPairs(lines);

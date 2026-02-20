@@ -1,99 +1,110 @@
 # OpenClo
 
-Open source 2D pattern editor + 3D garment visualization in the browser.
+[![Build](https://img.shields.io/github/actions/workflow/status/sssamuelll/openclo/deploy.yml?branch=main)](https://github.com/sssamuelll/openclo/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
+
+**Open source 2D pattern editor + 3D garment visualization in the browser.**
+
+OpenClo is a free, browser-based alternative to CLO3D for garment pattern design. Draw pattern pieces with Bézier curves, connect seams, add notches and grainlines, see everything rendered in 3D around a parametric avatar, and export production-ready files — all with optional AI assistance.
 
 **[Live Demo →](https://openclo.sdar.dev)**
 
-## What is this?
-
-OpenClo is a browser-based tool for garment pattern design. Draw pattern pieces with Bezier curves, see them rendered in 3D around a mannequin, export production-ready DXF for cutting.
-
-Think CLO3D, but open source, in the browser, and with AI assistance.
+![OpenClo Editor](docs/screenshots/editor.png)
 
 ## Features
 
-**2D Pattern Editor**
-- Pen tool with Bezier curves (click for corners, drag for smooth curves)
-- Node editor (double-click to edit anchor points + handles)
-- Seam connections, notch marks, grainline, darts
+### 🖊️ Editor
+- Pen tool with Bézier curves (click for corners, drag for smooth)
+- Node editor — edit anchor points + handles
+- Seam connections, notch marks (7 types), grainline, darts
 - Measurement tool
 - Parametric templates (bodice, sleeve, skirt, pants, collar)
-- SVG-based — infinite precision
+- Draggable split-view 2D + 3D
+- Undo/redo, save/load, keyboard shortcuts
 
-**3D Viewport**
-- Pattern pieces rendered as meshes around parametric avatar
-- GLTF/GLB avatar loader (Avaturn, ReadyPlayerMe, MakeHuman)
-- A-pose default, adjustable body measurements
+### ⚙️ Engines
+- **Seam allowance** — polygon offset with 6 corner types
+- **Nesting** — bottom-left skyline bin packing
+- **Grading** — multi-size pattern scaling
+- **Formula** — parametric calculations from 44 body measurements
 
-**AI Copilot**
-- Agent-agnostic chat panel (works with any LLM provider)
-- Generate and modify patterns via natural language
-- Command executor bridges AI responses → editor actions
-
-**Export**
-- DXF (R12) — pattern pieces with layers (cut, seam, notch, grainline, label)
+### 📤 Export
+- DXF (AAMA/ASTM D6673) with SPLINE entities
 - PDF — printable cut layouts
+- OBJ — 3D mesh export
 
-**Other**
-- Save/Load projects
-- Undo/Redo (full history)
-- Keyboard shortcuts
-- Mobile: chat-only experience (<768px)
-- CI/CD auto-deploy
+### 🤖 AI Copilot
+- Agent-agnostic chat panel (any LLM provider)
+- Generate and modify patterns via natural language
+- Command executor bridges AI → editor actions
 
-## Stack
+### 👤 3D Viewport
+- Parametric avatar (1.80m default, 44 body measurements)
+- GLTF/GLB loader (Avaturn, ReadyPlayerMe, MakeHuman)
+- A-pose, real-time pattern mesh preview
 
-- React 18 + TypeScript + Vite
-- Redux Toolkit
-- Three.js via React Three Fiber v8 + drei v9
-- Node.js + Express (server)
-- 82 unit tests (Vitest) + 16 E2E suites (Puppeteer)
-
-## Getting Started
+## Quick Start
 
 ```bash
 git clone https://github.com/sssamuelll/openclo.git
 cd openclo
 npm install
-npm run dev
+npm run dev       # http://localhost:5180
+npx vitest run    # 82 unit tests
+npm run build     # production build
 ```
 
-Open `http://localhost:5180`
+## Architecture
+
+React 18 + TypeScript + Vite, Redux Toolkit, Three.js via React Three Fiber.
+
+Each engine in `src/utils/` is independent — pure TypeScript, no external deps, fully unit tested.
+
+```
+src/
+├── components/     # UI (editor, viewport, panels, chat)
+├── utils/          # Engines (seam allowance, nesting, grading, DXF, PDF...)
+├── store/          # Redux slices
+docs/specs/         # Architecture, roadmap, file formats
+```
+
+See [docs/specs/ARCHITECTURE.md](docs/specs/ARCHITECTURE.md) for details.
+
+## File Format Compatibility
+
+| Format | Import | Export | Status |
+|--------|--------|--------|--------|
+| DXF (AAMA/ASTM) | ✅ | ✅ | Full support |
+| PDF | — | ✅ | Cut layouts |
+| OBJ | — | ✅ | 3D meshes |
+| OpenClo .json | ✅ | ✅ | Native format |
+| CLO3D .zprj | 🔜 | 🔜 | Planned v0.5 |
+| SVG | 🔜 | — | Planned v0.5 |
+| Gerber AccuMark | 🔜 | 🔜 | Planned v0.5 |
 
 ## Roadmap
 
 | Phase | What | Status |
 |-------|------|--------|
 | 1 | Foundation — editor, 3D, templates, AI, tests | ✅ Done (v0.1–v0.4) |
-| 2 | **Industry formats** — DXF/CLO3D/Gerber import+export | 🔨 In Progress (v0.5) |
-| 3 | **Pro UI** — per-view toolbars, floating panels, swappable views | 📋 Planned (v0.6) |
-| 4 | **Avatar system** — pose editor, body morphs, avatar library | 📋 Planned (v0.7) |
-| 5 | **Production output** — A0/A1 PDF, marker making, nesting | 📋 Planned (v0.8) |
-| 6 | **Cloth simulation** — mass-spring physics, draping, heatmaps | 📋 Planned (v0.9) |
-| 7 | **Grading** — multi-size rules, grade points, size range export | 📋 Planned (v0.10) |
-| — | **v1.0 Public release** — landing page, docs, tutorials | 📋 Planned |
+| 2 | Industry formats — DXF/CLO3D/Gerber import+export | 🔨 In Progress (v0.5) |
+| 3 | Pro UI — per-view toolbars, floating panels | 📋 Planned (v0.6) |
+| 4 | Avatar system — pose editor, body morphs | 📋 Planned (v0.7) |
+| 5 | Production output — A0/A1 PDF, marker making | 📋 Planned (v0.8) |
+| 6 | Cloth simulation — physics, draping, heatmaps | 📋 Planned (v0.9) |
+| 7 | Grading — multi-size rules, size range export | 📋 Planned (v0.10) |
 
 See [docs/specs/ROADMAP.md](docs/specs/ROADMAP.md) for full details.
 
-## File Format Compatibility
-
-| Format | Import | Export | Notes |
-|--------|--------|--------|-------|
-| DXF (ASTM D6673) | 🔨 v0.5 | ✅ Basic / 🔨 ASTM upgrade | Universal pattern exchange |
-| CLO3D .zprj | 🔨 v0.5 | 🔨 v0.5 | ZIP with DXF + metadata |
-| Gerber AccuMark | 🔨 v0.5 | 🔨 v0.5 | ZIP with ASTM DXF |
-| SVG | 🔨 v0.5 | — | Illustrator/Inkscape paths |
-| PDF | — | ✅ | Cut layouts |
-| OpenClo .json | ✅ | ✅ | Native project format |
-
-See [docs/specs/FILE-FORMATS.md](docs/specs/FILE-FORMATS.md) for format details.
-
 ## Why?
 
-Professional pattern design software (CLO3D, Browzwear, Gerber AccuMark) is expensive, closed-source, and desktop-only. There's no open source alternative that combines 2D pattern editing with 3D visualization.
+Professional pattern software (CLO3D, Browzwear, Gerber) is expensive, closed-source, and desktop-only. OpenClo is the open source alternative — browser-based, with AI-powered pattern generation that legacy tools can't match.
 
-OpenClo fills that gap — and adds AI-powered pattern generation that legacy software can't match.
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and PR guidelines.
 
 ## License
 
-MIT
+[MIT](LICENSE)

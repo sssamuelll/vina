@@ -514,7 +514,15 @@ function sanitizeBlockName(name: string): string {
 // ─── Public API ───
 
 /**
- * Generate AAMA/ASTM D6673 compliant DXF.
+ * Generate an AAMA/ASTM D6673 compliant DXF string from pattern pieces.
+ *
+ * Produces a complete DXF with HEADER, TABLES (layers + block records),
+ * BLOCKS (one per piece with outline, internals, and label), and ENTITIES
+ * (INSERT references spaced horizontally).
+ *
+ * @param pieces - Pattern pieces to export
+ * @param options - Optional export settings (DXF version, AAMA layer toggle)
+ * @returns Complete DXF file content as a string
  */
 export function generateDXFAAMA(pieces: PatternPiece[], options?: Partial<DXFExportOptions>): string {
   const opts = { ...DEFAULT_OPTIONS, ...options };
@@ -531,7 +539,13 @@ EOF
   return dxf;
 }
 
-/** Download AAMA DXF as file */
+/**
+ * Generate an AAMA DXF and trigger a browser file download.
+ *
+ * @param pieces - Pattern pieces to export
+ * @param filename - Download filename (default: `'pattern-aama.dxf'`)
+ * @param options - Optional DXF export settings
+ */
 export function downloadDXFAAMA(pieces: PatternPiece[], filename = 'pattern-aama.dxf', options?: Partial<DXFExportOptions>) {
   const dxf = generateDXFAAMA(pieces, options);
   const blob = new Blob([dxf], { type: 'application/dxf' });
