@@ -21,9 +21,9 @@ Think CLO3D, but open source, in the browser, and with AI assistance.
 - SVG-based — infinite precision
 
 **3D Viewport**
-- Pattern pieces rendered as meshes around parametric dress form
-- GLTF/GLB avatar loader (ReadyPlayerMe, MakeHuman, custom models)
-- Adjustable body measurements (height, chest, waist, hips, shoulder, arm, inseam)
+- Pattern pieces rendered as meshes around parametric avatar
+- GLTF/GLB avatar loader (Avaturn, ReadyPlayerMe, MakeHuman)
+- A-pose default, adjustable body measurements
 
 **AI Copilot**
 - Agent-agnostic chat panel (works with any LLM provider)
@@ -62,19 +62,16 @@ Open `http://localhost:5180`
 
 ## Roadmap
 
-| Version | What | Status |
-|---------|------|--------|
-| v0.1 | Workspace, pen tool, 2D→3D sync | ✅ Done |
-| v0.2 | Seam connections, notch marks, grainline | ✅ Done |
-| v0.3 | DXF/PDF export, save/load, undo/redo | ✅ Done |
-| v0.4 | AI copilot, parametric templates, polish | ✅ Done |
-| v0.5 | **File formats** — DXF import, CLO3D .zprj, Gerber AccuMark | 🔨 Next |
-| v0.6 | **UI overhaul** — per-view toolbars, floating panels, no fixed sidebar | 📋 Planned |
-| v0.7 | **Avatar editor** — pose sliders, body morphs, avatar library | 📋 Planned |
-| v0.8 | Production output — A0/A1 PDF, marker making | 📋 Planned |
-| v0.9 | Cloth simulation (mass-spring physics) | 📋 Planned |
-| v0.10 | Size grading | 📋 Planned |
-| v1.0 | Public release with docs and examples | 📋 Planned |
+| Phase | What | Status |
+|-------|------|--------|
+| 1 | Foundation — editor, 3D, templates, AI, tests | ✅ Done (v0.1–v0.4) |
+| 2 | **Industry formats** — DXF/CLO3D/Gerber import+export | 🔨 In Progress (v0.5) |
+| 3 | **Pro UI** — per-view toolbars, floating panels, swappable views | 📋 Planned (v0.6) |
+| 4 | **Avatar system** — pose editor, body morphs, avatar library | 📋 Planned (v0.7) |
+| 5 | **Production output** — A0/A1 PDF, marker making, nesting | 📋 Planned (v0.8) |
+| 6 | **Cloth simulation** — mass-spring physics, draping, heatmaps | 📋 Planned (v0.9) |
+| 7 | **Grading** — multi-size rules, grade points, size range export | 📋 Planned (v0.10) |
+| — | **v1.0 Public release** — landing page, docs, tutorials | 📋 Planned |
 
 See [docs/specs/ROADMAP.md](docs/specs/ROADMAP.md) for full details.
 

@@ -1,118 +1,107 @@
 # OpenClo — Roadmap
 
-## Completed
+## Phase 1: Foundation ✅ (v0.1–v0.4)
 
-### v0.1 — Foundation
-- [x] Split-view workspace (2D editor + 3D viewport)
-- [x] Pen tool with Bezier curves (click corners, drag curves)
-- [x] 2D → 3D sync (pattern pieces render as meshes around mannequin)
-- [x] Parametric dress form (adjustable measurements)
-- [x] GLTF/GLB avatar loader (ReadyPlayerMe, MakeHuman)
-- [x] Keyboard shortcuts (V, P, L, H, Delete, Ctrl+Z, etc.)
-- [x] Zoom & pan (wheel zoom toward cursor, middle-click pan)
+Everything needed to draw patterns and see them in 3D. Done.
 
-### v0.2 — Pattern Tools
-- [x] Seam connections between piece edges
-- [x] Notch marks
-- [x] Grainline tool
-- [x] Fabric grain direction
-
-### v0.3 — Export
-- [x] DXF export (R12, LWPOLYLINE, basic layers)
-- [x] PDF export (A4, piece layout)
-- [x] Node editor (double-click to edit anchor points + bezier handles)
-- [x] Save/Load projects (.json)
-- [x] Undo/Redo system
-
-### v0.4 — AI & Polish (current)
-- [x] AI Chat panel (agent-agnostic protocol)
+- [x] Split-view workspace (2D SVG editor + 3D Three.js viewport)
+- [x] Pen tool with Bezier curves, node editing
+- [x] 2D → 3D sync (pieces render as meshes around avatar)
+- [x] Pattern tools: seams, notches, grainline, darts, measurement
 - [x] Parametric templates (bodice, sleeve, skirt, pants, collar)
-- [x] Measurement tool
-- [x] Command executor (AI → Redux actions)
-- [x] PropertiesPanel (collapsible sidebar)
-- [x] Mobile chat-only experience (<768px)
-- [x] VS Code-style layout (flex panels, draggable divider)
-- [x] Smooth viewport transitions
-- [x] CI/CD (GitHub Actions → openclo.sdar.dev)
+- [x] DXF + PDF export (basic)
+- [x] Save/Load projects, Undo/Redo
+- [x] AI Chat copilot (agent-agnostic protocol)
+- [x] GLTF/GLB avatar with A-pose
+- [x] Mobile: chat-only (<768px)
+- [x] CI/CD → openclo.sdar.dev
 - [x] 82 unit tests + 16 E2E suites
-- [x] CSS deduplication + design system
 
-## In Progress
+## Phase 2: Industry Compatibility (v0.5) — IN PROGRESS
 
-### v0.5 — Industry File Formats
-> **Goal:** Speak the industry's language. Import from CLO3D/Gerber, export ASTM-compliant DXF.
+**Goal:** Speak the industry's language. A patronista can bring work from CLO3D into OpenClo and export back.
 
-**See:** [FILE-FORMATS.md](./FILE-FORMATS.md) for detailed spec.
+### File Formats
+- [ ] DXF Import (ASTM D6673) — LWPOLYLINE, SPLINE, LINE, POINT, TEXT, BLOCK/INSERT
+- [ ] DXF Export upgrade — ASTM layer numbering, SPLINE entities, piece BLOCKs
+- [ ] Real seam allowance offset — Clipper.js parallel curve, exported as Layer 2
+- [ ] CLO3D .zprj import — unzip, parse DXF + metadata JSON, load avatar OBJ
+- [ ] CLO3D .zprj export — zip DXF + metadata + avatar + thumbnail
+- [ ] Gerber AccuMark import/export — ZIP with ASTM DXF + manifest
+- [ ] SVG import — Illustrator/Inkscape paths → PatternPiece outlines
 
-- [ ] **DXF Import** — parse LWPOLYLINE, SPLINE, LINE, POINT, TEXT, BLOCK/INSERT; ASTM layer mapping
-- [ ] **DXF Export upgrade** — ASTM D6673 layer numbering, SPLINE entities (not polyline approximation), piece BLOCKs
-- [ ] **Real seam allowance offset** — parallel curve offset (Clipper.js or Minkowski sum), export as Layer 2
-- [ ] **CLO3D .zprj import** — unzip, parse DXF + metadata JSON, load avatar OBJ
-- [ ] **CLO3D .zprj export** — zip DXF + metadata + avatar + thumbnail
-- [ ] **Gerber AccuMark import** — unzip, parse ASTM DXF per piece
-- [ ] **Gerber AccuMark export** — zip with ASTM DXF + manifest
-- [ ] **SVG import** — parse paths → PatternPiece outlines (useful for Illustrator/Inkscape users)
+**See:** [FILE-FORMATS.md](./FILE-FORMATS.md)
 
-### v0.6 — UI Overhaul (CLO3D-Inspired Layout)
-- [ ] **Remove permanent right sidebar** — properties panel eats too much workspace
-- [ ] **Context toolbars per view** — 2D view gets 2D-specific tools on its left edge, 3D view gets 3D-specific tools on its left edge (like CLO3D)
-- [ ] **Floating panels inside views** — collapsible panels that live inside the 2D/3D viewport (like BioCanvas approach), not in a fixed sidebar
-- [ ] **Properties on selection** — instead of always-open panel, show properties as floating popover when piece/avatar is selected
-- [ ] **Top toolbar refactor** — global actions (save, export, undo, view mode) stay in top bar; tool-specific items move to view toolbars
-- [ ] **Contextual menus** — right-click context menus for pieces, seams, avatar (common in CAD tools)
-- [ ] **Fullscreen workspace** — maximize 2D or 3D view to use entire screen (double-click divider or hotkey)
-- [ ] **Status bar per view** — coordinates/zoom in 2D, camera angle/distance in 3D (bottom of each view, not global)
-- [ ] **Swappable view positions** — user chooses 2D left / 3D right or vice versa (drag to swap or toggle button)
+## Phase 3: Professional UI (v0.6)
 
-### v0.7 — Avatar Editor
-- [ ] Pose editor — sliders per joint (shoulders, arms, legs, torso bend)
+**Goal:** Feel like a real CAD tool, not a prototype. Maximize workspace, minimize chrome.
+
+### Layout Overhaul
+- [ ] Kill the permanent right sidebar — properties as floating popover on selection
+- [ ] Per-view toolbars — 2D tools on left of 2D editor, 3D tools on left of 3D viewport
+- [ ] Floating panels inside views (BioCanvas approach) — collapsible, draggable
+- [ ] Swappable view positions — user chooses 2D left / 3D right or vice versa
+- [ ] Fullscreen per view — maximize 2D or 3D to entire screen
+- [ ] Top toolbar: only global actions (save, export, undo, view mode)
+- [ ] Right-click context menus for pieces, seams, avatar
+- [ ] Status bar per view (coords/zoom in 2D, camera angle in 3D)
+
+## Phase 4: Avatar System (v0.7)
+
+**Goal:** The avatar is as important as the pattern. Full control over body and pose.
+
+- [ ] Pose editor — sliders per joint (shoulders, arms, legs, torso)
 - [ ] Pose presets (A-pose, T-pose, sitting, walking, arms-forward)
-- [ ] Body measurements → morph targets (chest, waist, hips, height reshape the mesh)
-- [ ] Load custom avatar (GLB/GLTF from Avaturn, ReadyPlayerMe, MakeHuman)
-- [ ] Avatar library — save/switch between multiple avatars
-- [ ] Skin tone / underwear color customization
+- [ ] Body measurements → morph targets (chest, waist, hips reshape the mesh)
+- [ ] Load custom avatars (Avaturn, ReadyPlayerMe, MakeHuman)
+- [ ] Avatar library — save/switch between multiple bodies
+- [ ] Skin tone / underwear customization
 
-### v0.8 — Production Output
+## Phase 5: Production Output (v0.8)
+
+**Goal:** Output that goes directly to the cutting table.
+
 - [ ] PDF cut layout — A0/A1 paper sizes, automatic nesting
-- [ ] Marker making — automatic piece layout for fabric width
+- [ ] Marker making — optimize piece layout for fabric width
 - [ ] Seam allowance visualization in 2D editor
 - [ ] Print-ready tiled PDF (A4 pages with alignment marks)
 
-## Planned
+## Phase 6: Cloth Simulation (v0.9)
 
-### v0.9 — Cloth Simulation
-- [ ] Mass-spring physics engine
+**Goal:** See how the garment actually drapes on the body.
+
+- [ ] Mass-spring physics engine (Verlet integration)
 - [ ] Real-time draping on avatar
-- [ ] Fabric property presets (cotton, silk, denim, jersey)
-- [ ] Collision detection (avatar ↔ fabric)
-- [ ] Tension/stress visualization
+- [ ] Fabric property presets (cotton, silk, denim, jersey, chiffon)
+- [ ] Collision detection (avatar ↔ fabric, self-collision)
+- [ ] Tension/stress heatmap visualization
+- [ ] Web Worker physics (SharedArrayBuffer)
 
-### v0.10 — Grading
-- [ ] Size grading rules (S/M/L/XL or numeric)
-- [ ] Grade reference points
+**See:** [SIMULATION.md](./SIMULATION.md)
+
+## Phase 7: Grading (v0.10)
+
+**Goal:** One pattern, all sizes.
+
+- [ ] Size grading rules (S/M/L/XL or numeric ranges)
+- [ ] Grade reference points on pieces
 - [ ] Multi-size DXF export
-- [ ] Size range visualization
+- [ ] Size range overlay visualization
 
-### v0.11 — Collaboration
-- [ ] Cloud project storage
-- [ ] Share projects via URL
-- [ ] Version history
-- [ ] Comments on pieces
+## v1.0 — Public Release
 
-### v1.0 — Public Release
-- [ ] Landing page
-- [ ] Documentation site
-- [ ] Tutorial videos
-- [ ] Example projects (shirt, dress, pants, jacket)
-- [ ] Performance optimization
-- [ ] Accessibility audit
+- [ ] Landing page + documentation site
+- [ ] Tutorial videos + example projects (shirt, dress, pants, jacket)
+- [ ] Performance optimization + accessibility audit
 - [ ] PWA / offline support
 
-## Future Ideas (post v1.0)
-- AI pattern generation from images (photo → pattern pieces)
+## Future (post v1.0)
+
+- AI pattern generation from photos (image → pattern pieces)
 - AI fit prediction (body scan → recommended adjustments)
+- Cloud collaboration (share via URL, version history, comments)
 - Knit pattern support
 - Embroidery/print placement
-- Integration with fabric suppliers (order directly)
-- Marketplace for pattern templates
-- Real-time collaboration (multiplayer editor)
+- Fabric supplier integration (order directly)
+- Pattern marketplace
+- Real-time multiplayer editor
