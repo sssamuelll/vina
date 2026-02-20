@@ -126,6 +126,19 @@ describe('projectSlice', () => {
     expect(store.getState().project.avatar.measurements.waist).toBe(82);
   });
 
+  it('supports optional expanded measurements without breaking existing', () => {
+    const store = createStore();
+    // New optional fields default to undefined
+    expect(store.getState().project.avatar.measurements.neckCirc).toBeUndefined();
+    expect(store.getState().project.avatar.measurements.thighCirc).toBeUndefined();
+    // Can set them
+    store.dispatch(updateMeasurements({ neckCirc: 38, upperArmCirc: 30 }));
+    expect(store.getState().project.avatar.measurements.neckCirc).toBe(38);
+    expect(store.getState().project.avatar.measurements.upperArmCirc).toBe(30);
+    // Primary measurements still intact
+    expect(store.getState().project.avatar.measurements.height).toBe(180);
+  });
+
   it('sets avatar mode', () => {
     const store = createStore();
     store.dispatch(setAvatarMode('model'));

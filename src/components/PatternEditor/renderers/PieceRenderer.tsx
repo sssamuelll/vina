@@ -40,22 +40,27 @@ export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSe
               />
             )}
 
-            {piece.internals.map(line => (
-              <path
-                key={line.id}
-                d={pathToSVG(line.path)}
-                fill="none"
-                stroke={
-                  line.type === 'grainline' ? '#6bff6b' :
-                  line.type === 'dart' ? '#ff9800' :
-                  line.type === 'fold' ? '#9c27b0' :
-                  '#888'
-                }
-                strokeWidth={0.8 / zoom2D}
-                strokeDasharray={line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D}` : 'none'}
-                opacity={line.type === 'grainline' && !showGrainlines ? 0 : 0.7}
-              />
-            ))}
+            {piece.internals.map(line => {
+              const isNotch = line.type === 'notch';
+              const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
+              return (
+                <path
+                  key={line.id}
+                  d={pathToSVG(line.path)}
+                  fill={hasFill ? 'rgba(255, 152, 0, 0.3)' : 'none'}
+                  stroke={
+                    line.type === 'grainline' ? '#6bff6b' :
+                    line.type === 'dart' ? '#ff9800' :
+                    line.type === 'notch' ? '#ff9800' :
+                    line.type === 'fold' ? '#9c27b0' :
+                    '#888'
+                  }
+                  strokeWidth={0.8 / zoom2D}
+                  strokeDasharray={line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D}` : 'none'}
+                  opacity={line.type === 'grainline' && !showGrainlines ? 0 : 0.7}
+                />
+              );
+            })}
 
             <text
               fontSize={11 / zoom2D}

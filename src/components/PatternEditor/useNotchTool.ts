@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
-import { PatternPiece, Point2D, InternalLine } from '../../types/types';
+import { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
+import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 
 /**
  * Notch tool: click on a piece edge to place a notch mark.
@@ -77,17 +78,14 @@ function closestPointOnOutline(
 }
 
 /** Create a notch InternalLine at a point with a normal direction */
-function createNotchLine(point: Point2D, normal: Point2D, piecePos: Point2D): InternalLine {
-  // Notch is a small line perpendicular to the edge
+function createNotchLine(point: Point2D, normal: Point2D, piecePos: Point2D, notchOptions?: NotchOptions): InternalLine {
   const localPt = { x: point.x - piecePos.x, y: point.y - piecePos.y };
-  const half = NOTCH_SIZE / 2;
+  const opts = notchOptions || DEFAULT_NOTCH_OPTIONS;
   return {
     id: `notch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: 'notch',
-    path: [
-      { type: 'M', values: [localPt.x - normal.x * half, localPt.y - normal.y * half] },
-      { type: 'L', values: [localPt.x + normal.x * NOTCH_SIZE, localPt.y + normal.y * NOTCH_SIZE] },
-    ],
+    path: generateNotchPath(localPt, normal, opts),
+    notchOptions: opts,
   };
 }
 
@@ -96,6 +94,7 @@ export function useNotchTool(
   pan: Point2D,
   pieces: PatternPiece[],
   onAddNotch: (pieceId: string, notch: InternalLine) => void,
+  notchOptions?: NotchOptions,
 ) {
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
 
@@ -113,7 +112,7 @@ export function useNotchTool(
     for (const piece of pieces) {
       const hit = closestPointOnOutline(pt, piece, zoom);
       if (hit) {
-        const notch = createNotchLine(hit.point, hit.normal, piece.position);
+        const notch = createNotchLine(hit.point, hit.normal, piece.position, notchOptions);
         onAddNotch(piece.id, notch);
         return;
       }

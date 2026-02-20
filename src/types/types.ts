@@ -44,10 +44,23 @@ export interface PatternPiece {
 
 export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat';
 
+export type NotchShape = 'slit' | 't-notch' | 'v-internal' | 'v-external' | 'u-notch' | 'castle' | 'diamond';
+export type NotchSubType = 'straightforward' | 'bisector' | 'intersection';
+
+export interface NotchOptions {
+  shape: NotchShape;
+  subType: NotchSubType;
+  length: number;    // mm, default 8
+  width: number;     // mm, default 3
+  angle: number;     // degrees, default 0
+  count: number;     // 1, 2, or 3
+}
+
 export interface InternalLine {
   id: string;
   type: InternalLineType;
   path: PathCommand[];
+  notchOptions?: NotchOptions;
 }
 
 // ─── Seams (connections between pieces) ───
@@ -78,6 +91,69 @@ export interface Fabric {
   friction: number;     // 0-1
 }
 
+// ─── Body Measurements ───
+
+export interface BodyMeasurements {
+  // ─── Primary (existing, always shown) ───
+  height: number;        // cm
+  chest: number;
+  waist: number;
+  hips: number;
+  shoulder: number;
+  armLength: number;
+  inseam: number;
+
+  // ─── Torso ───
+  neckCirc?: number;
+  highBust?: number;
+  lowBust?: number;
+  ribCirc?: number;
+  highHip?: number;
+
+  // ─── Vertical Heights ───
+  neckBackHeight?: number;
+  waistHeight?: number;
+  hipHeight?: number;
+  kneeHeight?: number;
+
+  // ─── Widths ───
+  shoulderWidth?: number;
+  bustWidth?: number;
+  waistWidth?: number;
+  hipWidth?: number;
+
+  // ─── Lengths Front/Back ───
+  neckToWaistFront?: number;
+  neckToWaistBack?: number;
+  shoulderToWaistFront?: number;
+  shoulderToWaistBack?: number;
+  waistToHipFront?: number;
+  waistToHipBack?: number;
+  waistToKnee?: number;
+  waistToFloor?: number;
+  crotchLength?: number;
+
+  // ─── Arms ───
+  upperArmCirc?: number;
+  elbowCirc?: number;
+  wristCirc?: number;
+  shoulderToElbow?: number;
+  elbowToWrist?: number;
+  armscyeDepth?: number;
+
+  // ─── Legs ───
+  thighCirc?: number;
+  kneeCirc?: number;
+  calfCirc?: number;
+  ankleCirc?: number;
+
+  // ─── Bust/Dart ───
+  bustPointToBustPoint?: number;
+  bustPointToNeckSide?: number;
+  dartWidthBust?: number;
+  dartWidthWaist?: number;
+}
+
 // ─── Avatar ───
 
 export interface Avatar {
@@ -86,15 +162,7 @@ export interface Avatar {
   /** Path to GLTF/GLB model */
   modelUrl: string;
   /** Body measurements for parametric adjustment */
-  measurements: {
-    height: number;     // cm
-    chest: number;
-    waist: number;
-    hips: number;
-    shoulder: number;
-    armLength: number;
-    inseam: number;
-  };
+  measurements: BodyMeasurements;
 }
 
 // ─── Project ───

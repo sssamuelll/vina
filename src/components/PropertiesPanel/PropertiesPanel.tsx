@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam, setProjectName, loadProject } from '../../store/projectSlice';
+import type { NotchShape, NotchOptions, BodyMeasurements } from '../../types/types';
 import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
@@ -18,6 +19,9 @@ export default function PropertiesPanel() {
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
   const [, forceUpdate] = useState(0);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [notchSettings, setNotchSettings] = useState<NotchOptions>({
+    shape: 'slit', subType: 'straightforward', length: 8, width: 3, angle: 0, count: 1,
+  });
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     project: false,
     piece: false,
@@ -238,6 +242,46 @@ export default function PropertiesPanel() {
                   <button className="panel-delete" onClick={handleDeletePiece}>
                     Delete Piece
                   </button>
+
+                  {/* Notch Settings */}
+                  <div className="notch-settings" style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+                    <div style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notch Settings</div>
+                    <div className="panel-field">
+                      <label>Shape</label>
+                      <select
+                        className="panel-input"
+                        value={notchSettings.shape}
+                        onChange={e => setNotchSettings(s => ({ ...s, shape: e.target.value as NotchShape }))}
+                      >
+                        <option value="slit">Slit</option>
+                        <option value="t-notch">T-Notch</option>
+                        <option value="v-internal">V-Internal</option>
+                        <option value="v-external">V-External</option>
+                        <option value="u-notch">U-Notch</option>
+                        <option value="castle">Castle</option>
+                        <option value="diamond">Diamond</option>
+                      </select>
+                    </div>
+                    <div className="panel-field">
+                      <label>Length (mm)</label>
+                      <input type="number" className="panel-input narrow" value={notchSettings.length} min={1} max={30}
+                        onChange={e => setNotchSettings(s => ({ ...s, length: Number(e.target.value) }))} />
+                    </div>
+                    <div className="panel-field">
+                      <label>Width (mm)</label>
+                      <input type="number" className="panel-input narrow" value={notchSettings.width} min={1} max={20}
+                        onChange={e => setNotchSettings(s => ({ ...s, width: Number(e.target.value) }))} />
+                    </div>
+                    <div className="panel-field">
+                      <label>Count</label>
+                      <select className="panel-input" value={notchSettings.count}
+                        onChange={e => setNotchSettings(s => ({ ...s, count: Number(e.target.value) as 1 | 2 | 3 }))}>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
             </section>
@@ -386,6 +430,44 @@ export default function PropertiesPanel() {
                           <span className="unit">cm</span>
                         </div>
                       </div>
+                    ))}
+
+                    {/* Expanded measurement groups */}
+                    {([
+                      { label: 'Torso', keys: ['neckCirc', 'highBust', 'lowBust', 'ribCirc', 'highHip'] as const },
+                      { label: 'Heights', keys: ['neckBackHeight', 'waistHeight', 'hipHeight', 'kneeHeight'] as const },
+                      { label: 'Widths', keys: ['shoulderWidth', 'bustWidth', 'waistWidth', 'hipWidth'] as const },
+                      { label: 'Lengths', keys: ['neckToWaistFront', 'neckToWaistBack', 'shoulderToWaistFront', 'shoulderToWaistBack', 'waistToHipFront', 'waistToHipBack', 'waistToKnee', 'waistToFloor', 'crotchLength'] as const },
+                      { label: 'Arms', keys: ['upperArmCirc', 'elbowCirc', 'wristCirc', 'shoulderToElbow', 'elbowToWrist', 'armscyeDepth'] as const },
+                      { label: 'Legs', keys: ['thighCirc', 'kneeCirc', 'calfCirc', 'ankleCirc'] as const },
+                      { label: 'Bust/Dart', keys: ['bustPointToBustPoint', 'bustPointToNeckSide', 'dartWidthBust', 'dartWidthWaist'] as const },
+                    ] as const).map(group => (
+                      <details key={group.label} style={{ marginTop: 4 }}>
+                        <summary style={{ cursor: 'pointer', fontSize: 11, color: '#aaa', userSelect: 'none' }}>{group.label}</summary>
+                        <div style={{ paddingLeft: 4 }}>
+                          {group.keys.map(key => {
+                            const val = avatar.measurements[key as keyof BodyMeasurements];
+                            return (
+                              <div className="panel-field" key={key}>
+                                <label>{key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase())}</label>
+                                <div className="panel-input-unit">
+                                  <input
+                                    type="number"
+                                    className="panel-input narrow"
+                                    value={val ?? ''}
+                                    placeholder="—"
+                                    onChange={e => {
+                                      const v = e.target.value;
+                                      dispatch(updateMeasurements({ [key]: v === '' ? undefined : Number(v) }));
+                                    }}
+                                  />
+                                  <span className="unit">cm</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
                     ))}
                   </div>
                 )}
