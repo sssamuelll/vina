@@ -47,8 +47,8 @@ const initialState: ProjectState = {
   seams: [],
   fabrics: [defaultFabric],
   avatar: defaultAvatar,
-  avatarMode: 'dressform',
-  avatarModelUrl: null,
+  avatarMode: 'model',
+  avatarModelUrl: '/default-avatar.glb',
   isDirty: false,
 };
 
