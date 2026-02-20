@@ -14,29 +14,39 @@ interface AvatarModelProps {
 /**
  * Set A-pose: rotate arms down ~45° from T-pose.
  * CLO3D standard pose — arms at 45° for natural garment draping.
+ * 
+ * Avaturn/Mixamo rigs: LeftShoulder has complex quaternion that orients the arm chain.
+ * LeftArm/RightArm are nearly identity in T-pose.
+ * To go from T-pose → A-pose, we rotate LeftArm/RightArm around their
+ * local forward axis (which points along the arm).
+ * 
+ * The shoulder quaternions orient the arm so that:
+ *   - Local Y points along the arm (outward)
+ *   - Local Z points forward
+ *   - Rotating around local Z in parent space brings the arm down
  */
 function setAPose(scene: THREE.Object3D) {
+  const DEG45 = Math.PI / 4;
+
   scene.traverse((child) => {
     if (!(child as THREE.Bone).isBone) return;
     const bone = child as THREE.Bone;
     const name = bone.name;
 
-    // Rotate upper arms down 45° (T-pose → A-pose)
-    // LeftArm: rotate +45° around Z (positive Z rotates down on left side)
-    // RightArm: rotate -45° around Z (negative Z rotates down on right side)
-    const angle = Math.PI / 4; // 45 degrees
-
     if (name === 'LeftArm' || name === 'LeftUpperArm') {
-      bone.rotation.z += angle;
+      // For left arm: rotate to bring arm down toward body
+      // In Mixamo/Avaturn rigs, the shoulder orients the chain so
+      // we need to apply rotation in the bone's local space
+      const q = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 0, 1), DEG45
+      );
+      bone.quaternion.multiply(q);
     } else if (name === 'RightArm' || name === 'RightUpperArm') {
-      bone.rotation.z -= angle;
-    }
-
-    // Slightly bend forearms inward for natural look
-    if (name === 'LeftForeArm' || name === 'LeftLowerArm') {
-      bone.rotation.z += angle * 0.15;
-    } else if (name === 'RightForeArm' || name === 'RightLowerArm') {
-      bone.rotation.z -= angle * 0.15;
+      // Mirror for right arm
+      const q = new THREE.Quaternion().setFromAxisAngle(
+        new THREE.Vector3(0, 0, -1), DEG45
+      );
+      bone.quaternion.multiply(q);
     }
   });
 }
@@ -52,6 +62,14 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
 
     // Apply A-pose (arms at 45° like CLO3D)
     setAPose(scene);
+
+    // Force skeleton update after bone manipulation
+    scene.traverse((child) => {
+      if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
+        const skinned = child as THREE.SkinnedMesh;
+        skinned.skeleton.update();
+      }
+    });
 
     // Compute bounding box for auto-scaling
     const box = new THREE.Box3().setFromObject(scene);
@@ -95,7 +113,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
       groupRef.current.remove(groupRef.current.children[0]);
     }
     groupRef.current.add(scene);
-  }, [gltf, autoScale]);
+  }, [gltf, autoScale, height]);
 
   return <group ref={groupRef} />;
 }
