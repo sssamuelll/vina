@@ -15,8 +15,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
   const gltf = useLoader(GLTFLoader, url);
   const poseApplied = useRef(false);
 
-  // Store reference to bones we need to rotate
-  const armBones = useRef<{ left?: THREE.Bone; right?: THREE.Bone }>({});
+  const armBones = useRef<{
+    left?: THREE.Bone; right?: THREE.Bone;
+    leftShoulder?: THREE.Bone; rightShoulder?: THREE.Bone;
+  }>({});
 
   useEffect(() => {
     if (!gltf?.scene || !groupRef.current) return;
@@ -32,6 +34,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
         armBones.current.left = bone;
       } else if (bone.name === 'RightArm' || bone.name === 'RightUpperArm') {
         armBones.current.right = bone;
+      } else if (bone.name === 'LeftShoulder') {
+        armBones.current.leftShoulder = bone;
+      } else if (bone.name === 'RightShoulder') {
+        armBones.current.rightShoulder = bone;
       }
     });
 
@@ -79,16 +85,30 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
   // Apply A-pose on first frame (after Three.js has processed the skeleton)
   useFrame(() => {
     if (poseApplied.current) return;
-    const { left, right } = armBones.current;
+    const { left, right, leftShoulder, rightShoulder } = armBones.current;
     if (!left && !right) return;
 
-    const DEG45 = Math.PI / 4;
-    const rot = new THREE.Quaternion().setFromAxisAngle(
-      new THREE.Vector3(1, 0, 0), DEG45
+    // Arms: 50° down from T-pose (45° + 5° extra per María's feedback)
+    const DEG50 = (Math.PI / 180) * 50;
+    const armRot = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(1, 0, 0), DEG50
     );
 
-    if (left) left.quaternion.multiply(rot);
-    if (right) right.quaternion.multiply(rot.clone());
+    if (left) left.quaternion.multiply(armRot);
+    if (right) right.quaternion.multiply(armRot.clone());
+
+    // Shoulders: slight inward rotation (~8°) to bring them closer to body
+    const DEG8 = (Math.PI / 180) * 8;
+    if (leftShoulder) {
+      leftShoulder.quaternion.multiply(
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), DEG8)
+      );
+    }
+    if (rightShoulder) {
+      rightShoulder.quaternion.multiply(
+        new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), DEG8)
+      );
+    }
 
     poseApplied.current = true;
   });
