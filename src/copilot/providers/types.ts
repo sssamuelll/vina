@@ -70,10 +70,10 @@ export interface ProviderResponse {
  */
 export interface ProviderConfig {
   /** Provider type */
-  provider: 'anthropic' | 'openai';
-  /** API key */
+  provider: 'anthropic' | 'openai' | 'ollama';
+  /** API key (empty for Ollama) */
   apiKey: string;
-  /** Model name (e.g. 'claude-sonnet-4-20250514', 'gpt-4o-mini') */
+  /** Model name (e.g. 'claude-sonnet-4-20250514', 'gpt-4o-mini', 'llama3') */
   model: string;
   /** Optional base URL override */
   baseUrl?: string;
@@ -125,12 +125,14 @@ export interface LLMProvider {
 export const PROVIDER_OPTIONS = [
   { value: 'anthropic', label: 'Anthropic (Claude)', defaultModel: 'claude-sonnet-4-20250514' },
   { value: 'openai', label: 'OpenAI (GPT)', defaultModel: 'gpt-4o-mini' },
+  { value: 'ollama', label: 'Ollama (Local)', defaultModel: 'llama3' },
 ] as const;
 
 /** Available models per provider */
 export const MODEL_OPTIONS: Record<string, string[]> = {
   anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-3-5-haiku-20241022'],
   openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
+  ollama: ['llama3', 'codellama', 'mistral', 'mixtral'],
 };
 
 // ─── Provider Config from localStorage ──────────────────────────────────────

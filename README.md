@@ -35,9 +35,16 @@ OpenClo is a free, browser-based alternative to CLO3D for garment pattern design
 - OBJ — 3D mesh export
 
 ### 🤖 AI Copilot
-- Agent-agnostic chat panel (any LLM provider)
-- Generate and modify patterns via natural language
-- Command executor bridges AI → editor actions
+- **Multi-provider**: Anthropic Claude, OpenAI GPT, Ollama (local/free)
+- **42 tools**: Create, modify, grade, nest, export — all via natural language
+- **Pattern skills**: Bodice, sleeve, skirt, collar, grading — with real drafting knowledge
+- **Teaching mode**: Explains WHY behind each action (patronaje education)
+- **Bilingual**: Spanish and English with proper pattern-making terminology
+- **Cost management**: Token tracking, budget warnings, smart model routing
+- **Error recovery**: Automatic retry with backoff, provider fallback
+- **Mobile-friendly**: Voice input, quick action chips, haptic feedback
+- **Offline mode**: Works with Ollama or built-in templates, no internet required
+- See [docs/AGENT_USAGE.md](docs/AGENT_USAGE.md) for the full usage guide
 
 ### 👤 3D Viewport
 - Parametric avatar (1.80m default, 44 body measurements)

@@ -365,6 +365,87 @@
   background: var(--accent-hover);
 }
 
+/* ─── Tool Calls ─── */
+.copilot-tool-calls {
+  margin-top: 6px;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.copilot-tool-calls.compact {
+  cursor: pointer;
+}
+
+.copilot-tool-compact {
+  font-weight: 500;
+}
+
+/* ─── Quick Actions (mobile chips) ─── */
+.copilot-quick-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+  overflow-x: auto;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.copilot-quick-actions::-webkit-scrollbar {
+  display: none;
+}
+
+.copilot-quick-chip {
+  white-space: nowrap;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 5px 12px;
+  border-radius: 16px;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+
+.copilot-quick-chip:hover,
+.copilot-quick-chip:active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.copilot-quick-chip:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* ─── Cost Footer ─── */
+.copilot-cost-footer {
+  padding: 3px 12px;
+  font-size: 9px;
+  color: var(--text-muted);
+  text-align: right;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ─── Voice Button ─── */
+.copilot-voice-btn {
+  flex-shrink: 0;
+}
+
+.copilot-voice-btn.listening {
+  color: var(--accent) !important;
+  animation: voice-pulse 1s infinite;
+}
+
+@keyframes voice-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Legacy floating mode (unused but kept for compat) */
 .copilot-toggle { display: none; }
 
@@ -425,5 +506,43 @@
   .copilot-suggestion {
     font-size: 13px;
     padding: 8px 14px;
+  }
+
+  /* Mobile fullscreen panel */
+  .copilot-panel.mobile.fullscreen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  /* Swipe indicator at top */
+  .copilot-panel.mobile.fullscreen .copilot-header::before {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 32px;
+    height: 4px;
+    background: var(--text-muted);
+    border-radius: 2px;
+    opacity: 0.3;
+  }
+
+  .copilot-quick-actions {
+    padding: 8px 16px;
+  }
+
+  .copilot-quick-chip {
+    font-size: 13px;
+    padding: 7px 14px;
+  }
+
+  .copilot-cost-footer {
+    padding: 4px 16px;
+    font-size: 10px;
   }
 }

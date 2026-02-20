@@ -7,17 +7,19 @@ import { executeCommands } from '../../copilot/commandExecutor';
 import { getDefaultRegistry } from '../../copilot/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
+import { ollamaProvider } from '../../copilot/providers/ollama';
 import {
   ProviderConfig,
   loadProviderConfig,
-  saveProviderConfig,
   PROVIDER_OPTIONS,
-  MODEL_OPTIONS,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
 import { runAgentLoop, type AgentLoopResult } from '../../copilot/agentLoop';
 import { runProactiveAnalysis, formatWarnings } from '../../copilot/proactiveAnalysis';
-import { isTeachingModeEnabled, setTeachingMode } from '../../copilot/teachingContext';
+import { isTeachingModeEnabled } from '../../copilot/teachingContext';
+import { CostManager } from '../../copilot/costManager';
+import { RecoveryStrategy, getErrorMessage, classifyError, isOfflineMode, getOfflineActions } from '../../copilot/errorRecovery';
+import AgentSettings from '../../copilot/AgentSettings';
 import './CopilotPanel.css';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
@@ -41,6 +43,15 @@ function saveAgentConfig(config: AgentConfig) {
   localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(config));
 }
 
+/** Quick action chips for mobile */
+const QUICK_ACTIONS = [
+  { label: 'Nuevo corpiño', text: 'Crear un corpiño base talla 40' },
+  { label: 'Agregar manga', text: 'Agregar manga al corpiño' },
+  { label: 'Gradar', text: 'Gradar todas las tallas' },
+  { label: 'Anidar', text: 'Anidar las piezas en tela' },
+  { label: 'Exportar DXF', text: 'Exportar proyecto como DXF' },
+];
+
 interface CopilotPanelProps {
   isColumn?: boolean;
   onClose?: () => void;
@@ -53,6 +64,16 @@ interface DisplayMessage {
   timestamp: number;
   toolCalls?: Array<{ name: string; result?: string; success?: boolean }>;
   isStreaming?: boolean;
+}
+
+/** Get the right provider instance based on config */
+function getProvider(config: ProviderConfig) {
+  switch (config.provider) {
+    case 'anthropic': return anthropicProvider;
+    case 'openai': return openaiProvider;
+    case 'ollama': return ollamaProvider;
+    default: return anthropicProvider;
+  }
 }
 
 export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanelProps = {}) {
@@ -70,25 +91,50 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
 
   // Legacy agent config
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(loadAgentConfig);
-  const [configEndpoint, setConfigEndpoint] = useState(agentConfig.endpoint || '');
 
   // New provider config
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfig);
-  const [settingsProvider, setSettingsProvider] = useState<'anthropic' | 'openai'>(providerConfig?.provider || 'anthropic');
-  const [settingsApiKey, setSettingsApiKey] = useState(providerConfig?.apiKey || '');
-  const [settingsModel, setSettingsModel] = useState(providerConfig?.model || 'claude-sonnet-4-20250514');
 
-  // Teaching mode
-  const [teachingMode, setTeachingModeState] = useState(isTeachingModeEnabled);
+  // Teaching mode (managed by AgentSettings)
+  useState(isTeachingModeEnabled);
 
   // Proactive warnings
   const [warnings, setWarnings] = useState<string>('');
+
+  // Cost management
+  const costManagerRef = useRef(new CostManager(project.id));
+  const [sessionCostLabel, setSessionCostLabel] = useState('');
+
+  // Recovery strategy
+  const recoveryRef = useRef(new RecoveryStrategy());
+
+  // Voice input (SpeechRecognition is not available in all browsers)
+  const [isListening, setIsListening] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
+
+  // Mobile detection
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Swipe handling
+  const touchStartRef = useRef<{ y: number; time: number } | null>(null);
+
+  // Expanded tool calls (mobile compact view)
+  const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
 
   // Memory
   const memoryRef = useRef(new ProjectMemory(project.id));
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Detect mobile
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -98,9 +144,10 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     if (isOpen) inputRef.current?.focus();
   }, [isOpen]);
 
-  // Update memory when project changes
+  // Update memory and cost manager when project changes
   useEffect(() => {
     memoryRef.current = new ProjectMemory(project.id);
+    costManagerRef.current = new CostManager(project.id);
   }, [project.id]);
 
   // Run proactive analysis when pieces change
@@ -113,8 +160,38 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     }
   }, [project.pieces, project.seams]);
 
+  // Voice input setup (Web Speech API — not available in all browsers)
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SpeechRecognitionAPI = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (SpeechRecognitionAPI) {
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'es-ES'; // Default to Spanish, auto-adjusts
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setInput(transcript);
+        }
+        setIsListening(false);
+      };
+      recognition.onerror = () => setIsListening(false);
+      recognition.onend = () => setIsListening(false);
+      recognitionRef.current = recognition;
+    }
+    return () => {
+      recognitionRef.current?.abort();
+    };
+  }, []);
+
   /** Determine which mode we're in */
-  const isProviderMode = providerConfig !== null && providerConfig.apiKey.length > 0;
+  const isProviderMode = providerConfig !== null && (
+    providerConfig.provider === 'ollama' || providerConfig.apiKey.length > 0
+  );
+  const offline = isOfflineMode(providerConfig);
 
   /** Send via the new LLM provider system with multi-turn agent loop */
   const handleProviderSend = useCallback(async (text: string) => {
@@ -126,9 +203,14 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     setInput('');
     setIsLoading(true);
 
+    // Haptic feedback on mobile
+    if (isMobile && navigator.vibrate) {
+      navigator.vibrate(30);
+    }
+
     try {
       const registry = getDefaultRegistry();
-      const provider = providerConfig.provider === 'anthropic' ? anthropicProvider : openaiProvider;
+      const provider = getProvider(providerConfig);
 
       // Create streaming assistant message
       const assistantMsg: DisplayMessage = {
@@ -140,75 +222,94 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       };
       setMessages(prev => [...prev, assistantMsg]);
 
-      // Run agent loop with multi-turn tool use
+      // Run agent loop with multi-turn tool use (wrapped in recovery)
       const getState = () => rootState;
-      const result: AgentLoopResult = await runAgentLoop(
-        text,
-        provider,
-        providerConfig,
-        registry,
-        dispatch,
-        getState,
-        memoryRef.current,
-        PATRONAJE_SOUL,
-        {
-          onText: (chunk) => {
-            setMessages(prev => {
-              const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last.role === 'assistant') {
-                updated[updated.length - 1] = { ...last, content: last.content + chunk };
+      const result: AgentLoopResult = await recoveryRef.current.withRecovery(() =>
+        runAgentLoop(
+          text,
+          provider,
+          providerConfig,
+          registry,
+          dispatch,
+          getState,
+          memoryRef.current,
+          PATRONAJE_SOUL,
+          {
+            onText: (chunk) => {
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last.role === 'assistant') {
+                  updated[updated.length - 1] = { ...last, content: last.content + chunk };
+                }
+                return updated;
+              });
+            },
+            onToolCallStart: (name, _round) => {
+              // Haptic on tool execution
+              if (isMobile && navigator.vibrate) {
+                navigator.vibrate(15);
               }
-              return updated;
-            });
-          },
-          onToolCallStart: (name, _round) => {
-            setMessages(prev => {
-              const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last.role === 'assistant') {
-                const tc = [...(last.toolCalls || []), { name }];
-                updated[updated.length - 1] = { ...last, toolCalls: tc };
-              }
-              return updated;
-            });
-          },
-          onToolCallEnd: (name, success, _round) => {
-            setMessages(prev => {
-              const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last.role === 'assistant' && last.toolCalls) {
-                const tc = last.toolCalls.map(t =>
-                  t.name === name && t.success === undefined ? { ...t, success } : t
-                );
-                updated[updated.length - 1] = { ...last, toolCalls: tc };
-              }
-              return updated;
-            });
-          },
-          onDone: () => {
-            setMessages(prev => {
-              const updated = [...prev];
-              const last = updated[updated.length - 1];
-              if (last.role === 'assistant') {
-                let content = last.content;
-                if (result.totalToolCalls > 0) {
-                  content += `\n✅ ${result.totalToolCalls} action${result.totalToolCalls > 1 ? 's' : ''} applied`;
-                  if (result.rounds.length > 1) {
-                    content += ` (${result.rounds.length} rounds)`;
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last.role === 'assistant') {
+                  const tc = [...(last.toolCalls || []), { name }];
+                  updated[updated.length - 1] = { ...last, toolCalls: tc };
+                }
+                return updated;
+              });
+            },
+            onToolCallEnd: (name, success, _round) => {
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last.role === 'assistant' && last.toolCalls) {
+                  const tc = last.toolCalls.map(t =>
+                    t.name === name && t.success === undefined ? { ...t, success } : t
+                  );
+                  updated[updated.length - 1] = { ...last, toolCalls: tc };
+                }
+                return updated;
+              });
+            },
+            onDone: () => {
+              setMessages(prev => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last.role === 'assistant') {
+                  let content = last.content;
+                  if (result.totalToolCalls > 0) {
+                    content += `\n✅ ${result.totalToolCalls} action${result.totalToolCalls > 1 ? 's' : ''} applied`;
+                    if (result.rounds.length > 1) {
+                      content += ` (${result.rounds.length} rounds)`;
+                    }
                   }
+                  // Append teaching content if any
+                  if (result.teachingContent.length > 0) {
+                    content += '\n\n' + result.teachingContent[0];
+                  }
+                  updated[updated.length - 1] = { ...last, content, isStreaming: false };
                 }
-                // Append teaching content if any
-                if (result.teachingContent.length > 0) {
-                  content += '\n\n' + result.teachingContent[0];
-                }
-                updated[updated.length - 1] = { ...last, content, isStreaming: false };
-              }
-              return updated;
-            });
+                return updated;
+              });
+            },
           },
-        },
+        )
       );
+
+      // Track cost
+      // Note: usage comes from the provider response; we estimate if unavailable
+      const totalRoundCalls = result.rounds.reduce((sum, r) => sum + r.toolCalls.length, 0);
+      const estimatedInput = result.content.length * 4; // rough estimate: 4 chars per token
+      const estimatedOutput = result.content.length;
+      costManagerRef.current.trackUsage(
+        providerConfig.provider,
+        estimatedInput,
+        estimatedOutput,
+        providerConfig.model,
+      );
+      setSessionCostLabel(costManagerRef.current.formatSessionCost());
 
       // Save to memory
       const allToolNames = result.rounds.flatMap(r => r.toolCalls.map(tc => tc.name));
@@ -220,20 +321,37 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       });
       memoryRef.current.save();
 
+      // Budget warning
+      if (costManagerRef.current.shouldWarn()) {
+        const warning = costManagerRef.current.getBudgetWarning();
+        if (warning) {
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: warning,
+            timestamp: Date.now(),
+          }]);
+        }
+      }
+
+      // Suppress lint: used for cost tracking total tool calls info
+      void totalRoundCalls;
+
     } catch (e: unknown) {
+      const errorType = classifyError(e);
+      const errorMsg = getErrorMessage(errorType, e);
       setMessages(prev => {
         const updated = [...prev];
         const last = updated[updated.length - 1];
         if (last?.role === 'assistant' && last.isStreaming) {
           updated[updated.length - 1] = {
             ...last,
-            content: last.content + `\n❌ Error: ${(e as Error).message}`,
+            content: last.content + `\n${errorMsg}`,
             isStreaming: false,
           };
         } else {
           updated.push({
             role: 'assistant',
-            content: `❌ Error: ${(e as Error).message}`,
+            content: errorMsg,
             timestamp: Date.now(),
           });
         }
@@ -242,7 +360,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     } finally {
       setIsLoading(false);
     }
-  }, [providerConfig, rootState, dispatch]);
+  }, [providerConfig, rootState, dispatch, isMobile]);
 
   /** Send via the legacy agent connector (HTTP/WS/built-in) */
   const handleLegacySend = useCallback(async (text: string) => {
@@ -299,39 +417,68 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     }
   };
 
-  const handleSaveSettings = () => {
-    // Save provider config
-    if (settingsApiKey.trim()) {
-      const config: ProviderConfig = {
-        provider: settingsProvider as 'anthropic' | 'openai',
-        apiKey: settingsApiKey,
-        model: settingsModel,
-      };
-      setProviderConfig(config);
-      saveProviderConfig(config);
-      // Also set agent config for display
-      const label = PROVIDER_OPTIONS.find(p => p.value === settingsProvider)?.label || settingsProvider;
+  /** Handle saving from the new AgentSettings panel */
+  const handleSettingsSave = useCallback((config: ProviderConfig | null) => {
+    setProviderConfig(config);
+    if (config) {
+      const label = PROVIDER_OPTIONS.find(p => p.value === config.provider)?.label || config.provider;
       setAgentConfig({ type: 'builtin', name: label });
-    } else if (configEndpoint.trim()) {
-      // Legacy endpoint mode
-      let newConfig: AgentConfig;
-      if (configEndpoint.startsWith('ws://') || configEndpoint.startsWith('wss://')) {
-        newConfig = { type: 'websocket', endpoint: configEndpoint, name: 'WebSocket Agent' };
-      } else {
-        newConfig = { type: 'http', endpoint: configEndpoint, name: 'HTTP Agent' };
-      }
-      setAgentConfig(newConfig);
-      saveAgentConfig(newConfig);
-      setProviderConfig(null);
     } else {
       setAgentConfig({ type: 'builtin', name: 'Built-in (Templates)' });
       saveAgentConfig({ type: 'builtin', name: 'Built-in (Templates)' });
-      setProviderConfig(null);
     }
-    setShowSettings(false);
-  };
+  }, []);
+
+  const handleClearConversation = useCallback(() => {
+    setMessages([]);
+    costManagerRef.current.resetSession();
+    setSessionCostLabel('');
+  }, []);
+
+  const handleClearMemory = useCallback(() => {
+    memoryRef.current.clear();
+    memoryRef.current.save();
+  }, []);
+
+  const handleBudgetChange = useCallback((budget: number) => {
+    costManagerRef.current.setBudget(budget);
+  }, []);
+
+  /** Toggle voice input */
+  const handleVoiceToggle = useCallback(() => {
+    if (!recognitionRef.current) return;
+    if (isListening) {
+      recognitionRef.current.abort();
+      setIsListening(false);
+    } else {
+      recognitionRef.current.start();
+      setIsListening(true);
+    }
+  }, [isListening]);
+
+  /** Swipe down to minimize (mobile) */
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (!isMobile) return;
+    touchStartRef.current = { y: e.touches[0].clientY, time: Date.now() };
+  }, [isMobile]);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!isMobile || !touchStartRef.current) return;
+    const deltaY = e.changedTouches[0].clientY - touchStartRef.current.y;
+    const deltaTime = Date.now() - touchStartRef.current.time;
+    // Swipe down gesture (fast, >100px)
+    if (deltaY > 100 && deltaTime < 300 && isFullscreen) {
+      setIsFullscreen(false);
+    }
+    touchStartRef.current = null;
+  }, [isMobile, isFullscreen]);
 
   const hasConnection = isProviderMode || agentConfig.type !== 'builtin';
+
+  // Provider display name
+  const providerLabel = providerConfig ? (
+    `${providerConfig.provider} / ${providerConfig.model.split('-').slice(0, 2).join('-')}`
+  ) : agentConfig.name;
 
   // For non-column mode (legacy floating), return the old behavior
   if (!isColumn) {
@@ -350,17 +497,23 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     }
   }
 
+  // Offline quick actions
+  const offlineActions = getOfflineActions();
+
   return (
-    <div className={`copilot-panel ${isColumn ? 'column-mode' : ''} ${isFullscreen ? 'fullscreen' : ''}`}>
+    <div
+      className={`copilot-panel ${isColumn ? 'column-mode' : ''} ${isFullscreen ? 'fullscreen' : ''} ${isMobile ? 'mobile' : ''}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <div className="copilot-header">
         <div className="copilot-title">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
           </svg>
           <span>Chat</span>
-          {hasConnection && <span className="copilot-agent-badge">
-            {isProviderMode ? `${settingsProvider} / ${settingsModel.split('-').slice(0, 2).join('-')}` : agentConfig.name}
-          </span>}
+          {hasConnection && <span className="copilot-agent-badge">{providerLabel}</span>}
+          {offline && <span className="copilot-agent-badge" style={{ color: '#ff9800' }}>Offline</span>}
         </div>
         <div className="copilot-header-actions">
           {isColumn && (
@@ -384,7 +537,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
               <path d="M9.73 7.27A.75.75 0 0 0 9.8 6.6L10.85 5.55A.75.75 0 0 0 10.85 4.45L9.8 3.4A.75.75 0 0 0 9.73 2.73L8.68 2.18A.75.75 0 0 0 7.82 2.27L6.77 2.82A.75.75 0 0 0 6.23 2.82L5.18 2.27A.75.75 0 0 0 4.32 2.18L3.27 2.73A.75.75 0 0 0 3.2 3.4L2.15 4.45A.75.75 0 0 0 2.15 5.55L3.2 6.6A.75.75 0 0 0 3.27 7.27L4.32 7.82A.75.75 0 0 0 5.18 7.73L6.23 7.18A.75.75 0 0 0 6.77 7.18L7.82 7.73A.75.75 0 0 0 8.68 7.82L9.73 7.27Z" stroke="currentColor" strokeWidth="1" fill="none"/>
             </svg>
           </button>
-          <button className="copilot-btn-sm" onClick={() => setMessages([])} title="Clear chat">
+          <button className="copilot-btn-sm" onClick={handleClearConversation} title="Clear chat">
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <path d="M2 3H10M4 3V2H8V3M3 3V10C3 10.5 3.5 11 4 11H8C8.5 11 9 10.5 9 10V3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
             </svg>
@@ -402,95 +555,20 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       </div>
 
       {showSettings && (
-        <div className="copilot-settings">
-          <h4>AI Provider</h4>
-          <p className="settings-hint">
-            Connect an AI provider for intelligent pattern assistance, or use built-in templates.
-          </p>
-
-          {/* Provider selection */}
-          <div className="settings-field">
-            <label>Provider</label>
-            <select
-              className="settings-input"
-              value={settingsProvider}
-              onChange={e => {
-                setSettingsProvider(e.target.value as 'anthropic' | 'openai');
-                const opt = PROVIDER_OPTIONS.find(p => p.value === e.target.value);
-                if (opt) setSettingsModel(opt.defaultModel);
-              }}
-            >
-              {PROVIDER_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* API Key */}
-          <div className="settings-field">
-            <label>API Key</label>
-            <input
-              type="password"
-              placeholder="sk-..."
-              value={settingsApiKey}
-              onChange={e => setSettingsApiKey(e.target.value)}
-              className="settings-input"
-            />
-          </div>
-
-          {/* Model */}
-          <div className="settings-field">
-            <label>Model</label>
-            <select
-              className="settings-input"
-              value={settingsModel}
-              onChange={e => setSettingsModel(e.target.value)}
-            >
-              {(MODEL_OPTIONS[settingsProvider] || []).map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Teaching mode toggle */}
-          <div className="settings-field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <label style={{ flex: 1 }}>Teaching Mode</label>
-            <input
-              type="checkbox"
-              checked={teachingMode}
-              onChange={e => {
-                setTeachingModeState(e.target.checked);
-                setTeachingMode(e.target.checked);
-              }}
-            />
-            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-              {teachingMode ? 'ON — explains why' : 'OFF'}
-            </span>
-          </div>
-
-          {/* Legacy endpoint (collapsible) */}
-          <details style={{ marginTop: 8 }}>
-            <summary style={{ fontSize: 10, color: 'var(--text-muted)', cursor: 'pointer' }}>
-              Custom agent endpoint (advanced)
-            </summary>
-            <div className="settings-field" style={{ marginTop: 6 }}>
-              <label>Agent Endpoint</label>
-              <input
-                type="text"
-                placeholder="http://localhost:3001/copilot"
-                value={configEndpoint}
-                onChange={e => setConfigEndpoint(e.target.value)}
-                className="settings-input"
-              />
-            </div>
-          </details>
-
-          <button className="settings-save" onClick={handleSaveSettings} style={{ marginTop: 8 }}>Save</button>
-        </div>
+        <AgentSettings
+          onSave={handleSettingsSave}
+          onClose={() => setShowSettings(false)}
+          onClearConversation={handleClearConversation}
+          onClearMemory={handleClearMemory}
+          sessionCost={costManagerRef.current.getSessionCost()}
+          projectCost={costManagerRef.current.getProjectCost()}
+          budget={costManagerRef.current.getBudget()}
+          onBudgetChange={handleBudgetChange}
+        />
       )}
 
       {/* Proactive analysis warnings */}
-      {warnings && (
+      {warnings && !showSettings && (
         <div style={{
           padding: '6px 10px',
           fontSize: 10,
@@ -506,15 +584,15 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       )}
 
       <div className="copilot-messages">
-        {messages.length === 0 && !hasConnection && (
+        {messages.length === 0 && !hasConnection && !offline && (
           <div className="copilot-empty">
             <svg className="copilot-empty-icon" width="40" height="40" viewBox="0 0 16 16" fill="none">
               <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="var(--text-muted)" strokeWidth="0.8" fill="none"/>
             </svg>
             <p className="copilot-empty-title">Connect an AI provider</p>
             <p className="copilot-empty-hint">
-              Add your Anthropic or OpenAI API key to get AI-powered pattern assistance.
-              Or use built-in templates for quick pattern blocks.
+              Add your Anthropic or OpenAI API key, or use Ollama for local AI.
+              Built-in templates work offline too.
             </p>
             <button className="copilot-setup-btn" onClick={() => setShowSettings(true)}>
               <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
@@ -524,9 +602,25 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
             </button>
           </div>
         )}
+        {messages.length === 0 && offline && !hasConnection && (
+          <div className="copilot-empty">
+            <p className="copilot-empty-title">Offline Mode</p>
+            <p className="copilot-empty-hint">No AI provider configured. Use quick actions below:</p>
+            <div className="copilot-suggestions">
+              {offlineActions.slice(0, 6).map(a => (
+                <button key={a.toolName + a.label} className="copilot-suggestion" onClick={() => handleSendText(a.label.split(' / ')[0])}>
+                  {a.icon} {a.label.split(' / ')[0]}
+                </button>
+              ))}
+            </div>
+            <button className="copilot-setup-btn" onClick={() => setShowSettings(true)} style={{ marginTop: 12 }}>
+              Configure Provider
+            </button>
+          </div>
+        )}
         {messages.length === 0 && hasConnection && (
           <div className="copilot-empty">
-            <p>Connected to <strong>{isProviderMode ? `${settingsProvider}` : agentConfig.name}</strong></p>
+            <p>Connected to <strong>{providerLabel}</strong></p>
             <p className="copilot-empty-hint">Ask anything about your patterns:</p>
             <div className="copilot-suggestions">
               {['Hazme un corpiño talla 40', 'Generate a bodice block', 'Create a sleeve', 'Revisa los márgenes de costura'].map(s => (
@@ -542,13 +636,31 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
             <div className="copilot-msg-content">
               {msg.content}
               {msg.toolCalls && msg.toolCalls.length > 0 && (
-                <div style={{ marginTop: 6, fontSize: 10, opacity: 0.7 }}>
-                  {msg.toolCalls.map((tc, j) => (
-                    <div key={j}>
-                      {tc.success === undefined ? '⏳' : tc.success ? '🔧' : '❌'} {tc.name}
-                      {tc.result && <span style={{ opacity: 0.6 }}> → {tc.result.slice(0, 80)}</span>}
+                <div
+                  className={`copilot-tool-calls ${isMobile ? 'compact' : ''}`}
+                  onClick={() => {
+                    if (isMobile) {
+                      setExpandedTools(prev => {
+                        const next = new Set(prev);
+                        if (next.has(i)) next.delete(i); else next.add(i);
+                        return next;
+                      });
+                    }
+                  }}
+                >
+                  {isMobile && !expandedTools.has(i) ? (
+                    <div className="copilot-tool-compact">
+                      {msg.toolCalls.every(tc => tc.success) ? '🔧' : '⚠️'}{' '}
+                      {msg.toolCalls.length} tool{msg.toolCalls.length > 1 ? 's' : ''} ▸
                     </div>
-                  ))}
+                  ) : (
+                    msg.toolCalls.map((tc, j) => (
+                      <div key={j}>
+                        {tc.success === undefined ? '⏳' : tc.success ? '🔧' : '❌'} {tc.name}
+                        {tc.result && !isMobile && <span style={{ opacity: 0.6 }}> → {tc.result.slice(0, 80)}</span>}
+                      </div>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -566,12 +678,49 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Mobile quick action chips */}
+      {isMobile && hasConnection && !showSettings && (
+        <div className="copilot-quick-actions">
+          {QUICK_ACTIONS.map(qa => (
+            <button
+              key={qa.label}
+              className="copilot-quick-chip"
+              onClick={() => handleSendText(qa.text)}
+              disabled={isLoading}
+            >
+              {qa.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Footer with cost display */}
+      {sessionCostLabel && !showSettings && (
+        <div className="copilot-cost-footer">
+          {sessionCostLabel}
+        </div>
+      )}
+
       <div className="copilot-input-area">
+        {/* Voice input button (mobile) */}
+        {recognitionRef.current && (
+          <button
+            className={`copilot-btn-sm copilot-voice-btn ${isListening ? 'listening' : ''}`}
+            onClick={handleVoiceToggle}
+            title="Voice input"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M7 1C5.9 1 5 1.9 5 3V7C5 8.1 5.9 9 7 9C8.1 9 9 8.1 9 7V3C9 1.9 8.1 1 7 1Z" fill={isListening ? 'var(--accent)' : 'none'} stroke="currentColor" strokeWidth="1"/>
+              <path d="M3 6V7C3 9.2 4.8 11 7 11C9.2 11 11 9.2 11 7V6" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+              <path d="M7 11V13" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
+            </svg>
+          </button>
+        )}
         <input
           ref={inputRef}
           type="text"
           className="copilot-input"
-          placeholder={hasConnection ? "Type a message..." : "Connect a provider in Settings..."}
+          placeholder={hasConnection ? "Type a message..." : offline ? "Quick action or connect provider..." : "Connect a provider in Settings..."}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
