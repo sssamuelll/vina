@@ -1,7 +1,10 @@
+import { useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setActiveTool } from '../../store/editorSlice';
+import { addPiece } from '../../store/projectSlice';
 import { Tool2D } from '../../types/types';
+import { parseDXF, dxfToPatternPieces } from '../../utils/dxf';
 import './Toolbar2D.css';
 
 interface ToolDef {
@@ -103,6 +106,24 @@ const getToolIcon = (toolId: Tool2D) => {
 export default function Toolbar2D() {
   const dispatch = useDispatch();
   const { activeTool } = useSelector((s: RootState) => s.editor);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportDXF = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const doc = parseDXF(text);
+    const pieces = dxfToPatternPieces(doc);
+    for (const piece of pieces) {
+      dispatch(addPiece(piece));
+    }
+    // Reset input so same file can be re-imported
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
   return (
     <div className="toolbar2d">
@@ -116,6 +137,26 @@ export default function Toolbar2D() {
           <span className="tool-icon">{getToolIcon(tool.id)}</span>
         </button>
       ))}
+      <div className="tool-separator" />
+      <button
+        className="tool-btn"
+        onClick={handleImportDXF}
+        title="Import DXF"
+      >
+        <span className="tool-icon">
+          <svg width={18} height={18} viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 15V3h8l4 4v8H3z" />
+            <path d="M9 8v5M7 11l2 2 2-2" />
+          </svg>
+        </span>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".dxf"
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
     </div>
   );
 }

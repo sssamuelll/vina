@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateDXF } from '../utils/exportDXF';
+import { generateDXF, generateDXFLegacy } from '../utils/exportDXF';
 import { PatternPiece } from '../types/types';
 
 function makePiece(overrides: Partial<PatternPiece> = {}): PatternPiece {

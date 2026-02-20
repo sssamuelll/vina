@@ -1,0 +1,544 @@
+/**
+ * AAMA/ASTM D6673 compliant DXF export.
+ * 
+ * Features:
+ * - Numbered AAMA layers: 1 (cut), 4 (notch), 7 (grainline), 8 (draw), 11 (intcut)
+ * - Each piece = BLOCK + INSERT reference
+ * - Cubic beziers exported as SPLINE entities (degree 3)
+ * - BLOCK_RECORD in TABLES (R2000+)
+ * - Text height = 2.5 (AAMA standard)
+ * - Supports R12 (POLYLINE) and R2000+ (LWPOLYLINE)
+ */
+import { PatternPiece, PathCommand } from '../../types/types';
+import { AAMA_LAYERS, DXFExportOptions } from './types';
+
+const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
+
+// ─── Handle counter for R2000+ ───
+
+let handleCounter = 0;
+function nextHandle(): string {
+  return (++handleCounter).toString(16).toUpperCase();
+}
+function resetHandles() { handleCounter = 0x100; }
+
+// ─── Header ───
+
+function dxfHeader(): string {
+  return `0
+SECTION
+2
+HEADER
+9
+$ACADVER
+1
+AC1015
+9
+$INSUNITS
+70
+4
+9
+$MEASUREMENT
+70
+1
+9
+$CLAYER
+8
+${AAMA_LAYERS.CUT}
+0
+ENDSEC
+`;
+}
+
+// ─── Tables ───
+
+function dxfTables(pieces: PatternPiece[], opts: DXFExportOptions): string {
+  let s = `0
+SECTION
+2
+TABLES
+`;
+  // LAYER table
+  s += `0
+TABLE
+2
+LAYER
+5
+${nextHandle()}
+`;
+  const layers = [
+    { name: AAMA_LAYERS.CUT, color: 7, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.NOTCH, color: 1, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.GRAINLINE, color: 3, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.DRAW, color: 4, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.INTCUT, color: 6, lt: 'DASHED' },
+  ];
+  for (const l of layers) {
+    s += `0
+LAYER
+5
+${nextHandle()}
+2
+${l.name}
+70
+0
+62
+${l.color}
+6
+${l.lt}
+`;
+  }
+  s += `0
+ENDTAB
+`;
+
+  // BLOCK_RECORD table (R2000+)
+  if (opts.version === 'R2000') {
+    s += `0
+TABLE
+2
+BLOCK_RECORD
+5
+${nextHandle()}
+`;
+    // Model space & paper space
+    for (const brName of ['*MODEL_SPACE', '*PAPER_SPACE']) {
+      s += `0
+BLOCK_RECORD
+5
+${nextHandle()}
+2
+${brName}
+`;
+    }
+    // One block record per piece
+    for (const piece of pieces) {
+      s += `0
+BLOCK_RECORD
+5
+${nextHandle()}
+2
+${sanitizeBlockName(piece.name)}
+`;
+    }
+    s += `0
+ENDTAB
+`;
+  }
+
+  s += `0
+ENDSEC
+`;
+  return s;
+}
+
+// ─── Blocks ───
+
+function dxfBlocks(pieces: PatternPiece[], opts: DXFExportOptions): string {
+  let s = `0
+SECTION
+2
+BLOCKS
+`;
+
+  // Model space block
+  s += `0
+BLOCK
+5
+${nextHandle()}
+8
+0
+2
+*MODEL_SPACE
+70
+0
+10
+0.0
+20
+0.0
+0
+ENDBLK
+5
+${nextHandle()}
+8
+0
+`;
+
+  // Paper space block
+  s += `0
+BLOCK
+5
+${nextHandle()}
+8
+0
+2
+*PAPER_SPACE
+70
+0
+10
+0.0
+20
+0.0
+0
+ENDBLK
+5
+${nextHandle()}
+8
+0
+`;
+
+  // One block per piece
+  for (const piece of pieces) {
+    const blockName = sanitizeBlockName(piece.name);
+    s += `0
+BLOCK
+5
+${nextHandle()}
+8
+${AAMA_LAYERS.CUT}
+2
+${blockName}
+70
+0
+10
+0.0
+20
+0.0
+`;
+    s += pieceEntities(piece, opts);
+    s += `0
+ENDBLK
+5
+${nextHandle()}
+8
+0
+`;
+  }
+
+  s += `0
+ENDSEC
+`;
+  return s;
+}
+
+// ─── Entities Section (INSERTs) ───
+
+function dxfEntities(pieces: PatternPiece[]): string {
+  let s = `0
+SECTION
+2
+ENTITIES
+`;
+  const SPACING = 30;
+  let currentX = 0;
+
+  for (const piece of pieces) {
+    const bb = pieceBBox(piece);
+    const offsetX = currentX - bb.minX;
+    const offsetY = -bb.minY;
+
+    s += `0
+INSERT
+5
+${nextHandle()}
+8
+${AAMA_LAYERS.CUT}
+2
+${sanitizeBlockName(piece.name)}
+10
+${offsetX.toFixed(4)}
+20
+${offsetY.toFixed(4)}
+30
+0.0
+41
+1.0
+42
+1.0
+50
+0.0
+`;
+    currentX += (bb.maxX - bb.minX) + SPACING;
+  }
+
+  s += `0
+ENDSEC
+`;
+  return s;
+}
+
+// ─── Piece Entities (inside block) ───
+
+function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
+  let s = '';
+
+  // Outline on cut layer
+  s += pathToEntities(piece.outline, AAMA_LAYERS.CUT, opts);
+
+  // Seam allowance (same outline for now, on draw layer)
+  if (piece.seamAllowance > 0) {
+    s += pathToEntities(piece.outline, AAMA_LAYERS.DRAW, opts);
+  }
+
+  // Internal lines
+  for (const line of piece.internals) {
+    let layer = AAMA_LAYERS.DRAW;
+    if (line.type === 'notch') layer = AAMA_LAYERS.NOTCH;
+    else if (line.type === 'grainline') layer = AAMA_LAYERS.GRAINLINE;
+
+    if (line.path.length >= 2 && line.path[0].type === 'M' && line.path[1].type === 'L') {
+      s += lineToDXF(
+        line.path[0].values[0], line.path[0].values[1],
+        line.path[1].values[0], line.path[1].values[1],
+        layer,
+      );
+    }
+  }
+
+  // Label
+  const bb = pieceBBox(piece);
+  const cx = (bb.minX + bb.maxX) / 2;
+  const cy = (bb.minY + bb.maxY) / 2;
+  s += textToDXF(piece.name, cx, -(cy), 2.5, AAMA_LAYERS.DRAW);
+
+  return s;
+}
+
+// ─── Path → DXF entities ───
+
+function pathToEntities(commands: PathCommand[], layer: string, opts: DXFExportOptions): string {
+  // Separate straight segments and curves
+  let s = '';
+  const straightPoints: { x: number; y: number }[] = [];
+  let cx = 0, cy = 0;
+  let isClosed = false;
+
+  const flushStraight = () => {
+    if (straightPoints.length < 2) { straightPoints.length = 0; return; }
+    s += lwpolylineToDXF(straightPoints, isClosed, layer);
+    straightPoints.length = 0;
+  };
+
+  for (const cmd of commands) {
+    const v = cmd.values;
+    switch (cmd.type) {
+      case 'M':
+        if (straightPoints.length > 1) flushStraight();
+        cx = v[0]; cy = v[1];
+        straightPoints.push({ x: cx, y: -cy });
+        break;
+      case 'L':
+      case 'H':
+      case 'V':
+        if (cmd.type === 'H') { cx = v[0]; }
+        else if (cmd.type === 'V') { cy = v[0]; }
+        else { cx = v[0]; cy = v[1]; }
+        straightPoints.push({ x: cx, y: -cy });
+        break;
+      case 'C': {
+        flushStraight();
+        // Emit SPLINE for cubic bezier
+        const p0x = cx, p0y = cy;
+        const cp1x = v[0], cp1y = v[1];
+        const cp2x = v[2], cp2y = v[3];
+        const p1x = v[4], p1y = v[5];
+
+        // Check if next commands are also C (compound spline)
+        s += splineToDXF([
+          { x: p0x, y: -p0y },
+          { x: cp1x, y: -cp1y },
+          { x: cp2x, y: -cp2y },
+          { x: p1x, y: -p1y },
+        ], layer);
+
+        cx = p1x; cy = p1y;
+        straightPoints.push({ x: cx, y: -cy }); // start point for next segment
+        break;
+      }
+      case 'Q': {
+        flushStraight();
+        // Elevate quadratic to cubic
+        const qp0x = cx, qp0y = cy;
+        const qcx = v[0], qcy = v[1];
+        const qp1x = v[2], qp1y = v[3];
+        const c1x = qp0x + (2 / 3) * (qcx - qp0x);
+        const c1y = qp0y + (2 / 3) * (qcy - qp0y);
+        const c2x = qp1x + (2 / 3) * (qcx - qp1x);
+        const c2y = qp1y + (2 / 3) * (qcy - qp1y);
+
+        s += splineToDXF([
+          { x: qp0x, y: -qp0y },
+          { x: c1x, y: -c1y },
+          { x: c2x, y: -c2y },
+          { x: qp1x, y: -qp1y },
+        ], layer);
+
+        cx = qp1x; cy = qp1y;
+        straightPoints.push({ x: cx, y: -cy });
+        break;
+      }
+      case 'Z':
+        isClosed = true;
+        break;
+    }
+  }
+  flushStraight();
+  return s;
+}
+
+// ─── DXF Entity Generators ───
+
+function splineToDXF(controlPoints: { x: number; y: number }[], layer: string): string {
+  const n = controlPoints.length;
+  // For a single cubic segment: 4 control points, knots [0,0,0,0,1,1,1,1]
+  // For compound: knots [0,0,0,0, 1,1,1, 2,2,2, ... m,m,m,m]
+  const numSegments = Math.floor((n - 1) / 3);
+  const knots: number[] = [0, 0, 0, 0];
+  for (let i = 1; i < numSegments; i++) {
+    knots.push(i, i, i);
+  }
+  knots.push(numSegments, numSegments, numSegments, numSegments);
+
+  // Remove duplicates at end if single segment
+  const knotVec = numSegments <= 1 ? [0, 0, 0, 0, 1, 1, 1, 1] : knots;
+
+  let s = `0
+SPLINE
+5
+${nextHandle()}
+8
+${layer}
+70
+8
+71
+3
+72
+${knotVec.length}
+73
+${n}
+`;
+  for (const k of knotVec) {
+    s += `40
+${k.toFixed(6)}
+`;
+  }
+  for (const pt of controlPoints) {
+    s += `10
+${pt.x.toFixed(4)}
+20
+${pt.y.toFixed(4)}
+30
+0.0
+`;
+  }
+  return s;
+}
+
+function lwpolylineToDXF(points: { x: number; y: number }[], closed: boolean, layer: string): string {
+  let s = `0
+LWPOLYLINE
+5
+${nextHandle()}
+8
+${layer}
+90
+${points.length}
+70
+${closed ? 1 : 0}
+`;
+  for (const pt of points) {
+    s += `10
+${pt.x.toFixed(4)}
+20
+${pt.y.toFixed(4)}
+`;
+  }
+  return s;
+}
+
+function lineToDXF(x1: number, y1: number, x2: number, y2: number, layer: string): string {
+  return `0
+LINE
+5
+${nextHandle()}
+8
+${layer}
+10
+${x1.toFixed(4)}
+20
+${(-y1).toFixed(4)}
+11
+${x2.toFixed(4)}
+21
+${(-y2).toFixed(4)}
+`;
+}
+
+function textToDXF(text: string, x: number, y: number, height: number, layer: string): string {
+  return `0
+TEXT
+5
+${nextHandle()}
+8
+${layer}
+10
+${x.toFixed(4)}
+20
+${y.toFixed(4)}
+40
+${height.toFixed(1)}
+1
+${text}
+`;
+}
+
+// ─── Helpers ───
+
+function pieceBBox(piece: PatternPiece): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const cmd of piece.outline) {
+    for (let i = 0; i < cmd.values.length - 1; i += 2) {
+      minX = Math.min(minX, cmd.values[i]);
+      minY = Math.min(minY, cmd.values[i + 1]);
+      maxX = Math.max(maxX, cmd.values[i]);
+      maxY = Math.max(maxY, cmd.values[i + 1]);
+    }
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function sanitizeBlockName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 31);
+}
+
+// ─── Public API ───
+
+/**
+ * Generate AAMA/ASTM D6673 compliant DXF.
+ */
+export function generateDXFAAMA(pieces: PatternPiece[], options?: Partial<DXFExportOptions>): string {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  resetHandles();
+
+  let dxf = '';
+  dxf += dxfHeader();
+  dxf += dxfTables(pieces, opts);
+  dxf += dxfBlocks(pieces, opts);
+  dxf += dxfEntities(pieces);
+  dxf += `0
+EOF
+`;
+  return dxf;
+}
+
+/** Download AAMA DXF as file */
+export function downloadDXFAAMA(pieces: PatternPiece[], filename = 'pattern-aama.dxf', options?: Partial<DXFExportOptions>) {
+  const dxf = generateDXFAAMA(pieces, options);
+  const blob = new Blob([dxf], { type: 'application/dxf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}

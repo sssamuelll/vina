@@ -1,0 +1,283 @@
+/**
+ * Convert DXF entities to OpenClo PatternPiece objects.
+ */
+import { PatternPiece, PathCommand, InternalLine } from '../../types/types';
+import {
+  DXFDocument, DXFEntity, DXFInsertData, DXFLineData,
+  DXFLWPolylineData, DXFPolylineData, DXFSplineData,
+  DXFArcData, DXFCircleData, DXFTextData, layerRole,
+} from './types';
+
+// ─── Entity → PathCommand[] conversion ───
+
+export function entityToPath(entity: DXFEntity): PathCommand[] {
+  switch (entity.type) {
+    case 'LINE': return lineToPath(entity.data as DXFLineData);
+    case 'LWPOLYLINE': return lwpolylineToPath(entity.data as DXFLWPolylineData);
+    case 'POLYLINE': return polylineToPath(entity.data as DXFPolylineData);
+    case 'SPLINE': return splineToPath(entity.data as DXFSplineData);
+    case 'ARC': return arcToPath(entity.data as DXFArcData);
+    case 'CIRCLE': return circleToPath(entity.data as DXFCircleData);
+    default: return [];
+  }
+}
+
+function lineToPath(d: DXFLineData): PathCommand[] {
+  return [
+    { type: 'M', values: [d.x1, d.y1] },
+    { type: 'L', values: [d.x2, d.y2] },
+  ];
+}
+
+function lwpolylineToPath(d: DXFLWPolylineData): PathCommand[] {
+  return polyVertexToPath(d.vertices, d.closed);
+}
+
+function polylineToPath(d: DXFPolylineData): PathCommand[] {
+  return polyVertexToPath(d.vertices, d.closed);
+}
+
+function polyVertexToPath(vertices: { x: number; y: number; bulge: number }[], closed: boolean): PathCommand[] {
+  if (vertices.length === 0) return [];
+  const cmds: PathCommand[] = [{ type: 'M', values: [vertices[0].x, vertices[0].y] }];
+
+  for (let i = 0; i < vertices.length; i++) {
+    const v = vertices[i];
+    const next = vertices[(i + 1) % vertices.length];
+    if (i === vertices.length - 1 && !closed) break;
+
+    if (Math.abs(v.bulge) < 1e-10) {
+      cmds.push({ type: 'L', values: [next.x, next.y] });
+    } else {
+      // Convert bulge to arc, then approximate as cubic bezier
+      const bulgeArcCmds = bulgeToArc(v.x, v.y, next.x, next.y, v.bulge);
+      cmds.push(...bulgeArcCmds);
+    }
+  }
+
+  if (closed) cmds.push({ type: 'Z', values: [] });
+  return cmds;
+}
+
+/** Convert a LWPOLYLINE bulge between two points to bezier approximation */
+function bulgeToArc(x1: number, y1: number, x2: number, y2: number, bulge: number): PathCommand[] {
+  const angle = 4 * Math.atan(Math.abs(bulge));
+  const dx = x2 - x1, dy = y2 - y1;
+  const chord = Math.sqrt(dx * dx + dy * dy);
+  if (chord < 1e-10) return [{ type: 'L', values: [x2, y2] }];
+
+  const sagitta = Math.abs(bulge) * chord / 2;
+  const radius = (chord / 2) / Math.sin(angle / 2);
+
+  // Midpoint of chord
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  // Normal to chord
+  const nx = -dy / chord, ny = dx / chord;
+  const sign = bulge > 0 ? 1 : -1;
+  const d = radius * Math.cos(angle / 2);
+  const cx = mx + sign * d * nx;
+  const cy = my + sign * d * ny;
+
+  // Approximate arc as cubic bezier
+  // For small arcs, single bezier is fine
+  const alpha = (4 / 3) * Math.tan(angle / 4);
+  const a1 = Math.atan2(y1 - cy, x1 - cx);
+  const a2 = Math.atan2(y2 - cy, x2 - cx);
+
+  const cp1x = x1 - alpha * radius * Math.sin(a1) * sign;
+  const cp1y = y1 + alpha * radius * Math.cos(a1) * sign;
+  const cp2x = x2 + alpha * radius * Math.sin(a2) * sign;
+  const cp2y = y2 - alpha * radius * Math.cos(a2) * sign;
+
+  return [{ type: 'C', values: [cp1x, cp1y, cp2x, cp2y, x2, y2] }];
+}
+
+function splineToPath(d: DXFSplineData): PathCommand[] {
+  const pts = d.controlPoints;
+  if (pts.length < 2) return [];
+
+  const cmds: PathCommand[] = [{ type: 'M', values: [pts[0].x, pts[0].y] }];
+
+  if (d.degree === 3) {
+    // Cubic bezier segments: every 3 control points after the first
+    for (let i = 1; i + 2 < pts.length; i += 3) {
+      cmds.push({
+        type: 'C',
+        values: [pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y, pts[i + 2].x, pts[i + 2].y],
+      });
+    }
+  } else {
+    // Fallback: connect with lines
+    for (let i = 1; i < pts.length; i++) {
+      cmds.push({ type: 'L', values: [pts[i].x, pts[i].y] });
+    }
+  }
+  return cmds;
+}
+
+function arcToPath(d: DXFArcData): PathCommand[] {
+  const startRad = (d.startAngle * Math.PI) / 180;
+  const endRad = (d.endAngle * Math.PI) / 180;
+  const x1 = d.cx + d.radius * Math.cos(startRad);
+  const y1 = d.cy + d.radius * Math.sin(startRad);
+  const x2 = d.cx + d.radius * Math.cos(endRad);
+  const y2 = d.cy + d.radius * Math.sin(endRad);
+
+  let sweep = endRad - startRad;
+  if (sweep <= 0) sweep += 2 * Math.PI;
+
+  const alpha = (4 / 3) * Math.tan(sweep / 4);
+  const cp1x = x1 - alpha * d.radius * Math.sin(startRad);
+  const cp1y = y1 + alpha * d.radius * Math.cos(startRad);
+  const cp2x = x2 + alpha * d.radius * Math.sin(endRad);
+  const cp2y = y2 - alpha * d.radius * Math.cos(endRad);
+
+  return [
+    { type: 'M', values: [x1, y1] },
+    { type: 'C', values: [cp1x, cp1y, cp2x, cp2y, x2, y2] },
+  ];
+}
+
+function circleToPath(d: DXFCircleData): PathCommand[] {
+  const { cx, cy, radius: r } = d;
+  const k = 0.5522847498; // (4/3)*tan(π/8)
+  return [
+    { type: 'M', values: [cx + r, cy] },
+    { type: 'C', values: [cx + r, cy + k * r, cx + k * r, cy + r, cx, cy + r] },
+    { type: 'C', values: [cx - k * r, cy + r, cx - r, cy + k * r, cx - r, cy] },
+    { type: 'C', values: [cx - k * r, cy - r, cx, cy - k * r, cx + r, cy - r] },
+    { type: 'C', values: [cx + r, cy - k * r, cx + r, cy, cx + r, cy] }, // close back
+    { type: 'Z', values: [] },
+  ];
+}
+
+// ─── Y-flip: DXF Y-up → screen Y-down ───
+
+function flipPathY(cmds: PathCommand[]): PathCommand[] {
+  return cmds.map(cmd => ({
+    type: cmd.type,
+    values: cmd.values.map((v, i) => i % 2 === 1 ? -v : v),
+  }));
+}
+
+// ─── Transform path by INSERT (translate, scale, rotate) ───
+
+function transformPath(cmds: PathCommand[], insert: DXFInsertData): PathCommand[] {
+  const rad = (insert.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  return cmds.map(cmd => ({
+    type: cmd.type,
+    values: cmd.values.map((v, i) => {
+      if (cmd.values.length < 2) return v;
+      const pairIdx = Math.floor(i / 2) * 2;
+      const x = cmd.values[pairIdx];
+      const y = cmd.values[pairIdx + 1];
+      const sx = x * insert.scaleX;
+      const sy = y * insert.scaleY;
+      const rx = sx * cos - sy * sin + insert.x;
+      const ry = sx * sin + sy * cos + insert.y;
+      return i % 2 === 0 ? rx : ry;
+    }),
+  }));
+}
+
+// ─── Main Converter ───
+
+export function dxfToPatternPieces(doc: DXFDocument): PatternPiece[] {
+  const pieces: PatternPiece[] = [];
+
+  if (doc.blocks.size > 0) {
+    // Each block (possibly referenced by INSERT) = one piece
+    const inserts = doc.entities.filter(e => e.type === 'INSERT');
+
+    for (const [blockName, block] of doc.blocks) {
+      const insert = inserts.find(e => (e.data as DXFInsertData).blockName === blockName);
+      const insertData: DXFInsertData = insert
+        ? insert.data as DXFInsertData
+        : { blockName, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+
+      const piece = entitiesToPiece(block.entities, blockName, insertData);
+      if (piece) pieces.push(piece);
+    }
+  } else {
+    // No blocks: group by entities, treat as single piece
+    const piece = entitiesToPiece(doc.entities, 'Imported Piece', null);
+    if (piece) pieces.push(piece);
+  }
+
+  return pieces;
+}
+
+function entitiesToPiece(
+  entities: DXFEntity[],
+  defaultName: string,
+  insertData: DXFInsertData | null,
+): PatternPiece | null {
+  let outline: PathCommand[] = [];
+  const internals: InternalLine[] = [];
+  let name = defaultName;
+
+  // Find piece name from TEXT entities
+  for (const e of entities) {
+    if (e.type === 'TEXT' || e.type === 'MTEXT') {
+      const text = (e.data as DXFTextData).text;
+      if (text.trim()) { name = text.trim(); break; }
+    }
+  }
+
+  // Group entities by layer role
+  for (const e of entities) {
+    if (e.type === 'TEXT' || e.type === 'MTEXT' || e.type === 'INSERT') continue;
+    const role = layerRole(e.layer);
+    let path = entityToPath(e);
+    if (path.length === 0) continue;
+
+    if (insertData) {
+      path = transformPath(path, insertData);
+    }
+
+    switch (role) {
+      case 'cut':
+      case 'unknown':
+        // Use first cut-layer entity as outline, or accumulate
+        if (outline.length === 0) {
+          outline = path;
+        } else {
+          // Append additional outline segments
+          outline.push(...path);
+        }
+        break;
+      case 'notch':
+        internals.push({ id: crypto.randomUUID(), type: 'notch', path: flipPathY(path) });
+        break;
+      case 'grainline':
+        internals.push({ id: crypto.randomUUID(), type: 'grainline', path: flipPathY(path) });
+        break;
+      case 'draw':
+      case 'intcut':
+        internals.push({ id: crypto.randomUUID(), type: 'dart', path: flipPathY(path) });
+        break;
+      case 'seam':
+      case 'label':
+        break; // skip for now
+    }
+  }
+
+  if (outline.length === 0) return null;
+
+  // Flip Y for outline
+  outline = flipPathY(outline);
+
+  return {
+    id: crypto.randomUUID(),
+    name,
+    outline,
+    internals,
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+}

@@ -261,7 +261,8 @@ function pieceBBox(piece: PatternPiece): { minX: number; minY: number; maxX: num
  * Generate a DXF string from pattern pieces.
  * Pieces are laid out left-to-right with spacing.
  */
-export function generateDXF(pieces: PatternPiece[]): string {
+/** @deprecated Use generateDXFAAMA from utils/dxf for AAMA compliance. */
+export function generateDXFLegacy(pieces: PatternPiece[]): string {
   let dxf = dxfHeader();
   const SPACING = 30; // mm between pieces
   let currentX = 0;
@@ -310,8 +311,12 @@ export function generateDXF(pieces: PatternPiece[]): string {
 }
 
 /** Download DXF as file */
+/** Keep generateDXF as alias for backward compat */
+export const generateDXF = generateDXFLegacy;
+
+/** @deprecated Use downloadDXFAAMA from utils/dxf for AAMA compliance. */
 export function downloadDXF(pieces: PatternPiece[], filename = 'pattern.dxf') {
-  const dxf = generateDXF(pieces);
+  const dxf = generateDXFLegacy(pieces);
   const blob = new Blob([dxf], { type: 'application/dxf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
