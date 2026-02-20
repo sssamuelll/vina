@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Component, Suspense, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import { useSelector } from 'react-redux';
@@ -7,6 +7,28 @@ import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import './Viewport3D.css';
+
+/** Error boundary so a WebGL crash doesn't take down the 2D editor */
+class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: string }> {
+  state = { hasError: false, error: '' };
+  static getDerivedStateFromError(err: Error) {
+    return { hasError: true, error: err.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="viewport3d viewport3d-error">
+          <div style={{ padding: '2rem', textAlign: 'center', color: '#888', fontSize: '0.85rem' }}>
+            <p style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>⚠️ 3D Preview Unavailable</p>
+            <p>WebGL could not initialize. The 2D editor still works normally.</p>
+            <p style={{ fontSize: '0.75rem', marginTop: '0.5rem', opacity: 0.6 }}>{this.state.error}</p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 /** Distribute pieces around the mannequin */
 function getPosition(index: number, total: number): [number, number, number] {
@@ -21,6 +43,8 @@ function getPosition(index: number, total: number): [number, number, number] {
 }
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+
+export { Viewport3DErrorBoundary };
 
 export default function Viewport3D() {
   const { pieces, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);

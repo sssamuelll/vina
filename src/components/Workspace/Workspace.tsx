@@ -4,7 +4,7 @@ import { RootState } from '../../store';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo } from '../../store/editorSlice';
 import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
-import Viewport3D from '../Viewport3D/Viewport3D';
+import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
@@ -311,7 +311,7 @@ export default function Workspace() {
               >
                 <div className="viewport-label">3D VIEW</div>
                 <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
-                  <Viewport3D />
+                  <Viewport3DErrorBoundary><Viewport3D /></Viewport3DErrorBoundary>
                 </div>
               </div>
             </div>
