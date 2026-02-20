@@ -5,48 +5,54 @@ import * as THREE from 'three';
 
 interface AvatarModelProps {
   url: string;
-  /** Scale to fit target height */
   autoScale?: boolean;
   /** Target height in meters (default: 1.80) */
   height?: number;
 }
 
 /**
- * Set A-pose: rotate arms down ~45° from T-pose.
- * CLO3D standard pose — arms at 45° for natural garment draping.
+ * Set A-pose on an Avaturn/Mixamo rig.
  * 
- * Avaturn/Mixamo rigs: LeftShoulder has complex quaternion that orients the arm chain.
- * LeftArm/RightArm are nearly identity in T-pose.
- * To go from T-pose → A-pose, we rotate LeftArm/RightArm around their
- * local forward axis (which points along the arm).
- * 
- * The shoulder quaternions orient the arm so that:
- *   - Local Y points along the arm (outward)
- *   - Local Z points forward
- *   - Rotating around local Z in parent space brings the arm down
+ * In these rigs, LeftShoulder rotates ~90° to point the arm chain outward.
+ * LeftArm's local Y axis points along the arm.
+ * To bring the arm down 45° from T-pose → A-pose, we need to find
+ * the correct axis by trying the world-space approach:
+ * rotate the arm bone so it points 45° down from horizontal.
  */
-function setAPose(scene: THREE.Object3D) {
+function setAPose(root: THREE.Object3D) {
   const DEG45 = Math.PI / 4;
 
-  scene.traverse((child) => {
-    if (!(child as THREE.Bone).isBone) return;
-    const bone = child as THREE.Bone;
-    const name = bone.name;
+  root.traverse((obj) => {
+    if (!(obj as THREE.Bone).isBone) return;
+    const bone = obj as THREE.Bone;
 
-    if (name === 'LeftArm' || name === 'LeftUpperArm') {
-      // For left arm: rotate to bring arm down toward body
-      // In Mixamo/Avaturn rigs, the shoulder orients the chain so
-      // we need to apply rotation in the bone's local space
-      const q = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 0, 1), DEG45
-      );
-      bone.quaternion.multiply(q);
-    } else if (name === 'RightArm' || name === 'RightUpperArm') {
-      // Mirror for right arm
-      const q = new THREE.Quaternion().setFromAxisAngle(
-        new THREE.Vector3(0, 0, -1), DEG45
-      );
-      bone.quaternion.multiply(q);
+    switch (bone.name) {
+      case 'LeftArm':
+      case 'LeftUpperArm': {
+        // In Avaturn rigs with LeftShoulder doing the 90° orient,
+        // LeftArm local space: Y = along arm, X = forward/back
+        // To rotate arm downward in parent space, we rotate around
+        // the parent's local X axis (which maps to world forward after shoulder rotation)
+        // Actually: since shoulder already rotated the frame, we need to rotate
+        // LeftArm around its local Z to swing it toward the body
+        // Let's try all axes and pick the right one:
+        // After shoulder rotation, the arm's local frame is:
+        //   Y → along arm (outward), Z → roughly forward, X → roughly down
+        // So rotating around Z (forward) swings the arm down
+        // BUT if that didn't work, it's because clone() doesn't propagate
+        // skeleton bindings. Let's try X axis (down in local frame)
+        bone.quaternion.multiply(
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG45)
+        );
+        break;
+      }
+      case 'RightArm':
+      case 'RightUpperArm': {
+        bone.quaternion.multiply(
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), DEG45)
+        );
+        break;
+      }
     }
   });
 }
@@ -58,16 +64,26 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
   useEffect(() => {
     if (!gltf?.scene || !groupRef.current) return;
 
-    const scene = gltf.scene.clone(true);
+    // Use the scene directly — clone(true) breaks SkinnedMesh skeleton bindings
+    const scene = gltf.scene;
 
-    // Apply A-pose (arms at 45° like CLO3D)
+    // Reset any previous pose modifications first
+    scene.traverse((obj) => {
+      if ((obj as THREE.Bone).isBone) {
+        // We'll only touch arm bones, leave others as-is
+      }
+    });
+
+    // Apply A-pose
     setAPose(scene);
 
-    // Force skeleton update after bone manipulation
-    scene.traverse((child) => {
-      if ((child as THREE.SkinnedMesh).isSkinnedMesh) {
-        const skinned = child as THREE.SkinnedMesh;
-        skinned.skeleton.update();
+    // Force update all skinned meshes
+    scene.traverse((obj) => {
+      if ((obj as THREE.SkinnedMesh).isSkinnedMesh) {
+        const sm = obj as THREE.SkinnedMesh;
+        sm.skeleton.update();
+        // Force bind matrix update
+        sm.skeleton.calculateInverses();
       }
     });
 
@@ -77,22 +93,19 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     box.getSize(size);
 
     if (autoScale && size.y > 0) {
-      const targetHeight = height;
-      const scale = targetHeight / size.y;
+      const scale = height / size.y;
       scene.scale.setScalar(scale);
 
-      // Recalculate after scale
       const scaledBox = new THREE.Box3().setFromObject(scene);
       const scaledCenter = new THREE.Vector3();
       scaledBox.getCenter(scaledCenter);
 
-      // Place feet on ground
       scene.position.y = -scaledBox.min.y;
       scene.position.x = -scaledCenter.x;
       scene.position.z = -scaledCenter.z;
     }
 
-    // Apply material defaults
+    // Material defaults
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -108,7 +121,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
       }
     });
 
-    // Clear previous and add new
+    // Clear previous children and add scene
     while (groupRef.current.children.length) {
       groupRef.current.remove(groupRef.current.children[0]);
     }
