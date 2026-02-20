@@ -593,8 +593,8 @@ describe('AAMA Export with Seam Allowance', () => {
     expect(drawEntities.length).toBeGreaterThan(0);
 
     // CUT vertices should extend beyond the 0-100 range (SA offset)
-    if (cutEntities[0].vertices) {
-      const xs = cutEntities[0].vertices.map((v: any) => v.x);
+    if ((cutEntities[0].data as any).vertices) {
+      const xs = (cutEntities[0].data as any).vertices.map((v: any) => v.x);
       const hasOffset = xs.some((x: number) => x < -1 || x > 101);
       expect(hasOffset).toBe(true);
     }

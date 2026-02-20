@@ -10,6 +10,7 @@ import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 
 const EDGE_HIT_THRESHOLD = 20; // px screen space
 const NOTCH_SIZE = 8; // mm in pattern space
+void NOTCH_SIZE; // reserved for future use
 
 interface NotchToolState {
   hoveredPoint: { pieceId: string; point: Point2D; normal: Point2D } | null;

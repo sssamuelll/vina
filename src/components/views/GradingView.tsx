@@ -2,9 +2,9 @@ import { useState, useMemo, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { updatePiece } from '../../store/projectSlice';
-import { standardGradeTable, gradePiece, scaleOutline } from '../../utils/grading';
+import { standardGradeTable, gradePiece } from '../../utils/grading';
 import type { GradeTable } from '../../utils/grading';
-import type { PatternPiece, PathCommand } from '../../types/types';
+import type { PathCommand } from '../../types/types';
 import './views.css';
 
 // ─── Constants ───
@@ -56,6 +56,7 @@ export default function GradingView() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  void measurements; // reserved for future use
 
   const [baseSize, setBaseSize] = useState<SizeLabel>('M');
   const [targetSizes, setTargetSizes] = useState<Set<SizeLabel>>(new Set(['S', 'M', 'L']));

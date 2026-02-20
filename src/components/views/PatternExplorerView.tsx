@@ -2,9 +2,9 @@ import { useState, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { selectPiece } from '../../store/editorSlice';
-import { addPiece, updatePiece } from '../../store/projectSlice';
+import { addPiece } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces } from '../../utils/dxf';
-import type { PatternPiece, Seam } from '../../types/types';
+import type { PatternPiece } from '../../types/types';
 import './views.css';
 
 // ─── Collapsible Section ───

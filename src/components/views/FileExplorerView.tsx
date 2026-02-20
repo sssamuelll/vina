@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { addPiece, loadProject, setProjectName } from '../../store/projectSlice';
+import { addPiece, loadProject } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';

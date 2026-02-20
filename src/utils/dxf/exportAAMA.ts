@@ -292,7 +292,7 @@ function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
 
   // Internal lines
   for (const line of piece.internals) {
-    let layer = AAMA_LAYERS.DRAW;
+    let layer: string = AAMA_LAYERS.DRAW;
     if (line.type === 'notch') layer = AAMA_LAYERS.NOTCH;
     else if (line.type === 'grainline') layer = AAMA_LAYERS.GRAINLINE;
 
@@ -316,7 +316,7 @@ function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
 
 // ─── Path → DXF entities ───
 
-function pathToEntities(commands: PathCommand[], layer: string, opts: DXFExportOptions): string {
+function pathToEntities(commands: PathCommand[], layer: string, _opts: DXFExportOptions): string {
   // Separate straight segments and curves
   let s = '';
   const straightPoints: { x: number; y: number }[] = [];

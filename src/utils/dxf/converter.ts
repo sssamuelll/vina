@@ -76,6 +76,7 @@ function bulgeToArc(x1: number, y1: number, x2: number, y2: number, bulge: numbe
   if (chord < 1e-10) return [{ type: 'L', values: [x2, y2] }];
 
   const sagitta = Math.abs(bulge) * chord / 2;
+  void sagitta; // reserved for future use
   const radius = (chord / 2) / Math.sin(angle / 2);
 
   // Midpoint of chord

@@ -137,6 +137,7 @@ function parseEntityList(pairs: GroupPair[]): DXFEntity[] {
       case 'LWPOLYLINE': {
         const closed = (int(entityPairs, 70) & 1) === 1;
         const count = int(entityPairs, 90);
+        void count; // vertex count hint, not needed for parsing
         const vertices: { x: number; y: number; bulge: number }[] = [];
         let vx = 0, vy = 0, vb = 0;
         let hasX = false;

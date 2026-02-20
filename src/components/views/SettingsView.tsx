@@ -8,7 +8,8 @@ import './views.css';
 
 type UnitSystem = 'mm' | 'cm' | 'inches';
 
-interface SettingsState {
+// eslint-disable-next-line @typescript-eslint/no-empty-interface
+export interface SettingsState {
   units: UnitSystem;
   gridEnabled: boolean;
   gridSpacing: number;

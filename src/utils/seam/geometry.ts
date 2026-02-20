@@ -2,6 +2,7 @@ import type { Point2D } from '../../types/types';
 
 export const ACCURACY = 0.001;
 const ACCURACY_SQ = ACCURACY * ACCURACY;
+void ACCURACY_SQ; // reserved for future use
 
 export function distanceSq(p1: Point2D, p2: Point2D): number {
   const dx = p1.x - p2.x;

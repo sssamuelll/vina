@@ -85,7 +85,7 @@ export function equidistant(inputPoints: SAPoint[], defaultWidth: number): Point
  */
 function ekvPoint(
   p1: Point2D, p2Line1: Point2D,
-  p2Line2: Point2D, p3: Point2D,
+  _p2Line2: Point2D, p3: Point2D,
   sp1: Point2D, sp2: Point2D,
   sp3: Point2D, sp4: Point2D,
   vertex: SAPoint,
@@ -169,7 +169,7 @@ function applyAngleType(
 function angleByLength(
   p2: Point2D,
   sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
-  width: number,
+  _width: number,
 ): Point2D[] {
   // Project perpendicular from p2 onto each offset edge, find points at `width` distance
   const pt1 = closestPointOnLine(p2, sp1, sp2);
@@ -185,7 +185,7 @@ function angleByLength(
  * ByIntersection: extend original edges' offset lines to find intersection.
  */
 function angleByIntersection(
-  p1: Point2D, p2: Point2D, p3: Point2D,
+  _p1: Point2D, _p2: Point2D, _p3: Point2D,
   sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
   _width: number,
 ): Point2D[] {
@@ -200,8 +200,8 @@ function angleByIntersection(
  * Mirror first edge across second offset edge direction.
  */
 function angleByFirstSymmetry(
-  p1: Point2D, p2: Point2D,
-  sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
+  _p1: Point2D, _p2: Point2D,
+  _sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
   _width: number,
 ): Point2D[] {
   // Mirror sp2 across the line sp3→sp4
@@ -217,8 +217,8 @@ function angleByFirstSymmetry(
  * Mirror second edge across first offset edge direction.
  */
 function angleBySecondSymmetry(
-  p2: Point2D, p3: Point2D,
-  sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
+  _p2: Point2D, _p3: Point2D,
+  sp1: Point2D, sp2: Point2D, sp3: Point2D, _sp4: Point2D,
   _width: number,
 ): Point2D[] {
   const mirrored = mirrorPointAcrossLine(sp3, sp1, sp2);
@@ -233,7 +233,7 @@ function angleBySecondSymmetry(
  * Right angle from first edge offset.
  */
 function angleByFirstRightAngle(
-  p1: Point2D, p2: Point2D,
+  _p1: Point2D, _p2: Point2D,
   sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
   width: number,
 ): Point2D[] {
@@ -259,7 +259,7 @@ function angleByFirstRightAngle(
  * Right angle from second edge offset.
  */
 function angleBySecondRightAngle(
-  p2: Point2D, p3: Point2D,
+  _p2: Point2D, _p3: Point2D,
   sp1: Point2D, sp2: Point2D, sp3: Point2D, sp4: Point2D,
   width: number,
 ): Point2D[] {
