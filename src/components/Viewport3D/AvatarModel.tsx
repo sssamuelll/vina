@@ -42,14 +42,14 @@ function setAPose(root: THREE.Object3D) {
         // BUT if that didn't work, it's because clone() doesn't propagate
         // skeleton bindings. Let's try X axis (down in local frame)
         bone.quaternion.multiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG45)
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), DEG45)
         );
         break;
       }
       case 'RightArm':
       case 'RightUpperArm': {
         bone.quaternion.multiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, -1), DEG45)
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-1, 0, 0), DEG45)
         );
         break;
       }
