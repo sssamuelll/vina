@@ -62,6 +62,7 @@
 - [ ] **Contextual menus** — right-click context menus for pieces, seams, avatar (common in CAD tools)
 - [ ] **Fullscreen workspace** — maximize 2D or 3D view to use entire screen (double-click divider or hotkey)
 - [ ] **Status bar per view** — coordinates/zoom in 2D, camera angle/distance in 3D (bottom of each view, not global)
+- [ ] **Swappable view positions** — user chooses 2D left / 3D right or vice versa (drag to swap or toggle button)
 
 ### v0.7 — Avatar Editor
 - [ ] Pose editor — sliders per joint (shoulders, arms, legs, torso bend)
