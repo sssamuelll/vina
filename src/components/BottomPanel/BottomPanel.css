@@ -1,0 +1,115 @@
+.bottom-panel {
+  background: var(--panel-bg);
+  border-top: 1px solid var(--separator);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+
+.bottom-panel.closed {
+  height: 0 !important;
+  border-top-color: transparent;
+}
+
+.bottom-panel-resize {
+  height: 4px;
+  cursor: row-resize;
+  flex-shrink: 0;
+  position: relative;
+  background: transparent;
+  transition: background 0.15s;
+}
+
+.bottom-panel-resize:hover {
+  background: var(--activitybar-indicator);
+}
+
+/* Wider hit area */
+.bottom-panel-resize::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -3px;
+  bottom: -3px;
+}
+
+.bottom-panel-tabs {
+  display: flex;
+  align-items: center;
+  background: var(--panel-header-bg);
+  border-bottom: 1px solid var(--separator);
+  padding: 0 8px;
+  height: 35px;
+  min-height: 35px;
+  flex-shrink: 0;
+}
+
+.bottom-panel-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.bottom-panel-tab:hover {
+  color: var(--text-primary);
+}
+
+.bottom-panel-tab.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--panel-tab-active-border);
+}
+
+.bottom-panel-tabs-spacer {
+  flex: 1;
+}
+
+.bottom-panel-close {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.bottom-panel-close:hover {
+  background: var(--btn-bg-hover);
+  color: var(--text-primary);
+}
+
+.bottom-panel-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.bottom-panel-pane {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.bottom-panel-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 20px;
+}

@@ -1,17 +1,25 @@
-import { useEffect, useCallback, useState, useRef } from 'react';
+import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { setViewMode, undo, redo } from '../../store/editorSlice';
+import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo } from '../../store/editorSlice';
 import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
-import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
+import ActivityBar from '../ActivityBar/ActivityBar';
+import type { SidebarView } from '../ActivityBar/ActivityBar';
+import Sidebar from '../Sidebar/Sidebar';
+import CommandPalette from '../CommandPalette/CommandPalette';
+import type { Command } from '../CommandPalette/CommandPalette';
+import StatusBar from '../StatusBar/StatusBar';
+import BottomPanel from '../BottomPanel/BottomPanel';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
+import { downloadDXF } from '../../utils/exportDXF';
+import { downloadPDF } from '../../utils/exportPDF';
 import './Workspace.css';
 
 function useIsMobile(breakpoint = 768) {
@@ -38,11 +46,20 @@ export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
   const project = useSelector((s: RootState) => s.project);
+  const pieces = useSelector((s: RootState) => s.project.pieces);
   const [, forceUpdate] = useState(0);
   const [showTemplates, setShowTemplates] = useState(false);
-  const [showCopilot, setShowCopilot] = useState(false);
   const isMobile = useIsMobile();
   useKeyboardShortcuts();
+
+  // ─── Activity Bar & Sidebar ───
+  const [activeView, setActiveView] = useState<SidebarView | null>('explorer');
+
+  // ─── Bottom Panel ───
+  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+
+  // ─── Command Palette ───
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // ─── Split ratio (draggable divider) ───
   const [splitRatio, setSplitRatio] = useState(0.5);
@@ -56,7 +73,6 @@ export default function Workspace() {
   const handleViewModeChange = useCallback((newMode: '2d' | 'split' | '3d') => {
     if (newMode === viewMode || phase !== 'idle') return;
 
-    // If 3D is involved (currently showing or will show), do sequenced transition
     const has3dNow = viewMode === '3d' || viewMode === 'split';
     const will3d = newMode === '3d' || newMode === 'split';
 
@@ -68,8 +84,6 @@ export default function Workspace() {
     }
   }, [viewMode, phase, dispatch]);
 
-  // Phase machine:
-  // fading-out (300ms) → switching (instant) → resizing (400ms CSS width anim + 300ms settle) → fading-in (300ms)
   useEffect(() => {
     if (phase === 'fading-out') {
       const t = setTimeout(() => setPhase('switching'), 320);
@@ -77,12 +91,10 @@ export default function Workspace() {
     }
     if (phase === 'switching' && pendingMode) {
       dispatch(setViewMode(pendingMode));
-      // Immediately move to resizing — CSS will animate the widths
       const t = setTimeout(() => setPhase('resizing'), 20);
       return () => clearTimeout(t);
     }
     if (phase === 'resizing') {
-      // Wait for CSS width transition (400ms) + Three.js recalc (300ms)
       const t = setTimeout(() => setPhase('fading-in'), 750);
       return () => clearTimeout(t);
     }
@@ -95,7 +107,6 @@ export default function Workspace() {
     }
   }, [phase, pendingMode, dispatch]);
 
-  // 3D opacity: visible only when idle or fading-in
   const show3d = phase === 'idle' || phase === 'fading-in';
 
   // ─── Divider drag handlers ───
@@ -138,16 +149,60 @@ export default function Workspace() {
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
   const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
 
+  // ─── Command Palette keyboard shortcut ───
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // ⌘K (Mac) or Ctrl+Shift+P
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        setShowCopilot(v => !v);
+        setCommandPaletteOpen(v => !v);
+      }
+      if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        setCommandPaletteOpen(v => !v);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // ─── Command list for palette ───
+  const commands: Command[] = useMemo(() => [
+    // Tools
+    { id: 'tool-select', name: 'Select Tool', category: 'Tools', shortcut: 'V', action: () => dispatch(setActiveTool('select')) },
+    { id: 'tool-pen', name: 'Pen Tool', category: 'Tools', shortcut: 'P', action: () => dispatch(setActiveTool('pen')) },
+    { id: 'tool-line', name: 'Line Tool', category: 'Tools', shortcut: 'L', action: () => dispatch(setActiveTool('line')) },
+    { id: 'tool-rectangle', name: 'Rectangle Tool', category: 'Tools', shortcut: 'R', action: () => dispatch(setActiveTool('rectangle')) },
+    { id: 'tool-seam', name: 'Seam Tool', category: 'Tools', shortcut: 'S', action: () => dispatch(setActiveTool('seam')) },
+    { id: 'tool-notch', name: 'Notch Tool', category: 'Tools', shortcut: 'N', action: () => dispatch(setActiveTool('notch')) },
+    { id: 'tool-grainline', name: 'Grainline Tool', category: 'Tools', shortcut: 'G', action: () => dispatch(setActiveTool('grainline')) },
+    { id: 'tool-measure', name: 'Measure Tool', category: 'Tools', shortcut: 'M', action: () => dispatch(setActiveTool('measure')) },
+    { id: 'tool-hand', name: 'Hand Tool', category: 'Tools', shortcut: 'H', action: () => dispatch(setActiveTool('hand')) },
+
+    // View
+    { id: 'view-2d', name: 'Switch to 2D View', category: 'View', action: () => handleViewModeChange('2d') },
+    { id: 'view-split', name: 'Switch to Split View', category: 'View', action: () => handleViewModeChange('split') },
+    { id: 'view-3d', name: 'Switch to 3D View', category: 'View', action: () => handleViewModeChange('3d') },
+    { id: 'view-sidebar', name: 'Toggle Sidebar', category: 'View', shortcut: '⌘B', action: () => setActiveView(v => v ? null : 'explorer') },
+    { id: 'view-panel', name: 'Toggle Bottom Panel', category: 'View', shortcut: '⌘J', action: () => setBottomPanelOpen(v => !v) },
+
+    // File
+    { id: 'file-templates', name: 'Add Template', category: 'File', action: () => setShowTemplates(true) },
+    { id: 'file-export-dxf', name: 'Export DXF', category: 'File', action: () => { if (pieces.length > 0) downloadDXF(pieces); } },
+    { id: 'file-export-pdf', name: 'Export PDF', category: 'File', action: () => { if (pieces.length > 0) downloadPDF(pieces); } },
+
+    // Edit
+    { id: 'edit-undo', name: 'Undo', category: 'Edit', shortcut: '⌘Z', action: handleUndo },
+    { id: 'edit-redo', name: 'Redo', category: 'Edit', shortcut: '⌘⇧Z', action: handleRedo },
+
+    // Pattern
+    { id: 'pattern-sa-toggle', name: 'Toggle Seam Allowance', category: 'Pattern', action: () => dispatch(toggleSeamAllowance()) },
+    { id: 'pattern-grainline-toggle', name: 'Toggle Grainlines', category: 'Pattern', action: () => dispatch(toggleGrainlines()) },
+    { id: 'pattern-grid-toggle', name: 'Toggle Snap to Grid', category: 'Pattern', action: () => dispatch(toggleSnapToGrid()) },
+
+    // Copilot
+    { id: 'copilot-open', name: 'Open Copilot Panel', category: 'Copilot', action: () => { setBottomPanelOpen(true); } },
+  ], [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces]);
 
   if (isMobile) {
     return (
@@ -174,6 +229,7 @@ export default function Workspace() {
 
   return (
     <div className="workspace">
+      {/* ─── Title Bar ─── */}
       <header className="workspace-toolbar">
         <div className="workspace-logo">OpenClo</div>
         <div className="toolbar-separator" />
@@ -208,55 +264,75 @@ export default function Workspace() {
         </div>
 
         <div className="toolbar-spacer" />
+
+        {/* Command palette trigger */}
         <button
-          className={`toolbar-btn copilot-toolbar-btn ${showCopilot ? 'active' : ''}`}
-          onClick={() => setShowCopilot(v => !v)}
-          title="Chat (Ctrl+K)"
+          className="toolbar-btn command-palette-trigger"
+          onClick={() => setCommandPaletteOpen(true)}
+          title="Command Palette (⌘K)"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="currentColor" strokeWidth="1.2" fill={showCopilot ? 'currentColor' : 'none'}/>
+            <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
           </svg>
-          Chat
+          <span className="command-palette-label">⌘K</span>
         </button>
       </header>
 
+      {/* ─── Body ─── */}
       <div className="workspace-body">
-        <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
-          <Toolbar2D />
-        </div>
+        <ActivityBar activeView={activeView} onViewChange={setActiveView} />
+        <Sidebar activeView={activeView} onClose={() => setActiveView(null)} />
 
-        {/* All viewports always in DOM — widths animate via CSS transition */}
-        <div className="editors" ref={editorsRef}>
-          <div
-            className={`viewport viewport-2d ${viewMode === '2d' || viewMode === 'split' ? '' : 'hidden-viewport'}`}
-            style={{ width: getViewportWidth('2d') }}
-          >
-            <div className="viewport-label">PATTERN</div>
-            <PatternEditor />
-          </div>
+        <div className="editor-area">
+          <div className="editors-with-toolbar">
+            {/* Toolbar2D floating in 2D viewport area */}
+            <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
+              <Toolbar2D />
+            </div>
 
-          {viewMode === 'split' && (
-            <div className="viewport-divider" onMouseDown={handleDividerMouseDown} />
-          )}
+            {/* Viewports */}
+            <div className="editors" ref={editorsRef}>
+              <div
+                className={`viewport viewport-2d ${viewMode === '2d' || viewMode === 'split' ? '' : 'hidden-viewport'}`}
+                style={{ width: getViewportWidth('2d') }}
+              >
+                <div className="viewport-label">PATTERN</div>
+                <PatternEditor />
+              </div>
 
-          <div
-            className={`viewport viewport-3d ${viewMode === '3d' || viewMode === 'split' ? '' : 'hidden-viewport'}`}
-            style={{ width: getViewportWidth('3d') }}
-          >
-            <div className="viewport-label">3D VIEW</div>
-            <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
-              <Viewport3D />
+              {viewMode === 'split' && (
+                <div className="viewport-divider" onMouseDown={handleDividerMouseDown} />
+              )}
+
+              <div
+                className={`viewport viewport-3d ${viewMode === '3d' || viewMode === 'split' ? '' : 'hidden-viewport'}`}
+                style={{ width: getViewportWidth('3d') }}
+              >
+                <div className="viewport-label">3D VIEW</div>
+                <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
+                  <Viewport3D />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
 
-        <PropertiesPanel />
-
-        <div className={`copilot-column ${showCopilot ? 'open' : 'closed'}`}>
-          <CopilotPanel isColumn={true} onClose={() => setShowCopilot(false)} />
+          <BottomPanel
+            isOpen={bottomPanelOpen}
+            onToggle={() => setBottomPanelOpen(v => !v)}
+          />
         </div>
       </div>
 
+      {/* ─── Status Bar ─── */}
+      <StatusBar />
+
+      {/* ─── Overlays ─── */}
+      <CommandPalette
+        commands={commands}
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+      />
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
     </div>
   );

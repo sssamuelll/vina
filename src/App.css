@@ -27,6 +27,53 @@
   --btn-bg-active: rgba(255, 255, 255, 0.12);
   --btn-transition: color 0.15s, background 0.15s, border-color 0.15s;
 
+  /* ─── Activity Bar ─── */
+  --activitybar-bg: #1e1e1e;
+  --activitybar-fg: #858585;
+  --activitybar-fg-active: #ffffff;
+  --activitybar-indicator: #4a9eff;
+  --activitybar-width: 48px;
+
+  /* ─── Sidebar ─── */
+  --sidebar-bg: #252526;
+  --sidebar-header-bg: #252526;
+  --sidebar-header-fg: #bbbbbb;
+  --sidebar-fg: #cccccc;
+  --sidebar-width: 280px;
+
+  /* ─── Editor ─── */
+  --editor-bg: #1e1e1e;
+  --editor-fg: #d4d4d4;
+
+  /* ─── Panel (bottom) ─── */
+  --panel-bg: #1e1e1e;
+  --panel-header-bg: #252526;
+  --panel-tab-active-border: #4a9eff;
+  --panel-height: 200px;
+
+  /* ─── Status Bar ─── */
+  --statusbar-bg: #007acc;
+  --statusbar-fg: #ffffff;
+  --statusbar-height: 22px;
+
+  /* ─── Title Bar ─── */
+  --titlebar-bg: #323233;
+  --titlebar-fg: #cccccc;
+  --titlebar-height: 44px;
+
+  /* ─── Command Palette ─── */
+  --palette-bg: #252526;
+  --palette-fg: #cccccc;
+  --palette-input-bg: #3c3c3c;
+  --palette-highlight: #4a9eff;
+  --palette-shadow: 0 8px 30px rgba(0,0,0,0.5);
+
+  /* ─── Focus / Separators ─── */
+  --focus-border: #4a9eff;
+  --separator: #3a3a3a;
+  --icon-size: 20px;
+  --font-size-small: 11px;
+
   /* ─── Spacing ─── */
   --toolbar-height: 44px;
   --panel-width: 280px;

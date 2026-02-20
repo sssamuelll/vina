@@ -5,7 +5,7 @@
   width: 100vw;
 }
 
-/* ─── Top Toolbar ─── */
+/* ─── Top Toolbar (Title Bar) ─── */
 .workspace-toolbar {
   height: var(--toolbar-height);
   background: var(--bg-secondary);
@@ -85,19 +85,24 @@
   border-color: var(--accent);
 }
 
-/* Copilot button in toolbar */
-.copilot-toolbar-btn {
+/* Command palette trigger in toolbar */
+.command-palette-trigger {
   padding: 5px 10px;
   font-size: 12px;
-  gap: 5px;
+  gap: 6px;
   font-weight: 500;
-  border: 1px solid transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
-.copilot-toolbar-btn.active {
-  color: var(--accent);
-  background: var(--accent-dim);
-  border-color: rgba(74, 158, 255, 0.2);
+.command-palette-trigger:hover {
+  border-color: var(--accent);
+}
+
+.command-palette-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
 .view-toggle {
@@ -129,10 +134,27 @@
   color: #fff;
 }
 
-/* ─── Body: flex row, no overlap ─── */
+/* ─── Body: flex row ─── */
 .workspace-body {
   flex: 1;
   display: flex;
+  overflow: hidden;
+}
+
+/* ─── Editor area: takes remaining space, column layout for editors + bottom panel ─── */
+.editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Editors + toolbar wrapper row */
+.editors-with-toolbar {
+  flex: 1;
+  display: flex;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -252,27 +274,4 @@
 
 .viewport-3d-content.hidden {
   opacity: 0;
-}
-
-/* ─── Copilot Column (slide in/out from right) ─── */
-.copilot-column {
-  flex-shrink: 0;
-  border-left: 1px solid var(--border);
-  background: var(--bg-panel);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.copilot-column.open {
-  width: 360px;
-  opacity: 1;
-}
-
-.copilot-column.closed {
-  width: 0;
-  opacity: 0;
-  border-left-color: transparent;
 }

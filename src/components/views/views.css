@@ -1,0 +1,553 @@
+/* ─── Shared Sidebar View Styles ─── */
+/* VS Code sidebar aesthetic: bg #252526, text #cccccc */
+
+.sidebar-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #252526;
+  color: #cccccc;
+  font-family: 'Inter', -apple-system, sans-serif;
+  font-size: 13px;
+  overflow-y: auto;
+  user-select: none;
+}
+
+/* ─── View Header ─── */
+
+.sidebar-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid #3a3a3a;
+  min-height: 32px;
+  flex-shrink: 0;
+}
+
+.sidebar-view-header h2 {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #bbbbbb;
+}
+
+.sidebar-view-header-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.sidebar-view-header-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #bbbbbb;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+}
+
+.sidebar-view-header-actions button:hover {
+  background: #3a3a3a;
+  color: #ffffff;
+}
+
+/* ─── View Content ─── */
+
+.sidebar-view-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* ─── Collapsible Section ─── */
+
+.sidebar-section {
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.sidebar-section:last-child {
+  border-bottom: none;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: #bbbbbb;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.sidebar-section-header:hover {
+  background: #2a2d2e;
+}
+
+.sidebar-section-toggle {
+  display: inline-block;
+  width: 16px;
+  font-size: 10px;
+  color: #888888;
+  flex-shrink: 0;
+}
+
+.sidebar-section-title {
+  flex: 1;
+}
+
+.sidebar-section-badge {
+  font-size: 10px;
+  color: #888888;
+  margin-left: 4px;
+}
+
+.sidebar-section-body {
+  padding: 4px 12px 8px;
+}
+
+.sidebar-section-body.collapsed {
+  display: none;
+}
+
+/* ─── Input Fields ─── */
+
+.sidebar-input {
+  width: 100%;
+  padding: 3px 6px;
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  color: #cccccc;
+  font-size: 13px;
+  font-family: inherit;
+  border-radius: 2px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.sidebar-input:focus {
+  border-color: #4a9eff;
+}
+
+.sidebar-input::placeholder {
+  color: #666666;
+}
+
+.sidebar-input-sm {
+  padding: 2px 4px;
+  font-size: 12px;
+  width: 64px;
+}
+
+/* Number inputs */
+input[type="number"].sidebar-input {
+  -moz-appearance: textfield;
+}
+
+input[type="number"].sidebar-input::-webkit-inner-spin-button,
+input[type="number"].sidebar-input::-webkit-outer-spin-button {
+  opacity: 1;
+  height: 18px;
+}
+
+/* ─── Select / Dropdown ─── */
+
+.sidebar-select {
+  width: 100%;
+  padding: 3px 6px;
+  background: #3c3c3c;
+  border: 1px solid #3c3c3c;
+  color: #cccccc;
+  font-size: 13px;
+  font-family: inherit;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.sidebar-select:focus {
+  border-color: #4a9eff;
+}
+
+/* ─── Labels ─── */
+
+.sidebar-label {
+  display: block;
+  font-size: 11px;
+  color: #999999;
+  margin-bottom: 2px;
+}
+
+/* ─── Field Row (label + input inline) ─── */
+
+.sidebar-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+  gap: 8px;
+}
+
+.sidebar-field-row .sidebar-label {
+  margin-bottom: 0;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.sidebar-field-row .sidebar-input,
+.sidebar-field-row .sidebar-select {
+  flex: 1;
+  max-width: 100px;
+}
+
+/* ─── Buttons ─── */
+
+.sidebar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #3c3c3c;
+  border: 1px solid #4a4a4a;
+  color: #cccccc;
+  font-size: 12px;
+  font-family: inherit;
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sidebar-btn:hover {
+  background: #4a4a4a;
+  color: #ffffff;
+}
+
+.sidebar-btn:active {
+  background: #555555;
+}
+
+.sidebar-btn-primary {
+  background: #0e639c;
+  border-color: #1177bb;
+  color: #ffffff;
+}
+
+.sidebar-btn-primary:hover {
+  background: #1177bb;
+}
+
+.sidebar-btn-primary:active {
+  background: #1b8ad4;
+}
+
+.sidebar-btn-full {
+  width: 100%;
+}
+
+.sidebar-btn-sm {
+  padding: 2px 6px;
+  font-size: 11px;
+}
+
+/* ─── Toggle Switch ─── */
+
+.sidebar-toggle {
+  position: relative;
+  display: inline-block;
+  width: 32px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.sidebar-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sidebar-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #555555;
+  border-radius: 9px;
+  transition: background 0.15s;
+}
+
+.sidebar-toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background: #cccccc;
+  border-radius: 50%;
+  transition: transform 0.15s;
+}
+
+.sidebar-toggle input:checked + .sidebar-toggle-slider {
+  background: #0e639c;
+}
+
+.sidebar-toggle input:checked + .sidebar-toggle-slider::before {
+  transform: translateX(14px);
+}
+
+/* ─── Toggle Button Group (for size selectors, etc.) ─── */
+
+.sidebar-toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.sidebar-toggle-btn {
+  padding: 3px 8px;
+  background: #3c3c3c;
+  border: 1px solid #4a4a4a;
+  color: #999999;
+  font-size: 11px;
+  font-family: inherit;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.sidebar-toggle-btn:hover {
+  background: #4a4a4a;
+  color: #cccccc;
+}
+
+.sidebar-toggle-btn.active {
+  background: #0e639c;
+  border-color: #1177bb;
+  color: #ffffff;
+}
+
+/* ─── Radio Group ─── */
+
+.sidebar-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #cccccc;
+  cursor: pointer;
+}
+
+.sidebar-radio-label input[type="radio"] {
+  accent-color: #4a9eff;
+  margin: 0;
+}
+
+/* ─── List Items ─── */
+
+.sidebar-list-item {
+  display: flex;
+  align-items: center;
+  padding: 3px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.sidebar-list-item:hover {
+  background: #2a2d2e;
+}
+
+.sidebar-list-item.selected {
+  background: #094771;
+  color: #ffffff;
+}
+
+.sidebar-list-item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-list-item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+}
+
+.sidebar-list-item:hover .sidebar-list-item-actions {
+  opacity: 1;
+}
+
+.sidebar-list-item-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #bbbbbb;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.sidebar-list-item-actions button:hover {
+  background: #3a3a3a;
+  color: #ffffff;
+}
+
+/* ─── Properties inline ─── */
+
+.sidebar-properties {
+  padding: 4px 8px 4px 24px;
+  font-size: 12px;
+  color: #999999;
+  background: #1e1e1e;
+  border-radius: 0 0 3px 3px;
+}
+
+.sidebar-property-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+
+.sidebar-property-label {
+  font-size: 11px;
+  color: #888888;
+}
+
+.sidebar-property-value {
+  font-size: 12px;
+  color: #cccccc;
+}
+
+/* ─── Color Input ─── */
+
+.sidebar-color-input {
+  width: 28px;
+  height: 20px;
+  border: 1px solid #4a4a4a;
+  border-radius: 2px;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+
+.sidebar-color-input::-webkit-color-swatch-wrapper {
+  padding: 1px;
+}
+
+.sidebar-color-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 1px;
+}
+
+/* ─── SVG Preview ─── */
+
+.sidebar-svg-preview {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+/* ─── Info / Result Bar ─── */
+
+.sidebar-info {
+  font-size: 11px;
+  color: #888888;
+  padding: 4px 0;
+}
+
+.sidebar-result {
+  background: #1e1e1e;
+  border: 1px solid #3a3a3a;
+  border-radius: 3px;
+  padding: 8px;
+  margin-top: 8px;
+}
+
+.sidebar-result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  font-size: 12px;
+}
+
+.sidebar-result-label {
+  color: #888888;
+}
+
+.sidebar-result-value {
+  color: #cccccc;
+  font-weight: 500;
+}
+
+/* ─── Separator ─── */
+
+.sidebar-separator {
+  height: 1px;
+  background: #3a3a3a;
+  margin: 4px 0;
+}
+
+/* ─── Scrollbar ─── */
+
+.sidebar-view::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-view::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-view::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
+
+.sidebar-view::-webkit-scrollbar-thumb:hover {
+  background: #555555;
+}
+
+.sidebar-view-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sidebar-view-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-view-content::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 4px;
+}
