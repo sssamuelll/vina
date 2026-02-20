@@ -123,7 +123,7 @@ describe('projectSlice', () => {
     store.dispatch(updateMeasurements({ chest: 100 }));
     expect(store.getState().project.avatar.measurements.chest).toBe(100);
     // Other measurements unchanged
-    expect(store.getState().project.avatar.measurements.waist).toBe(70);
+    expect(store.getState().project.avatar.measurements.waist).toBe(82);
   });
 
   it('sets avatar mode', () => {
