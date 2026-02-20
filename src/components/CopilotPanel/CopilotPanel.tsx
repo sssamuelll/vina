@@ -4,9 +4,7 @@ import { RootState, AppDispatch } from '../../store';
 import { AgentConfig, CopilotMessage, buildCopilotContext } from '../../copilot/protocol';
 import { sendToAgent } from '../../copilot/agentConnector';
 import { executeCommands } from '../../copilot/commandExecutor';
-import { buildAgentContext, serializeContext } from '../../copilot/contextBuilder';
 import { getDefaultRegistry } from '../../copilot/tools/registry';
-import { executeToolCalls, LLMToolCall } from '../../copilot/toolExecutor';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
 import {
@@ -15,10 +13,11 @@ import {
   saveProviderConfig,
   PROVIDER_OPTIONS,
   MODEL_OPTIONS,
-  ChatMessage,
-  StreamChunk,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
+import { runAgentLoop, type AgentLoopResult } from '../../copilot/agentLoop';
+import { runProactiveAnalysis, formatWarnings } from '../../copilot/proactiveAnalysis';
+import { isTeachingModeEnabled, setTeachingMode } from '../../copilot/teachingContext';
 import './CopilotPanel.css';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
@@ -79,6 +78,12 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [settingsApiKey, setSettingsApiKey] = useState(providerConfig?.apiKey || '');
   const [settingsModel, setSettingsModel] = useState(providerConfig?.model || 'claude-sonnet-4-20250514');
 
+  // Teaching mode
+  const [teachingMode, setTeachingModeState] = useState(isTeachingModeEnabled);
+
+  // Proactive warnings
+  const [warnings, setWarnings] = useState<string>('');
+
   // Memory
   const memoryRef = useRef(new ProjectMemory(project.id));
 
@@ -98,10 +103,20 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     memoryRef.current = new ProjectMemory(project.id);
   }, [project.id]);
 
+  // Run proactive analysis when pieces change
+  useEffect(() => {
+    if (project.pieces.length > 0) {
+      const w = runProactiveAnalysis(project.pieces, project.seams);
+      setWarnings(formatWarnings(w));
+    } else {
+      setWarnings('');
+    }
+  }, [project.pieces, project.seams]);
+
   /** Determine which mode we're in */
   const isProviderMode = providerConfig !== null && providerConfig.apiKey.length > 0;
 
-  /** Send via the new LLM provider system (with streaming and tool calls) */
+  /** Send via the new LLM provider system with multi-turn agent loop */
   const handleProviderSend = useCallback(async (text: string) => {
     if (!providerConfig || !text.trim()) return;
 
@@ -112,33 +127,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     setIsLoading(true);
 
     try {
-      const context = buildAgentContext(rootState);
-      const contextStr = serializeContext(context);
-      const memoryContext = memoryRef.current.toContextString();
       const registry = getDefaultRegistry();
-
-      // Build messages for the LLM
-      const chatMessages: ChatMessage[] = [
-        { role: 'system', content: `${PATRONAJE_SOUL}\n\n## Current Project State\n${contextStr}${memoryContext ? '\n\n## Memory\n' + memoryContext : ''}` },
-      ];
-
-      // Add conversation history (last 20)
-      const recentMemory = memoryRef.current.getRecent(20);
-      for (const m of recentMemory) {
-        chatMessages.push({ role: m.role, content: m.content });
-      }
-
-      // Add current user message
-      chatMessages.push({ role: 'user', content: text });
-
-      // Get tool definitions
-      const toolDefs = registry.list().map(t => ({
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters,
-      }));
-
-      // Choose provider
       const provider = providerConfig.provider === 'anthropic' ? anthropicProvider : openaiProvider;
 
       // Create streaming assistant message
@@ -151,94 +140,105 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       };
       setMessages(prev => [...prev, assistantMsg]);
 
-      // Stream response
-      const response = await provider.stream(
-        chatMessages,
-        toolDefs,
+      // Run agent loop with multi-turn tool use
+      const getState = () => rootState;
+      const result: AgentLoopResult = await runAgentLoop(
+        text,
+        provider,
         providerConfig,
-        (chunk: StreamChunk) => {
-          if (chunk.type === 'text' && chunk.content) {
+        registry,
+        dispatch,
+        getState,
+        memoryRef.current,
+        PATRONAJE_SOUL,
+        {
+          onText: (chunk) => {
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last.role === 'assistant') {
-                updated[updated.length - 1] = { ...last, content: last.content + chunk.content };
+                updated[updated.length - 1] = { ...last, content: last.content + chunk };
               }
               return updated;
             });
-          } else if (chunk.type === 'tool_call_start' && chunk.toolCall?.name) {
+          },
+          onToolCallStart: (name, _round) => {
             setMessages(prev => {
               const updated = [...prev];
               const last = updated[updated.length - 1];
               if (last.role === 'assistant') {
-                const tc = [...(last.toolCalls || []), { name: chunk.toolCall!.name! }];
+                const tc = [...(last.toolCalls || []), { name }];
                 updated[updated.length - 1] = { ...last, toolCalls: tc };
               }
               return updated;
             });
-          }
+          },
+          onToolCallEnd: (name, success, _round) => {
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last.role === 'assistant' && last.toolCalls) {
+                const tc = last.toolCalls.map(t =>
+                  t.name === name && t.success === undefined ? { ...t, success } : t
+                );
+                updated[updated.length - 1] = { ...last, toolCalls: tc };
+              }
+              return updated;
+            });
+          },
+          onDone: () => {
+            setMessages(prev => {
+              const updated = [...prev];
+              const last = updated[updated.length - 1];
+              if (last.role === 'assistant') {
+                let content = last.content;
+                if (result.totalToolCalls > 0) {
+                  content += `\n✅ ${result.totalToolCalls} action${result.totalToolCalls > 1 ? 's' : ''} applied`;
+                  if (result.rounds.length > 1) {
+                    content += ` (${result.rounds.length} rounds)`;
+                  }
+                }
+                // Append teaching content if any
+                if (result.teachingContent.length > 0) {
+                  content += '\n\n' + result.teachingContent[0];
+                }
+                updated[updated.length - 1] = { ...last, content, isStreaming: false };
+              }
+              return updated;
+            });
+          },
         },
       );
 
-      // Execute tool calls if any
-      if (response.toolCalls.length > 0) {
-        const calls: LLMToolCall[] = response.toolCalls.map(tc => ({
-          id: tc.id,
-          name: tc.name,
-          arguments: JSON.parse(tc.arguments),
-        }));
-
-        const getState = () => rootState;
-        const batchResult = await executeToolCalls(calls, registry, dispatch, getState);
-
-        // Update tool call results in the message
-        setMessages(prev => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === 'assistant') {
-            const toolCalls = batchResult.results.map(r => ({
-              name: r.toolName,
-              result: r.result.data ? JSON.stringify(r.result.data) : undefined,
-              success: r.result.success,
-            }));
-            let content = last.content;
-            if (batchResult.succeeded > 0) {
-              content += `\n✅ ${batchResult.succeeded} action${batchResult.succeeded > 1 ? 's' : ''} applied`;
-            }
-            if (batchResult.failed > 0) {
-              content += `\n⚠️ ${batchResult.failed} action${batchResult.failed > 1 ? 's' : ''} failed`;
-            }
-            updated[updated.length - 1] = { ...last, content, toolCalls, isStreaming: false };
-          }
-          return updated;
-        });
-      } else {
-        // Mark streaming done
-        setMessages(prev => {
-          const updated = [...prev];
-          const last = updated[updated.length - 1];
-          if (last.role === 'assistant') {
-            updated[updated.length - 1] = { ...last, isStreaming: false };
-          }
-          return updated;
-        });
-      }
-
       // Save to memory
+      const allToolNames = result.rounds.flatMap(r => r.toolCalls.map(tc => tc.name));
       memoryRef.current.addMessage({
         role: 'assistant',
-        content: response.content,
+        content: result.content,
         timestamp: Date.now(),
-        toolsCalled: response.toolCalls.map(tc => tc.name),
+        toolsCalled: allToolNames,
       });
       memoryRef.current.save();
 
     } catch (e: unknown) {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: `❌ Error: ${(e as Error).message}`,
-        timestamp: Date.now(),
-      }]);
+      setMessages(prev => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === 'assistant' && last.isStreaming) {
+          updated[updated.length - 1] = {
+            ...last,
+            content: last.content + `\n❌ Error: ${(e as Error).message}`,
+            isStreaming: false,
+          };
+        } else {
+          updated.push({
+            role: 'assistant',
+            content: `❌ Error: ${(e as Error).message}`,
+            timestamp: Date.now(),
+          });
+        }
+        return updated;
+      });
     } finally {
       setIsLoading(false);
     }
@@ -452,6 +452,22 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
             </select>
           </div>
 
+          {/* Teaching mode toggle */}
+          <div className="settings-field" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <label style={{ flex: 1 }}>Teaching Mode</label>
+            <input
+              type="checkbox"
+              checked={teachingMode}
+              onChange={e => {
+                setTeachingModeState(e.target.checked);
+                setTeachingMode(e.target.checked);
+              }}
+            />
+            <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+              {teachingMode ? 'ON — explains why' : 'OFF'}
+            </span>
+          </div>
+
           {/* Legacy endpoint (collapsible) */}
           <details style={{ marginTop: 8 }}>
             <summary style={{ fontSize: 10, color: 'var(--text-muted)', cursor: 'pointer' }}>
@@ -470,6 +486,22 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
           </details>
 
           <button className="settings-save" onClick={handleSaveSettings} style={{ marginTop: 8 }}>Save</button>
+        </div>
+      )}
+
+      {/* Proactive analysis warnings */}
+      {warnings && (
+        <div style={{
+          padding: '6px 10px',
+          fontSize: 10,
+          lineHeight: 1.4,
+          background: 'var(--bg-warning, rgba(255,200,0,0.08))',
+          borderBottom: '1px solid var(--border)',
+          whiteSpace: 'pre-line',
+          maxHeight: 80,
+          overflow: 'auto',
+        }}>
+          {warnings}
         </div>
       )}
 

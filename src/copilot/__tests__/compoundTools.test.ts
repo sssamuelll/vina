@@ -1,0 +1,77 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { ToolRegistry, getDefaultRegistry, resetDefaultRegistry } from '../tools/registry';
+
+describe('Compound Tools (Phase 2)', () => {
+  let registry: ToolRegistry;
+
+  beforeEach(() => {
+    resetDefaultRegistry();
+    registry = getDefaultRegistry();
+  });
+
+  describe('generateFromDescription', () => {
+    it('should be registered', () => {
+      expect(registry.has('generateFromDescription')).toBe(true);
+    });
+
+    it('should have required parameters', () => {
+      const tool = registry.get('generateFromDescription')!;
+      expect(tool.parameters.required).toContain('description');
+    });
+
+    it('should validate with valid params', () => {
+      const result = registry.validate('generateFromDescription', {
+        description: 'Hazme un corpiño talla 40',
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('should fail validation without description', () => {
+      const result = registry.validate('generateFromDescription', {});
+      expect(result.valid).toBe(false);
+    });
+  });
+
+  describe('transformPiece', () => {
+    it('should be registered', () => {
+      expect(registry.has('transformPiece')).toBe(true);
+    });
+
+    it('should have required parameters', () => {
+      const tool = registry.get('transformPiece')!;
+      expect(tool.parameters.required).toContain('pieceId');
+      expect(tool.parameters.required).toContain('transformation');
+    });
+
+    it('should validate valid transformation enum', () => {
+      const result = registry.validate('transformPiece', {
+        pieceId: 'piece-1',
+        transformation: 'straight-to-aline',
+      });
+      expect(result.valid).toBe(true);
+    });
+
+    it('should reject invalid transformation', () => {
+      const result = registry.validate('transformPiece', {
+        pieceId: 'piece-1',
+        transformation: 'invalid-transform',
+      });
+      expect(result.valid).toBe(false);
+    });
+
+    it('should accept optional amount parameter', () => {
+      const result = registry.validate('transformPiece', {
+        pieceId: 'piece-1',
+        transformation: 'lengthen',
+        amount: 50,
+      });
+      expect(result.valid).toBe(true);
+    });
+  });
+
+  describe('Total tools count', () => {
+    it('should have all 42 tools registered', () => {
+      expect(registry.size).toBe(42);
+    });
+  });
+});
