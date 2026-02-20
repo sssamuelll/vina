@@ -6,7 +6,7 @@ function makePiece(name: string, outline: any[]): PatternPiece {
   return {
     id: name, name, outline,
     internals: [], position: { x: 0, y: 0 }, rotation: 0,
-    mirrored: false, seamAllowance: 0, createdAt: new Date(), updatedAt: new Date(),
+    mirrored: false, seamAllowance: 0, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 

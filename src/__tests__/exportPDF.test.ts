@@ -18,8 +18,8 @@ function makePiece(overrides: Partial<PatternPiece> = {}): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
     ...overrides,
   };
 }

@@ -25,8 +25,8 @@ export function executeCommands(
           const piece: PatternPiece = {
             ...cmd.piece,
             id: uid(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
           };
           dispatch(addPiece(piece));
           dispatch(selectPiece(piece.id));
@@ -40,7 +40,7 @@ export function executeCommands(
           dispatch(updatePiece({
             ...piece,
             outline: cmd.outline,
-            updatedAt: new Date(),
+            updatedAt: Date.now(),
           }));
           executed++;
           break;
@@ -55,7 +55,7 @@ export function executeCommands(
         case 'rename_piece': {
           const piece = pieces.find(p => p.id === cmd.pieceId);
           if (!piece) { errors.push(`Piece ${cmd.pieceId} not found`); break; }
-          dispatch(updatePiece({ ...piece, name: cmd.name, updatedAt: new Date() }));
+          dispatch(updatePiece({ ...piece, name: cmd.name, updatedAt: Date.now() }));
           executed++;
           break;
         }
@@ -63,7 +63,7 @@ export function executeCommands(
         case 'set_seam_allowance': {
           const piece = pieces.find(p => p.id === cmd.pieceId);
           if (!piece) { errors.push(`Piece ${cmd.pieceId} not found`); break; }
-          dispatch(updatePiece({ ...piece, seamAllowance: cmd.mm, updatedAt: new Date() }));
+          dispatch(updatePiece({ ...piece, seamAllowance: cmd.mm, updatedAt: Date.now() }));
           executed++;
           break;
         }
@@ -91,7 +91,7 @@ export function executeCommands(
             ...c,
             values: c.values.map(v => v * cmd.factor),
           }));
-          dispatch(updatePiece({ ...piece, outline: scaled, updatedAt: new Date() }));
+          dispatch(updatePiece({ ...piece, outline: scaled, updatedAt: Date.now() }));
           executed++;
           break;
         }

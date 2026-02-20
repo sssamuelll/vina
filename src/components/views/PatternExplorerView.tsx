@@ -86,8 +86,8 @@ export default function PatternExplorerView() {
       rotation: 0,
       mirrored: false,
       seamAllowance: 10,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
     dispatch(addPiece(newPiece));
   }, [dispatch, pieces.length]);

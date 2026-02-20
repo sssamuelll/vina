@@ -266,7 +266,7 @@ export function useNodeEditor(zoom: number, pan: Point2D) {
         dispatch(updatePiece({
           ...piece,
           outline: newOutline,
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         }));
         // Refresh nodes
         const updatedPiece = { ...piece, outline: newOutline };

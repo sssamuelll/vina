@@ -122,7 +122,7 @@ describe('patternTemplates', () => {
       expect(piece.position).toEqual({ x: expect.any(Number), y: expect.any(Number) });
       expect(piece.rotation).toBe(0);
       expect(typeof piece.seamAllowance).toBe('number');
-      expect(piece.createdAt).toBeInstanceOf(Date);
+      expect(typeof piece.createdAt).toBe('number');
     });
   });
 });

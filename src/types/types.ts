@@ -38,8 +38,8 @@ export interface PatternPiece {
   seamAllowance: number;
   /** Fabric assignment */
   fabricId?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
 }
 
 export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat';
@@ -175,8 +175,8 @@ export interface OpenCloProject {
   seams: Seam[];
   fabrics: Fabric[];
   avatar: Avatar;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: number;
+  updatedAt: number;
 }
 
 // ─── UI State ───

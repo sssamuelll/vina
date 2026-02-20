@@ -95,8 +95,8 @@ export function generateBodiceBack(m: BodyMeasurements): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -146,8 +146,8 @@ export function generateBodiceFront(m: BodyMeasurements): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -183,8 +183,8 @@ export function generateSleeve(m: BodyMeasurements): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -233,8 +233,8 @@ export function generateSkirtFront(m: BodyMeasurements, lengthCm = 60): PatternP
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -274,8 +274,8 @@ export function generateSkirtBack(m: BodyMeasurements, lengthCm = 60): PatternPi
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -320,8 +320,8 @@ export function generatePantsFront(m: BodyMeasurements, _lengthCm?: number): Pat
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -356,8 +356,8 @@ export function generatePantsBack(m: BodyMeasurements): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 
@@ -391,8 +391,8 @@ export function generateCollar(m: BodyMeasurements, standH = 3, collarH = 5): Pa
     rotation: 0,
     mirrored: false,
     seamAllowance: 7,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 

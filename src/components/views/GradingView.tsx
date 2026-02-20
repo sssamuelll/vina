@@ -134,7 +134,7 @@ export default function GradingView() {
           ...graded,
           id: `${selectedPiece.id}-${size}`,
           name: `${selectedPiece.name} (${size})`,
-          updatedAt: new Date(),
+          updatedAt: Date.now(),
         }),
       );
     }

@@ -19,7 +19,7 @@ function makePiece(id: string): PatternPiece {
   return {
     id, name: 'Test', outline: [{ type: 'M', values: [0, 0] }, { type: 'Z', values: [] }],
     internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10,
-    createdAt: new Date(), updatedAt: new Date(),
+    createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 
@@ -111,7 +111,7 @@ describe('projectSlice', () => {
     store.dispatch(loadProject({
       id: 'new', name: 'Loaded', pieces: [makePiece('p1')],
       seams: [], fabrics: [], avatar: store.getState().project.avatar,
-      createdAt: new Date(), updatedAt: new Date(),
+      createdAt: Date.now(), updatedAt: Date.now(),
     }));
     expect(store.getState().project.pieces).toHaveLength(1);
     expect(store.getState().project.name).toBe('Loaded');
@@ -223,7 +223,7 @@ describe('undoMiddleware', () => {
     // loadProject clears history
     store.dispatch(loadProject({
       id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
-      avatar: store.getState().project.avatar, createdAt: new Date(), updatedAt: new Date(),
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
     }));
 
     expect(canUndo()).toBe(false);
@@ -246,7 +246,7 @@ describe('undoMiddleware', () => {
     const store = createStore();
     store.dispatch(loadProject({
       id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
-      avatar: store.getState().project.avatar, createdAt: new Date(), updatedAt: new Date(),
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
     }));
 
     store.dispatch(addPiece(makePiece('p1')));
@@ -262,7 +262,7 @@ describe('undoMiddleware', () => {
     const store = createStore();
     store.dispatch(loadProject({
       id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
-      avatar: store.getState().project.avatar, createdAt: new Date(), updatedAt: new Date(),
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
     }));
 
     store.dispatch(setActiveTool('pen'));

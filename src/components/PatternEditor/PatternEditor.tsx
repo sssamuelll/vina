@@ -31,8 +31,8 @@ export default function PatternEditor() {
     const fullPiece: PatternPiece = {
       ...piece,
       id: `piece-${Date.now()}`,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
     dispatch(addPiece(fullPiece));
     dispatch(selectPiece(fullPiece.id));

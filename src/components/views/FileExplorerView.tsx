@@ -98,8 +98,8 @@ export default function FileExplorerView() {
       seams,
       fabrics,
       avatar,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     };
     const json = JSON.stringify(project, null, 2);
     const blob = new Blob([json], { type: 'application/json' });

@@ -76,6 +76,7 @@ export default function Viewport3D() {
         />
 
         <OrbitControls
+          makeDefault
           enableDamping
           dampingFactor={0.05}
           minDistance={0.6}

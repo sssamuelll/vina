@@ -58,8 +58,8 @@ export default function PropertiesPanel() {
       seams: [],
       fabrics: [{ id: 'default-cotton', name: 'Cotton', color: '#e8e4df', weight: 150, stretch: 0.05, stiffness: 0.4, friction: 0.5 }],
       avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } },
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     }));
   }, [dispatch, isDirty]);
 
@@ -204,7 +204,7 @@ export default function PropertiesPanel() {
                       type="text"
                       className="panel-input"
                       value={selectedPiece.name}
-                      onChange={e => dispatch(updatePiece({ ...selectedPiece, name: e.target.value, updatedAt: new Date() }))}
+                      onChange={e => dispatch(updatePiece({ ...selectedPiece, name: e.target.value, updatedAt: Date.now() }))}
                     />
                   </div>
                   <div className="panel-field">
@@ -215,7 +215,7 @@ export default function PropertiesPanel() {
                       value={selectedPiece.seamAllowance}
                       min={0}
                       max={50}
-                      onChange={e => dispatch(updatePiece({ ...selectedPiece, seamAllowance: Number(e.target.value), updatedAt: new Date() }))}
+                      onChange={e => dispatch(updatePiece({ ...selectedPiece, seamAllowance: Number(e.target.value), updatedAt: Date.now() }))}
                     />
                   </div>
                   <div className="panel-field">
@@ -223,7 +223,7 @@ export default function PropertiesPanel() {
                     <select
                       className="panel-input"
                       value={selectedPiece.fabricId || ''}
-                      onChange={e => dispatch(updatePiece({ ...selectedPiece, fabricId: e.target.value || undefined, updatedAt: new Date() }))}
+                      onChange={e => dispatch(updatePiece({ ...selectedPiece, fabricId: e.target.value || undefined, updatedAt: Date.now() }))}
                     >
                       <option value="">None</option>
                       {fabrics.map(f => (
@@ -236,7 +236,7 @@ export default function PropertiesPanel() {
                     <input
                       type="checkbox"
                       checked={selectedPiece.mirrored}
-                      onChange={() => dispatch(updatePiece({ ...selectedPiece, mirrored: !selectedPiece.mirrored, updatedAt: new Date() }))}
+                      onChange={() => dispatch(updatePiece({ ...selectedPiece, mirrored: !selectedPiece.mirrored, updatedAt: Date.now() }))}
                     />
                   </div>
                   <button className="panel-delete" onClick={handleDeletePiece}>

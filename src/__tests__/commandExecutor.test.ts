@@ -24,8 +24,8 @@ function makePiece(id: string, name = 'Test'): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
 

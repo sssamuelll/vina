@@ -30,7 +30,7 @@ function serializeDates(obj: any): any {
 function deserializeDates(obj: any): any {
   if (Array.isArray(obj)) return obj.map(deserializeDates);
   if (obj && typeof obj === 'object') {
-    if (obj.__date__) return new Date(obj.__date__);
+    if (obj.__date__) return new Date(obj.__date__).getTime();
     const result: any = {};
     for (const key of Object.keys(obj)) {
       result[key] = deserializeDates(obj[key]);
@@ -48,8 +48,8 @@ export function saveProjectToJSON(state: ProjectState): string {
     seams: state.seams,
     fabrics: state.fabrics,
     avatar: state.avatar,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
   return JSON.stringify(serializeDates(project), null, 2);
 }

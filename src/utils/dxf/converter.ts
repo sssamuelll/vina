@@ -298,7 +298,7 @@ function entitiesToPiece(
     rotation: 0,
     mirrored: false,
     seamAllowance: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   };
 }
