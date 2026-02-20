@@ -558,6 +558,63 @@ describe('AAMA Export', () => {
   });
 });
 
+// ─── Seam Allowance in DXF Export ───
+
+describe('AAMA Export with Seam Allowance', () => {
+  it('exports CUT layer with SA offset and DRAW layer with original outline', () => {
+    const piece = makePiece({
+      seamAllowance: 10,
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [100, 100] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+    });
+    const dxf = generateDXFAAMA([piece]);
+
+    // Both layers should be present
+    expect(dxf).toContain('\n8\n1\n'); // CUT layer
+    expect(dxf).toContain('\n8\n8\n'); // DRAW layer
+
+    // CUT outline should be larger (offset outward by 10mm)
+    // Parse and check that CUT layer polyline has coordinates outside 0-100 range
+    const doc = parseDXF(dxf);
+    const allEntities = [...doc.entities];
+    for (const [, block] of doc.blocks) {
+      allEntities.push(...block.entities);
+    }
+
+    const cutEntities = allEntities.filter(e => e.layer === '1' && (e.type === 'LWPOLYLINE' || e.type === 'POLYLINE'));
+    const drawEntities = allEntities.filter(e => e.layer === '8' && (e.type === 'LWPOLYLINE' || e.type === 'POLYLINE'));
+
+    expect(cutEntities.length).toBeGreaterThan(0);
+    expect(drawEntities.length).toBeGreaterThan(0);
+
+    // CUT vertices should extend beyond the 0-100 range (SA offset)
+    if (cutEntities[0].vertices) {
+      const xs = cutEntities[0].vertices.map((v: any) => v.x);
+      const hasOffset = xs.some((x: number) => x < -1 || x > 101);
+      expect(hasOffset).toBe(true);
+    }
+  });
+
+  it('uses same outline for CUT and DRAW when seamAllowance is 0', () => {
+    const piece = makePiece({ seamAllowance: 0 });
+    const dxf = generateDXFAAMA([piece]);
+    const doc = parseDXF(dxf);
+    const allEntities: any[] = [];
+    for (const [, block] of doc.blocks) {
+      allEntities.push(...block.entities);
+    }
+    const cutPolys = allEntities.filter(e => e.layer === '1' && e.type === 'LWPOLYLINE');
+    const drawPolys = allEntities.filter(e => e.layer === '8' && e.type === 'LWPOLYLINE');
+    // Both should exist and have same vertex count
+    expect(cutPolys.length).toBe(drawPolys.length);
+  });
+});
+
 // ─── Round-trip Test ───
 
 describe('Round-trip: export → parse', () => {

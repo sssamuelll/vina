@@ -11,6 +11,7 @@
  */
 import { PatternPiece, PathCommand } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
+import { generateSeamAllowance } from '../seam';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -272,12 +273,21 @@ ENDSEC
 function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
   let s = '';
 
-  // Outline on cut layer
-  s += pathToEntities(piece.outline, AAMA_LAYERS.CUT, opts);
+  // Layer 8 (DRAW) = original design outline
+  s += pathToEntities(piece.outline, AAMA_LAYERS.DRAW, opts);
 
-  // Seam allowance (same outline for now, on draw layer)
+  // Layer 1 (CUT) = outline + seam allowance offset
   if (piece.seamAllowance > 0) {
-    s += pathToEntities(piece.outline, AAMA_LAYERS.DRAW, opts);
+    const saOutline = generateSeamAllowance(piece.outline, piece.seamAllowance);
+    if (saOutline.length > 0) {
+      s += pathToEntities(saOutline, AAMA_LAYERS.CUT, opts);
+    } else {
+      // Fallback: if SA generation fails, use original outline
+      s += pathToEntities(piece.outline, AAMA_LAYERS.CUT, opts);
+    }
+  } else {
+    // No SA: CUT = DRAW
+    s += pathToEntities(piece.outline, AAMA_LAYERS.CUT, opts);
   }
 
   // Internal lines
