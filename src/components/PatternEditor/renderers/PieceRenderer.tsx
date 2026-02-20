@@ -1,5 +1,6 @@
 import { PatternPiece } from '../../../types/types';
 import { pathToSVG } from '../utils';
+import { generateSeamAllowance } from '../../../utils/seam';
 
 interface PieceRendererProps {
   pieces: PatternPiece[];
@@ -31,9 +32,9 @@ export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSe
 
             {showSeamAllowance && piece.seamAllowance > 0 && (
               <path
-                d={pathToSVG(piece.outline)}
+                d={pathToSVG(generateSeamAllowance(piece.outline, piece.seamAllowance))}
                 fill="none"
-                stroke="rgba(74, 158, 255, 0.25)"
+                stroke="rgba(74, 158, 255, 0.4)"
                 strokeWidth={0.8 / zoom2D}
                 strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
               />
