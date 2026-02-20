@@ -100,9 +100,20 @@ export function useRectangleTool(
       }
     : null;
 
+  // Dimensions for overlay label
+  const rectDimensions = previewRect ? {
+    width: previewRect.width,
+    height: previewRect.height,
+    center: {
+      x: previewRect.x + previewRect.width / 2,
+      y: previewRect.y + previewRect.height / 2,
+    }
+  } : null;
+
   return {
     isDragging: state.isDragging,
     previewRect,
+    rectDimensions,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

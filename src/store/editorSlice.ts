@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { EditorState, ViewMode, Tool2D, Point2D } from '../types/types';
+import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem } from '../types/types';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -13,6 +13,7 @@ const initialState: EditorState = {
   snapToGrid: true,
   gridSize: 10,
   simulationRunning: false,
+  units: 'mm',
 };
 
 const editorSlice = createSlice({
@@ -65,6 +66,9 @@ const editorSlice = createSlice({
     toggleSimulation(state) {
       state.simulationRunning = !state.simulationRunning;
     },
+    setUnits(state, action: PayloadAction<UnitSystem>) {
+      state.units = action.payload;
+    },
     // These are intercepted by undoMiddleware — they never actually modify editor state
     undo() {},
     redo() {},
@@ -76,7 +80,7 @@ export const {
   selectPiece, togglePieceSelection, clearSelection, selectSeam,
   setZoom2D, setPan2D,
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, setGridSize,
-  toggleSimulation,
+  toggleSimulation, setUnits,
   undo, redo,
 } = editorSlice.actions;
 

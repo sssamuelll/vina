@@ -1,12 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { toggleSnapToGrid, setGridSize } from '../../store/editorSlice';
+import { toggleSnapToGrid, setGridSize, setUnits } from '../../store/editorSlice';
+import { UnitSystem } from '../../types/types';
 import './views.css';
-
-// ─── Types ───
-
-type UnitSystem = 'mm' | 'cm' | 'inches';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface SettingsState {
@@ -49,9 +46,9 @@ export default function SettingsView() {
   const dispatch = useDispatch();
   const snapToGrid = useSelector((s: RootState) => s.editor.snapToGrid);
   const gridSize = useSelector((s: RootState) => s.editor.gridSize);
+  const units = useSelector((s: RootState) => s.editor.units);
 
   // Local settings (not yet in Redux — extend as needed)
-  const [units, setUnits] = useState<UnitSystem>('mm');
   const [gridEnabled, setGridEnabled] = useState(true);
   const [snapDistance, setSnapDistance] = useState(5);
   const [canvasBgColor, setCanvasBgColor] = useState('#1e1e1e');
@@ -69,6 +66,10 @@ export default function SettingsView() {
     dispatch(toggleSnapToGrid());
   }, [dispatch]);
 
+  const handleUnitsChange = useCallback((value: UnitSystem) => {
+    dispatch(setUnits(value));
+  }, [dispatch]);
+
   return (
     <div className="sidebar-view">
       <div className="sidebar-view-header">
@@ -83,7 +84,7 @@ export default function SettingsView() {
               className="sidebar-select"
               style={{ maxWidth: 100 }}
               value={units}
-              onChange={(e) => setUnits(e.target.value as UnitSystem)}
+              onChange={(e) => handleUnitsChange(e.target.value as UnitSystem)}
             >
               <option value="mm">mm</option>
               <option value="cm">cm</option>

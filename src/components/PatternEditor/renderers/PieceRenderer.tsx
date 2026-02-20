@@ -1,6 +1,7 @@
 import { PatternPiece } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
+import { extractNodes } from '../useNodeEditor';
 
 interface PieceRendererProps {
   pieces: PatternPiece[];
@@ -89,6 +90,27 @@ export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSe
                 >
                   {piece.name}
                 </text>
+              );
+            })()}
+
+            {/* Anchor points for selected pieces */}
+            {isSelected && (() => {
+              const nodes = extractNodes(piece);
+              return (
+                <g className="anchor-points">
+                  {nodes.map((node, i) => (
+                    <circle
+                      key={i}
+                      cx={node.position.x}
+                      cy={node.position.y}
+                      r={3 / zoom2D}
+                      fill="rgba(74, 158, 255, 0.6)"
+                      stroke="#4a9eff"
+                      strokeWidth={1 / zoom2D}
+                      pointerEvents="none"
+                    />
+                  ))}
+                </g>
               );
             })()}
           </g>

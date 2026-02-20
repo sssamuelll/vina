@@ -195,6 +195,8 @@ export type Tool2D =
   | 'hand'         // pan
   | 'zoom';
 
+export type UnitSystem = 'mm' | 'cm' | 'inches';
+
 export interface EditorState {
   viewMode: ViewMode;
   activeTool: Tool2D;
@@ -207,4 +209,5 @@ export interface EditorState {
   snapToGrid: boolean;
   gridSize: number;       // mm
   simulationRunning: boolean;
+  units: UnitSystem;
 }

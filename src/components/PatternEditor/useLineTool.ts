@@ -104,10 +104,22 @@ export function useLineTool(
     }
   }, []);
 
+  // Line length for dimension label
+  const lineLength = state.startPoint && state.cursorPos
+    ? {
+        length: Math.hypot(state.cursorPos.x - state.startPoint.x, state.cursorPos.y - state.startPoint.y),
+        midpoint: {
+          x: (state.startPoint.x + state.cursorPos.x) / 2,
+          y: (state.startPoint.y + state.cursorPos.y) / 2,
+        }
+      }
+    : null;
+
   return {
     startPoint: state.startPoint,
     cursorPos: state.cursorPos,
     pieceId: state.pieceId,
+    lineLength,
     handleMouseDown,
     handleMouseMove,
     handleKeyDown,

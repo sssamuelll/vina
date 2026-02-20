@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import { selectPiece, clearSelection, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D } from '../../types/types';
+import { extractNodes, NodeRef } from './useNodeEditor';
 
 interface ToolHooks {
   pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void };
@@ -36,6 +37,34 @@ export function useEditorInteractions(
   const panRef = useRef<{ startMouse: Point2D; startPan: Point2D } | null>(null);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor } = tools;
+
+  /** Check if a click is near an anchor point of a piece */
+  const findClickedAnchorPoint = useCallback((
+    e: React.MouseEvent<SVGSVGElement>,
+    piece: PatternPiece
+  ): NodeRef | null => {
+    const svg = e.currentTarget;
+    const rect = svg.getBoundingClientRect();
+    const clickX = (e.clientX - rect.left - pan2D.x) / zoom2D;
+    const clickY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+    
+    // Convert to piece-local coordinates
+    const localX = clickX - piece.position.x;
+    const localY = clickY - piece.position.y;
+    
+    const nodes = extractNodes(piece);
+    const CLICK_THRESHOLD = 8 / zoom2D; // 8 screen pixels
+    
+    for (const node of nodes) {
+      const dx = localX - node.position.x;
+      const dy = localY - node.position.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist <= CLICK_THRESHOLD) {
+        return node.ref;
+      }
+    }
+    return null;
+  }, [pan2D, zoom2D]);
 
   // Clear measurements when switching away
   useEffect(() => {
@@ -106,10 +135,28 @@ export function useEditorInteractions(
     if (activeTool === 'select') {
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
+      
       if (pieceId) {
-        dispatch(selectPiece(pieceId));
         const piece = pieces.find(p => p.id === pieceId);
         if (piece) {
+          // Check if click is on an anchor point of the currently selected piece
+          const selectedPieceIds = new Set(
+            (target.ownerSVGElement?.querySelectorAll('.pattern-piece.selected') || [])
+              .map(el => el.getAttribute('data-piece-id'))
+              .filter(Boolean)
+          );
+          
+          if (selectedPieceIds.has(pieceId)) {
+            const clickedNode = findClickedAnchorPoint(e, piece);
+            if (clickedNode) {
+              // Enter node editing mode with this node selected
+              nodeEditor.enterNodeEdit(pieceId, clickedNode);
+              return;
+            }
+          }
+          
+          // Regular piece selection
+          dispatch(selectPiece(pieceId));
           dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
         }
       } else {

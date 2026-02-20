@@ -1,5 +1,8 @@
 import { useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 import { Point2D } from '../../types/types';
+import { formatDimension } from '../../utils/units';
 
 interface Measurement {
   id: string;
@@ -8,15 +11,15 @@ interface Measurement {
   distance: number;
 }
 
-function formatDistance(mm: number): string {
-  if (mm < 100) return `${mm.toFixed(1)} mm`;
-  return `${(mm / 10).toFixed(2)} cm`;
-}
-
 export function useMeasureTool(zoom: number, pan: Point2D) {
+  const units = useSelector((s: RootState) => s.editor.units);
   const [measurements, setMeasurements] = useState<Measurement[]>([]);
   const [currentStart, setCurrentStart] = useState<Point2D | null>(null);
   const [cursorPos, setCursorPos] = useState<Point2D | null>(null);
+
+  const formatDistance = useCallback((mm: number): string => {
+    return formatDimension(mm, units);
+  }, [units]);
 
   const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => ({
     x: (screenX - svgRect.left - pan.x) / zoom,

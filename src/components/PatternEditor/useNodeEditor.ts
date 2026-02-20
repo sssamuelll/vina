@@ -180,13 +180,13 @@ export function useNodeEditor(zoom: number, pan: Point2D) {
   }, [zoom, pan]);
 
   /** Enter node editing mode for a piece */
-  const enterNodeEdit = useCallback((pieceId: string) => {
+  const enterNodeEdit = useCallback((pieceId: string, selectedNode?: NodeRef) => {
     const piece = pieces.find(p => p.id === pieceId);
     if (!piece) return;
     setState({
       isEditing: true,
       editingPieceId: pieceId,
-      selectedNode: null,
+      selectedNode: selectedNode || null,
       hoveredNode: null,
       nodes: extractNodes(piece),
     });

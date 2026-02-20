@@ -1,7 +1,8 @@
-import { PatternPiece, Point2D, Tool2D } from '../../../types/types';
+import { PatternPiece, Point2D, Tool2D, UnitSystem } from '../../../types/types';
 import { getEdgeEndpoints } from '../useSeamTool';
 import { NodeRef } from '../useNodeEditor';
 import { HANDLE_RADIUS, ANCHOR_RADIUS } from '../utils';
+import { formatDimension } from '../../../utils/units';
 
 interface PenNode {
   anchor: Point2D;
@@ -37,13 +38,19 @@ interface ToolOverlayProps {
   activeTool: Tool2D;
   zoom2D: number;
   pieces: PatternPiece[];
+  units: string;
   // Pen
   penNodes: PenNode[];
   previewPath: string;
   guidePath: string | null;
+  penDistance: { distance: number; position: Point2D } | null;
+  // Rectangle
   rectPreview: { x: number; y: number; width: number; height: number } | null;
+  rectDimensions: { width: number; height: number; center: Point2D } | null;
+  // Line
   lineStart: Point2D | null;
   lineCursor: Point2D | null;
+  lineLength: { length: number; midpoint: Point2D } | null;
   // Seam
   firstEdge: SeamEdge | null;
   hoveredEdge: SeamEdge | null;
@@ -69,8 +76,10 @@ interface ToolOverlayProps {
 
 export default function ToolOverlay(props: ToolOverlayProps) {
   const {
-    activeTool, zoom2D, pieces,
-    penNodes, previewPath, guidePath, rectPreview, lineStart, lineCursor,
+    activeTool, zoom2D, pieces, units,
+    penNodes, previewPath, guidePath, penDistance,
+    rectPreview, rectDimensions,
+    lineStart, lineCursor, lineLength,
     firstEdge, hoveredEdge,
     notchHoveredPoint,
     grainlineIsDragging, grainlineStartPoint, grainlineEndPoint, grainlinePieceId,
@@ -253,6 +262,24 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         </g>
       )}
 
+      {/* ─── Pen tool: distance label ─── */}
+      {activeTool === 'pen' && penDistance && (
+        <g transform={`translate(${penDistance.position.x}, ${penDistance.position.y})`}>
+          <rect
+            x={-25 / zoom2D} y={-8 / zoom2D}
+            width={50 / zoom2D} height={16 / zoom2D}
+            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
+          />
+          <text
+            textAnchor="middle" dominantBaseline="central"
+            fill="#fff" fontSize={10 / zoom2D}
+            fontFamily="Inter, sans-serif" pointerEvents="none"
+          >
+            {formatDimension(penDistance.distance, units as UnitSystem)}
+          </text>
+        </g>
+      )}
+
       {/* ─── Line tool: start point + preview line ─── */}
       {activeTool === 'line' && lineStart && (
         <g>
@@ -269,6 +296,24 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         </g>
       )}
 
+      {/* ─── Line tool: dimension label ─── */}
+      {activeTool === 'line' && lineLength && (
+        <g transform={`translate(${lineLength.midpoint.x}, ${lineLength.midpoint.y})`}>
+          <rect
+            x={-25 / zoom2D} y={-8 / zoom2D}
+            width={50 / zoom2D} height={16 / zoom2D}
+            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
+          />
+          <text
+            textAnchor="middle" dominantBaseline="central"
+            fill="#fff" fontSize={10 / zoom2D}
+            fontFamily="Inter, sans-serif" pointerEvents="none"
+          >
+            {formatDimension(lineLength.length, units as UnitSystem)}
+          </text>
+        </g>
+      )}
+
       {/* ─── Rectangle tool: drag preview ─── */}
       {activeTool === 'rectangle' && rectPreview && (
         <rect
@@ -281,6 +326,24 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           strokeWidth={1.5 / zoom2D}
           strokeDasharray={`${4 / zoom2D}`}
         />
+      )}
+
+      {/* ─── Rectangle tool: dimension label ─── */}
+      {activeTool === 'rectangle' && rectDimensions && (
+        <g transform={`translate(${rectDimensions.center.x}, ${rectDimensions.center.y})`}>
+          <rect
+            x={-30 / zoom2D} y={-8 / zoom2D}
+            width={60 / zoom2D} height={16 / zoom2D}
+            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
+          />
+          <text
+            textAnchor="middle" dominantBaseline="central"
+            fill="#fff" fontSize={10 / zoom2D}
+            fontFamily="Inter, sans-serif" pointerEvents="none"
+          >
+            {formatDimension(rectDimensions.width, units as UnitSystem)} × {formatDimension(rectDimensions.height, units as UnitSystem)}
+          </text>
+        </g>
       )}
 
       {/* ─── Measure tool: measurement lines ─── */}
@@ -365,43 +428,65 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           hoveredNode.commandIndex === ref.commandIndex &&
           hoveredNode.pointType === ref.pointType;
 
+        const selectedNodeData = selectedNode ? nodeEditorNodes.find(n => isNodeSelected(n.ref)) : null;
+
         return (
-          <g className="node-editor" transform={`translate(${piece.position.x}, ${piece.position.y})`}>
-            {nodeEditorNodes.map((node, i) => (
-              <g key={i}>
-                {node.cp1 && (
-                  <>
-                    <line
-                      x1={node.position.x} y1={node.position.y}
-                      x2={node.cp1.x} y2={node.cp1.y}
-                      stroke="rgba(255, 107, 107, 0.5)"
-                      strokeWidth={0.8 / zoom2D}
-                    />
-                    <rect
-                      x={node.cp1.x - 3.5 / zoom2D}
-                      y={node.cp1.y - 3.5 / zoom2D}
-                      width={7 / zoom2D}
-                      height={7 / zoom2D}
-                      fill={isNodeSelected({ ...node.ref, pointType: 'cp2' }) ? '#ff6b6b' : '#fff'}
-                      stroke="#ff6b6b"
-                      strokeWidth={1 / zoom2D}
-                      style={{ cursor: 'move' }}
-                      rx={1 / zoom2D}
-                    />
-                  </>
-                )}
-                <circle
-                  cx={node.position.x}
-                  cy={node.position.y}
-                  r={4.5 / zoom2D}
-                  fill={isNodeSelected(node.ref) ? '#ffd700' : isNodeHovered(node.ref) ? '#6bb3ff' : '#4a9eff'}
-                  stroke="#fff"
-                  strokeWidth={1.2 / zoom2D}
-                  style={{ cursor: 'move' }}
+          <>
+            <g className="node-editor" transform={`translate(${piece.position.x}, ${piece.position.y})`}>
+              {nodeEditorNodes.map((node, i) => (
+                <g key={i}>
+                  {node.cp1 && (
+                    <>
+                      <line
+                        x1={node.position.x} y1={node.position.y}
+                        x2={node.cp1.x} y2={node.cp1.y}
+                        stroke="rgba(255, 107, 107, 0.5)"
+                        strokeWidth={0.8 / zoom2D}
+                      />
+                      <rect
+                        x={node.cp1.x - 3.5 / zoom2D}
+                        y={node.cp1.y - 3.5 / zoom2D}
+                        width={7 / zoom2D}
+                        height={7 / zoom2D}
+                        fill={isNodeSelected({ ...node.ref, pointType: 'cp2' }) ? '#ff6b6b' : '#fff'}
+                        stroke="#ff6b6b"
+                        strokeWidth={1 / zoom2D}
+                        style={{ cursor: 'move' }}
+                        rx={1 / zoom2D}
+                      />
+                    </>
+                  )}
+                  <circle
+                    cx={node.position.x}
+                    cy={node.position.y}
+                    r={4.5 / zoom2D}
+                    fill={isNodeSelected(node.ref) ? '#ffd700' : isNodeHovered(node.ref) ? '#6bb3ff' : '#4a9eff'}
+                    stroke="#fff"
+                    strokeWidth={1.2 / zoom2D}
+                    style={{ cursor: 'move' }}
+                  />
+                </g>
+              ))}
+            </g>
+
+            {/* Selected node coordinates */}
+            {selectedNodeData && (
+              <g transform={`translate(${selectedNodeData.position.x + piece.position.x}, ${selectedNodeData.position.y + piece.position.y - 20 / zoom2D})`}>
+                <rect
+                  x={-40 / zoom2D} y={-8 / zoom2D}
+                  width={80 / zoom2D} height={16 / zoom2D}
+                  rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
                 />
+                <text
+                  textAnchor="middle" dominantBaseline="central"
+                  fill="#fff" fontSize={9 / zoom2D}
+                  fontFamily="Inter, sans-serif" pointerEvents="none"
+                >
+                  x: {formatDimension(selectedNodeData.position.x, units as UnitSystem)}, y: {formatDimension(selectedNodeData.position.y, units as UnitSystem)}
+                </text>
               </g>
-            ))}
-          </g>
+            )}
+          </>
         );
       })()}
     </>

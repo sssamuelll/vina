@@ -199,12 +199,21 @@ export function usePenTool(
     }
   }, [nodesToCommands, onComplete]);
 
+  // Distance from last node to cursor for dimension label
+  const lastPointDistance = state.nodes.length > 0 && state.cursorPos && !state.isClosed
+    ? {
+        distance: dist(state.nodes[state.nodes.length - 1].anchor, state.cursorPos),
+        position: state.cursorPos,
+      }
+    : null;
+
   return {
     nodes: state.nodes,
     isDragging: state.isDragging,
     isClosed: state.isClosed,
     previewPath: buildPreviewPath(),
     guidePath: buildGuidePath(),
+    lastPointDistance,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,

@@ -24,7 +24,7 @@ export default function PatternEditor() {
   const dispatch = useDispatch();
   const { pieces, seams } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
-  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, gridSize } = editor;
+  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, gridSize, units } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
 
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -109,14 +109,16 @@ export default function PatternEditor() {
             activeTool={activeTool}
             zoom2D={zoom2D}
             pieces={pieces}
+            units={units}
             penNodes={pen.nodes}
             previewPath={pen.previewPath}
             guidePath={pen.guidePath}
-            firstEdge={seamTool.firstEdge}
-            hoveredEdge={seamTool.hoveredEdge}
+            penDistance={pen.lastPointDistance}
             rectPreview={rectTool.previewRect}
+            rectDimensions={rectTool.rectDimensions}
             lineStart={lineTool.startPoint}
             lineCursor={lineTool.cursorPos}
+            lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
             grainlineIsDragging={grainlineTool.isDragging}
             grainlineStartPoint={grainlineTool.startPoint}
