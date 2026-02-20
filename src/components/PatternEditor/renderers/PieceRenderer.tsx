@@ -62,16 +62,35 @@ export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSe
               );
             })}
 
-            <text
-              fontSize={11 / zoom2D}
-              fill="#555"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              pointerEvents="none"
-              fontFamily="Inter, sans-serif"
-            >
-              {piece.name}
-            </text>
+            {(() => {
+              // Calculate piece center from outline
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              for (const cmd of piece.outline) {
+                for (let i = 0; i < cmd.values.length - 1; i += 2) {
+                  minX = Math.min(minX, cmd.values[i]);
+                  minY = Math.min(minY, cmd.values[i + 1]);
+                  maxX = Math.max(maxX, cmd.values[i]);
+                  maxY = Math.max(maxY, cmd.values[i + 1]);
+                }
+              }
+              const cx = (minX + maxX) / 2;
+              const cy = (minY + maxY) / 2;
+              return (
+                <text
+                  x={cx}
+                  y={cy}
+                  fontSize={11 / zoom2D}
+                  fill="#555"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  pointerEvents="none"
+                  fontFamily="Inter, sans-serif"
+                  transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}
+                >
+                  {piece.name}
+                </text>
+              );
+            })()}
           </g>
         );
       })}
