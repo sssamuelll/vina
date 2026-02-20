@@ -48,8 +48,9 @@ function setAPose(root: THREE.Object3D) {
       }
       case 'RightArm':
       case 'RightUpperArm': {
+        // Right arm mirrors: same positive X rotation
         bone.quaternion.multiply(
-          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(-1, 0, 0), DEG45)
+          new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), DEG45)
         );
         break;
       }
