@@ -69,9 +69,10 @@ Open `http://localhost:5180`
 | v0.3 | DXF/PDF export, save/load, undo/redo | ✅ Done |
 | v0.4 | AI copilot, parametric templates, polish | ✅ Done |
 | v0.5 | **File formats** — DXF import, CLO3D .zprj, Gerber AccuMark | 🔨 Next |
-| v0.6 | Production output — A0/A1 PDF, marker making | 📋 Planned |
-| v0.7 | Cloth simulation (mass-spring physics) | 📋 Planned |
-| v0.8 | Size grading | 📋 Planned |
+| v0.6 | **Avatar editor** — pose sliders, body morphs, avatar library | 📋 Planned |
+| v0.7 | Production output — A0/A1 PDF, marker making | 📋 Planned |
+| v0.8 | Cloth simulation (mass-spring physics) | 📋 Planned |
+| v0.9 | Size grading | 📋 Planned |
 | v1.0 | Public release with docs and examples | 📋 Planned |
 
 See [docs/specs/ROADMAP.md](docs/specs/ROADMAP.md) for full details.

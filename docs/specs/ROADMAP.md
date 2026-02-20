@@ -53,7 +53,15 @@
 - [ ] **Gerber AccuMark export** — zip with ASTM DXF + manifest
 - [ ] **SVG import** — parse paths → PatternPiece outlines (useful for Illustrator/Inkscape users)
 
-### v0.6 — Production Output
+### v0.6 — Avatar Editor
+- [ ] Pose editor — sliders per joint (shoulders, arms, legs, torso bend)
+- [ ] Pose presets (A-pose, T-pose, sitting, walking, arms-forward)
+- [ ] Body measurements → morph targets (chest, waist, hips, height reshape the mesh)
+- [ ] Load custom avatar (GLB/GLTF from Avaturn, ReadyPlayerMe, MakeHuman)
+- [ ] Avatar library — save/switch between multiple avatars
+- [ ] Skin tone / underwear color customization
+
+### v0.7 — Production Output
 - [ ] PDF cut layout — A0/A1 paper sizes, automatic nesting
 - [ ] Marker making — automatic piece layout for fabric width
 - [ ] Seam allowance visualization in 2D editor
@@ -61,20 +69,20 @@
 
 ## Planned
 
-### v0.7 — Cloth Simulation
+### v0.8 — Cloth Simulation
 - [ ] Mass-spring physics engine
 - [ ] Real-time draping on avatar
 - [ ] Fabric property presets (cotton, silk, denim, jersey)
 - [ ] Collision detection (avatar ↔ fabric)
 - [ ] Tension/stress visualization
 
-### v0.8 — Grading
+### v0.9 — Grading
 - [ ] Size grading rules (S/M/L/XL or numeric)
 - [ ] Grade reference points
 - [ ] Multi-size DXF export
 - [ ] Size range visualization
 
-### v0.9 — Collaboration
+### v0.10 — Collaboration
 - [ ] Cloud project storage
 - [ ] Share projects via URL
 - [ ] Version history
