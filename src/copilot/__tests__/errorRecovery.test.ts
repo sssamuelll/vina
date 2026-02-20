@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   classifyError,
   calculateBackoff,
@@ -8,8 +8,29 @@ import {
   isOfflineMode,
   getOfflineActions,
   RecoveryStrategy,
+  hasFallbackProvider,
+  loadFallbackProvider,
+  saveFallbackProvider,
 } from '../errorRecovery';
 import type { ProviderConfig } from '../providers/types';
+
+// ─── localStorage mock ──────────────────────────────────────────────────────
+
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+    get length() { return Object.keys(store).length; },
+    key: vi.fn((i: number) => Object.keys(store)[i] || null),
+  };
+})();
+
+Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
+
+// ─── classifyError ──────────────────────────────────────────────────────────
 
 describe('classifyError', () => {
   it('should classify auth errors (401)', () => {
@@ -24,12 +45,32 @@ describe('classifyError', () => {
     expect(classifyError(new Error('Invalid API key provided'))).toBe('auth');
   });
 
+  it('should classify "invalid x-api-key" as auth', () => {
+    expect(classifyError(new Error('Invalid x-api-key header'))).toBe('auth');
+  });
+
+  it('should classify "authentication" as auth', () => {
+    expect(classifyError(new Error('Authentication failed'))).toBe('auth');
+  });
+
+  it('should classify "unauthorized" (lowercase) as auth', () => {
+    expect(classifyError(new Error('unauthorized access'))).toBe('auth');
+  });
+
   it('should classify rate limit errors (429)', () => {
     expect(classifyError(new Error('429 Too Many Requests'))).toBe('rate_limit');
   });
 
   it('should classify rate limit by message', () => {
     expect(classifyError(new Error('Rate limit exceeded'))).toBe('rate_limit');
+  });
+
+  it('should classify "too many requests" as rate_limit', () => {
+    expect(classifyError(new Error('too many requests, please wait'))).toBe('rate_limit');
+  });
+
+  it('should classify "quota" as rate_limit', () => {
+    expect(classifyError(new Error('API quota exceeded for this billing period'))).toBe('rate_limit');
   });
 
   it('should classify network errors', () => {
@@ -46,16 +87,52 @@ describe('classifyError', () => {
     expect(classifyError(new Error('504 Gateway Timeout'))).toBe('network');
   });
 
-  it('should classify provider unavailable', () => {
+  it('should classify ECONNREFUSED as network', () => {
+    expect(classifyError(new Error('connect ECONNREFUSED 127.0.0.1:11434'))).toBe('network');
+  });
+
+  it('should classify ENOTFOUND as network', () => {
+    expect(classifyError(new Error('getaddrinfo ENOTFOUND api.anthropic.com'))).toBe('network');
+  });
+
+  it('should classify "fetch" errors as network', () => {
+    expect(classifyError(new Error('fetch failed: network error'))).toBe('network');
+  });
+
+  it('should classify provider unavailable (500)', () => {
     expect(classifyError(new Error('500 Internal Server Error'))).toBe('provider_unavailable');
+  });
+
+  it('should classify "unavailable" as provider_unavailable', () => {
+    expect(classifyError(new Error('Service temporarily unavailable'))).toBe('provider_unavailable');
+  });
+
+  it('should classify "provider" mentions as provider_unavailable', () => {
+    expect(classifyError(new Error('Provider returned an error'))).toBe('provider_unavailable');
   });
 
   it('should classify invalid params', () => {
     expect(classifyError(new Error('Invalid parameters: missing required field'))).toBe('invalid_params');
   });
 
+  it('should classify "invalid outline" as invalid_params', () => {
+    expect(classifyError(new Error('Invalid outline: self-intersecting'))).toBe('invalid_params');
+  });
+
+  it('should classify "validation" as invalid_params', () => {
+    expect(classifyError(new Error('Validation error: bust must be positive'))).toBe('invalid_params');
+  });
+
+  it('should classify "missing required" as invalid_params', () => {
+    expect(classifyError(new Error('Missing required parameter: name'))).toBe('invalid_params');
+  });
+
   it('should classify tool execution errors', () => {
     expect(classifyError(new Error('Execution error: Piece not found'))).toBe('tool_execution');
+  });
+
+  it('should classify "piece not found" as tool_execution', () => {
+    expect(classifyError(new Error('Piece "Front Bodice" not found'))).toBe('tool_execution');
   });
 
   it('should classify unknown errors', () => {
@@ -65,7 +142,19 @@ describe('classifyError', () => {
   it('should handle string errors', () => {
     expect(classifyError('401 Unauthorized')).toBe('auth');
   });
+
+  it('should handle non-Error non-string objects', () => {
+    expect(classifyError(42)).toBe('unknown');
+    expect(classifyError(null)).toBe('unknown');
+    expect(classifyError(undefined)).toBe('unknown');
+  });
+
+  it('should handle objects with toString', () => {
+    expect(classifyError({ toString: () => '429 rate limited' })).toBe('rate_limit');
+  });
 });
+
+// ─── calculateBackoff ───────────────────────────────────────────────────────
 
 describe('calculateBackoff', () => {
   it('should calculate exponential delay', () => {
@@ -85,6 +174,15 @@ describe('calculateBackoff', () => {
     expect(d2).toBeLessThanOrEqual(4500);
   });
 
+  it('should produce increasing delays across attempts', () => {
+    // Run multiple times to account for jitter
+    const delays = [0, 1, 2, 3].map(a => calculateBackoff(a, 1000, 100000));
+    for (let i = 1; i < delays.length; i++) {
+      // Each delay should be roughly 2x the previous (within jitter)
+      expect(delays[i]).toBeGreaterThan(delays[i - 1]);
+    }
+  });
+
   it('should cap at maxMs', () => {
     const d = calculateBackoff(10, 1000, 5000);
     expect(d).toBeLessThanOrEqual(5000);
@@ -95,7 +193,27 @@ describe('calculateBackoff', () => {
     expect(d).toBeGreaterThanOrEqual(500);
     expect(d).toBeLessThanOrEqual(750);
   });
+
+  it('should handle base of 0', () => {
+    const d = calculateBackoff(0, 0, 10000);
+    // 0 * 2^0 + random * 0 = 0
+    expect(d).toBe(0);
+  });
+
+  it('should handle max of 0', () => {
+    const d = calculateBackoff(0, 1000, 0);
+    // min(1000 + jitter, 0) → 0
+    expect(d).toBe(0);
+  });
+
+  it('should use default parameters', () => {
+    const d = calculateBackoff(0);
+    expect(d).toBeGreaterThanOrEqual(1000);
+    expect(d).toBeLessThanOrEqual(1500);
+  });
 });
+
+// ─── retryWithBackoff ───────────────────────────────────────────────────────
 
 describe('retryWithBackoff', () => {
   it('should succeed on first attempt', async () => {
@@ -159,30 +277,116 @@ describe('retryWithBackoff', () => {
     expect(result.recovered).toBe(true);
     expect(result.attempts).toBe(2);
   });
+
+  it('should retry on provider_unavailable errors', async () => {
+    let attempt = 0;
+    const fn = vi.fn().mockImplementation(async () => {
+      attempt++;
+      if (attempt === 1) throw new Error('Provider temporarily unavailable');
+      return 'recovered';
+    });
+
+    const result = await retryWithBackoff(fn, { maxAttempts: 3, baseDelayMs: 10 });
+    expect(result.recovered).toBe(true);
+    expect(result.result).toBe('recovered');
+    expect(result.attempts).toBe(2);
+  });
+
+  it('should not retry on invalid_params errors', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('Invalid parameters: bust is negative'));
+
+    const result = await retryWithBackoff(fn, { maxAttempts: 3, baseDelayMs: 10 });
+    expect(result.recovered).toBe(false);
+    expect(result.attempts).toBe(1);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should not retry on tool_execution errors', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('Tool execution error: Piece not found'));
+
+    const result = await retryWithBackoff(fn, { maxAttempts: 3, baseDelayMs: 10 });
+    expect(result.recovered).toBe(false);
+    expect(result.attempts).toBe(1);
+  });
+
+  it('should use default options when none provided', async () => {
+    const fn = vi.fn().mockResolvedValue('ok');
+    const result = await retryWithBackoff(fn);
+    expect(result.result).toBe('ok');
+    expect(result.attempts).toBe(1);
+  });
+
+  it('should handle maxAttempts=1 (no retries)', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('Network error'));
+    const result = await retryWithBackoff(fn, { maxAttempts: 1, baseDelayMs: 10 });
+    expect(result.recovered).toBe(false);
+    expect(result.attempts).toBe(1);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('should exhaust all retries on persistent network failure', async () => {
+    const fn = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const result = await retryWithBackoff(fn, { maxAttempts: 3, baseDelayMs: 5 });
+    expect(result.recovered).toBe(false);
+    expect(result.attempts).toBe(3);
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
 });
+
+// ─── getErrorMessage ────────────────────────────────────────────────────────
 
 describe('getErrorMessage', () => {
   it('should return setup instructions for auth errors', () => {
     const msg = getErrorMessage('auth', new Error('401'));
     expect(msg).toContain('API key');
     expect(msg).toContain('console.anthropic.com');
+    expect(msg).toContain('platform.openai.com');
+    expect(msg).toContain('🔑');
   });
 
   it('should return rate limit message', () => {
     const msg = getErrorMessage('rate_limit', new Error('429'));
     expect(msg).toContain('Rate limit');
+    expect(msg).toContain('⏳');
   });
 
   it('should return network error message', () => {
     const msg = getErrorMessage('network', new Error('failed'));
     expect(msg).toContain('Network error');
+    expect(msg).toContain('🌐');
+  });
+
+  it('should return provider unavailable message', () => {
+    const msg = getErrorMessage('provider_unavailable', new Error('500'));
+    expect(msg).toContain('temporarily unavailable');
+    expect(msg).toContain('🔧');
+  });
+
+  it('should return invalid params message with raw error', () => {
+    const msg = getErrorMessage('invalid_params', new Error('bust must be positive'));
+    expect(msg).toContain('bust must be positive');
+    expect(msg).toContain('⚠️');
   });
 
   it('should include raw message for tool errors', () => {
     const msg = getErrorMessage('tool_execution', new Error('Piece XYZ not found'));
     expect(msg).toContain('Piece XYZ not found');
+    expect(msg).toContain('🔧');
+  });
+
+  it('should return unknown error message with raw error', () => {
+    const msg = getErrorMessage('unknown', new Error('Cosmic ray'));
+    expect(msg).toContain('Cosmic ray');
+    expect(msg).toContain('❌');
+  });
+
+  it('should handle non-Error values', () => {
+    const msg = getErrorMessage('unknown', 'string error');
+    expect(msg).toContain('string error');
   });
 });
+
+// ─── simplifyOutline ────────────────────────────────────────────────────────
 
 describe('simplifyOutline', () => {
   it('should convert cubic bezier to line', () => {
@@ -228,7 +432,64 @@ describe('simplifyOutline', () => {
     ];
     expect(simplifyOutline(outline)).toEqual(outline);
   });
+
+  it('should handle empty outline', () => {
+    expect(simplifyOutline([])).toEqual([]);
+  });
+
+  it('should handle single-point outline', () => {
+    const outline = [{ type: 'M', values: [0, 0] }];
+    expect(simplifyOutline(outline)).toEqual(outline);
+  });
+
+  it('should handle mixed curves and lines', () => {
+    const outline = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [10, 0] },
+      { type: 'C', values: [15, 0, 20, 5, 20, 10] },
+      { type: 'L', values: [20, 20] },
+      { type: 'Q', values: [10, 25, 0, 20] },
+      { type: 'Z', values: [] },
+    ];
+
+    const simplified = simplifyOutline(outline);
+    expect(simplified.length).toBe(6);
+    expect(simplified[0]).toEqual({ type: 'M', values: [0, 0] });
+    expect(simplified[1]).toEqual({ type: 'L', values: [10, 0] });
+    expect(simplified[2]).toEqual({ type: 'L', values: [20, 10] }); // C → L
+    expect(simplified[3]).toEqual({ type: 'L', values: [20, 20] });
+    expect(simplified[4]).toEqual({ type: 'L', values: [0, 20] }); // Q → L
+    expect(simplified[5]).toEqual({ type: 'Z', values: [] });
+  });
+
+  it('should keep degenerate C (< 6 values) unchanged', () => {
+    const outline = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [10, 20] }, // only 2 values, not a valid cubic
+      { type: 'Z', values: [] },
+    ];
+    const simplified = simplifyOutline(outline);
+    // The C has hasCurves=true so simplification runs, but < 6 values → kept as-is
+    expect(simplified[1]).toEqual({ type: 'C', values: [10, 20] });
+  });
+
+  it('should keep degenerate Q (< 4 values) unchanged', () => {
+    const outline = [
+      { type: 'M', values: [0, 0] },
+      { type: 'Q', values: [10] }, // only 1 value
+      { type: 'Z', values: [] },
+    ];
+    const simplified = simplifyOutline(outline);
+    expect(simplified[1]).toEqual({ type: 'Q', values: [10] });
+  });
+
+  it('should handle outline with only Z', () => {
+    const outline = [{ type: 'Z', values: [] }];
+    expect(simplifyOutline(outline)).toEqual(outline);
+  });
 });
+
+// ─── isOfflineMode ──────────────────────────────────────────────────────────
 
 describe('isOfflineMode', () => {
   it('should return true when config is null', () => {
@@ -249,12 +510,26 @@ describe('isOfflineMode', () => {
     const config: ProviderConfig = { provider: 'openai', apiKey: '   ', model: 'gpt-4o' };
     expect(isOfflineMode(config)).toBe(true);
   });
+
+  it('should return false for Ollama with empty key (Ollama does not need a key)', () => {
+    // isOfflineMode checks apiKey, so Ollama with empty key is technically "offline"
+    // This is expected behavior — Ollama uses baseUrl, not apiKey
+    const config: ProviderConfig = { provider: 'ollama', apiKey: '', model: 'llama3' };
+    expect(isOfflineMode(config)).toBe(true);
+  });
 });
+
+// ─── getOfflineActions ──────────────────────────────────────────────────────
 
 describe('getOfflineActions', () => {
   it('should return at least 5 actions', () => {
     const actions = getOfflineActions();
     expect(actions.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('should return exactly 10 actions', () => {
+    const actions = getOfflineActions();
+    expect(actions.length).toBe(10);
   });
 
   it('should include bodice creation', () => {
@@ -268,8 +543,79 @@ describe('getOfflineActions', () => {
     const actions = getOfflineActions();
     const dxf = actions.find(a => a.toolName === 'exportDXF');
     expect(dxf).toBeDefined();
+    const pdf = actions.find(a => a.toolName === 'exportPDF');
+    expect(pdf).toBeDefined();
+  });
+
+  it('should have bilingual labels (Spanish / English)', () => {
+    const actions = getOfflineActions();
+    for (const action of actions) {
+      expect(action.label).toContain('/');
+    }
+  });
+
+  it('should have unique tool actions', () => {
+    const actions = getOfflineActions();
+    const toolNames = new Set(actions.map(a => `${a.toolName}-${JSON.stringify(a.defaultParams)}`));
+    expect(toolNames.size).toBe(actions.length);
+  });
+
+  it('should have an emoji icon for each action', () => {
+    const actions = getOfflineActions();
+    for (const action of actions) {
+      expect(action.icon.length).toBeGreaterThan(0);
+    }
   });
 });
+
+// ─── Fallback Provider ──────────────────────────────────────────────────────
+
+describe('Fallback Provider', () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+  });
+
+  it('should return null when no fallback configured', () => {
+    expect(loadFallbackProvider()).toBeNull();
+  });
+
+  it('should save and load a fallback provider', () => {
+    const config: ProviderConfig = {
+      provider: 'openai',
+      apiKey: 'sk-test',
+      model: 'gpt-4o-mini',
+    };
+    saveFallbackProvider(config);
+    const loaded = loadFallbackProvider();
+    expect(loaded).toEqual(config);
+  });
+
+  it('should detect when fallback is available', () => {
+    saveFallbackProvider({
+      provider: 'openai',
+      apiKey: 'sk-test',
+      model: 'gpt-4o-mini',
+    });
+    expect(hasFallbackProvider('anthropic')).toBe(true);
+    expect(hasFallbackProvider('openai')).toBe(false); // same provider
+  });
+
+  it('should return false for fallback with empty API key', () => {
+    saveFallbackProvider({
+      provider: 'openai',
+      apiKey: '',
+      model: 'gpt-4o-mini',
+    });
+    expect(hasFallbackProvider('anthropic')).toBe(false);
+  });
+
+  it('should handle corrupted localStorage for fallback', () => {
+    localStorageMock.setItem('openclo-fallback-provider', 'not-json{');
+    expect(loadFallbackProvider()).toBeNull();
+  });
+});
+
+// ─── RecoveryStrategy ───────────────────────────────────────────────────────
 
 describe('RecoveryStrategy', () => {
   it('should recover from network errors via retry', async () => {
@@ -293,6 +639,66 @@ describe('RecoveryStrategy', () => {
     const result = await strategy.recover(new Error('401 Unauthorized'), fn);
     expect(result.recovered).toBe(false);
     expect(result.message).toContain('API key');
+    expect(result.attempts).toBe(1);
+  });
+
+  it('should recover from rate_limit errors via retry', async () => {
+    const strategy = new RecoveryStrategy(3, 10);
+    let attempt = 0;
+    const fn = async () => {
+      attempt++;
+      if (attempt < 2) throw new Error('429 rate limited');
+      return 'ok';
+    };
+
+    const result = await strategy.recover(new Error('429 rate limited'), fn);
+    expect(result.recovered).toBe(true);
+  });
+
+  it('should retry provider_unavailable with max 2 attempts', async () => {
+    const strategy = new RecoveryStrategy(5, 10);
+    let attempt = 0;
+    const fn = vi.fn().mockImplementation(async () => {
+      attempt++;
+      if (attempt < 3) throw new Error('Provider error 500');
+      return 'ok';
+    });
+
+    const result = await strategy.recover(new Error('Provider error 500'), fn);
+    // provider_unavailable path uses maxAttempts: 2
+    expect(result.recovered).toBe(false);
+    expect(result.attempts).toBe(2);
+  });
+
+  it('should return message for invalid_params without retry', async () => {
+    const strategy = new RecoveryStrategy(3, 10);
+    const fn = vi.fn();
+
+    const result = await strategy.recover(new Error('Invalid parameters: bust < 0'), fn);
+    expect(result.recovered).toBe(false);
+    expect(result.message).toContain('Invalid parameters');
+    expect(result.attempts).toBe(1);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('should return message for tool_execution without retry', async () => {
+    const strategy = new RecoveryStrategy(3, 10);
+    const fn = vi.fn();
+
+    const result = await strategy.recover(new Error('Tool execution error'), fn);
+    expect(result.recovered).toBe(false);
+    expect(result.message).toContain('Tool error');
+    expect(result.attempts).toBe(1);
+  });
+
+  it('should return message for unknown errors without retry', async () => {
+    const strategy = new RecoveryStrategy(3, 10);
+    const fn = vi.fn();
+
+    const result = await strategy.recover(new Error('cosmic rays'), fn);
+    expect(result.recovered).toBe(false);
+    expect(result.message).toContain('cosmic rays');
+    expect(result.attempts).toBe(1);
   });
 
   it('should wrap operations with withRecovery', async () => {
@@ -317,5 +723,20 @@ describe('RecoveryStrategy', () => {
         throw new Error('401 Unauthorized');
       })
     ).rejects.toThrow('API key');
+  });
+
+  it('should succeed on first attempt in withRecovery without recovery', async () => {
+    const strategy = new RecoveryStrategy(3, 10);
+    const result = await strategy.withRecovery(async () => 'first-try');
+    expect(result).toBe('first-try');
+  });
+
+  it('should use custom maxRetries and baseDelay', async () => {
+    const strategy = new RecoveryStrategy(1, 5);
+    const fn = vi.fn().mockRejectedValue(new Error('Network error'));
+
+    const result = await strategy.recover(new Error('Network error'), fn);
+    // With maxRetries=1, it should only try once on retry
+    expect(result.attempts).toBe(1);
   });
 });

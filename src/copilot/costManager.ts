@@ -181,7 +181,7 @@ export class CostManager {
   }
 
   /**
-   * Get cost summary for the current month across all projects.
+   * Get cost summary for the current month within this project.
    *
    * @returns Monthly cost summary
    */
@@ -235,7 +235,7 @@ export class CostManager {
       const saved = localStorage.getItem(BUDGET_STORAGE_KEY);
       if (saved) {
         const value = parseFloat(saved);
-        if (!isNaN(value) && value > 0) return value;
+        if (isFinite(value) && value >= 0) return value;
       }
     } catch { /* ignore */ }
     return DEFAULT_BUDGET;
@@ -244,9 +244,10 @@ export class CostManager {
   /**
    * Set the monthly budget.
    *
-   * @param amount - Budget amount in USD
+   * @param amount - Budget amount in USD (must be finite and >= 0)
    */
   setBudget(amount: number): void {
+    if (!isFinite(amount) || amount < 0) return;
     try {
       localStorage.setItem(BUDGET_STORAGE_KEY, String(amount));
     } catch { /* ignore */ }
