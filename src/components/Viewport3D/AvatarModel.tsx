@@ -1,8 +1,7 @@
-import { useEffect, useRef } from "react";
-import { useLoader } from "@react-three/fiber";
+import { useEffect, useRef, useMemo } from "react";
+import { useLoader, useFrame } from "@react-three/fiber";
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as THREE from 'three';
-import { SkeletonUtils } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 interface AvatarModelProps {
   url: string;
@@ -11,41 +10,30 @@ interface AvatarModelProps {
   height?: number;
 }
 
-/**
- * Set A-pose: rotate arms 45° down from T-pose.
- * Uses SkeletonUtils.clone for proper skeleton cloning,
- * then rotates arm bones in local space.
- */
-function applyAPose(scene: THREE.Object3D) {
-  const DEG45 = Math.PI / 4;
-  const rotDown = new THREE.Quaternion().setFromAxisAngle(
-    new THREE.Vector3(1, 0, 0), DEG45
-  );
-
-  scene.traverse((obj) => {
-    if (!(obj as THREE.Bone).isBone) return;
-    const bone = obj as THREE.Bone;
-
-    if (bone.name === 'LeftArm' || bone.name === 'LeftUpperArm') {
-      bone.quaternion.multiply(rotDown);
-    } else if (bone.name === 'RightArm' || bone.name === 'RightUpperArm') {
-      bone.quaternion.multiply(rotDown);
-    }
-  });
-}
-
 export default function AvatarModel({ url, autoScale = true, height = 1.80 }: AvatarModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const gltf = useLoader(GLTFLoader, url);
+  const poseApplied = useRef(false);
+
+  // Store reference to bones we need to rotate
+  const armBones = useRef<{ left?: THREE.Bone; right?: THREE.Bone }>({});
 
   useEffect(() => {
     if (!gltf?.scene || !groupRef.current) return;
+    poseApplied.current = false;
 
-    // SkeletonUtils.clone properly clones SkinnedMesh + skeleton bindings
-    const scene = SkeletonUtils.clone(gltf.scene);
+    const scene = gltf.scene;
 
-    // Apply A-pose
-    applyAPose(scene);
+    // Find arm bones
+    scene.traverse((obj) => {
+      if (!(obj as THREE.Bone).isBone) return;
+      const bone = obj as THREE.Bone;
+      if (bone.name === 'LeftArm' || bone.name === 'LeftUpperArm') {
+        armBones.current.left = bone;
+      } else if (bone.name === 'RightArm' || bone.name === 'RightUpperArm') {
+        armBones.current.right = bone;
+      }
+    });
 
     // Compute bounding box for auto-scaling
     const box = new THREE.Box3().setFromObject(scene);
@@ -87,6 +75,23 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     }
     groupRef.current.add(scene);
   }, [gltf, autoScale, height]);
+
+  // Apply A-pose on first frame (after Three.js has processed the skeleton)
+  useFrame(() => {
+    if (poseApplied.current) return;
+    const { left, right } = armBones.current;
+    if (!left && !right) return;
+
+    const DEG45 = Math.PI / 4;
+    const rot = new THREE.Quaternion().setFromAxisAngle(
+      new THREE.Vector3(1, 0, 0), DEG45
+    );
+
+    if (left) left.quaternion.multiply(rot);
+    if (right) right.quaternion.multiply(rot.clone());
+
+    poseApplied.current = true;
+  });
 
   return <group ref={groupRef} />;
 }
