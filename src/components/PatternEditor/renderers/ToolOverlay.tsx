@@ -41,6 +41,7 @@ interface ToolOverlayProps {
   penNodes: PenNode[];
   previewPath: string;
   guidePath: string | null;
+  rectPreview: { x: number; y: number; width: number; height: number } | null;
   // Seam
   firstEdge: SeamEdge | null;
   hoveredEdge: SeamEdge | null;
@@ -67,7 +68,7 @@ interface ToolOverlayProps {
 export default function ToolOverlay(props: ToolOverlayProps) {
   const {
     activeTool, zoom2D, pieces,
-    penNodes, previewPath, guidePath,
+    penNodes, previewPath, guidePath, rectPreview,
     firstEdge, hoveredEdge,
     notchHoveredPoint,
     grainlineIsDragging, grainlineStartPoint, grainlineEndPoint, grainlinePieceId,
@@ -248,6 +249,20 @@ export default function ToolOverlay(props: ToolOverlayProps) {
             />
           )}
         </g>
+      )}
+
+      {/* ─── Rectangle tool: drag preview ─── */}
+      {activeTool === 'rectangle' && rectPreview && (
+        <rect
+          x={rectPreview.x}
+          y={rectPreview.y}
+          width={rectPreview.width}
+          height={rectPreview.height}
+          fill="rgba(74, 158, 255, 0.15)"
+          stroke="#4a9eff"
+          strokeWidth={1.5 / zoom2D}
+          strokeDasharray={`${4 / zoom2D}`}
+        />
       )}
 
       {/* ─── Measure tool: measurement lines ─── */}

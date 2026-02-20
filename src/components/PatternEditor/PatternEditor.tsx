@@ -5,6 +5,7 @@ import { addPiece, addSeam, addInternalLine, setInternalLine } from '../../store
 import { selectPiece, selectSeam } from '../../store/editorSlice';
 import { PatternPiece, Seam, InternalLine } from '../../types/types';
 import { usePenTool } from './usePenTool';
+import { useRectangleTool } from './useRectangleTool';
 import { useSeamTool } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -37,6 +38,7 @@ export default function PatternEditor() {
   }, [dispatch]);
 
   const pen = usePenTool(zoom2D, pan2D, handlePieceComplete);
+  const rectTool = useRectangleTool(zoom2D, pan2D, handlePieceComplete);
 
   const handleSeamComplete = useCallback((seam: Omit<Seam, 'id'>) => {
     const fullSeam: Seam = { ...seam, id: `seam-${Date.now()}` };
@@ -62,7 +64,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, seamTool, notchTool, grainlineTool, measureTool, nodeEditor,
+      pen, rectTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor,
     });
 
   return (
@@ -105,6 +107,7 @@ export default function PatternEditor() {
             guidePath={pen.guidePath}
             firstEdge={seamTool.firstEdge}
             hoveredEdge={seamTool.hoveredEdge}
+            rectPreview={rectTool.previewRect}
             notchHoveredPoint={notchTool.hoveredPoint}
             grainlineIsDragging={grainlineTool.isDragging}
             grainlineStartPoint={grainlineTool.startPoint}
