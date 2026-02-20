@@ -142,8 +142,10 @@ export default function Workspace() {
   }, [dispatch]);
 
   useEffect(() => {
+    // Debounced save on every change + periodic backup
+    const debounce = setTimeout(() => saveToLocalStorage(project), 500);
     const interval = setInterval(() => saveToLocalStorage(project), 30000);
-    return () => clearInterval(interval);
+    return () => { clearTimeout(debounce); clearInterval(interval); };
   }, [project]);
 
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
