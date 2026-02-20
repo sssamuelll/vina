@@ -53,7 +53,7 @@ export default function PropertiesPanel() {
       pieces: [],
       seams: [],
       fabrics: [{ id: 'default-cotton', name: 'Cotton', color: '#e8e4df', weight: 150, stretch: 0.05, stiffness: 0.4, friction: 0.5 }],
-      avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 170, chest: 90, waist: 70, hips: 95, shoulder: 40, armLength: 60, inseam: 80 } },
+      avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } },
       createdAt: new Date(),
       updatedAt: new Date(),
     }));

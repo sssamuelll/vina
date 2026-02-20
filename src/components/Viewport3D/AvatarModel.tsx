@@ -5,8 +5,10 @@ import * as THREE from 'three';
 
 interface AvatarModelProps {
   url: string;
-  /** Scale to fit roughly 1.7m tall */
+  /** Scale to fit target height */
   autoScale?: boolean;
+  /** Target height in meters (default: 1.80) */
+  height?: number;
 }
 
 /**
@@ -39,7 +41,7 @@ function setAPose(scene: THREE.Object3D) {
   });
 }
 
-export default function AvatarModel({ url, autoScale = true }: AvatarModelProps) {
+export default function AvatarModel({ url, autoScale = true, height = 1.80 }: AvatarModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const gltf = useLoader(GLTFLoader, url);
 
@@ -57,8 +59,7 @@ export default function AvatarModel({ url, autoScale = true }: AvatarModelProps)
     box.getSize(size);
 
     if (autoScale && size.y > 0) {
-      // Target height: ~1.65m (realistic human height)
-      const targetHeight = 1.65;
+      const targetHeight = height;
       const scale = targetHeight / size.y;
       scene.scale.setScalar(scale);
 

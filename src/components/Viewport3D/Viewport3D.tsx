@@ -23,7 +23,7 @@ function getPosition(index: number, total: number): [number, number, number] {
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
 export default function Viewport3D() {
-  const { pieces, avatarMode, avatarModelUrl } = useSelector((s: RootState) => s.project);
+  const { pieces, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
   const { simulationRunning, selectedPieceIds } = useSelector((s: RootState) => s.editor);
 
   return (
@@ -39,7 +39,7 @@ export default function Viewport3D() {
         {avatarMode === 'dressform' && <Mannequin />}
         {avatarMode === 'model' && avatarModelUrl && (
           <Suspense fallback={null}>
-            <AvatarModel url={avatarModelUrl} />
+            <AvatarModel url={avatarModelUrl} height={avatar.measurements.height / 100} />
           </Suspense>
         )}
 

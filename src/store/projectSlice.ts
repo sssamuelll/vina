@@ -6,13 +6,13 @@ const defaultAvatar: Avatar = {
   name: 'Default Avatar',
   modelUrl: '',
   measurements: {
-    height: 170,
-    chest: 90,
-    waist: 70,
-    hips: 95,
-    shoulder: 40,
-    armLength: 60,
-    inseam: 80,
+    height: 180,
+    chest: 96,
+    waist: 82,
+    hips: 96,
+    shoulder: 44,
+    armLength: 64,
+    inseam: 82,
   },
 };
 
