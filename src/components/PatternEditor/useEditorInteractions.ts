@@ -7,6 +7,7 @@ import { PatternPiece, Point2D, Tool2D } from '../../types/types';
 interface ToolHooks {
   pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void };
   rectTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
+  lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
@@ -34,7 +35,7 @@ export function useEditorInteractions(
   const dragRef = useRef<{ pieceId: string; startMouse: Point2D; startPos: Point2D } | null>(null);
   const panRef = useRef<{ startMouse: Point2D; startPan: Point2D } | null>(null);
 
-  const { pen, rectTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor } = tools;
 
   // Clear measurements when switching away
   useEffect(() => {
@@ -45,6 +46,7 @@ export function useEditorInteractions(
   useEffect(() => {
     const handlers: ((e: KeyboardEvent) => void)[] = [];
     if (activeTool === 'pen') handlers.push(pen.handleKeyDown);
+    if (activeTool === 'line') handlers.push(lineTool.handleKeyDown);
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (activeTool === 'measure') handlers.push(measureTool.handleKeyDown);
     if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
@@ -92,6 +94,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') { pen.handleMouseDown(e); return; }
     if (activeTool === 'rectangle') { rectTool.handleMouseDown(e); return; }
+    if (activeTool === 'line') { lineTool.handleMouseDown(e); return; }
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
     if (activeTool === 'grainline') { grainlineTool.handleMouseDown(e); return; }
@@ -134,6 +137,7 @@ export function useEditorInteractions(
     }
     if (activeTool === 'pen') pen.handleMouseMove(e);
     if (activeTool === 'rectangle') rectTool.handleMouseMove(e);
+    if (activeTool === 'line') lineTool.handleMouseMove(e);
     if (activeTool === 'seam') seamTool.handleMouseMove(e);
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
     if (activeTool === 'grainline') grainlineTool.handleMouseMove(e);

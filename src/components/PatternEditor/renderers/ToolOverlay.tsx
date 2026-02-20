@@ -42,6 +42,8 @@ interface ToolOverlayProps {
   previewPath: string;
   guidePath: string | null;
   rectPreview: { x: number; y: number; width: number; height: number } | null;
+  lineStart: Point2D | null;
+  lineCursor: Point2D | null;
   // Seam
   firstEdge: SeamEdge | null;
   hoveredEdge: SeamEdge | null;
@@ -68,7 +70,7 @@ interface ToolOverlayProps {
 export default function ToolOverlay(props: ToolOverlayProps) {
   const {
     activeTool, zoom2D, pieces,
-    penNodes, previewPath, guidePath, rectPreview,
+    penNodes, previewPath, guidePath, rectPreview, lineStart, lineCursor,
     firstEdge, hoveredEdge,
     notchHoveredPoint,
     grainlineIsDragging, grainlineStartPoint, grainlineEndPoint, grainlinePieceId,
@@ -246,6 +248,22 @@ export default function ToolOverlay(props: ToolOverlayProps) {
               stroke="rgba(255, 215, 0, 0.3)"
               strokeWidth={1 / zoom2D}
               pointerEvents="none"
+            />
+          )}
+        </g>
+      )}
+
+      {/* ─── Line tool: start point + preview line ─── */}
+      {activeTool === 'line' && lineStart && (
+        <g>
+          <circle cx={lineStart.x} cy={lineStart.y} r={4 / zoom2D} fill="#4a9eff" />
+          {lineCursor && (
+            <line
+              x1={lineStart.x} y1={lineStart.y}
+              x2={lineCursor.x} y2={lineCursor.y}
+              stroke="#4a9eff"
+              strokeWidth={1.5 / zoom2D}
+              strokeDasharray={`${4 / zoom2D}`}
             />
           )}
         </g>
