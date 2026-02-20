@@ -20,6 +20,7 @@ import { detectLanguage, type AgentLanguage } from './languageDetection';
 import { getTeachingSnippet, formatTeachingSnippet, isTeachingModeEnabled } from './teachingContext';
 import { runProactiveAnalysis, formatWarnings } from './proactiveAnalysis';
 import type { ProjectMemory } from './memory';
+import { getRelevantSkills, buildSkillContext } from './skills/skillLoader';
 
 /** Maximum number of tool call rounds per user message */
 const MAX_ROUNDS = 5;
@@ -71,23 +72,30 @@ export interface AgentLoopCallbacks {
 }
 
 /**
- * Build the system prompt with current project context and memory.
+ * Build the system prompt with current project context, active skills, and memory.
  *
  * @param state - Current Redux state
  * @param memory - Project memory
  * @param soul - PATRONAJE_SOUL personality string
+ * @param skillContext - Formatted skill context string (if any skills matched)
+ * @param activeSkillNames - Names of matched skills for context tracking
  * @returns Complete system prompt
  */
 function buildSystemPrompt(
   state: RootState,
   memory: ProjectMemory,
   soul: string,
+  skillContext: string = '',
+  activeSkillNames: string[] = [],
 ): string {
-  const context = buildAgentContext(state);
+  const context = buildAgentContext(state, activeSkillNames);
   const contextStr = serializeContext(context);
   const memoryContext = memory.toContextString();
 
   let prompt = soul;
+  if (skillContext) {
+    prompt += `\n\n${skillContext}`;
+  }
   prompt += `\n\n## Current Project State\n${contextStr}`;
   if (memoryContext) {
     prompt += `\n\n## Memory\n${memoryContext}`;
@@ -135,9 +143,14 @@ export async function runAgentLoop(
   const teachingContent: string[] = [];
   let totalToolCalls = 0;
 
+  // Match relevant skills from user message
+  const matchedSkills = getRelevantSkills(userMessage);
+  const skillContext = buildSkillContext(matchedSkills);
+  const activeSkillNames = matchedSkills.map(s => s.name);
+
   // Build initial messages
   const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(getState(), memory, soul) },
+    { role: 'system', content: buildSystemPrompt(getState(), memory, soul, skillContext, activeSkillNames) },
   ];
 
   // Add conversation history from memory

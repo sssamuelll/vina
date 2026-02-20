@@ -70,6 +70,8 @@ export interface AgentContext {
     state: string;
     pieceFabrics: Record<string, string>;
   };
+  /** Names of active pattern skills matched from user message */
+  activeSkills: string[];
 }
 
 /**
@@ -120,7 +122,7 @@ function summarizePiece(piece: PatternPiece): PieceSummary {
  * @param state - Current Redux root state
  * @returns AgentContext object ready for serialization
  */
-export function buildAgentContext(state: RootState): AgentContext {
+export function buildAgentContext(state: RootState, activeSkills: string[] = []): AgentContext {
   const { project, editor, simulation } = state;
 
   return {
@@ -152,6 +154,7 @@ export function buildAgentContext(state: RootState): AgentContext {
       state: simulation.simulationState,
       pieceFabrics: simulation.pieceFabrics,
     },
+    activeSkills,
   };
 }
 
