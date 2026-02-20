@@ -53,7 +53,17 @@
 - [ ] **Gerber AccuMark export** — zip with ASTM DXF + manifest
 - [ ] **SVG import** — parse paths → PatternPiece outlines (useful for Illustrator/Inkscape users)
 
-### v0.6 — Avatar Editor
+### v0.6 — UI Overhaul (CLO3D-Inspired Layout)
+- [ ] **Remove permanent right sidebar** — properties panel eats too much workspace
+- [ ] **Context toolbars per view** — 2D view gets 2D-specific tools on its left edge, 3D view gets 3D-specific tools on its left edge (like CLO3D)
+- [ ] **Floating panels inside views** — collapsible panels that live inside the 2D/3D viewport (like BioCanvas approach), not in a fixed sidebar
+- [ ] **Properties on selection** — instead of always-open panel, show properties as floating popover when piece/avatar is selected
+- [ ] **Top toolbar refactor** — global actions (save, export, undo, view mode) stay in top bar; tool-specific items move to view toolbars
+- [ ] **Contextual menus** — right-click context menus for pieces, seams, avatar (common in CAD tools)
+- [ ] **Fullscreen workspace** — maximize 2D or 3D view to use entire screen (double-click divider or hotkey)
+- [ ] **Status bar per view** — coordinates/zoom in 2D, camera angle/distance in 3D (bottom of each view, not global)
+
+### v0.7 — Avatar Editor
 - [ ] Pose editor — sliders per joint (shoulders, arms, legs, torso bend)
 - [ ] Pose presets (A-pose, T-pose, sitting, walking, arms-forward)
 - [ ] Body measurements → morph targets (chest, waist, hips, height reshape the mesh)
@@ -61,7 +71,7 @@
 - [ ] Avatar library — save/switch between multiple avatars
 - [ ] Skin tone / underwear color customization
 
-### v0.7 — Production Output
+### v0.8 — Production Output
 - [ ] PDF cut layout — A0/A1 paper sizes, automatic nesting
 - [ ] Marker making — automatic piece layout for fabric width
 - [ ] Seam allowance visualization in 2D editor
@@ -69,20 +79,20 @@
 
 ## Planned
 
-### v0.8 — Cloth Simulation
+### v0.9 — Cloth Simulation
 - [ ] Mass-spring physics engine
 - [ ] Real-time draping on avatar
 - [ ] Fabric property presets (cotton, silk, denim, jersey)
 - [ ] Collision detection (avatar ↔ fabric)
 - [ ] Tension/stress visualization
 
-### v0.9 — Grading
+### v0.10 — Grading
 - [ ] Size grading rules (S/M/L/XL or numeric)
 - [ ] Grade reference points
 - [ ] Multi-size DXF export
 - [ ] Size range visualization
 
-### v0.10 — Collaboration
+### v0.11 — Collaboration
 - [ ] Cloud project storage
 - [ ] Share projects via URL
 - [ ] Version history
