@@ -1,4 +1,4 @@
-import { Component, Suspense, type ReactNode } from 'react';
+import { Component, Suspense, lazy, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import { useSelector } from 'react-redux';
@@ -7,6 +7,9 @@ import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import './Viewport3D.css';
+
+/** Lazy-load ClothMesh to keep bundle impact minimal */
+const ClothMesh = lazy(() => import('./ClothMesh'));
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
 class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: string }> {
@@ -48,7 +51,9 @@ export { Viewport3DErrorBoundary };
 
 export default function Viewport3D() {
   const { pieces, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
-  const { simulationRunning, selectedPieceIds } = useSelector((s: RootState) => s.editor);
+  const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
+  const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const useClothSim = simulationState !== 'idle';
 
   return (
     <div className="viewport3d">
@@ -67,16 +72,30 @@ export default function Viewport3D() {
           </Suspense>
         )}
 
-        {/* Pattern pieces as 3D meshes */}
-        {pieces.map((piece, i) => (
-          <PieceMesh
-            key={piece.id}
-            piece={piece}
-            isSelected={selectedPieceIds.includes(piece.id)}
-            color={PIECE_COLORS[i % PIECE_COLORS.length]}
-            position={getPosition(i, pieces.length)}
-          />
-        ))}
+        {/* Pattern pieces: cloth sim when running, static otherwise */}
+        {useClothSim ? (
+          <Suspense fallback={null}>
+            {pieces.map((piece, i) => (
+              <ClothMesh
+                key={piece.id}
+                piece={piece}
+                isSelected={selectedPieceIds.includes(piece.id)}
+                color={PIECE_COLORS[i % PIECE_COLORS.length]}
+                position={getPosition(i, pieces.length)}
+              />
+            ))}
+          </Suspense>
+        ) : (
+          pieces.map((piece, i) => (
+            <PieceMesh
+              key={piece.id}
+              piece={piece}
+              isSelected={selectedPieceIds.includes(piece.id)}
+              color={PIECE_COLORS[i % PIECE_COLORS.length]}
+              position={getPosition(i, pieces.length)}
+            />
+          ))
+        )}
 
         {/* Floor shadow */}
         <ContactShadows
@@ -110,8 +129,8 @@ export default function Viewport3D() {
       </Canvas>
 
       {/* Status */}
-      <div className={`sim-status ${simulationRunning ? 'running' : ''}`}>
-        {simulationRunning ? '● SIMULATING' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
+      <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>
+        {simulationState === 'running' ? '● SIMULATING' : simulationState === 'paused' ? '⏸ PAUSED' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
       </div>
     </div>
   );

@@ -208,6 +208,5 @@ export interface EditorState {
   showGrainlines: boolean;
   snapToGrid: boolean;
   gridSize: number;       // mm
-  simulationRunning: boolean;
   units: UnitSystem;
 }

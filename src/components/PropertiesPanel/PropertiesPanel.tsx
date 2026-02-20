@@ -3,7 +3,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam, setProjectName, loadProject } from '../../store/projectSlice';
 import type { NotchShape, NotchOptions, BodyMeasurements } from '../../types/types';
-import { toggleSimulation, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
+import { toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
+import { startSimulation, pauseSimulation, resetSimulation } from '../../store/simulationSlice';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadProjectFile, uploadProjectFile } from '../../utils/projectIO';
@@ -16,6 +17,7 @@ export default function PropertiesPanel() {
   const project = useSelector((s: RootState) => s.project);
   const { pieces, seams, fabrics, avatar, avatarMode, avatarModelUrl, name: projectName, isDirty } = project;
   const editor = useSelector((s: RootState) => s.editor);
+  const simulation = useSelector((s: RootState) => s.simulation);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
   const [, forceUpdate] = useState(0);
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
@@ -579,10 +581,23 @@ export default function PropertiesPanel() {
             <div className={`panel-section-body ${collapsedSections.simulation ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
                 <button
-                  className={`sim-button ${editor.simulationRunning ? 'running' : ''}`}
-                  onClick={() => dispatch(toggleSimulation())}
+                  className={`sim-button ${simulation.simulationState === 'running' ? 'running' : ''}`}
+                  onClick={() => {
+                    if (simulation.simulationState === 'running') {
+                      dispatch(pauseSimulation());
+                    } else {
+                      dispatch(startSimulation());
+                    }
+                  }}
                 >
-                  {editor.simulationRunning ? 'Pause Simulation' : 'Start Simulation'}
+                  {simulation.simulationState === 'running' ? 'Pause Simulation' : 'Start Simulation'}
+                </button>
+                <button
+                  className="sim-button"
+                  onClick={() => dispatch(resetSimulation())}
+                  disabled={simulation.simulationState === 'idle'}
+                >
+                  Reset Simulation
                 </button>
               </div>
             </div>

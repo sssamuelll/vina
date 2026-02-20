@@ -10,7 +10,6 @@ import editorReducer, {
   setViewMode, setActiveTool, selectPiece, clearSelection,
   togglePieceSelection, selectSeam, setZoom2D, setPan2D,
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid,
-  toggleSimulation,
 } from '../store/editorSlice';
 import { undoMiddleware, canUndo, canRedo } from '../store/undoMiddleware';
 import { PatternPiece } from '../types/types';
@@ -213,7 +212,6 @@ describe('editorSlice', () => {
 
     store.dispatch(toggleGrainlines());
     store.dispatch(toggleSnapToGrid());
-    store.dispatch(toggleSimulation());
   });
 });
 

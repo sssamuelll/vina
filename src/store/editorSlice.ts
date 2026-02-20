@@ -12,7 +12,6 @@ const initialState: EditorState = {
   showGrainlines: true,
   snapToGrid: true,
   gridSize: 10,
-  simulationRunning: false,
   units: 'mm',
 };
 
@@ -63,9 +62,6 @@ const editorSlice = createSlice({
     setGridSize(state, action: PayloadAction<number>) {
       state.gridSize = action.payload;
     },
-    toggleSimulation(state) {
-      state.simulationRunning = !state.simulationRunning;
-    },
     setUnits(state, action: PayloadAction<UnitSystem>) {
       state.units = action.payload;
     },
@@ -80,7 +76,7 @@ export const {
   selectPiece, togglePieceSelection, clearSelection, selectSeam,
   setZoom2D, setPan2D,
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, setGridSize,
-  toggleSimulation, setUnits,
+  setUnits,
   undo, redo,
 } = editorSlice.actions;
 
