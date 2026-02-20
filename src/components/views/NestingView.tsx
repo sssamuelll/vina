@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { movePiece, rotatePiece } from '../../store/projectSlice';
+import { setZoom2D, setPan2D } from '../../store/editorSlice';
 import { nestPieces } from '../../utils/nesting';
 import type { NestingOptions, NestingResult, PlacedPiece } from '../../utils/nesting';
 import './views.css';
@@ -85,6 +86,36 @@ export default function NestingView() {
     for (const p of nestResult.placements) {
       dispatch(movePiece({ id: p.pieceId, x: p.x, y: p.y }));
       dispatch(rotatePiece({ id: p.pieceId, rotation: p.rotation }));
+    }
+
+    // Zoom to fit all placed pieces
+    if (nestResult.placements.length > 0) {
+      // Calculate bounding box of all placements
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of nestResult.placements) {
+        const piece = pieces.find(pc => pc.id === p.pieceId);
+        if (!piece) continue;
+        for (const cmd of piece.outline) {
+          for (let i = 0; i < cmd.values.length - 1; i += 2) {
+            const px = p.x + cmd.values[i];
+            const py = p.y + cmd.values[i + 1];
+            minX = Math.min(minX, px);
+            minY = Math.min(minY, py);
+            maxX = Math.max(maxX, px);
+            maxY = Math.max(maxY, py);
+          }
+        }
+      }
+      const contentW = maxX - minX;
+      const contentH = maxY - minY;
+      // Assume viewport ~800x600, leave 10% padding
+      const viewW = 800;
+      const viewH = 600;
+      const zoom = Math.min(viewW / (contentW * 1.2), viewH / (contentH * 1.2), 2);
+      const panX = viewW / 2 - (minX + contentW / 2) * zoom;
+      const panY = viewH / 2 - (minY + contentH / 2) * zoom;
+      dispatch(setZoom2D(Math.max(0.05, zoom)));
+      dispatch(setPan2D({ x: panX, y: panY }));
     }
   }, [dispatch, pieces, sheetWidth, sheetHeight, margin, gap, rotationStep, allowMirror, sortStrategy]);
 
