@@ -24,8 +24,8 @@ export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSe
           >
             <path
               d={pathToSVG(piece.outline)}
-              fill={isSelected ? 'rgba(74, 158, 255, 0.15)' : 'rgba(74, 158, 255, 0.08)'}
-              stroke={isSelected ? '#ffd700' : '#4a9eff'}
+              fill={isSelected ? 'rgba(255, 215, 0, 0.18)' : 'rgba(74, 158, 255, 0.08)'}
+              stroke="#4a9eff"
               strokeWidth={1.5 / zoom2D}
               strokeLinejoin="round"
             />
