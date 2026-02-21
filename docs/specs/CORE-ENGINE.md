@@ -9,7 +9,7 @@ The core engine is the middleware between 2D pattern definition and 3D visualiza
 3. **Assembly** — define and execute virtual seam connections
 4. **Parametric Updates** — propagate measurement changes through the entire pipeline in near-real-time
 
-## 1. Pattern Representation
+## 1. Pattern Representation ✅ COMPLETE
 
 ### Internal Model
 
@@ -57,7 +57,7 @@ Users should be able to define their own parametric relationships:
 
 ---
 
-## 2. Meshing Pipeline (2D → 3D)
+## 2. Meshing Pipeline (2D → 3D) 🔨 NEXT (v0.6)
 
 ### Problem
 
@@ -72,7 +72,7 @@ Pattern pieces are 2D Bezier paths. Cloth simulation needs 3D triangle meshes. T
 PathCommand[] (Bezier)
     ↓ tessellate
 Polygon (point array)
-    ↓ triangulate (earcut / constrained Delaunay)
+    ↓ triangulate (cdt2d + clean-pslg)
 Triangle Mesh (vertices + faces)
     ↓ refine
 Simulation-Ready Mesh (uniform density, quality triangles)
@@ -84,20 +84,22 @@ Simulation-Ready Mesh (uniform density, quality triangles)
 
 **Tessellation:** Convert Bezier curves to point arrays. Adaptive resolution — more points on tight curves, fewer on straight edges. Current: 12 segments per cubic Bezier (fixed). Target: adaptive based on curvature.
 
-**Triangulation:** Use `earcut` (robust, handles holes) or constrained Delaunay triangulation for better quality. Earcut is already available as npm package and used by Three.js internally.
+**Triangulation:** **DECISION: Use `cdt2d`** (constrained Delaunay triangulation) instead of earcut for better quality triangles and hole handling. cdt2d produces more uniform triangles which are critical for simulation stability.
+
+**Preprocessing:** Use `clean-pslg` to robustly handle complex polygon shapes, remove degenerate edges, and ensure valid input for cdt2d.
 
 **Refinement:** After initial triangulation, subdivide long/thin triangles. Target: no triangle edge > 15mm for cloth simulation stability.
 
 **Dart handling:** Darts create folds — the mesh must have fold lines as constrained edges, not just visual overlays.
 
 ### Dependencies
-- `earcut` — polygon triangulation (already in Three.js)
-- Potential: `poly2tri` — constrained Delaunay (better quality, handles holes)
-- Potential: `cdt2d` — 2D constrained Delaunay triangulation
+- `cdt2d` — 2D constrained Delaunay triangulation (CHOSEN)
+- `clean-pslg` — polygon preprocessing for robust meshing
+- Remove: `earcut` (insufficient quality for simulation)
 
 ---
 
-## 3. Virtual Assembly (Seams)
+## 3. Virtual Assembly (Seams) 🔨 NEXT (v0.6)
 
 ### Seam Model
 
@@ -113,9 +115,20 @@ interface Seam {
 ### Assembly Process
 
 1. **Edge matching** — user defines which edges connect (click edge A, click edge B)
-2. **Length validation** — warn if edges differ by > 5% (easing tolerance configurable)
-3. **3D positioning** — seamed edges are placed adjacent on the avatar, aligned at seam points
-4. **Simulation constraint** — seam becomes a distance constraint in the physics solver
+2. **Edge parameterization** — map both seam edges to 0-1 parameter space for precise vertex alignment
+3. **Length validation** — warn if edges differ by > 5% (easing tolerance configurable)
+4. **3D positioning** — seamed edges are placed adjacent on the avatar, aligned at seam points
+5. **Simulation constraint** — seam becomes a distance constraint in the physics solver
+
+### Edge Parameterization Details
+
+**Problem:** Two seam edges may have different numbers of vertices or different spacing. Need 1:1 correspondence for sewing constraints.
+
+**Solution:** 
+- Parameterize each edge as t ∈ [0,1] based on arc length
+- Sample both edges at regular t intervals (e.g., every 0.01)
+- Create sewing constraints between corresponding parameter points
+- Handle length differences through easing (slight stretching/compression)
 
 ### Seam Types and 3D Behavior
 
@@ -128,7 +141,7 @@ interface Seam {
 
 ---
 
-## 4. Parametric Update Flow
+## 4. Parametric Update Flow ⚡ PARTIAL (generators ✅, meshing pipeline missing)
 
 ```
 User changes measurement (e.g. waist: 76 → 80)
@@ -156,7 +169,7 @@ Simulation re-runs (if active) → draping updates
 
 ---
 
-## 5. Units and Coordinate Systems
+## 5. Units and Coordinate Systems ✅ COMPLETE
 
 | Context | Unit | Y-axis |
 |---------|------|--------|

@@ -6,44 +6,38 @@ Real-time cloth simulation is the core differentiator. A pattern maker draws in 
 
 **Charter objective:** "Sistema de simulación física en tiempo real para drapeado y colisiones."
 
-## Physics Model
+## Physics Model ✅ COMPLETE (XPBD Implementation)
 
-### Mass-Spring System
+### XPBD (Extended Position Based Dynamics)
 
-The simplest viable approach for real-time browser simulation:
+**DECISION:** We implemented **XPBD** instead of mass-spring for better stability and constraint handling.
 
-```
-Each mesh vertex = point mass
-Connected by springs:
-├── Structural springs — along mesh edges (resist stretching)
-├── Shear springs — along diagonals (resist shearing)
-└── Bend springs — skip-one connections (resist bending)
-```
+**XPBD Advantages:**
+- More stable than mass-spring systems
+- Better constraint satisfaction (distance, collision, seam constraints)
+- Handles stiff materials without explosion
+- Position-based → naturally damped
 
-### Spring Parameters (per fabric)
+**Current Implementation (v0.5):**
+- 10 fabric presets with XPBD compliance parameters
+- Web Worker physics at 60fps
+- Distance constraints for stretch/shear resistance
+- Gravity simulation (pieces fall naturally)
 
-| Fabric | Structural K | Shear K | Bend K | Mass (g/m²) | Damping |
-|--------|-------------|---------|--------|-------------|---------|
-| Cotton (woven) | 800 | 200 | 50 | 150 | 0.98 |
-| Silk (light) | 400 | 100 | 10 | 50 | 0.99 |
-| Denim | 1200 | 400 | 200 | 350 | 0.97 |
-| Jersey (knit) | 300 | 80 | 20 | 180 | 0.98 |
-| Leather | 2000 | 600 | 500 | 800 | 0.95 |
-| Chiffon | 200 | 50 | 5 | 30 | 0.99 |
+**Missing (v0.6 gap):** Seam constraints, collision detection, garment placement
 
-These map from the `Fabric` type's `weight`, `stretch`, `stiffness` properties.
+### XPBD Parameters (per fabric)
 
-### Integration Method
+| Fabric | Stretch Compliance | Shear Compliance | Bend Compliance | Mass (g/m²) |
+|--------|-------------------|------------------|------------------|-------------|
+| Cotton (woven) | 0.001 | 0.005 | 0.02 | 150 |
+| Silk (light) | 0.002 | 0.01 | 0.1 | 50 |
+| Denim | 0.0008 | 0.0025 | 0.005 | 350 |
+| Jersey (knit) | 0.003 | 0.012 | 0.05 | 180 |
+| Leather | 0.0005 | 0.0016 | 0.002 | 800 |
+| Chiffon | 0.005 | 0.02 | 0.2 | 30 |
 
-**Verlet integration** — position-based, inherently stable, no explicit velocity:
-
-```
-newPos = pos + (pos - prevPos) * damping + acceleration * dt²
-```
-
-Advantages over Euler: no velocity explosion, naturally damped, handles constraints well.
-
-**Timestep:** Fixed 1/120s (sub-step if frame budget allows). Variable timestep causes instability.
+**Timestep:** Fixed 1/60s (16.67ms). XPBD handles larger timesteps better than Verlet integration.
 
 ### Constraint Solving
 
@@ -58,7 +52,7 @@ After integration, iteratively solve constraints (Jakobsen method):
 
 ---
 
-## Collision Detection
+## Collision Detection 🔨 NEXT (v0.6)
 
 ### Avatar Collision
 
@@ -67,20 +61,24 @@ The avatar is a **static collider** (doesn't move during simulation).
 **Approach:** Signed Distance Field (SDF)
 - Pre-compute SDF from avatar mesh (3D grid of distances to surface)
 - Each cloth vertex: if inside avatar → push to nearest surface point
-- SDF resolution: 128³ grid (~2MB) — computed once when avatar changes
+- SDF resolution: 64³/128³ grid (balance memory vs accuracy)
+- Computed once when avatar changes, cached
 
-**Alternative (simpler, v0.7 MVP):** Raycast from vertex toward avatar center. If intersection count is odd → inside → push out along surface normal.
+**Implementation Strategy:**
+1. Generate SDF in compute shader (WebGPU) or Web Worker 
+2. Store as 3D texture for GPU lookup or typed array for CPU
+3. Trilinear interpolation for smooth distance queries
 
-### Self-Collision
+### Self-Collision 🔨 NEXT (v0.6)
 
 Cloth-on-cloth collision (folds, layers). Expensive but necessary for realism.
 
-**Approach:** Spatial hashing
+**Approach:** Spatial hashing (following Müller papers #11/#15)
 - Divide space into grid cells (cell size = 2× cloth thickness)
 - Only check vertex-triangle pairs in same/adjacent cells
 - O(n) average vs O(n²) brute force
 
-**Can be disabled** for performance (toggle in UI).
+**Performance toggle:** Can be disabled for complex garments (UI setting).
 
 ---
 
@@ -111,29 +109,31 @@ Cloth-on-cloth collision (folds, layers). Expensive but necessary for realism.
 | Mesh update | < 1ms | Direct BufferGeometry write |
 | **Total per frame** | **< 14ms** | **60fps budget = 16.6ms** |
 
-### Web Worker Architecture
+### Web Worker Architecture ✅ COMPLETE
+
+**Current implementation (v0.5):** XPBD physics runs in Web Worker at 60fps.
 
 ```
 Main Thread                    Worker Thread
 ─────────────                  ─────────────
-User input, Three.js render    Physics simulation
+User input, Three.js render    Physics simulation (XPBD)
     │                              │
     ├── SharedArrayBuffer ────────►│ (vertex positions)
     │   (positions, forces)        │
-    │                              ├── Integration
-    │                              ├── Constraints
-    │                              ├── Collision
+    │                              ├── XPBD Integration
+    │                              ├── Distance Constraints
+    │                              ├── Gravity Forces
     │◄── Atomics.notify ──────────┤ (frame done)
     │                              │
     ├── Update BufferGeometry      │
     └── Render                     │
 ```
 
-SharedArrayBuffer allows zero-copy data sharing between threads. Requires `Cross-Origin-Isolation` headers (COOP + COEP).
+**Deployment:** Requires `Cross-Origin-Isolation` headers (COOP + COEP) — already configured on openclo.sdar.dev.
 
 ---
 
-## Initial Garment Placement
+## Initial Garment Placement 🔨 NEXT (v0.6)
 
 Before simulation starts, pieces need initial 3D positions around the avatar:
 
