@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { addPiece, addSeam, addInternalLine, setInternalLine } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
 import { selectPiece, selectSeam } from '../../store/editorSlice';
 import { PatternPiece, Seam, InternalLine } from '../../types/types';
 import { usePenTool } from './usePenTool';
@@ -26,6 +26,9 @@ export default function PatternEditor() {
   const editor = useSelector((s: RootState) => s.editor);
   const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, gridSize, units } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
+  
+  // State for inline piece name editing
+  const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
 
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
@@ -68,6 +71,23 @@ export default function PatternEditor() {
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useNodeEditor(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
+  
+  // Piece name editing callbacks
+  const handlePieceNameDoubleClick = useCallback((pieceId: string) => {
+    setEditingPieceNameId(pieceId);
+  }, []);
+  
+  const handlePieceNameSave = useCallback((pieceId: string, newName: string) => {
+    const piece = pieces.find(p => p.id === pieceId);
+    if (piece && newName.trim() && newName !== piece.name) {
+      dispatch(updatePiece({ ...piece, name: newName.trim(), updatedAt: Date.now() }));
+    }
+    setEditingPieceNameId(null);
+  }, [pieces, dispatch]);
+  
+  const handlePieceNameCancel = useCallback(() => {
+    setEditingPieceNameId(null);
+  }, []);
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
@@ -98,6 +118,10 @@ export default function PatternEditor() {
             zoom2D={zoom2D}
             showSeamAllowance={showSeamAllowance}
             showGrainlines={showGrainlines}
+            editingPieceNameId={editingPieceNameId}
+            onPieceNameDoubleClick={handlePieceNameDoubleClick}
+            onPieceNameSave={handlePieceNameSave}
+            onPieceNameCancel={handlePieceNameCancel}
           />
           <SeamRenderer
             seams={seams}

@@ -9,9 +9,23 @@ interface PieceRendererProps {
   zoom2D: number;
   showSeamAllowance: boolean;
   showGrainlines: boolean;
+  editingPieceNameId?: string | null;
+  onPieceNameDoubleClick?: (pieceId: string) => void;
+  onPieceNameSave?: (pieceId: string, newName: string) => void;
+  onPieceNameCancel?: () => void;
 }
 
-export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSeamAllowance, showGrainlines }: PieceRendererProps) {
+export default function PieceRenderer({ 
+  pieces, 
+  selectedPieceIds, 
+  zoom2D, 
+  showSeamAllowance, 
+  showGrainlines,
+  editingPieceNameId,
+  onPieceNameDoubleClick,
+  onPieceNameSave,
+  onPieceNameCancel
+}: PieceRendererProps) {
   return (
     <>
       {pieces.map(piece => {
@@ -76,21 +90,77 @@ export default function PieceRenderer({ pieces, selectedPieceIds, zoom2D, showSe
               }
               const cx = (minX + maxX) / 2;
               const cy = (minY + maxY) / 2;
-              return (
-                <text
-                  x={cx}
-                  y={cy}
-                  fontSize={11 / zoom2D}
-                  fill="#555"
-                  textAnchor="middle"
-                  dominantBaseline="middle"
-                  pointerEvents="none"
-                  fontFamily="Inter, sans-serif"
-                  transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}
-                >
-                  {piece.name}
-                </text>
-              );
+              const isEditing = editingPieceNameId === piece.id;
+              
+              if (isEditing) {
+                // Inline editing mode - use foreignObject with HTML input
+                return (
+                  <foreignObject
+                    x={cx - 50 / zoom2D} // Half-width of input (approximate)
+                    y={cy - 8 / zoom2D}  // Half-height of input
+                    width={100 / zoom2D}
+                    height={16 / zoom2D}
+                    transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}
+                  >
+                    <input
+                      type="text"
+                      defaultValue={piece.name}
+                      autoFocus
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        fontSize: `${11 / zoom2D}px`,
+                        fontFamily: 'Inter, sans-serif',
+                        color: '#555',
+                        textAlign: 'center',
+                        padding: 0,
+                        margin: 0,
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          onPieceNameSave?.(piece.id, e.currentTarget.value);
+                        } else if (e.key === 'Escape') {
+                          onPieceNameCancel?.();
+                        }
+                      }}
+                      onBlur={(e) => {
+                        onPieceNameSave?.(piece.id, e.currentTarget.value);
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.select(); // Auto-select all text
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation(); // Prevent canvas interactions
+                      }}
+                    />
+                  </foreignObject>
+                );
+              } else {
+                // Regular text mode
+                return (
+                  <text
+                    x={cx}
+                    y={cy}
+                    fontSize={11 / zoom2D}
+                    fill="#555"
+                    textAnchor="middle"
+                    dominantBaseline="middle"
+                    pointerEvents="auto"
+                    fontFamily="Inter, sans-serif"
+                    transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}
+                    onDoubleClick={(e) => {
+                      e.stopPropagation(); // Prevent propagation to canvas
+                      onPieceNameDoubleClick?.(piece.id);
+                    }}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {piece.name}
+                  </text>
+                );
+              }
             })()}
 
             {/* Anchor points for selected pieces */}
