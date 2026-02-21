@@ -1,7 +1,25 @@
 # OpenClo AI Agent Specification
 
 > Blueprint for an AI pattern-making copilot that speaks the language of patronaje.
-> Version 0.1 — February 2026
+> Version 1.0 — February 2026
+
+---
+
+## Status — All 5 Phases Implemented ✅
+
+As of **21 February 2026**, all five phases of the AI agent are fully implemented and tested:
+
+| Phase | Name | Status | Key Deliverables |
+|-------|------|--------|-----------------|
+| 1 | Foundation | ✅ Complete | 42 tools with JSON Schema, Anthropic + OpenAI providers with streaming, PATRONAJE_SOUL.md, context builder, tool executor, project memory |
+| 2 | Intelligence | ✅ Complete | Compound tools (generateFromDescription, transformPiece × 9), proactive analysis (5 checks), teaching mode (11 entries), ES/EN detection, multi-turn loop (5 rounds), smart defaults |
+| 3 | Skills | ✅ Complete | Skill loader + registry, 5 core skills (bodice Aldrich/Müller/Gilewska, sleeve, skirt, collar, grading), 35 formulas, 17 drafting methods, 52 construction steps, 41 grade rules, 55 bilingual triggers |
+| 4 | Polish | ✅ Complete | Error recovery (retry + fallback), cost manager (budget + model routing), Ollama local LLM, mobile UX (fullscreen, voice, chips, haptics), AgentSettings UI, ⌘/ shortcut |
+| 5 | Community | ✅ Complete | Plugin system (loader, registry, manager, permissions, sandboxing, namespacing), community skills (import/export/validation), marketplace prep, language packs (ES/EN + extensible), formula plugins, PluginManager UI |
+
+**Testing:** 997 unit tests (52 suites) + 133 E2E tests (5 suites) — all passing. `tsc -b` clean.
+
+**Bugs fixed during implementation:** 5 total (3 found by audit: unloadPlugin cleanup, resetLoadedPlugins error handling, empty triggers validation; 2 found earlier: setBudget(0), disconnected sim button).
 
 ---
 

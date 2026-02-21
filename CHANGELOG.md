@@ -3,6 +3,34 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] — 2026-02-21
+
+### Added
+- **XPBD Cloth Simulation** — Matthias Müller solver ported to TypeScript (MIT)
+- 10 calibrated fabric materials (Cotton Poplin, Denim, Silk Charmeuse, Wool Crepe, Jersey Knit, Organza, Linen, Neoprene, Chiffon, Canvas)
+- Web Worker for 60fps off-thread simulation
+- ClothMesh R3F component in Viewport3D (lazy-loaded)
+- Redux simulationSlice with play/pause/reset and per-piece fabric selection
+- **AI Agent Phase 1 — Foundation**: 42 tools with JSON Schema, Anthropic + OpenAI providers with streaming, PATRONAJE_SOUL.md personality, context builder, tool executor, project memory
+- **AI Agent Phase 2 — Intelligence**: Compound tools (generateFromDescription, transformPiece with 9 transformations), proactive analysis (5 checks), teaching mode (11 bilingual entries), ES/EN language detection, multi-turn agent loop (5 rounds), smart defaults
+- **AI Agent Phase 3 — Skills**: Skill loader + registry, 5 core skills (bodice Aldrich/Müller/Gilewska, sleeve, skirt, collar, grading), 35 formulas, 17 drafting methods, 52 construction steps, 41 grade rules, 55 bilingual triggers
+- **AI Agent Phase 4 — Polish**: Error recovery with retry + fallback, cost manager with budget + model routing, Ollama local LLM provider, mobile fullscreen + voice input + quick action chips + haptics, AgentSettings UI, keyboard shortcuts (⌘/)
+- **AI Agent Phase 5 — Community**: Plugin system (loader, registry, manager, permissions, sandboxing, namespacing), community skills (import/export/validation), marketplace preparation, language packs (ES/EN + extensible), formula plugins, PluginManager UI in ActivityBar
+- 997 unit tests (52 suites) + 5 E2E suites (133 tests total)
+- Documentation: AGENT_SPEC.md, AGENT_USAGE.md, OPENCLAW_PATTERNS.md
+
+### Fixed
+- unloadPlugin cleanup not removing all registered items
+- resetLoadedPlugins error handling on invalid state
+- Empty triggers validation in skill loader
+- setBudget(0) incorrectly treated as falsy
+- Disconnected simulation button in PropertiesPanel
+
+### Stats
+- ~30,634 LOC across 153 TypeScript files
+- 22,860+ lines added in this sprint
+- Commits: 2228e62 → 2c86de2
+
 ## [0.4.0] — 2026-02-20
 
 ### Added
