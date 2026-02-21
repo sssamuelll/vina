@@ -90,10 +90,45 @@ function sampleOutline(commands: PathCommand[], numSamplesPerEdge: number = 4): 
 }
 
 /**
- * Build a simple triangulated mesh from outline points.
- * Uses Three.js Shape + ShapeGeometry for reliable triangulation.
+ * Build a high-quality triangulated mesh from pattern piece using CDT.
+ * Uses Constrained Delaunay Triangulation for better physics stability.
  */
-function buildMeshFromOutline(
+function buildMeshFromPiece(piece: PatternPiece): { vertices: number[]; triIds: number[] } | null {
+  try {
+    // Import CDT mesher
+    const { meshPiece } = require('../../utils/mesh');
+    
+    const meshData = meshPiece(piece, {
+      yHeight: 1.2,
+      scale: SCALE,
+      maxEdgeLength: 15,
+      minAngle: 25,
+      maxRefinementPasses: 3,
+      curveResolution: 12,
+    });
+
+    if (meshData.vertices.length === 0 || meshData.triIds.length === 0) {
+      return null;
+    }
+
+    // Convert to the format expected by the component
+    const vertices: number[] = Array.from(meshData.vertices);
+    const triIds: number[] = Array.from(meshData.triIds);
+
+    return { vertices, triIds };
+  } catch (error) {
+    console.warn('CDT meshing failed, falling back to Three.js Shape:', error);
+    
+    // Fallback to the old Three.js Shape method
+    return buildMeshFromOutlineFallback(piece.outline);
+  }
+}
+
+/**
+ * Fallback mesh generation using Three.js Shape (old method).
+ * @deprecated Used only as fallback when CDT fails
+ */
+function buildMeshFromOutlineFallback(
   outline: PathCommand[],
 ): { vertices: number[]; triIds: number[] } | null {
   const points = sampleOutline(outline);
@@ -169,8 +204,8 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
     s.simulation.pieceFabrics[piece.id] ?? s.simulation.defaultFabricId
   );
 
-  // Build mesh data from piece outline
-  const meshData = useMemo(() => buildMeshFromOutline(piece.outline), [piece.outline]);
+  // Build mesh data from piece using CDT
+  const meshData = useMemo(() => buildMeshFromPiece(piece), [piece]);
 
   // Frame callback: stores latest positions for useFrame
   const onFrame = useCallback((positions: Float32Array, _numParticles: number, triIds: Int32Array) => {

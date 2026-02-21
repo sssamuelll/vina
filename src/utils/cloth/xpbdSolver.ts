@@ -749,6 +749,7 @@ export function generateRectClothMesh(
  * Triangulate a 2D polygon outline into a flat 3D mesh suitable for cloth simulation.
  * Uses ear-clipping triangulation for simple convex/concave polygons.
  *
+ * @deprecated Use meshPiece or meshPieceOutline from '../mesh' for better quality CDT meshing
  * @param points - 2D outline points [{x, y}, ...]
  * @param yHeight - Y position in 3D space (default 1.2m above ground)
  * @param scale - Scale factor from pattern units to meters (default 0.001 = mm→m)
@@ -864,6 +865,46 @@ function pointInTriangle(
   const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
   const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
   return !(hasNeg && hasPos);
+}
+
+// ─── New CDT Integration ────────────────────────────────────────────────────
+
+import type { PatternPiece } from '../../types/types';
+
+/**
+ * Create a high-quality mesh for cloth simulation using Constrained Delaunay Triangulation.
+ * 
+ * This is the new preferred method for meshing pattern pieces, replacing the old
+ * ear-clipping approach with proper CDT for better physics stability.
+ *
+ * @param piece - Pattern piece to mesh
+ * @param config - Optional mesh configuration
+ * @returns ClothMeshData ready for XPBD cloth simulation
+ */
+export function meshPieceForSimulation(
+  piece: PatternPiece,
+  config?: {
+    yHeight?: number;
+    scale?: number;
+    maxEdgeLength?: number;
+    minAngle?: number;
+    maxRefinementPasses?: number;
+    curveResolution?: number;
+  },
+): ClothMeshData {
+  try {
+    // Use CDT meshing for high-quality triangulation
+    const { meshPiece } = require('../mesh');
+    return meshPiece(piece, config);
+  } catch (error) {
+    // Fallback to old ear-clipping method if CDT fails
+    console.warn('CDT meshing failed, falling back to ear-clipping for piece', piece.id, ':', error);
+    
+    // Use the existing flattenPath function
+    const { flattenPath } = require('../seam');
+    const points = flattenPath(piece.outline);
+    return triangulatePieceOutline(points, config?.yHeight, config?.scale);
+  }
 }
 
 // ─── Exported helpers used by tests ─────────────────────────────────────────
