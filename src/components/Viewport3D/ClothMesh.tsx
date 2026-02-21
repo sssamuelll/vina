@@ -8,7 +8,7 @@
  * @module ClothMesh
  */
 
-import { useRef, useEffect, useCallback, useMemo } from 'react';
+import { useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useSelector } from 'react-redux';
@@ -93,12 +93,11 @@ function sampleOutline(commands: PathCommand[], numSamplesPerEdge: number = 4): 
  * Build a high-quality triangulated mesh from pattern piece using CDT.
  * Uses Constrained Delaunay Triangulation for better physics stability.
  */
-function buildMeshFromPiece(piece: PatternPiece): { vertices: number[]; triIds: number[] } | null {
+function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null): { vertices: number[]; triIds: number[] } | null {
   try {
-    // Import CDT mesher
-    const { meshPiece } = require('../../utils/mesh');
+    if (!meshPieceFn) return buildMeshFromOutlineFallback(piece.outline);
     
-    const meshData = meshPiece(piece, {
+    const meshData = meshPieceFn(piece, {
       yHeight: 1.2,
       scale: SCALE,
       maxEdgeLength: 15,
@@ -204,8 +203,16 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
     s.simulation.pieceFabrics[piece.id] ?? s.simulation.defaultFabricId
   );
 
-  // Build mesh data from piece using CDT
-  const meshData = useMemo(() => buildMeshFromPiece(piece), [piece]);
+  // Lazy-load CDT mesher (cdt2d is CJS, needs dynamic import in browser)
+  const [meshPieceFn, setMeshPieceFn] = useState<((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null>(null);
+  useEffect(() => {
+    import('../../utils/mesh').then(mod => {
+      setMeshPieceFn(() => mod.meshPiece);
+    }).catch(() => {});
+  }, []);
+
+  // Build mesh data from piece using CDT (or fallback)
+  const meshData = useMemo(() => buildMeshFromPiece(piece, meshPieceFn), [piece, meshPieceFn]);
 
   // Frame callback: stores latest positions for useFrame
   const onFrame = useCallback((positions: Float32Array, _numParticles: number, triIds: Int32Array) => {

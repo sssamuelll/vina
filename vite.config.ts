@@ -7,6 +7,9 @@ export default defineConfig({
     outDir: './dist'
   },
   plugins: [react()],
+  define: {
+    global: 'globalThis',
+  },
   worker: {
     format: 'es',
   },

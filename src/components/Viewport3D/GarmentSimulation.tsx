@@ -7,7 +7,7 @@
  * @module GarmentSimulation
  */
 
-import { Suspense, lazy, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Suspense, lazy, useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useSelector } from 'react-redux';
@@ -26,10 +26,13 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 /**
  * Build mesh data for a piece using CDT mesher.
  */
-function buildMeshFromPiece(piece: PatternPiece): { vertices: number[]; triIds: number[] } | null {
+function buildMeshFromPiece(
+  piece: PatternPiece,
+  meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null,
+): { vertices: number[]; triIds: number[] } | null {
   try {
-    const { meshPiece } = require('../../utils/mesh');
-    const meshData = meshPiece(piece, {
+    if (!meshPieceFn) return null;
+    const meshData = meshPieceFn(piece, {
       yHeight: 1.2,
       scale: SCALE,
       maxEdgeLength: 15,
@@ -80,6 +83,14 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
 
+  // Lazy-load CDT mesher
+  const [meshPieceFn, setMeshPieceFn] = useState<((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null>(null);
+  useEffect(() => {
+    import('../../utils/mesh').then(mod => {
+      setMeshPieceFn(() => mod.meshPiece);
+    }).catch(() => {});
+  }, []);
+
   // Build mesh data for all pieces
   const pieceMeshes = useMemo(() => {
     const result: Array<{
@@ -89,7 +100,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       outline: Array<{ type: string; values: number[] }>;
     }> = [];
     for (const piece of pieces) {
-      const mesh = buildMeshFromPiece(piece);
+      const mesh = buildMeshFromPiece(piece, meshPieceFn);
       if (!mesh) continue;
       result.push({
         pieceId: piece.id,
@@ -99,7 +110,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       });
     }
     return result;
-  }, [pieces]);
+  }, [pieces, meshPieceFn]);
 
   // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
