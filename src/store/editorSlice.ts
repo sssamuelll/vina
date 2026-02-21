@@ -6,6 +6,7 @@ const initialState: EditorState = {
   activeTool: 'select',
   selectedPieceIds: [],
   selectedSeamId: null,
+  selectedInternalLine: null,
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
   showSeamAllowance: true,
@@ -27,6 +28,7 @@ const editorSlice = createSlice({
     },
     selectPiece(state, action: PayloadAction<string>) {
       state.selectedPieceIds = [action.payload];
+      state.selectedInternalLine = null;
     },
     togglePieceSelection(state, action: PayloadAction<string>) {
       const idx = state.selectedPieceIds.indexOf(action.payload);
@@ -39,10 +41,17 @@ const editorSlice = createSlice({
     clearSelection(state) {
       state.selectedPieceIds = [];
       state.selectedSeamId = null;
+      state.selectedInternalLine = null;
     },
     selectSeam(state, action: PayloadAction<string>) {
       state.selectedSeamId = action.payload;
       state.selectedPieceIds = [];
+      state.selectedInternalLine = null;
+    },
+    selectInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
+      state.selectedInternalLine = action.payload;
+      state.selectedPieceIds = [action.payload.pieceId];
+      state.selectedSeamId = null;
     },
     setZoom2D(state, action: PayloadAction<number>) {
       state.zoom2D = Math.max(0.1, Math.min(10, action.payload));
@@ -73,7 +82,7 @@ const editorSlice = createSlice({
 
 export const {
   setViewMode, setActiveTool,
-  selectPiece, togglePieceSelection, clearSelection, selectSeam,
+  selectPiece, togglePieceSelection, clearSelection, selectSeam, selectInternalLine,
   setZoom2D, setPan2D,
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, setGridSize,
   setUnits,

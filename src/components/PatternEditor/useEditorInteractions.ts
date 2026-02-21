@@ -1,9 +1,67 @@
 import { useRef, useCallback, useEffect } from 'react';
-import { useDispatch } from 'react-redux';
-import { selectPiece, clearSelection, setZoom2D, setPan2D } from '../../store/editorSlice';
-import { movePiece } from '../../store/projectSlice';
-import { PatternPiece, Point2D, Tool2D } from '../../types/types';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { selectPiece, clearSelection, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
+import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
 import { extractNodes, NodeRef } from './useNodeEditor';
+
+/** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
+function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
+/** Minimum distance from a point to any segment of an internal line path */
+function distToInternalLine(px: number, py: number, path: PathCommand[]): number {
+  let minDist = Infinity;
+  let prevX = 0, prevY = 0;
+  for (const cmd of path) {
+    switch (cmd.type) {
+      case 'M':
+        prevX = cmd.values[0]; prevY = cmd.values[1];
+        break;
+      case 'L':
+        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[0], cmd.values[1]));
+        prevX = cmd.values[0]; prevY = cmd.values[1];
+        break;
+      case 'C':
+        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[4], cmd.values[5]));
+        prevX = cmd.values[4]; prevY = cmd.values[5];
+        break;
+      case 'Q':
+        minDist = Math.min(minDist, distToSegment(px, py, prevX, prevY, cmd.values[2], cmd.values[3]));
+        prevX = cmd.values[2]; prevY = cmd.values[3];
+        break;
+    }
+  }
+  return minDist;
+}
+
+/** Get the two endpoints of an internal line path */
+function getInternalLineEndpoints(line: InternalLine): [Point2D, Point2D] | null {
+  if (line.path.length < 2) return null;
+  const first = line.path[0];
+  if (first.type !== 'M' || first.values.length < 2) return null;
+  const startPt: Point2D = { x: first.values[0], y: first.values[1] };
+  const last = line.path[line.path.length - 1];
+  let endPt: Point2D;
+  if (last.type === 'L' && last.values.length >= 2) {
+    endPt = { x: last.values[0], y: last.values[1] };
+  } else if (last.type === 'C' && last.values.length >= 6) {
+    endPt = { x: last.values[4], y: last.values[5] };
+  } else if (last.type === 'Q' && last.values.length >= 4) {
+    endPt = { x: last.values[2], y: last.values[3] };
+  } else {
+    return null;
+  }
+  return [startPt, endPt];
+}
 
 interface ToolHooks {
   pen: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void; handleKeyDown: (e: KeyboardEvent) => void };
@@ -32,9 +90,14 @@ export function useEditorInteractions(
   tools: ToolHooks,
 ) {
   const dispatch = useDispatch();
+  const selectedInternalLine = useSelector((s: RootState) => s.editor.selectedInternalLine);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<{ pieceId: string; startMouse: Point2D; startPos: Point2D } | null>(null);
   const panRef = useRef<{ startMouse: Point2D; startPan: Point2D } | null>(null);
+  const internalLineDragRef = useRef<{
+    pieceId: string; lineId: string; endpointIndex: 0 | 1;
+    startMouse: Point2D; startPos: Point2D;
+  } | null>(null);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor } = tools;
 
@@ -71,6 +134,18 @@ export function useEditorInteractions(
     if (activeTool !== 'measure') measureTool.clear();
   }, [activeTool]);
 
+  // Delete/Backspace handler for selected internal line
+  const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
+    if (selectedInternalLine && (e.key === 'Delete' || e.key === 'Backspace')) {
+      dispatch(removeInternalLine({
+        pieceId: selectedInternalLine.pieceId,
+        lineId: selectedInternalLine.lineId,
+      }));
+      dispatch(clearSelection());
+      e.preventDefault();
+    }
+  }, [selectedInternalLine, dispatch]);
+
   // Keyboard events
   useEffect(() => {
     const handlers: ((e: KeyboardEvent) => void)[] = [];
@@ -79,11 +154,12 @@ export function useEditorInteractions(
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (activeTool === 'measure') handlers.push(measureTool.handleKeyDown);
     if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
+    if (activeTool === 'select' && selectedInternalLine) handlers.push(handleInternalLineKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown]);
+  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -133,6 +209,39 @@ export function useEditorInteractions(
       return;
     }
     if (activeTool === 'select') {
+      const svg = e.currentTarget;
+      const rect = svg.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left - pan2D.x) / zoom2D;
+      const clickY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+
+      // Check if dragging an endpoint of the currently selected internal line
+      if (selectedInternalLine) {
+        const ilPiece = pieces.find(p => p.id === selectedInternalLine.pieceId);
+        if (ilPiece) {
+          const ilLine = ilPiece.internals.find(l => l.id === selectedInternalLine.lineId);
+          if (ilLine) {
+            const endpoints = getInternalLineEndpoints(ilLine);
+            if (endpoints) {
+              const localX = clickX - ilPiece.position.x;
+              const localY = clickY - ilPiece.position.y;
+              const EP_THRESHOLD = 8 / zoom2D;
+              for (let i = 0; i < 2; i++) {
+                if (Math.hypot(localX - endpoints[i].x, localY - endpoints[i].y) <= EP_THRESHOLD) {
+                  internalLineDragRef.current = {
+                    pieceId: selectedInternalLine.pieceId,
+                    lineId: selectedInternalLine.lineId,
+                    endpointIndex: i as 0 | 1,
+                    startMouse: { x: e.clientX, y: e.clientY },
+                    startPos: { ...endpoints[i] },
+                  };
+                  return;
+                }
+              }
+            }
+          }
+        }
+      }
+
       const target = e.target as SVGElement;
       const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
       
@@ -155,6 +264,24 @@ export function useEditorInteractions(
               return;
             }
           }
+
+          // Check if clicking on an internal line
+          const localX = clickX - piece.position.x;
+          const localY = clickY - piece.position.y;
+          const LINE_THRESHOLD = 5 / zoom2D;
+          let nearestLine: InternalLine | null = null;
+          let nearestDist = Infinity;
+          for (const line of piece.internals) {
+            const dist = distToInternalLine(localX, localY, line.path);
+            if (dist < LINE_THRESHOLD && dist < nearestDist) {
+              nearestDist = dist;
+              nearestLine = line;
+            }
+          }
+          if (nearestLine) {
+            dispatch(selectInternalLine({ pieceId: piece.id, lineId: nearestLine.id }));
+            return;
+          }
           
           // Regular piece selection
           dispatch(selectPiece(pieceId));
@@ -171,6 +298,44 @@ export function useEditorInteractions(
       const dx = e.clientX - panRef.current.startMouse.x;
       const dy = e.clientY - panRef.current.startMouse.y;
       dispatch(setPan2D({ x: panRef.current.startPan.x + dx, y: panRef.current.startPan.y + dy }));
+      return;
+    }
+    if (internalLineDragRef.current && activeTool === 'select') {
+      const dx = (e.clientX - internalLineDragRef.current.startMouse.x) / zoom2D;
+      const dy = (e.clientY - internalLineDragRef.current.startMouse.y) / zoom2D;
+      const newPos: Point2D = {
+        x: internalLineDragRef.current.startPos.x + dx,
+        y: internalLineDragRef.current.startPos.y + dy,
+      };
+      const piece = pieces.find(p => p.id === internalLineDragRef.current!.pieceId);
+      if (piece) {
+        const line = piece.internals.find(l => l.id === internalLineDragRef.current!.lineId);
+        if (line) {
+          const newPath = line.path.map(c => ({ ...c, values: [...c.values] }));
+          if (internalLineDragRef.current.endpointIndex === 0) {
+            newPath[0].values[0] = newPos.x;
+            newPath[0].values[1] = newPos.y;
+          } else {
+            const last = newPath[newPath.length - 1];
+            if (last.type === 'L') {
+              last.values[0] = newPos.x; last.values[1] = newPos.y;
+            } else if (last.type === 'C') {
+              const ddx = newPos.x - last.values[4], ddy = newPos.y - last.values[5];
+              last.values[4] = newPos.x; last.values[5] = newPos.y;
+              last.values[2] += ddx; last.values[3] += ddy;
+            } else if (last.type === 'Q') {
+              const ddx = newPos.x - last.values[2], ddy = newPos.y - last.values[3];
+              last.values[2] = newPos.x; last.values[3] = newPos.y;
+              last.values[0] += ddx; last.values[1] += ddy;
+            }
+          }
+          dispatch(updateInternalLine({
+            pieceId: internalLineDragRef.current.pieceId,
+            lineId: internalLineDragRef.current.lineId,
+            path: newPath,
+          }));
+        }
+      }
       return;
     }
     if (dragRef.current && activeTool === 'select') {
@@ -195,6 +360,7 @@ export function useEditorInteractions(
   const handleMouseUp = useCallback(() => {
     panRef.current = null;
     dragRef.current = null;
+    internalLineDragRef.current = null;
     if (activeTool === 'pen') pen.handleMouseUp();
     if (activeTool === 'rectangle') rectTool.handleMouseUp();
     if (activeTool === 'grainline') grainlineTool.handleMouseUp();

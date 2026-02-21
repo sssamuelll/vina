@@ -82,6 +82,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       activeTool: 'select',
       selectedPieceIds: ['piece-1'],
       selectedSeamId: null,
+      selectedInternalLine: null,
       zoom2D: 1,
       pan2D: { x: 0, y: 0 },
       showSeamAllowance: true,

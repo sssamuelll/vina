@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine } from '../types/types';
+import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand } from '../types/types';
 
 const defaultAvatar: Avatar = {
   id: 'default',
@@ -107,6 +107,25 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    updateInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string; path: PathCommand[] }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        const line = piece.internals.find(l => l.id === action.payload.lineId);
+        if (line) {
+          line.path = action.payload.path;
+          piece.updatedAt = Date.now();
+          state.isDirty = true;
+        }
+      }
+    },
+    removeInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        piece.internals = piece.internals.filter(l => l.id !== action.payload.lineId);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
     /** Replace all internals of a given type (e.g. grainline — only one per piece) */
     setInternalLine(state, action: PayloadAction<{ pieceId: string; line: InternalLine }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
@@ -162,7 +181,8 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, setProjectName,
-  addPiece, updatePiece, removePiece, movePiece, rotatePiece, addInternalLine, setInternalLine,
+  addPiece, updatePiece, removePiece, movePiece, rotatePiece,
+  addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addSeam, removeSeam,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,

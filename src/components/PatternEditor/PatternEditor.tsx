@@ -118,6 +118,7 @@ export default function PatternEditor() {
             zoom2D={zoom2D}
             showSeamAllowance={showSeamAllowance}
             showGrainlines={showGrainlines}
+            selectedInternalLine={editor.selectedInternalLine}
             editingPieceNameId={editingPieceNameId}
             onPieceNameDoubleClick={handlePieceNameDoubleClick}
             onPieceNameSave={handlePieceNameSave}
@@ -166,10 +167,7 @@ export default function PatternEditor() {
           activeTool={activeTool}
           pieces={pieces}
           penNodesLength={pen.nodes.length}
-          seamFirstEdge={!!seamTool.firstEdge}
           nodeEditorIsEditing={nodeEditor.isEditing}
-          measurementsLength={measureTool.measurements.length}
-          measureCurrentStart={!!measureTool.currentStart}
         />
       </svg>
     </div>

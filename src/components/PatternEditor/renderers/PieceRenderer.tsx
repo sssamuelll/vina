@@ -9,6 +9,7 @@ interface PieceRendererProps {
   zoom2D: number;
   showSeamAllowance: boolean;
   showGrainlines: boolean;
+  selectedInternalLine?: { pieceId: string; lineId: string } | null;
   editingPieceNameId?: string | null;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
@@ -21,6 +22,7 @@ export default function PieceRenderer({
   zoom2D, 
   showSeamAllowance, 
   showGrainlines,
+  selectedInternalLine,
   editingPieceNameId,
   onPieceNameDoubleClick,
   onPieceNameSave,
@@ -58,22 +60,58 @@ export default function PieceRenderer({
             {piece.internals.map(line => {
               const isNotch = line.type === 'notch';
               const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
+              const isLineSelected = selectedInternalLine?.pieceId === piece.id && selectedInternalLine?.lineId === line.id;
               return (
-                <path
-                  key={line.id}
-                  d={pathToSVG(line.path)}
-                  fill={hasFill ? 'rgba(255, 152, 0, 0.3)' : 'none'}
-                  stroke={
-                    line.type === 'grainline' ? '#6bff6b' :
-                    line.type === 'dart' ? '#ff9800' :
-                    line.type === 'notch' ? '#ff9800' :
-                    line.type === 'fold' ? '#9c27b0' :
-                    '#888'
-                  }
-                  strokeWidth={0.8 / zoom2D}
-                  strokeDasharray={line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D}` : 'none'}
-                  opacity={line.type === 'grainline' && !showGrainlines ? 0 : 0.7}
-                />
+                <g key={line.id}>
+                  <path
+                    d={pathToSVG(line.path)}
+                    fill={hasFill ? 'rgba(255, 152, 0, 0.3)' : 'none'}
+                    stroke={
+                      isLineSelected ? '#ffd700' :
+                      line.type === 'grainline' ? '#6bff6b' :
+                      line.type === 'dart' ? '#ff9800' :
+                      line.type === 'notch' ? '#ff9800' :
+                      line.type === 'fold' ? '#9c27b0' :
+                      '#888'
+                    }
+                    strokeWidth={isLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
+                    strokeDasharray={line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D}` : 'none'}
+                    opacity={line.type === 'grainline' && !showGrainlines ? 0 : isLineSelected ? 1 : 0.7}
+                  />
+                  {isLineSelected && (() => {
+                    // Show draggable endpoints
+                    const first = line.path[0];
+                    const last = line.path[line.path.length - 1];
+                    const points: { x: number; y: number }[] = [];
+                    if (first?.type === 'M' && first.values.length >= 2) {
+                      points.push({ x: first.values[0], y: first.values[1] });
+                    }
+                    if (last?.type === 'L' && last.values.length >= 2) {
+                      points.push({ x: last.values[0], y: last.values[1] });
+                    } else if (last?.type === 'C' && last.values.length >= 6) {
+                      points.push({ x: last.values[4], y: last.values[5] });
+                    } else if (last?.type === 'Q' && last.values.length >= 4) {
+                      points.push({ x: last.values[2], y: last.values[3] });
+                    }
+                    return (
+                      <g className="internal-line-endpoints">
+                        {points.map((pt, i) => (
+                          <circle
+                            key={i}
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={3.5 / zoom2D}
+                            fill="rgba(255, 215, 0, 0.7)"
+                            stroke="#ffd700"
+                            strokeWidth={1 / zoom2D}
+                            style={{ cursor: 'move' }}
+                            pointerEvents="none"
+                          />
+                        ))}
+                      </g>
+                    );
+                  })()}
+                </g>
               );
             })}
 
