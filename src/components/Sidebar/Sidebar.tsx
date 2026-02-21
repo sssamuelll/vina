@@ -7,7 +7,6 @@ import {
   FileExplorerView,
   SettingsView,
 } from '../views';
-import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import PluginManager from '../PluginManager/PluginManager';
 import '../views/views.css';
 import './Sidebar.css';
@@ -24,7 +23,6 @@ const viewTitles: Record<SidebarView, string> = {
   nesting: 'Nesting',
   files: 'File Browser',
   plugins: 'Plugins',
-  copilot: 'AI Copilot',
   settings: 'Settings',
 };
 
@@ -50,7 +48,6 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             {activeView === 'nesting' && <NestingView />}
             {activeView === 'files' && <FileExplorerView />}
             {activeView === 'plugins' && <PluginManager />}
-            {activeView === 'copilot' && <CopilotPanel />}
             {activeView === 'settings' && <SettingsView />}
           </div>
         </>

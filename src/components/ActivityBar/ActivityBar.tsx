@@ -7,7 +7,6 @@ export type SidebarView =
   | 'nesting'
   | 'files'
   | 'plugins'
-  | 'copilot'
   | 'settings';
 
 interface ActivityBarProps {
@@ -92,17 +91,6 @@ const items: ActivityItem[] = [
         <path d="M8 3H12V6H14C14.55 6 15 6.45 15 7V10H12V8H8V10H5V7C5 6.45 5.45 6 6 6H8V3Z" />
         <path d="M5 10H15V15C15 15.55 14.55 16 14 16H6C5.45 16 5 15.55 5 15V10Z" />
         <path d="M8 16V18M12 16V18" />
-      </svg>
-    ),
-  },
-  {
-    id: 'copilot',
-    label: 'AI Copilot',
-    position: 'bottom',
-    icon: (
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 4H16C16.55 4 17 4.45 17 5V13C17 13.55 16.55 14 16 14H7L3 17V5C3 4.45 3.45 4 4 4Z" />
-        <path d="M7 8H13M7 11H10" />
       </svg>
     ),
   },
