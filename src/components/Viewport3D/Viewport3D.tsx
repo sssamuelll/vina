@@ -84,7 +84,7 @@ export default function Viewport3D() {
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
         gl={{ antialias: true }}
-        onCreated={({ scene }) => { scene.background = new THREE.Color('#2a2a2e'); }}
+        onCreated={({ scene }) => { scene.background = new THREE.Color('#f0f0f0'); }}
       >
         {/* Fashion studio lighting — bright, even, no dark zones */}
         <Environment preset="studio" />
@@ -136,15 +136,21 @@ export default function Viewport3D() {
           far={2}
         />
 
+        {/* White floor plane */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
+          <planeGeometry args={[20, 20]} />
+          <meshStandardMaterial color="#ffffff" />
+        </mesh>
+
         <Grid
           args={[10, 10]}
           cellSize={0.1}
           cellThickness={0.5}
-          cellColor="#333"
+          cellColor="#d0d0d0"
           sectionSize={1}
           sectionThickness={1}
-          sectionColor="#444"
-          fadeDistance={6}
+          sectionColor="#b0b0b0"
+          fadeDistance={8}
           position={[0, -0.001, 0]}
         />
 

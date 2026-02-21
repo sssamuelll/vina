@@ -88,6 +88,35 @@ async function ensureSidebarClosed() {
   }
 }
 
+/** Open the Copilot panel (now in BottomPanel, not ActivityBar) */
+async function openCopilotPanel() {
+  // Open bottom panel if closed
+  const panelOpen = await page.$('.bottom-panel.open');
+  if (!panelOpen) {
+    await page.keyboard.down('Meta');
+    await page.keyboard.press('k');
+    await page.keyboard.up('Meta');
+    await sleep(300);
+    await page.type('.palette-input', 'Toggle Bottom Panel');
+    await sleep(200);
+    await page.keyboard.press('Enter');
+    await sleep(400);
+  }
+  // Click Copilot tab
+  await page.evaluate(() => {
+    const tabs = [...document.querySelectorAll('.bottom-panel-tab')];
+    const copilotTab = tabs.find(t => t.textContent.trim() === 'Copilot');
+    if (copilotTab) copilotTab.click();
+  });
+  await sleep(300);
+  // Ensure panel is tall enough to see content
+  await page.evaluate(() => {
+    const panel = document.querySelector('.bottom-panel');
+    if (panel) panel.style.height = '400px';
+  });
+  await sleep(200);
+}
+
 /** Expose the Redux store on window.__store__ */
 async function exposeStore() {
   const hasStore = await page.evaluate(() => typeof window.__store__ !== 'undefined');
@@ -193,7 +222,7 @@ async function testCopilotPanelUI() {
   await freshPage();
 
   // Open Copilot via activity bar
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
 
   // Panel renders
   const panel = await page.$('.copilot-panel');
@@ -247,11 +276,12 @@ async function testCopilotPanelUI() {
   });
   await sleep(200);
 
-  // Toggle visibility — click AI Copilot again to close sidebar
-  await openActivityView('AI Copilot');
+  // Toggle visibility — close bottom panel
+  const closePanelBtn = await page.$('.bottom-panel-close');
+  if (closePanelBtn) await closePanelBtn.click();
   await sleep(200);
-  const sidebarClosed = await page.$('.sidebar.closed');
-  ok(sidebarClosed, 'Clicking AI Copilot icon again toggles panel closed');
+  const panelClosed = await page.$('.bottom-panel.closed');
+  ok(panelClosed, 'Closing bottom panel hides copilot');
 }
 
 // ─── 2. Agent Settings ─────────────────────────────────
@@ -261,7 +291,7 @@ async function testAgentSettings() {
   await freshPage();
 
   // Open copilot and then settings
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
 
   await page.evaluate(() => {
@@ -342,13 +372,11 @@ async function testQuickActionChips() {
     localStorage.setItem('openclo-provider-config', JSON.stringify(config));
   });
 
-  // Open copilot at desktop width first
+  // On mobile, the app shows CopilotPanel directly
   await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle0' });
   await sleep(800);
-  await openActivityView('AI Copilot');
-  await sleep(300);
 
-  // Now resize to mobile
+  // Resize to mobile
   await page.setViewport({ width: 375, height: 812 });
   await sleep(800);
 
@@ -383,7 +411,7 @@ async function testKeyboardShortcuts() {
   await freshPage();
 
   // Open copilot panel first
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(300);
 
   // Test keyboard shortcut module loads correctly
@@ -434,7 +462,11 @@ async function testKeyboardShortcuts() {
     // Simulate Cmd+Shift+/ (toggle)
     document.dispatchEvent(new KeyboardEvent('keydown', { key: '/', metaKey: true, shiftKey: true, bubbles: true }));
 
-    // Simulate Escape when copilot input is focused
+    // Open copilot panel if collapsed, then simulate Escape on input
+    const collapsedTab = document.querySelector('.copilot-collapsed-tab');
+    if (collapsedTab) collapsedTab.click();
+    // Wait for React render
+    await new Promise(r => setTimeout(r, 300));
     const input = document.querySelector('.copilot-input');
     if (input) {
       input.focus();
@@ -480,7 +512,7 @@ async function testCostFooter() {
   await freshPage();
 
   // Open copilot
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
 
   // Cost manager module loads
@@ -552,7 +584,7 @@ async function testErrorRecoveryUI() {
     localStorage.removeItem('openclo-provider-config');
   });
   await freshPage();
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(300);
 
   // When no API key set, shows appropriate message
@@ -607,7 +639,7 @@ async function testProviderSelection() {
   await freshPage();
 
   // Open copilot + settings
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('.copilot-btn-sm')].find(b => b.title === 'Settings');
@@ -694,7 +726,7 @@ async function testTeachingModeToggle() {
   await freshPage();
 
   // Open copilot + settings
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
   await page.evaluate(() => {
     const btn = [...document.querySelectorAll('.copilot-btn-sm')].find(b => b.title === 'Settings');
@@ -788,7 +820,7 @@ async function testAgentLoop() {
   await freshPage();
 
   // Open copilot
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
 
   // Ensure NO provider configured — sending should fail gracefully
@@ -796,7 +828,7 @@ async function testAgentLoop() {
     localStorage.removeItem('openclo-provider-config');
   });
   await freshPage();
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(300);
 
   // Type a message and send
@@ -852,7 +884,7 @@ async function testProactiveWarnings() {
   await sleep(600);
 
   // Open copilot to see warnings
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(500);
 
   // Check for warnings display
@@ -981,7 +1013,7 @@ async function testMemory() {
   ok(memoryResult.secondToolsCalled?.includes('createPiece'), 'Assistant message has toolsCalled');
 
   // Verify CopilotPanel stores conversation in localStorage
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
 
   const localStorageKeys = await page.evaluate(() => {
@@ -1004,7 +1036,7 @@ async function testNoConsoleErrors() {
   const errorsBefore = consoleErrors.length;
 
   // Full interaction cycle
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
 
   // Open settings
@@ -1028,11 +1060,11 @@ async function testNoConsoleErrors() {
   await sleep(600);
 
   // Switch views
-  await openActivityView('AI Copilot');
-  await sleep(200);
   await openActivityView('Pattern Explorer');
   await sleep(200);
-  await openActivityView('AI Copilot');
+  await openActivityView('Plugins');
+  await sleep(200);
+  await openActivityView('Pattern Explorer');
   await sleep(200);
 
   // Keyboard shortcuts
@@ -1059,7 +1091,7 @@ async function testRapidInteraction() {
   const errorsBefore = consoleErrors.length;
 
   // Open copilot
-  await openActivityView('AI Copilot');
+  await openCopilotPanel();
   await sleep(200);
 
   // Open settings

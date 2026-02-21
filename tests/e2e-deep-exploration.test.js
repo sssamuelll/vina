@@ -149,13 +149,13 @@ async function testMultiPieceWorkflow() {
     // Re-select rectangle tool (might reset to select after creating)
     await selectTool('r');
 
-    // Rectangle 2
-    await svgDrag(200, 50, 300, 120);
+    // Rectangle 2 (within SVG bounds)
+    await svgDrag(50, 150, 150, 220);
     await sleep(400);
     await selectTool('r');
 
     // Rectangle 3
-    await svgDrag(50, 170, 150, 240);
+    await svgDrag(50, 250, 150, 320);
     await sleep(400);
 
     const after = await getPieceCount();
@@ -278,7 +278,7 @@ async function testRectangleEdgeCases() {
     const before = await getPieceCount();
     await selectTool('r');
     // Big reverse drag with plenty of steps
-    await svgDrag(350, 350, 200, 250, 15);
+    await svgDrag(200, 400, 50, 340, 15);
     await sleep(400);
     const after = await getPieceCount();
     assert(after > before, `Reverse drag didn't create piece: ${before} → ${after}`);
@@ -391,7 +391,7 @@ async function testViewModeTransitions() {
     await sleep(500);
     // In headless without WebGL, error boundary catches it — check for either canvas or error
     const has3D = await page.evaluate(() => {
-      const canvas = document.querySelector('.viewport-3d-content canvas');
+      const canvas = document.querySelector('.viewport3d canvas');
       const error = document.querySelector('.viewport3d-error');
       return !!(canvas || error);
     });
@@ -804,13 +804,13 @@ async function testFileExplorerExport() {
 async function testCopilotPanel() {
   console.log('\n🔬 Copilot / AI Chat Panel');
 
-  await run('Copilot sidebar accessible', async () => {
-    await clickActivityBarItem(5); // AI Copilot = index 5
-    const title = await page.evaluate(() => {
-      const t = document.querySelector('.sidebar-title');
-      return t ? t.textContent : '';
-    });
-    assert(title, `Copilot sidebar title: "${title}"`);
+  await run('Copilot accessible (side panel or bottom tab)', async () => {
+    // Copilot may be a side panel (default: right) or bottom tab depending on layout setting
+    const hasSidePanel = await page.$('.copilot-side-panel');
+    const hasCopilotTab = await page.evaluate(() =>
+      [...document.querySelectorAll('.bottom-panel-tab')].some(t => t.textContent.trim() === 'Copilot')
+    );
+    assert(hasSidePanel || hasCopilotTab, 'Copilot accessible via side panel or bottom tab');
   });
 }
 
@@ -852,6 +852,22 @@ async function main() {
   console.log('🔍 OpenClo Deep Exploration E2E');
   console.log(`   Target: ${URL}\n`);
 
+  // Start dev server
+  const { spawn } = await import('child_process');
+  const devServer = spawn('npx', ['vite', '--port', PORT, '--strictPort'], {
+    cwd: '/Users/samueldarioballesterosgarcia/Projects/01_products/openclo',
+    stdio: 'pipe',
+  });
+
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Vite timeout after 30s')), 30000);
+    const onData = d => {
+      if (d.toString().includes('Local:')) { clearTimeout(timeout); resolve(); }
+    };
+    devServer.stdout.on('data', onData);
+    devServer.stderr.on('data', onData);
+  });
+
   browser = await puppeteer.launch({
     headless: 'new',
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu']
@@ -866,10 +882,16 @@ async function main() {
   page.on('pageerror', err => uncaughtExceptions.push(err.message));
   page.on('requestfailed', req => failedRequests.push(req.url()));
 
+  const cleanup = async () => {
+    if (browser) await browser.close();
+    if (devServer) devServer.kill('SIGTERM');
+  };
+
   try {
     await page.goto(URL, { waitUntil: 'networkidle0', timeout: 15000 });
   } catch (e) {
     console.error(`❌ Failed to load ${URL}: ${e.message}`);
+    await cleanup();
     process.exit(1);
   }
 
@@ -917,7 +939,7 @@ async function main() {
   }
   console.log('═'.repeat(50));
 
-  await browser.close();
+  await cleanup();
   process.exit(results.failed > 0 ? 1 : 0);
 }
 

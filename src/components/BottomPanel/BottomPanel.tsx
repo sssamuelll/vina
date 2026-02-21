@@ -131,14 +131,8 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
   }, []);
 
   return (
-    <div
-      className={`bottom-panel ${isOpen ? 'open' : 'closed'}`}
-      style={{ height: isOpen ? height : 0 }}
-    >
-      {/* Drag handle */}
-      <div className="bottom-panel-resize" onMouseDown={handleDragStart} />
-
-      {/* Tab bar */}
+    <div className={`bottom-panel ${isOpen ? 'open' : 'closed'}`}>
+      {/* Tab bar — always visible (VS Code pattern) */}
       <div className="bottom-panel-tabs">
         {tabs.map(tab => (
           <button
@@ -150,33 +144,41 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
           </button>
         ))}
         <div className="bottom-panel-tabs-spacer" />
-        <button className="bottom-panel-close" onClick={onToggle} title="Close Panel">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M4 4L10 10M10 4L4 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          </svg>
-        </button>
+        {isOpen && (
+          <button className="bottom-panel-close" onClick={onToggle} title="Close Panel">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M4 4L10 10M10 4L4 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* Tab content */}
-      <div className="bottom-panel-content">
-        {activeTab === 'copilot' && copilotPosition === 'bottom' && (
-          <div className="bottom-panel-pane">
-            <CopilotPanel isColumn={true} />
-          </div>
-        )}
-        {activeTab === 'problems' && (
-          <ProblemsView warnings={warnings} />
-        )}
-        {activeTab === 'output' && (
-          <div className="bottom-panel-pane bottom-panel-placeholder">
-            <span>Output log</span>
-          </div>
-        )}
-        {activeTab === 'nesting-preview' && (
-          <div className="bottom-panel-pane bottom-panel-placeholder">
-            <span>Nesting preview will appear here</span>
-          </div>
-        )}
+      {/* Collapsible content area */}
+      <div className="bottom-panel-body" style={{ height: isOpen ? height : 0 }}>
+        {/* Drag handle */}
+        <div className="bottom-panel-resize" onMouseDown={handleDragStart} />
+
+        {/* Tab content */}
+        <div className="bottom-panel-content">
+          {activeTab === 'copilot' && copilotPosition === 'bottom' && (
+            <div className="bottom-panel-pane">
+              <CopilotPanel isColumn={true} />
+            </div>
+          )}
+          {activeTab === 'problems' && (
+            <ProblemsView warnings={warnings} />
+          )}
+          {activeTab === 'output' && (
+            <div className="bottom-panel-pane bottom-panel-placeholder">
+              <span>Output log</span>
+            </div>
+          )}
+          {activeTab === 'nesting-preview' && (
+            <div className="bottom-panel-pane bottom-panel-placeholder">
+              <span>Nesting preview will appear here</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

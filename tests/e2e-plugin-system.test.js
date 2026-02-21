@@ -957,7 +957,7 @@ async function testNoConsoleErrors() {
   await sleep(200);
   await openActivityView('Plugins');
   await sleep(200);
-  await openActivityView('AI Copilot');
+  await openActivityView('Plugins');
   await sleep(200);
   await openActivityView('Plugins');
   await sleep(200);

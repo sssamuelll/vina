@@ -187,16 +187,16 @@ async function testBottomPanelOpens() {
   const panelNowOpen = await page.$('.bottom-panel.open');
   ok(panelNowOpen, 'Bottom panel opens via command palette');
 
-  // Copilot tab is visible
-  const copilotTab = await page.evaluate(() => {
-    const tabs = [...document.querySelectorAll('.bottom-panel-tab')];
-    return tabs.some(t => t.textContent.trim() === 'Copilot');
+  // Copilot accessible (side panel when position=right, or bottom tab when position=bottom)
+  const copilotAccessible = await page.evaluate(() => {
+    const sidePanel = document.querySelector('.copilot-side-panel');
+    const tabInBottom = [...document.querySelectorAll('.bottom-panel-tab')].some(t => t.textContent.trim() === 'Copilot');
+    return !!(sidePanel || tabInBottom);
   });
-  ok(copilotTab, 'Copilot tab is visible in bottom panel');
+  ok(copilotAccessible, 'Copilot is accessible (side panel or bottom tab)');
 
-  // All four tabs exist
+  // Core tabs exist (Copilot tab only when position=bottom)
   const tabLabels = await page.$$eval('.bottom-panel-tab', tabs => tabs.map(t => t.textContent.trim()));
-  ok(tabLabels.includes('Copilot'), 'Copilot tab exists');
   ok(tabLabels.includes('Problems'), 'Problems tab exists');
   ok(tabLabels.includes('Output'), 'Output tab exists');
   ok(tabLabels.includes('Nesting Preview'), 'Nesting Preview tab exists');
@@ -919,12 +919,7 @@ async function testMobileViewport() {
   await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle0' });
   await sleep(800);
 
-  // Open copilot via activity bar at desktop size first
-  const aiBtn = await page.$('button.activity-bar-item[title="AI Copilot"]');
-  if (aiBtn) {
-    await aiBtn.click();
-    await sleep(300);
-  }
+  // On mobile viewport the app renders CopilotPanel directly (mobile-chat layout)
 
   // Switch to mobile viewport
   await page.setViewport({ width: 375, height: 812 });

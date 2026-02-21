@@ -575,7 +575,7 @@ async function testSimulationStateTransitions() {
 
   // Create a piece first (rectangle tool)
   await selectToolByKey('r');
-  await svgDrag(150, 150, 400, 350, 15);
+  await svgDrag(50, 50, 250, 200, 15);
   await sleep(600);
 
   const pieceCount = await countPieces();
@@ -619,7 +619,7 @@ async function testEditorSimulationToggle() {
 
   // Create a piece and select it to see properties panel
   await selectToolByKey('r');
-  await svgDrag(150, 150, 400, 350, 15);
+  await svgDrag(50, 50, 250, 200, 15);
   await sleep(600);
 
   // Select the piece
@@ -822,7 +822,7 @@ async function testNoConsoleErrors() {
 
   // Create a piece
   await selectToolByKey('r');
-  await svgDrag(150, 150, 400, 350, 15);
+  await svgDrag(50, 50, 250, 200, 15);
   await sleep(600);
 
   const errorsBefore = consoleErrors.length;
@@ -872,7 +872,7 @@ async function testSimulationPerformance() {
 
   // Create a piece
   await selectToolByKey('r');
-  await svgDrag(150, 150, 400, 350, 15);
+  await svgDrag(50, 50, 250, 200, 15);
   await sleep(600);
 
   // Measure time to dispatch start and get state back
@@ -970,7 +970,7 @@ async function testSolverWithCreatedPiece() {
 
   // Create a rectangle piece
   await selectToolByKey('r');
-  await svgDrag(150, 150, 400, 350, 15);
+  await svgDrag(50, 50, 250, 200, 15);
   await sleep(600);
 
   const pieceCount = await countPieces();
@@ -1169,7 +1169,7 @@ async function testViewModeSimulationInteraction() {
 
   // Create a piece
   await selectToolByKey('r');
-  await svgDrag(150, 150, 400, 350, 15);
+  await svgDrag(50, 50, 250, 200, 15);
   await sleep(600);
 
   // Start in 2D mode

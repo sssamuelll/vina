@@ -331,12 +331,10 @@ export default function Workspace() {
             </div>
           </div>
 
-          {copilotPosition === 'bottom' && (
-            <BottomPanel
-              isOpen={bottomPanelOpen}
-              onToggle={() => setBottomPanelOpen(v => !v)}
-            />
-          )}
+          <BottomPanel
+            isOpen={bottomPanelOpen}
+            onToggle={() => setBottomPanelOpen(v => !v)}
+          />
         </div>
         
         {/* Right copilot panel */}
