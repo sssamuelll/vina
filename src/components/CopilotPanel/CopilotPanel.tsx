@@ -584,15 +584,14 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       )}
 
       <div className="copilot-messages">
-        {messages.length === 0 && !hasConnection && !offline && (
+        {messages.length === 0 && !hasConnection && (
           <div className="copilot-empty">
             <svg className="copilot-empty-icon" width="40" height="40" viewBox="0 0 16 16" fill="none">
               <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="var(--text-muted)" strokeWidth="0.8" fill="none"/>
             </svg>
-            <p className="copilot-empty-title">Connect an AI provider</p>
+            <p className="copilot-empty-title">AI Pattern Assistant</p>
             <p className="copilot-empty-hint">
-              Add your Anthropic or OpenAI API key, or use Ollama for local AI.
-              Built-in templates work offline too.
+              Configure an AI provider to get started — or use quick actions below without AI.
             </p>
             <button className="copilot-setup-btn" onClick={() => setShowSettings(true)}>
               <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
@@ -600,22 +599,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
               </svg>
               Configure Provider
             </button>
-          </div>
-        )}
-        {messages.length === 0 && offline && !hasConnection && (
-          <div className="copilot-empty">
-            <p className="copilot-empty-title">Offline Mode</p>
-            <p className="copilot-empty-hint">No AI provider configured. Use quick actions below:</p>
-            <div className="copilot-suggestions">
+            <div className="copilot-suggestions" style={{ marginTop: 12 }}>
               {offlineActions.slice(0, 6).map(a => (
                 <button key={a.toolName + a.label} className="copilot-suggestion" onClick={() => handleSendText(a.label.split(' / ')[0])}>
                   {a.icon} {a.label.split(' / ')[0]}
                 </button>
               ))}
             </div>
-            <button className="copilot-setup-btn" onClick={() => setShowSettings(true)} style={{ marginTop: 12 }}>
-              Configure Provider
-            </button>
           </div>
         )}
         {messages.length === 0 && hasConnection && (
