@@ -192,6 +192,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
 
   // Start/stop worker
   useEffect(() => {
+    console.log('[GarmentSimulation] Effect:', { simulationState, pieceMeshes: pieceMeshes.length, meshPieceFn: !!meshPieceFn });
     if (simulationState === 'running' && pieceMeshes.length > 0) {
       const client = new ClothWorkerClient();
       clientRef.current = client;
@@ -203,11 +204,16 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
         // Generate and set avatar body SDF for collision
         if (avatarModelUrl) {
           try {
+            console.log('[GarmentSimulation] Building avatar SDF...', { avatarModelUrl, avatarHeight });
             const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
+            console.log('[GarmentSimulation] SDF generated:', { min: sdf.min, max: sdf.max, resolution: sdf.resolution });
             client.setSDF(sdf);
+            console.log('[GarmentSimulation] SDF sent to worker');
           } catch (e) {
             console.warn('[GarmentSimulation] Avatar SDF generation failed:', e);
           }
+        } else {
+          console.warn('[GarmentSimulation] No avatarModelUrl, skipping SDF');
         }
 
         client.start();

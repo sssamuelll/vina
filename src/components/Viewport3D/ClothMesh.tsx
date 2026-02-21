@@ -15,6 +15,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, PathCommand } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
+import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -202,6 +203,8 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
   const fabricId = useSelector((s: RootState) =>
     s.simulation.pieceFabrics[piece.id] ?? s.simulation.defaultFabricId
   );
+  const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
 
   // Lazy-load CDT mesher (cdt2d is CJS, needs dynamic import in browser)
   const [meshPieceFn, setMeshPieceFn] = useState<((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null>(null);
@@ -227,8 +230,19 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
       clientRef.current = client;
       client.onFrame = onFrame;
 
-      client.init(meshData).then(() => {
+      client.init(meshData).then(async () => {
         client.setFabric(fabricId);
+
+        // Generate and set avatar body SDF for collision
+        if (avatarModelUrl) {
+          try {
+            const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
+            client.setSDF(sdf);
+          } catch (e) {
+            console.warn('[ClothMesh] Avatar SDF generation failed:', e);
+          }
+        }
+
         client.start();
       }).catch(() => {
         // Worker init failed — simulation won't run for this piece
