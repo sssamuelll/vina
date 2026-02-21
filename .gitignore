@@ -2,3 +2,7 @@ node_modules
 dist
 dist-server
 .DS_Store
+
+# Playwright
+test-results/
+playwright-report/
