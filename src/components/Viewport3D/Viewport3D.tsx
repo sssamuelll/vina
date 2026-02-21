@@ -1,6 +1,7 @@
 import { Component, Suspense, lazy, type ReactNode, useRef, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
+import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import PieceMesh from './PieceMesh';
@@ -82,12 +83,15 @@ export default function Viewport3D() {
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
+        gl={{ antialias: true }}
+        onCreated={({ scene }) => { scene.background = new THREE.Color('#2a2a2e'); }}
       >
-        {/* Studio lighting */}
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[3, 5, 4]} intensity={0.9} castShadow shadow-mapSize={1024} />
-        <directionalLight position={[-2, 3, -1]} intensity={0.25} />
-        <hemisphereLight args={['#dde4ee', '#8b7355', 0.25]} />
+        {/* Fashion studio lighting — bright, even, no dark zones */}
+        <ambientLight intensity={0.8} />
+        <directionalLight position={[3, 5, 4]} intensity={1.2} castShadow shadow-mapSize={1024} />
+        <directionalLight position={[-3, 4, -2]} intensity={0.8} />
+        <directionalLight position={[0, 2, 5]} intensity={0.6} />
+        <hemisphereLight args={['#ffffff', '#b0c4de', 0.5]} />
 
         {/* Avatar: dress form or loaded 3D model */}
         {avatarMode === 'dressform' && <Mannequin />}
