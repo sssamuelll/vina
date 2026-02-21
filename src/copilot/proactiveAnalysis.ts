@@ -352,6 +352,31 @@ export function runProactiveAnalysis(
 }
 
 /**
+ * Deduplicate warnings by content.
+ *
+ * @param warnings - Array of proactive warnings
+ * @returns Deduplicated warnings array
+ */
+function deduplicateWarnings(warnings: ProactiveWarning[]): ProactiveWarning[] {
+  const seen = new Map<string, ProactiveWarning>();
+  
+  for (const warning of warnings) {
+    const key = `${warning.category}:${warning.severity}:${warning.message}`;
+    const existing = seen.get(key);
+    
+    if (existing) {
+      // Merge piece IDs for duplicate warnings
+      const mergedPieceIds = [...new Set([...existing.pieceIds, ...warning.pieceIds])];
+      seen.set(key, { ...existing, pieceIds: mergedPieceIds });
+    } else {
+      seen.set(key, warning);
+    }
+  }
+  
+  return Array.from(seen.values());
+}
+
+/**
  * Format warnings as a compact display string.
  *
  * @param warnings - Array of proactive warnings
@@ -360,13 +385,16 @@ export function runProactiveAnalysis(
 export function formatWarnings(warnings: ProactiveWarning[]): string {
   if (warnings.length === 0) return '';
 
+  // Deduplicate warnings first
+  const deduped = deduplicateWarnings(warnings);
+
   const icons: Record<WarningSeverity, string> = {
     error: '❌',
     warning: '⚠️',
     info: '💡',
   };
 
-  return warnings
+  return deduped
     .map(w => `${icons[w.severity]} ${w.message}`)
     .join('\n');
 }

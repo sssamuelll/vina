@@ -182,12 +182,29 @@ export default function AgentSettings({
   };
 
   const panelStyle: React.CSSProperties = {
-    padding: 16,
     background: 'var(--bg-secondary)',
     borderBottom: '1px solid var(--border)',
     fontSize: 11,
     maxHeight: '80vh',
+    display: 'flex',
+    flexDirection: 'column',
+  };
+
+  const contentStyle: React.CSSProperties = {
+    flex: 1,
+    padding: 16,
     overflowY: 'auto',
+  };
+
+  const footerStyle: React.CSSProperties = {
+    marginTop: 14,
+    display: 'flex',
+    gap: 8,
+    justifyContent: 'flex-end',
+    padding: 16,
+    paddingTop: 12,
+    borderTop: '1px solid var(--border)',
+    background: 'var(--bg-secondary)',
   };
 
   const fieldStyle: React.CSSProperties = {
@@ -260,16 +277,17 @@ export default function AgentSettings({
 
   return (
     <div style={panelStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Agent Settings</h4>
-        <button
-          onClick={onClose}
-          style={{ ...btnSecondaryStyle, padding: '2px 8px' }}
-          title="Close settings"
-        >
-          ✕
-        </button>
-      </div>
+      <div style={contentStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Agent Settings</h4>
+          <button
+            onClick={onClose}
+            style={{ ...btnSecondaryStyle, padding: '2px 8px' }}
+            title="Close settings"
+          >
+            ✕
+          </button>
+        </div>
 
       {/* Provider Selection */}
       <div style={fieldStyle}>
@@ -418,18 +436,19 @@ export default function AgentSettings({
         </div>
       </div>
 
-      {/* Actions */}
-      <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button style={btnSecondaryStyle} onClick={onClearConversation}>
-          🗑 Clear conversation
-        </button>
-        <button style={btnSecondaryStyle} onClick={onClearMemory}>
-          🧹 Clear memory
-        </button>
+        {/* Actions */}
+        <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button style={btnSecondaryStyle} onClick={onClearConversation}>
+            🗑 Clear conversation
+          </button>
+          <button style={btnSecondaryStyle} onClick={onClearMemory}>
+            🧹 Clear memory
+          </button>
+        </div>
       </div>
 
-      {/* Save */}
-      <div style={{ marginTop: 14, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+      {/* Save/Cancel - sticky at bottom */}
+      <div style={footerStyle}>
         <button style={btnSecondaryStyle} onClick={onClose}>Cancel</button>
         <button style={btnStyle} onClick={handleSave}>Save</button>
       </div>

@@ -19,7 +19,7 @@ const tabs: { id: BottomTab; label: string }[] = [
 
 export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }: BottomPanelProps) {
   const [activeTab, setActiveTab] = useState<BottomTab>(defaultTab);
-  const [height, setHeight] = useState(200);
+  const [height, setHeight] = useState(280);
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(0);

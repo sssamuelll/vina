@@ -919,9 +919,12 @@ async function testMobileViewport() {
   await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle0' });
   await sleep(800);
 
-  // Open copilot via activity bar
-  await openActivityView('AI Copilot');
-  await sleep(300);
+  // Open copilot via activity bar at desktop size first
+  const aiBtn = await page.$('button.activity-bar-item[title="AI Copilot"]');
+  if (aiBtn) {
+    await aiBtn.click();
+    await sleep(300);
+  }
 
   // Switch to mobile viewport
   await page.setViewport({ width: 375, height: 812 });

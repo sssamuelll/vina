@@ -19,6 +19,8 @@ import { runProactiveAnalysis, formatWarnings } from '../../copilot/proactiveAna
 import { isTeachingModeEnabled } from '../../copilot/teachingContext';
 import { CostManager } from '../../copilot/costManager';
 import { RecoveryStrategy, getErrorMessage, classifyError, isOfflineMode, getOfflineActions } from '../../copilot/errorRecovery';
+import { type AgentLanguage } from '../../copilot/languageDetection';
+import { loadLanguagePreference } from '../../copilot/AgentSettings';
 import AgentSettings from '../../copilot/AgentSettings';
 import './CopilotPanel.css';
 
@@ -44,13 +46,32 @@ function saveAgentConfig(config: AgentConfig) {
 }
 
 /** Quick action chips for mobile */
-const QUICK_ACTIONS = [
-  { label: 'Nuevo corpiño', text: 'Crear un corpiño base talla 40' },
-  { label: 'Agregar manga', text: 'Agregar manga al corpiño' },
-  { label: 'Gradar', text: 'Gradar todas las tallas' },
-  { label: 'Anidar', text: 'Anidar las piezas en tela' },
-  { label: 'Exportar DXF', text: 'Exportar proyecto como DXF' },
-];
+const QUICK_ACTIONS: Record<AgentLanguage, Array<{ label: string; text: string }>> = {
+  es: [
+    { label: 'Nuevo corpiño', text: 'Crear un corpiño base talla 40' },
+    { label: 'Agregar manga', text: 'Agregar manga al corpiño' },
+    { label: 'Gradar', text: 'Gradar todas las tallas' },
+    { label: 'Anidar', text: 'Anidar las piezas en tela' },
+    { label: 'Exportar DXF', text: 'Exportar proyecto como DXF' },
+  ],
+  en: [
+    { label: 'New bodice', text: 'Create a basic bodice block size 40' },
+    { label: 'Add sleeve', text: 'Add sleeve to the bodice' },
+    { label: 'Grade', text: 'Grade all sizes' },
+    { label: 'Nest', text: 'Nest the pieces on fabric' },
+    { label: 'Export DXF', text: 'Export project as DXF' },
+  ],
+};
+
+/** Get localized quick actions based on language preference */
+function getLocalizedQuickActions(): Array<{ label: string; text: string }> {
+  const langPref = loadLanguagePreference();
+  if (langPref === 'es' || langPref === 'en') {
+    return QUICK_ACTIONS[langPref];
+  }
+  // For 'auto', detect based on the first message if available, otherwise default to Spanish
+  return QUICK_ACTIONS.es;
+}
 
 interface CopilotPanelProps {
   isColumn?: boolean;
@@ -671,7 +692,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       {/* Mobile quick action chips */}
       {isMobile && hasConnection && !showSettings && (
         <div className="copilot-quick-actions">
-          {QUICK_ACTIONS.map(qa => (
+          {getLocalizedQuickActions().map(qa => (
             <button
               key={qa.label}
               className="copilot-quick-chip"
