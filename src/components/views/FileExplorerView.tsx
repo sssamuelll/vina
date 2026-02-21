@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { addPiece, loadProject } from '../../store/projectSlice';
+import { addPiece, loadProject, addSeam, updateAvatar, updateMeasurements, setProjectName } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
+import { importZprj } from '../../utils/formats/zprjImport';
+import { downloadZprj } from '../../utils/formats/zprjExport';
 import { computeCuttingLayout, DEFAULT_CONFIG } from '../../utils/export/cuttingLayout';
 import type { PaperSize, CuttingLayoutConfig } from '../../utils/export/cuttingLayout';
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
@@ -48,6 +50,7 @@ export default function FileExplorerView() {
   const projectId = useSelector((s: RootState) => s.project.id);
 
   const dxfInputRef = useRef<HTMLInputElement>(null);
+  const zprjInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
 
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
@@ -80,6 +83,45 @@ export default function FileExplorerView() {
     },
     [dispatch],
   );
+
+  // ─── Import .zprj ───
+
+  const handleImportZprj = useCallback(() => {
+    zprjInputRef.current?.click();
+  }, []);
+
+  const handleZprjFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const result = await importZprj(file);
+        for (const piece of result.pieces) dispatch(addPiece(piece));
+        for (const seam of result.seams) dispatch(addSeam(seam));
+        if (result.projectName) dispatch(setProjectName(result.projectName));
+        if (result.avatar?.measurements) dispatch(updateMeasurements(result.avatar.measurements));
+        if (result.avatar?.modelUrl) dispatch(updateAvatar({ modelUrl: result.avatar.modelUrl }));
+      } catch (err) {
+        console.error('Failed to import .zprj:', err);
+        alert('Failed to import .zprj file. Check console for details.');
+      }
+      if (zprjInputRef.current) zprjInputRef.current.value = '';
+    },
+    [dispatch],
+  );
+
+  // ─── Export .zprj ───
+
+  const handleExportZprj = useCallback(() => {
+    downloadZprj(
+      { pieces, seams, fabrics, avatar, projectName },
+      { projectName: projectName || 'project' },
+    );
+    setLastExport({
+      filename: `${projectName || 'project'}.zprj`,
+      date: new Date().toLocaleString(),
+    });
+  }, [pieces, seams, fabrics, avatar, projectName]);
 
   // ─── Export ───
 
@@ -206,6 +248,13 @@ export default function FileExplorerView() {
         onChange={handleDXFFileChange}
       />
       <input
+        ref={zprjInputRef}
+        type="file"
+        accept=".zprj"
+        style={{ display: 'none' }}
+        onChange={handleZprjFileChange}
+      />
+      <input
         ref={projectInputRef}
         type="file"
         accept=".json,.openclo.json"
@@ -223,7 +272,7 @@ export default function FileExplorerView() {
             <button className="sidebar-btn sidebar-btn-full" disabled title="Coming soon">
               📄 Import SVG
             </button>
-            <button className="sidebar-btn sidebar-btn-full" disabled title="Coming soon">
+            <button className="sidebar-btn sidebar-btn-full" onClick={handleImportZprj}>
               📁 Import .zprj
             </button>
           </div>
@@ -252,6 +301,13 @@ export default function FileExplorerView() {
               disabled={pieces.length === 0}
             >
               🧊 Export OBJ
+            </button>
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={handleExportZprj}
+              disabled={pieces.length === 0}
+            >
+              📁 Export .zprj (CLO3D)
             </button>
           </div>
         </Section>
