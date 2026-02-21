@@ -9,6 +9,7 @@
 
 import type { ClothSimConfig, SphereCollider, CapsuleCollider } from './xpbdSolver';
 import type { WorkerInMessage, WorkerOutMessage } from './clothWorker';
+import type { SDFData } from './sdfGenerator';
 
 /**
  * Callback for receiving simulation frames.
@@ -150,6 +151,15 @@ export class ClothWorkerClient {
    */
   setCapsuleColliders(colliders: CapsuleCollider[]): void {
     this.postMessage({ type: 'setCapsuleColliders', colliders });
+  }
+
+  /**
+   * Set SDF data for accurate avatar body collision.
+   *
+   * @param sdf - Signed distance field data
+   */
+  setSDF(sdf: SDFData): void {
+    this.postMessage({ type: 'setSDF', sdf });
   }
 
   /**

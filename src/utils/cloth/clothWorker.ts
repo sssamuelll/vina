@@ -9,6 +9,7 @@
 
 import { XPBDClothSolver, type ClothSimConfig, type ClothMeshData, type SphereCollider, type CapsuleCollider } from './xpbdSolver';
 import { getComplianceForFabric } from './fabricLibrary';
+import { type SDFData } from './sdfGenerator';
 
 // ─── Message Protocol ───────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ export type WorkerInMessage =
   | { type: 'setConfig'; config: Partial<ClothSimConfig> }
   | { type: 'setSphereColliders'; colliders: SphereCollider[] }
   | { type: 'setCapsuleColliders'; colliders: CapsuleCollider[] }
+  | { type: 'setSDF'; sdf: SDFData }
   | { type: 'pinParticle'; index: number }
   | { type: 'unpinParticle'; index: number };
 
@@ -174,6 +176,13 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       case 'setCapsuleColliders': {
         if (solver) {
           solver.setCapsuleColliders(msg.colliders);
+        }
+        break;
+      }
+
+      case 'setSDF': {
+        if (solver) {
+          solver.setSDF(msg.sdf);
         }
         break;
       }

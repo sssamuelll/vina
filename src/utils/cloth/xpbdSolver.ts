@@ -10,6 +10,8 @@
  * @module xpbdSolver
  */
 
+import { type SDFData, sampleSDF, sdfGradient } from './sdfGenerator';
+
 // ─── Vector Math on Float32Array ────────────────────────────────────────────
 
 /** Set particle `anr` to zero in array `a`. */
@@ -274,6 +276,9 @@ export class XPBDClothSolver {
   /** Capsule colliders for avatar approximation */
   private capsuleColliders: CapsuleCollider[] = [];
 
+  /** SDF data for accurate avatar body collision */
+  private sdfData: SDFData | null = null;
+
   /**
    * Create a new XPBD cloth solver.
    *
@@ -425,6 +430,15 @@ export class XPBDClothSolver {
    */
   setCapsuleColliders(colliders: CapsuleCollider[]): void {
     this.capsuleColliders = colliders;
+  }
+
+  /**
+   * Set SDF data for accurate avatar body collision.
+   * 
+   * @param sdf - Signed distance field data or null to disable
+   */
+  setSDF(sdf: SDFData | null): void {
+    this.sdfData = sdf;
   }
 
   /**
@@ -599,6 +613,33 @@ export class XPBDClothSolver {
           this.pos[pi] = cx + dx * invDist * r;
           this.pos[pi + 1] = cy + dy * invDist * r;
           this.pos[pi + 2] = cz + dz * invDist * r;
+        }
+      }
+    }
+
+    // SDF collision (accurate avatar body collision)
+    if (this.sdfData) {
+      const epsilon = 0.001; // 1mm offset to avoid z-fighting
+      
+      for (let i = 0; i < this.numParticles; i++) {
+        if (this.invMass[i] === 0.0) continue;
+
+        const pi = 3 * i;
+        const point: [number, number, number] = [this.pos[pi], this.pos[pi + 1], this.pos[pi + 2]];
+        
+        // Sample SDF at particle position
+        const distance = sampleSDF(this.sdfData, point);
+        
+        // If particle is inside body (distance < 0)
+        if (distance < 0) {
+          // Compute gradient (push direction)
+          const gradient = sdfGradient(this.sdfData, point);
+          
+          // Push particle to surface with small offset
+          const pushDistance = -distance + epsilon;
+          this.pos[pi] += gradient[0] * pushDistance;
+          this.pos[pi + 1] += gradient[1] * pushDistance;
+          this.pos[pi + 2] += gradient[2] * pushDistance;
         }
       }
     }
