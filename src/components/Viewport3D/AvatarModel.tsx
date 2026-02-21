@@ -102,13 +102,11 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
       // Apply joint rotation
       const jointRot = joints[name];
       if (jointRot) {
-        const euler = new THREE.Euler(
-          jointRot.x * DEG2RAD,
-          jointRot.y * DEG2RAD,
-          jointRot.z * DEG2RAD,
-          'XYZ'
-        );
-        const rotQ = new THREE.Quaternion().setFromEuler(euler);
+        // Use axis-angle like avatarSDF.ts for consistency
+        const rotQ = new THREE.Quaternion();
+        if (jointRot.x !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), jointRot.x * DEG2RAD));
+        if (jointRot.y !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), jointRot.y * DEG2RAD));
+        if (jointRot.z !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), jointRot.z * DEG2RAD));
         bone.quaternion.copy(bindPose).multiply(rotQ);
       } else {
         bone.quaternion.copy(bindPose);

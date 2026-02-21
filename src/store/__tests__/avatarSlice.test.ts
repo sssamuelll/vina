@@ -17,8 +17,8 @@ describe('avatarSlice', () => {
   it('initializes with A-pose preset', () => {
     const state = getInitialState();
     expect(state.pose.activePreset).toBe('A-pose');
-    expect(state.pose.joints.LeftArm).toEqual({ x: 50, y: 0, z: 0 });
-    expect(state.pose.joints.RightArm).toEqual({ x: 50, y: 0, z: 0 });
+    expect(state.pose.joints.LeftArm).toEqual({ x: 0, y: 0, z: -45 });
+    expect(state.pose.joints.RightArm).toEqual({ x: 0, y: 0, z: 45 });
   });
 
   it('setJointRotation updates a specific joint', () => {
@@ -49,9 +49,9 @@ describe('avatarSlice', () => {
     expect(state.pose.activePreset).toBeNull();
   });
 
-  it('A-pose preset has arms at 50°', () => {
-    expect(POSE_PRESETS['A-pose'].LeftArm?.x).toBe(50);
-    expect(POSE_PRESETS['A-pose'].RightArm?.x).toBe(50);
+  it('A-pose preset has arms at 45° Z rotation', () => {
+    expect(POSE_PRESETS['A-pose'].LeftArm?.z).toBe(-45);
+    expect(POSE_PRESETS['A-pose'].RightArm?.z).toBe(45);
   });
 
   it('togglePoseEditor toggles', () => {

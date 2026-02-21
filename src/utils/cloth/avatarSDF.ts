@@ -28,11 +28,13 @@ export function clearAvatarSDFCache(): void {
 
 // ─── A-Pose helpers ──────────────────────────────────────────────────────────
 
-const DEG50 = (Math.PI / 180) * 50;
-const DEG8 = (Math.PI / 180) * 8;
+const DEG45 = (Math.PI / 180) * 45;
+const DEG5 = (Math.PI / 180) * 5;
 
 /**
  * Apply the same A-pose bone rotations that AvatarModel.tsx applies.
+ * For Mixamo rigs: Z-axis rotation lowers arms from T-pose to A-pose.
+ * Left arm: negative Z (down), Right arm: positive Z (down).
  */
 function applyAPose(scene: THREE.Object3D): void {
   let left: THREE.Bone | null = null;
@@ -49,13 +51,15 @@ function applyAPose(scene: THREE.Object3D): void {
     else if (bone.name === 'RightShoulder') rightShoulder = bone;
   });
 
-  const armRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), DEG50);
-  if (left) (left as THREE.Bone).quaternion.multiply(armRot.clone());
-  if (right) (right as THREE.Bone).quaternion.multiply(armRot.clone());
+  const leftArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -DEG45);
+  const rightArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG45);
+  if (left) (left as THREE.Bone).quaternion.multiply(leftArmRot);
+  if (right) (right as THREE.Bone).quaternion.multiply(rightArmRot);
 
-  const shoulderRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), DEG8);
-  if (leftShoulder) (leftShoulder as THREE.Bone).quaternion.multiply(shoulderRot.clone());
-  if (rightShoulder) (rightShoulder as THREE.Bone).quaternion.multiply(shoulderRot.clone());
+  const leftShoulderRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -DEG5);
+  const rightShoulderRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG5);
+  if (leftShoulder) (leftShoulder as THREE.Bone).quaternion.multiply(leftShoulderRot);
+  if (rightShoulder) (rightShoulder as THREE.Bone).quaternion.multiply(rightShoulderRot);
 }
 
 // ─── Mesh extraction ─────────────────────────────────────────────────────────

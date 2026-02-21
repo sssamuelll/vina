@@ -33,21 +33,21 @@ export type EditableJoint = typeof EDITABLE_JOINTS[number];
 
 export const POSE_PRESETS: Record<string, Record<string, JointRotation>> = {
   'A-pose': {
-    LeftArm: { x: 50, y: 0, z: 0 },
-    RightArm: { x: 50, y: 0, z: 0 },
-    LeftShoulder: { x: 8, y: 0, z: 0 },
-    RightShoulder: { x: 8, y: 0, z: 0 },
+    LeftArm: { x: 0, y: 0, z: -45 },
+    RightArm: { x: 0, y: 0, z: 45 },
+    LeftShoulder: { x: 0, y: 0, z: -5 },
+    RightShoulder: { x: 0, y: 0, z: 5 },
   },
   'T-pose': {},
   'Relaxed': {
-    LeftArm: { x: 60, y: 0, z: 10 },
-    RightArm: { x: 60, y: 0, z: -10 },
+    LeftArm: { x: 0, y: 0, z: -60 },
+    RightArm: { x: 0, y: 0, z: 60 },
     LeftUpLeg: { x: 5, y: 0, z: 0 },
     RightUpLeg: { x: 5, y: 0, z: 0 },
   },
   'Arms Forward': {
-    LeftArm: { x: 90, y: 0, z: 0 },
-    RightArm: { x: 90, y: 0, z: 0 },
+    LeftArm: { x: 0, y: 90, z: 0 },
+    RightArm: { x: 0, y: -90, z: 0 },
   },
   'Sitting': {
     LeftUpLeg: { x: 90, y: 0, z: 0 },
