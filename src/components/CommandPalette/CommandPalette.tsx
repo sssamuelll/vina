@@ -129,7 +129,7 @@ export default function CommandPalette({ commands, isOpen, onClose }: CommandPal
 
   return (
     <div className="command-palette-overlay" onClick={onClose}>
-      <div className="command-palette" onClick={e => e.stopPropagation()} onKeyDown={handleKeyDown}>
+      <div className="command-palette" onClick={e => e.stopPropagation()}>
         <div className="palette-input-wrapper">
           <span className="palette-prefix">&gt;</span>
           <input
@@ -138,6 +138,7 @@ export default function CommandPalette({ commands, isOpen, onClose }: CommandPal
             className="palette-input"
             value={query}
             onChange={e => setQuery(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder="Type a command..."
           />
         </div>

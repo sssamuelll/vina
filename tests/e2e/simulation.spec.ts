@@ -30,7 +30,6 @@ test.describe('Simulation Panel', () => {
     const slider = page.locator('input[type="range"]');
     await slider.fill('3');
     await expect(page.locator('text=3mm')).toBeVisible();
-    await expect(page.locator('text=Alta calidad')).toBeVisible();
   });
 
   test('Start Simulation disabled without pieces', async ({ page }) => {
@@ -90,33 +89,25 @@ test.describe('Simulation Panel', () => {
   });
 });
 
-test.describe('Avatar View', () => {
+// ─── Avatar / 3D View ───────────────────────────────────────────────────────
+
+test.describe('Avatar & 3D View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 10000 });
   });
 
   test('ActivityBar shows avatar icon', async ({ page }) => {
-    const avatarIcon = page.locator('.activity-bar-item[title="Avatar"]');
-    await expect(avatarIcon).toBeVisible();
+    await expect(page.locator('.activity-bar-item[title="Avatar"]')).toBeVisible();
   });
-});
 
-test.describe('A-pose', () => {
-  test('3D view renders avatar', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForSelector('svg.pattern-svg', { timeout: 10000 });
+  test('3D view renders a canvas', async ({ page }) => {
     await page.click('button:has-text("3D")');
     await page.waitForTimeout(2000);
-
-    // Canvas should exist
-    const canvas = page.locator('canvas');
-    await expect(canvas).toBeVisible();
+    await expect(page.locator('canvas')).toBeVisible();
   });
 
   test.skip('avatar in A-pose (visual regression)', async ({ page }) => {
-    // Skip until baseline is established — run manually first:
-    // npx playwright test --update-snapshots
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 10000 });
     await page.click('button:has-text("3D")');

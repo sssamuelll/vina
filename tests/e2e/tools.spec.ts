@@ -19,20 +19,13 @@ test.describe('Pattern Editor Tools', () => {
     await page.mouse.move(cx + 80, cy + 60, { steps: 10 });
     await page.mouse.up();
 
-    // Piece should appear
     await expect(page.locator('text=Pieces: 1')).toBeVisible({ timeout: 3000 });
-  });
-
-  test.skip('select tool selects piece', async ({ page }) => {
-    // TODO: find correct DOM selector for selection state
-    // The selection fill is applied inline, need to inspect actual DOM structure
   });
 
   test('view switching 2D → Split → 3D', async ({ page }) => {
     await page.click('button:has-text("2D")');
     await page.waitForTimeout(300);
-    const svgVisible = await page.locator('svg.pattern-svg').isVisible();
-    expect(svgVisible).toBe(true);
+    expect(await page.locator('svg.pattern-svg').isVisible()).toBe(true);
 
     await page.click('button:has-text("Split")');
     await page.waitForTimeout(300);
@@ -45,7 +38,6 @@ test.describe('Pattern Editor Tools', () => {
   });
 
   test('StatusBar shows correct info', async ({ page }) => {
-    // StatusBar items are individual spans — check content exists
     const statusBar = page.locator('.status-bar');
     await expect(statusBar).toBeVisible();
     await expect(statusBar.locator('text=/Pieces.*0/')).toBeVisible();
@@ -65,8 +57,8 @@ test.describe('Sidebar Views', () => {
   });
 
   test('BottomPanel tabs visible', async ({ page }) => {
-    await expect(page.locator('text=Problems')).toBeVisible();
-    await expect(page.locator('text=Output')).toBeVisible();
-    await expect(page.locator('text=Nesting Preview')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Problems' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Output' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Nesting Preview' })).toBeVisible();
   });
 });
