@@ -28,7 +28,7 @@ export function clearAvatarSDFCache(): void {
 
 // ─── A-Pose helpers ──────────────────────────────────────────────────────────
 
-const DEG45 = (Math.PI / 180) * 45;
+const DEG65 = (Math.PI / 180) * 65;
 const DEG5 = (Math.PI / 180) * 5;
 
 /**
@@ -51,8 +51,8 @@ function applyAPose(scene: THREE.Object3D): void {
     else if (bone.name === 'RightShoulder') rightShoulder = bone;
   });
 
-  const leftArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -DEG45);
-  const rightArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG45);
+  const leftArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -DEG65);
+  const rightArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG65);
   if (left) (left as THREE.Bone).quaternion.multiply(leftArmRot);
   if (right) (right as THREE.Bone).quaternion.multiply(rightArmRot);
 
