@@ -13,6 +13,7 @@ import cleanPSLG from 'clean-pslg';
 import type { PatternPiece, Point2D, PathCommand } from '../../types/types';
 import type { ClothMeshData } from '../cloth/xpbdSolver';
 import { flattenPath } from '../seam/index';
+import { refineMesh } from './refine';
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -140,10 +141,21 @@ export function meshPieceOutline(
     }
   }
 
-  // TODO: Fix refinement - boundary edge constraints break when adding interior points
-  // For now, skip refinement to get basic CDT functionality working
+  // Apply refinement for better quality triangles (with fallback)
+  try {
+    const refined = refineMesh(points, triangles, edges, config.maxEdgeLength, config.minAngle, config.maxRefinementPasses);
+    
+    // Only use refined result if it produced valid triangles
+    if (refined.triangles.length > 0) {
+      return convertToClothMeshData(refined.points, refined.triangles, config);
+    } else {
+      console.warn('Refinement produced no triangles, falling back to basic CDT');
+    }
+  } catch (error) {
+    console.warn('Refinement failed, falling back to basic CDT:', error);
+  }
   
-  // Convert to 3D ClothMeshData (using original points/triangles)
+  // Fallback to basic CDT mesh
   return convertToClothMeshData(points, triangles, config);
 }
 

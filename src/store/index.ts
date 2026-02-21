@@ -3,6 +3,7 @@ import projectReducer from './projectSlice';
 import editorReducer from './editorSlice';
 import simulationReducer from './simulationSlice';
 import pluginReducer from './pluginSlice';
+import layoutReducer from './layoutSlice';
 import { undoMiddleware } from './undoMiddleware';
 
 export const store = configureStore({
@@ -11,6 +12,7 @@ export const store = configureStore({
     editor: editorReducer,
     simulation: simulationReducer,
     plugins: pluginReducer,
+    layout: layoutReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

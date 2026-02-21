@@ -43,6 +43,7 @@ interface BadTriangle {
  *
  * @param points - 2D mesh points (will not be modified)
  * @param triangles - Triangle indices (will not be modified)
+ * @param edges - Original constraint edges to preserve during re-triangulation
  * @param maxEdgeLength - Maximum allowed edge length
  * @param minAngleDeg - Minimum allowed angle in degrees
  * @param maxPasses - Maximum refinement iterations
@@ -51,6 +52,7 @@ interface BadTriangle {
 export function refineMesh(
   points: number[][],
   triangles: number[][],
+  edges: number[][],
   maxEdgeLength: number,
   minAngleDeg: number,
   maxPasses: number = 3,
@@ -105,11 +107,10 @@ export function refineMesh(
     // Add new points and rebuild triangulation
     currentPoints.push(...newPoints);
 
-    // Rebuild CDT with new points (preserve boundary edges)
-    const boundaryEdges = extractBoundaryEdges(points.length);
-    
+    // Rebuild CDT with new points (preserve original constraint edges)
+    // The original edges still reference the same boundary point indices
     try {
-      currentTriangles = cdt2d(currentPoints, boundaryEdges, {
+      currentTriangles = cdt2d(currentPoints, edges, {
         interior: true,
         exterior: false,
       });
@@ -256,24 +257,4 @@ function isPointTooClose(
     }
   }
   return false;
-}
-
-/**
- * Extract boundary edges from the original outline for CDT constraint preservation.
- *
- * @param originalPointCount - Number of points in original outline
- * @returns Array of boundary constraint edges
- */
-function extractBoundaryEdges(
-  originalPointCount: number,
-): number[][] {
-  // Simple boundary edge extraction: assume first N points form the outline
-  const boundaryEdges: number[][] = [];
-  
-  for (let i = 0; i < originalPointCount; i++) {
-    const next = (i + 1) % originalPointCount;
-    boundaryEdges.push([i, next]);
-  }
-
-  return boundaryEdges;
 }
