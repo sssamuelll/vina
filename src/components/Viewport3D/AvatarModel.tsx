@@ -31,13 +31,41 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     boneMap.current.clear();
     bindPoses.current.clear();
 
-    // Collect bones and store bind poses
+    // Collect bones from skeleton (not traverse) to ensure we modify the actual rendered bones
+    let skeleton: THREE.Skeleton | null = null;
     scene.traverse((obj) => {
-      if (!(obj as THREE.Bone).isBone) return;
-      const bone = obj as THREE.Bone;
-      boneMap.current.set(bone.name, bone);
-      bindPoses.current.set(bone.name, bone.quaternion.clone());
+      if ((obj as THREE.SkinnedMesh).isSkinnedMesh && !skeleton) {
+        skeleton = (obj as THREE.SkinnedMesh).skeleton;
+      }
     });
+
+    if (skeleton) {
+      for (const bone of (skeleton as THREE.Skeleton).bones) {
+        boneMap.current.set(bone.name, bone);
+        bindPoses.current.set(bone.name, bone.quaternion.clone());
+      }
+      // Apply initial pose
+      boneMap.current.forEach((bone, name) => {
+        const jointRot = joints[name];
+        if (jointRot) {
+          const bindQ = bindPoses.current.get(name)!;
+          const rotQ = new THREE.Quaternion();
+          if (jointRot.x !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), jointRot.x * DEG2RAD));
+          if (jointRot.y !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), jointRot.y * DEG2RAD));
+          if (jointRot.z !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), jointRot.z * DEG2RAD));
+          bone.quaternion.copy(rotQ).multiply(bindQ);
+          console.log(`[AvatarModel] Applied ${name} z:${jointRot.z}°`);
+        }
+      });
+    } else {
+      // Fallback: traverse for bones
+      scene.traverse((obj) => {
+        if (!(obj as THREE.Bone).isBone) return;
+        const bone = obj as THREE.Bone;
+        boneMap.current.set(bone.name, bone);
+        bindPoses.current.set(bone.name, bone.quaternion.clone());
+      });
+    }
 
     // Compute bounding box for auto-scaling
     const box = new THREE.Box3().setFromObject(scene);
@@ -79,11 +107,14 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
       groupRef.current.remove(groupRef.current.children[0]);
     }
     groupRef.current.add(scene);
+
+    // Apply initial pose immediately after loading
+    requestAnimationFrame(() => applyPose.current());
   }, [gltf, autoScale, height]);
 
-  // Apply pose + morph weights from Redux every frame
-  useFrame(() => {
-    // Compute morph weights from measurements
+  // Helper to apply pose + morphs to all bones
+  const applyPose = useRef(() => {});
+  applyPose.current = () => {
     const morphCfg: MorphConfig = {
       chest: measurements.chest,
       waist: measurements.waist,
@@ -99,20 +130,18 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
       const bindPose = bindPoses.current.get(name);
       if (!bindPose) return;
 
-      // Apply joint rotation
       const jointRot = joints[name];
       if (jointRot) {
-        // Use axis-angle like avatarSDF.ts for consistency
         const rotQ = new THREE.Quaternion();
         if (jointRot.x !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), jointRot.x * DEG2RAD));
         if (jointRot.y !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), jointRot.y * DEG2RAD));
         if (jointRot.z !== 0) rotQ.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), jointRot.z * DEG2RAD));
-        bone.quaternion.copy(bindPose).multiply(rotQ);
+        bone.quaternion.copy(rotQ).multiply(bindPose);
       } else {
         bone.quaternion.copy(bindPose);
       }
 
-      // Apply morph bone scaling
+      // Morph bone scaling
       if (MORPH_BONE_MAP.chest.includes(name as 'Spine1' | 'Spine2')) {
         bone.scale.set(weights.chestScale, 1, weights.chestScale);
       } else if (MORPH_BONE_MAP.waist.includes(name as 'Spine')) {
@@ -129,7 +158,17 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
         bone.scale.set(1, 1, 1);
       }
     });
-  });
+  };
+
+  // Apply pose reactively when joints or measurements change
+  useEffect(() => {
+    if (boneMap.current.size > 0) {
+      applyPose.current();
+    }
+  }, [joints, measurements]);
+
+  // Also apply every frame for smooth animation
+  useFrame(() => { applyPose.current(); });
 
   return <group ref={groupRef} />;
 }
