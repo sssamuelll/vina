@@ -67,6 +67,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
           const mat = mesh.material as THREE.MeshStandardMaterial;
           if (mat.isMeshStandardMaterial) {
             mat.roughness = Math.max(mat.roughness, 0.4);
+            mat.metalness = Math.min(mat.metalness, 0.3); // prevent black-hole effect without envmap
             mat.envMapIntensity = 0.5;
           }
         }

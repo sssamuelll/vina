@@ -1,6 +1,6 @@
 import { Component, Suspense, lazy, type ReactNode, useRef, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Grid, ContactShadows, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -87,6 +87,7 @@ export default function Viewport3D() {
         onCreated={({ scene }) => { scene.background = new THREE.Color('#2a2a2e'); }}
       >
         {/* Fashion studio lighting — bright, even, no dark zones */}
+        <Environment preset="studio" />
         <ambientLight intensity={0.8} />
         <directionalLight position={[3, 5, 4]} intensity={1.2} castShadow shadow-mapSize={1024} />
         <directionalLight position={[-3, 4, -2]} intensity={0.8} />
