@@ -134,6 +134,25 @@
   color: #fff;
 }
 
+/* ─── Layout Controls ─── */
+.layout-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.swap-views-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.copilot-position-btn {
+  position: relative;
+}
+
+.copilot-position-btn svg circle {
+  opacity: 0.8;
+}
+
 /* ─── Body: flex row ─── */
 .workspace-body {
   flex: 1;

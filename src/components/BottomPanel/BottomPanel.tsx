@@ -1,4 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import './BottomPanel.css';
 
@@ -10,7 +12,7 @@ interface BottomPanelProps {
   defaultTab?: BottomTab;
 }
 
-const tabs: { id: BottomTab; label: string }[] = [
+const allTabs: { id: BottomTab; label: string }[] = [
   { id: 'copilot', label: 'Copilot' },
   { id: 'problems', label: 'Problems' },
   { id: 'output', label: 'Output' },
@@ -18,11 +20,35 @@ const tabs: { id: BottomTab; label: string }[] = [
 ];
 
 export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }: BottomPanelProps) {
-  const [activeTab, setActiveTab] = useState<BottomTab>(defaultTab);
+  const { copilotPosition } = useSelector((state: RootState) => state.layout);
+  
+  // Filter tabs based on copilot position
+  const tabs = allTabs.filter(tab => 
+    tab.id !== 'copilot' || copilotPosition === 'bottom'
+  );
+  // Determine the initial active tab based on what's available
+  const getInitialTab = () => {
+    if (copilotPosition === 'bottom' && defaultTab === 'copilot') {
+      return 'copilot';
+    }
+    return tabs.length > 0 ? tabs[0].id : 'problems';
+  };
+  
+  const [activeTab, setActiveTab] = useState<BottomTab>(getInitialTab());
   const [height, setHeight] = useState(280);
   const isDragging = useRef(false);
   const startY = useRef(0);
   const startHeight = useRef(0);
+
+  // Update active tab if copilot moves away from bottom
+  useEffect(() => {
+    if (activeTab === 'copilot' && copilotPosition !== 'bottom') {
+      const firstAvailableTab = tabs.find(t => t.id !== 'copilot');
+      if (firstAvailableTab) {
+        setActiveTab(firstAvailableTab.id);
+      }
+    }
+  }, [copilotPosition, activeTab, tabs]);
 
   const handleTabClick = useCallback((tabId: BottomTab) => {
     if (activeTab === tabId && isOpen) {
@@ -96,7 +122,7 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
 
       {/* Tab content */}
       <div className="bottom-panel-content">
-        {activeTab === 'copilot' && (
+        {activeTab === 'copilot' && copilotPosition === 'bottom' && (
           <div className="bottom-panel-pane">
             <CopilotPanel isColumn={true} />
           </div>

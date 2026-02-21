@@ -101,6 +101,13 @@ function mockState(overrides?: Partial<RootState>): RootState {
       enabledPlugins: [],
       pluginErrors: {},
     },
+    layout: {
+      copilotPosition: 'right',
+      copilotOpen: true,
+      copilotSize: 340,
+      primaryView: '2d',
+      splitRatio: 0.5,
+    },
   };
 
   if (overrides) {

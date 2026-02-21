@@ -1,0 +1,210 @@
+/* ===== COPILOT SIDE PANEL ===== */
+
+.copilot-side-panel {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  position: relative;
+  height: 100%;
+  min-width: 280px;
+  max-width: 60vw;
+  transition: width 0.2s ease;
+}
+
+.copilot-side-panel.left {
+  border-right: 1px solid var(--border);
+  border-left: none;
+  border-top: none;
+  border-bottom: none;
+}
+
+.copilot-side-panel.right {
+  border-left: 1px solid var(--border);
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+}
+
+.copilot-side-panel.collapsed {
+  width: 48px !important;
+  min-width: 48px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  transition: width 0.2s ease;
+}
+
+/* ===== RESIZE HANDLE ===== */
+
+.copilot-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 10;
+  transition: background-color 0.15s ease;
+}
+
+.copilot-resize-handle.left {
+  right: -2px;
+}
+
+.copilot-resize-handle.right {
+  left: -2px;
+}
+
+.copilot-resize-handle:hover {
+  background-color: var(--accent);
+}
+
+.copilot-resize-handle:active {
+  background-color: var(--accent);
+}
+
+/* ===== COLLAPSED STATE ===== */
+
+.copilot-collapsed-tab {
+  writing-mode: vertical-lr;
+  text-orientation: mixed;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 0;
+  margin: 20px auto;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  user-select: none;
+  background: var(--bg);
+}
+
+.copilot-collapsed-tab:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.copilot-collapsed-tab svg {
+  transform: rotate(90deg);
+  flex-shrink: 0;
+}
+
+.copilot-collapsed-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+/* ===== PANEL HEADER ===== */
+
+.copilot-side-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.copilot-side-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.copilot-side-title svg {
+  flex-shrink: 0;
+}
+
+.copilot-side-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.copilot-side-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+}
+
+.copilot-side-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.copilot-side-btn:active {
+  background: var(--bg-active);
+}
+
+/* ===== PANEL CONTENT ===== */
+
+.copilot-side-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Override the CopilotPanel styles when in side mode */
+.copilot-side-content .copilot-panel {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  height: 100%;
+}
+
+.copilot-side-content .copilot-panel .copilot-header {
+  display: none; /* Hide the internal header since we have our own */
+}
+
+/* ===== SMOOTH ANIMATIONS ===== */
+
+@media (prefers-reduced-motion: reduce) {
+  .copilot-side-panel,
+  .copilot-collapsed-tab,
+  .copilot-side-btn,
+  .copilot-resize-handle {
+    transition: none;
+  }
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 768px) {
+  .copilot-side-panel {
+    min-width: 240px;
+  }
+  
+  .copilot-side-panel.collapsed {
+    width: 40px !important;
+    min-width: 40px;
+  }
+  
+  .copilot-collapsed-tab {
+    height: 100px;
+    margin: 16px auto;
+  }
+  
+  .copilot-collapsed-label {
+    font-size: 10px;
+  }
+}
