@@ -15,7 +15,7 @@ import {
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
 import { runAgentLoop, type AgentLoopResult } from '../../copilot/agentLoop';
-import { runProactiveAnalysis, formatWarnings } from '../../copilot/proactiveAnalysis';
+// Proactive analysis moved to BottomPanel Problems tab
 import { isTeachingModeEnabled } from '../../copilot/teachingContext';
 import { CostManager } from '../../copilot/costManager';
 import { RecoveryStrategy, getErrorMessage, classifyError, isOfflineMode, getOfflineActions } from '../../copilot/errorRecovery';
@@ -119,8 +119,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   // Teaching mode (managed by AgentSettings)
   useState(isTeachingModeEnabled);
 
-  // Proactive warnings
-  const [warnings, setWarnings] = useState<string>('');
+  // Proactive warnings (moved to BottomPanel Problems tab)
 
   // Cost management
   const costManagerRef = useRef(new CostManager(project.id));
@@ -171,15 +170,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     costManagerRef.current = new CostManager(project.id);
   }, [project.id]);
 
-  // Run proactive analysis when pieces change
-  useEffect(() => {
-    if (project.pieces.length > 0) {
-      const w = runProactiveAnalysis(project.pieces, project.seams);
-      setWarnings(formatWarnings(w));
-    } else {
-      setWarnings('');
-    }
-  }, [project.pieces, project.seams]);
+  // Proactive analysis moved to BottomPanel Problems tab (VS Code style)
 
   // Voice input setup (Web Speech API — not available in all browsers)
   useEffect(() => {
@@ -588,21 +579,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
         />
       )}
 
-      {/* Proactive analysis warnings */}
-      {warnings && !showSettings && (
-        <div style={{
-          padding: '6px 10px',
-          fontSize: 10,
-          lineHeight: 1.4,
-          background: 'var(--bg-warning, rgba(255,200,0,0.08))',
-          borderBottom: '1px solid var(--border)',
-          whiteSpace: 'pre-line',
-          maxHeight: 80,
-          overflow: 'auto',
-        }}>
-          {warnings}
-        </div>
-      )}
+      {/* Proactive analysis warnings moved to BottomPanel → Problems tab */}
 
       <div className="copilot-messages">
         {messages.length === 0 && !hasConnection && (

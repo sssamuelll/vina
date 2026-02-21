@@ -113,3 +113,62 @@
   font-size: 12px;
   padding: 20px;
 }
+
+/* ─── Problems Panel (VS Code style) ─── */
+.problems-list {
+  padding: 0;
+  overflow-y: auto;
+}
+
+.problem-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  font-size: 12px;
+  line-height: 22px;
+  cursor: default;
+  border-bottom: 1px solid var(--separator);
+}
+
+.problem-row:hover {
+  background: var(--btn-bg-hover);
+}
+
+.problem-row:last-child {
+  border-bottom: none;
+}
+
+.problem-icon {
+  flex-shrink: 0;
+  font-size: 10px;
+}
+
+.problem-message {
+  flex: 1;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.problem-category {
+  flex-shrink: 0;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.06);
+}
+
+.problem-warning .problem-message {
+  color: #cca700;
+}
+
+.problem-error .problem-message {
+  color: #f14c4c;
+}
+
+.problem-info .problem-message {
+  color: #3794ff;
+}

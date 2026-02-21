@@ -1,7 +1,8 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
+import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/proactiveAnalysis';
 import './BottomPanel.css';
 
 type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview';
@@ -12,17 +13,53 @@ interface BottomPanelProps {
   defaultTab?: BottomTab;
 }
 
-const allTabs: { id: BottomTab; label: string }[] = [
-  { id: 'copilot', label: 'Copilot' },
-  { id: 'problems', label: 'Problems' },
-  { id: 'output', label: 'Output' },
-  { id: 'nesting-preview', label: 'Nesting Preview' },
-];
+function buildTabs(problemCount: number): { id: BottomTab; label: string }[] {
+  return [
+    { id: 'copilot', label: 'Copilot' },
+    { id: 'problems', label: problemCount > 0 ? `Problems (${problemCount})` : 'Problems' },
+    { id: 'output', label: 'Output' },
+    { id: 'nesting-preview', label: 'Nesting Preview' },
+  ];
+}
+
+const SEVERITY_ICON: Record<string, string> = {
+  error: '🔴',
+  warning: '🟡',
+  info: '🔵',
+};
+
+function ProblemsView({ warnings }: { warnings: ProactiveWarning[] }) {
+  if (warnings.length === 0) {
+    return (
+      <div className="bottom-panel-pane bottom-panel-placeholder">
+        <span>No problems detected</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bottom-panel-pane problems-list">
+      {warnings.map((w, i) => (
+        <div key={i} className={`problem-row problem-${w.severity}`}>
+          <span className="problem-icon">{SEVERITY_ICON[w.severity] ?? '🔵'}</span>
+          <span className="problem-message">{w.message}</span>
+          <span className="problem-category">{w.category}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }: BottomPanelProps) {
   const { copilotPosition } = useSelector((state: RootState) => state.layout);
+  const pieces = useSelector((state: RootState) => state.project.pieces);
+  const seams = useSelector((state: RootState) => state.project.seams);
+
+  // Reactive proactive analysis — runs when pieces/seams change
+  const warnings = useMemo(() => runProactiveAnalysis(pieces, seams), [pieces, seams]);
   
   // Filter tabs based on copilot position
+  const allTabs = buildTabs(warnings.length);
   const tabs = allTabs.filter(tab => 
     tab.id !== 'copilot' || copilotPosition === 'bottom'
   );
@@ -128,9 +165,7 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
           </div>
         )}
         {activeTab === 'problems' && (
-          <div className="bottom-panel-pane bottom-panel-placeholder">
-            <span>No problems detected</span>
-          </div>
+          <ProblemsView warnings={warnings} />
         )}
         {activeTab === 'output' && (
           <div className="bottom-panel-pane bottom-panel-placeholder">
