@@ -8,6 +8,7 @@ import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
+import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import './Viewport3D.css';
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
@@ -30,18 +31,6 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
     }
     return this.props.children;
   }
-}
-
-/** Distribute pieces around the mannequin */
-function getPosition(index: number, total: number): [number, number, number] {
-  // Arrange pieces in a circle around the mannequin
-  const radius = 0.6;
-  const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
-  return [
-    Math.cos(angle) * radius,
-    1.1,
-    Math.sin(angle) * radius,
-  ];
 }
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
@@ -104,15 +93,18 @@ export default function Viewport3D() {
         {useClothSim ? (
           <GarmentSimulation pieces={pieces} seams={seams} />
         ) : (
-          pieces.map((piece, i) => (
-            <PieceMesh
-              key={piece.id}
-              piece={piece}
-              isSelected={selectedPieceIds.includes(piece.id)}
-              color={PIECE_COLORS[i % PIECE_COLORS.length]}
-              position={getPosition(i, pieces.length)}
-            />
-          ))
+          (() => {
+            const placements = placeGarmentPieces(pieces, avatar.measurements);
+            return pieces.map((piece, i) => (
+              <PieceMesh
+                key={piece.id}
+                piece={piece}
+                isSelected={selectedPieceIds.includes(piece.id)}
+                color={PIECE_COLORS[i % PIECE_COLORS.length]}
+                position={placements[i].position}
+              />
+            ));
+          })()
         )}
 
         {/* Floor shadow */}

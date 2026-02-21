@@ -16,17 +16,12 @@ import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
+import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
 const SCALE = 0.003;
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
-
-function getPosition(index: number, total: number): [number, number, number] {
-  const radius = 0.6;
-  const angle = (index / Math.max(total, 1)) * Math.PI * 2 - Math.PI / 2;
-  return [Math.cos(angle) * radius, 1.1, Math.sin(angle) * radius];
-}
 
 /**
  * Build mesh data for a piece using CDT mesher.
@@ -106,9 +101,18 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
     return result;
   }, [pieces]);
 
+  // Compute placements for each piece
+  const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
+
   // Build merged geometry for rendering (static initial state)
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
+
+    // Compute placements
+    const placements = pieces.map((piece, i) => {
+      const region = detectBodyRegion(piece.name);
+      return computePlacement(region, avatarMeasurements, i, pieces.length);
+    });
 
     // Count totals
     let totalVerts = 0;
@@ -127,10 +131,21 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       const p = pieceMeshes[pi];
       const numVerts = p.vertices.length / 3;
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
+      const placement = placements[pi];
 
-      // Copy vertices
-      for (let i = 0; i < p.vertices.length; i++) {
-        positions[vOffset * 3 + i] = p.vertices[i];
+      // Build rotation matrix from Euler angles
+      const euler = new THREE.Euler(placement.rotation[0], placement.rotation[1], placement.rotation[2]);
+      const rotMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
+      const pos = new THREE.Vector3(...placement.position);
+
+      // Copy vertices with placement transform applied
+      for (let vi = 0; vi < numVerts; vi++) {
+        const v = new THREE.Vector3(p.vertices[vi * 3], p.vertices[vi * 3 + 1], p.vertices[vi * 3 + 2]);
+        v.applyMatrix4(rotMatrix);
+        v.add(pos);
+        positions[(vOffset + vi) * 3] = v.x;
+        positions[(vOffset + vi) * 3 + 1] = v.y;
+        positions[(vOffset + vi) * 3 + 2] = v.z;
       }
 
       // Set vertex colors
@@ -156,7 +171,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
     geo.computeVertexNormals();
 
     return { staticGeometry: geo };
-  }, [pieceMeshes]);
+  }, [pieceMeshes, pieces, avatarMeasurements]);
 
   const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
 
@@ -255,6 +270,8 @@ export default function GarmentSimulation({ pieces, seams }: GarmentSimulationPr
   }
 
   // No seams — fall back to individual ClothMesh per piece
+  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  const placements = placeGarmentPieces(pieces, measurements);
   return (
     <Suspense fallback={null}>
       {pieces.map((piece, i) => (
@@ -263,7 +280,7 @@ export default function GarmentSimulation({ pieces, seams }: GarmentSimulationPr
           piece={piece}
           isSelected={selectedPieceIds.includes(piece.id)}
           color={PIECE_COLORS[i % PIECE_COLORS.length]}
-          position={getPosition(i, pieces.length)}
+          position={placements[i].position}
         />
       ))}
     </Suspense>
