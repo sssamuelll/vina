@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, type ReactNode, useRef, useEffect, useState } from 'react';
+import { Component, Suspense, type ReactNode, useRef, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows, Environment } from '@react-three/drei';
 import * as THREE from 'three';
@@ -7,10 +7,8 @@ import { RootState } from '../../store';
 import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
+import GarmentSimulation from './GarmentSimulation';
 import './Viewport3D.css';
-
-/** Lazy-load ClothMesh to keep bundle impact minimal */
-const ClothMesh = lazy(() => import('./ClothMesh'));
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
 class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: string }> {
@@ -51,7 +49,7 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 export { Viewport3DErrorBoundary };
 
 export default function Viewport3D() {
-  const { pieces, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
+  const { pieces, seams, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const useClothSim = simulationState !== 'idle';
@@ -104,17 +102,7 @@ export default function Viewport3D() {
 
         {/* Pattern pieces: cloth sim when running, static otherwise */}
         {useClothSim ? (
-          <Suspense fallback={null}>
-            {pieces.map((piece, i) => (
-              <ClothMesh
-                key={piece.id}
-                piece={piece}
-                isSelected={selectedPieceIds.includes(piece.id)}
-                color={PIECE_COLORS[i % PIECE_COLORS.length]}
-                position={getPosition(i, pieces.length)}
-              />
-            ))}
-          </Suspense>
+          <GarmentSimulation pieces={pieces} seams={seams} />
         ) : (
           pieces.map((piece, i) => (
             <PieceMesh

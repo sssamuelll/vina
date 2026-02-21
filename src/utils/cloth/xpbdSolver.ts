@@ -11,6 +11,7 @@
  */
 
 import { type SDFData, sampleSDF, sdfGradient } from './sdfGenerator';
+import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
 
 // ─── Vector Math on Float32Array ────────────────────────────────────────────
 
@@ -279,6 +280,9 @@ export class XPBDClothSolver {
   /** SDF data for accurate avatar body collision */
   private sdfData: SDFData | null = null;
 
+  /** Seam constraints for multi-piece sewing */
+  private seamConstraints: SeamConstraintSet | null = null;
+
   /**
    * Create a new XPBD cloth solver.
    *
@@ -442,6 +446,15 @@ export class XPBDClothSolver {
   }
 
   /**
+   * Set seam constraints for multi-piece sewing.
+   *
+   * @param seamSet - Seam constraint set from buildSeamConstraints(), or null to clear
+   */
+  setSeamConstraints(seamSet: SeamConstraintSet | null): void {
+    this.seamConstraints = seamSet;
+  }
+
+  /**
    * Pre-solve: integrate gravity, save previous positions, enforce ground plane.
    */
   private preSolve(sdt: number): void {
@@ -478,6 +491,9 @@ export class XPBDClothSolver {
   private solve(sdt: number): void {
     this.solveStretching(this.config.stretchingCompliance, sdt);
     this.solveBending(this.config.bendingCompliance, sdt);
+    if (this.seamConstraints) {
+      solveSeamConstraints(this.pos, this.invMass, this.seamConstraints, sdt);
+    }
     this.solveCollisions();
   }
 

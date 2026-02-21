@@ -10,12 +10,27 @@
 import { XPBDClothSolver, type ClothSimConfig, type ClothMeshData, type SphereCollider, type CapsuleCollider } from './xpbdSolver';
 import { getComplianceForFabric } from './fabricLibrary';
 import { type SDFData } from './sdfGenerator';
+import { mergeMeshes, buildSeamConstraints, type MergedMesh } from './seamAssembly';
 
 // ─── Message Protocol ───────────────────────────────────────────────────────
+
+/** Data needed to build seam constraints in the worker */
+export interface SeamInitData {
+  id: string;
+  pieceAId: string;
+  pieceAEdgeStart: number;
+  pieceAEdgeEnd: number;
+  pieceBId: string;
+  pieceBEdgeStart: number;
+  pieceBEdgeEnd: number;
+  type: 'standard' | 'french' | 'flat-felled' | 'overlock';
+}
 
 /** Messages sent from main thread → worker */
 export type WorkerInMessage =
   | { type: 'init'; meshData: { vertices: number[]; triIds: number[] }; config?: Partial<ClothSimConfig> }
+  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: number[]; triIds: number[]; outline: Array<{ type: string; values: number[] }> }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
+  | { type: 'setSeams'; seams: SeamInitData[] }
   | { type: 'start' }
   | { type: 'stop' }
   | { type: 'reset' }
@@ -41,6 +56,8 @@ export type WorkerOutMessage =
 let solver: XPBDClothSolver | null = null;
 let running = false;
 let animFrameId: ReturnType<typeof setTimeout> | null = null;
+let cachedMergedMesh: MergedMesh | null = null;
+let cachedOutlines: Map<string, Array<{ type: string; values: number[] }>> | null = null;
 
 /**
  * Run one simulation step and post the result.
@@ -79,8 +96,73 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
           triIds: new Int32Array(msg.meshData.triIds),
         };
         solver = new XPBDClothSolver(meshData, msg.config);
+        cachedMergedMesh = null;
+        cachedOutlines = null;
         running = false;
         (self as unknown as Worker).postMessage({ type: 'ready' } satisfies WorkerOutMessage);
+        break;
+      }
+
+      case 'initMultiPiece': {
+        // Merge all pieces into one particle system
+        const pieceMeshes = msg.pieces.map(p => ({
+          pieceId: p.pieceId,
+          vertices: new Float32Array(p.vertices),
+          triIds: new Int32Array(p.triIds),
+        }));
+        const merged = mergeMeshes(pieceMeshes);
+        cachedMergedMesh = merged;
+
+        // Cache outlines for seam building
+        const outlines = new Map<string, Array<{ type: string; values: number[] }>>();
+        for (const p of msg.pieces) {
+          outlines.set(p.pieceId, p.outline);
+        }
+        cachedOutlines = outlines;
+
+        // Create solver with merged mesh
+        const mergedMeshData: ClothMeshData = {
+          vertices: merged.vertices,
+          triIds: merged.triIds,
+        };
+        solver = new XPBDClothSolver(mergedMeshData, msg.config);
+
+        // Build and set seam constraints
+        if (msg.seams.length > 0) {
+          const seams: import('../../types/types').Seam[] = msg.seams.map(s => ({
+            id: s.id,
+            pieceA: { pieceId: s.pieceAId, edgeStart: s.pieceAEdgeStart, edgeEnd: s.pieceAEdgeEnd },
+            pieceB: { pieceId: s.pieceBId, edgeStart: s.pieceBEdgeStart, edgeEnd: s.pieceBEdgeEnd },
+            type: s.type,
+          }));
+          const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
+          for (const [id, cmds] of outlines) {
+            outlineMap.set(id, cmds as import('../../types/types').PathCommand[]);
+          }
+          const seamSet = buildSeamConstraints(seams, outlineMap, merged);
+          solver.setSeamConstraints(seamSet);
+        }
+
+        running = false;
+        (self as unknown as Worker).postMessage({ type: 'ready' } satisfies WorkerOutMessage);
+        break;
+      }
+
+      case 'setSeams': {
+        if (solver && cachedMergedMesh && cachedOutlines) {
+          const seams: import('../../types/types').Seam[] = msg.seams.map(s => ({
+            id: s.id,
+            pieceA: { pieceId: s.pieceAId, edgeStart: s.pieceAEdgeStart, edgeEnd: s.pieceAEdgeEnd },
+            pieceB: { pieceId: s.pieceBId, edgeStart: s.pieceBEdgeStart, edgeEnd: s.pieceBEdgeEnd },
+            type: s.type,
+          }));
+          const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
+          for (const [id, cmds] of cachedOutlines) {
+            outlineMap.set(id, cmds as import('../../types/types').PathCommand[]);
+          }
+          const seamSet = buildSeamConstraints(seams, outlineMap, cachedMergedMesh);
+          solver.setSeamConstraints(seamSet);
+        }
         break;
       }
 

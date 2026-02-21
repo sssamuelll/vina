@@ -8,7 +8,7 @@
  */
 
 import type { ClothSimConfig, SphereCollider, CapsuleCollider } from './xpbdSolver';
-import type { WorkerInMessage, WorkerOutMessage } from './clothWorker';
+import type { WorkerInMessage, WorkerOutMessage, SeamInitData } from './clothWorker';
 import type { SDFData } from './sdfGenerator';
 
 /**
@@ -75,6 +75,49 @@ export class ClothWorkerClient {
       this.readyResolve = resolve;
       this.postMessage({ type: 'init', meshData, config });
     });
+  }
+
+  /**
+   * Initialize the worker with multiple pieces merged into one solver, plus seam constraints.
+   *
+   * @param pieces - Array of piece mesh data with outlines
+   * @param seams - Seam init data for building constraints
+   * @param config - Optional initial simulation config
+   * @returns Promise that resolves when worker is ready
+   */
+  async initMultiPiece(
+    pieces: Array<{ pieceId: string; vertices: number[]; triIds: number[]; outline: Array<{ type: string; values: number[] }> }>,
+    seams: SeamInitData[],
+    config?: Partial<ClothSimConfig>,
+  ): Promise<void> {
+    this.dispose();
+
+    this.worker = new Worker(
+      new URL('./clothWorker.ts', import.meta.url),
+      { type: 'module' },
+    );
+
+    this.worker.onmessage = (event: MessageEvent<WorkerOutMessage>) => {
+      this.handleMessage(event.data);
+    };
+
+    this.worker.onerror = (err) => {
+      this.onError?.(err.message);
+    };
+
+    return new Promise<void>((resolve) => {
+      this.readyResolve = resolve;
+      this.postMessage({ type: 'initMultiPiece', pieces, seams, config });
+    });
+  }
+
+  /**
+   * Update seam constraints on a running multi-piece solver.
+   *
+   * @param seams - New seam init data
+   */
+  setSeams(seams: SeamInitData[]): void {
+    this.postMessage({ type: 'setSeams', seams });
   }
 
   /**
