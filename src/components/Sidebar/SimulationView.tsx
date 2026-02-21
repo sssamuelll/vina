@@ -1,6 +1,6 @@
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { startSimulation, pauseSimulation, resetSimulation } from '../../store/simulationSlice';
+import { startSimulation, pauseSimulation, resetSimulation, setParticleDistance } from '../../store/simulationSlice';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 
 /**
@@ -56,6 +56,32 @@ export default function SimulationView() {
         >
           ↺ Reset
         </button>
+      </div>
+
+      {/* Particle Distance */}
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          Particle Distance
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px' }}>
+          <input
+            type="range"
+            min={2} max={20} step={1}
+            value={simulation.particleDistance}
+            onChange={e => dispatch(setParticleDistance(Number(e.target.value)))}
+            disabled={isRunning || isPaused}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: '12px', color: '#ccc', minWidth: '36px', textAlign: 'right' }}>
+            {simulation.particleDistance}mm
+          </span>
+        </div>
+        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
+          {simulation.particleDistance <= 3 ? '⚠ Alta calidad — simulación lenta' :
+           simulation.particleDistance <= 5 ? 'Calidad estándar' :
+           simulation.particleDistance <= 10 ? 'Rápido — menos detalle' :
+           'Muy rápido — sin pliegues'}
+        </div>
       </div>
 
       {/* Piece count */}

@@ -96,6 +96,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       simulationState: 'idle',
       pieceFabrics: { 'piece-1': 'cotton-poplin' },
       defaultFabricId: 'cotton-poplin',
+      particleDistance: 5,
+      pieceParticleDistance: {},
     },
     plugins: {
       installedPlugins: [],

@@ -29,13 +29,14 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 function buildMeshFromPiece(
   piece: PatternPiece,
   meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null,
+  particleDistance: number = 5,
 ): { vertices: number[]; triIds: number[] } | null {
   try {
     if (!meshPieceFn) return null;
     const meshData = meshPieceFn(piece, {
       yHeight: 1.2,
       scale: SCALE,
-      maxEdgeLength: 15,
+      maxEdgeLength: particleDistance,
       minAngle: 25,
       maxRefinementPasses: 3,
       curveResolution: 12,
@@ -82,6 +83,8 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
+  const globalParticleDistance = useSelector((s: RootState) => s.simulation.particleDistance);
+  const pieceParticleDistances = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
 
   // Lazy-load CDT mesher
   const [meshPieceFn, setMeshPieceFn] = useState<((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null>(null);
@@ -100,7 +103,8 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       outline: Array<{ type: string; values: number[] }>;
     }> = [];
     for (const piece of pieces) {
-      const mesh = buildMeshFromPiece(piece, meshPieceFn);
+      const pd = pieceParticleDistances[piece.id] ?? globalParticleDistance;
+      const mesh = buildMeshFromPiece(piece, meshPieceFn, pd);
       if (!mesh) continue;
       result.push({
         pieceId: piece.id,
@@ -110,7 +114,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       });
     }
     return result;
-  }, [pieces, meshPieceFn]);
+  }, [pieces, meshPieceFn, globalParticleDistance, pieceParticleDistances]);
 
   // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);

@@ -94,14 +94,14 @@ function sampleOutline(commands: PathCommand[], numSamplesPerEdge: number = 4): 
  * Build a high-quality triangulated mesh from pattern piece using CDT.
  * Uses Constrained Delaunay Triangulation for better physics stability.
  */
-function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null): { vertices: number[]; triIds: number[] } | null {
+function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null, particleDistance: number = 5): { vertices: number[]; triIds: number[] } | null {
   try {
     if (!meshPieceFn) return buildMeshFromOutlineFallback(piece.outline);
     
     const meshData = meshPieceFn(piece, {
       yHeight: 1.2,
       scale: SCALE,
-      maxEdgeLength: 15,
+      maxEdgeLength: particleDistance,
       minAngle: 25,
       maxRefinementPasses: 3,
       curveResolution: 12,
@@ -205,6 +205,9 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
   );
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
+  const particleDistance = useSelector((s: RootState) =>
+    s.simulation.pieceParticleDistance[piece.id] ?? s.simulation.particleDistance
+  );
 
   // Lazy-load CDT mesher (cdt2d is CJS, needs dynamic import in browser)
   const [meshPieceFn, setMeshPieceFn] = useState<((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null>(null);
@@ -215,7 +218,7 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
   }, []);
 
   // Build mesh data from piece using CDT (or fallback)
-  const meshData = useMemo(() => buildMeshFromPiece(piece, meshPieceFn), [piece, meshPieceFn]);
+  const meshData = useMemo(() => buildMeshFromPiece(piece, meshPieceFn, particleDistance), [piece, meshPieceFn, particleDistance]);
 
   // Frame callback: stores latest positions for useFrame
   const onFrame = useCallback((positions: Float32Array, _numParticles: number, triIds: Int32Array) => {

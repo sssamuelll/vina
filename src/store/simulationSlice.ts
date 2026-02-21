@@ -18,12 +18,18 @@ interface SimulationSliceState {
   pieceFabrics: Record<string, string>;
   /** Default fabric ID for new pieces */
   defaultFabricId: string;
+  /** Default particle distance in mm (CLO3D-style mesh density control) */
+  particleDistance: number;
+  /** Per-piece particle distance overrides in mm, keyed by piece ID */
+  pieceParticleDistance: Record<string, number>;
 }
 
 const initialState: SimulationSliceState = {
   simulationState: 'idle',
   pieceFabrics: {},
   defaultFabricId: 'cotton-poplin',
+  particleDistance: 5,
+  pieceParticleDistance: {},
 };
 
 const simulationSlice = createSlice({
@@ -50,6 +56,14 @@ const simulationSlice = createSlice({
     setDefaultFabric(state, action: PayloadAction<string>) {
       state.defaultFabricId = action.payload;
     },
+    /** Set the global particle distance (mm). Clamped to 2–20mm. */
+    setParticleDistance(state, action: PayloadAction<number>) {
+      state.particleDistance = Math.max(2, Math.min(20, action.payload));
+    },
+    /** Set per-piece particle distance override (mm). */
+    setPieceParticleDistance(state, action: PayloadAction<{ pieceId: string; distance: number }>) {
+      state.pieceParticleDistance[action.payload.pieceId] = Math.max(2, Math.min(20, action.payload.distance));
+    },
   },
 });
 
@@ -59,6 +73,8 @@ export const {
   resetSimulation,
   setFabric,
   setDefaultFabric,
+  setParticleDistance,
+  setPieceParticleDistance,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;
