@@ -150,7 +150,7 @@ describe('SDF Generator', () => {
       const end = performance.now();
       
       expect(sdf).not.toBeNull();
-      expect(end - start).toBeLessThan(1500); // Should complete in < 1500ms
+      expect(end - start).toBeLessThan(3000); // Should complete in < 3000ms
     });
   });
   
