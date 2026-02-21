@@ -16,6 +16,7 @@ import type { Command } from '../CommandPalette/CommandPalette';
 import StatusBar from '../StatusBar/StatusBar';
 import BottomPanel from '../BottomPanel/BottomPanel';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { createCopilotKeyHandler } from '../../copilot/keyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { downloadDXF } from '../../utils/exportDXF';
@@ -147,6 +148,37 @@ export default function Workspace() {
     const interval = setInterval(() => saveToLocalStorage(project), 30000);
     return () => { clearTimeout(debounce); clearInterval(interval); };
   }, [project]);
+
+  // ─── Copilot Keyboard Shortcuts ───
+  useEffect(() => {
+    const copilotHandler = createCopilotKeyHandler({
+      onFocusInput: () => {
+        // Open bottom panel and set to copilot tab if not already open
+        if (!bottomPanelOpen) {
+          setBottomPanelOpen(true);
+        }
+        // Focus the copilot input after a short delay to ensure DOM is ready
+        setTimeout(() => {
+          const copilotInput = document.querySelector('.copilot-input') as HTMLInputElement;
+          if (copilotInput) {
+            copilotInput.focus();
+          }
+        }, 100);
+      },
+      onTogglePanel: () => {
+        setBottomPanelOpen(prev => !prev);
+      },
+      onBlurInput: () => {
+        const copilotInput = document.querySelector('.copilot-input') as HTMLInputElement;
+        if (copilotInput) {
+          copilotInput.blur();
+        }
+      },
+    });
+
+    document.addEventListener('keydown', copilotHandler);
+    return () => document.removeEventListener('keydown', copilotHandler);
+  }, [bottomPanelOpen]);
 
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
   const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
