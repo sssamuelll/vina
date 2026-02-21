@@ -15,6 +15,7 @@ import { RootState } from '../../store';
 import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
+import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
@@ -81,6 +82,8 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
+  const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
 
   // Build mesh data for all pieces
   const pieceMeshes = useMemo(() => {
@@ -168,8 +171,19 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       clientRef.current = client;
       client.onFrame = onFrame;
 
-      client.initMultiPiece(pieceMeshes, seamInitData).then(() => {
+      client.initMultiPiece(pieceMeshes, seamInitData).then(async () => {
         client.setFabric(fabricId);
+
+        // Generate and set avatar body SDF for collision
+        if (avatarModelUrl) {
+          try {
+            const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
+            client.setSDF(sdf);
+          } catch (e) {
+            console.warn('[GarmentSimulation] Avatar SDF generation failed:', e);
+          }
+        }
+
         client.start();
       }).catch(() => {});
 
@@ -188,7 +202,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       clientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, pieceMeshes, seamInitData, fabricId, onFrame]);
+  }, [simulationState, pieceMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
 
   // Per-frame geometry update
   useFrame(() => {
