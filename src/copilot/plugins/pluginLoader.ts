@@ -187,7 +187,7 @@ export function validatePlugin(plugin: OpenCloPlugin): ValidationResult {
     } else {
       for (let i = 0; i < plugin.skills.length; i++) {
         const ps = plugin.skills[i];
-        if (!ps.skill || !ps.skill.name || !ps.skill.triggers || !ps.skill.description) {
+        if (!ps.skill || !ps.skill.name || !Array.isArray(ps.skill.triggers) || ps.skill.triggers.length === 0 || !ps.skill.description) {
           errors.push(`Skill[${i}] must have a valid PatternSkill with name, triggers, and description`);
         }
       }
@@ -371,10 +371,13 @@ export function unloadPlugin(pluginId: string): void {
   const plugin = loadedPlugins.get(pluginId);
   if (!plugin) return;
 
-  if (plugin.onUnload) {
-    plugin.onUnload();
+  try {
+    if (plugin.onUnload) {
+      plugin.onUnload();
+    }
+  } finally {
+    loadedPlugins.delete(pluginId);
   }
-  loadedPlugins.delete(pluginId);
 }
 
 /**
@@ -411,8 +414,12 @@ export function isPluginLoaded(pluginId: string): boolean {
  */
 export function resetLoadedPlugins(): void {
   for (const plugin of loadedPlugins.values()) {
-    if (plugin.onUnload) {
-      plugin.onUnload();
+    try {
+      if (plugin.onUnload) {
+        plugin.onUnload();
+      }
+    } catch {
+      // Swallow errors during reset to ensure all plugins are cleaned up
     }
   }
   loadedPlugins.clear();
