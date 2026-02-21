@@ -8,7 +8,9 @@ export type SidebarView =
   | 'files'
   | 'plugins'
   | 'settings'
-  | 'pose';
+  | 'pose'
+  | 'simulation'
+  | 'avatar';
 
 interface ActivityBarProps {
   activeView: SidebarView | null;
@@ -83,6 +85,27 @@ const items: ActivityItem[] = [
         <path d="M10 6V12" />
         <path d="M6 8L10 7L14 8" />
         <path d="M7 17L10 12L13 17" />
+      </svg>
+    ),
+  },
+  {
+    id: 'simulation',
+    label: 'Simulation',
+    position: 'top',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="6,3 18,10 6,17" />
+      </svg>
+    ),
+  },
+  {
+    id: 'avatar',
+    label: 'Avatar',
+    position: 'top',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="10" cy="6" r="3" />
+        <path d="M4 18C4 14.69 6.69 12 10 12C13.31 12 16 14.69 16 18" />
       </svg>
     ),
   },

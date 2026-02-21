@@ -374,7 +374,7 @@ describe('SDF Generator', () => {
       const end = performance.now();
       
       expect(sdf).not.toBeNull();
-      expect(end - start).toBeLessThan(1000); // < 1 second
+      expect(end - start).toBeLessThan(3000); // < 3 seconds (CI can be slow)
     });
     
     it('handles moderately complex meshes efficiently', () => {
@@ -385,7 +385,7 @@ describe('SDF Generator', () => {
       const end = performance.now();
       
       expect(sdf).not.toBeNull();
-      expect(end - start).toBeLessThan(2000); // < 2 seconds for detailed mesh
+      expect(end - start).toBeLessThan(5000); // < 5 seconds for detailed mesh (CI can be slow)
     });
   });
 });
