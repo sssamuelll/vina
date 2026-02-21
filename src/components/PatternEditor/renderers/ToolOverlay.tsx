@@ -329,22 +329,27 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {/* ─── Rectangle tool: dimension label ─── */}
-      {activeTool === 'rectangle' && rectDimensions && (
-        <g transform={`translate(${rectDimensions.center.x}, ${rectDimensions.center.y})`}>
-          <rect
-            x={-30 / zoom2D} y={-8 / zoom2D}
-            width={60 / zoom2D} height={16 / zoom2D}
-            rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
-          />
-          <text
-            textAnchor="middle" dominantBaseline="central"
-            fill="#fff" fontSize={10 / zoom2D}
-            fontFamily="Inter, sans-serif" pointerEvents="none"
-          >
-            {formatDimension(rectDimensions.width, units as UnitSystem)} × {formatDimension(rectDimensions.height, units as UnitSystem)}
-          </text>
-        </g>
-      )}
+      {activeTool === 'rectangle' && rectDimensions && (() => {
+        const dimText = `${formatDimension(rectDimensions.width, units as UnitSystem)} × ${formatDimension(rectDimensions.height, units as UnitSystem)}`;
+        const charWidth = 5.5;
+        const pillWidth = Math.max(60, dimText.length * charWidth + 16);
+        return (
+          <g transform={`translate(${rectDimensions.center.x}, ${rectDimensions.center.y})`}>
+            <rect
+              x={-pillWidth / 2 / zoom2D} y={-8 / zoom2D}
+              width={pillWidth / zoom2D} height={16 / zoom2D}
+              rx={8 / zoom2D} fill="rgba(0,0,0,0.75)"
+            />
+            <text
+              textAnchor="middle" dominantBaseline="central"
+              fill="#fff" fontSize={10 / zoom2D}
+              fontFamily="Inter, sans-serif" pointerEvents="none"
+            >
+              {dimText}
+            </text>
+          </g>
+        );
+      })()}
 
       {/* ─── Measure tool: measurement lines ─── */}
       {activeTool === 'measure' && (
