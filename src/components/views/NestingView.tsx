@@ -203,7 +203,6 @@ export default function NestingView() {
   return (
     <div className="sidebar-view">
       <div className="sidebar-view-header">
-        <h2>Nesting</h2>
         <div className="sidebar-view-header-actions">
           <button
             onClick={handleRunNesting}

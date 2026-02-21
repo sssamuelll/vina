@@ -117,7 +117,6 @@ export default function PatternExplorerView() {
   return (
     <div className="sidebar-view">
       <div className="sidebar-view-header">
-        <h2>Pattern Explorer</h2>
         <div className="sidebar-view-header-actions">
           <button onClick={handleAddPiece} title="Add Piece">+</button>
           <button onClick={handleImportDXF} title="Import DXF">↓</button>

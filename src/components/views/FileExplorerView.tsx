@@ -144,10 +144,6 @@ export default function FileExplorerView() {
 
   return (
     <div className="sidebar-view">
-      <div className="sidebar-view-header">
-        <h2>Files</h2>
-      </div>
-
       {/* Hidden file inputs */}
       <input
         ref={dxfInputRef}

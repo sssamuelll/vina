@@ -129,9 +129,6 @@ export default function MeasurementsView() {
 
   return (
     <div className="sidebar-view">
-      <div className="sidebar-view-header">
-        <h2>Measurements</h2>
-      </div>
       <div className="sidebar-view-content">
         {/* Avatar info */}
         <div className="sidebar-section">

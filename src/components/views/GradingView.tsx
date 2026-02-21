@@ -143,7 +143,6 @@ export default function GradingView() {
   return (
     <div className="sidebar-view">
       <div className="sidebar-view-header">
-        <h2>Grading</h2>
         <div className="sidebar-view-header-actions">
           <button
             onClick={handleApplyGrading}

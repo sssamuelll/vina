@@ -72,9 +72,6 @@ export default function SettingsView() {
 
   return (
     <div className="sidebar-view">
-      <div className="sidebar-view-header">
-        <h2>Settings</h2>
-      </div>
       <div className="sidebar-view-content">
         {/* Units */}
         <Section title="Units">
