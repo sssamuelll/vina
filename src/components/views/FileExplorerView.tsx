@@ -7,6 +7,9 @@ import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
 import { importZprj } from '../../utils/formats/zprjImport';
 import { downloadZprj } from '../../utils/formats/zprjExport';
+import { importSVG } from '../../utils/formats/svgImport';
+import { importGerber } from '../../utils/formats/gerberImport';
+import { downloadGerber } from '../../utils/formats/gerberExport';
 import { computeCuttingLayout, DEFAULT_CONFIG } from '../../utils/export/cuttingLayout';
 import type { PaperSize, CuttingLayoutConfig } from '../../utils/export/cuttingLayout';
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
@@ -51,6 +54,8 @@ export default function FileExplorerView() {
 
   const dxfInputRef = useRef<HTMLInputElement>(null);
   const zprjInputRef = useRef<HTMLInputElement>(null);
+  const svgInputRef = useRef<HTMLInputElement>(null);
+  const gerberInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
 
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
@@ -80,6 +85,29 @@ export default function FileExplorerView() {
         dispatch(addPiece(piece));
       }
       if (dxfInputRef.current) dxfInputRef.current.value = '';
+    },
+    [dispatch],
+  );
+
+  // ─── Import SVG ───
+
+  const handleImportSVG = useCallback(() => {
+    svgInputRef.current?.click();
+  }, []);
+
+  const handleSVGFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const text = await file.text();
+      const result = importSVG(text);
+      for (const piece of result.pieces) {
+        dispatch(addPiece(piece));
+      }
+      if (result.warnings.length > 0) {
+        console.warn('SVG import warnings:', result.warnings);
+      }
+      if (svgInputRef.current) svgInputRef.current.value = '';
     },
     [dispatch],
   );
@@ -122,6 +150,41 @@ export default function FileExplorerView() {
       date: new Date().toLocaleString(),
     });
   }, [pieces, seams, fabrics, avatar, projectName]);
+
+  // ─── Import Gerber ───
+
+  const handleImportGerber = useCallback(() => {
+    gerberInputRef.current?.click();
+  }, []);
+
+  const handleGerberFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      try {
+        const result = await importGerber(file);
+        for (const piece of result.pieces) dispatch(addPiece(piece));
+        if (result.warnings.length > 0) {
+          console.warn('Gerber import warnings:', result.warnings);
+        }
+      } catch (err) {
+        console.error('Failed to import Gerber:', err);
+        alert('Failed to import Gerber AccuMark file. Check console for details.');
+      }
+      if (gerberInputRef.current) gerberInputRef.current.value = '';
+    },
+    [dispatch],
+  );
+
+  // ─── Export Gerber ───
+
+  const handleExportGerber = useCallback(() => {
+    downloadGerber(pieces, seams, projectName || 'accumark-export');
+    setLastExport({
+      filename: `${projectName || 'accumark-export'}.zip`,
+      date: new Date().toLocaleString(),
+    });
+  }, [pieces, seams, projectName]);
 
   // ─── Export ───
 
@@ -255,6 +318,20 @@ export default function FileExplorerView() {
         onChange={handleZprjFileChange}
       />
       <input
+        ref={svgInputRef}
+        type="file"
+        accept=".svg"
+        style={{ display: 'none' }}
+        onChange={handleSVGFileChange}
+      />
+      <input
+        ref={gerberInputRef}
+        type="file"
+        accept=".zip"
+        style={{ display: 'none' }}
+        onChange={handleGerberFileChange}
+      />
+      <input
         ref={projectInputRef}
         type="file"
         accept=".json,.openclo.json"
@@ -269,11 +346,14 @@ export default function FileExplorerView() {
             <button className="sidebar-btn sidebar-btn-full" onClick={handleImportDXF}>
               📄 Import DXF
             </button>
-            <button className="sidebar-btn sidebar-btn-full" disabled title="Coming soon">
+            <button className="sidebar-btn sidebar-btn-full" onClick={handleImportSVG}>
               📄 Import SVG
             </button>
             <button className="sidebar-btn sidebar-btn-full" onClick={handleImportZprj}>
               📁 Import .zprj
+            </button>
+            <button className="sidebar-btn sidebar-btn-full" onClick={handleImportGerber}>
+              📦 Import Gerber AccuMark
             </button>
           </div>
         </Section>
@@ -308,6 +388,13 @@ export default function FileExplorerView() {
               disabled={pieces.length === 0}
             >
               📁 Export .zprj (CLO3D)
+            </button>
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={handleExportGerber}
+              disabled={pieces.length === 0}
+            >
+              📦 Export Gerber AccuMark
             </button>
           </div>
         </Section>
