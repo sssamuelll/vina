@@ -7,7 +7,8 @@ export type SidebarView =
   | 'nesting'
   | 'files'
   | 'plugins'
-  | 'settings';
+  | 'settings'
+  | 'pose';
 
 interface ActivityBarProps {
   activeView: SidebarView | null;
@@ -69,6 +70,19 @@ const items: ActivityItem[] = [
         <rect x="11" y="3" width="6" height="5" />
         <rect x="11" y="10" width="6" height="7" />
         <rect x="3" y="13" width="6" height="4" />
+      </svg>
+    ),
+  },
+  {
+    id: 'pose',
+    label: 'Pose Editor',
+    position: 'top',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="10" cy="4" r="2" />
+        <path d="M10 6V12" />
+        <path d="M6 8L10 7L14 8" />
+        <path d="M7 17L10 12L13 17" />
       </svg>
     ),
   },

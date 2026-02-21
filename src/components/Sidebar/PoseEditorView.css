@@ -1,0 +1,156 @@
+.pose-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  font-size: 12px;
+}
+
+.pose-section-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--text-primary, #ccc);
+}
+
+.pose-preset-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.pose-preset-btn {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 3px;
+  background: var(--bg-secondary, #2a2a2a);
+  color: var(--text-primary, #ccc);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.pose-preset-btn.active {
+  background: var(--accent, #007acc);
+  color: #fff;
+  border-color: var(--accent, #007acc);
+}
+
+.pose-preset-btn:hover {
+  background: var(--bg-hover, #333);
+}
+
+.pose-reset-all {
+  padding: 4px 8px;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.pose-group-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  color: var(--text-primary, #ccc);
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pose-chevron {
+  display: inline-block;
+  transition: transform 0.15s;
+  font-size: 10px;
+}
+
+.pose-chevron.open {
+  transform: rotate(90deg);
+}
+
+.pose-group-body {
+  padding-left: 8px;
+}
+
+.pose-joint {
+  margin-bottom: 8px;
+}
+
+.pose-joint-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.pose-joint-name {
+  font-weight: 500;
+  color: var(--text-primary, #ccc);
+}
+
+.pose-joint-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.pose-btn-small {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border-color, #444);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text-secondary, #999);
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.pose-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+}
+
+.pose-axis-label {
+  width: 12px;
+  font-weight: 600;
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+}
+
+.pose-slider {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border-color, #444);
+  border-radius: 2px;
+  outline: none;
+}
+
+.pose-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent, #007acc);
+  cursor: pointer;
+}
+
+.pose-value {
+  width: 36px;
+  text-align: right;
+  color: var(--text-secondary, #999);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}

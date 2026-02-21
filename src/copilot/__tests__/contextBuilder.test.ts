@@ -123,6 +123,15 @@ function mockState(overrides?: Partial<RootState>): RootState {
       gridSpacing: 10,
       fabricUtilization: 0,
     },
+    avatar: {
+      pose: {
+        joints: { LeftArm: { x: 50, y: 0, z: 0 }, RightArm: { x: 50, y: 0, z: 0 }, LeftShoulder: { x: 8, y: 0, z: 0 }, RightShoulder: { x: 8, y: 0, z: 0 } },
+        activePreset: 'A-pose',
+      },
+      poseEditorOpen: false,
+      avatarProfiles: [],
+      activeProfileId: null,
+    },
   };
 
   if (overrides) {

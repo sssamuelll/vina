@@ -5,6 +5,7 @@ import simulationReducer from './simulationSlice';
 import pluginReducer from './pluginSlice';
 import layoutReducer from './layoutSlice';
 import markerReducer from './markerSlice';
+import avatarReducer from './avatarSlice';
 import { undoMiddleware } from './undoMiddleware';
 
 export const store = configureStore({
@@ -15,6 +16,7 @@ export const store = configureStore({
     plugins: pluginReducer,
     layout: layoutReducer,
     marker: markerReducer,
+    avatar: avatarReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
