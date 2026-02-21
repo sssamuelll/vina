@@ -12,6 +12,7 @@
 
 import { type SDFData, sampleSDF, sdfGradient } from './sdfGenerator';
 import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
+import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfCollision';
 
 // ─── Vector Math on Float32Array ────────────────────────────────────────────
 
@@ -117,6 +118,10 @@ export interface ClothSimConfig {
   groundY: number;
   /** Friction coefficient for ground contact (default 0.5) */
   groundFriction: number;
+  /** Enable self-collision detection (default true) */
+  selfCollision: boolean;
+  /** Cloth thickness for self-collision in meters (default 0.002 = 2mm) */
+  clothThickness: number;
 }
 
 /**
@@ -283,6 +288,11 @@ export class XPBDClothSolver {
   /** Seam constraints for multi-piece sewing */
   private seamConstraints: SeamConstraintSet | null = null;
 
+  /** Spatial hash grid for self-collision */
+  private spatialHash: SpatialHashGrid;
+  /** Triangle adjacency for self-collision neighbor skipping */
+  private adjacency: Set<number>[];
+
   /**
    * Create a new XPBD cloth solver.
    *
@@ -299,6 +309,8 @@ export class XPBDClothSolver {
       bendingCompliance: 1.0,
       groundY: 0.0,
       groundFriction: 0.5,
+      selfCollision: true,
+      clothThickness: 0.002,
       ...config,
     };
 
@@ -350,6 +362,10 @@ export class XPBDClothSolver {
     this.grads = new Float32Array(4 * 3);
 
     this.initPhysics();
+
+    // Self-collision setup
+    this.spatialHash = new SpatialHashGrid(this.config.clothThickness * 2);
+    this.adjacency = buildAdjacency(this.triIds, this.numParticles);
   }
 
   /**
@@ -495,6 +511,13 @@ export class XPBDClothSolver {
       solveSeamConstraints(this.pos, this.invMass, this.seamConstraints, sdt);
     }
     this.solveCollisions();
+
+    if (this.config.selfCollision) {
+      solveSelfCollision(
+        this.pos, this.prevPos, this.invMass, this.numParticles,
+        this.triIds, this.config.clothThickness, this.spatialHash, this.adjacency,
+      );
+    }
   }
 
   /**
