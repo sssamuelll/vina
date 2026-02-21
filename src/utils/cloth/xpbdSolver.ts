@@ -13,6 +13,7 @@
 import { type SDFData, sampleSDF, sdfGradient } from './sdfGenerator';
 import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
 import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfCollision';
+import { type LRAConstraint, buildLRAConstraints, solveLRA } from './longRangeAttachments';
 
 // ─── Vector Math on Float32Array ────────────────────────────────────────────
 
@@ -122,6 +123,16 @@ export interface ClothSimConfig {
   selfCollision: boolean;
   /** Cloth thickness for self-collision in meters (default 0.002 = 2mm) */
   clothThickness: number;
+  /** Enable adaptive substepping (default true) */
+  adaptiveSubsteps: boolean;
+  /** Minimum substeps for adaptive mode (default 10) */
+  minSubsteps: number;
+  /** Maximum substeps for adaptive mode (default 30) */
+  maxSubsteps: number;
+  /** Max velocity threshold in m/s for adaptive substeps and velocity clamping (default 5.0) */
+  maxVelocity: number;
+  /** Enable Long Range Attachments (default true) */
+  enableLRA: boolean;
 }
 
 /**
@@ -293,6 +304,9 @@ export class XPBDClothSolver {
   /** Triangle adjacency for self-collision neighbor skipping */
   private adjacency: Set<number>[];
 
+  /** Long Range Attachment constraints */
+  private lraConstraints: LRAConstraint[] | null = null;
+
   /**
    * Create a new XPBD cloth solver.
    *
@@ -311,6 +325,11 @@ export class XPBDClothSolver {
       groundFriction: 0.5,
       selfCollision: true,
       clothThickness: 0.002,
+      adaptiveSubsteps: true,
+      minSubsteps: 10,
+      maxSubsteps: 30,
+      maxVelocity: 5.0,
+      enableLRA: true,
       ...config,
     };
 
@@ -418,6 +437,7 @@ export class XPBDClothSolver {
   pinParticle(particleIndex: number): void {
     if (particleIndex >= 0 && particleIndex < this.numParticles) {
       this.invMass[particleIndex] = 0.0;
+      if (this.config.enableLRA) this.rebuildLRA();
     }
   }
 
@@ -431,7 +451,27 @@ export class XPBDClothSolver {
   unpinParticle(particleIndex: number, mass: number = 1.0): void {
     if (particleIndex >= 0 && particleIndex < this.numParticles) {
       this.invMass[particleIndex] = mass;
+      if (this.config.enableLRA) this.rebuildLRA();
     }
+  }
+
+  /**
+   * Build/rebuild Long Range Attachment constraints from current pinned particles.
+   */
+  buildLRA(): void {
+    this.rebuildLRA();
+  }
+
+  private rebuildLRA(): void {
+    const pinned = new Set<number>();
+    for (let i = 0; i < this.numParticles; i++) {
+      if (this.invMass[i] === 0.0) pinned.add(i);
+    }
+    if (pinned.size === 0) {
+      this.lraConstraints = null;
+      return;
+    }
+    this.lraConstraints = buildLRAConstraints(this.restPos, this.numParticles, this.triIds, pinned);
   }
 
   /**
@@ -517,6 +557,11 @@ export class XPBDClothSolver {
         this.pos, this.prevPos, this.invMass, this.numParticles,
         this.triIds, this.config.clothThickness, this.spatialHash, this.adjacency,
       );
+    }
+
+    // LRA as hard limit after all soft constraints
+    if (this.config.enableLRA && this.lraConstraints) {
+      solveLRA(this.pos, this.invMass, this.lraConstraints);
     }
   }
 
@@ -688,9 +733,16 @@ export class XPBDClothSolver {
    * Post-solve: derive velocities from position change.
    */
   private postSolve(sdt: number): void {
+    const maxSpeed = this.config.maxVelocity ?? 5.0;
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
       vecSetDiff(this.vel, i, this.pos, i, this.prevPos, i, 1.0 / sdt);
+
+      // Clamp velocity to prevent explosions
+      const speed = Math.sqrt(vecLengthSquared(this.vel, i));
+      if (speed > maxSpeed) {
+        vecScale(this.vel, i, maxSpeed / speed);
+      }
     }
   }
 
@@ -699,9 +751,26 @@ export class XPBDClothSolver {
    * Runs `config.numSubsteps` sub-iterations.
    */
   step(): void {
-    const sdt = this.config.dt / this.config.numSubsteps;
+    let numSubsteps = this.config.numSubsteps;
 
-    for (let step = 0; step < this.config.numSubsteps; step++) {
+    if (this.config.adaptiveSubsteps) {
+      // Compute max particle velocity from current state
+      let maxVel = 0;
+      for (let i = 0; i < this.numParticles; i++) {
+        if (this.invMass[i] === 0.0) continue;
+        const v2 = vecLengthSquared(this.vel, i);
+        if (v2 > maxVel) maxVel = v2;
+      }
+      maxVel = Math.sqrt(maxVel);
+
+      const maxVelocity = this.config.maxVelocity;
+      const scaled = Math.round(this.config.numSubsteps * maxVel / maxVelocity);
+      numSubsteps = Math.max(this.config.minSubsteps, Math.min(this.config.maxSubsteps, scaled));
+    }
+
+    const sdt = this.config.dt / numSubsteps;
+
+    for (let step = 0; step < numSubsteps; step++) {
       this.preSolve(sdt);
       this.solve(sdt);
       this.postSolve(sdt);
