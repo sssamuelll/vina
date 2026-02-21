@@ -109,6 +109,20 @@ function mockState(overrides?: Partial<RootState>): RootState {
       primaryView: '2d',
       splitRatio: 0.5,
     },
+    marker: {
+      isOpen: false,
+      paperSize: 'A0' as const,
+      paperWidth: 841,
+      paperHeight: 1189,
+      scale: 1,
+      margin: 10,
+      layout: null,
+      selectedPieceIndex: null,
+      includeSeamAllowance: true,
+      showGrid: true,
+      gridSpacing: 10,
+      fabricUtilization: 0,
+    },
   };
 
   if (overrides) {

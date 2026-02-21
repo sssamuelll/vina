@@ -23,6 +23,7 @@ import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO'
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
+import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import './Workspace.css';
 
 function useIsMobile(breakpoint = 768) {
@@ -353,6 +354,7 @@ export default function Workspace() {
         onClose={() => setCommandPaletteOpen(false)}
       />
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
+      <MarkerEditor />
     </div>
   );
 }

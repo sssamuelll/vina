@@ -8,6 +8,8 @@ import { downloadOBJ } from '../../utils/export/exportOBJ';
 import { computeCuttingLayout, DEFAULT_CONFIG } from '../../utils/export/cuttingLayout';
 import type { PaperSize, CuttingLayoutConfig } from '../../utils/export/cuttingLayout';
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
+import { PAPER_SIZES } from '../../utils/export/cuttingLayout';
+import { openMarker } from '../../store/markerSlice';
 import type { OpenCloProject } from '../../types/types';
 import './views.css';
 
@@ -114,6 +116,30 @@ export default function FileExplorerView() {
     await exportCuttingPDF(layout, config, filename);
     setLastExport({ filename, date: new Date().toLocaleString() });
   }, [pieces, seams, projectName, clPaperSize, clScale, clIncludeSA, clIncludeGrainline, clTileToA4]);
+
+  const handleEditLayout = useCallback(() => {
+    const config: CuttingLayoutConfig = {
+      ...DEFAULT_CONFIG,
+      paperSize: clPaperSize,
+      scale: clScale,
+      includeSeamAllowance: clIncludeSA,
+      includeGrainline: clIncludeGrainline,
+      tileToA4: false,
+    };
+    const layout = computeCuttingLayout(pieces, seams, config);
+    const paperDims = clPaperSize === 'CUSTOM'
+      ? { width: 841, height: 1189 }
+      : PAPER_SIZES[clPaperSize]!;
+    dispatch(openMarker({
+      layout,
+      paperSize: clPaperSize,
+      paperWidth: paperDims.width,
+      paperHeight: paperDims.height,
+      scale: clScale,
+      margin: config.margin,
+      includeSeamAllowance: clIncludeSA,
+    }));
+  }, [dispatch, pieces, seams, clPaperSize, clScale, clIncludeSA, clIncludeGrainline]);
 
   // ─── Project Save / Load ───
 
@@ -285,6 +311,13 @@ export default function FileExplorerView() {
               disabled={pieces.length === 0}
             >
               ✂️ Export Cutting Layout
+            </button>
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={handleEditLayout}
+              disabled={pieces.length === 0}
+            >
+              ✏️ Edit Layout
             </button>
           </div>
         </Section>
