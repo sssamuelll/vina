@@ -8,6 +8,7 @@ interface PieceRendererProps {
   selectedPieceIds: string[];
   zoom2D: number;
   showSeamAllowance: boolean;
+  defaultSeamAllowanceWidth: number;
   showGrainlines: boolean;
   selectedInternalLine?: { pieceId: string; lineId: string } | null;
   editingPieceNameId?: string | null;
@@ -20,7 +21,8 @@ export default function PieceRenderer({
   pieces, 
   selectedPieceIds, 
   zoom2D, 
-  showSeamAllowance, 
+  showSeamAllowance,
+  defaultSeamAllowanceWidth, 
   showGrainlines,
   selectedInternalLine,
   editingPieceNameId,
@@ -47,9 +49,9 @@ export default function PieceRenderer({
               strokeLinejoin="round"
             />
 
-            {showSeamAllowance && piece.seamAllowance > 0 && (
+            {showSeamAllowance && (piece.seamAllowance > 0 || defaultSeamAllowanceWidth > 0) && (
               <path
-                d={pathToSVG(generateSeamAllowance(piece.outline, piece.seamAllowance))}
+                d={pathToSVG(generateSeamAllowance(piece.outline, piece.seamAllowance || defaultSeamAllowanceWidth))}
                 fill="none"
                 stroke="rgba(74, 158, 255, 0.4)"
                 strokeWidth={0.8 / zoom2D}

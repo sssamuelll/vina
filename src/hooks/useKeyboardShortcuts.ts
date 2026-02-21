@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { setActiveTool, clearSelection, undo, redo } from '../store/editorSlice';
+import { setActiveTool, clearSelection, toggleSeamAllowance, undo, redo } from '../store/editorSlice';
 import { removePiece } from '../store/projectSlice';
 import { Tool2D } from '../types/types';
 
@@ -45,7 +45,13 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      // Shift+S toggles seam allowance visibility
+      if (e.shiftKey && e.key === 'S') {
+        dispatch(toggleSeamAllowance());
+        return;
+      }
+
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
 
       const tool = SHORTCUTS[e.key.toLowerCase()];
       if (tool) {

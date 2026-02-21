@@ -206,6 +206,7 @@ export interface EditorState {
   zoom2D: number;
   pan2D: Point2D;
   showSeamAllowance: boolean;
+  defaultSeamAllowanceWidth: number;  // mm fallback when piece has no SA set
   showGrainlines: boolean;
   snapToGrid: boolean;
   gridSize: number;       // mm

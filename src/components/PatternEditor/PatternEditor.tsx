@@ -117,6 +117,7 @@ export default function PatternEditor() {
             selectedPieceIds={selectedPieceIds}
             zoom2D={zoom2D}
             showSeamAllowance={showSeamAllowance}
+            defaultSeamAllowanceWidth={editor.defaultSeamAllowanceWidth}
             showGrainlines={showGrainlines}
             selectedInternalLine={editor.selectedInternalLine}
             editingPieceNameId={editingPieceNameId}

@@ -10,6 +10,7 @@ const initialState: EditorState = {
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
   showSeamAllowance: true,
+  defaultSeamAllowanceWidth: 10,
   showGrainlines: true,
   snapToGrid: true,
   gridSize: 10,
@@ -62,6 +63,9 @@ const editorSlice = createSlice({
     toggleSeamAllowance(state) {
       state.showSeamAllowance = !state.showSeamAllowance;
     },
+    setDefaultSAWidth(state, action: PayloadAction<number>) {
+      state.defaultSeamAllowanceWidth = Math.max(0, Math.min(50, action.payload));
+    },
     toggleGrainlines(state) {
       state.showGrainlines = !state.showGrainlines;
     },
@@ -84,7 +88,7 @@ export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectSeam, selectInternalLine,
   setZoom2D, setPan2D,
-  toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, setGridSize,
+  toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize,
   setUnits,
   undo, redo,
 } = editorSlice.actions;

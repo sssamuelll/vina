@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece, removePiece, updateMeasurements, setAvatarMode, setAvatarModelUrl, removeSeam, setProjectName, loadProject } from '../../store/projectSlice';
 import type { NotchShape, NotchOptions, BodyMeasurements } from '../../types/types';
-import { toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
+import { toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
 import { startSimulation, pauseSimulation, resetSimulation } from '../../store/simulationSlice';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
@@ -219,6 +219,22 @@ export default function PropertiesPanel() {
                       max={50}
                       onChange={e => dispatch(updatePiece({ ...selectedPiece, seamAllowance: Number(e.target.value), updatedAt: Date.now() }))}
                     />
+                  </div>
+                  <div className="panel-field" style={{ flexWrap: 'wrap', gap: 4 }}>
+                    <label>SA Presets</label>
+                    <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+                      {([['Overlock', 8], ['Standard', 10], ['Flat-felled', 12], ['French', 15]] as const).map(([label, width]) => (
+                        <button
+                          key={label}
+                          className="panel-labeled-btn"
+                          style={{ fontSize: 10, padding: '2px 6px' }}
+                          onClick={() => dispatch(updatePiece({ ...selectedPiece, seamAllowance: width, updatedAt: Date.now() }))}
+                          title={`${label}: ${width}mm`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div className="panel-field">
                     <label>Fabric</label>
@@ -498,8 +514,21 @@ export default function PropertiesPanel() {
               <div className="panel-section-content">
                 <label className="panel-toggle">
                   <input type="checkbox" checked={editor.showSeamAllowance} onChange={() => dispatch(toggleSeamAllowance())} />
-                  Seam allowance
+                  Seam allowance (Shift+S)
                 </label>
+                {editor.showSeamAllowance && (
+                  <div className="panel-field">
+                    <label>Default SA (mm)</label>
+                    <input
+                      type="number"
+                      className="panel-input narrow"
+                      value={editor.defaultSeamAllowanceWidth}
+                      min={0}
+                      max={50}
+                      onChange={e => dispatch(setDefaultSAWidth(Number(e.target.value)))}
+                    />
+                  </div>
+                )}
                 <label className="panel-toggle">
                   <input type="checkbox" checked={editor.showGrainlines} onChange={() => dispatch(toggleGrainlines())} />
                   Grainlines

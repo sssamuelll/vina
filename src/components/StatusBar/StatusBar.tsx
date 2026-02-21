@@ -32,7 +32,7 @@ export default function StatusBar() {
         <span className="status-item">{toolLabels[editor.activeTool] || editor.activeTool}</span>
       </div>
       <div className="status-bar-right">
-        <span className="status-item">SA: {saValue}mm</span>
+        <span className="status-item" title="Shift+S to toggle">SA: {editor.showSeamAllowance ? `${saValue}mm` : 'Off'}</span>
         <span className="status-separator" />
         <span className="status-item">mm</span>
         <span className="status-separator" />

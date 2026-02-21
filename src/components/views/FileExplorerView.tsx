@@ -5,6 +5,9 @@ import { addPiece, loadProject } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
+import { computeCuttingLayout, DEFAULT_CONFIG } from '../../utils/export/cuttingLayout';
+import type { PaperSize, CuttingLayoutConfig } from '../../utils/export/cuttingLayout';
+import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
 import type { OpenCloProject } from '../../types/types';
 import './views.css';
 
@@ -47,6 +50,14 @@ export default function FileExplorerView() {
 
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
 
+  // ─── Cutting Layout State ───
+  const [clPaperSize, setClPaperSize] = useState<PaperSize>('A0');
+  const [clIncludeSA, setClIncludeSA] = useState(true);
+  const [clIncludeGrainline, setClIncludeGrainline] = useState(true);
+  const [clTileToA4, setClTileToA4] = useState(false);
+  const [clScale, setClScale] = useState(1.0);
+  const [clUtilization, setClUtilization] = useState<number | null>(null);
+
   // ─── Import ───
 
   const handleImportDXF = useCallback(() => {
@@ -87,6 +98,22 @@ export default function FileExplorerView() {
     downloadOBJ(pieces, filename);
     setLastExport({ filename, date: new Date().toLocaleString() });
   }, [pieces, projectName]);
+
+  const handleExportCuttingLayout = useCallback(async () => {
+    const config: CuttingLayoutConfig = {
+      ...DEFAULT_CONFIG,
+      paperSize: clPaperSize,
+      scale: clScale,
+      includeSeamAllowance: clIncludeSA,
+      includeGrainline: clIncludeGrainline,
+      tileToA4: clTileToA4,
+    };
+    const layout = computeCuttingLayout(pieces, seams, config);
+    setClUtilization(layout.fabricUtilization);
+    const filename = `${projectName || 'pattern'}-cutting-layout.pdf`;
+    await exportCuttingPDF(layout, config, filename);
+    setLastExport({ filename, date: new Date().toLocaleString() });
+  }, [pieces, seams, projectName, clPaperSize, clScale, clIncludeSA, clIncludeGrainline, clTileToA4]);
 
   // ─── Project Save / Load ───
 
@@ -199,6 +226,65 @@ export default function FileExplorerView() {
               disabled={pieces.length === 0}
             >
               🧊 Export OBJ
+            </button>
+          </div>
+        </Section>
+
+        {/* Cutting Layout Section */}
+        <Section title="Cutting Layout">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontSize: 11 }}>
+              Paper Size
+              <select
+                value={clPaperSize}
+                onChange={e => setClPaperSize(e.target.value as PaperSize)}
+                style={{ width: '100%', marginTop: 2 }}
+              >
+                <option value="A0">A0 (841×1189mm)</option>
+                <option value="A1">A1 (594×841mm)</option>
+                <option value="A4">A4 (210×297mm)</option>
+              </select>
+            </label>
+            <label style={{ fontSize: 11 }}>
+              Scale
+              <select
+                value={clScale}
+                onChange={e => setClScale(Number(e.target.value))}
+                style={{ width: '100%', marginTop: 2 }}
+              >
+                <option value={1}>1:1</option>
+                <option value={0.5}>1:2</option>
+                <option value={0.2}>1:5</option>
+              </select>
+            </label>
+            <label style={{ fontSize: 11 }}>
+              <input type="checkbox" checked={clIncludeSA} onChange={e => setClIncludeSA(e.target.checked)} />
+              {' '}Include Seam Allowance
+            </label>
+            <label style={{ fontSize: 11 }}>
+              <input type="checkbox" checked={clIncludeGrainline} onChange={e => setClIncludeGrainline(e.target.checked)} />
+              {' '}Include Grainline
+            </label>
+            <label style={{ fontSize: 11 }}>
+              <input
+                type="checkbox"
+                checked={clTileToA4}
+                onChange={e => setClTileToA4(e.target.checked)}
+                disabled={clPaperSize === 'A4'}
+              />
+              {' '}Tile to A4
+            </label>
+            {clUtilization !== null && (
+              <div style={{ fontSize: 11, color: '#888' }}>
+                Fabric utilization: {(clUtilization * 100).toFixed(1)}%
+              </div>
+            )}
+            <button
+              className="sidebar-btn sidebar-btn-primary sidebar-btn-full"
+              onClick={handleExportCuttingLayout}
+              disabled={pieces.length === 0}
+            >
+              ✂️ Export Cutting Layout
             </button>
           </div>
         </Section>
