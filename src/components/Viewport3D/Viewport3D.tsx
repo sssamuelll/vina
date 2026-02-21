@@ -1,4 +1,4 @@
-import { Component, Suspense, lazy, type ReactNode } from 'react';
+import { Component, Suspense, lazy, type ReactNode, useRef, useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import { useSelector } from 'react-redux';
@@ -55,9 +55,34 @@ export default function Viewport3D() {
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const useClothSim = simulationState !== 'idle';
 
+  // Force Canvas to resize continuously during CSS transitions (VS Code-style view resizing)
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) {
+        setContainerSize({
+          width: entry.contentRect.width,
+          height: entry.contentRect.height,
+        });
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   return (
-    <div className="viewport3d">
-      <Canvas camera={{ position: [0, 0.8, 2.8], fov: 35 }} shadows>
+    <div className="viewport3d" ref={containerRef}>
+      <Canvas
+        camera={{ position: [0, 0.8, 2.8], fov: 35 }}
+        shadows
+        resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
+        style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
+      >
         {/* Studio lighting */}
         <ambientLight intensity={0.35} />
         <directionalLight position={[3, 5, 4]} intensity={0.9} castShadow shadow-mapSize={1024} />
