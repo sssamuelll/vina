@@ -2,7 +2,7 @@ import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo } from '../../store/editorSlice';
-import { swapViews, cycleCopilotPosition, setSplitRatio } from '../../store/layoutSlice';
+import { cycleCopilotPosition, setSplitRatio } from '../../store/layoutSlice';
 import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
@@ -36,19 +36,16 @@ function useIsMobile(breakpoint = 768) {
 }
 
 /**
- * Sequenced view transition:
- *   1. Fade out 3D (300ms)
- *   2. Wait until fade complete
- *   3. Change layout (viewMode)
- *   4. Wait for Three.js to recalculate (150ms)
- *   5. Fade in 3D (300ms)
+ * VS Code-style view management:
+ * - Both 2D and 3D views are ALWAYS mounted (never unmounted/remounted)
+ * - Views resize via CSS width transitions (0% ↔ 50% ↔ 100%)
+ * - Three.js WebGL context is preserved across view switches
+ * - No phase/fade transitions — just smooth CSS width changes
  */
-type TransitionPhase = 'idle' | 'fading-out' | 'switching' | 'resizing' | 'fading-in';
-
 export default function Workspace() {
   const dispatch = useDispatch();
   const { viewMode } = useSelector((s: RootState) => s.editor);
-  const { copilotPosition, primaryView, splitRatio: layoutSplitRatio } = useSelector((s: RootState) => s.layout);
+  const { copilotPosition, splitRatio: layoutSplitRatio } = useSelector((s: RootState) => s.layout);
   const project = useSelector((s: RootState) => s.project);
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const [, forceUpdate] = useState(0);
@@ -69,48 +66,10 @@ export default function Workspace() {
   const editorsRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  // ─── Sequenced 3D transition ───
-  const [phase, setPhase] = useState<TransitionPhase>('idle');
-  const [pendingMode, setPendingMode] = useState<'2d' | 'split' | '3d' | null>(null);
-
   const handleViewModeChange = useCallback((newMode: '2d' | 'split' | '3d') => {
-    if (newMode === viewMode || phase !== 'idle') return;
-
-    const has3dNow = viewMode === '3d' || viewMode === 'split';
-    const will3d = newMode === '3d' || newMode === 'split';
-
-    if (has3dNow || will3d) {
-      setPendingMode(newMode);
-      setPhase('fading-out');
-    } else {
-      dispatch(setViewMode(newMode));
-    }
-  }, [viewMode, phase, dispatch]);
-
-  useEffect(() => {
-    if (phase === 'fading-out') {
-      const t = setTimeout(() => setPhase('switching'), 320);
-      return () => clearTimeout(t);
-    }
-    if (phase === 'switching' && pendingMode) {
-      dispatch(setViewMode(pendingMode));
-      const t = setTimeout(() => setPhase('resizing'), 20);
-      return () => clearTimeout(t);
-    }
-    if (phase === 'resizing') {
-      const t = setTimeout(() => setPhase('fading-in'), 750);
-      return () => clearTimeout(t);
-    }
-    if (phase === 'fading-in') {
-      const t = setTimeout(() => {
-        setPhase('idle');
-        setPendingMode(null);
-      }, 320);
-      return () => clearTimeout(t);
-    }
-  }, [phase, pendingMode, dispatch]);
-
-  const show3d = phase === 'idle' || phase === 'fading-in';
+    if (newMode === viewMode) return;
+    dispatch(setViewMode(newMode));
+  }, [viewMode, dispatch]);
 
   // ─── Divider drag handlers ───
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
@@ -221,7 +180,6 @@ export default function Workspace() {
     { id: 'view-3d', name: 'Switch to 3D View', category: 'View', action: () => handleViewModeChange('3d') },
     { id: 'view-sidebar', name: 'Toggle Sidebar', category: 'View', shortcut: '⌘B', action: () => setActiveView(v => v ? null : 'explorer') },
     { id: 'view-panel', name: 'Toggle Bottom Panel', category: 'View', shortcut: '⌘J', action: () => setBottomPanelOpen(v => !v) },
-    { id: 'view-swap-editors', name: 'Swap 2D/3D Views', category: 'View', action: () => dispatch(swapViews()) },
     { id: 'view-copilot-position', name: 'Cycle Copilot Position', category: 'View', action: () => dispatch(cycleCopilotPosition()) },
 
     // File
@@ -255,22 +213,16 @@ export default function Workspace() {
     );
   }
 
-  // Explicit widths so CSS can transition between states
-  const getViewportWidth = (which: '2d' | '3d') => {
-    if (viewMode === 'split') {
-      const leftWidth = layoutSplitRatio * 100;
-      const rightWidth = (1 - layoutSplitRatio) * 100;
-      
-      // Determine which view is on the left based on primaryView
-      if (primaryView === '2d') {
-        return which === '2d' ? `${leftWidth}%` : `${rightWidth}%`;
-      } else {
-        return which === '2d' ? `${rightWidth}%` : `${leftWidth}%`;
-      }
-    }
-    if (viewMode === '2d') return which === '2d' ? '100%' : '0%';
-    if (viewMode === '3d') return which === '2d' ? '0%' : '100%';
-    return '0%';
+  // VS Code approach: both views always mounted, width controls visibility
+  const get2dWidth = () => {
+    if (viewMode === '2d') return '100%';
+    if (viewMode === '3d') return '0%';
+    return `${layoutSplitRatio * 100}%`; // split
+  };
+  const get3dWidth = () => {
+    if (viewMode === '3d') return '100%';
+    if (viewMode === '2d') return '0%';
+    return `${(1 - layoutSplitRatio) * 100}%`; // split
   };
 
   return (
@@ -311,41 +263,16 @@ export default function Workspace() {
         
         <div className="toolbar-separator" />
         
-        {/* Layout controls */}
-        <div className="layout-controls">
-          {/* Swap 2D/3D views button */}
-          <button 
-            className="toolbar-btn swap-views-btn" 
-            onClick={() => dispatch(swapViews())}
-            title={`Swap views (currently: ${primaryView === '2d' ? '2D left, 3D right' : '3D left, 2D right'})`}
-            disabled={viewMode !== 'split'}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 5H8M8 5L6 3M8 5L6 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M13 11H8M8 11L10 9M8 11L10 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          
-          {/* Copilot position toggle */}
-          <button 
-            className="toolbar-btn copilot-position-btn" 
-            onClick={() => dispatch(cycleCopilotPosition())}
-            title={`Copilot position: ${copilotPosition} (click to cycle)`}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="none" stroke="currentColor" strokeWidth="1.2"/>
-              {copilotPosition === 'bottom' && (
-                <circle cx="13" cy="13" r="2" fill="var(--accent)" stroke="var(--bg)" strokeWidth="1"/>
-              )}
-              {copilotPosition === 'right' && (
-                <circle cx="13" cy="3" r="2" fill="var(--accent)" stroke="var(--bg)" strokeWidth="1"/>
-              )}
-              {copilotPosition === 'left' && (
-                <circle cx="3" cy="3" r="2" fill="var(--accent)" stroke="var(--bg)" strokeWidth="1"/>
-              )}
-            </svg>
-          </button>
-        </div>
+        {/* Copilot position toggle */}
+        <button 
+          className="toolbar-btn copilot-position-btn" 
+          onClick={() => dispatch(cycleCopilotPosition())}
+          title={`Copilot: ${copilotPosition} (click to cycle)`}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="none" stroke="currentColor" strokeWidth="1.2"/>
+          </svg>
+        </button>
 
         <div className="toolbar-spacer" />
 
@@ -380,61 +307,27 @@ export default function Workspace() {
               <Toolbar2D />
             </div>
 
-            {/* Viewports */}
+            {/* Viewports — ALWAYS mounted, sized via CSS width (VS Code pattern) */}
             <div className="editors" ref={editorsRef}>
-              {/* For single view modes, primaryView doesn't matter - show the requested view */}
-              {viewMode === '2d' && (
-                <div className="viewport viewport-2d" style={{ width: '100%' }}>
-                  <div className="viewport-label">PATTERN</div>
-                  <PatternEditor />
-                </div>
-              )}
-              
-              {viewMode === '3d' && (
-                <div className="viewport viewport-3d" style={{ width: '100%' }}>
-                  <div className="viewport-label">3D VIEW</div>
-                  <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
-                    <Viewport3DErrorBoundary><Viewport3D /></Viewport3DErrorBoundary>
-                  </div>
-                </div>
-              )}
+              <div
+                className={`viewport viewport-2d ${viewMode === '3d' ? 'viewport-collapsed' : ''}`}
+                style={{ width: get2dWidth() }}
+              >
+                <div className="viewport-label">PATTERN</div>
+                <PatternEditor />
+              </div>
 
-              {/* For split mode, primaryView determines left/right positioning */}
               {viewMode === 'split' && (
-                <>
-                  {/* Left viewport */}
-                  <div
-                    className={`viewport ${primaryView === '2d' ? 'viewport-2d' : 'viewport-3d'}`}
-                    style={{ width: primaryView === '2d' ? getViewportWidth('2d') : getViewportWidth('3d') }}
-                  >
-                    <div className="viewport-label">{primaryView === '2d' ? 'PATTERN' : '3D VIEW'}</div>
-                    {primaryView === '2d' ? (
-                      <PatternEditor />
-                    ) : (
-                      <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
-                        <Viewport3DErrorBoundary><Viewport3D /></Viewport3DErrorBoundary>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="viewport-divider" onMouseDown={handleDividerMouseDown} />
-
-                  {/* Right viewport */}
-                  <div
-                    className={`viewport ${primaryView === '2d' ? 'viewport-3d' : 'viewport-2d'}`}
-                    style={{ width: primaryView === '2d' ? getViewportWidth('3d') : getViewportWidth('2d') }}
-                  >
-                    <div className="viewport-label">{primaryView === '2d' ? '3D VIEW' : 'PATTERN'}</div>
-                    {primaryView === '2d' ? (
-                      <div className={`viewport-3d-content ${show3d ? 'visible' : 'hidden'}`}>
-                        <Viewport3DErrorBoundary><Viewport3D /></Viewport3DErrorBoundary>
-                      </div>
-                    ) : (
-                      <PatternEditor />
-                    )}
-                  </div>
-                </>
+                <div className="viewport-divider" onMouseDown={handleDividerMouseDown} />
               )}
+
+              <div
+                className={`viewport viewport-3d ${viewMode === '2d' ? 'viewport-collapsed' : ''}`}
+                style={{ width: get3dWidth() }}
+              >
+                <div className="viewport-label">3D VIEW</div>
+                <Viewport3DErrorBoundary><Viewport3D /></Viewport3DErrorBoundary>
+              </div>
             </div>
           </div>
 
