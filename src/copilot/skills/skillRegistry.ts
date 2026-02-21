@@ -113,6 +113,28 @@ export class SkillRegistry {
   has(name: string): boolean {
     return this.skills.has(name);
   }
+
+  /**
+   * Unregister a skill by name.
+   *
+   * Removes the skill and all its trigger index entries.
+   *
+   * @param name - Skill name to unregister
+   * @returns true if the skill was found and removed
+   */
+  unregister(name: string): boolean {
+    const skill = this.skills.get(name);
+    if (!skill) return false;
+
+    this.skills.delete(name);
+    for (const trigger of skill.triggers) {
+      const key = trigger.toLowerCase();
+      if (this.triggerIndex.get(key) === skill) {
+        this.triggerIndex.delete(key);
+      }
+    }
+    return true;
+  }
 }
 
 // ─── All core skill definitions ─────────────────────────────────────────────

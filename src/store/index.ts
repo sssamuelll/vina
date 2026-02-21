@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import projectReducer from './projectSlice';
 import editorReducer from './editorSlice';
 import simulationReducer from './simulationSlice';
+import pluginReducer from './pluginSlice';
 import { undoMiddleware } from './undoMiddleware';
 
 export const store = configureStore({
@@ -9,6 +10,7 @@ export const store = configureStore({
     project: projectReducer,
     editor: editorReducer,
     simulation: simulationReducer,
+    plugins: pluginReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

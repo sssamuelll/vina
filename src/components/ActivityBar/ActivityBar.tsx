@@ -6,6 +6,7 @@ export type SidebarView =
   | 'grading'
   | 'nesting'
   | 'files'
+  | 'plugins'
   | 'copilot'
   | 'settings';
 
@@ -79,6 +80,18 @@ const items: ActivityItem[] = [
     icon: (
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 15V5C3 4.45 3.45 4 4 4H8L10 6H16C16.55 6 17 6.45 17 7V15C17 15.55 16.55 16 16 16H4C3.45 16 3 15.55 3 15Z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'plugins',
+    label: 'Plugins',
+    position: 'bottom',
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M8 3H12V6H14C14.55 6 15 6.45 15 7V10H12V8H8V10H5V7C5 6.45 5.45 6 6 6H8V3Z" />
+        <path d="M5 10H15V15C15 15.55 14.55 16 14 16H6C5.45 16 5 15.55 5 15V10Z" />
+        <path d="M8 16V18M12 16V18" />
       </svg>
     ),
   },

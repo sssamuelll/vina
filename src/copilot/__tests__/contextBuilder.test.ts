@@ -95,6 +95,11 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pieceFabrics: { 'piece-1': 'cotton-poplin' },
       defaultFabricId: 'cotton-poplin',
     },
+    plugins: {
+      installedPlugins: [],
+      enabledPlugins: [],
+      pluginErrors: {},
+    },
   };
 
   if (overrides) {

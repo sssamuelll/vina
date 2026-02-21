@@ -1,0 +1,236 @@
+/* PluginManager styles */
+
+.plugin-manager {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.plugin-manager__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.plugin-manager__header h2 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.plugin-manager__count {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.plugin-manager__install {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.plugin-manager__install-input {
+  flex: 1;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  background: var(--input-bg, #1e1e1e);
+  color: var(--text-primary, #ccc);
+}
+
+.plugin-manager__install-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  background: var(--button-bg, #0e639c);
+  color: var(--button-fg, #fff);
+  cursor: pointer;
+}
+
+.plugin-manager__install-btn:hover {
+  background: var(--button-hover-bg, #1177bb);
+}
+
+.plugin-manager__error {
+  padding: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--error-fg, #f48771);
+  background: var(--error-bg, rgba(244, 135, 113, 0.1));
+  border-radius: 4px;
+}
+
+.plugin-manager__list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plugin-manager__empty {
+  text-align: center;
+  padding: 24px 0;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+}
+
+.plugin-manager__hint {
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+/* PluginCard */
+
+.plugin-card {
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--card-bg, #252526);
+}
+
+.plugin-card--enabled {
+  border-color: var(--accent-color, #0e639c);
+}
+
+.plugin-card--error {
+  border-color: var(--error-fg, #f48771);
+}
+
+.plugin-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.plugin-card__info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  cursor: pointer;
+  flex: 1;
+}
+
+.plugin-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #ccc);
+}
+
+.plugin-card__version {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.plugin-card__author {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.plugin-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plugin-card__toggle {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+}
+
+.plugin-card__toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.plugin-card__toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--toggle-off, #555);
+  border-radius: 16px;
+  transition: 0.2s;
+}
+
+.plugin-card__toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.plugin-card__toggle input:checked + .plugin-card__toggle-slider {
+  background: var(--accent-color, #0e639c);
+}
+
+.plugin-card__toggle input:checked + .plugin-card__toggle-slider::before {
+  transform: translateX(12px);
+}
+
+.plugin-card__remove {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 4px;
+}
+
+.plugin-card__remove:hover {
+  color: var(--error-fg, #f48771);
+}
+
+.plugin-card__error {
+  margin-top: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--error-fg, #f48771);
+  background: var(--error-bg, rgba(244, 135, 113, 0.1));
+  border-radius: 3px;
+}
+
+.plugin-card__details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color, #333);
+}
+
+.plugin-card__description {
+  font-size: 12px;
+  color: var(--text-primary, #ccc);
+  margin: 0 0 8px;
+  line-height: 1.5;
+}
+
+.plugin-card__permissions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.plugin-card__permission-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  background: var(--badge-bg, #333);
+  color: var(--text-secondary, #aaa);
+}
+
+.plugin-card__id {
+  font-size: 10px;
+  color: var(--text-secondary, #666);
+  font-family: monospace;
+}
