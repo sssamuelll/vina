@@ -7,6 +7,9 @@ import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
+import Toolbar3D from '../Toolbar3D/Toolbar3D';
+import type { Tool3D } from '../Toolbar3D/Toolbar3D';
+import AvatarPanel from '../Viewport3D/AvatarPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import CopilotSidePanel from '../CopilotPanel/CopilotSidePanel';
@@ -62,6 +65,10 @@ export default function Workspace() {
 
   // ─── Command Palette ───
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // ─── 3D Toolbar ───
+  const [activeTool3D, setActiveTool3D] = useState<Tool3D>('camera');
+  const [avatarPanelOpen, setAvatarPanelOpen] = useState(false);
 
   // ─── Split ratio (draggable divider) ───
   const editorsRef = useRef<HTMLDivElement>(null);
@@ -327,7 +334,20 @@ export default function Workspace() {
                 style={{ width: get3dWidth() }}
               >
                 <div className="viewport-label">3D VIEW</div>
-                <Viewport3DErrorBoundary><Viewport3D /></Viewport3DErrorBoundary>
+                <div className="viewport3d-with-toolbar">
+                  <Viewport3DErrorBoundary>
+                    <Viewport3D activeTool3D={activeTool3D} />
+                  </Viewport3DErrorBoundary>
+                  <AvatarPanel open={avatarPanelOpen} onClose={() => setAvatarPanelOpen(false)} />
+                  <div className={`toolbar3d-wrapper ${viewMode !== '2d' ? 'visible' : 'hidden'}`}>
+                    <Toolbar3D
+                      activeTool={activeTool3D}
+                      onToolChange={setActiveTool3D}
+                      avatarPanelOpen={avatarPanelOpen}
+                      onToggleAvatarPanel={() => setAvatarPanelOpen(v => !v)}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>

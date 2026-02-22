@@ -204,7 +204,11 @@
 }
 
 .viewport-2d { background: var(--bg-canvas); }
-.viewport-3d { background: var(--bg-primary); }
+.viewport-3d {
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
 
 .viewport-divider {
   width: var(--divider-width);
@@ -278,6 +282,37 @@
   width: 0 !important;
   overflow: hidden;
   pointer-events: none;
+}
+
+/* ─── 3D Viewport with Toolbar ─── */
+.viewport3d-with-toolbar {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.viewport3d-with-toolbar > div:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbar3d-wrapper {
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toolbar3d-wrapper.visible {
+  width: var(--toolbar2d-width, 42px);
+  opacity: 1;
+}
+
+.toolbar3d-wrapper.hidden {
+  width: 0;
+  opacity: 0;
 }
 
 /* ─── Layout Controls ─── */
