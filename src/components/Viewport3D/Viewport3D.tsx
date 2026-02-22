@@ -10,6 +10,7 @@ import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
 import JointGizmos from './JointGizmos';
 import { usePoseDrag } from './usePoseDrag';
+import AvatarPanel from './AvatarPanel';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import './Viewport3D.css';
 
@@ -46,13 +47,19 @@ export default function Viewport3D() {
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
   const useClothSim = simulationState !== 'idle';
 
+  // Avatar panel
+  const [avatarPanelOpen, setAvatarPanelOpen] = useState(false);
+
   // Camera vs Edit mode
   const [cameraMode, setCameraMode] = useState(true);
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
 
-  // When pose editor opens, auto-switch to edit mode
+  // When pose editor opens, auto-switch to edit mode and open avatar panel
   useEffect(() => {
-    if (poseEditorOpen) setCameraMode(false);
+    if (poseEditorOpen) {
+      setCameraMode(false);
+      setAvatarPanelOpen(true);
+    }
   }, [poseEditorOpen]);
 
   // Sync OrbitControls with cameraMode
@@ -194,6 +201,22 @@ export default function Viewport3D() {
           target={[0, 0.75, 0]}
         />
       </Canvas>
+
+      {/* Avatar panel toggle */}
+      <button
+        className={`viewport3d-avatar-toggle ${avatarPanelOpen ? 'active' : ''}`}
+        onClick={() => setAvatarPanelOpen(p => !p)}
+        title="Avatar & Pose Panel"
+      >
+        <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ verticalAlign: 'middle', marginRight: 4 }}>
+          <circle cx="10" cy="6" r="3" />
+          <path d="M4 18C4 14.69 6.69 12 10 12C13.31 12 16 14.69 16 18" />
+        </svg>
+        Avatar
+      </button>
+
+      {/* Avatar & Pose panel */}
+      <AvatarPanel open={avatarPanelOpen} onClose={() => setAvatarPanelOpen(false)} />
 
       {/* Camera/Edit mode toggle — top right of 3D viewport */}
       <button

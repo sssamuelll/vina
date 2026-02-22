@@ -8,8 +8,6 @@ import {
   SettingsView,
 } from '../views';
 import PluginManager from '../PluginManager/PluginManager';
-import PoseEditorView from './PoseEditorView';
-import AvatarView from './AvatarView';
 import SimulationView from './SimulationView';
 import '../views/views.css';
 import './Sidebar.css';
@@ -27,9 +25,7 @@ const viewTitles: Record<SidebarView, string> = {
   files: 'File Browser',
   plugins: 'Plugins',
   settings: 'Settings',
-  pose: 'Pose Editor',
   simulation: 'Simulation',
-  avatar: 'Avatar',
 };
 
 export default function Sidebar({ activeView, onClose }: SidebarProps) {
@@ -55,9 +51,7 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             {activeView === 'files' && <FileExplorerView />}
             {activeView === 'plugins' && <PluginManager />}
             {activeView === 'settings' && <SettingsView />}
-            {activeView === 'pose' && <PoseEditorView />}
             {activeView === 'simulation' && <SimulationView />}
-            {activeView === 'avatar' && <AvatarView />}
           </div>
         </>
       )}
