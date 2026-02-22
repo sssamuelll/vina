@@ -52,14 +52,14 @@ export const HUMAN_JOINTS: Record<string, AnatomicalJoint> = {
     // From axis discovery: +X=adduction(down), -X=abduction(up), +Z=forward, -Z=backward
     xMin: -170, xMax: 70,    // abduction(170°) to full adduction(70° past body)
     yMin: -90,  yMax: 90,    // internal/external rotation
-    zMin: -60,  zMax: 100,   // extension(60° back) to flexion(100° forward)
+    zMin: -40,  zMax: 100,   // extension(40° back) to flexion(100° forward)
     maxSwing: 170,
   },
   RightArm: {
     type: 'ball',
     xMin: -170, xMax: 70,
     yMin: -90,  yMax: 90,
-    zMin: -100, zMax: 60,    // mirrored Z: forward is negative for right
+    zMin: -100, zMax: 40,    // mirrored Z: -Z=forward, +Z=backward (max 40° extension)
     maxSwing: 170,
   },
 
