@@ -4,6 +4,7 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
   loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
+  togglePoseEditor,
   POSE_PRESETS, JOINT_CONSTRAINTS,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
 } from '../../store/avatarSlice';
@@ -49,6 +50,7 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
   const activeProfileId = useSelector((s: RootState) => s.avatar.activeProfileId);
   const avatarMode = useSelector((s: RootState) => s.project.avatarMode);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
 
   // Pose state
   const activePreset = useSelector((s: RootState) => s.avatar.pose.activePreset);
@@ -72,6 +74,16 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
     dispatch(loadProfilesFromStorage());
     dispatch(loadSavedPosesFromStorage());
   }, [dispatch]);
+
+  // Sync gizmos with panel open state + pose section
+  useEffect(() => {
+    if (open && poseOpen && !poseEditorOpen) {
+      dispatch(togglePoseEditor());
+    }
+    if (!open && poseEditorOpen) {
+      dispatch(togglePoseEditor());
+    }
+  }, [open, poseOpen, poseEditorOpen, dispatch]);
 
   // Derive model name
   useEffect(() => {
@@ -254,7 +266,13 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
 
           {/* ── Pose Section ── */}
           <div className="ap-section">
-            <button className="ap-section-header" onClick={() => setPoseOpen(!poseOpen)}>
+            <button className="ap-section-header" onClick={() => {
+              const next = !poseOpen;
+              setPoseOpen(next);
+              // Sync gizmos: open Pose section → show gizmos, close → hide
+              if (next && !poseEditorOpen) dispatch(togglePoseEditor());
+              if (!next && poseEditorOpen) dispatch(togglePoseEditor());
+            }}>
               <span className={`ap-chevron ${poseOpen ? 'open' : ''}`}>▸</span>
               Pose
             </button>
