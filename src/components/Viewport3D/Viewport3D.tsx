@@ -100,7 +100,7 @@ export default function Viewport3D() {
         )}
 
         {/* Joint gizmos for interactive pose editing */}
-        <JointGizmos poseDrag={poseDrag} />
+        <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
 
         {/* Pattern pieces: cloth sim when running, static otherwise */}
         {useClothSim ? (

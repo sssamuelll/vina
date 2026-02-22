@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useStore } from 'react-redux';
 import type { RootState } from '../../store';
 import {
   setJointRotation,
@@ -33,7 +33,8 @@ const SENSITIVITY = 0.5; // degrees per pixel
 
 export interface PoseDragState {
   isDragging: boolean;
-  onGizmoPointerDown: (jointName: string, e: { stopPropagation: () => void }) => void;
+  isDraggingRef: React.RefObject<boolean>;
+  onGizmoPointerDown: (jointName: string, e: { stopPropagation: () => void; nativeEvent?: Event }) => void;
   onPointerMove: (e: PointerEvent) => void;
   onPointerUp: (e: PointerEvent) => void;
 }
@@ -42,16 +43,18 @@ export function usePoseDrag(
   setOrbitEnabled: (enabled: boolean) => void,
 ): PoseDragState {
   const dispatch = useDispatch();
-  const joints = useSelector((s: RootState) => s.avatar.pose.joints);
+  const store = useStore<RootState>();
   const isDraggingRef = useRef(false);
   const activeJointRef = useRef<string | null>(null);
   const lastPosRef = useRef({ x: 0, y: 0 });
-  const shiftRef = useRef(false);
-  // Snapshot of rotation at drag start
-  const startRotRef = useRef({ x: 0, y: 0, z: 0 });
 
-  const onGizmoPointerDown = useCallback((jointName: string, e: { stopPropagation: () => void }) => {
+  const onGizmoPointerDown = useCallback((jointName: string, e: { stopPropagation: () => void; nativeEvent?: Event }) => {
     e.stopPropagation();
+    // Also stop the native DOM event from reaching OrbitControls
+    if (e.nativeEvent) {
+      e.nativeEvent.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation();
+    }
     if (!JOINT_CONSTRAINTS[jointName]) return;
 
     isDraggingRef.current = true;
@@ -59,17 +62,13 @@ export function usePoseDrag(
     dispatch(selectJoint(jointName));
     setOrbitEnabled(false);
 
-    const rot = joints[jointName] ?? { x: 0, y: 0, z: 0 };
-    startRotRef.current = { ...rot };
-
     // We'll capture the pointer position from the first move event
     lastPosRef.current = { x: -9999, y: -9999 };
-  }, [dispatch, joints, setOrbitEnabled]);
+  }, [dispatch, setOrbitEnabled]);
 
   const onPointerMove = useCallback((e: PointerEvent) => {
     if (!isDraggingRef.current || !activeJointRef.current) return;
 
-    shiftRef.current = e.shiftKey;
     const joint = activeJointRef.current;
 
     if (lastPosRef.current.x === -9999) {
@@ -84,7 +83,8 @@ export function usePoseDrag(
     const mapping = AXIS_MAP[joint];
     if (!mapping) return;
 
-    const currentRot = joints[joint] ?? { x: 0, y: 0, z: 0 };
+    // Read current rotation from store (avoid stale closure)
+    const currentRot = store.getState().avatar.pose.joints[joint] ?? { x: 0, y: 0, z: 0 };
     const newRot = { ...currentRot };
 
     if (mapping.horizontal && dx !== 0) {
@@ -97,20 +97,22 @@ export function usePoseDrag(
     const clamped = clampJointRotation(joint, newRot);
     dispatch(setJointRotation({ joint, rotation: clamped }));
 
-    if (shiftRef.current) {
+    if (e.shiftKey) {
       dispatch(mirrorJoint(joint));
     }
-  }, [dispatch, joints]);
+  }, [dispatch, store]);
 
   const onPointerUp = useCallback((_e: PointerEvent) => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     activeJointRef.current = null;
     setOrbitEnabled(true);
+    document.body.style.cursor = '';
   }, [setOrbitEnabled]);
 
   return {
     isDragging: isDraggingRef.current,
+    isDraggingRef,
     onGizmoPointerDown,
     onPointerMove,
     onPointerUp,
