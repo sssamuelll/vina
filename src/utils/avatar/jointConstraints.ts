@@ -82,17 +82,17 @@ export const HUMAN_JOINTS: Record<string, AnatomicalJoint> = {
   // Pronation/supination happens at the forearm (radioulnar joint), mapped to Y.
   LeftForeArm: {
     type: 'hinge',
-    hingeAxis: new THREE.Vector3(1, 0, 0),  // X axis = flexion from discovery
-    hingeMin: 0,      // full extension (straight arm)
-    hingeMax: 145,    // full flexion
+    hingeAxis: new THREE.Vector3(1, 0, 0),  // X axis = flexion (verified: -X = flex toward bicep)
+    hingeMin: -145,   // full flexion (hand toward shoulder)
+    hingeMax: 5,      // near-full extension (slight hyperextension)
     // Allow forearm pronation/supination on Y
     yMin: -85, yMax: 85,
   },
   RightForeArm: {
     type: 'hinge',
     hingeAxis: new THREE.Vector3(1, 0, 0),
-    hingeMin: 0,
-    hingeMax: 145,
+    hingeMin: -145,
+    hingeMax: 5,
     yMin: -85, yMax: 85,
   },
 
