@@ -20,7 +20,6 @@ import CommandPalette from '../CommandPalette/CommandPalette';
 import type { Command } from '../CommandPalette/CommandPalette';
 import StatusBar from '../StatusBar/StatusBar';
 import BottomPanel from '../BottomPanel/BottomPanel';
-import ToolOptions from '../ToolOptions/ToolOptions';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { createCopilotKeyHandler } from '../../copilot/keyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
@@ -60,7 +59,7 @@ export default function Workspace() {
   useKeyboardShortcuts();
 
   // ─── Activity Bar & Sidebar ───
-  const [activeView, setActiveView] = useState<SidebarView | null>('explorer');
+  const [activeView, setActiveView] = useState<SidebarView | null>(null);
 
   // ─── Bottom Panel ───
   const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
@@ -320,12 +319,6 @@ export default function Workspace() {
         )}
 
         <div className="editor-area">
-          {/* Tool Options Bar */}
-          <div className="tool-options-wrapper">
-            {viewMode !== '3d' && <ToolOptions context="2d" />}
-            {viewMode !== '2d' && <ToolOptions context="3d" />}
-          </div>
-          
           <div className="editors-with-toolbar">
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
