@@ -80,8 +80,8 @@ export const JOINT_CONSTRAINTS: Record<string, {
 
 export const POSE_PRESETS: Record<string, Record<string, JointRotation>> = {
   'A-pose': {
-    LeftArm: { x: 15, y: 10, z: -25 },
-    RightArm: { x: 15, y: -10, z: 25 },
+    LeftArm: { x: 30, y: 10, z: -25 },
+    RightArm: { x: 30, y: -10, z: 25 },
     LeftShoulder: { x: 0, y: 0, z: -5 },
     RightShoulder: { x: 0, y: 0, z: 5 },
   },
