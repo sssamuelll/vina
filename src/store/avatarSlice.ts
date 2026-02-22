@@ -52,32 +52,34 @@ export const JOINT_CONSTRAINTS: Record<string, {
   minY: number; maxY: number; 
   minZ: number; maxZ: number; 
 }> = {
-  // Spine joints
-  Spine: { minX: -30, maxX: 30, minY: -15, maxY: 15, minZ: -15, maxZ: 15 },
-  Spine1: { minX: -30, maxX: 30, minY: -15, maxY: 15, minZ: -15, maxZ: 15 },
-  Spine2: { minX: -30, maxX: 30, minY: -15, maxY: 15, minZ: -15, maxZ: 15 },
+  // Spine joints — each vertebral segment has limited ROM; total spine is cumulative
+  Spine: { minX: -20, maxX: 20, minY: -15, maxY: 15, minZ: -10, maxZ: 10 },
+  Spine1: { minX: -15, maxX: 15, minY: -10, maxY: 10, minZ: -8, maxZ: 8 },
+  Spine2: { minX: -15, maxX: 15, minY: -10, maxY: 10, minZ: -8, maxZ: 8 },
   
   // Head and neck
-  Neck: { minX: -60, maxX: 60, minY: -60, maxY: 60, minZ: -30, maxZ: 30 },
-  Head: { minX: -30, maxX: 30, minY: -60, maxY: 60, minZ: -30, maxZ: 30 },
+  Neck: { minX: -40, maxX: 40, minY: -45, maxY: 45, minZ: -25, maxZ: 25 },
+  Head: { minX: -20, maxX: 20, minY: -40, maxY: 40, minZ: -20, maxZ: 20 },
   
-  // Left arm
-  LeftShoulder: { minX: -30, maxX: 30, minY: -30, maxY: 30, minZ: -30, maxZ: 30 },
-  LeftArm: { minX: -90, maxX: 90, minY: -90, maxY: 90, minZ: -90, maxZ: 0 },
-  LeftForeArm: { minX: -120, maxX: 0, minY: -30, maxY: 30, minZ: -30, maxZ: 30 },
+  // Left arm — X: flexion(+)/extension(-), Y: internal/external rotation, Z: abduction(-)
+  // Human shoulder: ~170° flexion, ~45° extension, ~50° internal rot, ~90° external, ~180° abduction
+  LeftShoulder: { minX: -15, maxX: 15, minY: -15, maxY: 15, minZ: -15, maxZ: 10 },
+  LeftArm: { minX: -45, maxX: 60, minY: -50, maxY: 50, minZ: -80, maxZ: 0 },
+  LeftForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -10, maxZ: 10 },
   
-  // Right arm
-  RightShoulder: { minX: -30, maxX: 30, minY: -30, maxY: 30, minZ: -30, maxZ: 30 },
-  RightArm: { minX: -90, maxX: 90, minY: -90, maxY: 90, minZ: 0, maxZ: 90 },
-  RightForeArm: { minX: -120, maxX: 0, minY: -30, maxY: 30, minZ: -30, maxZ: 30 },
+  // Right arm (mirrored Z)
+  RightShoulder: { minX: -15, maxX: 15, minY: -15, maxY: 15, minZ: -10, maxZ: 15 },
+  RightArm: { minX: -45, maxX: 60, minY: -50, maxY: 50, minZ: 0, maxZ: 80 },
+  RightForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -10, maxZ: 10 },
   
-  // Left leg
-  LeftUpLeg: { minX: -90, maxX: 90, minY: -30, maxY: 30, minZ: -30, maxZ: 30 },
-  LeftLeg: { minX: -150, maxX: 0, minY: -15, maxY: 15, minZ: -15, maxZ: 15 },
+  // Left leg — X: flexion(+)/extension(-), Y: internal/external rotation, Z: abduction
+  // Human hip: ~120° flexion, ~20° extension, ~45° abduction, ~30° adduction
+  LeftUpLeg: { minX: -20, maxX: 120, minY: -30, maxY: 30, minZ: -30, maxZ: 45 },
+  LeftLeg: { minX: -140, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
   
-  // Right leg
-  RightUpLeg: { minX: -90, maxX: 90, minY: -30, maxY: 30, minZ: -30, maxZ: 30 },
-  RightLeg: { minX: -150, maxX: 0, minY: -15, maxY: 15, minZ: -15, maxZ: 15 },
+  // Right leg (mirrored)
+  RightUpLeg: { minX: -20, maxX: 120, minY: -30, maxY: 30, minZ: -45, maxZ: 30 },
+  RightLeg: { minX: -140, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
 };
 
 export const POSE_PRESETS: Record<string, Record<string, JointRotation>> = {
