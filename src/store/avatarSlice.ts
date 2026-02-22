@@ -42,6 +42,7 @@ export const EDITABLE_JOINTS = [
   'LeftShoulder', 'RightShoulder',
   'LeftArm', 'RightArm',
   'LeftForeArm', 'RightForeArm',
+  'LeftHand', 'RightHand',
   'LeftUpLeg', 'RightUpLeg',
   'LeftLeg', 'RightLeg',
 ] as const;
