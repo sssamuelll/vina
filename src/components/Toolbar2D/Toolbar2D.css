@@ -1,32 +1,44 @@
 .toolbar2d {
-  width: var(--toolbar2d-width);
+  width: 72px; /* Two columns of 32px buttons + gaps */
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 4px;
+  padding: 4px 2px;
   gap: 0;
   flex-shrink: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
-.tool-group {
+.tool-row-group {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  gap: 1px;
+}
+
+.tool-row {
+  display: flex;
+  flex-direction: row;
+  gap: 1px;
 }
 
 .tool-separator {
-  width: 20px;
+  width: 60px;
   height: 1px;
   background: var(--border);
-  margin: 6px 0;
+  margin: 4px auto;
+}
+
+.tool-spacer {
+  width: 32px;
+  height: 32px;
 }
 
 .tool-btn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -61,7 +73,7 @@
 .tool-btn::before {
   content: '';
   position: absolute;
-  left: -4px;
+  left: -2px;
   top: 50%;
   transform: translateY(-50%) scaleY(0);
   width: 3px;

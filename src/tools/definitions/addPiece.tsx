@@ -1,0 +1,30 @@
+import React from 'react';
+import { ToolDefinition } from '../types';
+
+const AddPieceIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 18 18" 
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Pattern piece outline */}
+    <path d="M3 3L15 3L15 15L3 15Z"/>
+    {/* Plus symbol */}
+    <path d="M9 6L9 12"/>
+    <path d="M6 9L12 9"/>
+  </svg>
+);
+
+export const addPieceTool: ToolDefinition = {
+  id: 'addPiece',
+  name: 'Add Piece',
+  context: '2d',
+  icon: AddPieceIcon,
+  cursor: 'default',
+  group: 'pattern',
+};

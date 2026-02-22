@@ -185,12 +185,25 @@ export type ViewMode = '2d' | '3d' | 'split';
 
 export type Tool2D =
   | 'select'
+  | 'editCurve'    // edit curve points
+  | 'editConstrain' // edit with constraints
+  | 'movePattern'  // move pattern pieces
+  | 'copyPattern'  // copy/paste pattern pieces
   | 'pen'          // draw piece outlines (bezier)
   | 'line'         // straight lines / darts
+  | 'internalShape' // internal shape (dashed rectangle)
   | 'rectangle'    // quick rectangular pieces
   | 'seam'         // connect edges between pieces
+  | 'seamAllowance' // seam allowance editing
   | 'notch'        // add notch marks
   | 'grainline'    // set fabric grain direction
+  | 'duplicate'    // duplicate pieces
+  | 'grading'      // grading tool
+  | 'textAnnotation' // text annotation
+  | 'elastic'      // elastic/gathering
+  | 'addPiece'     // add new piece
+  | 'fabricTexture' // fabric/texture assignment
+  | 'flatten'      // flatten/iron
   | 'measure'      // distance / angle measurement
   | 'hand'         // pan
   | 'zoom';

@@ -2,13 +2,26 @@ import { toolRegistry } from './registry';
 
 // Import all tool definitions
 import { selectTool } from './definitions/select';
+import { editCurveTool } from './definitions/editCurve';
+import { editConstrainTool } from './definitions/editConstrain';
+import { movePatternTool } from './definitions/movePattern';
+import { copyPatternTool } from './definitions/copyPattern';
 import { transformTool } from './definitions/transform';
 import { penTool } from './definitions/pen';
 import { lineTool } from './definitions/line';
+import { internalShapeTool } from './definitions/internalShape';
 import { rectangleTool } from './definitions/rectangle';
 import { seamTool } from './definitions/seam';
+import { seamAllowanceTool } from './definitions/seamAllowance';
 import { notchTool } from './definitions/notch';
 import { grainlineTool } from './definitions/grainline';
+import { duplicateTool } from './definitions/duplicate';
+import { gradingTool } from './definitions/grading';
+import { textAnnotationTool } from './definitions/textAnnotation';
+import { elasticTool } from './definitions/elastic';
+import { addPieceTool } from './definitions/addPiece';
+import { fabricTextureTool } from './definitions/fabricTexture';
+import { flattenTool } from './definitions/flatten';
 import { measureTool } from './definitions/measure';
 import { handTool } from './definitions/hand';
 import { zoomTool } from './definitions/zoom';
@@ -30,11 +43,16 @@ import { simulateTool } from './definitions/simulate';
 const allTools = [
   // 2D Tools — Selection & Transform
   selectTool,
+  editCurveTool,
+  editConstrainTool,
+  movePatternTool,
+  copyPatternTool,
   transformTool,
   
   // 2D Tools — Drawing
   penTool,
   lineTool,
+  internalShapeTool,
   rectangleTool,
   dartTool,
   traceTool,
@@ -43,14 +61,22 @@ const allTools = [
   // 2D Tools — Pattern Editing
   scissorsTool,
   mirrorTool,
+  duplicateTool,
+  addPieceTool,
+  fabricTextureTool,
+  flattenTool,
   
   // 2D Tools — Sewing
   seamTool,
+  seamAllowanceTool,
+  elasticTool,
   freeSewingTool,
   
   // 2D Tools — Annotation
   notchTool,
   grainlineTool,
+  gradingTool,
+  textAnnotationTool,
   measureTool,
   
   // 2D Tools — Navigation

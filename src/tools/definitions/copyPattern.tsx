@@ -1,0 +1,30 @@
+import React from 'react';
+import { ToolDefinition } from '../types';
+
+const CopyPatternIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
+  <svg 
+    width={size} 
+    height={size} 
+    viewBox="0 0 18 18" 
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={1.5}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Back rectangle */}
+    <path d="M4 4L12 4L12 12L4 12Z"/>
+    {/* Front rectangle (overlapping) */}
+    <path d="M6 6L14 6L14 14L6 14Z"/>
+  </svg>
+);
+
+export const copyPatternTool: ToolDefinition = {
+  id: 'copyPattern',
+  name: 'Copy Pattern',
+  context: '2d',
+  shortcut: 'c',
+  icon: CopyPatternIcon,
+  cursor: 'default',
+  group: 'pattern',
+};

@@ -11,23 +11,46 @@ export default function Toolbar2D() {
   const legacyActiveTool = useSelector((s: RootState) => s.editor.activeTool);
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
 
-  // Get 2D tools grouped by category (CLO3D style)
-  const toolGroups = useMemo(() => {
-    const groups = [
-      'select',     // Selection & Transform
-      'draw',       // Drawing tools
-      'pattern',    // Pattern editing
-      'sewing',     // Sewing tools
-      'annotation', // Annotation
-      'navigation'  // Navigation
+  // Define the two-column layout as per CLO3D specification
+  const toolLayout = useMemo(() => {
+    const layout: Array<{ rows: [string, string | null][] }> = [
+      {
+        rows: [
+          ['select', 'editCurve'],
+          ['transform', 'editConstrain'], 
+          ['pen', 'movePattern'],
+          ['line', 'copyPattern'],
+        ]
+      },
+      {
+        rows: [
+          ['internalShape', 'flatten'],
+          ['seamAllowance', 'rectangle'],
+          ['scissors', 'fabricTexture'],
+          ['mirror', 'duplicate'],
+        ]
+      },
+      {
+        rows: [
+          ['grading', 'trace'],
+          ['grainline', 'measure'],
+        ]
+      },
+      {
+        rows: [
+          ['textAnnotation', 'elastic'],
+          ['notch', 'addPiece'],
+        ]
+      },
+      {
+        rows: [
+          ['seam', 'freesewing'],
+          ['hand', 'zoom'],
+        ]
+      },
     ];
     
-    return groups.map(groupName => ({
-      name: groupName,
-      tools: toolRegistry.getToolsByGroup(groupName).filter(tool => 
-        tool.context === '2d' || tool.context === 'both'
-      )
-    })).filter(group => group.tools.length > 0);
+    return layout;
   }, []);
 
   // Use new tool system but keep backward compatibility
@@ -39,26 +62,36 @@ export default function Toolbar2D() {
     dispatch(setActiveTool2D(toolId));
   };
 
+  const renderToolButton = (toolId: string) => {
+    const tool = toolRegistry.getTool(toolId);
+    if (!tool) return null;
+
+    const IconComponent = tool.icon;
+    return (
+      <button
+        key={tool.id}
+        className={`tool-btn ${currentActiveTool === tool.id ? 'active' : ''}`}
+        onClick={() => handleToolClick(tool.id)}
+        title={`${tool.name}${tool.shortcut ? ` (${tool.shortcut.toUpperCase()})` : ''}`}
+      >
+        <span className="tool-icon">
+          <IconComponent size={18} />
+        </span>
+      </button>
+    );
+  };
+
   return (
     <div className="toolbar2d">
-      {toolGroups.map((group, groupIndex) => (
-        <div key={group.name} className="tool-group">
-          {group.tools.map(tool => {
-            const IconComponent = tool.icon;
-            return (
-              <button
-                key={tool.id}
-                className={`tool-btn ${currentActiveTool === tool.id ? 'active' : ''}`}
-                onClick={() => handleToolClick(tool.id)}
-                title={`${tool.name}${tool.shortcut ? ` (${tool.shortcut.toUpperCase()})` : ''}`}
-              >
-                <span className="tool-icon">
-                  <IconComponent size={18} />
-                </span>
-              </button>
-            );
-          })}
-          {groupIndex < toolGroups.length - 1 && <div className="tool-separator" />}
+      {toolLayout.map((group, groupIndex) => (
+        <div key={groupIndex} className="tool-row-group">
+          {group.rows.map(([leftId, rightId]) => (
+            <div key={`${leftId}-${rightId || 'empty'}`} className="tool-row">
+              {renderToolButton(leftId)}
+              {rightId ? renderToolButton(rightId) : <div className="tool-spacer" />}
+            </div>
+          ))}
+          {groupIndex < toolLayout.length - 1 && <div className="tool-separator" />}
         </div>
       ))}
     </div>
