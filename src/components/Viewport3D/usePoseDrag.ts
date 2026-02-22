@@ -6,32 +6,8 @@ import {
   clampJointRotation,
   selectJoint,
   mirrorJoint,
-  JOINT_CONSTRAINTS,
 } from '../../store/avatarSlice';
-
-type AxisMapping = { horizontal?: 'x' | 'y' | 'z'; vertical?: 'x' | 'y' | 'z' };
-
-// Axis mapping verified via axis discovery on Avaturn GLB:
-// Arms: +X = lower (adduction), -X = raise. Z = forward/backward
-// Legs: +X = flex (kick forward), -X = extend back
-// Spine: Y = twist, X = flex/extend
-const AXIS_MAP: Record<string, AxisMapping> = {
-  LeftArm: { vertical: 'x', horizontal: 'z' },    // drag up→raise(-X), drag right→forward(+Z)
-  RightArm: { vertical: 'x', horizontal: 'z' },    // drag up→raise(-X), drag right→forward(-Z)
-  LeftForeArm: { vertical: 'x' },                   // hinge: drag up→flex(+X)
-  RightForeArm: { vertical: 'x' },
-  LeftUpLeg: { vertical: 'x', horizontal: 'z' },
-  RightUpLeg: { vertical: 'x', horizontal: 'z' },
-  LeftLeg: { vertical: 'x' },
-  RightLeg: { vertical: 'x' },
-  Spine: { horizontal: 'y', vertical: 'x' },
-  Spine1: { horizontal: 'y', vertical: 'x' },
-  Spine2: { horizontal: 'y', vertical: 'x' },
-  Neck: { horizontal: 'y', vertical: 'x' },
-  Head: { horizontal: 'y', vertical: 'x' },
-  LeftShoulder: { horizontal: 'z', vertical: 'x' },
-  RightShoulder: { horizontal: 'z', vertical: 'x' },
-};
+import { DRAG_MAPPINGS, HUMAN_JOINTS } from '../../utils/avatar/jointConstraints';
 
 const SENSITIVITY = 0.5; // degrees per pixel
 
@@ -59,7 +35,7 @@ export function usePoseDrag(
       e.nativeEvent.stopPropagation();
       e.nativeEvent.stopImmediatePropagation();
     }
-    if (!JOINT_CONSTRAINTS[jointName]) return;
+    if (!HUMAN_JOINTS[jointName]) return;
 
     isDraggingRef.current = true;
     activeJointRef.current = jointName;
@@ -84,7 +60,7 @@ export function usePoseDrag(
     const dy = e.clientY - lastPosRef.current.y;
     lastPosRef.current = { x: e.clientX, y: e.clientY };
 
-    const mapping = AXIS_MAP[joint];
+    const mapping = DRAG_MAPPINGS[joint];
     if (!mapping) return;
 
     // Read current rotation from store (avoid stale closure)
@@ -92,10 +68,12 @@ export function usePoseDrag(
     const newRot = { ...currentRot };
 
     if (mapping.horizontal && dx !== 0) {
-      newRot[mapping.horizontal] += dx * SENSITIVITY;
+      const sign = mapping.horizontalSign ?? 1;
+      newRot[mapping.horizontal] += dx * SENSITIVITY * sign;
     }
     if (mapping.vertical && dy !== 0) {
-      newRot[mapping.vertical] -= dy * SENSITIVITY; // invert Y for natural feel
+      const sign = mapping.verticalSign ?? -1; // default: invert Y for natural feel
+      newRot[mapping.vertical] += dy * SENSITIVITY * sign;
     }
 
     const clamped = clampJointRotation(joint, newRot);

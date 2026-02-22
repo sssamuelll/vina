@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
-import { constrainJointRotation, ANATOMICAL_CONSTRAINTS } from '../utils/avatar/swingTwistConstraint';
+import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
 
 export interface JointRotation {
   x: number;  // degrees
@@ -152,9 +152,9 @@ export const IK_CHAINS: IKChain[] = [
  * Falls back to simple per-axis clamp for joints without anatomical definition.
  */
 export function clampJointRotation(jointName: string, rotation: JointRotation): JointRotation {
-  // Use biomechanical swing-twist constraint if defined
-  if (ANATOMICAL_CONSTRAINTS[jointName]) {
-    return constrainJointRotation(jointName, rotation);
+  // Use anatomical joint constraints (hinge/ball/limited)
+  if (HUMAN_JOINTS[jointName]) {
+    return constrainJoint(jointName, rotation);
   }
   
   // Legacy fallback for joints without anatomical constraints
