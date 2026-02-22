@@ -349,3 +349,16 @@
   color: #6aafff;
   border-color: rgba(68, 136, 255, 0.4);
 }
+
+/* Saved poses */
+.ap-saved-poses {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ap-saved-pose-row {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}

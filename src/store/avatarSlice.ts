@@ -30,6 +30,7 @@ export interface AvatarState {
   pose: PoseState;
   poseEditorOpen: boolean;
   selectedJoint: string | null;
+  savedPoses: SavedPose[];
   avatarProfiles: AvatarProfile[];
   activeProfileId: string | null;
 }
@@ -154,6 +155,27 @@ export function clampJointRotation(jointName: string, rotation: JointRotation): 
 
 export const MIRROR_MAP_EXPORT = MIRROR_MAP;
 
+// ─── Custom Pose Storage (localStorage) ───
+export interface SavedPose {
+  id: string;
+  name: string;
+  joints: Record<string, JointRotation>;
+  createdAt: number;
+}
+
+const POSES_STORAGE_KEY = 'openclo-saved-poses';
+
+function loadSavedPoses(): SavedPose[] {
+  try {
+    const raw = localStorage.getItem(POSES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function persistPoses(poses: SavedPose[]) {
+  localStorage.setItem(POSES_STORAGE_KEY, JSON.stringify(poses));
+}
+
 const initialState: AvatarState = {
   pose: {
     joints: { ...POSE_PRESETS['A-pose'] },
@@ -164,6 +186,7 @@ const initialState: AvatarState = {
   },
   poseEditorOpen: false,
   selectedJoint: null,
+  savedPoses: [],
   avatarProfiles: [],
   activeProfileId: null,
 };
@@ -182,6 +205,13 @@ const avatarSlice = createSlice({
       if (preset !== undefined) {
         state.pose.joints = { ...preset };
         state.pose.activePreset = action.payload;
+        return;
+      }
+      // Check saved custom poses
+      const custom = state.savedPoses.find(p => p.id === action.payload);
+      if (custom) {
+        state.pose.joints = { ...custom.joints };
+        state.pose.activePreset = custom.id;
       }
     },
     resetPose(state) {
@@ -232,6 +262,45 @@ const avatarSlice = createSlice({
       state.pose.activePreset = null;
     },
     
+    // ─── Custom Pose Management ───
+    loadSavedPosesFromStorage(state) {
+      state.savedPoses = loadSavedPoses();
+    },
+    savePose(state, action: PayloadAction<string>) {
+      const name = action.payload;
+      const now = Date.now();
+      const pose: SavedPose = {
+        id: `pose-${now}`,
+        name,
+        joints: { ...state.pose.joints },
+        createdAt: now,
+      };
+      const poses = loadSavedPoses();
+      poses.push(pose);
+      persistPoses(poses);
+      state.savedPoses = poses;
+      state.pose.activePreset = pose.id;
+    },
+    deleteSavedPose(state, action: PayloadAction<string>) {
+      const poses = loadSavedPoses().filter(p => p.id !== action.payload);
+      persistPoses(poses);
+      state.savedPoses = poses;
+      if (state.pose.activePreset === action.payload) {
+        state.pose.activePreset = null;
+      }
+    },
+    overwriteSavedPose(state, action: PayloadAction<string>) {
+      const id = action.payload;
+      const poses = loadSavedPoses();
+      const idx = poses.findIndex(p => p.id === id);
+      if (idx >= 0) {
+        poses[idx].joints = { ...state.pose.joints };
+        poses[idx].createdAt = Date.now();
+        persistPoses(poses);
+        state.savedPoses = poses;
+      }
+    },
+
     // ─── IK Actions ───
     toggleIK(state) {
       state.pose.ikEnabled = !state.pose.ikEnabled;
@@ -259,6 +328,7 @@ const avatarSlice = createSlice({
 export const {
   setJointRotation, setPreset, resetPose, togglePoseEditor, selectJoint, mirrorJoint,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
+  loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
   toggleIK, setIKTarget, removeIKTarget, updateIKChainTarget,
 } = avatarSlice.actions;
 export default avatarSlice.reducer;

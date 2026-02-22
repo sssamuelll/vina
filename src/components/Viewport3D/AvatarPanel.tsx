@@ -3,6 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
+  loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
   POSE_PRESETS, JOINT_CONSTRAINTS,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
 } from '../../store/avatarSlice';
@@ -51,6 +52,7 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
 
   // Pose state
   const activePreset = useSelector((s: RootState) => s.avatar.pose.activePreset);
+  const savedPoses = useSelector((s: RootState) => s.avatar.savedPoses);
   const selectedJoint = useSelector((s: RootState) => s.avatar.selectedJoint);
   const jointRotation = useSelector(
     (s: RootState) => selectedJoint ? s.avatar.pose.joints[selectedJoint] : null
@@ -68,6 +70,7 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
 
   useEffect(() => {
     dispatch(loadProfilesFromStorage());
+    dispatch(loadSavedPosesFromStorage());
   }, [dispatch]);
 
   // Derive model name
@@ -269,7 +272,43 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
                     </button>
                   ))}
                 </div>
-                <button className="ap-btn" onClick={() => dispatch(resetPose())}>Reset All</button>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button className="ap-btn" style={{ flex: 1 }} onClick={() => dispatch(resetPose())}>Reset All</button>
+                  <button className="ap-btn" style={{ flex: 1 }} onClick={() => {
+                    const name = prompt('Pose name:');
+                    if (name) dispatch(savePose(name));
+                  }}>💾 Save Pose</button>
+                </div>
+
+                {/* Saved custom poses */}
+                {savedPoses.length > 0 && (
+                  <div className="ap-saved-poses">
+                    <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>Saved Poses</div>
+                    {savedPoses.map(p => (
+                      <div key={p.id} className="ap-saved-pose-row">
+                        <button
+                          className={`ap-preset-btn ${activePreset === p.id ? 'active' : ''}`}
+                          style={{ flex: 1, textAlign: 'left' }}
+                          onClick={() => dispatch(setPreset(p.id))}
+                        >
+                          {p.name}
+                        </button>
+                        <button
+                          className="ap-btn"
+                          style={{ padding: '1px 5px', fontSize: 9, flexShrink: 0 }}
+                          onClick={() => dispatch(overwriteSavedPose(p.id))}
+                          title="Overwrite with current pose"
+                        >↻</button>
+                        <button
+                          className="ap-btn"
+                          style={{ padding: '1px 5px', fontSize: 9, flexShrink: 0 }}
+                          onClick={() => { if (confirm(`Delete "${p.name}"?`)) dispatch(deleteSavedPose(p.id)); }}
+                          title="Delete"
+                        >×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="ap-hint">Click joints in 3D to pose</div>
 
