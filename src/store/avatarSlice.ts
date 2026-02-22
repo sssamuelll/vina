@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
+import { constrainJointRotation, ANATOMICAL_CONSTRAINTS } from '../utils/avatar/swingTwistConstraint';
 
 export interface JointRotation {
   x: number;  // degrees
@@ -62,18 +63,18 @@ export const JOINT_CONSTRAINTS: Record<string, {
   Head: { minX: -20, maxX: 20, minY: -40, maxY: 40, minZ: -20, maxZ: 20 },
   
   // Left arm — EMPIRICALLY VERIFIED axis mapping (Mixamo + ZYX Euler):
-  //   X(-) = raise arm up/overhead    X(+) = arm behind back
+  //   X(+) = raise arm up/overhead    X(-) = arm behind back / down
   //   Y(-) = arm forward (zombie)     Y(+) = limited
-  //   Z(-) = abduction (away body)    Z(+) = adduction (toward body)
+  //   Z(+) = abduction LEFT (away body)  Z(-) = adduction LEFT (toward body)
   // Human ROM: raise ~170°, back ~40°, forward ~90°, abduction ~80°
-  LeftShoulder: { minX: -15, maxX: 10, minY: -10, maxY: 10, minZ: -15, maxZ: 5 },
-  LeftArm: { minX: -160, maxX: 40, minY: -90, maxY: 20, minZ: -80, maxZ: 5 },
-  LeftForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
+  LeftShoulder: { minX: -10, maxX: 15, minY: -10, maxY: 10, minZ: -5, maxZ: 15 },
+  LeftArm: { minX: -40, maxX: 160, minY: -90, maxY: 20, minZ: -5, maxZ: 80 },
+  LeftForeArm: { minX: 0, maxX: 145, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
   
-  // Right arm — Z mirrored, Y mirrored
-  RightShoulder: { minX: -15, maxX: 10, minY: -10, maxY: 10, minZ: -5, maxZ: 15 },
-  RightArm: { minX: -160, maxX: 40, minY: -20, maxY: 90, minZ: -5, maxZ: 80 },
-  RightForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
+  // Right arm — Z mirrored
+  RightShoulder: { minX: -10, maxX: 15, minY: -10, maxY: 10, minZ: -15, maxZ: 5 },
+  RightArm: { minX: -40, maxX: 160, minY: -20, maxY: 90, minZ: -80, maxZ: 5 },
+  RightForeArm: { minX: 0, maxX: 145, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
   
   // Left leg — X: flexion(+)/extension(-), Y: internal/external rotation, Z: abduction
   // Human hip: ~120° flexion, ~20° extension, ~45° abduction, ~30° adduction
@@ -87,21 +88,23 @@ export const JOINT_CONSTRAINTS: Record<string, {
 
 export const POSE_PRESETS: Record<string, Record<string, JointRotation>> = {
   'A-pose': {
-    LeftArm: { x: 27, y: 0, z: -25 },
-    RightArm: { x: 27, y: 0, z: 25 },
-    LeftShoulder: { x: 0, y: 0, z: -5 },
-    RightShoulder: { x: 0, y: 0, z: 5 },
+    // +X = lower arm (adduction), verified via axis discovery
+    LeftArm: { x: 25, y: 0, z: 0 },
+    RightArm: { x: 25, y: 0, z: 0 },
   },
   'T-pose': {},
   'Relaxed': {
-    LeftArm: { x: 0, y: 0, z: -60 },
-    RightArm: { x: 0, y: 0, z: 60 },
+    // +X = lower arm significantly
+    LeftArm: { x: 60, y: 0, z: 0 },
+    RightArm: { x: 60, y: 0, z: 0 },
     LeftUpLeg: { x: 5, y: 0, z: 0 },
     RightUpLeg: { x: 5, y: 0, z: 0 },
   },
   'Arms Forward': {
-    LeftArm: { x: 0, y: 90, z: 0 },
-    RightArm: { x: 0, y: -90, z: 0 },
+    // -Z = forward for Left, +Z = forward for Right (from discovery)
+    // Actually: LeftArm +Z = slight fwd, -Z = very backward. So +Z for forward.
+    LeftArm: { x: 0, y: 0, z: 45 },
+    RightArm: { x: 0, y: 0, z: -45 },
   },
   'Sitting': {
     LeftUpLeg: { x: 90, y: 0, z: 0 },
@@ -145,9 +148,16 @@ export const IK_CHAINS: IKChain[] = [
 ];
 
 /**
- * Clamp joint rotation values within their constraints
+ * Clamp joint rotation using swing-twist biomechanical constraints.
+ * Falls back to simple per-axis clamp for joints without anatomical definition.
  */
 export function clampJointRotation(jointName: string, rotation: JointRotation): JointRotation {
+  // Use biomechanical swing-twist constraint if defined
+  if (ANATOMICAL_CONSTRAINTS[jointName]) {
+    return constrainJointRotation(jointName, rotation);
+  }
+  
+  // Legacy fallback for joints without anatomical constraints
   const constraints = JOINT_CONSTRAINTS[jointName];
   if (!constraints) return rotation;
   

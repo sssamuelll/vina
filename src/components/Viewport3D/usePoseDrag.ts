@@ -11,10 +11,14 @@ import {
 
 type AxisMapping = { horizontal?: 'x' | 'y' | 'z'; vertical?: 'x' | 'y' | 'z' };
 
+// Axis mapping verified via axis discovery on Avaturn GLB:
+// Arms: +X = lower (adduction), -X = raise. Z = forward/backward
+// Legs: +X = flex (kick forward), -X = extend back
+// Spine: Y = twist, X = flex/extend
 const AXIS_MAP: Record<string, AxisMapping> = {
-  LeftArm: { horizontal: 'z', vertical: 'x' },
-  RightArm: { horizontal: 'z', vertical: 'x' },
-  LeftForeArm: { vertical: 'x' },
+  LeftArm: { vertical: 'x', horizontal: 'z' },    // drag up→raise(-X), drag right→forward(+Z)
+  RightArm: { vertical: 'x', horizontal: 'z' },    // drag up→raise(-X), drag right→forward(-Z)
+  LeftForeArm: { vertical: 'x' },                   // hinge: drag up→flex(+X)
   RightForeArm: { vertical: 'x' },
   LeftUpLeg: { vertical: 'x', horizontal: 'z' },
   RightUpLeg: { vertical: 'x', horizontal: 'z' },

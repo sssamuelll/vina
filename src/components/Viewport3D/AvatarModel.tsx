@@ -17,6 +17,137 @@ interface AvatarModelProps {
 
 const DEG2RAD = Math.PI / 180;
 
+// ===== AXIS DISCOVERY (keep for future GLB models) — enable with ?axisDiscovery in URL =====
+function discoverBoneAxes(boneMap: Map<string, THREE.Bone>, bindPoses: Map<string, THREE.Quaternion>, scene: THREE.Object3D) {
+  const testBones = ['LeftShoulder', 'LeftArm', 'LeftForeArm', 'RightArm'];
+  const handBone = boneMap.get('LeftHand') || boneMap.get('LeftForeArm');
+  const rightHandBone = boneMap.get('RightHand') || boneMap.get('RightForeArm');
+  if (!handBone) { console.warn('[AxisDiscovery] No hand bone found'); return; }
+  
+  const axes = ['x', 'y', 'z'] as const;
+  const testAngle = 45; // degrees
+  
+  console.log('===== AXIS DISCOVERY START =====');
+  console.log('Bone hierarchy:');
+  const hierBones = ['Hips', 'Spine', 'Spine1', 'Spine2', 'LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+                     'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand'];
+  for (const bn of hierBones) {
+    const b = boneMap.get(bn);
+    if (b) {
+      const wp = new THREE.Vector3();
+      b.getWorldPosition(wp);
+      const localAxes = {
+        x: new THREE.Vector3(1,0,0).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())),
+        y: new THREE.Vector3(0,1,0).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())),
+        z: new THREE.Vector3(0,0,1).applyQuaternion(b.getWorldQuaternion(new THREE.Quaternion())),
+      };
+      console.log(`  ${bn}: world(${wp.x.toFixed(3)}, ${wp.y.toFixed(3)}, ${wp.z.toFixed(3)}) | localX→world(${localAxes.x.x.toFixed(2)},${localAxes.x.y.toFixed(2)},${localAxes.x.z.toFixed(2)}) localY→(${localAxes.y.x.toFixed(2)},${localAxes.y.y.toFixed(2)},${localAxes.y.z.toFixed(2)}) localZ→(${localAxes.z.x.toFixed(2)},${localAxes.z.y.toFixed(2)},${localAxes.z.z.toFixed(2)})`);
+    }
+  }
+  
+  // Get baseline hand position
+  scene.updateMatrixWorld(true);
+  const baseline = new THREE.Vector3();
+  handBone.getWorldPosition(baseline);
+  const rightBaseline = new THREE.Vector3();
+  if (rightHandBone) rightHandBone.getWorldPosition(rightBaseline);
+  
+  console.log(`\nBaseline LeftHand world: (${baseline.x.toFixed(3)}, ${baseline.y.toFixed(3)}, ${baseline.z.toFixed(3)})`);
+  if (rightHandBone) console.log(`Baseline RightHand world: (${rightBaseline.x.toFixed(3)}, ${rightBaseline.y.toFixed(3)}, ${rightBaseline.z.toFixed(3)})`);
+  
+  for (const boneName of testBones) {
+    const bone = boneMap.get(boneName);
+    const bindQ = bindPoses.get(boneName);
+    if (!bone || !bindQ) continue;
+    
+    const refHand = boneName.startsWith('Right') ? rightHandBone : handBone;
+    const refBaseline = boneName.startsWith('Right') ? rightBaseline : baseline;
+    if (!refHand) continue;
+    
+    console.log(`\n--- ${boneName} (testing +${testAngle}° each axis) ---`);
+    
+    for (const axis of axes) {
+      // Reset to bind pose
+      bone.quaternion.copy(bindQ);
+      scene.updateMatrixWorld(true);
+      
+      // Apply +testAngle on this axis only
+      const euler = new THREE.Euler(
+        axis === 'x' ? testAngle * DEG2RAD : 0,
+        axis === 'y' ? testAngle * DEG2RAD : 0,
+        axis === 'z' ? testAngle * DEG2RAD : 0,
+        'ZYX'
+      );
+      const rotQ = new THREE.Quaternion().setFromEuler(euler);
+      bone.quaternion.copy(bindQ).multiply(rotQ);
+      scene.updateMatrixWorld(true);
+      
+      const pos = new THREE.Vector3();
+      refHand.getWorldPosition(pos);
+      const delta = pos.clone().sub(refBaseline);
+      
+      // Interpret anatomically (world space: Y=up, Z=forward, X=right)
+      let interpretation = '';
+      if (Math.abs(delta.y) > Math.abs(delta.x) && Math.abs(delta.y) > Math.abs(delta.z)) {
+        interpretation = delta.y > 0 ? 'HAND GOES UP ↑' : 'HAND GOES DOWN ↓';
+      } else if (Math.abs(delta.x) > Math.abs(delta.z)) {
+        interpretation = delta.x > 0 ? 'HAND GOES RIGHT →' : 'HAND GOES LEFT ←';
+      } else {
+        interpretation = delta.z > 0 ? 'HAND GOES FORWARD ↗' : 'HAND GOES BACKWARD ↙';
+      }
+      
+      console.log(`  +${axis}: hand delta(${delta.x.toFixed(3)}, ${delta.y.toFixed(3)}, ${delta.z.toFixed(3)}) → ${interpretation}`);
+      
+      // Reset
+      bone.quaternion.copy(bindQ);
+    }
+    
+    // Also test negative
+    console.log(`  --- ${boneName} (testing -${testAngle}° each axis) ---`);
+    for (const axis of axes) {
+      bone.quaternion.copy(bindQ);
+      scene.updateMatrixWorld(true);
+      
+      const euler = new THREE.Euler(
+        axis === 'x' ? -testAngle * DEG2RAD : 0,
+        axis === 'y' ? -testAngle * DEG2RAD : 0,
+        axis === 'z' ? -testAngle * DEG2RAD : 0,
+        'ZYX'
+      );
+      const rotQ = new THREE.Quaternion().setFromEuler(euler);
+      bone.quaternion.copy(bindQ).multiply(rotQ);
+      scene.updateMatrixWorld(true);
+      
+      const pos = new THREE.Vector3();
+      refHand.getWorldPosition(pos);
+      const delta = pos.clone().sub(refBaseline);
+      
+      let interpretation = '';
+      if (Math.abs(delta.y) > Math.abs(delta.x) && Math.abs(delta.y) > Math.abs(delta.z)) {
+        interpretation = delta.y > 0 ? 'HAND GOES UP ↑' : 'HAND GOES DOWN ↓';
+      } else if (Math.abs(delta.x) > Math.abs(delta.z)) {
+        interpretation = delta.x > 0 ? 'HAND GOES RIGHT →' : 'HAND GOES LEFT ←';
+      } else {
+        interpretation = delta.z > 0 ? 'HAND GOES FORWARD ↗' : 'HAND GOES BACKWARD ↙';
+      }
+      
+      console.log(`  -${axis}: hand delta(${delta.x.toFixed(3)}, ${delta.y.toFixed(3)}, ${delta.z.toFixed(3)}) → ${interpretation}`);
+      
+      bone.quaternion.copy(bindQ);
+    }
+  }
+  
+  // Final reset all
+  for (const boneName of testBones) {
+    const bone = boneMap.get(boneName);
+    const bindQ = bindPoses.get(boneName);
+    if (bone && bindQ) bone.quaternion.copy(bindQ);
+  }
+  scene.updateMatrixWorld(true);
+  console.log('\n===== AXIS DISCOVERY END =====');
+}
+// ===== END AXIS DISCOVERY =====
+
 export default function AvatarModel({ url, autoScale = true, height = 1.80 }: AvatarModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const gltf = useLoader(GLTFLoader, url);
@@ -64,6 +195,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
           console.log(`[AvatarModel] Applied ${name} z:${jointRot.z}°`);
         }
       });
+      // Run axis discovery diagnostic (enable with ?axisDiscovery in URL)
+      if (window.location.search.includes('axisDiscovery')) {
+        discoverBoneAxes(boneMap.current, bindPoses.current, scene);
+      }
     } else {
       // Fallback: traverse for bones
       scene.traverse((obj) => {
