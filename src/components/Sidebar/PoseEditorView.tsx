@@ -6,6 +6,8 @@ import {
   setPreset,
   resetPose,
   mirrorJoint,
+  toggleIK,
+  removeIKTarget,
   POSE_PRESETS,
 } from '../../store/avatarSlice';
 import './PoseEditorView.css';
@@ -78,6 +80,8 @@ function JointSliders({ joint }: { joint: string }) {
 export default function PoseEditorView() {
   const dispatch = useDispatch();
   const activePreset = useSelector((s: RootState) => s.avatar.pose.activePreset);
+  const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
+  const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const toggleGroup = (label: string) => {
@@ -102,6 +106,42 @@ export default function PoseEditorView() {
         <button className="pose-reset-all" onClick={() => dispatch(resetPose())}>
           Reset All
         </button>
+      </div>
+
+      <div className="pose-ik-section">
+        <div className="pose-section-title">Inverse Kinematics</div>
+        <div className="pose-ik-controls">
+          <label className="pose-ik-toggle">
+            <input
+              type="checkbox"
+              checked={ikEnabled}
+              onChange={() => dispatch(toggleIK())}
+            />
+            Enable IK Mode
+          </label>
+          {ikEnabled && (
+            <div className="pose-ik-help">
+              <small>Click and drag hands/feet in the 3D view to pose with IK</small>
+            </div>
+          )}
+        </div>
+        {ikTargets.length > 0 && (
+          <div className="pose-ik-targets">
+            <div className="pose-subsection-title">Active Targets</div>
+            {ikTargets.map(target => (
+              <div key={target.name} className="pose-ik-target">
+                <span>{target.name}</span>
+                <button 
+                  className="pose-btn-small"
+                  onClick={() => dispatch(removeIKTarget(target.name))}
+                  title="Remove IK target"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="pose-joints">

@@ -28,38 +28,43 @@ export function clearAvatarSDFCache(): void {
 
 // ─── A-Pose helpers ──────────────────────────────────────────────────────────
 
-const DEG75 = (Math.PI / 180) * 75;
-const DEG5 = (Math.PI / 180) * 5;
+import { POSE_PRESETS } from '../../store/avatarSlice';
+
+const DEG2RAD = Math.PI / 180;
 
 /**
  * Apply the same A-pose bone rotations that AvatarModel.tsx applies.
- * For Mixamo rigs: Z-axis rotation lowers arms from T-pose to A-pose.
- * Left arm: negative Z (down), Right arm: positive Z (down).
+ * Uses the same Euler rotation approach for consistency.
  */
 function applyAPose(scene: THREE.Object3D): void {
-  let left: THREE.Bone | null = null;
-  let right: THREE.Bone | null = null;
-  let leftShoulder: THREE.Bone | null = null;
-  let rightShoulder: THREE.Bone | null = null;
+  const boneMap = new Map<string, THREE.Bone>();
+  const bindPoses = new Map<string, THREE.Quaternion>();
 
+  // Collect bones
   scene.traverse((obj) => {
     if (!(obj as THREE.Bone).isBone) return;
     const bone = obj as THREE.Bone;
-    if (bone.name === 'LeftArm' || bone.name === 'LeftUpperArm') left = bone;
-    else if (bone.name === 'RightArm' || bone.name === 'RightUpperArm') right = bone;
-    else if (bone.name === 'LeftShoulder') leftShoulder = bone;
-    else if (bone.name === 'RightShoulder') rightShoulder = bone;
+    boneMap.set(bone.name, bone);
+    bindPoses.set(bone.name, bone.quaternion.clone());
   });
 
-  const leftArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -DEG75);
-  const rightArmRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG75);
-  if (left) (left as THREE.Bone).quaternion.multiply(leftArmRot);
-  if (right) (right as THREE.Bone).quaternion.multiply(rightArmRot);
+  // Apply A-pose rotations using the same logic as AvatarModel.tsx
+  const aPoseJoints = POSE_PRESETS['A-pose'];
+  boneMap.forEach((bone, name) => {
+    const bindPose = bindPoses.get(name);
+    if (!bindPose) return;
 
-  const leftShoulderRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -DEG5);
-  const rightShoulderRot = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), DEG5);
-  if (leftShoulder) (leftShoulder as THREE.Bone).quaternion.multiply(leftShoulderRot);
-  if (rightShoulder) (rightShoulder as THREE.Bone).quaternion.multiply(rightShoulderRot);
+    const jointRot = aPoseJoints[name];
+    if (jointRot) {
+      // Use Euler with 'ZYX' order for more natural rotations
+      const euler = new THREE.Euler(jointRot.x * DEG2RAD, jointRot.y * DEG2RAD, jointRot.z * DEG2RAD, 'ZYX');
+      const rotQ = new THREE.Quaternion().setFromEuler(euler);
+      // POST-multiply: bindPose first, then local rotation (local space)
+      bone.quaternion.copy(bindPose).multiply(rotQ);
+    } else {
+      bone.quaternion.copy(bindPose);
+    }
+  });
 }
 
 // ─── Mesh extraction ─────────────────────────────────────────────────────────

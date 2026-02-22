@@ -129,6 +129,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pose: {
         joints: { LeftArm: { x: 50, y: 0, z: 0 }, RightArm: { x: 50, y: 0, z: 0 }, LeftShoulder: { x: 8, y: 0, z: 0 }, RightShoulder: { x: 8, y: 0, z: 0 } },
         activePreset: 'A-pose',
+        ikChains: [],
+        ikTargets: [],
+        ikEnabled: false,
       },
       poseEditorOpen: false,
       avatarProfiles: [],
