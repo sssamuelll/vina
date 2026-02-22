@@ -19,9 +19,9 @@ const AvatarIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const avatarTool: ToolDefinition = {
   id: 'avatar',
-  name: 'Avatar & Measurements',
+  name: 'Avatar',
   context: '3d',
   icon: AvatarIcon,
   cursor: 'pointer',
-  group: '3d-edit',
+  group: '3d-avatar',
 };

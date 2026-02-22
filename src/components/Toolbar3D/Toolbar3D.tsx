@@ -16,9 +16,22 @@ export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Tool
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
 
-  // Get 3D tools from registry
-  const tools3D = useMemo(() => {
-    return toolRegistry.getToolsByContext('3d');
+  // Get 3D tools grouped by category (CLO3D style)
+  const toolGroups = useMemo(() => {
+    const groups = [
+      '3d-navigate',    // Navigation
+      '3d-arrange',     // Arrangement 
+      '3d-edit',        // Editing
+      '3d-avatar',      // Avatar
+      '3d-simulation'   // Simulation
+    ];
+    
+    return groups.map(groupName => ({
+      name: groupName,
+      tools: toolRegistry.getToolsByGroup(groupName).filter(tool => 
+        tool.context === '3d' || tool.context === 'both'
+      )
+    })).filter(group => group.tools.length > 0);
   }, []);
 
   const handleClick = (toolId: string) => {
@@ -47,21 +60,26 @@ export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Tool
 
   return (
     <div className="toolbar3d">
-      {tools3D.map(tool => {
-        const IconComponent = tool.icon;
-        return (
-          <button
-            key={tool.id}
-            className={`tool3d-btn ${isActive(tool.id) ? 'active' : ''}`}
-            onClick={() => handleClick(tool.id)}
-            title={tool.name}
-          >
-            <span className="tool3d-icon">
-              <IconComponent size={18} />
-            </span>
-          </button>
-        );
-      })}
+      {toolGroups.map((group, groupIndex) => (
+        <div key={group.name} className="tool3d-group">
+          {group.tools.map(tool => {
+            const IconComponent = tool.icon;
+            return (
+              <button
+                key={tool.id}
+                className={`tool3d-btn ${isActive(tool.id) ? 'active' : ''}`}
+                onClick={() => handleClick(tool.id)}
+                title={tool.name}
+              >
+                <span className="tool3d-icon">
+                  <IconComponent size={18} />
+                </span>
+              </button>
+            );
+          })}
+          {groupIndex < toolGroups.length - 1 && <div className="tool3d-separator" />}
+        </div>
+      ))}
     </div>
   );
 }

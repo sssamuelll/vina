@@ -6,8 +6,22 @@
   flex-direction: column;
   align-items: center;
   padding: 8px 4px;
-  gap: 2px;
+  gap: 0;
   flex-shrink: 0;
+}
+
+.tool3d-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool3d-separator {
+  width: 20px;
+  height: 1px;
+  background: var(--border);
+  margin: 6px 0;
 }
 
 .tool3d-btn {

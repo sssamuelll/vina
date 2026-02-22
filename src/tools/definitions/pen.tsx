@@ -28,18 +28,26 @@ export const penTool: ToolDefinition = {
   options: [
     {
       id: 'smoothing',
-      label: 'Stroke Smoothing',
+      label: 'Smoothing',
       type: 'toggle',
       value: true,
     },
     {
-      id: 'snapAngle',
-      label: 'Snap to Angle',
-      type: 'number',
-      value: 15,
-      min: 0,
-      max: 45,
-      step: 5,
+      id: 'snapGrid',
+      label: 'Snap to Grid',
+      type: 'toggle',
+      value: false,
+    },
+    {
+      id: 'constrainAngles',
+      label: 'Constrain Angles',
+      type: 'select',
+      value: 'none',
+      choices: [
+        { label: 'None', value: 'none' },
+        { label: '45°', value: '45' },
+        { label: '90°', value: '90' },
+      ],
     },
   ],
 };

@@ -21,20 +21,26 @@ const PoseIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const poseTool: ToolDefinition = {
   id: 'pose',
-  name: 'Pose (drag joints)',
+  name: 'Pose',
   context: '3d',
   icon: PoseIcon,
   cursor: 'pointer',
-  group: '3d-edit',
+  group: '3d-avatar',
   options: [
     {
       id: 'sensitivity',
-      label: 'Sensitivity (°/px)',
+      label: 'Sensitivity',
       type: 'number',
       value: 0.5,
       min: 0.1,
       max: 2.0,
       step: 0.1,
+    },
+    {
+      id: 'constraints',
+      label: 'Constraint Toggle',
+      type: 'toggle',
+      value: true,
     },
   ],
 };

@@ -19,12 +19,12 @@ const MeasureIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const measureTool: ToolDefinition = {
   id: 'measure',
-  name: 'Measure Tool',
+  name: 'Measure',
   context: '2d',
   shortcut: 'm',
   icon: MeasureIcon,
   cursor: 'crosshair',
-  group: 'view',
+  group: 'annotation',
   options: [
     {
       id: 'units',
@@ -36,6 +36,18 @@ export const measureTool: ToolDefinition = {
         { label: 'Centimeters', value: 'cm' },
         { label: 'Inches', value: 'inches' },
       ],
+    },
+    {
+      id: 'showAngle',
+      label: 'Show Angle',
+      type: 'toggle',
+      value: false,
+    },
+    {
+      id: 'cumulative',
+      label: 'Cumulative Distance',
+      type: 'toggle',
+      value: false,
     },
   ],
 };

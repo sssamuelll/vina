@@ -18,12 +18,12 @@ const NotchIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const notchTool: ToolDefinition = {
   id: 'notch',
-  name: 'Notch Tool',
+  name: 'Notch',
   context: '2d',
   shortcut: 'n',
   icon: NotchIcon,
   cursor: 'pointer',
-  group: 'edit',
+  group: 'annotation',
   options: [
     {
       id: 'notchShape',
@@ -39,6 +39,15 @@ export const notchTool: ToolDefinition = {
         { label: 'Castle', value: 'castle' },
         { label: 'Diamond', value: 'diamond' },
       ],
+    },
+    {
+      id: 'notchSize',
+      label: 'Size',
+      type: 'number',
+      value: 8,
+      min: 3,
+      max: 20,
+      step: 1,
     },
     {
       id: 'notchCount',

@@ -19,12 +19,12 @@ const SeamIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 
 export const seamTool: ToolDefinition = {
   id: 'seam',
-  name: 'Seam Tool',
+  name: 'Seam',
   context: '2d',
   shortcut: 's',
   icon: SeamIcon,
   cursor: 'pointer',
-  group: 'edit',
+  group: 'sewing',
   options: [
     {
       id: 'seamType',
@@ -37,6 +37,15 @@ export const seamTool: ToolDefinition = {
         { label: 'Flat-Felled', value: 'flat-felled' },
         { label: 'Overlock', value: 'overlock' },
       ],
+    },
+    {
+      id: 'stitchLength',
+      label: 'Stitch Length',
+      type: 'number',
+      value: 2.5,
+      min: 1.0,
+      max: 6.0,
+      step: 0.1,
     },
   ],
 };
