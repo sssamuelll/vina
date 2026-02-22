@@ -30,14 +30,36 @@ import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import './Workspace.css';
 
-function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(window.innerWidth < breakpoint);
+/**
+ * Viewport-adaptive layout hook.
+ * Returns size class and adjusts initial layout based on available space.
+ * 
+ * Breakpoints:
+ *   mobile:  < 768px  → chat only
+ *   compact: < 1200px → default to 2D view, no split (not enough room)
+ *   medium:  < 1600px → split with 40/60 ratio favoring 3D
+ *   large:   ≥ 1600px → split with 50/50
+ */
+type ViewportClass = 'mobile' | 'compact' | 'medium' | 'large';
+
+function useViewportAdaptive() {
+  const getClass = useCallback((): ViewportClass => {
+    const w = window.innerWidth;
+    if (w < 768) return 'mobile';
+    if (w < 1200) return 'compact';
+    if (w < 1600) return 'medium';
+    return 'large';
+  }, []);
+
+  const [vpClass, setVpClass] = useState<ViewportClass>(getClass);
+
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < breakpoint);
+    const onResize = () => setVpClass(getClass());
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, [breakpoint]);
-  return isMobile;
+  }, [getClass]);
+
+  return vpClass;
 }
 
 /**
@@ -55,8 +77,25 @@ export default function Workspace() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const [, forceUpdate] = useState(0);
   const [showTemplates, setShowTemplates] = useState(false);
-  const isMobile = useIsMobile();
+  const vpClass = useViewportAdaptive();
+  const isMobile = vpClass === 'mobile';
   useKeyboardShortcuts();
+
+  // ─── Adapt layout to viewport on mount ───
+  const hasAdapted = useRef(false);
+  useEffect(() => {
+    if (hasAdapted.current) return;
+    hasAdapted.current = true;
+    
+    if (vpClass === 'compact') {
+      // Small screen: default to 2D, no split
+      if (viewMode === 'split') dispatch(setViewMode('2d'));
+    } else if (vpClass === 'medium') {
+      // Medium: split favoring 3D (40/60)
+      dispatch(setSplitRatio(0.4));
+    }
+    // Large: keep default 50/50 split
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Activity Bar & Sidebar ───
   const [activeView, setActiveView] = useState<SidebarView | null>(null);
