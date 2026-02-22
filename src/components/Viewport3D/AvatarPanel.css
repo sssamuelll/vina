@@ -1,34 +1,27 @@
-/* AvatarPanel — right-side overlay inside 3D viewport */
+/* AvatarPanel — sidebar that pushes 3D viewport (like ActivityBar sidebar) */
 .avatar-panel-wrapper {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 10;
-  pointer-events: none;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: width 0.2s ease;
+}
+
+.avatar-panel-wrapper.open {
+  width: 260px;
+}
+
+.avatar-panel-wrapper.closed {
+  width: 0;
 }
 
 .avatar-panel {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 280px;
-  background: rgba(30, 30, 30, 0.95);
-  backdrop-filter: blur(12px);
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  width: 260px;
+  height: 100%;
+  background: var(--bg-secondary, #1e1e1e);
+  border-left: 1px solid var(--border, rgba(255, 255, 255, 0.08));
   color: var(--text-primary, #ccc);
   font-size: 12px;
   display: flex;
   flex-direction: column;
-  pointer-events: auto;
-  transform: translateX(0);
-  transition: transform 0.2s ease;
-}
-
-.avatar-panel.hidden {
-  transform: translateX(100%);
-  pointer-events: none;
 }
 
 .avatar-panel-header {

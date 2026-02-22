@@ -156,8 +156,8 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
   const canMirror = selectedJoint ? (selectedJoint.startsWith('Left') || selectedJoint.startsWith('Right')) : false;
 
   return (
-    <div className="avatar-panel-wrapper">
-      <div className={`avatar-panel ${open ? '' : 'hidden'}`}>
+    <div className={`avatar-panel-wrapper ${open ? 'open' : 'closed'}`}>
+      <div className="avatar-panel">
         <div className="avatar-panel-header">
           <h3>Avatar & Pose</h3>
           <button className="avatar-panel-close" onClick={onClose} title="Close">×</button>
