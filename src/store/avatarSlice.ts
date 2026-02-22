@@ -61,16 +61,19 @@ export const JOINT_CONSTRAINTS: Record<string, {
   Neck: { minX: -40, maxX: 40, minY: -45, maxY: 45, minZ: -25, maxZ: 25 },
   Head: { minX: -20, maxX: 20, minY: -40, maxY: 40, minZ: -20, maxZ: 20 },
   
-  // Left arm — X: flexion(+)/extension(-), Y: internal/external rotation, Z: abduction(-)
-  // Human shoulder: ~170° flexion, ~45° extension, ~50° internal rot, ~90° external, ~180° abduction
-  LeftShoulder: { minX: -15, maxX: 15, minY: -15, maxY: 15, minZ: -15, maxZ: 10 },
-  LeftArm: { minX: -45, maxX: 60, minY: -50, maxY: 50, minZ: -80, maxZ: 0 },
-  LeftForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -10, maxZ: 10 },
+  // Left arm — EMPIRICALLY VERIFIED axis mapping (Mixamo + ZYX Euler):
+  //   X(-) = raise arm up/overhead    X(+) = arm behind back
+  //   Y(-) = arm forward (zombie)     Y(+) = limited
+  //   Z(-) = abduction (away body)    Z(+) = adduction (toward body)
+  // Human ROM: raise ~170°, back ~40°, forward ~90°, abduction ~80°
+  LeftShoulder: { minX: -15, maxX: 10, minY: -10, maxY: 10, minZ: -15, maxZ: 5 },
+  LeftArm: { minX: -160, maxX: 40, minY: -90, maxY: 20, minZ: -80, maxZ: 5 },
+  LeftForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
   
-  // Right arm (mirrored Z)
-  RightShoulder: { minX: -15, maxX: 15, minY: -15, maxY: 15, minZ: -10, maxZ: 15 },
-  RightArm: { minX: -45, maxX: 60, minY: -50, maxY: 50, minZ: 0, maxZ: 80 },
-  RightForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -10, maxZ: 10 },
+  // Right arm — Z mirrored, Y mirrored
+  RightShoulder: { minX: -15, maxX: 10, minY: -10, maxY: 10, minZ: -5, maxZ: 15 },
+  RightArm: { minX: -160, maxX: 40, minY: -20, maxY: 90, minZ: -5, maxZ: 80 },
+  RightForeArm: { minX: -145, maxX: 0, minY: -10, maxY: 10, minZ: -5, maxZ: 5 },
   
   // Left leg — X: flexion(+)/extension(-), Y: internal/external rotation, Z: abduction
   // Human hip: ~120° flexion, ~20° extension, ~45° abduction, ~30° adduction

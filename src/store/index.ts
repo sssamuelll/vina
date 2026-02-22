@@ -27,5 +27,8 @@ export const store = configureStore({
     }).concat(undoMiddleware),
 });
 
+// Expose store for debugging (remove in production)
+(window as unknown as Record<string, unknown>).__OPENCLO_STORE__ = store;
+
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
