@@ -82,15 +82,15 @@ export const HUMAN_JOINTS: Record<string, AnatomicalJoint> = {
   // Pronation/supination happens at the forearm (radioulnar joint), mapped to Y.
   LeftForeArm: {
     type: 'hinge',
-    hingeAxis: new THREE.Vector3(1, 0, 0),  // X axis = flexion from discovery
-    hingeMin: 0,      // full extension (straight arm)
-    hingeMax: 145,    // full flexion
-    // Allow forearm pronation/supination on Y
+    hingeAxis: new THREE.Vector3(0, 0, 1),  // Z axis = elbow flexion
+    hingeMin: 0,
+    hingeMax: 145,
+    // Y = forearm pronation/supination
     yMin: -85, yMax: 85,
   },
   RightForeArm: {
     type: 'hinge',
-    hingeAxis: new THREE.Vector3(1, 0, 0),
+    hingeAxis: new THREE.Vector3(0, 0, 1),
     hingeMin: 0,
     hingeMax: 145,
     yMin: -85, yMax: 85,
@@ -204,9 +204,15 @@ export function constrainJoint(
           result.x = 0;
           result.z = 0;
         } else {
+          // Hinge is on Z
           result.z = clamp(result.z, joint.hingeMin ?? -180, joint.hingeMax ?? 180);
           result.x = 0;
-          result.y = 0;
+          // Allow Y if defined (e.g., forearm pronation/supination)
+          if (joint.yMin !== undefined && joint.yMax !== undefined) {
+            result.y = clamp(result.y, joint.yMin, joint.yMax);
+          } else {
+            result.y = 0;
+          }
         }
       }
       break;
@@ -367,8 +373,8 @@ export const DRAG_MAPPINGS: Record<string, DragMapping> = {
   // Arms: vertical drag → X (raise/lower), horizontal drag → Z (forward/back)
   LeftArm:      { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: 1 },
   RightArm:     { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: -1 },
-  LeftForeArm:  { vertical: 'x', verticalSign: 1 },  // Only flexion
-  RightForeArm: { vertical: 'x', verticalSign: 1 },
+  LeftForeArm:  { vertical: 'z', verticalSign: 1, horizontal: 'y', horizontalSign: 1 },  // Z=elbow flex, Y=pronation
+  RightForeArm: { vertical: 'z', verticalSign: 1, horizontal: 'y', horizontalSign: -1 },
   // Shoulders: minimal, same pattern as arms
   LeftShoulder:  { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: 1 },
   RightShoulder: { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: -1 },
