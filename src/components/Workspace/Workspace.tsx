@@ -2,13 +2,13 @@ import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo } from '../../store/editorSlice';
+import { setActiveTool2D, setActiveTool3D } from '../../store/toolSlice';
 import { cycleCopilotPosition, setSplitRatio } from '../../store/layoutSlice';
 import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import Toolbar3D from '../Toolbar3D/Toolbar3D';
-import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import AvatarPanel from '../Viewport3D/AvatarPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
@@ -20,12 +20,14 @@ import CommandPalette from '../CommandPalette/CommandPalette';
 import type { Command } from '../CommandPalette/CommandPalette';
 import StatusBar from '../StatusBar/StatusBar';
 import BottomPanel from '../BottomPanel/BottomPanel';
+import ToolOptions from '../ToolOptions/ToolOptions';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { createCopilotKeyHandler } from '../../copilot/keyboardShortcuts';
 import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
+import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import './Workspace.css';
 
@@ -67,7 +69,7 @@ export default function Workspace() {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // ─── 3D Toolbar ───
-  const [activeTool3D, setActiveTool3D] = useState<Tool3D>('camera');
+  const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const [avatarPanelOpen, setAvatarPanelOpen] = useState(false);
 
   // ─── Split ratio (draggable divider) ───
@@ -170,17 +172,25 @@ export default function Workspace() {
   }, []);
 
   // ─── Command list for palette ───
-  const commands: Command[] = useMemo(() => [
-    // Tools
-    { id: 'tool-select', name: 'Select Tool', category: 'Tools', shortcut: 'V', action: () => dispatch(setActiveTool('select')) },
-    { id: 'tool-pen', name: 'Pen Tool', category: 'Tools', shortcut: 'P', action: () => dispatch(setActiveTool('pen')) },
-    { id: 'tool-line', name: 'Line Tool', category: 'Tools', shortcut: 'L', action: () => dispatch(setActiveTool('line')) },
-    { id: 'tool-rectangle', name: 'Rectangle Tool', category: 'Tools', shortcut: 'R', action: () => dispatch(setActiveTool('rectangle')) },
-    { id: 'tool-seam', name: 'Seam Tool', category: 'Tools', shortcut: 'S', action: () => dispatch(setActiveTool('seam')) },
-    { id: 'tool-notch', name: 'Notch Tool', category: 'Tools', shortcut: 'N', action: () => dispatch(setActiveTool('notch')) },
-    { id: 'tool-grainline', name: 'Grainline Tool', category: 'Tools', shortcut: 'G', action: () => dispatch(setActiveTool('grainline')) },
-    { id: 'tool-measure', name: 'Measure Tool', category: 'Tools', shortcut: 'M', action: () => dispatch(setActiveTool('measure')) },
-    { id: 'tool-hand', name: 'Hand Tool', category: 'Tools', shortcut: 'H', action: () => dispatch(setActiveTool('hand')) },
+  const commands: Command[] = useMemo(() => {
+    const toolCommands = toolRegistry.getAllTools().map(tool => ({
+      id: `tool-${tool.id}`,
+      name: tool.name,
+      category: 'Tools',
+      shortcut: tool.shortcut?.toUpperCase(),
+      action: () => {
+        if (tool.context === '2d' || tool.context === 'both') {
+          dispatch(setActiveTool(tool.id as any)); // Backward compatibility
+          dispatch(setActiveTool2D(tool.id));
+        }
+        if (tool.context === '3d' || tool.context === 'both') {
+          dispatch(setActiveTool3D(tool.id));
+        }
+      },
+    }));
+
+    return [
+      ...toolCommands,
 
     // View
     { id: 'view-2d', name: 'Switch to 2D View', category: 'View', action: () => handleViewModeChange('2d') },
@@ -206,7 +216,8 @@ export default function Workspace() {
 
     // Copilot
     { id: 'copilot-open', name: 'Open Copilot Panel', category: 'Copilot', action: () => { setBottomPanelOpen(true); } },
-  ], [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces]);
+    ];
+  }, [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces]);
 
   if (isMobile) {
     return (
@@ -309,6 +320,12 @@ export default function Workspace() {
         )}
 
         <div className="editor-area">
+          {/* Tool Options Bar */}
+          <div className="tool-options-wrapper">
+            {viewMode !== '3d' && <ToolOptions context="2d" />}
+            {viewMode !== '2d' && <ToolOptions context="3d" />}
+          </div>
+          
           <div className="editors-with-toolbar">
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
@@ -336,13 +353,11 @@ export default function Workspace() {
                 <div className="viewport-label">3D VIEW</div>
                 <div className="viewport3d-with-toolbar">
                   <Viewport3DErrorBoundary>
-                    <Viewport3D activeTool3D={activeTool3D} />
+                    <Viewport3D activeTool3D={activeTool3D as any} />
                   </Viewport3DErrorBoundary>
                   <AvatarPanel open={avatarPanelOpen} onClose={() => setAvatarPanelOpen(false)} />
                   <div className={`toolbar3d-wrapper ${viewMode !== '2d' ? 'visible' : 'hidden'}`}>
                     <Toolbar3D
-                      activeTool={activeTool3D}
-                      onToolChange={setActiveTool3D}
                       avatarPanelOpen={avatarPanelOpen}
                       onToggleAvatarPanel={() => setAvatarPanelOpen(v => !v)}
                     />

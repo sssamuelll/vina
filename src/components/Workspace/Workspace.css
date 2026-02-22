@@ -320,3 +320,13 @@
   width: 28px;
   height: 28px;
 }
+
+/* ─── Tool Options Bar ─── */
+.tool-options-wrapper {
+  flex-shrink: 0;
+  min-height: 0; /* Allow child to control height */
+}
+
+.tool-options-wrapper:empty {
+  display: none; /* Hide when no options are shown */
+}

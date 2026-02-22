@@ -139,6 +139,12 @@ function mockState(overrides?: Partial<RootState>): RootState {
       avatarProfiles: [],
       activeProfileId: null,
     },
+    tools: {
+      activeTool2D: 'select',
+      activeTool3D: 'camera',
+      toolOptions: {},
+      recentTools: [],
+    },
   };
 
   if (overrides) {
