@@ -29,6 +29,7 @@ export interface PoseState {
 export interface AvatarState {
   pose: PoseState;
   poseEditorOpen: boolean;
+  selectedJoint: string | null;
   avatarProfiles: AvatarProfile[];
   activeProfileId: string | null;
 }
@@ -151,6 +152,8 @@ export function clampJointRotation(jointName: string, rotation: JointRotation): 
   };
 }
 
+export const MIRROR_MAP_EXPORT = MIRROR_MAP;
+
 const initialState: AvatarState = {
   pose: {
     joints: { ...POSE_PRESETS['A-pose'] },
@@ -160,6 +163,7 @@ const initialState: AvatarState = {
     ikEnabled: false,
   },
   poseEditorOpen: false,
+  selectedJoint: null,
   avatarProfiles: [],
   activeProfileId: null,
 };
@@ -210,6 +214,9 @@ const avatarSlice = createSlice({
       }
     },
 
+    selectJoint(state, action: PayloadAction<string | null>) {
+      state.selectedJoint = action.payload;
+    },
     mirrorJoint(state, action: PayloadAction<string>) {
       const joint = action.payload;
       const mirror = MIRROR_MAP[joint];
@@ -250,7 +257,7 @@ const avatarSlice = createSlice({
 });
 
 export const {
-  setJointRotation, setPreset, resetPose, togglePoseEditor, mirrorJoint,
+  setJointRotation, setPreset, resetPose, togglePoseEditor, selectJoint, mirrorJoint,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
   toggleIK, setIKTarget, removeIKTarget, updateIKChainTarget,
 } = avatarSlice.actions;

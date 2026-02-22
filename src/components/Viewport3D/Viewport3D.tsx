@@ -1,4 +1,4 @@
-import { Component, Suspense, type ReactNode, useRef, useEffect, useState } from 'react';
+import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
@@ -8,6 +8,8 @@ import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
+import JointGizmos from './JointGizmos';
+import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import './Viewport3D.css';
 
@@ -41,7 +43,16 @@ export default function Viewport3D() {
   const { pieces, seams, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
   const useClothSim = simulationState !== 'idle';
+
+  const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+  const setOrbitEnabled = useCallback((enabled: boolean) => {
+    if (orbitRef.current) {
+      orbitRef.current.enabled = enabled;
+    }
+  }, []);
+  const poseDrag = usePoseDrag(setOrbitEnabled);
 
   // Force Canvas to resize continuously during CSS transitions (VS Code-style view resizing)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -87,6 +98,9 @@ export default function Viewport3D() {
             <AvatarModel url={avatarModelUrl} height={avatar.measurements.height / 100} />
           </Suspense>
         )}
+
+        {/* Joint gizmos for interactive pose editing */}
+        <JointGizmos poseDrag={poseDrag} />
 
         {/* Pattern pieces: cloth sim when running, static otherwise */}
         {useClothSim ? (
@@ -134,6 +148,7 @@ export default function Viewport3D() {
         />
 
         <OrbitControls
+          ref={orbitRef}
           makeDefault
           enableDamping
           dampingFactor={0.05}
@@ -147,6 +162,11 @@ export default function Viewport3D() {
       <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>
         {simulationState === 'running' ? '● SIMULATING' : simulationState === 'paused' ? '⏸ PAUSED' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
       </div>
+      {poseEditorOpen && (
+        <div className="sim-status" style={{ left: 'auto', right: 12, color: '#4488ff', opacity: 0.8 }}>
+          ● POSE MODE
+        </div>
+      )}
     </div>
   );
 }

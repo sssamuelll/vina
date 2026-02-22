@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import {
@@ -6,6 +6,7 @@ import {
   setPreset,
   resetPose,
   mirrorJoint,
+  selectJoint,
   toggleIK,
   removeIKTarget,
   POSE_PRESETS,
@@ -80,9 +81,21 @@ function JointSliders({ joint }: { joint: string }) {
 export default function PoseEditorView() {
   const dispatch = useDispatch();
   const activePreset = useSelector((s: RootState) => s.avatar.pose.activePreset);
+  const selectedJoint = useSelector((s: RootState) => s.avatar.selectedJoint);
   const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
   const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [slidersCollapsed, setSlidersCollapsed] = useState(true);
+
+  // Auto-expand the group containing the selected joint
+  useEffect(() => {
+    if (!selectedJoint) return;
+    const group = JOINT_GROUPS.find((g) => g.joints.includes(selectedJoint));
+    if (group) {
+      setCollapsed((prev) => ({ ...prev, [group.label]: false }));
+      setSlidersCollapsed(false);
+    }
+  }, [selectedJoint]);
 
   const toggleGroup = (label: string) => {
     setCollapsed((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -90,6 +103,24 @@ export default function PoseEditorView() {
 
   return (
     <div className="pose-editor">
+      {/* Instruction text */}
+      <div style={{ padding: '8px 12px', fontSize: '0.8rem', color: '#999', borderBottom: '1px solid #333' }}>
+        Click a joint in the 3D view to pose — or use presets below
+        {selectedJoint && (
+          <div style={{ marginTop: 4, fontSize: '0.9rem', color: '#44ff44', fontWeight: 600 }}>
+            Selected: {selectedJoint}
+            <button
+              className="pose-btn-small"
+              style={{ marginLeft: 8 }}
+              onClick={() => dispatch(selectJoint(null))}
+              title="Deselect joint"
+            >
+              ×
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="pose-presets">
         <div className="pose-section-title">Presets</div>
         <div className="pose-preset-buttons">
@@ -145,7 +176,15 @@ export default function PoseEditorView() {
       </div>
 
       <div className="pose-joints">
-        {JOINT_GROUPS.map((group) => (
+        <button
+          className="pose-group-header"
+          onClick={() => setSlidersCollapsed((p) => !p)}
+          style={{ borderBottom: '1px solid #333' }}
+        >
+          <span className={`pose-chevron ${slidersCollapsed ? '' : 'open'}`}>▸</span>
+          Joint Sliders
+        </button>
+        {!slidersCollapsed && JOINT_GROUPS.map((group) => (
           <div className="pose-group" key={group.label}>
             <button
               className="pose-group-header"

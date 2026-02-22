@@ -134,6 +134,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
         ikEnabled: false,
       },
       poseEditorOpen: false,
+      selectedJoint: null,
       avatarProfiles: [],
       activeProfileId: null,
     },
