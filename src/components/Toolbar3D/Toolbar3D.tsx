@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { togglePoseEditor } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
 import './Toolbar3D.css';
@@ -14,7 +13,6 @@ interface Toolbar3DProps {
 export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Toolbar3DProps) {
   const dispatch = useDispatch();
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
 
   // Get 3D tools grouped by category (CLO3D style)
   const toolGroups = useMemo(() => {
@@ -39,22 +37,11 @@ export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Tool
       onToggleAvatarPanel();
       return;
     }
-    if (toolId === 'pose') {
-      // Toggle pose editor + switch to pose mode
-      if (!poseEditorOpen) dispatch(togglePoseEditor());
-      dispatch(setActiveTool3D('pose'));
-      return;
-    }
-    // Switching away from pose — close pose editor
-    if (poseEditorOpen) {
-      dispatch(togglePoseEditor());
-    }
     dispatch(setActiveTool3D(toolId));
   };
 
   const isActive = (toolId: string) => {
     if (toolId === 'avatar') return avatarPanelOpen;
-    if (toolId === 'pose') return activeTool3D === 'pose' || poseEditorOpen;
     return activeTool3D === toolId;
   };
 

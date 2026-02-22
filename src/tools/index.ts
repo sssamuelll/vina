@@ -27,7 +27,7 @@ import { handTool } from './definitions/hand';
 import { zoomTool } from './definitions/zoom';
 import { cameraTool } from './definitions/camera';
 import { edit3dTool } from './definitions/edit3d';
-import { poseTool } from './definitions/pose';
+// pose tool removed — pose controls are inside AvatarPanel
 import { avatarTool } from './definitions/avatar';
 import { scissorsTool } from './definitions/scissors';
 import { dartTool } from './definitions/dart';
@@ -93,8 +93,7 @@ const allTools = [
   // 3D Tools — Editing
   edit3dTool,
   
-  // 3D Tools — Avatar
-  poseTool,
+  // 3D Tools — Avatar (pose is inside AvatarPanel)
   avatarTool,
   
   // 3D Tools — Simulation
