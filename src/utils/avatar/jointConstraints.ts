@@ -82,18 +82,18 @@ export const HUMAN_JOINTS: Record<string, AnatomicalJoint> = {
   // Pronation/supination happens at the forearm (radioulnar joint), mapped to Y.
   LeftForeArm: {
     type: 'hinge',
-    hingeAxis: new THREE.Vector3(1, 0, 0),  // X axis = flexion from discovery
-    hingeMin: 0,      // full extension (straight arm)
-    hingeMax: 145,    // full flexion
-    // Allow forearm pronation/supination on Y
-    yMin: -85, yMax: 85,
+    hingeAxis: new THREE.Vector3(1, 0, 0),  // X axis = flexion (verified: -X = flex toward bicep)
+    hingeMin: -145,   // full flexion (hand toward shoulder)
+    hingeMax: 5,      // near-full extension (slight hyperextension allowed)
+    // Allow forearm pronation/supination on Z (verified: Z = forward/backward in A-pose)
+    zMin: -85, zMax: 85,
   },
   RightForeArm: {
     type: 'hinge',
     hingeAxis: new THREE.Vector3(1, 0, 0),
-    hingeMin: 0,
-    hingeMax: 145,
-    yMin: -85, yMax: 85,
+    hingeMin: -145,
+    hingeMax: 5,
+    zMin: -85, zMax: 85,
   },
 
   // === HIP — ball-and-socket ===
@@ -192,12 +192,17 @@ export function constrainJoint(
         if (Math.abs(ax.x) > 0.5) {
           // Hinge is on X
           result.x = clamp(result.x, joint.hingeMin ?? -180, joint.hingeMax ?? 180);
-          result.z = 0; // Lock non-hinge axes
-          // Allow Y if yMin/yMax defined (pronation/supination)
+          // Allow Y if defined (some joints allow secondary rotation)
           if (joint.yMin !== undefined && joint.yMax !== undefined) {
             result.y = clamp(result.y, joint.yMin, joint.yMax);
           } else {
             result.y = 0;
+          }
+          // Allow Z if defined (e.g., forearm pronation/supination)
+          if (joint.zMin !== undefined && joint.zMax !== undefined) {
+            result.z = clamp(result.z, joint.zMin, joint.zMax);
+          } else {
+            result.z = 0;
           }
         } else if (Math.abs(ax.y) > 0.5) {
           result.y = clamp(result.y, joint.hingeMin ?? -180, joint.hingeMax ?? 180);
@@ -367,8 +372,8 @@ export const DRAG_MAPPINGS: Record<string, DragMapping> = {
   // Arms: vertical drag → X (raise/lower), horizontal drag → Z (forward/back)
   LeftArm:      { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: 1 },
   RightArm:     { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: -1 },
-  LeftForeArm:  { vertical: 'x', verticalSign: 1 },  // Only flexion
-  RightForeArm: { vertical: 'x', verticalSign: 1 },
+  LeftForeArm:  { vertical: 'x', verticalSign: 1, horizontal: 'z', horizontalSign: 1 },  // Flexion + pronation
+  RightForeArm: { vertical: 'x', verticalSign: 1, horizontal: 'z', horizontalSign: -1 },
   // Shoulders: minimal, same pattern as arms
   LeftShoulder:  { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: 1 },
   RightShoulder: { vertical: 'x', verticalSign: -1, horizontal: 'z', horizontalSign: -1 },
