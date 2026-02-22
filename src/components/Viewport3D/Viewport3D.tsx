@@ -46,13 +46,50 @@ export default function Viewport3D() {
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
   const useClothSim = simulationState !== 'idle';
 
+  // Camera vs Edit mode
+  const [cameraMode, setCameraMode] = useState(true);
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+
+  // When pose editor opens, auto-switch to edit mode
+  useEffect(() => {
+    if (poseEditorOpen) setCameraMode(false);
+  }, [poseEditorOpen]);
+
+  // Sync OrbitControls with cameraMode
+  // In edit mode: only middle-click orbits (left-click free for tools)
+  // In camera mode: normal orbit behavior
+  useEffect(() => {
+    const controls = orbitRef.current;
+    if (!controls) return;
+    if (cameraMode) {
+      controls.enabled = true;
+      controls.mouseButtons = {
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+    } else {
+      controls.enabled = true; // keep enabled for middle-click
+      controls.mouseButtons = {
+        LEFT: -1 as unknown as THREE.MOUSE, // disable left-click orbit
+        MIDDLE: THREE.MOUSE.ROTATE,
+        RIGHT: THREE.MOUSE.PAN,
+      };
+    }
+  }, [cameraMode]);
+
   const setOrbitEnabled = useCallback((enabled: boolean) => {
     if (orbitRef.current) {
       orbitRef.current.enabled = enabled;
     }
   }, []);
+
   const poseDrag = usePoseDrag(setOrbitEnabled);
+
+  const toggleCameraMode = () => {
+    const next = !cameraMode;
+    setCameraMode(next);
+  };
 
   // Force Canvas to resize continuously during CSS transitions (VS Code-style view resizing)
   const containerRef = useRef<HTMLDivElement>(null);
@@ -158,13 +195,22 @@ export default function Viewport3D() {
         />
       </Canvas>
 
+      {/* Camera/Edit mode toggle — top right of 3D viewport */}
+      <button
+        className={`viewport3d-mode-toggle ${cameraMode ? 'camera' : 'edit'}`}
+        onClick={toggleCameraMode}
+        title={cameraMode ? 'Switch to Edit Mode (unlock mouse for tools)' : 'Switch to Camera Mode (orbit/pan/zoom)'}
+      >
+        {cameraMode ? '📷 Camera' : '✏️ Edit'}
+      </button>
+
       {/* Status */}
       <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>
         {simulationState === 'running' ? '● SIMULATING' : simulationState === 'paused' ? '⏸ PAUSED' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
       </div>
-      {poseEditorOpen && (
-        <div className="sim-status" style={{ left: 'auto', right: 12, color: '#4488ff', opacity: 0.8 }}>
-          ● POSE MODE
+      {!cameraMode && (
+        <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9 }}>
+          ✏️ EDIT MODE — middle-click to orbit
         </div>
       )}
     </div>

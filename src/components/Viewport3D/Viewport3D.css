@@ -19,8 +19,46 @@
   padding: 4px 10px;
   background: rgba(0, 0, 0, 0.6);
   border-radius: 4px;
+  pointer-events: none;
 }
 
 .sim-status.running {
   color: #6bff6b;
+}
+
+/* Camera / Edit mode toggle button */
+.viewport3d-mode-toggle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+
+.viewport3d-mode-toggle.camera {
+  background: rgba(0, 0, 0, 0.5);
+  color: #ccc;
+}
+
+.viewport3d-mode-toggle.camera:hover {
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+}
+
+.viewport3d-mode-toggle.edit {
+  background: rgba(68, 136, 255, 0.3);
+  color: #6aafff;
+  border-color: rgba(68, 136, 255, 0.4);
+}
+
+.viewport3d-mode-toggle.edit:hover {
+  background: rgba(68, 136, 255, 0.5);
+  color: #fff;
 }
