@@ -213,25 +213,32 @@ export function constrainJoint(
     }
 
     case 'ball': {
-      // Ball joint: clamp each axis + enforce swing cone
+      // Ball joint: clamp each axis + coupled constraints + swing cone
       result.x = clamp(result.x, joint.xMin ?? -180, joint.xMax ?? 180);
       result.y = clamp(result.y, joint.yMin ?? -180, joint.yMax ?? 180);
       result.z = clamp(result.z, joint.zMin ?? -180, joint.zMax ?? 180);
 
+      // === Coupled constraints (shoulder biomechanics) ===
+      // When the arm extends backward (toward Z limits), restrict other axes.
+      // This prevents anatomically impossible combinations.
+      if (jointName === 'LeftArm' || jointName === 'RightArm') {
+        applyCoupledShoulderConstraints(jointName, result, joint);
+      }
+      if (jointName === 'LeftUpLeg' || jointName === 'RightUpLeg') {
+        applyCoupledHipConstraints(result, joint);
+      }
+
       // Enforce maximum swing cone
       if (joint.maxSwing !== undefined) {
-        // Total swing = angle of the quaternion from identity
         const euler = new THREE.Euler(result.x * DEG2RAD, result.y * DEG2RAD, result.z * DEG2RAD, 'ZYX');
         const q = new THREE.Quaternion().setFromEuler(euler);
         const totalAngle = 2 * Math.acos(Math.min(1, Math.abs(q.w))) * RAD2DEG;
 
         if (totalAngle > joint.maxSwing) {
-          // Scale all components proportionally to fit within cone
           const scale = joint.maxSwing / totalAngle;
           result.x *= scale;
           result.y *= scale;
           result.z *= scale;
-          // Re-clamp after scaling
           result.x = clamp(result.x, joint.xMin ?? -180, joint.xMax ?? 180);
           result.y = clamp(result.y, joint.yMin ?? -180, joint.yMax ?? 180);
           result.z = clamp(result.z, joint.zMin ?? -180, joint.zMax ?? 180);
@@ -250,6 +257,77 @@ export function constrainJoint(
   }
 
   return result;
+}
+
+// ─── Coupled Constraint Functions ───
+
+/**
+ * Shoulder coupled constraints (Kapandji):
+ * - When arm extends backward (Z toward back limit), X range narrows drastically.
+ *   In extension, the arm can only adduct (move inward toward body), not abduct freely.
+ * - When arm is fully abducted (X at max raise), internal rotation is limited.
+ * - At high flexion (Z forward), abduction range reduces.
+ */
+function applyCoupledShoulderConstraints(
+  jointName: string,
+  result: { x: number; y: number; z: number },
+  joint: AnatomicalJoint
+) {
+  const zMin = joint.zMin ?? -40;
+  const zMax = joint.zMax ?? 100;
+
+  // Determine how far backward the arm is (0 = neutral, 1 = max extension)
+  // For LeftArm: negative Z = backward. For RightArm: positive Z = backward.
+  const isLeft = jointName === 'LeftArm';
+  const backwardZ = isLeft ? -result.z : result.z;
+  const maxBack = isLeft ? -(zMin) : zMax;
+
+  if (maxBack > 0 && backwardZ > 0) {
+    const backwardRatio = clamp(backwardZ / maxBack, 0, 1);
+
+    // As arm goes backward, X range shrinks toward adduction only.
+    // At full extension: can only adduct (X: 20..70), can't abduct (raise overhead)
+    // At neutral (0 extension): full range (-170..70)
+    const xMinReduced = lerp(joint.xMin ?? -170, 20, backwardRatio);
+    result.x = clamp(result.x, xMinReduced, joint.xMax ?? 70);
+
+    // Also reduce Y (rotation) range when arm is far back
+    // At full extension: rotation limited to ±30° (from ±90°)
+    const yRange = lerp(90, 30, backwardRatio);
+    result.y = clamp(result.y, -yRange, yRange);
+  }
+
+  // When arm is highly abducted (raised overhead, X very negative),
+  // reduce internal rotation to prevent shoulder impingement
+  const abductionDeg = -(result.x); // negative X = abduction
+  if (abductionDeg > 90) {
+    const ratio = clamp((abductionDeg - 90) / 80, 0, 1); // 90°-170° range
+    const yRange = lerp(90, 20, ratio);
+    result.y = clamp(result.y, -yRange, yRange);
+  }
+}
+
+/**
+ * Hip coupled constraints:
+ * - At high flexion (X > 90°), abduction and rotation reduce.
+ * - At full extension (X < 0), adduction is limited.
+ */
+function applyCoupledHipConstraints(
+  result: { x: number; y: number; z: number },
+  joint: AnatomicalJoint
+) {
+  // High flexion → reduce rotation and abduction
+  if (result.x > 90) {
+    const ratio = clamp((result.x - 90) / 30, 0, 1);
+    const yRange = lerp(joint.yMax ?? 45, 15, ratio);
+    result.y = clamp(result.y, -yRange, yRange);
+    const zRange = lerp(joint.zMax ?? 45, 15, ratio);
+    result.z = clamp(result.z, -zRange, zRange);
+  }
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }
 
 function clamp(v: number, min: number, max: number): number {
