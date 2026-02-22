@@ -9,9 +9,15 @@ import './Toolbar2D.css';
 
 /**
  * Photoshop-style tool groups.
- * First tool in each group is the default visible tool.
- * Long-press or right-click shows the flyout with all tools in the group.
- * Small triangle indicator shows when a group has sub-tools.
+ * 
+ * Behavior (matches Adobe Photoshop exactly):
+ * - Click → selects the currently visible tool (instant, no menu)
+ * - Press & hold (~300ms) → shows horizontal strip of sub-tools
+ * - Drag to sub-tool while holding → highlights it
+ * - Release on sub-tool → selects it, replaces the visible tool icon
+ * - Small triangle (▸) in bottom-right indicates sub-tools exist
+ * 
+ * First tool in each group is the initial default.
  */
 const TOOL_GROUPS: string[][] = [
   // ─── Selection & Transform ───
@@ -38,121 +44,126 @@ const TOOL_GROUPS: string[][] = [
   ['hand', 'zoom'],
 ];
 
-/** Separators: insert after these group indices */
-const SEPARATORS_AFTER = [1, 4, 8, 10, 14];
+/** Insert visual separators after these group indices */
+const SEPARATORS_AFTER = [1, 4, 8, 9, 13];
 
-const LONG_PRESS_MS = 400;
+const HOLD_DELAY_MS = 300;
 
 interface ToolGroupButtonProps {
   tools: ToolDefinition[];
   activeToolId: string;
-  selectedToolPerGroup: Record<number, string>;
+  visibleToolId: string;
   groupIndex: number;
   onToolSelect: (toolId: string, groupIndex: number) => void;
 }
 
-function ToolGroupButton({ tools, activeToolId, selectedToolPerGroup, groupIndex, onToolSelect }: ToolGroupButtonProps) {
-  const [flyoutOpen, setFlyoutOpen] = useState(false);
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const btnRef = useRef<HTMLDivElement>(null);
+function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToolSelect }: ToolGroupButtonProps) {
+  const [stripOpen, setStripOpen] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDragging = useRef(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const hasSubs = tools.length > 1;
 
-  // Which tool to show as the group representative
-  const visibleToolId = selectedToolPerGroup[groupIndex] || tools[0].id;
   const visibleTool = tools.find(t => t.id === visibleToolId) || tools[0];
-  const isActive = tools.some(t => t.id === activeToolId);
+  const isGroupActive = tools.some(t => t.id === activeToolId);
 
-  const closeFlyout = useCallback(() => setFlyoutOpen(false), []);
-
-  // Close flyout on outside click
+  // Cleanup on unmount
   useEffect(() => {
-    if (!flyoutOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
-        closeFlyout();
-      }
+    return () => {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [flyoutOpen, closeFlyout]);
-
-  const handleMouseDown = useCallback(() => {
-    if (!hasSubs) return;
-    longPressTimer.current = setTimeout(() => {
-      setFlyoutOpen(true);
-      longPressTimer.current = null;
-    }, LONG_PRESS_MS);
-  }, [hasSubs]);
-
-  const handleMouseUp = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-      // Short click — select this tool
-      onToolSelect(visibleTool.id, groupIndex);
-    }
-  }, [visibleTool.id, groupIndex, onToolSelect]);
-
-  const handleMouseLeave = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
   }, []);
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    if (!hasSubs) return;
-    e.preventDefault();
-    setFlyoutOpen(prev => !prev);
+  // Close strip on pointer up anywhere (for the drag gesture)
+  useEffect(() => {
+    if (!stripOpen) return;
+    const handleGlobalUp = (_e: PointerEvent) => {
+      if (isDragging.current && hoveredId) {
+        onToolSelect(hoveredId, groupIndex);
+      }
+      setStripOpen(false);
+      isDragging.current = false;
+      setHoveredId(null);
+    };
+    window.addEventListener('pointerup', handleGlobalUp);
+    return () => window.removeEventListener('pointerup', handleGlobalUp);
+  }, [stripOpen, hoveredId, groupIndex, onToolSelect]);
+
+  const handlePointerDown = useCallback((_e: React.PointerEvent) => {
+    _e.preventDefault();
+    // Start hold timer for sub-tools strip
+    if (hasSubs) {
+      holdTimer.current = setTimeout(() => {
+        setStripOpen(true);
+        isDragging.current = true;
+        holdTimer.current = null;
+      }, HOLD_DELAY_MS);
+    }
   }, [hasSubs]);
 
-  const handleClick = useCallback(() => {
-    if (!hasSubs) {
+  const handlePointerUp = useCallback(() => {
+    // If hold timer is still running, it was a quick click
+    if (holdTimer.current) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
       onToolSelect(visibleTool.id, groupIndex);
     }
-  }, [hasSubs, visibleTool.id, groupIndex, onToolSelect]);
+    // If strip is open from hold but no drag selection happened,
+    // the global pointerup handler will close it
+  }, [visibleTool.id, groupIndex, onToolSelect]);
 
-  const handleFlyoutSelect = useCallback((toolId: string) => {
-    onToolSelect(toolId, groupIndex);
-    setFlyoutOpen(false);
-  }, [groupIndex, onToolSelect]);
+  const handlePointerLeave = useCallback(() => {
+    // Cancel hold if pointer leaves before threshold
+    if (holdTimer.current && !stripOpen) {
+      clearTimeout(holdTimer.current);
+      holdTimer.current = null;
+    }
+  }, [stripOpen]);
+
+  const handleStripItemEnter = useCallback((toolId: string) => {
+    setHoveredId(toolId);
+  }, []);
+
+  const handleStripItemLeave = useCallback(() => {
+    setHoveredId(null);
+  }, []);
 
   const IconComponent = visibleTool.icon;
 
   return (
-    <div className="tool-group-btn-wrapper" ref={btnRef}>
+    <div className="tool-group-wrapper" ref={wrapperRef}>
       <button
-        className={`tool-btn ${isActive ? 'active' : ''}`}
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseLeave}
-        onContextMenu={handleContextMenu}
-        title={`${visibleTool.name}${visibleTool.shortcut ? ` (${visibleTool.shortcut.toUpperCase()})` : ''}${hasSubs ? ' — right-click for more' : ''}`}
+        className={`tool-btn ${isGroupActive ? 'active' : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
+        title={`${visibleTool.name}${visibleTool.shortcut ? ` (${visibleTool.shortcut.toUpperCase()})` : ''}`}
       >
         <span className="tool-icon">
           <IconComponent size={18} />
         </span>
-        {hasSubs && <span className="tool-sub-indicator" />}
+        {hasSubs && <span className="tool-sub-triangle" />}
       </button>
 
-      {flyoutOpen && (
-        <div className="tool-flyout">
+      {stripOpen && hasSubs && (
+        <div className="tool-strip">
           {tools.map(tool => {
-            const FlyoutIcon = tool.icon;
+            const StripIcon = tool.icon;
+            const isHovered = hoveredId === tool.id;
+            const isCurrent = activeToolId === tool.id;
             return (
-              <button
+              <div
                 key={tool.id}
-                className={`flyout-item ${activeToolId === tool.id ? 'active' : ''}`}
-                onClick={() => handleFlyoutSelect(tool.id)}
-                title={`${tool.name}${tool.shortcut ? ` (${tool.shortcut.toUpperCase()})` : ''}`}
+                className={`strip-item ${isHovered ? 'hovered' : ''} ${isCurrent ? 'current' : ''}`}
+                onPointerEnter={() => handleStripItemEnter(tool.id)}
+                onPointerLeave={handleStripItemLeave}
               >
-                <span className="flyout-icon">
-                  <FlyoutIcon size={16} />
+                <span className="strip-icon">
+                  <StripIcon size={18} />
                 </span>
-                <span className="flyout-label">{tool.name}</span>
-                {tool.shortcut && <span className="flyout-shortcut">{tool.shortcut.toUpperCase()}</span>}
-              </button>
+                <span className="strip-tooltip">{tool.name}</span>
+              </div>
             );
           })}
         </div>
@@ -165,13 +176,12 @@ export default function Toolbar2D() {
   const dispatch = useDispatch();
   const legacyActiveTool = useSelector((s: RootState) => s.editor.activeTool);
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
-  const [selectedToolPerGroup, setSelectedToolPerGroup] = useState<Record<number, string>>({});
+  const [selectedPerGroup, setSelectedPerGroup] = useState<Record<number, string>>({});
 
   const currentActiveTool = activeTool2D || legacyActiveTool;
 
-  // Resolve tool definitions for each group
   const resolvedGroups = useMemo(() => {
-    return TOOL_GROUPS.map(ids => 
+    return TOOL_GROUPS.map(ids =>
       ids.map(id => toolRegistry.getTool(id)).filter((t): t is ToolDefinition => t !== undefined)
     ).filter(group => group.length > 0);
   }, []);
@@ -179,7 +189,7 @@ export default function Toolbar2D() {
   const handleToolSelect = useCallback((toolId: string, groupIndex: number) => {
     dispatch(setActiveTool(toolId as any));
     dispatch(setActiveTool2D(toolId));
-    setSelectedToolPerGroup(prev => ({ ...prev, [groupIndex]: toolId }));
+    setSelectedPerGroup(prev => ({ ...prev, [groupIndex]: toolId }));
   }, [dispatch]);
 
   return (
@@ -189,7 +199,7 @@ export default function Toolbar2D() {
           <ToolGroupButton
             tools={tools}
             activeToolId={currentActiveTool}
-            selectedToolPerGroup={selectedToolPerGroup}
+            visibleToolId={selectedPerGroup[idx] || tools[0].id}
             groupIndex={idx}
             onToolSelect={handleToolSelect}
           />

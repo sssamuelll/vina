@@ -10,18 +10,19 @@
   gap: 1px;
   flex-shrink: 0;
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: visible;
 }
 
 .toolbar2d::-webkit-scrollbar {
   width: 0;
 }
 
-/* ─── Tool Button ─── */
-.tool-group-btn-wrapper {
+/* ─── Tool Group Wrapper ─── */
+.tool-group-wrapper {
   position: relative;
 }
 
+/* ─── Tool Button ─── */
 .tool-btn {
   width: 34px;
   height: 30px;
@@ -32,8 +33,10 @@
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: background 0.12s;
   position: relative;
+  touch-action: none;   /* prevent scroll on hold */
+  user-select: none;
 }
 
 .tool-btn .tool-icon {
@@ -52,7 +55,7 @@
   color: var(--text-primary);
 }
 
-/* ─── Active Indicator (left accent bar) ─── */
+/* ─── Active Indicator ─── */
 .tool-btn.active {
   background: none;
 }
@@ -78,26 +81,27 @@
   color: white;
 }
 
-/* ─── Sub-tool Triangle Indicator ─── */
-.tool-sub-indicator {
+/* ─── Sub-tool Triangle (Photoshop style) ─── */
+.tool-sub-triangle {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
+  bottom: 3px;
+  right: 3px;
   width: 0;
   height: 0;
   border-style: solid;
-  border-width: 0 0 5px 5px;
+  border-width: 0 0 4px 4px;
   border-color: transparent transparent var(--text-secondary) transparent;
-  opacity: 0.5;
+  opacity: 0.4;
+  pointer-events: none;
 }
 
-.tool-btn:hover .tool-sub-indicator {
-  opacity: 0.8;
+.tool-btn:hover .tool-sub-triangle,
+.tool-btn.active .tool-sub-triangle {
+  opacity: 0.7;
 }
 
-.tool-btn.active .tool-sub-indicator {
+.tool-btn.active .tool-sub-triangle {
   border-color: transparent transparent var(--accent) transparent;
-  opacity: 1;
 }
 
 /* ─── Separator ─── */
@@ -108,65 +112,73 @@
   margin: 4px auto;
 }
 
-/* ─── Flyout Menu ─── */
-.tool-flyout {
+/* ─── Horizontal Strip (Photoshop press-and-hold) ─── */
+.tool-strip {
   position: absolute;
-  left: 100%;
-  top: 0;
-  margin-left: 4px;
+  left: calc(100% + 2px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: row;
+  gap: 0;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 4px;
-  min-width: 180px;
+  border-radius: 4px;
+  padding: 2px;
   z-index: 1000;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
 }
 
-.flyout-item {
+.strip-item {
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  background: none;
-  border: none;
-  border-radius: 4px;
+  justify-content: center;
+  border-radius: 3px;
   cursor: pointer;
+  position: relative;
   color: var(--text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-  transition: all 0.1s;
+  transition: background 0.08s;
 }
 
-.flyout-item:hover {
+.strip-item:hover,
+.strip-item.hovered {
   background: var(--btn-bg-hover);
   color: var(--text-primary);
 }
 
-.flyout-item.active {
+.strip-item.current {
   color: white;
-  background: rgba(255, 255, 255, 0.06);
 }
 
-.flyout-icon {
+.strip-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
 }
 
-.flyout-label {
-  flex: 1;
+/* Tooltip below each strip item */
+.strip-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 1001;
 }
 
-.flyout-shortcut {
-  color: var(--text-secondary);
-  font-size: 11px;
-  opacity: 0.6;
-  margin-left: 12px;
+.strip-item:hover .strip-tooltip,
+.strip-item.hovered .strip-tooltip {
+  opacity: 1;
 }
