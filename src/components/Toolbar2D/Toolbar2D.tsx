@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setActiveTool } from '../../store/editorSlice';
@@ -60,9 +61,10 @@ interface ToolGroupButtonProps {
 function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToolSelect }: ToolGroupButtonProps) {
   const [stripOpen, setStripOpen] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [stripPos, setStripPos] = useState({ top: 0, left: 0 });
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDragging = useRef(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const hasSubs = tools.length > 1;
 
   const visibleTool = tools.find(t => t.id === visibleToolId) || tools[0];
@@ -78,7 +80,7 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
   // Close strip on pointer up anywhere (for the drag gesture)
   useEffect(() => {
     if (!stripOpen) return;
-    const handleGlobalUp = (_e: PointerEvent) => {
+    const handleGlobalUp = () => {
       if (isDragging.current && hoveredId) {
         onToolSelect(hoveredId, groupIndex);
       }
@@ -90,50 +92,75 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
     return () => window.removeEventListener('pointerup', handleGlobalUp);
   }, [stripOpen, hoveredId, groupIndex, onToolSelect]);
 
+  const openStrip = useCallback(() => {
+    if (!btnRef.current) return;
+    const rect = btnRef.current.getBoundingClientRect();
+    setStripPos({
+      top: rect.top + rect.height / 2 - 18, // vertically center on button
+      left: rect.right + 4,
+    });
+    setStripOpen(true);
+    isDragging.current = true;
+  }, []);
+
   const handlePointerDown = useCallback((_e: React.PointerEvent) => {
     _e.preventDefault();
-    // Start hold timer for sub-tools strip
     if (hasSubs) {
       holdTimer.current = setTimeout(() => {
-        setStripOpen(true);
-        isDragging.current = true;
+        openStrip();
         holdTimer.current = null;
       }, HOLD_DELAY_MS);
     }
-  }, [hasSubs]);
+  }, [hasSubs, openStrip]);
 
   const handlePointerUp = useCallback(() => {
-    // If hold timer is still running, it was a quick click
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
       onToolSelect(visibleTool.id, groupIndex);
     }
-    // If strip is open from hold but no drag selection happened,
-    // the global pointerup handler will close it
   }, [visibleTool.id, groupIndex, onToolSelect]);
 
   const handlePointerLeave = useCallback(() => {
-    // Cancel hold if pointer leaves before threshold
     if (holdTimer.current && !stripOpen) {
       clearTimeout(holdTimer.current);
       holdTimer.current = null;
     }
   }, [stripOpen]);
 
-  const handleStripItemEnter = useCallback((toolId: string) => {
-    setHoveredId(toolId);
-  }, []);
-
-  const handleStripItemLeave = useCallback(() => {
-    setHoveredId(null);
-  }, []);
-
   const IconComponent = visibleTool.icon;
 
+  const stripEl = stripOpen && hasSubs ? createPortal(
+    <div
+      className="tool-strip"
+      style={{ top: stripPos.top, left: stripPos.left }}
+    >
+      {tools.map(tool => {
+        const StripIcon = tool.icon;
+        const isHovered = hoveredId === tool.id;
+        const isCurrent = activeToolId === tool.id;
+        return (
+          <div
+            key={tool.id}
+            className={`strip-item ${isHovered ? 'hovered' : ''} ${isCurrent ? 'current' : ''}`}
+            onPointerEnter={() => setHoveredId(tool.id)}
+            onPointerLeave={() => setHoveredId(null)}
+          >
+            <span className="strip-icon">
+              <StripIcon size={18} />
+            </span>
+            <span className="strip-tooltip">{tool.name}</span>
+          </div>
+        );
+      })}
+    </div>,
+    document.body
+  ) : null;
+
   return (
-    <div className="tool-group-wrapper" ref={wrapperRef}>
+    <div className="tool-group-wrapper">
       <button
+        ref={btnRef}
         className={`tool-btn ${isGroupActive ? 'active' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
@@ -145,29 +172,7 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
         </span>
         {hasSubs && <span className="tool-sub-triangle" />}
       </button>
-
-      {stripOpen && hasSubs && (
-        <div className="tool-strip">
-          {tools.map(tool => {
-            const StripIcon = tool.icon;
-            const isHovered = hoveredId === tool.id;
-            const isCurrent = activeToolId === tool.id;
-            return (
-              <div
-                key={tool.id}
-                className={`strip-item ${isHovered ? 'hovered' : ''} ${isCurrent ? 'current' : ''}`}
-                onPointerEnter={() => handleStripItemEnter(tool.id)}
-                onPointerLeave={handleStripItemLeave}
-              >
-                <span className="strip-icon">
-                  <StripIcon size={18} />
-                </span>
-                <span className="strip-tooltip">{tool.name}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {stripEl}
     </div>
   );
 }

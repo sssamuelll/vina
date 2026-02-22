@@ -10,7 +10,7 @@
   gap: 1px;
   flex-shrink: 0;
   overflow-y: auto;
-  overflow-x: visible;
+  overflow-x: hidden;
 }
 
 .toolbar2d::-webkit-scrollbar {
@@ -113,11 +113,9 @@
 }
 
 /* ─── Horizontal Strip (Photoshop press-and-hold) ─── */
+/* Rendered in document.body via portal to escape overflow clipping */
 .tool-strip {
-  position: absolute;
-  left: calc(100% + 2px);
-  top: 50%;
-  transform: translateY(-50%);
+  position: fixed;
   display: flex;
   flex-direction: row;
   gap: 0;
