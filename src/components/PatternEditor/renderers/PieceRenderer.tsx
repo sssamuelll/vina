@@ -1,7 +1,35 @@
-import { PatternPiece } from '../../../types/types';
+
+import { PatternPiece, PathCommand } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
 import { extractNodes } from '../useNodeEditor';
+
+/** Compute bounding box center of a path outline. */
+function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const cmd of outline) {
+    const v = cmd.values;
+    if (cmd.type === 'M' || cmd.type === 'L') {
+      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+      if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
+    } else if (cmd.type === 'C') {
+      for (let i = 0; i < 6; i += 2) {
+        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
+        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
+      }
+    } else if (cmd.type === 'Q') {
+      for (let i = 0; i < 4; i += 2) {
+        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
+        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
+      }
+    } else if (cmd.type === 'H') {
+      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+    } else if (cmd.type === 'V') {
+      if (v[0] < minY) minY = v[0]; if (v[0] > maxY) maxY = v[0];
+    }
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
 
 interface PieceRendererProps {
   pieces: PatternPiece[];
@@ -34,11 +62,12 @@ export default function PieceRenderer({
     <>
       {pieces.map(piece => {
         const isSelected = selectedPieceIds.includes(piece.id);
+        const { cx, cy } = piece.outline?.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };
         return (
           <g
             key={piece.id}
             data-piece-id={piece.id}
-            transform={`translate(${piece.position.x}, ${piece.position.y}) rotate(${piece.rotation})`}
+            transform={`translate(${piece.position.x}, ${piece.position.y}) rotate(${piece.rotation}, ${cx}, ${cy})`}
             className={`pattern-piece ${isSelected ? 'selected' : ''}`}
           >
             <path

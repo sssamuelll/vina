@@ -84,7 +84,7 @@ export default function PieceMesh({ piece, isSelected, color, position }: PieceM
   if (!geometry) return null;
 
   return (
-    <group position={position} rotation={[0, 0, 0]}>
+    <group position={position} rotation={[0, -(piece.rotation ?? 0) * Math.PI / 180, 0]}>
       {/* Front face — pieces are drawn in XY, already vertical */}
       <mesh geometry={geometry}>
         <meshStandardMaterial

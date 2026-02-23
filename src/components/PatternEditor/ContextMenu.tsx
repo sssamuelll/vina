@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
 import {
   removePiece,
   rotatePiece,
@@ -51,6 +53,7 @@ interface MenuItem {
 
 export default function ContextMenu({ menu, onClose, onRename }: ContextMenuProps) {
   const dispatch = useDispatch();
+  const pieces = useSelector((s: RootState) => s.project.pieces);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on click outside or Escape
@@ -83,24 +86,24 @@ export default function ContextMenu({ menu, onClose, onRename }: ContextMenuProp
     // ── Piece context ──
     const pid = menu.pieceId;
 
+    // Find current rotation to add to it
+    const currentRotation = pieces?.find(p => p.id === pid)?.rotation ?? 0;
+
     items.push({
       label: 'Rotate 90°',
       icon: '↻',
       shortcut: 'R',
-      action: () => act(() => {
-        // Get current rotation and add 90
-        dispatch(rotatePiece({ id: pid, rotation: 90 }));
-      }),
+      action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation + 90 }))),
     });
     items.push({
       label: 'Rotate 180°',
       icon: '↻',
-      action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: 180 }))),
+      action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation + 180 }))),
     });
     items.push({
       label: 'Rotate -90°',
       icon: '↺',
-      action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: -90 }))),
+      action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation - 90 }))),
       separator: true,
     });
     items.push({
