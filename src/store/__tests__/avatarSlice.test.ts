@@ -17,8 +17,9 @@ describe('avatarSlice', () => {
   it('initializes with A-pose preset', () => {
     const state = getInitialState();
     expect(state.pose.activePreset).toBe('A-pose');
-    expect(state.pose.joints.LeftArm).toEqual({ x: 15, y: 10, z: -25 });
-    expect(state.pose.joints.RightArm).toEqual({ x: 15, y: -10, z: 25 });
+    // A-pose: arms lowered ~25° on X axis (adduction), verified via axis discovery
+    expect(state.pose.joints.LeftArm).toEqual({ x: 25, y: 0, z: 0 });
+    expect(state.pose.joints.RightArm).toEqual({ x: 25, y: 0, z: 0 });
   });
 
   it('setJointRotation updates a specific joint', () => {
@@ -49,9 +50,12 @@ describe('avatarSlice', () => {
     expect(state.pose.activePreset).toBeNull();
   });
 
-  it('A-pose preset has arms at 25° Z rotation', () => {
-    expect(POSE_PRESETS['A-pose'].LeftArm?.z).toBe(-25);
-    expect(POSE_PRESETS['A-pose'].RightArm?.z).toBe(25);
+  it('A-pose preset has arms at 25° X rotation', () => {
+    expect(POSE_PRESETS['A-pose'].LeftArm?.x).toBe(25);
+    expect(POSE_PRESETS['A-pose'].RightArm?.x).toBe(25);
+    // Y and Z are zero in current A-pose
+    expect(POSE_PRESETS['A-pose'].LeftArm?.y).toBe(0);
+    expect(POSE_PRESETS['A-pose'].LeftArm?.z).toBe(0);
   });
 
   it('togglePoseEditor toggles', () => {
@@ -72,13 +76,14 @@ describe('avatarSlice', () => {
     expect(state.pose.joints.RightArm).toEqual({ x: 45, y: 10, z: 15 });
   });
 
-  it('mirrorJoint copies right to left with negated Z', () => {
+  it('mirrorJoint copies right to left with negated Z (hinge clamped)', () => {
     let state = avatarReducer(
       getInitialState(),
       setJointRotation({ joint: 'RightLeg', rotation: { x: -30, y: 0, z: 5 } })
     );
     state = avatarReducer(state, mirrorJoint('RightLeg'));
-    expect(state.pose.joints.LeftLeg).toEqual({ x: -30, y: 0, z: -5 });
+    // LeftLeg is a hinge joint (X-axis only) — Y and Z are clamped to 0
+    expect(state.pose.joints.LeftLeg).toEqual({ x: -30, y: 0, z: 0 });
   });
 
   it('mirrorJoint does nothing for non-mirrored joints', () => {

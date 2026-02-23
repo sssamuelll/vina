@@ -102,7 +102,7 @@ export async function importGerber(file: File | ArrayBuffer): Promise<GerberImpo
       );
       if (piece && entry.fabricType) {
         // Store fabric type hint as fabricId
-        (piece as any).fabricId = entry.fabricType;
+        piece.fabricId = entry.fabricType;
       }
     }
   }

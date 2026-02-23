@@ -32,7 +32,7 @@ export async function exportGerber(
     `# AccuMark Manifest — ${projectName}`,
     `# piece_name\tsize\tfabric_type`,
     ...pieces.map(p => {
-      const fabricType = (p as any).fabricId || 'MAIN';
+      const fabricType = p.fabricId || 'MAIN';
       return `${p.name}\t\t${fabricType}`;
     }),
   ];
