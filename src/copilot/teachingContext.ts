@@ -251,22 +251,20 @@ const TEACHING_DB: Record<string, TeachingEntry> = {
     },
   },
 
-  generateFromDescription: {
+  generateFromTemplate: {
     es: {
-      title: 'Generación desde descripción',
+      title: 'Generación desde plantilla Seamly2D',
       explanation:
-        'El agente interpreta tu descripción para seleccionar las plantillas correctas y ' +
-        'configurar medidas. Un "corpiño base" genera delantero y espalda con pinzas y ' +
-        'línea de hilo. Un "vestido con manga" genera corpiño + falda + manga.',
-      tip: 'Sé específico: "vestido recto sin mangas talla 40" da mejores resultados que "hazme un vestido".',
+        'Se genera el patrón desde una plantilla validada de Seamly2D con geometría de construcción real. ' +
+        'Las piezas se calculan paramétricamente según las medidas corporales o talla estándar.',
+      tip: 'Usa searchTemplates para encontrar la plantilla correcta antes de generar.',
     },
     en: {
-      title: 'Generation from Description',
+      title: 'Generation from Seamly2D Template',
       explanation:
-        'The agent interprets your description to select the right templates and ' +
-        'configure measurements. A "basic bodice" generates front and back with darts ' +
-        'and grainline. A "dress with sleeves" generates bodice + skirt + sleeve.',
-      tip: 'Be specific: "sleeveless straight dress size 40" gives better results than "make me a dress".',
+        'The pattern is generated from a validated Seamly2D template with real construction geometry. ' +
+        'Pieces are parametrically calculated from body measurements or standard size.',
+      tip: 'Use searchTemplates to find the right template before generating.',
     },
   },
 };

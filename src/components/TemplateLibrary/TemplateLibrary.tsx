@@ -1,8 +1,7 @@
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { addPiece } from '../../store/projectSlice';
-import { selectPiece } from '../../store/editorSlice';
-import { PATTERN_TEMPLATES, PatternTemplate } from '../../utils/patternTemplates';
+import { getCatalog, getCatalogByCategory, type CatalogEntry, type GarmentCategory } from '../../utils/seamly2d/catalog';
+import { useState } from 'react';
 import './TemplateLibrary.css';
 
 interface Props {
@@ -10,51 +9,89 @@ interface Props {
   onClose: () => void;
 }
 
-export default function TemplateLibrary({ isOpen, onClose }: Props) {
-  const dispatch = useDispatch();
-  const avatar = useSelector((s: RootState) => s.project.avatar);
+const CATEGORY_LABELS: Record<GarmentCategory, string> = {
+  tops: '👚 Tops',
+  bottoms: '👖 Bottoms',
+  dresses: '👗 Dresses',
+  outerwear: '🧥 Outerwear',
+  underwear: '🩱 Underwear',
+  blocks: '📐 Blocks',
+  sleeves: '🦾 Sleeves',
+  other: '📦 Other',
+};
 
-  const handleGenerate = (template: PatternTemplate) => {
-    const pieces = template.generate(avatar.measurements);
-    pieces.forEach(piece => {
-      dispatch(addPiece(piece));
-    });
-    // Select the first generated piece
-    if (pieces.length > 0) {
-      dispatch(selectPiece(pieces[0].id));
+export default function TemplateLibrary({ isOpen, onClose }: Props) {
+  const avatar = useSelector((s: RootState) => s.project.avatar);
+  const [filter, setFilter] = useState<GarmentCategory | 'all'>('all');
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const catalog = filter === 'all' ? getCatalog() : getCatalogByCategory(filter);
+  const categories = [...new Set(getCatalog().map(e => e.category))];
+
+  const handleGenerate = async (entry: CatalogEntry) => {
+    setLoading(entry.id);
+    try {
+      // Dispatch a custom event that the CopilotPanel can pick up,
+      // or directly use the template engine
+      const event = new CustomEvent('openclo:generate-template', {
+        detail: { templateId: entry.id },
+      });
+      window.dispatchEvent(event);
+      onClose();
+    } finally {
+      setLoading(null);
     }
-    onClose();
   };
 
   return (
     <div className={`template-overlay ${isOpen ? 'open' : 'closed'}`} onClick={onClose}>
       <div className="template-library" onClick={e => e.stopPropagation()}>
         <div className="template-header">
-          <h2>Pattern Templates</h2>
+          <h2>Seamly2D Pattern Library</h2>
           <p className="template-subtitle">
-            Generated from avatar measurements ({avatar.measurements.chest}cm chest, {avatar.measurements.waist}cm waist, {avatar.measurements.hips}cm hips)
+            {catalog.length} validated patterns • Measurements: {avatar.measurements.chest}cm chest, {avatar.measurements.waist}cm waist
           </p>
           <button className="template-close" onClick={onClose}>✕</button>
         </div>
 
-        <div className="template-grid">
-          {PATTERN_TEMPLATES.map(template => (
+        <div className="template-filters">
+          <button
+            className={`template-filter ${filter === 'all' ? 'active' : ''}`}
+            onClick={() => setFilter('all')}
+          >All</button>
+          {categories.map(cat => (
             <button
-              key={template.id}
+              key={cat}
+              className={`template-filter ${filter === cat ? 'active' : ''}`}
+              onClick={() => setFilter(cat)}
+            >{CATEGORY_LABELS[cat]}</button>
+          ))}
+        </div>
+
+        <div className="template-grid">
+          {catalog.map(entry => (
+            <button
+              key={entry.id}
               className="template-card"
-              onClick={() => handleGenerate(template)}
+              onClick={() => handleGenerate(entry)}
+              disabled={loading === entry.id}
             >
-              <span className="template-icon">{template.icon}</span>
-              <span className="template-name">{template.name}</span>
-              <span className="template-name-es">{template.nameEs}</span>
-              <span className="template-desc">{template.description}</span>
+              <span className="template-complexity" data-level={entry.complexity}>
+                {entry.complexity}
+              </span>
+              <span className="template-name">{entry.name}</span>
+              <span className="template-name-es">{entry.nameEs}</span>
+              <span className="template-desc">{entry.description}</span>
+              <span className="template-meta">
+                {entry.gender} • {entry.requiredMeasurements.length} measurements
+              </span>
             </button>
           ))}
         </div>
 
         <div className="template-footer">
           <span className="template-hint">
-            💡 Adjust avatar measurements in the Properties panel to change pattern sizing
+            💡 These are real patterns from Seamly2D — validated construction, not AI-generated shapes
           </span>
         </div>
       </div>

@@ -8,7 +8,7 @@
  */
 
 import { AgentConfig, CopilotContext, CopilotResponse, DEFAULT_SYSTEM_PROMPT } from './protocol';
-import { PatternPiece } from '../types/types';
+// types imported as needed
 
 // ─── Server-side Agent (via local server API) ───
 
@@ -107,81 +107,23 @@ async function sendWS(config: AgentConfig, context: CopilotContext): Promise<Cop
   });
 }
 
-/** Strip id/createdAt/updatedAt from a generated piece for create_piece command */
-function stripPiece(p: PatternPiece): Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'> {
-  const { id, createdAt, updatedAt, ...rest } = p;
-  return rest;
-}
-
 // ─── Built-in Agent (offline, template-based) ───
 
 async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promise<CopilotResponse> {
   const msg = context.message.toLowerCase();
 
-  // Simple keyword matching for common requests
-  if (msg.includes('bodice') || msg.includes('corpiño') || msg.includes('blusa')) {
-    const { generateBodiceBack, generateBodiceFront } = await import('../utils/patternTemplates');
-    const m = context.project.measurements;
-    const back = generateBodiceBack(m);
-    const front = generateBodiceFront(m);
-    return {
-      message: `Generated bodice block (front + back) for ${m.chest}cm chest, ${m.waist}cm waist.`,
-      commands: [
-        { type: 'create_piece', piece: stripPiece(back) },
-        { type: 'create_piece', piece: stripPiece(front) },
-      ],
-    };
-  }
+  // Search Seamly2D catalog for matching patterns
+  const { searchCatalog } = await import('../utils/seamly2d/catalog');
+  const results = searchCatalog(msg);
 
-  if (msg.includes('sleeve') || msg.includes('manga')) {
-    const { generateSleeve } = await import('../utils/patternTemplates');
-    const m = context.project.measurements;
-    const sleeve = generateSleeve(m);
+  if (results.length > 0) {
+    const top = results[0];
     return {
-      message: `Generated sleeve for ${m.armLength}cm arm length.`,
-      commands: [
-        { type: 'create_piece', piece: stripPiece(sleeve) },
-      ],
-    };
-  }
-
-  if (msg.includes('skirt') || msg.includes('falda')) {
-    const { generateSkirtFront, generateSkirtBack } = await import('../utils/patternTemplates');
-    const m = context.project.measurements;
-    const front = generateSkirtFront(m);
-    const back = generateSkirtBack(m);
-    return {
-      message: `Generated A-line skirt (front + back) for ${m.waist}cm waist, ${m.hips}cm hips.`,
-      commands: [
-        { type: 'create_piece', piece: stripPiece(front) },
-        { type: 'create_piece', piece: stripPiece(back) },
-      ],
-    };
-  }
-
-  if (msg.includes('pants') || msg.includes('pantalón') || msg.includes('trouser')) {
-    const { generatePantsFront, generatePantsBack } = await import('../utils/patternTemplates');
-    const m = context.project.measurements;
-    const front = generatePantsFront(m);
-    const back = generatePantsBack(m);
-    return {
-      message: `Generated trouser block (front + back) for ${m.waist}cm waist, ${m.inseam}cm inseam.`,
-      commands: [
-        { type: 'create_piece', piece: stripPiece(front) },
-        { type: 'create_piece', piece: stripPiece(back) },
-      ],
-    };
-  }
-
-  if (msg.includes('collar') || msg.includes('cuello')) {
-    const { generateCollar } = await import('../utils/patternTemplates');
-    const m = context.project.measurements;
-    const collar = generateCollar(m);
-    return {
-      message: `Generated shirt collar.`,
-      commands: [
-        { type: 'create_piece', piece: stripPiece(collar) },
-      ],
+      message: `Found pattern: **${top.name}** (${top.nameEs})\n\n` +
+        `${top.description}\n\n` +
+        `To generate it, connect an AI provider in Settings and ask me to use template "${top.id}".\n\n` +
+        `Other matches: ${results.slice(1, 4).map(r => r.name).join(', ') || 'none'}`,
+      commands: [],
     };
   }
 

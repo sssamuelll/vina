@@ -73,8 +73,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 56 tools registered', () => {
-      expect(registry.size).toBe(56);
+    it('has 55 tools registered', () => {
+      expect(registry.size).toBe(55);
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -117,11 +117,11 @@ describe('Tools E2E', () => {
       expect(store.getState().project.pieces[0].name).toBe('Front Bodice');
     });
 
-    it('createPiece with template generates piece', async () => {
+    it('createPiece with outline generates piece', async () => {
       const tool = registry.get('createPiece')!;
       const result = await executeTool(store, tool, {
-        name: 'Test Bodice',
-        template: 'bodice-front',
+        name: 'Test Piece',
+        outline: RECT_OUTLINE,
       });
       expect(result.success).toBe(true);
       expect(store.getState().project.pieces.length).toBeGreaterThanOrEqual(1);
@@ -413,7 +413,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all 56 tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(56);
+      expect(names.length).toBe(55);
 
       // Key tools from every category
       const expected = [

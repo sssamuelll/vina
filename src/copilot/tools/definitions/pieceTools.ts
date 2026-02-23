@@ -27,52 +27,19 @@ function computeBounds(outline: PathCommand[]): { width: number; height: number 
   return { width: Math.round(maxX - minX), height: Math.round(maxY - minY) };
 }
 
-/** Map template name to generator function — may return one or multiple pieces */
-async function generateFromTemplate(
-  template: string,
-  measurements: Record<string, number>,
-): Promise<PatternPiece[]> {
-  const {
-    generateBodiceFront, generateBodiceBack,
-    generateSleeve,
-    generateSkirtFront, generateSkirtBack,
-    generatePantsFront, generatePantsBack,
-    generateCollar,
-    generateTShirt,
-  } = await import('../../../utils/patternTemplates');
-
-  const m = measurements as unknown as Parameters<typeof generateBodiceFront>[0];
-
-  switch (template) {
-    case 't-shirt': return generateTShirt(m);
-    case 'bodice-front': return [generateBodiceFront(m)];
-    case 'bodice-back': return [generateBodiceBack(m)];
-    case 'sleeve': return [generateSleeve(m)];
-    case 'skirt-front': return [generateSkirtFront(m)];
-    case 'skirt-back': return [generateSkirtBack(m)];
-    case 'pants-front': return [generatePantsFront(m)];
-    case 'pants-back': return [generatePantsBack(m)];
-    case 'collar': return [generateCollar(m)];
-    default: throw new Error(`Unknown template: ${template}`);
-  }
-}
-
 // ─── createPiece ────────────────────────────────────────────────────────────
 
 const createPieceTool: ToolDefinition = {
   name: 'createPiece',
   description:
-    'Create a new pattern piece on the canvas. Can create from outline points or from a named template (bodice, sleeve, skirt, pants, collar). ' +
-    '/ Crear una nueva pieza de patrón en el lienzo. Puede crear desde puntos de contorno o desde una plantilla (corpiño, manga, falda, pantalón, cuello).',
+    'Create a new pattern piece from an SVG outline on the canvas. ' +
+    'For standard garments, use generateFromTemplate (Seamly2D patterns) instead. ' +
+    '/ Crear una nueva pieza de patrón desde un contorno SVG. ' +
+    'Para prendas estándar, usar generateFromTemplate (patrones Seamly2D).',
   parameters: {
     type: 'object',
     properties: {
       name: { type: 'string', description: 'Piece name / Nombre de la pieza (e.g. "Front Bodice", "Delantero Corpiño")' },
-      template: {
-        type: 'string',
-        enum: ['t-shirt', 'bodice-front', 'bodice-back', 'sleeve', 'skirt-front', 'skirt-back', 'pants-front', 'pants-back', 'collar'],
-        description: 'Generate from a standard pattern block using current measurements / Generar desde un bloque base usando medidas actuales',
-      },
       outline: {
         type: 'array',
         description: 'SVG PathCommand array defining the piece shape. 1 unit = 1mm / Array de PathCommand SVG. 1 unidad = 1mm',
@@ -99,36 +66,10 @@ const createPieceTool: ToolDefinition = {
   execute: async (
     params: Record<string, unknown>,
     dispatch: AppDispatch,
-    getState: () => RootState,
+    _getState: () => RootState,
   ): Promise<ToolResult> => {
     try {
-      const state = getState();
-
-      if (params.template) {
-        const measurements = state.project.avatar.measurements;
-        const pieces = await generateFromTemplate(params.template as string, measurements as unknown as Record<string, number>);
-
-        // Multi-piece templates (t-shirt, etc.)
-        const createdIds: string[] = [];
-        for (const p of pieces) {
-          p.id = uid();
-          p.createdAt = Date.now();
-          p.updatedAt = Date.now();
-          if (params.seamAllowance !== undefined) p.seamAllowance = params.seamAllowance as number;
-          dispatch(addPiece(p));
-          createdIds.push(p.id);
-        }
-        if (createdIds.length > 0) dispatch(selectPiece(createdIds[0]));
-
-        return {
-          success: true,
-          data: {
-            pieceIds: createdIds,
-            pieceNames: pieces.map(p => p.name),
-            count: pieces.length,
-          },
-        };
-      } else if (params.outline) {
+      if (params.outline) {
         const piece: PatternPiece = {
           id: uid(),
           name: (params.name as string) || 'New Piece',

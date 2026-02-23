@@ -355,7 +355,7 @@ const SIMPLE_TOOLS: ReadonlySet<string> = new Set([
 
 /** Tools that require more intelligence and should use the best model */
 const COMPLEX_TOOLS: ReadonlySet<string> = new Set([
-  'generateFromDescription',
+  'generateFromTemplate',
   'transformPiece',
   'createPiece',
   'modifyOutline',

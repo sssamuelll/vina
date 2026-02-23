@@ -496,8 +496,8 @@ describe('classifyToolComplexity', () => {
     expect(classifyToolComplexity('evaluateFormula')).toBe('simple');
   });
 
-  it('should classify generateFromDescription as complex', () => {
-    expect(classifyToolComplexity('generateFromDescription')).toBe('complex');
+  it('should classify generateFromTemplate as complex', () => {
+    expect(classifyToolComplexity('generateFromTemplate')).toBe('complex');
   });
 
   it('should classify createPiece as complex', () => {
