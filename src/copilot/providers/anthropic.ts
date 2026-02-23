@@ -176,6 +176,10 @@ export const anthropicProvider: LLMProvider = {
     }
     const baseUrl = resolveBaseUrl(config.baseUrl);
 
+    if (!config.apiKey) {
+      throw new Error('API key is missing. Go to Settings (⚙️) and enter your Anthropic API key.');
+    }
+
     const body: Record<string, unknown> = {
       model: config.model,
       max_tokens: config.maxTokens || 4096,
@@ -185,16 +189,24 @@ export const anthropicProvider: LLMProvider = {
     if (system) body.system = system;
     if (tools.length > 0) body.tools = toAnthropicTools(tools);
 
-    const response = await fetch(`${baseUrl}/v1/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify(body),
-    });
+    const url = `${baseUrl}/v1/messages`;
+    console.log('[Anthropic] POST', url, '| model:', config.model, '| messages:', anthropicMessages.length);
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': config.apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (fetchError) {
+      console.error('[Anthropic] fetch failed:', fetchError, '| URL:', url);
+      throw new Error(`Network error calling ${url}: ${fetchError instanceof Error ? fetchError.message : fetchError}`);
+    }
 
     if (!response.ok) {
       const text = await response.text();
