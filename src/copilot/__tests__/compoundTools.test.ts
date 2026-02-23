@@ -71,7 +71,7 @@ describe('Compound Tools (Phase 2)', () => {
 
   describe('Total tools count', () => {
     it('should have all 42 tools registered', () => {
-      expect(registry.size).toBe(42);
+      expect(registry.size).toBe(45);
     });
   });
 });
