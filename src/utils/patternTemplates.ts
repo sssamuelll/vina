@@ -388,7 +388,38 @@ export interface PatternTemplate {
   generate: (measurements: BodyMeasurements) => PatternPiece[];
 }
 
+/** Generate a complete t-shirt: front bodice, back bodice, 2 sleeves */
+export function generateTShirt(m: BodyMeasurements): PatternPiece[] {
+  const front = generateBodiceFront(m);
+  front.name = 'Delantero Camiseta';
+  const back = generateBodiceBack(m);
+  back.name = 'Espalda Camiseta';
+  const sleeveL = generateSleeve(m);
+  sleeveL.name = 'Manga Izquierda';
+  const sleeveR = generateSleeve(m);
+  sleeveR.name = 'Manga Derecha';
+  sleeveR.mirrored = true;
+
+  // Position pieces nicely
+  const backW = mm(m.chest) / 4 + 10;
+  front.position = { x: 50 + backW + 40, y: 50 };
+  back.position = { x: 50, y: 50 };
+  sleeveL.position = { x: 50, y: 50 + mm(m.backLength ?? m.height * 0.25) + 60 };
+  sleeveR.position = { x: 50 + backW + 40, y: 50 + mm(m.backLength ?? m.height * 0.25) + 60 };
+
+  return [back, front, sleeveL, sleeveR];
+}
+
 export const PATTERN_TEMPLATES: PatternTemplate[] = [
+  {
+    id: 't-shirt',
+    name: 'T-Shirt',
+    nameEs: 'Camiseta Básica',
+    description: 'Complete t-shirt: front + back bodice + 2 sleeves',
+    descriptionEs: 'Camiseta completa: delantero + espalda + 2 mangas',
+    icon: '👕',
+    generate: (m) => generateTShirt(m),
+  },
   {
     id: 'bodice-block',
     name: 'Bodice Block',

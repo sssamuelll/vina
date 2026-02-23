@@ -27,30 +27,32 @@ function computeBounds(outline: PathCommand[]): { width: number; height: number 
   return { width: Math.round(maxX - minX), height: Math.round(maxY - minY) };
 }
 
-/** Map template name to generator function */
+/** Map template name to generator function — may return one or multiple pieces */
 async function generateFromTemplate(
   template: string,
   measurements: Record<string, number>,
-): Promise<PatternPiece> {
+): Promise<PatternPiece[]> {
   const {
     generateBodiceFront, generateBodiceBack,
     generateSleeve,
     generateSkirtFront, generateSkirtBack,
     generatePantsFront, generatePantsBack,
     generateCollar,
+    generateTShirt,
   } = await import('../../../utils/patternTemplates');
 
   const m = measurements as unknown as Parameters<typeof generateBodiceFront>[0];
 
   switch (template) {
-    case 'bodice-front': return generateBodiceFront(m);
-    case 'bodice-back': return generateBodiceBack(m);
-    case 'sleeve': return generateSleeve(m);
-    case 'skirt-front': return generateSkirtFront(m);
-    case 'skirt-back': return generateSkirtBack(m);
-    case 'pants-front': return generatePantsFront(m);
-    case 'pants-back': return generatePantsBack(m);
-    case 'collar': return generateCollar(m);
+    case 't-shirt': return generateTShirt(m);
+    case 'bodice-front': return [generateBodiceFront(m)];
+    case 'bodice-back': return [generateBodiceBack(m)];
+    case 'sleeve': return [generateSleeve(m)];
+    case 'skirt-front': return [generateSkirtFront(m)];
+    case 'skirt-back': return [generateSkirtBack(m)];
+    case 'pants-front': return [generatePantsFront(m)];
+    case 'pants-back': return [generatePantsBack(m)];
+    case 'collar': return [generateCollar(m)];
     default: throw new Error(`Unknown template: ${template}`);
   }
 }
@@ -68,7 +70,7 @@ const createPieceTool: ToolDefinition = {
       name: { type: 'string', description: 'Piece name / Nombre de la pieza (e.g. "Front Bodice", "Delantero Corpiño")' },
       template: {
         type: 'string',
-        enum: ['bodice-front', 'bodice-back', 'sleeve', 'skirt-front', 'skirt-back', 'pants-front', 'pants-back', 'collar'],
+        enum: ['t-shirt', 'bodice-front', 'bodice-back', 'sleeve', 'skirt-front', 'skirt-back', 'pants-front', 'pants-back', 'collar'],
         description: 'Generate from a standard pattern block using current measurements / Generar desde un bloque base usando medidas actuales',
       },
       outline: {
@@ -101,14 +103,33 @@ const createPieceTool: ToolDefinition = {
   ): Promise<ToolResult> => {
     try {
       const state = getState();
-      let piece: PatternPiece;
 
       if (params.template) {
         const measurements = state.project.avatar.measurements;
-        piece = await generateFromTemplate(params.template as string, measurements as unknown as Record<string, number>);
-        piece.name = (params.name as string) || piece.name;
+        const pieces = await generateFromTemplate(params.template as string, measurements as unknown as Record<string, number>);
+
+        // Multi-piece templates (t-shirt, etc.)
+        const createdIds: string[] = [];
+        for (const p of pieces) {
+          p.id = uid();
+          p.createdAt = Date.now();
+          p.updatedAt = Date.now();
+          if (params.seamAllowance !== undefined) p.seamAllowance = params.seamAllowance as number;
+          dispatch(addPiece(p));
+          createdIds.push(p.id);
+        }
+        if (createdIds.length > 0) dispatch(selectPiece(createdIds[0]));
+
+        return {
+          success: true,
+          data: {
+            pieceIds: createdIds,
+            pieceNames: pieces.map(p => p.name),
+            count: pieces.length,
+          },
+        };
       } else if (params.outline) {
-        piece = {
+        const piece: PatternPiece = {
           id: uid(),
           name: (params.name as string) || 'New Piece',
           outline: params.outline as PathCommand[],
@@ -120,35 +141,20 @@ const createPieceTool: ToolDefinition = {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
+
+        dispatch(addPiece(piece));
+        dispatch(selectPiece(piece.id));
+
+        return {
+          success: true,
+          data: {
+            pieceId: piece.id,
+            bounds: computeBounds(piece.outline),
+          },
+        };
       } else {
         return { success: false, error: 'Either template or outline must be provided' };
       }
-
-      if (params.seamAllowance !== undefined) {
-        piece.seamAllowance = params.seamAllowance as number;
-      }
-      if (params.position) {
-        piece.position = params.position as { x: number; y: number };
-      }
-      if (params.mirrored !== undefined) {
-        piece.mirrored = params.mirrored as boolean;
-      }
-
-      // Ensure unique ID
-      piece.id = uid();
-      piece.createdAt = Date.now();
-      piece.updatedAt = Date.now();
-
-      dispatch(addPiece(piece));
-      dispatch(selectPiece(piece.id));
-
-      return {
-        success: true,
-        data: {
-          pieceId: piece.id,
-          bounds: computeBounds(piece.outline),
-        },
-      };
     } catch (e: unknown) {
       return { success: false, error: (e as Error).message };
     }
