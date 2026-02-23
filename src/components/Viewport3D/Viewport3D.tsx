@@ -111,13 +111,40 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const snapshot3D = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
-    const canvas = container.querySelector('canvas');
-    if (!canvas) return;
-    // Force a fresh render to ensure preserveDrawingBuffer captures current frame
-    const dataUrl = canvas.toDataURL('image/png');
+    const store = container as unknown as Record<string, unknown>;
+    const renderer = store.__gl as THREE.WebGLRenderer | undefined;
+    const scene = store.__scene as THREE.Scene | undefined;
+    const camera = store.__camera as THREE.Camera | undefined;
+    if (!renderer || !scene || !camera) return;
+
+    // Force a render so the framebuffer is fresh, then capture
+    renderer.render(scene, camera);
+    const canvas = renderer.domElement;
+    // After render(), the buffer is available for readPixels
+    const glCtx = canvas.getContext('webgl2') || canvas.getContext('webgl');
+    if (!glCtx) return;
+
+    const w = glCtx.drawingBufferWidth;
+    const h = glCtx.drawingBufferHeight;
+    const pixels = new Uint8Array(w * h * 4);
+    glCtx.readPixels(0, 0, w, h, glCtx.RGBA, glCtx.UNSIGNED_BYTE, pixels);
+
+    // Flip vertically (WebGL is bottom-up)
+    const offscreen = document.createElement('canvas');
+    offscreen.width = w;
+    offscreen.height = h;
+    const ctx = offscreen.getContext('2d')!;
+    const imageData = ctx.createImageData(w, h);
+    for (let y = 0; y < h; y++) {
+      const srcRow = (h - 1 - y) * w * 4;
+      const dstRow = y * w * 4;
+      imageData.data.set(pixels.subarray(srcRow, srcRow + w * 4), dstRow);
+    }
+    ctx.putImageData(imageData, 0, 0);
+
     const link = document.createElement('a');
     link.download = `openclo-fitmap-${Date.now()}.png`;
-    link.href = dataUrl;
+    link.href = offscreen.toDataURL('image/png');
     link.click();
   }, []);
 
@@ -144,8 +171,14 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
-        gl={{ antialias: true, preserveDrawingBuffer: true }}
-        onCreated={({ scene }) => { scene.background = new THREE.Color('#f0f0f0'); }}
+        gl={{ antialias: true }}
+        onCreated={({ gl, scene, camera }) => {
+          scene.background = new THREE.Color('#f0f0f0');
+          // Store refs for snapshot (readPixels needs a fresh render)
+          (containerRef.current as unknown as Record<string, unknown>).__gl = gl;
+          (containerRef.current as unknown as Record<string, unknown>).__scene = scene;
+          (containerRef.current as unknown as Record<string, unknown>).__camera = camera;
+        }}
       >
         <ambientLight intensity={0.5} />
         <directionalLight position={[3, 5, 4]} intensity={0.7} castShadow shadow-mapSize={1024} />
