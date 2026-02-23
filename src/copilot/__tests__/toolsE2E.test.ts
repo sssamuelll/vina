@@ -73,8 +73,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 54 tools registered', () => {
-      expect(registry.size).toBe(54);
+    it('has 56 tools registered', () => {
+      expect(registry.size).toBe(56);
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -411,16 +411,16 @@ describe('Tools E2E', () => {
   // ─── Coverage Summary ─────────────────────────────────────────────
 
   describe('Coverage', () => {
-    it('all 54 tool names present', () => {
+    it('all 56 tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(54);
+      expect(names.length).toBe(56);
 
       // Key tools from every category
       const expected = [
         'createPiece', 'deletePiece', 'mirrorPiece',
         'createSeam',
         'setViewMode',
-        'exportDXF', 'exportPDF',
+        'exportDXF', 'exportPDF', 'export3DOBJ', 'export3DGLTF',
         'setMeasurements',
         'autoDetectSeams',
         'searchFabrics', 'getFabricDetails', 'compareFabrics',

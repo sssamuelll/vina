@@ -143,6 +143,56 @@ const exportOBJTool: ToolDefinition = {
   },
 };
 
+// ─── export3DOBJ ────────────────────────────────────────────────────────────
+
+const export3DOBJTool: ToolDefinition = {
+  name: 'export3DOBJ',
+  description:
+    'Export simulated 3D garment mesh to Wavefront OBJ for Blender/Maya/Rhino. ' +
+    'Dispatches a custom event that the 3D viewport handles. ' +
+    '/ Exportar malla 3D de prenda simulada a OBJ.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename (without .obj)' },
+      scale: { type: 'number', description: 'Scale: mm→target (0.1=cm, 0.001=m). Default: 0.1' },
+    },
+  },
+  execute: async (params): Promise<ToolResult> => {
+    const filename = (params.filename as string) || 'garment-3d';
+    const scale = (params.scale as number) || 0.1;
+    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+      detail: { format: 'obj', filename, scale },
+    }));
+    return { success: true, data: { filename: `${filename}.obj`, format: 'OBJ', note: 'Export triggered via 3D viewport' } };
+  },
+};
+
+// ─── export3DGLTF ───────────────────────────────────────────────────────────
+
+const export3DGLTFTool: ToolDefinition = {
+  name: 'export3DGLTF',
+  description:
+    'Export simulated 3D garment mesh to glTF/GLB for Blender/Unity/Unreal/web. ' +
+    'Dispatches a custom event that the 3D viewport handles. ' +
+    '/ Exportar malla 3D de prenda simulada a glTF/GLB.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename (without extension)' },
+      binary: { type: 'boolean', description: 'Export as .glb (default true)' },
+    },
+  },
+  execute: async (params): Promise<ToolResult> => {
+    const filename = (params.filename as string) || 'garment-3d';
+    const binary = (params.binary as boolean) ?? true;
+    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+      detail: { format: binary ? 'glb' : 'gltf', filename, binary },
+    }));
+    return { success: true, data: { filename: `${filename}.${binary ? 'glb' : 'gltf'}`, format: binary ? 'GLB' : 'glTF' } };
+  },
+};
+
 // ─── saveProject ────────────────────────────────────────────────────────────
 
 const saveProjectTool: ToolDefinition = {
@@ -176,5 +226,7 @@ export const tools: ToolDefinition[] = [
   exportDXFTool,
   exportPDFTool,
   exportOBJTool,
+  export3DOBJTool,
+  export3DGLTFTool,
   saveProjectTool,
 ];

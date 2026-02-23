@@ -293,6 +293,31 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     geometryRef.current = staticGeometry;
   }, [staticGeometry]);
 
+  // Listen for 3D export events from copilot tools
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const { format, filename, scale, binary } = (e as CustomEvent).detail || {};
+      if (!meshRef.current) return;
+
+      const group = new THREE.Group();
+      group.add(meshRef.current.clone(true));
+
+      try {
+        if (format === 'obj') {
+          const { downloadOBJ } = await import('../../utils/export/objExporter');
+          downloadOBJ(group, { filename, scale: scale || 0.1 });
+        } else if (format === 'glb' || format === 'gltf') {
+          const { downloadGLTF } = await import('../../utils/export/gltfExporter');
+          await downloadGLTF(group, { filename, binary: binary ?? true });
+        }
+      } catch (err) {
+        console.error('[GarmentSimulation] 3D export failed:', err);
+      }
+    };
+    window.addEventListener('openclo:export3d', handler);
+    return () => window.removeEventListener('openclo:export3d', handler);
+  }, []);
+
   if (!staticGeometry) return null;
 
   return (

@@ -314,22 +314,24 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
       discoverBoneAxes(boneMap.current, bindPoses.current, scene);
     }
 
-    // Compute bounding box for auto-scaling
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
+    // Auto-scale: skip for OBJ/FBX (already scaled in their loader useEffect)
+    if (!isObjFbx) {
+      const box = new THREE.Box3().setFromObject(scene);
+      const size = new THREE.Vector3();
+      box.getSize(size);
 
-    if (autoScale && size.y > 0) {
-      const scale = height / size.y;
-      scene.scale.setScalar(scale);
+      if (autoScale && size.y > 0) {
+        const scale = height / size.y;
+        scene.scale.setScalar(scale);
 
-      const scaledBox = new THREE.Box3().setFromObject(scene);
-      const scaledCenter = new THREE.Vector3();
-      scaledBox.getCenter(scaledCenter);
+        const scaledBox = new THREE.Box3().setFromObject(scene);
+        const scaledCenter = new THREE.Vector3();
+        scaledBox.getCenter(scaledCenter);
 
-      scene.position.y = -scaledBox.min.y;
-      scene.position.x = -scaledCenter.x;
-      scene.position.z = -scaledCenter.z;
+        scene.position.y = -scaledBox.min.y;
+        scene.position.x = -scaledCenter.x;
+        scene.position.z = -scaledCenter.z;
+      }
     }
 
     // Material defaults
@@ -356,21 +358,28 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     groupRef.current.add(scene);
 
     // Initialize IK solver
-    initializeIK();
+    initializeIK(scene);
 
     // Apply initial pose immediately after loading
     requestAnimationFrame(() => applyPose.current());
-  }, [isVrm ? vrmScene : isObjFbx ? objFbxScene : gltf, autoScale, height, vrmInstance, isObjFbx]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vrmScene, objFbxScene, gltf, autoScale, height, vrmInstance, isVrm, isObjFbx]);
 
   // Initialize IK solver and chains
-  const initializeIK = () => {
-    if (!gltf?.scene || boneMap.current.size === 0) return;
+  const initializeIK = (activeScene: THREE.Object3D) => {
+    if (!activeScene || boneMap.current.size === 0) return;
 
     try {
-      const mesh = gltf.scene.children.find((child) => (child as THREE.SkinnedMesh).isSkinnedMesh) as THREE.SkinnedMesh;
-      if (!mesh || !mesh.skeleton) return;
+      let mesh: THREE.SkinnedMesh | null = null;
+      activeScene.traverse((child) => {
+        if (!mesh && (child as THREE.SkinnedMesh).isSkinnedMesh) {
+          mesh = child as THREE.SkinnedMesh;
+        }
+      });
+      if (!mesh || !(mesh as THREE.SkinnedMesh).skeleton) return;
 
       // Create IK chains
+      const skeleton = (mesh as THREE.SkinnedMesh).skeleton!;
       const iks = ikChains.map(chain => {
         const bones = chain.bones.map(boneName => {
           const bone = boneMap.current.get(boneName);
@@ -378,7 +387,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
             console.warn(`[AvatarModel] IK bone not found: ${boneName}`);
             return null;
           }
-          return { index: mesh.skeleton!.bones.indexOf(bone) };
+          return { index: skeleton.bones.indexOf(bone) };
         }).filter(b => b !== null);
 
         if (bones.length === 0) return null;
