@@ -6,7 +6,7 @@ interface CopilotHeaderProps {
   offline: boolean;
   isColumn: boolean;
   isFullscreen: boolean;
-  showSettings: boolean;
+  showSettings?: boolean;
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onClearConversation: () => void;
@@ -19,7 +19,7 @@ export default function CopilotHeader({
   offline,
   isColumn,
   isFullscreen,
-  showSettings,
+  showSettings: _showSettings,
   onToggleFullscreen,
   onToggleSettings,
   onClearConversation,

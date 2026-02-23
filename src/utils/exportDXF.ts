@@ -1,5 +1,5 @@
 import { PatternPiece, PathCommand } from '../types/types';
-import { preparePieces, type PreparedPiece } from './export/pipeline';
+import { preparePieces } from './export/pipeline';
 
 /**
  * Export pattern pieces to DXF (AutoCAD Drawing Exchange Format).

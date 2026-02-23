@@ -17,7 +17,7 @@ const mm = (cm: number) => cm * 10;
 /* Path helpers imported from ./pathHelpers */
 
 /** Derive measurements that aren't directly provided */
-function deriveMeasurements(m: BodyMeasurements): Required<BodyMeasurements> {
+function deriveMeasurements(m: BodyMeasurements): BodyMeasurements & { neckCirc: number; backLength: number; frontLength: number; armholeDepth: number } {
   return {
     ...m,
     neckCirc: m.neckCirc ?? m.chest * 0.36,

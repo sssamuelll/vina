@@ -132,7 +132,7 @@ export function generateSeamAllowance(
     : JoinType.Round;
 
   const co = new ClipperOffset();
-  co.addPath(clipperPath, jt, EndType.Polygon);
+  co.addPath(clipperPath as unknown as Point64[], jt, EndType.Polygon);
 
   const result = new Paths64();
   co.execute(width * CLIPPER_SCALE, result);

@@ -5,19 +5,6 @@ import {
 } from '../utils/seam';
 import type { PathCommand, Point2D } from '../types/types';
 
-function dist(a: Point2D, b: Point2D): number {
-  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
-}
-
-// Distance from point to line segment
-function pointToSegmentDist(p: Point2D, a: Point2D, b: Point2D): number {
-  const dx = b.x - a.x, dy = b.y - a.y;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq < 1e-10) return dist(p, a);
-  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
-  return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
-}
-
 function makeSquareOutline(size: number): PathCommand[] {
   return [
     { type: 'M', values: [0, 0] },
