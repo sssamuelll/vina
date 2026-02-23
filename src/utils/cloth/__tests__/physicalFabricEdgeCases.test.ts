@@ -5,7 +5,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   PHYSICAL_FABRIC_LIBRARY,
-  getAllPhysicalFabrics,
   getPhysicalFabric,
   searchPhysicalFabrics,
   getFabricsByWeave,

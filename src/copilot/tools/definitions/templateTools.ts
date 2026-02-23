@@ -12,7 +12,9 @@ import { searchCatalog, getCatalog, getCatalogEntry, type CatalogEntry } from '.
 import { PatternTemplateEngine, type SeamlyPattern } from '../../../utils/seamly2d/templateEngine';
 import { buildMeasurements, inferSizeSystem, type StandardSize, type SizeSystem } from '../../../utils/seamly2d/sizeTables';
 import { autoSew } from '../../../utils/autoSew';
-import { addPiece, addSeam } from '../../../store/projectSlice';
+import { addPiece, addSeam, addFabric } from '../../../store/projectSlice';
+import { getPhysicalFabric, toBasicMaterial, searchPhysicalFabrics } from '../../../utils/cloth/physicalFabric';
+import type { Fabric } from '../../../types/types';
 
 // ─── Template JSON loader (static imports for bundled templates) ────────────
 
@@ -170,6 +172,10 @@ const generateFromTemplateTool: ToolDefinition = {
       shoulder: { type: 'number', description: 'Shoulder length in mm / Largo de hombro en mm' },
       armLength: { type: 'number', description: 'Arm length in mm / Largo de brazo en mm' },
       inseam: { type: 'number', description: 'Inseam in mm / Entrepierna en mm' },
+      fabricId: {
+        type: 'string',
+        description: 'Physical fabric ID (e.g., "cotton-poplin", "denim-12oz", "lycra-spandex"). Use searchFabrics to find options. / ID de tela física',
+      },
       autoSew: {
         type: 'boolean',
         description: 'Auto-detect and apply seams (default true) / Auto-detectar y aplicar costuras',
@@ -245,6 +251,42 @@ const generateFromTemplateTool: ToolDefinition = {
       return { success: false, error: 'Template generated 0 pieces' };
     }
 
+    // Resolve fabric
+    const fabricIdParam = params.fabricId as string | undefined;
+    let projectFabric: Fabric | null = null;
+    let fabricName: string | null = null;
+
+    if (fabricIdParam) {
+      const physFabric = getPhysicalFabric(fabricIdParam);
+      if (!physFabric) {
+        const suggestions = searchPhysicalFabrics(fabricIdParam);
+        return {
+          success: false,
+          error: `Fabric "${fabricIdParam}" not found. ${
+            suggestions.length > 0
+              ? `Did you mean: ${suggestions.slice(0, 3).map(f => f.id).join(', ')}?`
+              : 'Use searchFabrics to find available fabrics.'
+          }`,
+        };
+      }
+      const basic = toBasicMaterial(physFabric);
+      projectFabric = {
+        id: physFabric.id,
+        name: physFabric.name,
+        color: '#e8e4df',
+        weight: basic.weight,
+        stretch: 1 - basic.stretchStiffness,
+        stiffness: basic.bendStiffness,
+        friction: basic.friction,
+      };
+      fabricName = physFabric.name;
+
+      // Assign fabric to all pieces
+      for (const piece of pieces) {
+        piece.fabricId = physFabric.id;
+      }
+    }
+
     // Layout pieces side by side (don't stack them)
     let xOffset = 0;
     for (const piece of pieces) {
@@ -267,6 +309,9 @@ const generateFromTemplateTool: ToolDefinition = {
     // Add to project
     const doAdd = params.addToProject !== false;
     if (doAdd) {
+      if (projectFabric) {
+        dispatch(addFabric(projectFabric));
+      }
       for (const piece of pieces) {
         dispatch(addPiece(piece));
       }
@@ -285,6 +330,7 @@ const generateFromTemplateTool: ToolDefinition = {
         template: entry.name,
         size: size || 'M (default)',
         sizeSystem: system,
+        fabric: fabricName || 'none (default cotton)',
         piecesGenerated: pieces.length,
         pieces: pieces.map(p => ({ id: p.id, name: p.name })),
         seams: sewResult ? {
