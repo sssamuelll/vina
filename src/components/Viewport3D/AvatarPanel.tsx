@@ -92,9 +92,11 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
     }
   }, [avatarModelUrl]);
 
-  // GLB upload
+  // 3D model upload (OBJ, FBX, GLB, GLTF, VRM)
   const handleFileUpload = useCallback((file: File) => {
-    if (!file.name.endsWith('.glb') && !file.name.endsWith('.vrm')) return;
+    const ext = file.name.toLowerCase().split('.').pop() || '';
+    const supported = ['obj', 'fbx', 'glb', 'gltf', 'vrm'];
+    if (!supported.includes(ext)) return;
     const url = URL.createObjectURL(file);
     dispatch(setAvatarModelUrl(url));
     setModelName(file.name);
@@ -176,7 +178,7 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".glb,.vrm"
+                  accept=".obj,.fbx,.glb,.gltf,.vrm"
                   style={{ display: 'none' }}
                   onChange={e => {
                     const f = e.target.files?.[0];
@@ -190,7 +192,7 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
                   onDragLeave={() => setDragover(false)}
                   onDrop={handleDrop}
                 >
-                  📁 Drop .glb or .vrm file or click to upload
+                  📁 Drop .obj, .fbx, .glb, .gltf, or .vrm file
                 </div>
                 <div className="ap-model-info">
                   <span>{modelName ?? 'Default Avatar'}</span>

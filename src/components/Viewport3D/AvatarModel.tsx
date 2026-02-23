@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLoader, useFrame } from "@react-three/fiber";
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js';
 import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
@@ -8,7 +10,11 @@ import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
 import { setJointRotation, clampJointRotation } from '../../store/avatarSlice';
 import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
+import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
 import type { VRM } from '@pixiv/three-vrm';
+
+// ─── Unit scale map (to meters for three.js scene) ─────────────────────────
+const UNIT_TO_METERS: Record<string, number> = { mm: 0.001, cm: 0.01, m: 1, inches: 0.0254 };
 
 interface AvatarModelProps {
   url: string;
@@ -152,11 +158,15 @@ function discoverBoneAxes(boneMap: Map<string, THREE.Bone>, bindPoses: Map<strin
 
 export default function AvatarModel({ url, autoScale = true, height = 1.80 }: AvatarModelProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const isVrm = isVRMFile(url);
-  // useLoader is always called (hooks can't be conditional), but VRM files are loaded separately
-  const gltf = useLoader(GLTFLoader, isVrm ? '/default-avatar.glb' : url);
+  const format = detectFormat(url.split('/').pop() || url) as MeshFormat;
+  const isVrm = format === 'vrm' || isVRMFile(url);
+  const isObjFbx = format === 'obj' || format === 'fbx';
+  const isGltf = !isVrm && !isObjFbx;
+  // useLoader is always called (hooks can't be conditional), but non-GLTF files are loaded separately
+  const gltf = useLoader(GLTFLoader, isGltf ? url : '/default-avatar.glb');
   const [vrmInstance, setVrmInstance] = useState<VRM | null>(null);
   const [vrmScene, setVrmScene] = useState<THREE.Group | null>(null);
+  const [objFbxScene, setObjFbxScene] = useState<THREE.Group | null>(null);
   const boneMap = useRef<Map<string, THREE.Bone>>(new Map());
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
   const ikSolver = useRef<CCDIKSolver | null>(null);
@@ -186,8 +196,66 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     return () => { cancelled = true; };
   }, [url, isVrm]);
 
+  // Load OBJ/FBX files separately
   useEffect(() => {
-    const scene = isVrm ? vrmScene : gltf?.scene;
+    if (!isObjFbx) {
+      setObjFbxScene(null);
+      return;
+    }
+    let cancelled = false;
+    const loader = format === 'fbx' ? new FBXLoader() : new OBJLoader();
+    loader.load(
+      url,
+      (result) => {
+        if (cancelled) return;
+        const group = result instanceof THREE.Group ? result : new THREE.Group().add(result);
+
+        // Auto-scale: detect unit from bounding box and normalize
+        const bbox = new THREE.Box3().setFromObject(group);
+        const unit = detectUnit(bbox);
+        const scale = UNIT_TO_METERS[unit] || 1;
+        if (scale !== 1) {
+          group.scale.multiplyScalar(scale);
+          group.updateMatrixWorld(true);
+        }
+
+        // Auto-scale to target height
+        const scaledBbox = new THREE.Box3().setFromObject(group);
+        const currentHeight = scaledBbox.max.y - scaledBbox.min.y;
+        if (currentHeight > 0) {
+          const targetHeight = height; // meters
+          const ratio = targetHeight / currentHeight;
+          if (ratio > 2 || ratio < 0.5) {
+            group.scale.multiplyScalar(ratio);
+            group.updateMatrixWorld(true);
+          }
+        }
+
+        // Center feet on ground
+        const finalBbox = new THREE.Box3().setFromObject(group);
+        const center = new THREE.Vector3();
+        finalBbox.getCenter(center);
+        group.position.set(-center.x, -finalBbox.min.y, -center.z);
+
+        // Ensure normals
+        group.traverse(obj => {
+          if (obj instanceof THREE.Mesh && obj.geometry && !obj.geometry.attributes.normal) {
+            obj.geometry.computeVertexNormals();
+          }
+        });
+
+        setObjFbxScene(group);
+      },
+      undefined,
+      (err) => {
+        if (!cancelled) console.error(`[AvatarModel] Failed to load ${format}:`, err);
+      },
+    );
+    return () => { cancelled = true; };
+  }, [url, isObjFbx, format, height]);
+
+  useEffect(() => {
+    const scene = isVrm ? vrmScene : isObjFbx ? objFbxScene : gltf?.scene;
     if (!scene || !groupRef.current) return;
     boneMap.current.clear();
     bindPoses.current.clear();
@@ -292,7 +360,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
 
     // Apply initial pose immediately after loading
     requestAnimationFrame(() => applyPose.current());
-  }, [isVrm ? vrmScene : gltf, autoScale, height, vrmInstance]);
+  }, [isVrm ? vrmScene : isObjFbx ? objFbxScene : gltf, autoScale, height, vrmInstance, isObjFbx]);
 
   // Initialize IK solver and chains
   const initializeIK = () => {

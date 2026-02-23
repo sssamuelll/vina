@@ -270,14 +270,14 @@ describe('Tools E2E', () => {
       const tool = registry.get('searchFabrics')!;
       const result = await executeTool(store, tool, { query: 'cotton' });
       expect(result.success).toBe(true);
-      expect(result.data.results.length).toBeGreaterThan(0);
+      expect((result.data as any).results.length).toBeGreaterThan(0);
     });
 
     it('getFabricDetails returns fabric info', async () => {
       const tool = registry.get('getFabricDetails')!;
       const result = await executeTool(store, tool, { fabricId: 'cotton-poplin' });
       expect(result.success).toBe(true);
-      expect(result.data.name).toBeTruthy();
+      expect(result.data!.name).toBeTruthy();
     });
 
     it('getFabricDetails fails for unknown fabric', async () => {
@@ -308,7 +308,7 @@ describe('Tools E2E', () => {
       const tool = registry.get('searchTemplates')!;
       const result = await executeTool(store, tool, {});
       expect(result.success).toBe(true);
-      expect(result.data.total).toBeGreaterThan(0);
+      expect(result.data!.total).toBeGreaterThan(0);
     });
   });
 
@@ -355,7 +355,7 @@ describe('Tools E2E', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.data.adjustments.length).toBeGreaterThan(0);
+      expect((result.data as any).adjustments.length).toBeGreaterThan(0);
       expect(Object.keys(store.getState().parametric.variableOverrides).length).toBeGreaterThan(0);
     });
 
