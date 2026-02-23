@@ -7,7 +7,8 @@
 
 import type { PatternPiece, Point2D } from '../../types/types';
 import type { Seam } from '../../types/types'; // eslint-disable-line @typescript-eslint/no-unused-vars
-import { flattenPath, generateSeamAllowance } from '../seam/index';
+import { flattenPath } from '../seam/index';
+import { preparePiece } from './pipeline';
 import { nestPieces, computeArea } from '../nesting/nestingEngine';
 import type { NestingOptions } from '../nesting/types';
 
@@ -164,17 +165,14 @@ export function computeCuttingLayout(
     const piece = pieces.find(p => p.id === placement.pieceId);
     if (!piece) continue;
 
-    const outlinePoints = flattenPath(piece.outline);
-    const outlineFlat = flattenToArray(outlinePoints);
+    // Use shared pipeline for outline flattening and SA generation
+    const pp = preparePiece(piece);
+    const outlineFlat = flattenToArray(pp.flatOutline);
 
-    // Compute SA outline if needed
+    // SA outline from pipeline
     let saFlat: number[] | undefined;
-    if (config.includeSeamAllowance && piece.seamAllowance > 0) {
-      const saCommands = generateSeamAllowance(piece.outline, piece.seamAllowance);
-      if (saCommands.length > 0) {
-        const saPoints = flattenPath(saCommands);
-        saFlat = flattenToArray(saPoints);
-      }
+    if (config.includeSeamAllowance && pp.flatSeamOutline.length > 0) {
+      saFlat = flattenToArray(pp.flatSeamOutline);
     }
 
     // Grainline

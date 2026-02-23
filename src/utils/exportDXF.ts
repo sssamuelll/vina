@@ -1,5 +1,5 @@
 import { PatternPiece, PathCommand } from '../types/types';
-import { generateSeamAllowance } from './seam';
+import { preparePieces, type PreparedPiece } from './export/pipeline';
 
 /**
  * Export pattern pieces to DXF (AutoCAD Drawing Exchange Format).
@@ -59,18 +59,15 @@ function flattenCubicBezier(
     ax3: number, ay3: number,
     depth: number,
   ) {
-    // Flatness test: max distance of control points from chord
     const dx = ax3 - ax0;
     const dy = ay3 - ay0;
     const lenSq = dx * dx + dy * dy;
 
     let d1: number, d2: number;
     if (lenSq < 1e-10) {
-      // Degenerate — use distance from start
       d1 = Math.sqrt((ax1 - ax0) ** 2 + (ay1 - ay0) ** 2);
       d2 = Math.sqrt((ax2 - ax0) ** 2 + (ay2 - ay0) ** 2);
     } else {
-      // Perpendicular distance of control points from chord line
       d1 = Math.abs((ax1 - ax0) * dy - (ay1 - ay0) * dx) / Math.sqrt(lenSq);
       d2 = Math.abs((ax2 - ax0) * dy - (ay2 - ay0) * dx) / Math.sqrt(lenSq);
     }
@@ -78,13 +75,10 @@ function flattenCubicBezier(
     const maxD = Math.max(d1, d2);
 
     if (maxD <= tolerance && depth >= Math.log2(minSegs)) {
-      // Flat enough and minimum segments met
       points.push({ x: ax3, y: ay3 });
     } else if (depth >= Math.log2(maxSegs)) {
-      // Hit max depth
       points.push({ x: ax3, y: ay3 });
     } else {
-      // De Casteljau split at t=0.5
       const mx01 = (ax0 + ax1) / 2, my01 = (ay0 + ay1) / 2;
       const mx12 = (ax1 + ax2) / 2, my12 = (ay1 + ay2) / 2;
       const mx23 = (ax2 + ax3) / 2, my23 = (ay2 + ay3) / 2;
@@ -112,7 +106,6 @@ function flattenQuadBezier(
   minSegs: number,
   maxSegs: number,
 ): { x: number; y: number }[] {
-  // Promote to cubic: CP1 = P0 + 2/3*(P1-P0), CP2 = P2 + 2/3*(P1-P2)
   const cx1 = x0 + (2 / 3) * (x1 - x0);
   const cy1 = y0 + (2 / 3) * (y1 - y0);
   const cx2 = x2 + (2 / 3) * (x1 - x2);
@@ -213,7 +206,7 @@ EOF
 `;
 }
 
-/** Convert PathCommands to DXF POLYLINE/LWPOLYLINE entities */
+/** Convert PathCommands to DXF LWPOLYLINE entities */
 function outlineToDXF(
   commands: PathCommand[],
   offsetX: number,
@@ -240,7 +233,6 @@ function outlineToDXF(
         points.push({ x: cx + offsetX, y: -(cy + offsetY), bulge: 0 });
         break;
       case 'C': {
-        // Adaptive cubic bezier flattening based on chord error tolerance
         const flatPts = flattenCubicBezier(
           cx, cy, v[0], v[1], v[2], v[3], v[4], v[5],
           tolerance, minSegs, maxSegs,
@@ -252,7 +244,6 @@ function outlineToDXF(
         break;
       }
       case 'Q': {
-        // Adaptive quadratic bezier flattening
         const flatPts = flattenQuadBezier(
           cx, cy, v[0], v[1], v[2], v[3],
           tolerance, minSegs, maxSegs,
@@ -271,7 +262,6 @@ function outlineToDXF(
 
   if (points.length < 2) return '';
 
-  // LWPOLYLINE (lightweight, better compatibility)
   let dxf = `0
 LWPOLYLINE
 8
@@ -344,45 +334,25 @@ ${(-(y + offsetY)).toFixed(4)}
 `;
 }
 
-/** Compute bounding box of a piece */
-function pieceBBox(piece: PatternPiece): { minX: number; minY: number; maxX: number; maxY: number } {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const cmd of piece.outline) {
-    const v = cmd.values;
-    for (let i = 0; i < v.length - 1; i += 2) {
-      minX = Math.min(minX, v[i]);
-      minY = Math.min(minY, v[i + 1]);
-      maxX = Math.max(maxX, v[i]);
-      maxY = Math.max(maxY, v[i + 1]);
-    }
-  }
-  return { minX, minY, maxX, maxY };
-}
-
 /**
  * Generate a DXF string from pattern pieces.
- * Pieces are laid out left-to-right with spacing.
+ * Uses shared pipeline for piece preparation (bbox, SA, layout).
  */
 /** @deprecated Use generateDXFAAMA from utils/dxf for AAMA compliance. */
 export function generateDXFLegacy(pieces: PatternPiece[], opts: DxfExportOptions = {}): string {
-  let dxf = dxfHeader();
-  const SPACING = 30; // mm between pieces
-  let currentX = 0;
+  const prepared = preparePieces(pieces, { spacing: 30 });
 
-  for (const piece of pieces) {
-    const bb = pieceBBox(piece);
-    const offsetX = currentX - bb.minX;
-    const offsetY = -bb.minY;
+  let dxf = dxfHeader();
+
+  for (const pp of prepared) {
+    const { piece, seamOutline, offsetX, offsetY, boundingBox: bb } = pp;
 
     // Outline (cut line)
     dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'CUT', opts);
 
-    // Seam allowance — proper offset via Clipper2
-    if (piece.seamAllowance > 0) {
-      const saOutline = generateSeamAllowance(piece.outline, piece.seamAllowance);
-      if (saOutline.length > 0) {
-        dxf += outlineToDXF(saOutline, offsetX, offsetY, 'SEAM', opts);
-      }
+    // Seam allowance — proper offset via Clipper2 (from pipeline)
+    if (piece.seamAllowance > 0 && seamOutline.length > 0) {
+      dxf += outlineToDXF(seamOutline, offsetX, offsetY, 'SEAM', opts);
     }
 
     // Internal lines
@@ -406,15 +376,12 @@ export function generateDXFLegacy(pieces: PatternPiece[], opts: DxfExportOptions
     const centerX = (bb.minX + bb.maxX) / 2;
     const centerY = (bb.minY + bb.maxY) / 2;
     dxf += textToDXF(piece.name, centerX, centerY, offsetX, offsetY, 5, 'LABEL');
-
-    currentX += (bb.maxX - bb.minX) + SPACING;
   }
 
   dxf += dxfFooter();
   return dxf;
 }
 
-/** Download DXF as file */
 /** Keep generateDXF as alias for backward compat */
 export const generateDXF = generateDXFLegacy;
 

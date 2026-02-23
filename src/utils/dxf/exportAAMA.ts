@@ -11,7 +11,7 @@
  */
 import { PatternPiece, PathCommand } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
-import { generateSeamAllowance } from '../seam';
+import { preparePieces, computeBBox } from '../export/pipeline';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -136,6 +136,9 @@ ENDSEC
 // ─── Blocks ───
 
 function dxfBlocks(pieces: PatternPiece[], opts: DXFExportOptions): string {
+  // Pre-compute SA outlines via pipeline (for block content)
+  const prepared = preparePieces(pieces, { spacing: 30 });
+
   let s = `0
 SECTION
 2
@@ -188,8 +191,9 @@ ${nextHandle()}
 0
 `;
 
-  // One block per piece
-  for (const piece of pieces) {
+  // One block per piece — use prepared SA outlines
+  for (const pp of prepared) {
+    const { piece, seamOutline } = pp;
     const blockName = sanitizeBlockName(piece.name);
     s += `0
 BLOCK
@@ -206,7 +210,7 @@ ${blockName}
 20
 0.0
 `;
-    s += pieceEntities(piece, opts);
+    s += pieceEntities(piece, seamOutline, opts);
     s += `0
 ENDBLK
 5
@@ -225,19 +229,16 @@ ENDSEC
 // ─── Entities Section (INSERTs) ───
 
 function dxfEntities(pieces: PatternPiece[]): string {
+  // Use pipeline for consistent layout
+  const prepared = preparePieces(pieces, { spacing: 30 });
+
   let s = `0
 SECTION
 2
 ENTITIES
 `;
-  const SPACING = 30;
-  let currentX = 0;
 
-  for (const piece of pieces) {
-    const bb = pieceBBox(piece);
-    const offsetX = currentX - bb.minX;
-    const offsetY = -bb.minY;
-
+  for (const pp of prepared) {
     s += `0
 INSERT
 5
@@ -245,11 +246,11 @@ ${nextHandle()}
 8
 ${AAMA_LAYERS.CUT}
 2
-${sanitizeBlockName(piece.name)}
+${sanitizeBlockName(pp.piece.name)}
 10
-${offsetX.toFixed(4)}
+${pp.offsetX.toFixed(4)}
 20
-${offsetY.toFixed(4)}
+${pp.offsetY.toFixed(4)}
 30
 0.0
 41
@@ -259,7 +260,6 @@ ${offsetY.toFixed(4)}
 50
 0.0
 `;
-    currentX += (bb.maxX - bb.minX) + SPACING;
   }
 
   s += `0
@@ -270,21 +270,15 @@ ENDSEC
 
 // ─── Piece Entities (inside block) ───
 
-function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
+function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DXFExportOptions): string {
   let s = '';
 
-  // Layer 8 (DRAW) = original design outline
+  // Layer 8 (DRAW) = original design outline (uses SPLINE for beziers)
   s += pathToEntities(piece.outline, AAMA_LAYERS.DRAW, opts);
 
   // Layer 1 (CUT) = outline + seam allowance offset
-  if (piece.seamAllowance > 0) {
-    const saOutline = generateSeamAllowance(piece.outline, piece.seamAllowance);
-    if (saOutline.length > 0) {
-      s += pathToEntities(saOutline, AAMA_LAYERS.CUT, opts);
-    } else {
-      // Fallback: if SA generation fails, use original outline
-      s += pathToEntities(piece.outline, AAMA_LAYERS.CUT, opts);
-    }
+  if (piece.seamAllowance > 0 && seamOutline.length > 0) {
+    s += pathToEntities(seamOutline, AAMA_LAYERS.CUT, opts);
   } else {
     // No SA: CUT = DRAW
     s += pathToEntities(piece.outline, AAMA_LAYERS.CUT, opts);
@@ -306,7 +300,7 @@ function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
   }
 
   // Label
-  const bb = pieceBBox(piece);
+  const bb = computeBBox(piece.outline);
   const cx = (bb.minX + bb.maxX) / 2;
   const cy = (bb.minY + bb.maxY) / 2;
   s += textToDXF(piece.name, cx, -(cy), 2.5, AAMA_LAYERS.DRAW);
@@ -317,7 +311,6 @@ function pieceEntities(piece: PatternPiece, opts: DXFExportOptions): string {
 // ─── Path → DXF entities ───
 
 function pathToEntities(commands: PathCommand[], layer: string, _opts: DXFExportOptions): string {
-  // Separate straight segments and curves
   let s = '';
   const straightPoints: { x: number; y: number }[] = [];
   let cx = 0, cy = 0;
@@ -347,13 +340,11 @@ function pathToEntities(commands: PathCommand[], layer: string, _opts: DXFExport
         break;
       case 'C': {
         flushStraight();
-        // Emit SPLINE for cubic bezier
         const p0x = cx, p0y = cy;
         const cp1x = v[0], cp1y = v[1];
         const cp2x = v[2], cp2y = v[3];
         const p1x = v[4], p1y = v[5];
 
-        // Check if next commands are also C (compound spline)
         s += splineToDXF([
           { x: p0x, y: -p0y },
           { x: cp1x, y: -cp1y },
@@ -362,12 +353,11 @@ function pathToEntities(commands: PathCommand[], layer: string, _opts: DXFExport
         ], layer);
 
         cx = p1x; cy = p1y;
-        straightPoints.push({ x: cx, y: -cy }); // start point for next segment
+        straightPoints.push({ x: cx, y: -cy });
         break;
       }
       case 'Q': {
         flushStraight();
-        // Elevate quadratic to cubic
         const qp0x = cx, qp0y = cy;
         const qcx = v[0], qcy = v[1];
         const qp1x = v[2], qp1y = v[3];
@@ -400,8 +390,6 @@ function pathToEntities(commands: PathCommand[], layer: string, _opts: DXFExport
 
 function splineToDXF(controlPoints: { x: number; y: number }[], layer: string): string {
   const n = controlPoints.length;
-  // For a single cubic segment: 4 control points, knots [0,0,0,0,1,1,1,1]
-  // For compound: knots [0,0,0,0, 1,1,1, 2,2,2, ... m,m,m,m]
   const numSegments = Math.floor((n - 1) / 3);
   const knots: number[] = [0, 0, 0, 0];
   for (let i = 1; i < numSegments; i++) {
@@ -409,7 +397,6 @@ function splineToDXF(controlPoints: { x: number; y: number }[], layer: string): 
   }
   knots.push(numSegments, numSegments, numSegments, numSegments);
 
-  // Remove duplicates at end if single segment
   const knotVec = numSegments <= 1 ? [0, 0, 0, 0, 1, 1, 1, 1] : knots;
 
   let s = `0
@@ -504,19 +491,6 @@ ${text}
 
 // ─── Helpers ───
 
-function pieceBBox(piece: PatternPiece): { minX: number; minY: number; maxX: number; maxY: number } {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const cmd of piece.outline) {
-    for (let i = 0; i < cmd.values.length - 1; i += 2) {
-      minX = Math.min(minX, cmd.values[i]);
-      minY = Math.min(minY, cmd.values[i + 1]);
-      maxX = Math.max(maxX, cmd.values[i]);
-      maxY = Math.max(maxY, cmd.values[i + 1]);
-    }
-  }
-  return { minX, minY, maxX, maxY };
-}
-
 function sanitizeBlockName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 31);
 }
@@ -529,6 +503,8 @@ function sanitizeBlockName(name: string): string {
  * Produces a complete DXF with HEADER, TABLES (layers + block records),
  * BLOCKS (one per piece with outline, internals, and label), and ENTITIES
  * (INSERT references spaced horizontally).
+ *
+ * Uses the shared export pipeline for piece preparation (bbox, SA, layout).
  *
  * @param pieces - Pattern pieces to export
  * @param options - Optional export settings (DXF version, AAMA layer toggle)

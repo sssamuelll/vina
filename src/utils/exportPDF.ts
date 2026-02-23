@@ -1,4 +1,5 @@
 import { PatternPiece, PathCommand } from '../types/types';
+import { preparePieces } from './export/pipeline';
 
 /**
  * Export pattern pieces to PDF at 1:1 scale.
@@ -16,20 +17,6 @@ import { PatternPiece, PathCommand } from '../types/types';
  */
 
 const MM_TO_PT = 72 / 25.4; // 2.8346 pt per mm
-
-function pieceBBox(piece: PatternPiece) {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const cmd of piece.outline) {
-    const v = cmd.values;
-    for (let i = 0; i < v.length - 1; i += 2) {
-      minX = Math.min(minX, v[i]);
-      minY = Math.min(minY, v[i + 1]);
-      maxX = Math.max(maxX, v[i]);
-      maxY = Math.max(maxY, v[i + 1]);
-    }
-  }
-  return { minX, minY, maxX, maxY, w: maxX - minX, h: maxY - minY };
-}
 
 /** Convert PathCommands to PDF path operators */
 function commandsToPDFPath(
@@ -82,29 +69,29 @@ function commandsToPDFPath(
 
 /**
  * Generate PDF content.
+ * Uses shared pipeline for piece preparation (bbox, SA, layout).
  * Returns raw PDF bytes as a string (ASCII + binary-safe via Blob).
  */
 export function generatePDF(pieces: PatternPiece[]): string {
-  // Calculate total layout: pieces side by side
-  const SPACING = 30; // mm
   const MARGIN = 20; // mm
+  const prepared = preparePieces(pieces, { spacing: 30 });
+
+  // Calculate total layout dimensions
   let totalW = MARGIN * 2;
   let maxH = 0;
-  const layouts: { piece: PatternPiece; ox: number; oy: number }[] = [];
-  let cx = MARGIN;
-
-  for (const piece of pieces) {
-    const bb = pieceBBox(piece);
-    layouts.push({
-      piece,
-      ox: cx - bb.minX,
-      oy: MARGIN - bb.minY,
-    });
-    cx += bb.w + SPACING;
-    maxH = Math.max(maxH, bb.h);
+  for (const pp of prepared) {
+    const rightEdge = pp.offsetX + pp.boundingBox.maxX + MARGIN;
+    if (rightEdge > totalW) totalW = rightEdge;
+    if (pp.boundingBox.height > maxH) maxH = pp.boundingBox.height;
   }
-  totalW = cx - SPACING + MARGIN;
   const totalH = maxH + MARGIN * 2;
+
+  // Adjust offsets to include margin
+  const layouts = prepared.map(pp => ({
+    ...pp,
+    ox: pp.offsetX + MARGIN,
+    oy: pp.offsetY + MARGIN,
+  }));
 
   // Page size in points
   const pageW = totalW * MM_TO_PT;
@@ -113,18 +100,16 @@ export function generatePDF(pieces: PatternPiece[]): string {
   // Build PDF content stream
   let stream = '';
 
-  for (const { piece, ox, oy } of layouts) {
-    const bb = pieceBBox(piece);
-
+  for (const { piece, seamOutline, boundingBox: bb, ox, oy } of layouts) {
     // Cut line — solid black 0.5pt
     stream += '0 0 0 RG\n0.5 w\n[] 0 d\n';
     stream += commandsToPDFPath(piece.outline, ox, oy, totalH);
     stream += 'S\n';
 
-    // Seam allowance — dashed gray (same outline for now)
-    if (piece.seamAllowance > 0) {
+    // Seam allowance — dashed gray (use actual SA outline from pipeline)
+    if (piece.seamAllowance > 0 && seamOutline.length > 0) {
       stream += '0.6 0.6 0.6 RG\n0.3 w\n[3 2] 0 d\n';
-      stream += commandsToPDFPath(piece.outline, ox, oy, totalH);
+      stream += commandsToPDFPath(seamOutline, ox, oy, totalH);
       stream += 'S\n';
     }
 
