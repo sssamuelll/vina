@@ -212,7 +212,29 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
       };
 
-      client.initMultiPiece(pieceMeshes, seamInitData).then(async () => {
+      // Apply placement transforms to vertices before sending to worker
+      // so particles start near the avatar body (required for SDF collision)
+      const placedMeshes = pieceMeshes.map((pm, i) => {
+        const region = detectBodyRegion(pieces[i]?.name ?? '');
+        const placement = computePlacement(region, avatarMeasurements, i, pieces.length);
+        const euler = new THREE.Euler(placement.rotation[0], placement.rotation[1], placement.rotation[2]);
+        const rotMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
+        const pos = new THREE.Vector3(...placement.position);
+
+        const numVerts = pm.vertices.length / 3;
+        const transformed = new Array<number>(pm.vertices.length);
+        for (let vi = 0; vi < numVerts; vi++) {
+          const v = new THREE.Vector3(pm.vertices[vi * 3], pm.vertices[vi * 3 + 1], pm.vertices[vi * 3 + 2]);
+          v.applyMatrix4(rotMatrix);
+          v.add(pos);
+          transformed[vi * 3] = v.x;
+          transformed[vi * 3 + 1] = v.y;
+          transformed[vi * 3 + 2] = v.z;
+        }
+        return { ...pm, vertices: transformed };
+      });
+
+      client.initMultiPiece(placedMeshes, seamInitData).then(async () => {
         client.setFabric(fabricId);
         client.requestEdgeData();
 

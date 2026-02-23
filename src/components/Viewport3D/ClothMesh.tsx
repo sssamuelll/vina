@@ -252,7 +252,20 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
         edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
       };
 
-      client.init(meshData).then(async () => {
+      // Apply position offset to vertices so particles start near the avatar body
+      const placedData = { ...meshData };
+      if (position[0] !== 0 || position[1] !== 0 || position[2] !== 0) {
+        const verts = [...meshData.vertices];
+        const numVerts = verts.length / 3;
+        for (let i = 0; i < numVerts; i++) {
+          verts[i * 3] += position[0];
+          verts[i * 3 + 1] += position[1];
+          verts[i * 3 + 2] += position[2];
+        }
+        placedData.vertices = verts;
+      }
+
+      client.init(placedData).then(async () => {
         client.setFabric(fabricId);
         // Request edge data for fit map computation
         client.requestEdgeData();
