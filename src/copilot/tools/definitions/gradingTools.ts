@@ -8,7 +8,9 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { addPiece } from '../../../store/projectSlice';
 import { gradePiece, standardGradeTable } from '../../../utils/grading';
+import { batchGrade } from '../../../utils/grading/batchGrader';
 import { uid } from '../../../utils/pathHelpers';
+import type { StandardSize, SizeSystem } from '../../../utils/seamly2d/sizeTables';
 
 // ─── gradePiece ─────────────────────────────────────────────────────────────
 
@@ -117,6 +119,37 @@ const gradeAllSizesTool: ToolDefinition = {
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const state = getState();
     const sizes = (params.sizes as string[]) || ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+    // If a template is active, use template-based batch grading (much more accurate)
+    const { activePattern, currentSize, sizeSystem } = state.parametric;
+    if (activePattern) {
+      const result = batchGrade(activePattern, {
+        sizes: sizes as StandardSize[],
+        baseSize: (currentSize || 'M') as StandardSize,
+        sizeSystem: sizeSystem as SizeSystem,
+      });
+
+      const pieceResults: Array<{ size: string; pieceId: string; name: string }> = [];
+      for (const gradedSize of result.sizes) {
+        for (const piece of gradedSize.pieces) {
+          dispatch(addPiece(piece));
+          pieceResults.push({ size: gradedSize.size, pieceId: piece.id, name: piece.name });
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          method: 'template-based',
+          sizesGenerated: result.sizes.length,
+          totalPieces: result.totalPieces,
+          pieces: pieceResults,
+          warnings: result.warnings,
+        },
+      };
+    }
+
+    // Fallback: uniform scaling for non-template patterns
     const gradeTable = standardGradeTable();
     const baseMeasurements = state.project.avatar.measurements as unknown as Record<string, number>;
 
@@ -152,6 +185,7 @@ const gradeAllSizesTool: ToolDefinition = {
     return {
       success: true,
       data: {
+        method: 'uniform-scaling',
         sizesGenerated: sizes.length,
         pieces: results,
       },
