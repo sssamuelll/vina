@@ -8,23 +8,8 @@
  * Origin: top-left of piece bounding box
  */
 
-import { PatternPiece, PathCommand, InternalLine } from '../types/types';
+import { PatternPiece, PathCommand, InternalLine, BodyMeasurements } from '../types/types';
 import { uid, M, L, C, Z } from './pathHelpers';
-
-interface BodyMeasurements {
-  height: number;     // cm
-  chest: number;      // cm
-  waist: number;      // cm
-  hips: number;       // cm
-  shoulder: number;   // cm
-  armLength: number;  // cm
-  inseam: number;     // cm
-  // Derived (calculated if not provided)
-  neckCirc?: number;  // cm
-  backLength?: number; // cm (nape to waist)
-  frontLength?: number; // cm (shoulder to waist over bust)
-  armholeDepth?: number; // cm
-}
 
 /** Convert cm to mm (our SVG units) */
 const mm = (cm: number) => cm * 10;

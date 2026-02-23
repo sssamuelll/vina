@@ -1,25 +1,5 @@
 import type { PathCommand, Point2D } from '../../types/types';
-import { AngleType, SAPoint } from './types';
-import { equidistant } from './equidistant';
 import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
-
-export { AngleType } from './types';
-export type { SAPoint, SeamAllowanceOptions } from './types';
-export { equidistant, maxLocalSA } from './equidistant';
-export { checkLoops } from './checkLoops';
-export {
-  createParallelLine,
-  lineIntersection,
-  bisectorLine,
-  angleBetweenBisectors,
-  pointOnLine,
-  isClockwise,
-  removeDuplicates,
-  removePointsOnLine,
-  distanceSq,
-  distance,
-  ACCURACY,
-} from './geometry';
 
 const CURVE_RESOLUTION = 12;
 
@@ -186,43 +166,4 @@ export function generateSeamAllowance(
   commands.push({ type: 'Z', values: [] });
 
   return commands;
-}
-
-/**
- * Legacy equidistant-based seam allowance (kept for per-point SA width control).
- * Use generateSeamAllowance for standard uniform-width offsets.
- */
-export function generateSeamAllowanceLegacy(outline: PathCommand[], width: number): PathCommand[] {
-  if (width <= 0) return [];
-
-  const flat = flattenPath(outline);
-  if (flat.length < 3) return [];
-
-  const saPoints: SAPoint[] = flat.map(p => ({
-    x: p.x,
-    y: p.y,
-    saBefore: -1,
-    saAfter: -1,
-    angleType: AngleType.ByLength,
-  }));
-
-  const offsetPoints = equidistant(saPoints, width);
-  if (offsetPoints.length < 2) return [];
-
-  const result: PathCommand[] = [
-    { type: 'M', values: [offsetPoints[0].x, offsetPoints[0].y] },
-  ];
-  for (let i = 1; i < offsetPoints.length; i++) {
-    result.push({ type: 'L', values: [offsetPoints[i].x, offsetPoints[i].y] });
-  }
-  result.push({ type: 'Z', values: [] });
-
-  return result;
-}
-
-/**
- * Advanced: per-point SA control.
- */
-export function generateSeamAllowanceAdvanced(points: SAPoint[], defaultWidth: number): Point2D[] {
-  return equidistant(points, defaultWidth);
 }

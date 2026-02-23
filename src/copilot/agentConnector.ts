@@ -8,6 +8,7 @@
  */
 
 import { AgentConfig, CopilotContext, CopilotResponse, DEFAULT_SYSTEM_PROMPT } from './protocol';
+import { PatternPiece } from '../types/types';
 
 // ─── Server-side Agent (via local server API) ───
 
@@ -107,7 +108,7 @@ async function sendWS(config: AgentConfig, context: CopilotContext): Promise<Cop
 }
 
 /** Strip id/createdAt/updatedAt from a generated piece for create_piece command */
-function stripPiece(p: any): Omit<import('../types/types').PatternPiece, 'id' | 'createdAt' | 'updatedAt'> {
+function stripPiece(p: PatternPiece): Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'> {
   const { id, createdAt, updatedAt, ...rest } = p;
   return rest;
 }
@@ -120,7 +121,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
   // Simple keyword matching for common requests
   if (msg.includes('bodice') || msg.includes('corpiño') || msg.includes('blusa')) {
     const { generateBodiceBack, generateBodiceFront } = await import('../utils/patternTemplates');
-    const m = context.project.measurements as any;
+    const m = context.project.measurements;
     const back = generateBodiceBack(m);
     const front = generateBodiceFront(m);
     return {
@@ -134,7 +135,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
 
   if (msg.includes('sleeve') || msg.includes('manga')) {
     const { generateSleeve } = await import('../utils/patternTemplates');
-    const m = context.project.measurements as any;
+    const m = context.project.measurements;
     const sleeve = generateSleeve(m);
     return {
       message: `Generated sleeve for ${m.armLength}cm arm length.`,
@@ -146,7 +147,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
 
   if (msg.includes('skirt') || msg.includes('falda')) {
     const { generateSkirtFront, generateSkirtBack } = await import('../utils/patternTemplates');
-    const m = context.project.measurements as any;
+    const m = context.project.measurements;
     const front = generateSkirtFront(m);
     const back = generateSkirtBack(m);
     return {
@@ -160,7 +161,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
 
   if (msg.includes('pants') || msg.includes('pantalón') || msg.includes('trouser')) {
     const { generatePantsFront, generatePantsBack } = await import('../utils/patternTemplates');
-    const m = context.project.measurements as any;
+    const m = context.project.measurements;
     const front = generatePantsFront(m);
     const back = generatePantsBack(m);
     return {
@@ -174,7 +175,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
 
   if (msg.includes('collar') || msg.includes('cuello')) {
     const { generateCollar } = await import('../utils/patternTemplates');
-    const m = context.project.measurements as any;
+    const m = context.project.measurements;
     const collar = generateCollar(m);
     return {
       message: `Generated shirt collar.`,
@@ -213,7 +214,7 @@ async function sendBuiltin(_config: AgentConfig, context: CopilotContext): Promi
 
 // ─── Response Validation ───
 
-function validateResponse(data: any): CopilotResponse {
+function validateResponse(data: Partial<CopilotResponse> & Record<string, unknown>): CopilotResponse {
   if (typeof data.message !== 'string') {
     data.message = 'Done.';
   }
@@ -221,7 +222,7 @@ function validateResponse(data: any): CopilotResponse {
     data.commands = [];
   }
   // Validate each command has a type
-  data.commands = data.commands.filter((c: any) => c && typeof c.type === 'string');
+  data.commands = data.commands.filter((c) => c && typeof c.type === 'string');
   return data as CopilotResponse;
 }
 

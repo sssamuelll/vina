@@ -17,7 +17,7 @@
  * - Built-in: direct function call (for embedded agents)
  */
 
-import { PatternPiece, PathCommand, Point2D, InternalLine } from '../types/types';
+import { PatternPiece, PathCommand, Point2D, InternalLine, BodyMeasurements } from '../types/types';
 
 // ─── Context sent TO the agent ───
 
@@ -26,7 +26,7 @@ export interface CopilotContext {
   project: {
     name: string;
     pieces: CopilotPieceInfo[];
-    measurements: Record<string, number>;
+    measurements: BodyMeasurements;
   };
   /** Currently selected piece(s) */
   selectedPieceIds: string[];

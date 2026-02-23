@@ -152,6 +152,11 @@ export interface BodyMeasurements {
   bustPointToNeckSide?: number;
   dartWidthBust?: number;
   dartWidthWaist?: number;
+
+  // ─── Derived / Pattern Construction ───
+  backLength?: number;     // cm (nape to waist)
+  frontLength?: number;    // cm (shoulder to waist over bust)
+  armholeDepth?: number;   // cm
 }
 
 // ─── Avatar ───
