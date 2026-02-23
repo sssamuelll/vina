@@ -14,6 +14,111 @@ import { PatternPiece, PathCommand } from '../types/types';
  * DXF version: R12 (maximum compatibility with plotters)
  */
 
+export interface DxfExportOptions {
+  /**
+   * Maximum allowed chord error in mm for curve flattening.
+   * Lower = more precise (more vertices), higher = fewer vertices.
+   * Default: 0.1mm (suitable for laser cutters and plotters).
+   */
+  curveTolerance?: number;
+  /**
+   * Minimum segments per curve (floor). Default: 4.
+   */
+  minSegments?: number;
+  /**
+   * Maximum segments per curve (ceiling). Default: 64.
+   */
+  maxSegments?: number;
+}
+
+const DEFAULT_CURVE_TOLERANCE = 0.1; // mm
+const DEFAULT_MIN_SEGMENTS = 4;
+const DEFAULT_MAX_SEGMENTS = 64;
+
+/**
+ * Adaptively flatten a cubic bezier based on chord error tolerance.
+ * Uses recursive subdivision until the midpoint deviation from the
+ * chord is within tolerance.
+ */
+function flattenCubicBezier(
+  x0: number, y0: number,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  x3: number, y3: number,
+  tolerance: number,
+  minSegs: number,
+  maxSegs: number,
+): { x: number; y: number }[] {
+  const points: { x: number; y: number }[] = [];
+
+  function subdivide(
+    ax0: number, ay0: number,
+    ax1: number, ay1: number,
+    ax2: number, ay2: number,
+    ax3: number, ay3: number,
+    depth: number,
+  ) {
+    // Flatness test: max distance of control points from chord
+    const dx = ax3 - ax0;
+    const dy = ay3 - ay0;
+    const lenSq = dx * dx + dy * dy;
+
+    let d1: number, d2: number;
+    if (lenSq < 1e-10) {
+      // Degenerate — use distance from start
+      d1 = Math.sqrt((ax1 - ax0) ** 2 + (ay1 - ay0) ** 2);
+      d2 = Math.sqrt((ax2 - ax0) ** 2 + (ay2 - ay0) ** 2);
+    } else {
+      // Perpendicular distance of control points from chord line
+      d1 = Math.abs((ax1 - ax0) * dy - (ay1 - ay0) * dx) / Math.sqrt(lenSq);
+      d2 = Math.abs((ax2 - ax0) * dy - (ay2 - ay0) * dx) / Math.sqrt(lenSq);
+    }
+
+    const maxD = Math.max(d1, d2);
+
+    if (maxD <= tolerance && depth >= Math.log2(minSegs)) {
+      // Flat enough and minimum segments met
+      points.push({ x: ax3, y: ay3 });
+    } else if (depth >= Math.log2(maxSegs)) {
+      // Hit max depth
+      points.push({ x: ax3, y: ay3 });
+    } else {
+      // De Casteljau split at t=0.5
+      const mx01 = (ax0 + ax1) / 2, my01 = (ay0 + ay1) / 2;
+      const mx12 = (ax1 + ax2) / 2, my12 = (ay1 + ay2) / 2;
+      const mx23 = (ax2 + ax3) / 2, my23 = (ay2 + ay3) / 2;
+      const mx012 = (mx01 + mx12) / 2, my012 = (my01 + my12) / 2;
+      const mx123 = (mx12 + mx23) / 2, my123 = (my12 + my23) / 2;
+      const mx0123 = (mx012 + mx123) / 2, my0123 = (my012 + my123) / 2;
+
+      subdivide(ax0, ay0, mx01, my01, mx012, my012, mx0123, my0123, depth + 1);
+      subdivide(mx0123, my0123, mx123, my123, mx23, my23, ax3, ay3, depth + 1);
+    }
+  }
+
+  subdivide(x0, y0, x1, y1, x2, y2, x3, y3, 0);
+  return points;
+}
+
+/**
+ * Adaptively flatten a quadratic bezier based on chord error tolerance.
+ */
+function flattenQuadBezier(
+  x0: number, y0: number,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  tolerance: number,
+  minSegs: number,
+  maxSegs: number,
+): { x: number; y: number }[] {
+  // Promote to cubic: CP1 = P0 + 2/3*(P1-P0), CP2 = P2 + 2/3*(P1-P2)
+  const cx1 = x0 + (2 / 3) * (x1 - x0);
+  const cy1 = y0 + (2 / 3) * (y1 - y0);
+  const cx2 = x2 + (2 / 3) * (x1 - x2);
+  const cy2 = y2 + (2 / 3) * (y1 - y2);
+  return flattenCubicBezier(x0, y0, cx1, cy1, cx2, cy2, x2, y2, tolerance, minSegs, maxSegs);
+}
+
 
 function dxfHeader(): string {
   return `0
@@ -113,7 +218,11 @@ function outlineToDXF(
   offsetX: number,
   offsetY: number,
   layer: string,
+  opts: DxfExportOptions = {},
 ): string {
+  const tolerance = opts.curveTolerance ?? DEFAULT_CURVE_TOLERANCE;
+  const minSegs = opts.minSegments ?? DEFAULT_MIN_SEGMENTS;
+  const maxSegs = opts.maxSegments ?? DEFAULT_MAX_SEGMENTS;
   const points: { x: number; y: number; bulge: number }[] = [];
   let cx = 0, cy = 0;
   let isClosed = false;
@@ -130,35 +239,27 @@ function outlineToDXF(
         points.push({ x: cx + offsetX, y: -(cy + offsetY), bulge: 0 });
         break;
       case 'C': {
-        // Approximate cubic bezier with line segments
-        const x0 = cx, y0 = cy;
-        const x1 = v[0], y1 = v[1];
-        const x2 = v[2], y2 = v[3];
-        const x3 = v[4], y3 = v[5];
-        const steps = 12;
-        for (let s = 1; s <= steps; s++) {
-          const t = s / steps;
-          const mt = 1 - t;
-          const px = mt*mt*mt*x0 + 3*mt*mt*t*x1 + 3*mt*t*t*x2 + t*t*t*x3;
-          const py = mt*mt*mt*y0 + 3*mt*mt*t*y1 + 3*mt*t*t*y2 + t*t*t*y3;
-          points.push({ x: px + offsetX, y: -(py + offsetY), bulge: 0 });
+        // Adaptive cubic bezier flattening based on chord error tolerance
+        const flatPts = flattenCubicBezier(
+          cx, cy, v[0], v[1], v[2], v[3], v[4], v[5],
+          tolerance, minSegs, maxSegs,
+        );
+        for (const pt of flatPts) {
+          points.push({ x: pt.x + offsetX, y: -(pt.y + offsetY), bulge: 0 });
         }
-        cx = x3; cy = y3;
+        cx = v[4]; cy = v[5];
         break;
       }
       case 'Q': {
-        const x0 = cx, y0 = cy;
-        const x1 = v[0], y1 = v[1];
-        const x2 = v[2], y2 = v[3];
-        const steps = 8;
-        for (let s = 1; s <= steps; s++) {
-          const t = s / steps;
-          const mt = 1 - t;
-          const px = mt*mt*x0 + 2*mt*t*x1 + t*t*x2;
-          const py = mt*mt*y0 + 2*mt*t*y1 + t*t*y2;
-          points.push({ x: px + offsetX, y: -(py + offsetY), bulge: 0 });
+        // Adaptive quadratic bezier flattening
+        const flatPts = flattenQuadBezier(
+          cx, cy, v[0], v[1], v[2], v[3],
+          tolerance, minSegs, maxSegs,
+        );
+        for (const pt of flatPts) {
+          points.push({ x: pt.x + offsetX, y: -(pt.y + offsetY), bulge: 0 });
         }
-        cx = x2; cy = y2;
+        cx = v[2]; cy = v[3];
         break;
       }
       case 'Z':
@@ -262,7 +363,7 @@ function pieceBBox(piece: PatternPiece): { minX: number; minY: number; maxX: num
  * Pieces are laid out left-to-right with spacing.
  */
 /** @deprecated Use generateDXFAAMA from utils/dxf for AAMA compliance. */
-export function generateDXFLegacy(pieces: PatternPiece[]): string {
+export function generateDXFLegacy(pieces: PatternPiece[], opts: DxfExportOptions = {}): string {
   let dxf = dxfHeader();
   const SPACING = 30; // mm between pieces
   let currentX = 0;
@@ -273,12 +374,12 @@ export function generateDXFLegacy(pieces: PatternPiece[]): string {
     const offsetY = -bb.minY;
 
     // Outline (cut line)
-    dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'CUT');
+    dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'CUT', opts);
 
     // Seam allowance (offset outline — simplified: same shape for now)
     // TODO: proper offset curve
     if (piece.seamAllowance > 0) {
-      dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'SEAM');
+      dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'SEAM', opts);
     }
 
     // Internal lines
@@ -315,8 +416,8 @@ export function generateDXFLegacy(pieces: PatternPiece[]): string {
 export const generateDXF = generateDXFLegacy;
 
 /** @deprecated Use downloadDXFAAMA from utils/dxf for AAMA compliance. */
-export function downloadDXF(pieces: PatternPiece[], filename = 'pattern.dxf') {
-  const dxf = generateDXFLegacy(pieces);
+export function downloadDXF(pieces: PatternPiece[], filename = 'pattern.dxf', opts: DxfExportOptions = {}) {
+  const dxf = generateDXFLegacy(pieces, opts);
   const blob = new Blob([dxf], { type: 'application/dxf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
