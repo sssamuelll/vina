@@ -22,7 +22,7 @@ import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
-const SCALE = 0.003;
+const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
 /**

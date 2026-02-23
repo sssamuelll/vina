@@ -26,7 +26,7 @@ import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-const SCALE = 0.003; // 1 SVG unit ≈ 3mm in 3D (match PieceMesh)
+const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
 
 /**
  * Sample evenly-spaced points from a PathCommand outline.

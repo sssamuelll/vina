@@ -36,7 +36,7 @@ export interface MeshConfig {
 /** Default mesh configuration */
 const DEFAULT_CONFIG: Required<MeshConfig> = {
   yHeight: 1.2,
-  scale: 0.003,
+  scale: 0.001, // 1mm = 0.001m
   maxEdgeLength: 15,
   minAngle: 25,
   maxRefinementPasses: 3,

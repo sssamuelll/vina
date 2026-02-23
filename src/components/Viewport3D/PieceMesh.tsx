@@ -8,7 +8,7 @@ import { PatternPiece, PathCommand } from '../../types/types';
  * 
  * Scale: 1 SVG unit = 1mm in pattern space → 0.001m in Three.js
  */
-const SCALE = 0.003; // Scale up for visibility (1 SVG unit ≈ 3mm in 3D)
+const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
 
 function commandsToShape(commands: PathCommand[]): THREE.Shape | null {
   if (commands.length === 0) return null;

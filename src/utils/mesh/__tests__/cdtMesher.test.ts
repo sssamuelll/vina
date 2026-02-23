@@ -267,8 +267,8 @@ describe('CDT Mesher', () => {
       const points: number[][] = [];
       for (let i = 0; i < result.vertices.length / 3; i++) {
         // Convert from 3D back to 2D pattern units (reverse the scaling)
-        const x = result.vertices[i * 3] / 0.003;
-        const z = result.vertices[i * 3 + 2] / 0.003;
+        const x = result.vertices[i * 3] / 0.001;
+        const z = result.vertices[i * 3 + 2] / 0.001;
         points.push([x, z]);
       }
 
@@ -298,8 +298,8 @@ describe('CDT Mesher', () => {
       // Convert back to 2D for analysis
       const points: number[][] = [];
       for (let i = 0; i < result.vertices.length / 3; i++) {
-        const x = result.vertices[i * 3] / 0.003;
-        const z = result.vertices[i * 3 + 2] / 0.003;
+        const x = result.vertices[i * 3] / 0.001;
+        const z = result.vertices[i * 3 + 2] / 0.001;
         points.push([x, z]);
       }
 
@@ -471,8 +471,8 @@ describe('CDT Mesher', () => {
       // Convert to 2D for winding analysis
       const points: number[][] = [];
       for (let i = 0; i < result.vertices.length / 3; i++) {
-        const x = result.vertices[i * 3] / 0.003;
-        const z = result.vertices[i * 3 + 2] / 0.003;
+        const x = result.vertices[i * 3] / 0.001;
+        const z = result.vertices[i * 3 + 2] / 0.001;
         points.push([x, z]);
       }
 
@@ -513,8 +513,8 @@ describe('CDT Mesher', () => {
       // Convert to 2D
       const points: number[][] = [];
       for (let i = 0; i < result.vertices.length / 3; i++) {
-        const x = result.vertices[i * 3] / 0.003;
-        const z = result.vertices[i * 3 + 2] / 0.003;
+        const x = result.vertices[i * 3] / 0.001;
+        const z = result.vertices[i * 3 + 2] / 0.001;
         points.push([x, z]);
       }
 
