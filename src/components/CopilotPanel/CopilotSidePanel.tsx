@@ -1,4 +1,4 @@
-import { MessageSquare, PanelLeftClose, PanelRightClose, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageSquare, PanelLeftClose, PanelRightClose, ChevronLeft, ChevronRight, Settings } from 'lucide-react';
 import { useRef, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -100,6 +100,15 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
         </div>
         
         <div className="copilot-side-actions">
+          {/* Settings */}
+          <button
+            className="copilot-side-btn"
+            onClick={() => window.dispatchEvent(new CustomEvent('openclo:copilot-settings'))}
+            title="Chat settings"
+          >
+            <Settings size={14} />
+          </button>
+
           {/* Position toggle */}
           <button
             className="copilot-side-btn"

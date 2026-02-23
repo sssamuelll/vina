@@ -87,6 +87,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
 
+  // Listen for external settings toggle (from CopilotSidePanel)
+  useEffect(() => {
+    const handler = () => setShowSettings(prev => !prev);
+    window.addEventListener('openclo:copilot-settings', handler);
+    return () => window.removeEventListener('openclo:copilot-settings', handler);
+  }, []);
+
   // Detect mobile
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 768);
