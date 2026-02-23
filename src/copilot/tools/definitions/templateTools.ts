@@ -13,6 +13,8 @@ import { PatternTemplateEngine, type SeamlyPattern } from '../../../utils/seamly
 import { buildMeasurements, inferSizeSystem, type StandardSize, type SizeSystem } from '../../../utils/seamly2d/sizeTables';
 import { autoSew } from '../../../utils/autoSew';
 import { addPiece, addSeam, addFabric } from '../../../store/projectSlice';
+import { activateTemplate } from '../../../store/parametricSlice';
+import { resolveVariables } from '../../../utils/seamly2d/formulaEvaluator';
 import { getPhysicalFabric, toBasicMaterial, searchPhysicalFabrics } from '../../../utils/cloth/physicalFabric';
 import type { Fabric } from '../../../types/types';
 
@@ -322,6 +324,30 @@ const generateFromTemplateTool: ToolDefinition = {
           }
         }
       }
+    }
+
+    // Activate parametric panel — resolve variables for slider defaults
+    try {
+      const measMap: Record<string, number> = {};
+      for (const [k, v] of Object.entries(measurements)) {
+        if (typeof v === 'number') measMap[k] = v;
+      }
+      if (pattern.measurements?.defaults) {
+        for (const [k, v] of Object.entries(pattern.measurements.defaults)) {
+          if (measMap[k] === undefined) measMap[k] = v;
+        }
+      }
+      const resolvedVars = resolveVariables(pattern.variables, measMap);
+      dispatch(activateTemplate({
+        pattern,
+        measurements,
+        size: size || null,
+        sizeSystem: system,
+        resolvedVariables: resolvedVars,
+        pieceIds: pieces.map(p => p.id),
+      }));
+    } catch {
+      // Non-critical — panel just won't activate
     }
 
     return {

@@ -114,10 +114,42 @@
 
 /* ─── Individual slider ─────────────────────────────────────────────────── */
 
+.parametric-group-count {
+  font-size: 9px;
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-weight: 400;
+}
+
 .parametric-slider {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.parametric-slider--modified .parametric-slider-name {
+  color: var(--accent);
+}
+
+.parametric-slider-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 2px;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+}
+
+.parametric-slider-reset:hover {
+  opacity: 1;
+  color: var(--accent);
 }
 
 .parametric-slider-header {

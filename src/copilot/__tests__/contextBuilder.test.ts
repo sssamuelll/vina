@@ -145,6 +145,15 @@ function mockState(overrides?: Partial<RootState>): RootState {
       toolOptions: {},
       recentTools: [],
     },
+    parametric: {
+      activePattern: null,
+      baseMeasurements: null,
+      currentSize: null,
+      sizeSystem: 'eu-women',
+      variableOverrides: {},
+      variableDefaults: {},
+      generatedPieceIds: [],
+    },
   };
 
   if (overrides) {
