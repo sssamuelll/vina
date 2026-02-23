@@ -190,108 +190,97 @@ export const anthropicProvider: LLMProvider = {
     if (tools.length > 0) body.tools = toAnthropicTools(tools);
 
     const url = `${baseUrl}/v1/messages`;
-    console.log('[Anthropic] POST', url, '| model:', config.model, '| messages:', anthropicMessages.length);
+    const payload = JSON.stringify(body);
+    console.log('[Anthropic] POST', url, '| model:', config.model, '| messages:', anthropicMessages.length, '| bodySize:', payload.length);
 
-    let response: Response;
-    try {
-      response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': config.apiKey,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify(body),
-      });
-    } catch (fetchError) {
-      console.error('[Anthropic] fetch failed:', fetchError, '| URL:', url);
-      throw new Error(`Network error calling ${url}: ${fetchError instanceof Error ? fetchError.message : fetchError}`);
-    }
+    // Use XHR for streaming — more reliable across browsers (Safari fetch+streaming is buggy)
+    return new Promise<ProviderResponse>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('x-api-key', config.apiKey);
+      xhr.setRequestHeader('anthropic-version', '2023-06-01');
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Anthropic API error ${response.status}: ${text}`);
-    }
+      let fullContent = '';
+      const toolCalls: ProviderToolCall[] = [];
+      let currentToolId = '';
+      let currentToolName = '';
+      let currentToolArgs = '';
+      let lastProcessed = 0;
 
-    if (!response.body) {
-      // Fallback to non-streaming if ReadableStream not available
-      const data = await response.json();
-      return parseAnthropicResponse(data);
-    }
-
-    // Read SSE stream
-    let fullContent = '';
-    const toolCalls: ProviderToolCall[] = [];
-    let currentToolId = '';
-    let currentToolName = '';
-    let currentToolArgs = '';
-
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const jsonStr = line.slice(6).trim();
-        if (jsonStr === '[DONE]') continue;
-
-        try {
-          const event = JSON.parse(jsonStr);
-
-          switch (event.type) {
-            case 'content_block_start': {
-              if (event.content_block?.type === 'tool_use') {
-                currentToolId = event.content_block.id;
-                currentToolName = event.content_block.name;
-                currentToolArgs = '';
-                onChunk({ type: 'tool_call_start', toolCall: { id: currentToolId, name: currentToolName } });
-              }
-              break;
+      function processChunk(text: string) {
+        const lines = text.split('\n');
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            switch (event.type) {
+              case 'content_block_start':
+                if (event.content_block?.type === 'tool_use') {
+                  currentToolId = event.content_block.id;
+                  currentToolName = event.content_block.name;
+                  currentToolArgs = '';
+                  onChunk({ type: 'tool_call_start', toolCall: { id: currentToolId, name: currentToolName } });
+                }
+                break;
+              case 'content_block_delta':
+                if (event.delta?.type === 'text_delta') {
+                  fullContent += event.delta.text;
+                  onChunk({ type: 'text', content: event.delta.text });
+                } else if (event.delta?.type === 'input_json_delta') {
+                  currentToolArgs += event.delta.partial_json;
+                  onChunk({ type: 'tool_call_delta', toolCall: { id: currentToolId } });
+                }
+                break;
+              case 'content_block_stop':
+                if (currentToolId && currentToolName) {
+                  toolCalls.push({ id: currentToolId, name: currentToolName, arguments: currentToolArgs || '{}' });
+                  onChunk({ type: 'tool_call_end', toolCall: { id: currentToolId, name: currentToolName, arguments: currentToolArgs } });
+                  currentToolId = '';
+                  currentToolName = '';
+                  currentToolArgs = '';
+                }
+                break;
+              case 'message_stop':
+                onChunk({ type: 'done' });
+                break;
             }
-            case 'content_block_delta': {
-              if (event.delta?.type === 'text_delta') {
-                fullContent += event.delta.text;
-                onChunk({ type: 'text', content: event.delta.text });
-              } else if (event.delta?.type === 'input_json_delta') {
-                currentToolArgs += event.delta.partial_json;
-                onChunk({ type: 'tool_call_delta', toolCall: { id: currentToolId } });
-              }
-              break;
-            }
-            case 'content_block_stop': {
-              if (currentToolId && currentToolName) {
-                toolCalls.push({
-                  id: currentToolId,
-                  name: currentToolName,
-                  arguments: currentToolArgs || '{}',
-                });
-                onChunk({ type: 'tool_call_end', toolCall: { id: currentToolId, name: currentToolName, arguments: currentToolArgs } });
-                currentToolId = '';
-                currentToolName = '';
-                currentToolArgs = '';
-              }
-              break;
-            }
-            case 'message_stop': {
-              onChunk({ type: 'done' });
-              break;
-            }
-          }
-        } catch {
-          // Skip unparseable lines
+          } catch { /* skip unparseable */ }
         }
       }
-    }
 
-    return { content: fullContent, toolCalls };
+      xhr.onprogress = () => {
+        const newText = xhr.responseText.substring(lastProcessed);
+        lastProcessed = xhr.responseText.length;
+        if (newText) processChunk(newText);
+      };
+
+      xhr.onload = () => {
+        // Process any remaining text
+        const remaining = xhr.responseText.substring(lastProcessed);
+        if (remaining) processChunk(remaining);
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve({ content: fullContent, toolCalls });
+        } else {
+          reject(new Error(`Anthropic API error ${xhr.status}: ${xhr.responseText.slice(0, 500)}`));
+        }
+      };
+
+      xhr.onerror = () => {
+        console.error('[Anthropic] XHR error, status:', xhr.status, 'readyState:', xhr.readyState);
+        reject(new Error(`Network error calling ${url} (XHR status ${xhr.status})`));
+      };
+
+      xhr.ontimeout = () => {
+        reject(new Error('Request timed out'));
+      };
+
+      xhr.timeout = 120000; // 2 minutes
+      xhr.send(payload);
+    });
   },
 };
 
