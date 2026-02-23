@@ -21,6 +21,7 @@ import { tools as editorToolDefs } from './definitions/editorTools';
 import { tools as analysisToolDefs } from './definitions/analysisTools';
 import { tools as compoundToolDefs } from './definitions/compoundTools';
 import { tools as autoSewToolDefs } from './definitions/autoSewTools';
+import { tools as templateToolDefs } from './definitions/templateTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -271,6 +272,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   analysisToolDefs,
   compoundToolDefs,
   autoSewToolDefs,
+  templateToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
