@@ -1,0 +1,389 @@
+{
+  "name": "patron_blusa",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {
+    "#Nombre_1": {
+      "formula": "1",
+      "description": "Descripción"
+    }
+  },
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "delantero",
+      "x": 21.1137,
+      "y": 1.00542
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 1,
+      "angle": 180,
+      "length": 3.5
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 2,
+      "angle": 180,
+      "length": 6
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 3,
+      "angle": 180,
+      "length": 10
+    },
+    {
+      "id": 5,
+      "name": "A4",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 1,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 6,
+      "name": "A5",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 5,
+      "angle": 270,
+      "length": 11.5
+    },
+    {
+      "id": 7,
+      "name": "A6",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 6,
+      "angle": 270,
+      "length": 24.5
+    },
+    {
+      "id": 8,
+      "name": "A7",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 7,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 9,
+      "name": "A8",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 4,
+      "angle": 270,
+      "length": 5
+    },
+    {
+      "id": 10,
+      "name": "A9",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 2,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 13,
+      "name": "A10",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 8,
+      "angle": 180,
+      "length": 9.5
+    },
+    {
+      "id": 14,
+      "name": "A11",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 13,
+      "angle": 180,
+      "length": 10
+    },
+    {
+      "id": 18,
+      "name": "A12",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 6,
+      "angle": 180,
+      "length": 5
+    },
+    {
+      "id": 20,
+      "name": "A13",
+      "type": "endLine",
+      "block": "delantero",
+      "basePoint": 18,
+      "angle": 180,
+      "length": 1.5
+    },
+    {
+      "id": 11,
+      "name": "",
+      "type": "line",
+      "block": "delantero",
+      "firstPoint": 3,
+      "secondPoint": 10,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 15,
+      "name": "",
+      "type": "line",
+      "block": "delantero",
+      "firstPoint": 9,
+      "secondPoint": 14,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 16,
+      "name": "",
+      "type": "line",
+      "block": "delantero",
+      "firstPoint": 14,
+      "secondPoint": 13,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 17,
+      "name": "",
+      "type": "line",
+      "block": "delantero",
+      "firstPoint": 13,
+      "secondPoint": 7,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 19,
+      "name": "",
+      "type": "line",
+      "block": "delantero",
+      "firstPoint": 7,
+      "secondPoint": 18,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 12,
+      "name": "",
+      "type": "spline",
+      "block": "delantero",
+      "point1": 9,
+      "point4": 3,
+      "angle1": 4.70013,
+      "angle2": 241.501
+    },
+    {
+      "id": 21,
+      "name": "",
+      "type": "spline",
+      "block": "delantero",
+      "point1": 18,
+      "point4": 10,
+      "angle1": 129.55,
+      "angle2": 230.215
+    },
+    {
+      "id": 22,
+      "name": "B",
+      "type": "single",
+      "block": "espalda",
+      "x": 46.1486,
+      "y": 1.05833
+    },
+    {
+      "id": 23,
+      "name": "B1",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 22,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 24,
+      "name": "B2",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 23,
+      "angle": 270,
+      "length": 11.5
+    },
+    {
+      "id": 25,
+      "name": "B3",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 24,
+      "angle": 270,
+      "length": 24.5
+    },
+    {
+      "id": 26,
+      "name": "B4",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 25,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 27,
+      "name": "B5",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 26,
+      "angle": 180,
+      "length": 19.5
+    },
+    {
+      "id": 29,
+      "name": "B6",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 24,
+      "angle": 180,
+      "length": 5
+    },
+    {
+      "id": 31,
+      "name": "B7",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 22,
+      "angle": 180,
+      "length": 3.5
+    },
+    {
+      "id": 32,
+      "name": "B8",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 31,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 33,
+      "name": "B9",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 31,
+      "angle": 180,
+      "length": 6
+    },
+    {
+      "id": 34,
+      "name": "B10",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 33,
+      "angle": 180,
+      "length": 3
+    },
+    {
+      "id": 35,
+      "name": "B11",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 34,
+      "angle": 180,
+      "length": 7
+    },
+    {
+      "id": 36,
+      "name": "B12",
+      "type": "endLine",
+      "block": "espalda",
+      "basePoint": 35,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 28,
+      "name": "",
+      "type": "line",
+      "block": "espalda",
+      "firstPoint": 27,
+      "secondPoint": 25,
+      "lineColor": "blue"
+    },
+    {
+      "id": 30,
+      "name": "",
+      "type": "line",
+      "block": "espalda",
+      "firstPoint": 25,
+      "secondPoint": 29,
+      "lineColor": "blue"
+    },
+    {
+      "id": 38,
+      "name": "",
+      "type": "line",
+      "block": "espalda",
+      "firstPoint": 36,
+      "secondPoint": 27,
+      "lineColor": "blue"
+    },
+    {
+      "id": 39,
+      "name": "",
+      "type": "line",
+      "block": "espalda",
+      "firstPoint": 33,
+      "secondPoint": 32,
+      "lineColor": "blue"
+    },
+    {
+      "id": 40,
+      "name": "",
+      "type": "line",
+      "block": "espalda",
+      "firstPoint": 33,
+      "secondPoint": 34,
+      "lineColor": "blue"
+    },
+    {
+      "id": 37,
+      "name": "",
+      "type": "spline",
+      "block": "espalda",
+      "point1": 29,
+      "point4": 32,
+      "angle1": 128.447,
+      "angle2": 237.104
+    },
+    {
+      "id": 41,
+      "name": "",
+      "type": "spline",
+      "block": "espalda",
+      "point1": 34,
+      "point4": 36,
+      "angle1": 213.279,
+      "angle2": 351.699
+    }
+  ],
+  "pieces": []
+}

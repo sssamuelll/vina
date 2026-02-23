@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import type { SidebarView } from '../ActivityBar/ActivityBar';
 import {
   PatternExplorerView,
@@ -38,9 +39,7 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
           <div className="sidebar-header">
             <span className="sidebar-title">{viewTitles[activeView]}</span>
             <button className="sidebar-close" onClick={onClose} title="Close Sidebar">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M4 4L10 10M10 4L4 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
+              <X size={14} />
             </button>
           </div>
           <div className="sidebar-content">

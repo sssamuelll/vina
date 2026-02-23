@@ -1,0 +1,717 @@
+{
+  "name": "pantalon_base_Eli",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "pantalon base",
+      "x": 0.79375,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 1,
+      "angle": 360,
+      "length": "hip_circ/4"
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 2,
+      "angle": 270,
+      "length": 100
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "pointOfIntersection",
+      "block": "pantalon base",
+      "firstPoint": 1,
+      "secondPoint": 3
+    },
+    {
+      "id": 7,
+      "name": "A4",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "hip_circ/4-1"
+    },
+    {
+      "id": 8,
+      "name": "A5",
+      "type": "pointOfIntersection",
+      "block": "pantalon base",
+      "firstPoint": 2,
+      "secondPoint": 7
+    },
+    {
+      "id": 10,
+      "name": "A6",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 1,
+      "angle": 270,
+      "length": 1
+    },
+    {
+      "id": 11,
+      "name": "A7",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 1,
+      "angle": 0,
+      "length": "waist_circ/4+2"
+    },
+    {
+      "id": 13,
+      "name": "A8",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 7,
+      "angle": 180,
+      "length": "hip_circ/2/10"
+    },
+    {
+      "id": 14,
+      "name": "A9",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 2,
+      "angle": 270,
+      "length": "height_waist_side_to_hip-3"
+    },
+    {
+      "id": 15,
+      "name": "A10",
+      "type": "pointOfIntersection",
+      "block": "pantalon base",
+      "firstPoint": 1,
+      "secondPoint": 14
+    },
+    {
+      "id": 19,
+      "name": "A11",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 14,
+      "angle": 270,
+      "length": "81/2"
+    },
+    {
+      "id": 20,
+      "name": "A12",
+      "type": "pointOfIntersection",
+      "block": "pantalon base",
+      "firstPoint": 7,
+      "secondPoint": 19
+    },
+    {
+      "id": 21,
+      "name": "A13",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 13,
+      "angle": 360,
+      "length": "hip_circ/4/2+5"
+    },
+    {
+      "id": 22,
+      "name": "A14",
+      "type": "height",
+      "block": "pantalon base",
+      "basePoint": 21,
+      "p1Line": 4,
+      "p2Line": 3
+    },
+    {
+      "id": 23,
+      "name": "A15",
+      "type": "height",
+      "block": "pantalon base",
+      "basePoint": 21,
+      "p1Line": 1,
+      "p2Line": 2
+    },
+    {
+      "id": 24,
+      "name": "A16",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 23,
+      "angle": 270,
+      "length": 8
+    },
+    {
+      "id": 25,
+      "name": "A17",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 23,
+      "angle": 180,
+      "length": 1
+    },
+    {
+      "id": 26,
+      "name": "A18",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 25,
+      "angle": 360,
+      "length": 2
+    },
+    {
+      "id": 29,
+      "name": "A19",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 20,
+      "angle": 360,
+      "length": "hip_circ/4"
+    },
+    {
+      "id": 30,
+      "name": "A20",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 29,
+      "angle": 180,
+      "length": 1.7
+    },
+    {
+      "id": 31,
+      "name": "A21",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 20,
+      "angle": 0,
+      "length": 1.7
+    },
+    {
+      "id": 32,
+      "name": "A22",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 4,
+      "angle": 359.772,
+      "length": 2.5
+    },
+    {
+      "id": 33,
+      "name": "A23",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 3,
+      "angle": 180.263,
+      "length": 2.5
+    },
+    {
+      "id": 55,
+      "name": "A24",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 13,
+      "angle": 180,
+      "length": 5
+    },
+    {
+      "id": 56,
+      "name": "A25",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 1,
+      "angle": 0,
+      "length": 4
+    },
+    {
+      "id": 57,
+      "name": "A26",
+      "type": "normal",
+      "block": "pantalon base",
+      "firstPoint": 56,
+      "secondPoint": 2,
+      "angle": 0,
+      "length": 2
+    },
+    {
+      "id": 58,
+      "name": "A27",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 57,
+      "angle": 354.659,
+      "length": "waist_circ/4+3"
+    },
+    {
+      "id": 59,
+      "name": "A28",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 30,
+      "angle": 0,
+      "length": 1
+    },
+    {
+      "id": 60,
+      "name": "A29",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 31,
+      "angle": 180,
+      "length": 1
+    },
+    {
+      "id": 61,
+      "name": "A30",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 33,
+      "angle": 0,
+      "length": 1
+    },
+    {
+      "id": 62,
+      "name": "A31",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 32,
+      "angle": 180,
+      "length": 1
+    },
+    {
+      "id": 67,
+      "name": "A32",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 55,
+      "angle": 270,
+      "length": 1
+    },
+    {
+      "id": 73,
+      "name": "A33",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 58,
+      "angle": 174.959,
+      "length": "22.75/2"
+    },
+    {
+      "id": 74,
+      "name": "A34",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 73,
+      "angle": 270,
+      "length": 9
+    },
+    {
+      "id": 75,
+      "name": "A35",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 73,
+      "angle": 352.87,
+      "length": 1.5
+    },
+    {
+      "id": 76,
+      "name": "A36",
+      "type": "endLine",
+      "block": "pantalon base",
+      "basePoint": 73,
+      "angle": 172.415,
+      "length": 1.5
+    },
+    {
+      "id": 5,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 3,
+      "secondPoint": 4,
+      "lineColor": "black"
+    },
+    {
+      "id": 6,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 4,
+      "secondPoint": 1,
+      "lineColor": "black"
+    },
+    {
+      "id": 9,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 7,
+      "secondPoint": 8,
+      "lineColor": "black"
+    },
+    {
+      "id": 16,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 15,
+      "secondPoint": 14,
+      "lineColor": "black"
+    },
+    {
+      "id": 18,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 10,
+      "secondPoint": 15,
+      "lineColor": "blue"
+    },
+    {
+      "id": 27,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 24,
+      "secondPoint": 26,
+      "lineColor": "blue"
+    },
+    {
+      "id": 28,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 24,
+      "secondPoint": 25,
+      "lineColor": "blue"
+    },
+    {
+      "id": 35,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 31,
+      "secondPoint": 32,
+      "lineColor": "blue"
+    },
+    {
+      "id": 36,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 32,
+      "secondPoint": 33,
+      "lineColor": "blue"
+    },
+    {
+      "id": 37,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 33,
+      "secondPoint": 30,
+      "lineColor": "blue"
+    },
+    {
+      "id": 54,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 1,
+      "secondPoint": 1,
+      "lineColor": "black"
+    },
+    {
+      "id": 63,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 61,
+      "secondPoint": 59,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 69,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 15,
+      "secondPoint": 57,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 71,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 60,
+      "secondPoint": 62,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 72,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 62,
+      "secondPoint": 61,
+      "lineColor": "black"
+    },
+    {
+      "id": 77,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 76,
+      "secondPoint": 74,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 78,
+      "name": "",
+      "type": "line",
+      "block": "pantalon base",
+      "firstPoint": 74,
+      "secondPoint": 75,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 12,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 10,
+      "point4": 11,
+      "angle1": 356.606,
+      "angle2": 191.512
+    },
+    {
+      "id": 17,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 13,
+      "point4": 15,
+      "angle1": 20.4673,
+      "angle2": 251.78
+    },
+    {
+      "id": 34,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 13,
+      "point4": 31,
+      "angle1": 294.241,
+      "angle2": 93.3546
+    },
+    {
+      "id": 38,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 11,
+      "point4": 14,
+      "angle1": 309.361,
+      "angle2": 91.3998
+    },
+    {
+      "id": 39,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 14,
+      "point4": 30,
+      "angle1": 267,
+      "angle2": 88
+    },
+    {
+      "id": 64,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 59,
+      "point4": 8,
+      "angle1": 88,
+      "angle2": 263
+    },
+    {
+      "id": 65,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 58,
+      "point4": 14,
+      "angle1": 267,
+      "angle2": 82
+    },
+    {
+      "id": 66,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 58,
+      "point4": 57,
+      "angle1": 176,
+      "angle2": 352
+    },
+    {
+      "id": 68,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 67,
+      "point4": 15,
+      "angle1": 14,
+      "angle2": 261
+    },
+    {
+      "id": 70,
+      "name": "",
+      "type": "spline",
+      "block": "pantalon base",
+      "point1": 55,
+      "point4": 60,
+      "angle1": 301,
+      "angle2": 97
+    },
+    {
+      "id": 40,
+      "name": "B",
+      "type": "single",
+      "block": "trasero",
+      "x": 42.9068,
+      "y": 1.35666
+    },
+    {
+      "id": 41,
+      "name": "B1",
+      "type": "endLine",
+      "block": "trasero",
+      "basePoint": 40,
+      "angle": 360,
+      "length": "hip_circ/4"
+    },
+    {
+      "id": 42,
+      "name": "B2",
+      "type": "endLine",
+      "block": "trasero",
+      "basePoint": 41,
+      "angle": 270,
+      "length": 100
+    },
+    {
+      "id": 43,
+      "name": "B3",
+      "type": "pointOfIntersection",
+      "block": "trasero",
+      "firstPoint": 40,
+      "secondPoint": 42
+    },
+    {
+      "id": 46,
+      "name": "B4",
+      "type": "endLine",
+      "block": "trasero",
+      "basePoint": 41,
+      "angle": 270,
+      "length": 19
+    },
+    {
+      "id": 47,
+      "name": "B5",
+      "type": "pointOfIntersection",
+      "block": "trasero",
+      "firstPoint": 40,
+      "secondPoint": 46
+    },
+    {
+      "id": 49,
+      "name": "B6",
+      "type": "endLine",
+      "block": "trasero",
+      "basePoint": 40,
+      "angle": 270,
+      "length": "hip_circ/4-1"
+    },
+    {
+      "id": 50,
+      "name": "B7",
+      "type": "pointOfIntersection",
+      "block": "trasero",
+      "firstPoint": 46,
+      "secondPoint": 49
+    },
+    {
+      "id": 52,
+      "name": "B8",
+      "type": "endLine",
+      "block": "trasero",
+      "basePoint": 49,
+      "angle": 180,
+      "length": 10
+    },
+    {
+      "id": 53,
+      "name": "B9",
+      "type": "endLine",
+      "block": "trasero",
+      "basePoint": 46,
+      "angle": 270,
+      "length": 25
+    },
+    {
+      "id": 44,
+      "name": "",
+      "type": "line",
+      "block": "trasero",
+      "firstPoint": 40,
+      "secondPoint": 43,
+      "lineColor": "black"
+    },
+    {
+      "id": 45,
+      "name": "",
+      "type": "line",
+      "block": "trasero",
+      "firstPoint": 43,
+      "secondPoint": 42,
+      "lineColor": "black"
+    },
+    {
+      "id": 48,
+      "name": "",
+      "type": "line",
+      "block": "trasero",
+      "firstPoint": 47,
+      "secondPoint": 46,
+      "lineColor": "black"
+    },
+    {
+      "id": 51,
+      "name": "",
+      "type": "line",
+      "block": "trasero",
+      "firstPoint": 49,
+      "secondPoint": 50,
+      "lineColor": "black"
+    }
+  ],
+  "pieces": []
+}

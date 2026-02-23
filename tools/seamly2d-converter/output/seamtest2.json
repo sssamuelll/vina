@@ -1,0 +1,108 @@
+{
+  "name": "seamtest2",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Pattern piece 1",
+      "x": 0.79375,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 0,
+      "length": 10
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 2,
+      "secondPoint": 1,
+      "angle": 0,
+      "length": 5
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 1,
+      "secondPoint": 3,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 5,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 4,
+      "point4": 3,
+      "angle1": 236.89,
+      "angle2": 209.202,
+      "length1": 1.06381,
+      "length2": 2.9538
+    },
+    {
+      "id": 6,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 1,
+      "point4": 4,
+      "angle1": 241.792,
+      "angle2": 241.791,
+      "length1": 2.22517,
+      "length2": 2.12741
+    }
+  ],
+  "pieces": [
+    {
+      "name": "",
+      "closed": false,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 12,
+          "type": "NodePoint"
+        },
+        {
+          "id": 13,
+          "type": "NodePoint"
+        },
+        {
+          "id": 14,
+          "type": "NodePoint"
+        },
+        {
+          "id": 15,
+          "type": "NodeSpline",
+          "reverse": true
+        },
+        {
+          "id": 16,
+          "type": "NodePoint"
+        },
+        {
+          "id": 17,
+          "type": "NodeSpline",
+          "reverse": true
+        }
+      ]
+    }
+  ]
+}

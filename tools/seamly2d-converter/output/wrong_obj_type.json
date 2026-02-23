@@ -1,0 +1,30 @@
+{
+  "name": "wrong_obj_type",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {
+    "#Increment_1": {
+      "formula": "0",
+      "description": ""
+    },
+    "#Increment_2": {
+      "formula": "0",
+      "description": ""
+    }
+  },
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "sing le",
+      "block": "Pattern piece 1",
+      "x": 0.926042,
+      "y": 1.05833
+    }
+  ],
+  "pieces": []
+}

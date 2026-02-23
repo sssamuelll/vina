@@ -1,0 +1,1736 @@
+{
+  "name": "trousers",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {
+    "#Size_Length": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#WaistCircumference": {
+      "formula": "waist_circ+2",
+      "description": "*** CHECK ***&#xa;Waist Circumference + Ease"
+    },
+    "#HipCircumference": {
+      "formula": "hip_circ",
+      "description": "*** CHECK ***&#xa;Hip Circumference + Ease"
+    },
+    "#WaistHeight": {
+      "formula": "height_waist_side",
+      "description": "Waist Height"
+    },
+    "#CrotchHeight": {
+      "formula": "leg_crotch_to_floor",
+      "description": "Crotch height"
+    },
+    "#KneeCircumference": {
+      "formula": "52",
+      "description": "*** CHECK ***&#xa;Knee Circumference + Ease"
+    },
+    "#KneeHeight": {
+      "formula": "height_knee",
+      "description": "Knee Height or CrotchHeight * 0,6&#xa;"
+    },
+    "#AnkleCircumfence": {
+      "formula": "42",
+      "description": "*** CHECK ***&#xa;Ankle level circumference of full length trouser&#xa;&#xa;Calculateted&#xa;leg_ankle_circ + ease&#xa;leg_ankle_high_circ+ ease&#xa;"
+    },
+    "#HipLineHeight": {
+      "formula": "hip_circ/20+3 + leg_crotch_to_floor",
+      "description": "* DO NOT CHANGE *&#xa;Calculated:&#xa;HipCircumference/20+3 + CrotchHeight&#xa;&#xa;&#xa;"
+    },
+    "#FrontPanelWaistFront": {
+      "formula": "waist_circ/10",
+      "description": "* DO NOT CHANGE *&#xa;&#xa;Front panel front side width at Waist line&#xa;Calculated:&#xa;&#xa;WaistGirth/10 or FrontPanelWidthFront - 0,5..1&#xa;&#xa;"
+    },
+    "#FrontPanelWidth": {
+      "formula": "hip_circ/4",
+      "description": "* DO NOT CHANGE *&#xa;&#xa;Total Front panel width at Hip line&#xa;&#xa;Calculated:&#xa;HipCircumference/4"
+    },
+    "#FrontPanelWidthFront": {
+      "formula": "waist_circ/10+1.5",
+      "description": "* DO NOT CHANGE *&#xa;&#xa;Front panel front side width at Hip line&#xa;&#xa;Calculated:&#xa;1/10 WaistCircumfence+1,5"
+    },
+    "#FrontCrotchHookWidth": {
+      "formula": "hip_circ/20+1",
+      "description": "* DO NOT CHANGE *&#xa;&#xa;Front Crotch hook guidance point at Hip line&#xa;&#xa;Calculated:&#xa;HipCircumference/20 + 0,5...1&#xa;"
+    },
+    "#BackPanelWidth": {
+      "formula": "hip_circ/4+2",
+      "description": "*** CHECK ***&#xa;Calculated:&#xa;HipCircumference/4 + ease (0...4)"
+    },
+    "#BackPanelWidthBack": {
+      "formula": "(hip_circ/4+2)/4",
+      "description": "*** CHECK ***&#xa;Buttock shape&#xa;Square &#x9;H-shape &#x9;(hip_circ/4+2)/4+0,5 &#x9;&#xa;Round&#x9;O-shape&#x9;(hip_circ/4+2)/4-0,5&#xa;Pear&#x9;A-shape&#x9;(hip_circ/4+2)/4+1…1,5 cm&#xa;Inverted&#x9;V-shape&#x9;(hip_circ/4+2)/4&#xa;"
+    },
+    "#Hemline_Side": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#HemlineHeight": {
+      "formula": "2",
+      "description": "*** CHECK ***&#xa;Height of the hemline from heel&#xa;&#xa;This defines the length of trousers"
+    },
+    "#HemlineAddition": {
+      "formula": "3",
+      "description": "*** CHECK ***&#xa;Additional length to hemline for turns, cuffs etc."
+    },
+    "#HemLineStreightHeight": {
+      "formula": "4",
+      "description": "*** CHECK ***&#xa;Streigth part  in the hemline for shortening etc."
+    },
+    "#HemLineFrontBackDiffrence": {
+      "formula": "1",
+      "description": "*** CHECK ***&#xa;Shifting side seam from back to front in knee and ankle&#xa;Men &#x9;1&#xa;Women &#x9;2"
+    },
+    "#SideShift": {
+      "formula": "0",
+      "description": "* SPECIAL CASE *&#xa;Width of the stripe&#xa;The difference between front and back panels for trousers with stripe in the side seam."
+    },
+    "#Waist_Back_Center": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#BackPanelCenterShift": {
+      "formula": "2",
+      "description": "*** CHECK ***&#xa;Shifting back panel center 0 ... 2&#xa;&#xa;Change shape of the back panel"
+    },
+    "#BackPanelForm": {
+      "formula": "3",
+      "description": "*** CHECK ***&#xa;Changes the straightness of the back center&#xa;&#xa;Back panel form 2...5&#xa;2..3 Round buttocks&#xa;4 normal&#xa;5 slim&#xa;"
+    },
+    "#BackCenterInc": {
+      "formula": "0",
+      "description": "Increment to back center seam to make 90 angle"
+    },
+    "#BackPanelFittingInc": {
+      "formula": "4",
+      "description": "*** CHECK ***&#xa;Fitting addition to the back seam&#xa;Reservation for further resizing of waistline. Mainly in men trousers"
+    },
+    "#BackCenterShift": {
+      "formula": "0",
+      "description": "Shifting Center&#xa;Adjust for body shape"
+    },
+    "#BackCenterDrop": {
+      "formula": "0",
+      "description": "Dropping +value or rising  -value the back center seam from waistline"
+    },
+    "#BackDartDepth_1": {
+      "formula": "11",
+      "description": "Depth of dart in the middle of the back panel"
+    },
+    "#BackDartDepth_2": {
+      "formula": "8",
+      "description": "Depth of dart in 1/4 panel width from back center seam"
+    },
+    "#Waist_Front_Center": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#FronCenterDrop": {
+      "formula": "0",
+      "description": "Dropping +value or rising -value the front center seam from waistline"
+    },
+    "#FrontCenterShift": {
+      "formula": "0",
+      "description": "Shifting Center seam&#xa;Adjust for body shape"
+    },
+    "#FrontDartDepth": {
+      "formula": "6",
+      "description": "Depth of the front dart"
+    },
+    "#Waist_Side": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#SideCurve": {
+      "formula": "1.5",
+      "description": "*** CHECK ***&#xa;Side curvature at Waist line&#xa;How much is the side seam curving in"
+    },
+    "#SideDrop": {
+      "formula": "0",
+      "description": "Dropping the side from the waistline"
+    },
+    "#WaistLineCurve": {
+      "formula": "2",
+      "description": "* DO NOT CHANGE *&#xa;The distance to create 90 degree seams&#xa;"
+    },
+    "#Pleats": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#Pleat1": {
+      "formula": "4",
+      "description": "*** CHECK ***&#xa;&#xa;Front panet pleat amount. &#xa;Pleat widens the whole front panel"
+    },
+    "#Pleat2": {
+      "formula": "2",
+      "description": "*** CHECK ***&#xa;Front panet pleat amount. &#xa;Pleat widens the front panel to knee level"
+    },
+    "#Pocket": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#PocketOpeningWidth": {
+      "formula": "4",
+      "description": "*** CHECK ***&#xa;The pocket mouth distance from the side seam"
+    },
+    "#PocketOpeningHeight": {
+      "formula": "17",
+      "description": "*** CHECK ***&#xa;The height of the pocket mount from the waistline"
+    },
+    "#PocketWidth": {
+      "formula": "14",
+      "description": "*** CHECK ***&#xa;The width of the pocket in the waistline"
+    },
+    "#PocketDepth": {
+      "formula": "28",
+      "description": "*** CHECK ***&#xa;Depth of the pocket in the front"
+    },
+    "#PocketPanelWidth": {
+      "formula": "5",
+      "description": "The width of the panel in the pocket mouth"
+    },
+    "#Additional_Parts": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#ZipperPanelWidth": {
+      "formula": "4",
+      "description": "The width of the zipper panel"
+    },
+    "#WaistBandWidth": {
+      "formula": "4",
+      "description": "*** CHECK ***&#xa;Waist band width"
+    },
+    "#ButtonPanelWidth": {
+      "formula": "8",
+      "description": "*** CHECK ***&#xa;The width of the additional button panel in the waistband"
+    }
+  },
+  "construction": [
+    {
+      "id": 1,
+      "name": "HeelLine",
+      "type": "single",
+      "block": "Trousers",
+      "x": -0.286555,
+      "y": -5.33536
+    },
+    {
+      "id": 2,
+      "name": "WaistLIne",
+      "type": "endLine",
+      "block": "Trousers",
+      "basePoint": 1,
+      "angle": 90,
+      "length": "#WaistHeight"
+    },
+    {
+      "id": 3,
+      "name": "CrotchLine",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#CrotchHeight"
+    },
+    {
+      "id": 4,
+      "name": "HipLine",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#HipLineHeight"
+    },
+    {
+      "id": 5,
+      "name": "KneeLine",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#KneeHeight"
+    },
+    {
+      "id": 6,
+      "name": "A1",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 5,
+      "angle": 0,
+      "length": "(#AnkleCircumfence/2-#HemLineFrontBackDiffrence)/2-#SideShift/2"
+    },
+    {
+      "id": 7,
+      "name": "A2",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 5,
+      "angle": 0,
+      "length": "(#AnkleCircumfence/2+#HemLineFrontBackDiffrence)/2+#SideShift/2"
+    },
+    {
+      "id": 8,
+      "name": "A3",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 5,
+      "angle": 180,
+      "length": "(#AnkleCircumfence/2-#HemLineFrontBackDiffrence)/2"
+    },
+    {
+      "id": 9,
+      "name": "A4",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 5,
+      "angle": 180,
+      "length": "(#AnkleCircumfence/2+#HemLineFrontBackDiffrence)/2"
+    },
+    {
+      "id": 10,
+      "name": "A5",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 5,
+      "secondPoint": 3,
+      "angle": 0,
+      "length": "(#KneeCircumference/2-#HemLineFrontBackDiffrence)/2-#SideShift/2"
+    },
+    {
+      "id": 11,
+      "name": "A6",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 5,
+      "secondPoint": 3,
+      "angle": 0,
+      "length": "(#KneeCircumference/2+#HemLineFrontBackDiffrence)/2+#SideShift/2"
+    },
+    {
+      "id": 12,
+      "name": "A7",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 5,
+      "secondPoint": 3,
+      "angle": 180,
+      "length": "(#KneeCircumference/2-#HemLineFrontBackDiffrence)/2"
+    },
+    {
+      "id": 13,
+      "name": "A8",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 5,
+      "secondPoint": 3,
+      "angle": 180,
+      "length": "(#KneeCircumference/2+#HemLineFrontBackDiffrence)/2"
+    },
+    {
+      "id": 14,
+      "name": "A9",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 4,
+      "secondPoint": 3,
+      "angle": 0,
+      "length": "#FrontPanelWidthFront"
+    },
+    {
+      "id": 15,
+      "name": "A10",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 14,
+      "secondPoint": 4,
+      "angle": 90,
+      "length": "#FrontCrotchHookWidth"
+    },
+    {
+      "id": 16,
+      "name": "CrotchPointFront",
+      "type": "lineIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 3,
+      "angle": 0,
+      "p1Line": 12,
+      "p2Line": 15
+    },
+    {
+      "id": 17,
+      "name": "A11",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 14,
+      "secondPoint": 4,
+      "length": "#BackPanelWidth"
+    },
+    {
+      "id": 18,
+      "name": "BackPanelCenter",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 4,
+      "secondPoint": 14,
+      "length": "#BackPanelCenterShift"
+    },
+    {
+      "id": 19,
+      "name": "A12",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 18,
+      "secondPoint": 15,
+      "length": "#BackPanelWidthBack"
+    },
+    {
+      "id": 20,
+      "name": "BackPanelForm",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 17,
+      "secondPoint": 4,
+      "angle": 180,
+      "length": "#BackPanelForm"
+    },
+    {
+      "id": 21,
+      "name": "A13",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 19,
+      "secondPoint": 20,
+      "angle": 180,
+      "length": "Line_BackPanelCenter_A12"
+    },
+    {
+      "id": 23,
+      "name": "A14",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 19,
+      "secondPoint": 18,
+      "length": "Line_BackPanelForm_A12*#BackPanelWidth/(Line_A11_HipLine+Line_HipLine_BackPanelCenter+Line_BackPanelCenter_A12)"
+    },
+    {
+      "id": 24,
+      "name": "A15",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 18,
+      "secondPoint": 19,
+      "length": "Line_A14_BackPanelCenter"
+    },
+    {
+      "id": 25,
+      "name": "CrotchPointBack",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 13,
+      "secondPoint": 24,
+      "length": "Line_A7_CrotchPointFront"
+    },
+    {
+      "id": 26,
+      "name": "WaistLineFront",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 2,
+      "secondPoint": 4,
+      "angle": 0,
+      "length": "#FrontPanelWaistFront"
+    },
+    {
+      "id": 27,
+      "name": "WaistLineSideFront",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 2,
+      "secondPoint": 4,
+      "angle": 180,
+      "length": "Line_A11_HipLine-#SideCurve"
+    },
+    {
+      "id": 28,
+      "name": "A16",
+      "type": "lineIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 2,
+      "angle": 180,
+      "p1Line": 11,
+      "p2Line": 23
+    },
+    {
+      "id": 30,
+      "name": "A17",
+      "type": "shoulder",
+      "block": "Trousers",
+      "p1Line": 19,
+      "p2Line": 21,
+      "pShoulder": 5,
+      "length": "Line_KneeLine_A16"
+    },
+    {
+      "id": 31,
+      "name": "WaistLineBack",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 30,
+      "secondPoint": 28,
+      "length": "#BackCenterShift"
+    },
+    {
+      "id": 32,
+      "name": "WaistLineSideBack",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 28,
+      "secondPoint": 30,
+      "length": "#SideCurve"
+    },
+    {
+      "id": 33,
+      "name": "ShiftedFront",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 27,
+      "secondPoint": 2,
+      "length": "#SideShift/2"
+    },
+    {
+      "id": 34,
+      "name": "ShiftedBack",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 32,
+      "secondPoint": 28,
+      "length": "#SideShift/2"
+    },
+    {
+      "id": 35,
+      "name": "ShiftedFontHipLine",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 17,
+      "secondPoint": 4,
+      "length": "#SideShift/2"
+    },
+    {
+      "id": 36,
+      "name": "ShiftedBackHipLine",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 23,
+      "secondPoint": 18,
+      "angle": 90,
+      "length": "#SideShift/2"
+    },
+    {
+      "id": 39,
+      "name": "DroppedBack",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 31,
+      "secondPoint": 19,
+      "length": "#BackCenterDrop"
+    },
+    {
+      "id": 40,
+      "name": "DroppedFront",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 26,
+      "secondPoint": 14,
+      "length": "#FronCenterDrop"
+    },
+    {
+      "id": 47,
+      "name": "StraightToHemline",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#HemlineHeight+#HemLineStreightHeight"
+    },
+    {
+      "id": 48,
+      "name": "A18",
+      "type": "curveIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 47,
+      "angle": 180,
+      "curve": 37
+    },
+    {
+      "id": 51,
+      "name": "A19",
+      "type": "curveIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 47,
+      "angle": 180,
+      "curve": 38
+    },
+    {
+      "id": 54,
+      "name": "A20",
+      "type": "curveIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 47,
+      "angle": 0,
+      "curve": 45
+    },
+    {
+      "id": 57,
+      "name": "A21",
+      "type": "curveIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 47,
+      "angle": 0,
+      "curve": 46
+    },
+    {
+      "id": 60,
+      "name": "DroppedSideFront",
+      "type": "cutSplinePath",
+      "block": "Trousers",
+      "splinePath": 37,
+      "length": "#SideDrop"
+    },
+    {
+      "id": 61,
+      "name": "DroppedSideBack",
+      "type": "cutSplinePath",
+      "block": "Trousers",
+      "splinePath": 38,
+      "length": "SplPath_WaistLineSideBack_A19-SplPath_ShiftedFront_A18+#SideDrop"
+    },
+    {
+      "id": 62,
+      "name": "A22",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 48,
+      "secondPoint": 47,
+      "angle": 180,
+      "length": "#HemLineStreightHeight"
+    },
+    {
+      "id": 63,
+      "name": "A23",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 51,
+      "secondPoint": 47,
+      "angle": 180,
+      "length": "#HemLineStreightHeight"
+    },
+    {
+      "id": 64,
+      "name": "A24",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 54,
+      "secondPoint": 47,
+      "angle": 0,
+      "length": "#HemLineStreightHeight"
+    },
+    {
+      "id": 65,
+      "name": "A25",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 57,
+      "secondPoint": 47,
+      "angle": 0,
+      "length": "#HemLineStreightHeight"
+    },
+    {
+      "id": 67,
+      "name": "A26",
+      "type": "lineIntersect",
+      "block": "Trousers",
+      "p1Line1": 60,
+      "p2Line1": 40,
+      "p1Line2": 2,
+      "p2Line2": 4
+    },
+    {
+      "id": 68,
+      "name": "A27",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 60,
+      "secondPoint": 67,
+      "length": "#WaistLineCurve"
+    },
+    {
+      "id": 69,
+      "name": "A28",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 40,
+      "secondPoint": 67,
+      "length": "#WaistLineCurve"
+    },
+    {
+      "id": 70,
+      "name": "FrontSide",
+      "type": "height",
+      "block": "Trousers",
+      "basePoint": 68,
+      "p1Line": 35,
+      "p2Line": 60
+    },
+    {
+      "id": 71,
+      "name": "FrontCenter",
+      "type": "height",
+      "block": "Trousers",
+      "basePoint": 69,
+      "p1Line": 14,
+      "p2Line": 40
+    },
+    {
+      "id": 72,
+      "name": "A29",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 39,
+      "secondPoint": 61,
+      "length": "#WaistLineCurve"
+    },
+    {
+      "id": 73,
+      "name": "BackCenter",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 39,
+      "secondPoint": 31,
+      "length": "-#BackCenterInc"
+    },
+    {
+      "id": 74,
+      "name": "A30",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 61,
+      "secondPoint": 39,
+      "length": "#WaistLineCurve"
+    },
+    {
+      "id": 75,
+      "name": "BackSide",
+      "type": "height",
+      "block": "Trousers",
+      "basePoint": 74,
+      "p1Line": 36,
+      "p2Line": 61
+    },
+    {
+      "id": 77,
+      "name": "A31",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 67,
+      "secondPoint": 40,
+      "length": "(Line_WaistLineSideFront_WaistLineFront-#WaistCircumference/4)/2"
+    },
+    {
+      "id": 78,
+      "name": "A32",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 67,
+      "secondPoint": 60,
+      "length": "(Line_WaistLineSideFront_WaistLineFront-#WaistCircumference/4)/2"
+    },
+    {
+      "id": 79,
+      "name": "A33",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 60,
+      "secondPoint": 67,
+      "length": "Line_DroppedSideFront_A26/2"
+    },
+    {
+      "id": 82,
+      "name": "A34",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 67,
+      "secondPoint": 4,
+      "length": "#FrontDartDepth"
+    },
+    {
+      "id": 87,
+      "name": "A35",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 61,
+      "secondPoint": 39,
+      "length": "Line_DroppedSideBack_DroppedBack/2"
+    },
+    {
+      "id": 88,
+      "name": "A36",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 87,
+      "secondPoint": 39,
+      "length": "Line_DroppedSideBack_DroppedBack/4"
+    },
+    {
+      "id": 89,
+      "name": "A37",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 87,
+      "secondPoint": 61,
+      "length": "((Line_WaistLineSideBack_WaistLineBack-#WaistCircumference/4)/2)>2?2:((Line_WaistLineSideBack_WaistLineBack-#WaistCircumference/4)/2)"
+    },
+    {
+      "id": 90,
+      "name": "A38",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 87,
+      "secondPoint": 39,
+      "length": "Line_A35_A37"
+    },
+    {
+      "id": 91,
+      "name": "A39",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 88,
+      "secondPoint": 61,
+      "length": "((Line_WaistLineSideBack_WaistLineBack-#WaistCircumference/4-4)/2)>0?((Line_WaistLineSideBack_WaistLineBack-#WaistCircumference/4-4)/2):0"
+    },
+    {
+      "id": 92,
+      "name": "A40",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 88,
+      "secondPoint": 39,
+      "length": "Line_A36_A39"
+    },
+    {
+      "id": 93,
+      "name": "A41",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 87,
+      "secondPoint": 89,
+      "angle": 0,
+      "length": "#BackDartDepth_1"
+    },
+    {
+      "id": 94,
+      "name": "A42",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 88,
+      "secondPoint": 91,
+      "angle": 0,
+      "length": "#BackDartDepth_2"
+    },
+    {
+      "id": 102,
+      "name": "Pocket1",
+      "type": "cutSpline",
+      "block": "Trousers",
+      "spline": 80,
+      "length": "Spl_A32_FrontSide-#PocketOpeningWidth"
+    },
+    {
+      "id": 103,
+      "name": "Pocket2",
+      "type": "cutSplinePath",
+      "block": "Trousers",
+      "splinePath": 37,
+      "length": "#PocketOpeningHeight-#SideDrop"
+    },
+    {
+      "id": 105,
+      "name": "A43",
+      "type": "cutSpline",
+      "block": "Trousers",
+      "spline": 80,
+      "length": "(Spl_A32_FrontSide-#PocketOpeningWidth-#PocketWidth)<0?0:Spl_A32_FrontSide-#PocketOpeningWidth"
+    },
+    {
+      "id": 106,
+      "name": "A44",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 102,
+      "secondPoint": 103,
+      "angle": 0,
+      "length": "#PocketPanelWidth"
+    },
+    {
+      "id": 107,
+      "name": "A45",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 103,
+      "secondPoint": 102,
+      "angle": 180,
+      "length": "#PocketPanelWidth"
+    },
+    {
+      "id": 108,
+      "name": "A46",
+      "type": "cutSplinePath",
+      "block": "Trousers",
+      "splinePath": 37,
+      "length": "#PocketOpeningHeight-#SideDrop+2"
+    },
+    {
+      "id": 109,
+      "name": "A47",
+      "type": "lineIntersect",
+      "block": "Trousers",
+      "p1Line1": 107,
+      "p2Line1": 106,
+      "p1Line2": 105,
+      "p2Line2": 79
+    },
+    {
+      "id": 110,
+      "name": "A48",
+      "type": "pointOfIntersection",
+      "block": "Trousers",
+      "firstPoint": 109,
+      "secondPoint": 108
+    },
+    {
+      "id": 113,
+      "name": "A49",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 108,
+      "secondPoint": 107,
+      "length": 2
+    },
+    {
+      "id": 114,
+      "name": "A50",
+      "type": "pointOfIntersection",
+      "block": "Trousers",
+      "firstPoint": 113,
+      "secondPoint": 103
+    },
+    {
+      "id": 118,
+      "name": "A51",
+      "type": "endLine",
+      "block": "Trousers",
+      "basePoint": 105,
+      "angle": 285.136,
+      "length": "#PocketDepth"
+    },
+    {
+      "id": 119,
+      "name": "A52",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 105,
+      "secondPoint": 118,
+      "length": -1
+    },
+    {
+      "id": 120,
+      "name": "A53",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 108,
+      "secondPoint": 113,
+      "length": -1
+    },
+    {
+      "id": 121,
+      "name": "A54",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 70,
+      "secondPoint": 102,
+      "length": -1
+    },
+    {
+      "id": 140,
+      "name": "Hemline",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 47,
+      "secondPoint": 1,
+      "length": "#HemLineStreightHeight"
+    },
+    {
+      "id": 142,
+      "name": "BackCenterFitted",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 73,
+      "secondPoint": 72,
+      "length": "-#BackPanelFittingInc"
+    },
+    {
+      "id": 147,
+      "name": "HemlineAddition",
+      "type": "alongLine",
+      "block": "Trousers",
+      "firstPoint": 140,
+      "secondPoint": 3,
+      "length": "-#HemlineAddition"
+    },
+    {
+      "id": 148,
+      "name": "A55",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 62,
+      "secondPoint": 140,
+      "angle": 180,
+      "length": "#HemlineAddition"
+    },
+    {
+      "id": 149,
+      "name": "A56",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 63,
+      "secondPoint": 140,
+      "angle": 180,
+      "length": "#HemlineAddition"
+    },
+    {
+      "id": 150,
+      "name": "A57",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 64,
+      "secondPoint": 140,
+      "angle": 0,
+      "length": "#HemlineAddition"
+    },
+    {
+      "id": 151,
+      "name": "A58",
+      "type": "normal",
+      "block": "Trousers",
+      "firstPoint": 65,
+      "secondPoint": 140,
+      "angle": 0,
+      "length": "#HemlineAddition"
+    },
+    {
+      "id": 155,
+      "name": "ZipperLength",
+      "type": "cutSpline",
+      "block": "Trousers",
+      "spline": 43,
+      "length": "Spl_A9_CrotchPointFront*0.3"
+    },
+    {
+      "id": 278,
+      "name": "A59",
+      "type": "curveIntersectAxis",
+      "block": "Trousers",
+      "basePoint": 102,
+      "angle": "AngleLine_Pocket2_Pocket1",
+      "curve": 122
+    },
+    {
+      "id": 22,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 20,
+      "secondPoint": 19,
+      "lineColor": "green"
+    },
+    {
+      "id": 29,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 5,
+      "secondPoint": 28,
+      "lineColor": "green"
+    },
+    {
+      "id": 41,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 39,
+      "secondPoint": 19,
+      "lineColor": "black"
+    },
+    {
+      "id": 42,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 40,
+      "secondPoint": 14,
+      "lineColor": "black"
+    },
+    {
+      "id": 66,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 63,
+      "secondPoint": 65,
+      "lineColor": "black"
+    },
+    {
+      "id": 76,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 27,
+      "secondPoint": 26,
+      "lineColor": "green"
+    },
+    {
+      "id": 83,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 78,
+      "secondPoint": 82,
+      "lineColor": "black"
+    },
+    {
+      "id": 84,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 82,
+      "secondPoint": 77,
+      "lineColor": "black"
+    },
+    {
+      "id": 85,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 32,
+      "secondPoint": 31,
+      "lineColor": "green"
+    },
+    {
+      "id": 86,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 61,
+      "secondPoint": 39,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 97,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 89,
+      "secondPoint": 93,
+      "lineColor": "black"
+    },
+    {
+      "id": 98,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 93,
+      "secondPoint": 90,
+      "lineColor": "black"
+    },
+    {
+      "id": 99,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 90,
+      "secondPoint": 91,
+      "lineColor": "black"
+    },
+    {
+      "id": 100,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 91,
+      "secondPoint": 94,
+      "lineColor": "black"
+    },
+    {
+      "id": 101,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 94,
+      "secondPoint": 92,
+      "lineColor": "black"
+    },
+    {
+      "id": 111,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 109,
+      "secondPoint": 110,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 112,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 108,
+      "secondPoint": 110,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 115,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 103,
+      "secondPoint": 114,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 116,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 114,
+      "secondPoint": 113,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 117,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 109,
+      "secondPoint": 107,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 141,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 73,
+      "secondPoint": 25,
+      "lineColor": "green"
+    },
+    {
+      "id": 146,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 142,
+      "secondPoint": 144,
+      "lineColor": "black"
+    },
+    {
+      "id": 152,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 149,
+      "secondPoint": 151,
+      "lineColor": "black"
+    },
+    {
+      "id": 156,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 71,
+      "secondPoint": 14,
+      "lineColor": "black"
+    },
+    {
+      "id": 277,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 103,
+      "secondPoint": 102,
+      "lineColor": "green"
+    },
+    {
+      "id": 415,
+      "name": "",
+      "type": "line",
+      "block": "Trousers",
+      "firstPoint": 406,
+      "secondPoint": 410,
+      "lineColor": "black"
+    },
+    {
+      "id": 37,
+      "name": "",
+      "type": "splinePath",
+      "block": "Trousers",
+      "pathPoints": [
+        {
+          "point": 33,
+          "angle1": 77.3013,
+          "angle2": 257.301,
+          "length1": 0,
+          "length2": 4.93604
+        },
+        {
+          "point": 35,
+          "angle1": 87.613,
+          "angle2": 267.613,
+          "length1": 4.02217,
+          "length2": 4.70857
+        },
+        {
+          "point": 10,
+          "angle1": 93.3989,
+          "angle2": 273.399,
+          "length1": 6.43666,
+          "length2": 1.38116
+        },
+        {
+          "point": 6,
+          "angle1": 91.4031,
+          "angle2": 271.403,
+          "length1": 12.6215,
+          "length2": 1.03743
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "name": "",
+      "type": "splinePath",
+      "block": "Trousers",
+      "pathPoints": [
+        {
+          "point": 32,
+          "angle1": 72.2583,
+          "angle2": 252.258,
+          "length1": 0,
+          "length2": 2.3987
+        },
+        {
+          "point": 36,
+          "angle1": 94.7533,
+          "angle2": 274.753,
+          "length1": 3.32473,
+          "length2": 7.8882
+        },
+        {
+          "point": 11,
+          "angle1": 92.6819,
+          "angle2": 272.682,
+          "length1": 5.07256,
+          "length2": 7.98258
+        },
+        {
+          "point": 7,
+          "angle1": 92.5608,
+          "angle2": 272.561,
+          "length1": 8.35821,
+          "length2": 0.92691
+        }
+      ]
+    },
+    {
+      "id": 43,
+      "name": "",
+      "type": "spline",
+      "block": "Trousers",
+      "point1": 14,
+      "point4": 16,
+      "angle1": 289.225,
+      "angle2": 172.122,
+      "length1": 0.936419,
+      "length2": 6.03918
+    },
+    {
+      "id": 44,
+      "name": "",
+      "type": "spline",
+      "block": "Trousers",
+      "point1": 19,
+      "point4": 25,
+      "angle1": 276.624,
+      "angle2": 184.997,
+      "length1": 8.18526,
+      "length2": 9.74322
+    },
+    {
+      "id": 45,
+      "name": "",
+      "type": "splinePath",
+      "block": "Trousers",
+      "pathPoints": [
+        {
+          "point": 16,
+          "angle1": 75.9675,
+          "angle2": 255.968,
+          "length1": 0,
+          "length2": 9.99561
+        },
+        {
+          "point": 12,
+          "angle1": 86.8814,
+          "angle2": 266.881,
+          "length1": 3.03101,
+          "length2": 1.97704
+        },
+        {
+          "point": 8,
+          "angle1": 90.9281,
+          "angle2": 270.928,
+          "length1": 13.2212,
+          "length2": 1.06103
+        }
+      ]
+    },
+    {
+      "id": 46,
+      "name": "",
+      "type": "splinePath",
+      "block": "Trousers",
+      "pathPoints": [
+        {
+          "point": 25,
+          "angle1": 66.6267,
+          "angle2": 246.627,
+          "length1": 0,
+          "length2": 4.75923
+        },
+        {
+          "point": 13,
+          "angle1": 83.4533,
+          "angle2": 263.453,
+          "length1": 4.73401,
+          "length2": 4.8357
+        },
+        {
+          "point": 9,
+          "angle1": 90.3065,
+          "angle2": 270.307,
+          "length1": 4.81369,
+          "length2": 1.02926
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "name": "",
+      "type": "cubicBezier",
+      "block": "Trousers",
+      "point1": 78,
+      "point2": 68,
+      "point3": 68,
+      "point4": 70
+    },
+    {
+      "id": 81,
+      "name": "",
+      "type": "cubicBezier",
+      "block": "Trousers",
+      "point1": 77,
+      "point2": 69,
+      "point3": 69,
+      "point4": 71
+    },
+    {
+      "id": 95,
+      "name": "",
+      "type": "cubicBezier",
+      "block": "Trousers",
+      "point1": 89,
+      "point2": 74,
+      "point3": 74,
+      "point4": 75
+    },
+    {
+      "id": 96,
+      "name": "",
+      "type": "cubicBezier",
+      "block": "Trousers",
+      "point1": 92,
+      "point2": 72,
+      "point3": 72,
+      "point4": 73
+    },
+    {
+      "id": 104,
+      "name": "",
+      "type": "spline",
+      "block": "Trousers",
+      "point1": 103,
+      "point4": 102,
+      "angle1": 347.194,
+      "angle2": 255.987,
+      "length1": 0.382566,
+      "length2": 4.83348
+    },
+    {
+      "id": 122,
+      "name": "",
+      "type": "splinePath",
+      "block": "Trousers",
+      "pathPoints": [
+        {
+          "point": 118,
+          "angle1": 139.455,
+          "angle2": 319.455,
+          "length1": 0,
+          "length2": 0.845004
+        },
+        {
+          "point": 120,
+          "angle1": 271.981,
+          "angle2": 91.9814,
+          "length1": 21.6161,
+          "length2": 12.0557
+        },
+        {
+          "point": 121,
+          "angle1": 120.963,
+          "angle2": 300.963,
+          "length1": 0,
+          "length2": 0.0769746
+        },
+        {
+          "point": 119,
+          "angle1": 272.048,
+          "angle2": 92.0483,
+          "length1": 1.16402,
+          "length2": 1.08292
+        }
+      ]
+    },
+    {
+      "id": 414,
+      "name": "",
+      "type": "splinePath",
+      "block": "Trousers",
+      "pathPoints": [
+        {
+          "point": 6,
+          "angle1": 270.5,
+          "angle2": 90.4996,
+          "length1": 0,
+          "length2": 3.51434
+        },
+        {
+          "point": 395,
+          "angle1": 274.229,
+          "angle2": 94.229,
+          "length1": 4.64362,
+          "length2": 5.06989
+        },
+        {
+          "point": 396,
+          "angle1": 276.386,
+          "angle2": 96.3858,
+          "length1": 4.53707,
+          "length2": 7.58168
+        },
+        {
+          "point": 406,
+          "angle1": 273.825,
+          "angle2": 93.825,
+          "length1": 6.53204,
+          "length2": 86.278
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "name": "B",
+      "type": "single",
+      "block": "Waistband",
+      "x": -0.0282207,
+      "y": 11.4017
+    },
+    {
+      "id": 157,
+      "name": "B1",
+      "type": "endLine",
+      "block": "Waistband",
+      "basePoint": 154,
+      "angle": 270,
+      "length": "Line_A9_FrontCenter+Spl_A9_ZipperLength+1"
+    },
+    {
+      "id": 158,
+      "name": "B2",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 154,
+      "secondPoint": 157,
+      "angle": 0,
+      "length": "#ZipperPanelWidth"
+    },
+    {
+      "id": 159,
+      "name": "B3",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 158,
+      "secondPoint": 154,
+      "angle": 0,
+      "length": "Line_B_B1-#ZipperPanelWidth"
+    },
+    {
+      "id": 161,
+      "name": "B4",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 154,
+      "secondPoint": 158,
+      "angle": 0,
+      "length": "#WaistBandWidth"
+    },
+    {
+      "id": 162,
+      "name": "B5",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 161,
+      "secondPoint": 154,
+      "angle": 0,
+      "length": "#ZipperPanelWidth"
+    },
+    {
+      "id": 164,
+      "name": "B6",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 161,
+      "secondPoint": 154,
+      "angle": 180,
+      "length": "#ButtonPanelWidth"
+    },
+    {
+      "id": 165,
+      "name": "B7",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 154,
+      "secondPoint": 161,
+      "angle": 0,
+      "length": "#ButtonPanelWidth"
+    },
+    {
+      "id": 167,
+      "name": "B8",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 161,
+      "secondPoint": 154,
+      "angle": 0,
+      "length": "#WaistCircumference/2+#BackPanelFittingInc+1"
+    },
+    {
+      "id": 168,
+      "name": "B9",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 154,
+      "secondPoint": 161,
+      "angle": 180,
+      "length": "#WaistCircumference/2+#BackPanelFittingInc+1"
+    },
+    {
+      "id": 169,
+      "name": "B10",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 161,
+      "secondPoint": 154,
+      "angle": 180,
+      "length": "#WaistCircumference/2+#BackPanelFittingInc+1"
+    },
+    {
+      "id": 170,
+      "name": "B11",
+      "type": "normal",
+      "block": "Waistband",
+      "firstPoint": 154,
+      "secondPoint": 161,
+      "angle": 0,
+      "length": "#WaistCircumference/2+#BackPanelFittingInc+1"
+    },
+    {
+      "id": 163,
+      "name": "",
+      "type": "line",
+      "block": "Waistband",
+      "firstPoint": 162,
+      "secondPoint": 158,
+      "lineColor": "black"
+    },
+    {
+      "id": 166,
+      "name": "",
+      "type": "line",
+      "block": "Waistband",
+      "firstPoint": 164,
+      "secondPoint": 165,
+      "lineColor": "black"
+    },
+    {
+      "id": 171,
+      "name": "",
+      "type": "line",
+      "block": "Waistband",
+      "firstPoint": 167,
+      "secondPoint": 168,
+      "lineColor": "black"
+    },
+    {
+      "id": 172,
+      "name": "",
+      "type": "line",
+      "block": "Waistband",
+      "firstPoint": 169,
+      "secondPoint": 170,
+      "lineColor": "black"
+    },
+    {
+      "id": 160,
+      "name": "",
+      "type": "spline",
+      "block": "Waistband",
+      "point1": 157,
+      "point4": 159,
+      "angle1": 0.526595,
+      "angle2": 268.422,
+      "length1": 2.73822,
+      "length2": 2.3439
+    }
+  ],
+  "pieces": []
+}

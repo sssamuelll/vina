@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight, ChevronDown, FileText, Box, Minus, User, Eye, Download, Play, Save, FolderOpen, Plus, X, Printer, FileDown } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -83,45 +84,37 @@ export default function PropertiesPanel() {
         onClick={() => setIsPanelCollapsed(!isPanelCollapsed)}
         title={isPanelCollapsed ? 'Expand properties panel' : 'Collapse properties panel'}
       >
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path 
-            d={isPanelCollapsed ? "M4 3L7 6L4 9" : "M8 3L5 6L8 9"} 
-            stroke="currentColor" 
-            strokeWidth="1.5" 
-            strokeLinecap="round" 
-            strokeLinejoin="round"
-          />
-        </svg>
+        {isPanelCollapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>
 
       {isPanelCollapsed && (
         <div className="panel-icons">
           <button className="panel-icon-shortcut" title="Project" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, project: false })); }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2H12V14H4V2Z" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M6 5H10M6 8H10" stroke="currentColor" strokeWidth="1"/></svg>
+            <FileText size={16} />
           </button>
           {selectedPiece && (
             <button className="panel-icon-shortcut" title="Piece" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, piece: false })); }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 4L8 2L13 4L13 12L8 14L3 12Z" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+              <Box size={16} />
             </button>
           )}
           {seams.length > 0 && (
             <button className="panel-icon-shortcut" title="Seams" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, seams: false })); }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8H13" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 2"/></svg>
+              <Minus size={16} />
             </button>
           )}
           <button className="panel-icon-shortcut" title="Avatar" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, avatar: false })); }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M4 14C4 11.2 5.8 9 8 9C10.2 9 12 11.2 12 14" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+            <User size={16} />
           </button>
           <button className="panel-icon-shortcut" title="Display" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, display: false })); }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8C2 8 5 3 8 3C11 3 14 8 14 8C14 8 11 13 8 13C5 13 2 8 2 8Z" stroke="currentColor" strokeWidth="1.2" fill="none"/><circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+            <Eye size={16} />
           </button>
           {pieces.length > 0 && (
             <button className="panel-icon-shortcut" title="Export" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, export: false })); }}>
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3V10M5 7L8 10L11 7M3 13H13" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <Download size={16} />
             </button>
           )}
           <button className="panel-icon-shortcut" title="Simulation" onClick={() => { setIsPanelCollapsed(false); setCollapsedSections(prev => ({ ...prev, simulation: false })); }}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 3L12 8L5 13V3Z" stroke="currentColor" strokeWidth="1.2" fill="none"/></svg>
+            <Play size={16} />
           </button>
         </div>
       )}
@@ -135,15 +128,7 @@ export default function PropertiesPanel() {
               onClick={() => toggleSection('project')}
             >
               <span className="panel-title">PROJECT</span>
-              <svg 
-                width="12" 
-                height="12" 
-                viewBox="0 0 12 12" 
-                fill="none"
-                className={collapsedSections.project ? 'collapsed' : 'expanded'}
-              >
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <ChevronDown size={12} className={collapsedSections.project ? "collapsed" : "expanded"} />
             </button>
             <div className={`panel-section-body ${collapsedSections.project ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
@@ -158,22 +143,15 @@ export default function PropertiesPanel() {
                 </div>
                 <div className="panel-button-row">
                   <button className="panel-labeled-btn" onClick={handleSave}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M10 1H3C2.45 1 2 1.45 2 2V12C2 12.55 2.45 13 3 13H11C11.55 13 12 12.55 12 12V4L10 1Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                      <path d="M8.5 1V5H4.5V1M8.5 9V13H4.5V9H8.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                    </svg>
+                    <Save size={14} />
                     <span>Save</span>
                   </button>
                   <button className="panel-labeled-btn" onClick={handleLoad}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M2 11V3C2 2.45 2.45 2 3 2H6L8 4H11C11.55 4 12 4.45 12 5V11C12 11.55 11.55 12 11 12H3C2.45 12 2 11.55 2 11Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                    </svg>
+                    <FolderOpen size={14} />
                     <span>Open</span>
                   </button>
                   <button className="panel-labeled-btn" onClick={handleNew}>
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                      <path d="M7 3V11M3 7H11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    </svg>
+                    <Plus size={14} />
                     <span>New</span>
                   </button>
                 </div>
@@ -188,15 +166,7 @@ export default function PropertiesPanel() {
                 onClick={() => toggleSection('piece')}
               >
                 <span className="panel-title">PIECE</span>
-                <svg 
-                  width="12" 
-                  height="12" 
-                  viewBox="0 0 12 12" 
-                  fill="none"
-                  className={collapsedSections.piece ? 'collapsed' : 'expanded'}
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ChevronDown size={12} className={collapsedSections.piece ? "collapsed" : "expanded"} />
               </button>
               <div className={`panel-section-body ${collapsedSections.piece ? 'collapsed' : ''}`}>
                 <div className="panel-section-content">
@@ -313,15 +283,7 @@ export default function PropertiesPanel() {
                 onClick={() => toggleSection('seams')}
               >
                 <span className="panel-title">SEAMS ({seams.length})</span>
-                <svg 
-                  width="12" 
-                  height="12" 
-                  viewBox="0 0 12 12" 
-                  fill="none"
-                  className={collapsedSections.seams ? 'collapsed' : 'expanded'}
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ChevronDown size={12} className={collapsedSections.seams ? "collapsed" : "expanded"} />
               </button>
               <div className={`panel-section-body ${collapsedSections.seams ? 'collapsed' : ''}`}>
                 <div className="panel-section-content">
@@ -343,9 +305,7 @@ export default function PropertiesPanel() {
                           className="seam-delete"
                           onClick={(e) => { e.stopPropagation(); dispatch(removeSeam(seam.id)); }}
                         >
-                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                          </svg>
+                          <X size={10} />
                         </button>
                       </div>
                     );
@@ -362,15 +322,7 @@ export default function PropertiesPanel() {
               onClick={() => toggleSection('avatar')}
             >
               <span className="panel-title">AVATAR</span>
-              <svg 
-                width="12" 
-                height="12" 
-                viewBox="0 0 12 12" 
-                fill="none"
-                className={collapsedSections.avatar ? 'collapsed' : 'expanded'}
-              >
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <ChevronDown size={12} className={collapsedSections.avatar ? "collapsed" : "expanded"} />
             </button>
             <div className={`panel-section-body ${collapsedSections.avatar ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
@@ -500,15 +452,7 @@ export default function PropertiesPanel() {
               onClick={() => toggleSection('display')}
             >
               <span className="panel-title">DISPLAY</span>
-              <svg 
-                width="12" 
-                height="12" 
-                viewBox="0 0 12 12" 
-                fill="none"
-                className={collapsedSections.display ? 'collapsed' : 'expanded'}
-              >
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <ChevronDown size={12} className={collapsedSections.display ? "collapsed" : "expanded"} />
             </button>
             <div className={`panel-section-body ${collapsedSections.display ? 'collapsed' : ''}`}>
               <div className="panel-section-content">
@@ -549,15 +493,7 @@ export default function PropertiesPanel() {
                 onClick={() => toggleSection('export')}
               >
                 <span className="panel-title">EXPORT</span>
-                <svg 
-                  width="12" 
-                  height="12" 
-                  viewBox="0 0 12 12" 
-                  fill="none"
-                  className={collapsedSections.export ? 'collapsed' : 'expanded'}
-                >
-                  <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <ChevronDown size={12} className={collapsedSections.export ? "collapsed" : "expanded"} />
               </button>
               <div className={`panel-section-body ${collapsedSections.export ? 'collapsed' : ''}`}>
                 <div className="panel-section-content">
@@ -567,10 +503,7 @@ export default function PropertiesPanel() {
                       onClick={() => downloadDXF(pieces)}
                       title="Download DXF for cutting plotters"
                     >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M3 1H9V3H3V1ZM1 5H11V11H1V5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                        <path d="M3 7H9M5 9H7" stroke="currentColor" strokeWidth="1"/>
-                      </svg>
+                      <Printer size={12} />
                       DXF
                     </button>
                     <button
@@ -578,10 +511,7 @@ export default function PropertiesPanel() {
                       onClick={() => downloadPDF(pieces)}
                       title="Download PDF at 1:1 scale"
                     >
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                        <path d="M8 1H3C2.45 1 2 1.45 2 2V10C2 10.55 2.45 11 3 11H9C9.55 11 10 10.55 10 10V4L8 1Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-                        <path d="M8 1V4H10" stroke="currentColor" strokeWidth="1" fill="none"/>
-                      </svg>
+                      <FileDown size={12} />
                       PDF
                     </button>
                   </div>
@@ -597,15 +527,7 @@ export default function PropertiesPanel() {
               onClick={() => toggleSection('simulation')}
             >
               <span className="panel-title">SIMULATION</span>
-              <svg 
-                width="12" 
-                height="12" 
-                viewBox="0 0 12 12" 
-                fill="none"
-                className={collapsedSections.simulation ? 'collapsed' : 'expanded'}
-              >
-                <path d="M3 4.5L6 7.5L9 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <ChevronDown size={12} className={collapsedSections.simulation ? "collapsed" : "expanded"} />
             </button>
             <div className={`panel-section-body ${collapsedSections.simulation ? 'collapsed' : ''}`}>
               <div className="panel-section-content">

@@ -1,0 +1,65 @@
+{
+  "name": "wrong_formula",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Pattern piece 1",
+      "x": 1.34938,
+      "y": 1.24354
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 0,
+      "length": "height_scapula/10+"
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 269.719,
+      "length": "Line_A_A1"
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "pointOfIntersection",
+      "block": "Pattern piece 1",
+      "firstPoint": 2,
+      "secondPoint": 3
+    },
+    {
+      "id": 5,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 3,
+      "secondPoint": 4,
+      "lineColor": "black"
+    },
+    {
+      "id": 6,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 2,
+      "secondPoint": 4,
+      "lineColor": "black"
+    }
+  ],
+  "pieces": []
+}

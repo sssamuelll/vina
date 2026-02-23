@@ -1,0 +1,586 @@
+{
+  "name": "keiko_skirt",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Skirt Front A",
+      "x": 0.926042,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "B",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "(leg_crotch_to_floor*1.25) + height_waist_side_to_hip - (height_knee * 1.2)"
+    },
+    {
+      "id": 3,
+      "name": "C",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 1,
+      "angle": 180,
+      "length": "(hip_circ/4) + 1.27"
+    },
+    {
+      "id": 4,
+      "name": "D",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 2,
+      "angle": 180,
+      "length": "Line_A_C"
+    },
+    {
+      "id": 6,
+      "name": "E",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 3,
+      "angle": 180,
+      "length": "(hip_circ/4) + 1.27"
+    },
+    {
+      "id": 7,
+      "name": "F",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 4,
+      "angle": 180,
+      "length": "Line_C_E"
+    },
+    {
+      "id": 9,
+      "name": "G",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 3,
+      "secondPoint": 4,
+      "length": "height_waist_side_to_hip"
+    },
+    {
+      "id": 10,
+      "name": "H",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 9,
+      "angle": 0,
+      "length": "Line_A_C"
+    },
+    {
+      "id": 11,
+      "name": "I",
+      "type": "endLine",
+      "block": "Skirt Front A",
+      "basePoint": 9,
+      "angle": 180,
+      "length": "Line_C_E"
+    },
+    {
+      "id": 12,
+      "name": "J",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 3,
+      "secondPoint": 1,
+      "length": 3
+    },
+    {
+      "id": 13,
+      "name": "K",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 3,
+      "secondPoint": 6,
+      "length": 3
+    },
+    {
+      "id": 14,
+      "name": "L",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 1,
+      "secondPoint": 10,
+      "length": 1.5
+    },
+    {
+      "id": 15,
+      "name": "M",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 6,
+      "secondPoint": 11,
+      "length": 1.15
+    },
+    {
+      "id": 21,
+      "name": "N",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 19,
+      "length": "Spl_L_J/3"
+    },
+    {
+      "id": 25,
+      "name": "P",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 19,
+      "length": "Spl_L_J*0.66"
+    },
+    {
+      "id": 28,
+      "name": "p1",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 23,
+      "length": "(Spl_L_J - (waist_circ/4))/2"
+    },
+    {
+      "id": 31,
+      "name": "p2",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 27,
+      "length": "(Spl_L_J - (waist_circ/4))/2"
+    },
+    {
+      "id": 42,
+      "name": "R",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 20,
+      "length": "Spl_M_K/3"
+    },
+    {
+      "id": 45,
+      "name": "T",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 20,
+      "length": "Spl_M_K*0.66"
+    },
+    {
+      "id": 48,
+      "name": "p5",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 44,
+      "length": "(Spl_M_K - waist_circ/4)/2"
+    },
+    {
+      "id": 51,
+      "name": "p6",
+      "type": "cutSpline",
+      "block": "Skirt Front A",
+      "spline": 47,
+      "length": "(Spl_M_K - waist_circ/4)/2"
+    },
+    {
+      "id": 60,
+      "name": "p9",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 3,
+      "secondPoint": 9,
+      "length": "Line_C_G - 3"
+    },
+    {
+      "id": 74,
+      "name": "A1",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 3,
+      "secondPoint": 9,
+      "length": "Line_C_G/2"
+    },
+    {
+      "id": 90,
+      "name": "S",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 48,
+      "secondPoint": 42
+    },
+    {
+      "id": 92,
+      "name": "p7",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 42,
+      "secondPoint": 90,
+      "length": "Line_R_S/2"
+    },
+    {
+      "id": 93,
+      "name": "p12",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 92,
+      "secondPoint": 60
+    },
+    {
+      "id": 99,
+      "name": "U",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 51,
+      "secondPoint": 45
+    },
+    {
+      "id": 101,
+      "name": "p8",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 45,
+      "secondPoint": 99,
+      "length": "Line_T_U/2"
+    },
+    {
+      "id": 102,
+      "name": "p13",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 101,
+      "secondPoint": 60
+    },
+    {
+      "id": 103,
+      "name": "A5",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 101,
+      "secondPoint": 74
+    },
+    {
+      "id": 104,
+      "name": "A4",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 92,
+      "secondPoint": 74
+    },
+    {
+      "id": 107,
+      "name": "Q",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 31,
+      "secondPoint": 25
+    },
+    {
+      "id": 108,
+      "name": "O",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 28,
+      "secondPoint": 21
+    },
+    {
+      "id": 111,
+      "name": "p3",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 21,
+      "secondPoint": 108,
+      "length": "Line_N_O/2"
+    },
+    {
+      "id": 112,
+      "name": "p4",
+      "type": "alongLine",
+      "block": "Skirt Front A",
+      "firstPoint": 25,
+      "secondPoint": 107,
+      "length": "Line_Q_P/2"
+    },
+    {
+      "id": 113,
+      "name": "p10",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 111,
+      "secondPoint": 60
+    },
+    {
+      "id": 114,
+      "name": "p11",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 112,
+      "secondPoint": 60
+    },
+    {
+      "id": 115,
+      "name": "A2",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 111,
+      "secondPoint": 74
+    },
+    {
+      "id": 116,
+      "name": "A3",
+      "type": "pointOfIntersection",
+      "block": "Skirt Front A",
+      "firstPoint": 112,
+      "secondPoint": 74
+    },
+    {
+      "id": 8,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 6,
+      "secondPoint": 7,
+      "lineColor": "black"
+    },
+    {
+      "id": 91,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 42,
+      "secondPoint": 90,
+      "lineColor": "black"
+    },
+    {
+      "id": 100,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 45,
+      "secondPoint": 99,
+      "lineColor": "black"
+    },
+    {
+      "id": 109,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 107,
+      "secondPoint": 25,
+      "lineColor": "black"
+    },
+    {
+      "id": 110,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 21,
+      "secondPoint": 108,
+      "lineColor": "black"
+    },
+    {
+      "id": 127,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 9,
+      "secondPoint": 4,
+      "lineColor": "black"
+    },
+    {
+      "id": 128,
+      "name": "",
+      "type": "line",
+      "block": "Skirt Front A",
+      "firstPoint": 4,
+      "secondPoint": 7,
+      "lineColor": "black"
+    },
+    {
+      "id": 19,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 14,
+      "point4": 12,
+      "angle1": 180,
+      "angle2": 352.272
+    },
+    {
+      "id": 20,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 15,
+      "point4": 13,
+      "angle1": 0,
+      "angle2": 184
+    },
+    {
+      "id": 73,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 13,
+      "point4": 9,
+      "angle1": 291.592,
+      "angle2": 91.5128
+    },
+    {
+      "id": 75,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 9,
+      "point4": 12,
+      "angle1": 91.0166,
+      "angle2": 248.817
+    },
+    {
+      "id": 95,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 42,
+      "point4": 93,
+      "angle1": 277,
+      "angle2": 89.8576
+    },
+    {
+      "id": 96,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 90,
+      "point4": 93,
+      "angle1": 262,
+      "angle2": 89.9482
+    },
+    {
+      "id": 105,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 45,
+      "point4": 102,
+      "angle1": 277,
+      "angle2": 89.6747
+    },
+    {
+      "id": 106,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 99,
+      "point4": 102,
+      "angle1": 262,
+      "angle2": 90.1446
+    },
+    {
+      "id": 117,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 113,
+      "point4": 21,
+      "angle1": 89.6473,
+      "angle2": 261.527
+    },
+    {
+      "id": 118,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 108,
+      "point4": 113,
+      "angle1": 277,
+      "angle2": 90.8185
+    },
+    {
+      "id": 119,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 114,
+      "point4": 25,
+      "angle1": 89.9927,
+      "angle2": 263.259
+    },
+    {
+      "id": 120,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 107,
+      "point4": 114,
+      "angle1": 277,
+      "angle2": 89.4725
+    },
+    {
+      "id": 121,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 25,
+      "point4": 108,
+      "angle1": 350.211,
+      "angle2": 187.959
+    },
+    {
+      "id": 122,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 90,
+      "point4": 45,
+      "angle1": 354.096,
+      "angle2": 188.644
+    },
+    {
+      "id": 123,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 99,
+      "point4": 13,
+      "angle1": 353.73,
+      "angle2": 195.158
+    },
+    {
+      "id": 124,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 12,
+      "point4": 107,
+      "angle1": 339.415,
+      "angle2": 186.015
+    },
+    {
+      "id": 126,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 21,
+      "point4": 14,
+      "angle1": 348.365,
+      "angle2": 180
+    },
+    {
+      "id": 130,
+      "name": "",
+      "type": "spline",
+      "block": "Skirt Front A",
+      "point1": 15,
+      "point4": 42,
+      "angle1": 1,
+      "angle2": 190.987
+    }
+  ],
+  "pieces": []
+}

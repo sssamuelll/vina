@@ -1,0 +1,900 @@
+{
+  "name": "moulage_05_armhole_neckline",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {
+    "#inch": {
+      "formula": "2.54",
+      "description": "1 inch"
+    },
+    "#quarter": {
+      "formula": "0.64",
+      "description": "1/4"
+    },
+    "#threeEight": {
+      "formula": "0.95",
+      "description": "3/8"
+    },
+    "#oneEight": {
+      "formula": "0.32",
+      "description": "1/8"
+    },
+    "#fiveEight": {
+      "formula": "1.59",
+      "description": "5/8"
+    },
+    "#ShoulderDart": {
+      "formula": "1.59",
+      "description": "Shoulder dart for C cup"
+    },
+    "#Waistdart": {
+      "formula": "1.59",
+      "description": "Waist dart for 2 \" to 7\" low hip - waist - Was supposed to be less but based on Suzy made more"
+    },
+    "#armholedart": {
+      "formula": "1.59",
+      "description": "Armhome dart for C cup"
+    },
+    "#Centerfrontdart": {
+      "formula": "1.59",
+      "description": "Center front dart width for C cup"
+    },
+    "#threequarter": {
+      "formula": "1.91",
+      "description": "3/4\""
+    },
+    "#Backwaistdart": {
+      "formula": "0.64",
+      "description": "Back waist dart - was supposed to 0 but based on Suzy"
+    },
+    "#Sidedartwidth": {
+      "formula": "3.18",
+      "description": "Side Dart width for C cup"
+    }
+  },
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Pattern piece 1",
+      "x": 0.926042,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 360,
+      "length": "4*2.54"
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "angle": 180,
+      "length": "neck_side_to_waist_f"
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 3,
+      "angle": 270,
+      "length": "4.5*2.54"
+    },
+    {
+      "id": 5,
+      "name": "A4",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 4,
+      "angle": 270,
+      "length": "4*2.54"
+    },
+    {
+      "id": 6,
+      "name": "Z",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 5,
+      "angle": 0,
+      "length": "(leg_thigh_mid_circ/4)+0.635"
+    },
+    {
+      "id": 7,
+      "name": "A6",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 4,
+      "angle": 0,
+      "length": "(leg_thigh_mid_circ/4)+0.635"
+    },
+    {
+      "id": 8,
+      "name": "A7",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 3,
+      "angle": 0,
+      "length": "(leg_thigh_mid_circ/4)+0.635"
+    },
+    {
+      "id": 10,
+      "name": "I",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 1,
+      "secondPoint": 3,
+      "length": "neck_side_to_waist_f/2"
+    },
+    {
+      "id": 11,
+      "name": "JBustguide",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 10,
+      "angle": 0,
+      "length": "(bust_circ/4)+0.635"
+    },
+    {
+      "id": 12,
+      "name": "A10",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "3*2.54"
+    },
+    {
+      "id": 13,
+      "name": "A11",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 12,
+      "angle": 0,
+      "length": "8*2.54"
+    },
+    {
+      "id": 14,
+      "name": "B",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "(neck_circ/6)+0.635"
+    },
+    {
+      "id": 15,
+      "name": "C",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 14,
+      "angle": 90,
+      "length": "(neck_circ/6)+0.635+0.3175"
+    },
+    {
+      "id": 16,
+      "name": "D",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 14,
+      "secondPoint": 15,
+      "length": "((neck_circ/6)+0.635+0.3175)/2"
+    },
+    {
+      "id": 17,
+      "name": "E",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 16,
+      "angle": 0,
+      "length": "6*2.54"
+    },
+    {
+      "id": 18,
+      "name": "tmp",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 16,
+      "secondPoint": 17,
+      "length": "Line_D_E/4"
+    },
+    {
+      "id": 19,
+      "name": "A13",
+      "type": "shoulder",
+      "block": "Pattern piece 1",
+      "p1Line": 16,
+      "p2Line": 18,
+      "pShoulder": 15,
+      "length": "shoulder_length+1.5875"
+    },
+    {
+      "id": 20,
+      "name": "F",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 15,
+      "angle": 343.365,
+      "length": "shoulder_length+#ShoulderDart"
+    },
+    {
+      "id": 21,
+      "name": "G",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 15,
+      "secondPoint": 20,
+      "length": "shoulder_length/2"
+    },
+    {
+      "id": 22,
+      "name": "H",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 20,
+      "secondPoint": 15,
+      "length": "shoulder_length/2"
+    },
+    {
+      "id": 23,
+      "name": "K",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 10,
+      "secondPoint": 11,
+      "length": "bustpoint_to_bustpoint/2"
+    },
+    {
+      "id": 24,
+      "name": "A14",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 23,
+      "angle": 90,
+      "length": "2*2.54"
+    },
+    {
+      "id": 25,
+      "name": "A15",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 23,
+      "angle": 270,
+      "length": "2*2.54"
+    },
+    {
+      "id": 26,
+      "name": "tmp1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 24,
+      "angle": 90,
+      "length": 2.54
+    },
+    {
+      "id": 27,
+      "name": "L_bust",
+      "type": "shoulder",
+      "block": "Pattern piece 1",
+      "p1Line": 26,
+      "p2Line": 24,
+      "pShoulder": 1,
+      "length": "neck_front_to_bust_f"
+    },
+    {
+      "id": 34,
+      "name": "M",
+      "type": "height",
+      "block": "Pattern piece 1",
+      "basePoint": 27,
+      "p1Line": 1,
+      "p2Line": 3
+    },
+    {
+      "id": 35,
+      "name": "O",
+      "type": "height",
+      "block": "Pattern piece 1",
+      "basePoint": 27,
+      "p1Line": 5,
+      "p2Line": 6
+    },
+    {
+      "id": 36,
+      "name": "N",
+      "type": "height",
+      "block": "Pattern piece 1",
+      "basePoint": 27,
+      "p1Line": 3,
+      "p2Line": 8
+    },
+    {
+      "id": 41,
+      "name": "Q",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 36,
+      "secondPoint": 8,
+      "length": "#Waistdart/2"
+    },
+    {
+      "id": 42,
+      "name": "P",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 36,
+      "secondPoint": 3,
+      "length": "#Waistdart/2"
+    },
+    {
+      "id": 43,
+      "name": "S",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 35,
+      "secondPoint": 36,
+      "length": "3*#inch"
+    },
+    {
+      "id": 44,
+      "name": "T",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 42,
+      "angle": 270,
+      "length": "#inch/2"
+    },
+    {
+      "id": 45,
+      "name": "U",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 41,
+      "angle": 270,
+      "length": "#inch/2"
+    },
+    {
+      "id": 49,
+      "name": "V",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 27,
+      "secondPoint": 36,
+      "length": "#threequarter"
+    },
+    {
+      "id": 54,
+      "name": "W2ndBust",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 34,
+      "angle": 0,
+      "length": "Line_I_JBustguide"
+    },
+    {
+      "id": 55,
+      "name": "A8",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 54,
+      "angle": 90,
+      "length": "4*#inch"
+    },
+    {
+      "id": 56,
+      "name": "X",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 3,
+      "secondPoint": 8,
+      "length": "((waist_circ/4)+#quarter)+#Waistdart"
+    },
+    {
+      "id": 57,
+      "name": "Ints1",
+      "type": "lineIntersect",
+      "block": "Pattern piece 1",
+      "p1Line1": 43,
+      "p2Line1": 44,
+      "p1Line2": 4,
+      "p2Line2": 7
+    },
+    {
+      "id": 58,
+      "name": "Ints2",
+      "type": "lineIntersect",
+      "block": "Pattern piece 1",
+      "p1Line1": 43,
+      "p2Line1": 45,
+      "p1Line2": 7,
+      "p2Line2": 4
+    },
+    {
+      "id": 61,
+      "name": "Y",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 4,
+      "angle": 0,
+      "length": "(highhip_circ/4)+#quarter+Line_Ints1_Ints2"
+    },
+    {
+      "id": 64,
+      "name": "R",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 44,
+      "secondPoint": 42,
+      "angle": 0,
+      "length": "Line_P_A2"
+    },
+    {
+      "id": 67,
+      "name": "tmp2",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 54,
+      "angle": 270,
+      "length": "#inch"
+    },
+    {
+      "id": 68,
+      "name": "a3rdbust",
+      "type": "shoulder",
+      "block": "Pattern piece 1",
+      "p1Line": 67,
+      "p2Line": 54,
+      "pShoulder": 56,
+      "length": "armpit_to_waist_side+#Sidedartwidth"
+    },
+    {
+      "id": 69,
+      "name": "b",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 68,
+      "angle": 180,
+      "length": "Line_I_JBustguide"
+    },
+    {
+      "id": 71,
+      "name": "c",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 56,
+      "secondPoint": 68,
+      "length": "3*#inch"
+    },
+    {
+      "id": 72,
+      "name": "A5",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 71,
+      "secondPoint": 68,
+      "angle": 0,
+      "length": "#oneEight"
+    },
+    {
+      "id": 74,
+      "name": "A9",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 54,
+      "angle": 90,
+      "length": "#Sidedartwidth/2"
+    },
+    {
+      "id": 75,
+      "name": "A12",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 54,
+      "angle": 270,
+      "length": "#Sidedartwidth/2"
+    },
+    {
+      "id": 78,
+      "name": "e",
+      "type": "lineIntersect",
+      "block": "Pattern piece 1",
+      "p1Line1": 68,
+      "p2Line1": 71,
+      "p1Line2": 75,
+      "p2Line2": 27
+    },
+    {
+      "id": 80,
+      "name": "d",
+      "type": "lineIntersect",
+      "block": "Pattern piece 1",
+      "p1Line1": 68,
+      "p2Line1": 71,
+      "p1Line2": 74,
+      "p2Line2": 27
+    },
+    {
+      "id": 81,
+      "name": "A16",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 49,
+      "secondPoint": 42,
+      "length": "Line_V_P/3"
+    },
+    {
+      "id": 82,
+      "name": "A17",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 49,
+      "secondPoint": 41,
+      "length": "Line_V_Q/3"
+    },
+    {
+      "id": 83,
+      "name": "A18",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 81,
+      "secondPoint": 49,
+      "angle": 0,
+      "length": "#quarter"
+    },
+    {
+      "id": 84,
+      "name": "A19",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 82,
+      "secondPoint": 49,
+      "angle": 180,
+      "length": "#quarter"
+    },
+    {
+      "id": 87,
+      "name": "A20",
+      "type": "lineIntersect",
+      "block": "Pattern piece 1",
+      "p1Line1": 22,
+      "p2Line1": 27,
+      "p1Line2": 13,
+      "p2Line2": 12
+    },
+    {
+      "id": 88,
+      "name": "f",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 87,
+      "secondPoint": 22,
+      "angle": 180,
+      "length": "#oneEight"
+    },
+    {
+      "id": 89,
+      "name": "A22",
+      "type": "lineIntersect",
+      "block": "Pattern piece 1",
+      "p1Line1": 21,
+      "p2Line1": 27,
+      "p1Line2": 13,
+      "p2Line2": 12
+    },
+    {
+      "id": 91,
+      "name": "g",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 12,
+      "secondPoint": 13,
+      "length": "across_chest_f/2"
+    },
+    {
+      "id": 92,
+      "name": "h",
+      "type": "pointOfIntersection",
+      "block": "Pattern piece 1",
+      "firstPoint": 91,
+      "secondPoint": 68
+    },
+    {
+      "id": 93,
+      "name": "i",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 92,
+      "angle": 45,
+      "length": "#inch"
+    },
+    {
+      "id": 94,
+      "name": "a1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 68,
+      "angle": 180,
+      "length": "#inch/2"
+    },
+    {
+      "id": 96,
+      "name": "k",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 93,
+      "secondPoint": 92,
+      "angle": 0,
+      "length": "#armholedart/2"
+    },
+    {
+      "id": 97,
+      "name": "j",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 93,
+      "secondPoint": 92,
+      "angle": 180,
+      "length": "#armholedart/2"
+    },
+    {
+      "id": 101,
+      "name": "l",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 14,
+      "angle": "90+45",
+      "length": "#inch"
+    },
+    {
+      "id": 102,
+      "name": "A21",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 0,
+      "length": "#inch/2"
+    },
+    {
+      "id": 105,
+      "name": "m",
+      "type": "cutSpline",
+      "block": "Pattern piece 1",
+      "spline": 104,
+      "length": "Spl_F_a3rdbust-(((armscye_circ/2)-#quarter)+#armholedart)"
+    },
+    {
+      "id": 9,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 8,
+      "secondPoint": 6,
+      "lineColor": "black"
+    },
+    {
+      "id": 46,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 44,
+      "secondPoint": 43,
+      "lineColor": "black"
+    },
+    {
+      "id": 47,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 45,
+      "secondPoint": 43,
+      "lineColor": "black"
+    },
+    {
+      "id": 50,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 49,
+      "secondPoint": 41,
+      "lineColor": "black"
+    },
+    {
+      "id": 51,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 49,
+      "secondPoint": 42,
+      "lineColor": "black"
+    },
+    {
+      "id": 52,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 21,
+      "secondPoint": 27,
+      "lineColor": "black"
+    },
+    {
+      "id": 53,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 27,
+      "secondPoint": 22,
+      "lineColor": "black"
+    },
+    {
+      "id": 59,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 57,
+      "secondPoint": 58,
+      "lineColor": "black"
+    },
+    {
+      "id": 62,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 61,
+      "secondPoint": 6,
+      "lineColor": "black"
+    },
+    {
+      "id": 63,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 56,
+      "secondPoint": 61,
+      "lineColor": "black"
+    },
+    {
+      "id": 65,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 45,
+      "secondPoint": 56,
+      "lineColor": "black"
+    },
+    {
+      "id": 70,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 56,
+      "secondPoint": 68,
+      "lineColor": "black"
+    },
+    {
+      "id": 73,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 72,
+      "secondPoint": 56,
+      "lineColor": "black"
+    },
+    {
+      "id": 76,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 27,
+      "secondPoint": 74,
+      "lineColor": "black"
+    },
+    {
+      "id": 77,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 27,
+      "secondPoint": 75,
+      "lineColor": "black"
+    },
+    {
+      "id": 79,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 78,
+      "secondPoint": 72,
+      "lineColor": "black"
+    },
+    {
+      "id": 98,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 97,
+      "secondPoint": 27,
+      "lineColor": "black"
+    },
+    {
+      "id": 99,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 96,
+      "secondPoint": 27,
+      "lineColor": "black"
+    },
+    {
+      "id": 108,
+      "name": "",
+      "type": "line",
+      "block": "Pattern piece 1",
+      "firstPoint": 15,
+      "secondPoint": 105,
+      "lineColor": "black"
+    },
+    {
+      "id": 85,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 49,
+      "point4": 41,
+      "angle1": 279.541,
+      "angle2": 83.7825
+    },
+    {
+      "id": 86,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 42,
+      "point4": 49,
+      "angle1": 96.2418,
+      "angle2": 260.109
+    },
+    {
+      "id": 90,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 22,
+      "point4": 27,
+      "angle1": 262.96,
+      "angle2": 76.7863
+    },
+    {
+      "id": 103,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 102,
+      "point4": 15,
+      "angle1": 3.32386,
+      "angle2": 261.824
+    },
+    {
+      "id": 104,
+      "name": "",
+      "type": "spline",
+      "block": "Pattern piece 1",
+      "point1": 20,
+      "point4": 68,
+      "angle1": 237.407,
+      "angle2": 181.375
+    }
+  ],
+  "pieces": []
+}

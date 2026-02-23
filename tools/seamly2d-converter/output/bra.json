@@ -1,0 +1,368 @@
+{
+  "name": "bra",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "Т",
+      "type": "single",
+      "block": "Bra",
+      "x": 0.819903,
+      "y": 23.1895
+    },
+    {
+      "id": 2,
+      "name": "Т4",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 1,
+      "angle": 0,
+      "length": "highbust_circ/2"
+    },
+    {
+      "id": 3,
+      "name": "T2",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "Line_Т_Т4/2"
+    },
+    {
+      "id": 4,
+      "name": "T1",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 1,
+      "secondPoint": 3,
+      "length": "Line_Т_T2/2"
+    },
+    {
+      "id": 5,
+      "name": "T3",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 3,
+      "secondPoint": 2,
+      "length": "Line_T2_Т4/2"
+    },
+    {
+      "id": 6,
+      "name": "B",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 1,
+      "angle": 90,
+      "length": "highbust_to_waist_f"
+    },
+    {
+      "id": 7,
+      "name": "B1",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 4,
+      "angle": 90,
+      "length": "highbust_to_waist_f+6"
+    },
+    {
+      "id": 8,
+      "name": "В2",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 3,
+      "angle": 90,
+      "length": "armpit_to_waist_side"
+    },
+    {
+      "id": 9,
+      "name": "В3",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 5,
+      "angle": 90,
+      "length": "across_back_to_waist_b"
+    },
+    {
+      "id": 10,
+      "name": "В4",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 9,
+      "angle": 0,
+      "length": 3
+    },
+    {
+      "id": 11,
+      "name": "В5",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 2,
+      "angle": 90,
+      "length": "across_back_to_waist_b-6"
+    },
+    {
+      "id": 14,
+      "name": "Т5",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 1,
+      "secondPoint": 4,
+      "length": "(highbust_circ-waist_circ)/2/2"
+    },
+    {
+      "id": 16,
+      "name": "Т6",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 2,
+      "secondPoint": 5,
+      "length": "(highbust_circ-waist_circ)/2/2"
+    },
+    {
+      "id": 18,
+      "name": "Т7",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 3,
+      "secondPoint": 8,
+      "length": 2.5
+    },
+    {
+      "id": 20,
+      "name": "Г",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 4,
+      "secondPoint": 7,
+      "length": "lowbust_to_waist_f"
+    },
+    {
+      "id": 21,
+      "name": "Г1х",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 20,
+      "angle": 180,
+      "length": "Line_Т_T1"
+    },
+    {
+      "id": 22,
+      "name": "Г1",
+      "type": "lineIntersect",
+      "block": "Bra",
+      "p1Line1": 6,
+      "p2Line1": 14,
+      "p1Line2": 20,
+      "p2Line2": 21
+    },
+    {
+      "id": 23,
+      "name": "Г2",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 22,
+      "secondPoint": 20,
+      "length": 2.5
+    },
+    {
+      "id": 24,
+      "name": "Г3",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 6,
+      "secondPoint": 7,
+      "length": 2.5
+    },
+    {
+      "id": 25,
+      "name": "Г4",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 20,
+      "angle": 0,
+      "length": "Line_Г2_Г-2"
+    },
+    {
+      "id": 27,
+      "name": "В5х",
+      "type": "endLine",
+      "block": "Bra",
+      "basePoint": 25,
+      "angle": 90,
+      "length": "Line_Г_B1"
+    },
+    {
+      "id": 28,
+      "name": "В51",
+      "type": "lineIntersect",
+      "block": "Bra",
+      "p1Line1": 7,
+      "p2Line1": 8,
+      "p1Line2": 25,
+      "p2Line2": 27
+    },
+    {
+      "id": 30,
+      "name": "Г5",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 20,
+      "secondPoint": 28,
+      "length": "Line_Г_В51/3"
+    },
+    {
+      "id": 31,
+      "name": "Г6",
+      "type": "normal",
+      "block": "Bra",
+      "firstPoint": 30,
+      "secondPoint": 20,
+      "angle": 0,
+      "length": 1.7
+    },
+    {
+      "id": 33,
+      "name": "Г7",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 23,
+      "secondPoint": 24,
+      "length": "Line_Г2_Г3/2"
+    },
+    {
+      "id": 35,
+      "name": "Г8",
+      "type": "alongLine",
+      "block": "Bra",
+      "firstPoint": 33,
+      "secondPoint": 20,
+      "length": "Line_Г7_Г/3"
+    },
+    {
+      "id": 36,
+      "name": "Г9",
+      "type": "normal",
+      "block": "Bra",
+      "firstPoint": 35,
+      "secondPoint": 33,
+      "angle": 0,
+      "length": 2.5
+    },
+    {
+      "id": 12,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 6,
+      "secondPoint": 7
+    },
+    {
+      "id": 15,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 6,
+      "secondPoint": 14
+    },
+    {
+      "id": 17,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 16,
+      "secondPoint": 11
+    },
+    {
+      "id": 26,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 7,
+      "secondPoint": 8
+    },
+    {
+      "id": 29,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 20,
+      "secondPoint": 28
+    },
+    {
+      "id": 32,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 23,
+      "secondPoint": 24
+    },
+    {
+      "id": 34,
+      "name": "",
+      "type": "line",
+      "block": "Bra",
+      "firstPoint": 33,
+      "secondPoint": 20
+    },
+    {
+      "id": 13,
+      "name": "",
+      "type": "spline",
+      "block": "Bra",
+      "point1": 10,
+      "point4": 11,
+      "angle1": 274.169,
+      "angle2": 187.017
+    },
+    {
+      "id": 19,
+      "name": "",
+      "type": "splinePath",
+      "block": "Bra",
+      "pathPoints": [
+        {
+          "point": 14
+        },
+        {
+          "point": 18
+        },
+        {
+          "point": 16
+        }
+      ]
+    },
+    {
+      "id": 37,
+      "name": "",
+      "type": "splinePath",
+      "block": "Bra",
+      "pathPoints": [
+        {
+          "point": 24
+        },
+        {
+          "point": 33
+        },
+        {
+          "point": 36
+        },
+        {
+          "point": 20
+        },
+        {
+          "point": 31
+        },
+        {
+          "point": 28
+        }
+      ]
+    }
+  ],
+  "pieces": []
+}

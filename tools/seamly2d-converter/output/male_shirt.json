@@ -1,0 +1,2170 @@
+{
+  "name": "male_shirt",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {
+    "#ToBeVerified": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#BackHeight": {
+      "formula": "neck_back_to_waist_b",
+      "description": "Calculation&#xa;&#xa;(1/4 Height )+ Ease&#xa;&#xa;+3,0 cm Slim Fit Ease &#xa;+3,0 cm Normal Fit Ease&#xa;+3,0 cm Loose Fit Ease"
+    },
+    "#ArmSkyeHeightBack": {
+      "formula": "(bust_circ/10+12)+5",
+      "description": "Calculate:&#xa;(1/10 BustGirth + 12cm) + ease&#xa;&#xa;+3,0 cm Slim Fit Ease &#xa;+4,0 cm Normal Fit Ease&#xa;+5,0 cm Loose Fit Ease"
+    },
+    "#BustCircumfence": {
+      "formula": "bust_circ+4",
+      "description": ""
+    },
+    "#FrontWidth": {
+      "formula": "(#BustCircumfence < 112 ? #BustCircumfence/5-1 : #BustCircumfence/2-(#BustCircumfence/10+2+#BustCircumfence/10+10.5))+1.5",
+      "description": "Calculation&#xa;&#xa;2/10 BustGirth - 1cm+Ease, when BustGirth < 112 cm&#xa;1/2 BustGirth - (ArmSkyeWidth + BackWidth)+ Ease, when BustGirth > 112 cm&#xa;&#xa;+0,75 cm Slim Fit Ease &#xa;+1,0 cm   Normal Fit Ease&#xa;+1,5 cm   Loose Fit Ease&#xa;&#xa;&#xa;"
+    },
+    "#BackWidth": {
+      "formula": "(#BustCircumfence < 100 ? #BustCircumfence/5-1: #BustCircumfence/10+10.5)+3",
+      "description": "Calculation&#xa;&#xa;2/10 BustGirth - 1cm+Ease, when BustGirth < 100 cm&#xa;1/10 BustGirth + 10.5+Ease, when BustGirth > 100 cm&#xa;&#xa;+1,25 cm Slim Fit Ease &#xa;+2,0 cm   Normal Fit Ease&#xa;+3.0 cm   Loose Fit Ease&#xa;&#xa;&#xa;"
+    },
+    "#ArmSkyeHeightFront": {
+      "formula": "(#BustCircumfence/10+12-1)+5",
+      "description": "Calculation&#xa;&#xa;ArmSkyeWidth - 1 cm + Ease = (bust_circ/10+12-1) + Ease&#xa;&#xa;+3,0 cm Slim Fit Ease &#xa;+4,0 cm Normal Fit Ease&#xa;+5,0 cm Loose Fit Ease"
+    },
+    "#ArmSkyeWidth": {
+      "formula": "(bust_circ/10+2)+5.5",
+      "description": "Calculation:&#xa;(1/10 BustGirth + 2cm) + Ease&#xa;&#xa;+3,5 cm Slim Fit Ease &#xa;+4,5 cm Normal Fit Ease&#xa;+5,5 cm Loose Fit Ease"
+    },
+    "#Hemline": {
+      "formula": "height/2-10",
+      "description": "Calculation&#xa;1/2 Height - 10 cm"
+    },
+    "#Modifications": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#ArmSkyeDrop": {
+      "formula": "1",
+      "description": "The amount of drop of the arm skye"
+    },
+    "#NeckLineHeightFront": {
+      "formula": "neck_circ/6+1",
+      "description": "The height of the neckline"
+    },
+    "#NeckLineDropBack": {
+      "formula": "1",
+      "description": "The drop of the back neckline"
+    },
+    "#YokeHeight": {
+      "formula": "8",
+      "description": "Height of the yoke"
+    },
+    "#HemlineCurve": {
+      "formula": "5",
+      "description": ""
+    },
+    "#SideIntake": {
+      "formula": "(bust_circ-waist_circ)/2/2/2<0?0:(bust_circ-waist_circ)/2/2/2",
+      "description": "The amount intake in the side.&#xa;Can be adjusted manually."
+    },
+    "#SideIntakeWaist": {
+      "formula": "(bust_circ-hip_circ)/8",
+      "description": "The amount intake in the side of the hemline.&#xa;Can be adjusted manually."
+    },
+    "#BackIntake": {
+      "formula": "(bust_circ-waist_circ)/2/2/2<0?0:(bust_circ-waist_circ)/2/2/2",
+      "description": "The amount intake in the back.&#xa;Can be adjusted manually."
+    },
+    "#BackIntakeWaist": {
+      "formula": "(bust_circ-hip_circ)/8",
+      "description": "The amount intake in the back in the hemline.&#xa;Can be adjusted manually."
+    },
+    "#BackPleat": {
+      "formula": "3",
+      "description": "Pleat on the center of the back"
+    },
+    "#YokeIntake": {
+      "formula": "1.5",
+      "description": "The side intake amount"
+    },
+    "#ButtonPanelWidth": {
+      "formula": "5.5",
+      "description": "Amount of fabric needed for button panel. The seam allowance will be added."
+    },
+    "#ShortSleeveLength": {
+      "formula": "32",
+      "description": "Length of the sleeve"
+    },
+    "#PocketHeight": {
+      "formula": "13",
+      "description": "Height of the pocket"
+    },
+    "#PocketWidth": {
+      "formula": "9",
+      "description": "Width of the pocket"
+    },
+    "#PocketBottomForm": {
+      "formula": "1",
+      "description": "How much the pocekt bottom is dopped in the center. Value 0 means flat bottom."
+    },
+    "#PocketFold": {
+      "formula": "3",
+      "description": "Pocket upper part fold amount"
+    },
+    "#PocketFoldCenter": {
+      "formula": "1",
+      "description": "Pocket center form; Value 0 is flat center"
+    },
+    "#PocketFlap": {
+      "formula": "3",
+      "description": "Height of the pocket flap"
+    },
+    "#PocketFlapCenter": {
+      "formula": "1",
+      "description": "Pocket flap center form; Value 0 is flat center"
+    },
+    "#CuffWidth": {
+      "formula": "6",
+      "description": ""
+    },
+    "#PlacketWidth": {
+      "formula": "3",
+      "description": ""
+    },
+    "#CanBeAdjusted": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#PlacketDepth": {
+      "formula": "15",
+      "description": "The placket depth"
+    },
+    "#CollarHeight": {
+      "formula": "3.8",
+      "description": "Collar top height on the back"
+    },
+    "#CollarAngle": {
+      "formula": "120",
+      "description": "The angle of the collar"
+    },
+    "#CollarFrontHeight": {
+      "formula": "7",
+      "description": "Collar front height"
+    },
+    "#CalculationsMeasurements": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#NecWidth": {
+      "formula": "neck_circ/6",
+      "description": "Calculation&#xa;&#xa;1/6 Neck Girth"
+    },
+    "#ShoulderWidth": {
+      "formula": "shoulder_length+5",
+      "description": "Calculation:&#xa;Shoulder length + ease"
+    },
+    "#ShoulderDropBack": {
+      "formula": "2",
+      "description": "Shoulder point drop on back"
+    },
+    "#ShoulderDropFront": {
+      "formula": "4",
+      "description": "Shoulder point drop on front&#xa;"
+    },
+    "#ShoulderShilft": {
+      "formula": "1.5",
+      "description": "Amount of the shift of the shoulder seam from back to front"
+    },
+    "#SleeveCapHeightAdjust": {
+      "formula": "6",
+      "description": "Adjusting sleeve cap  heights"
+    },
+    "#SleeveDart": {
+      "formula": "2",
+      "description": "The amount of the dart in the sleeve"
+    },
+    "#SleeveWristGirth": {
+      "formula": "hand_circ+3+2*#SleeveDart",
+      "description": "Hand wristcircumfence + ease + darts"
+    },
+    "#SleeveHemLineTurn": {
+      "formula": "2",
+      "description": "Short sleeve hemline turn amount"
+    },
+    "#ArmLength": {
+      "formula": "arm_shoulder_tip_to_wrist_bent+3",
+      "description": "Length of the arm"
+    },
+    "#CuffGirth": {
+      "formula": "#SleeveWristGirth-2*#SleeveDart",
+      "description": "Cuff circumfence"
+    },
+    "#PrintingFix": {
+      "formula": "0.01",
+      "description": "The is a value to control Seamly2D to print inside of the of the piece"
+    },
+    "#CollarButton": {
+      "formula": "1.5",
+      "description": "The amount needed to be added to the collar for the button panel"
+    },
+    "#CollarFrontBaseHeight": {
+      "formula": "2",
+      "description": "Collabase height at the front"
+    },
+    "#CollarUpperButtonLength": {
+      "formula": "#CollarButton+1",
+      "description": "The length of the Collar Top from button"
+    }
+  },
+  "construction": [
+    {
+      "id": 1,
+      "name": "ShoulderLine",
+      "type": "single",
+      "block": "Men shirt",
+      "x": 0.0130144,
+      "y": 3.58763
+    },
+    {
+      "id": 2,
+      "name": "Hemline",
+      "type": "endLine",
+      "block": "Men shirt",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "#Hemline"
+    },
+    {
+      "id": 3,
+      "name": "BustLine",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#ArmSkyeHeightBack"
+    },
+    {
+      "id": 4,
+      "name": "Waistline",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#BackHeight"
+    },
+    {
+      "id": 5,
+      "name": "A1",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 3,
+      "secondPoint": 1,
+      "angle": 0,
+      "length": "#FrontWidth+#ArmSkyeWidth+#BackWidth"
+    },
+    {
+      "id": 6,
+      "name": "A2",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 3,
+      "secondPoint": 5,
+      "length": "#BackWidth"
+    },
+    {
+      "id": 7,
+      "name": "A3",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 6,
+      "secondPoint": 5,
+      "length": "#ArmSkyeWidth"
+    },
+    {
+      "id": 8,
+      "name": "A4",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 3,
+      "secondPoint": 5,
+      "length": "Line_BustLine_A1/2"
+    },
+    {
+      "id": 9,
+      "name": "A5",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 6,
+      "secondPoint": 3,
+      "angle": 0,
+      "length": "#ArmSkyeHeightBack"
+    },
+    {
+      "id": 10,
+      "name": "A6",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 7,
+      "secondPoint": 8,
+      "angle": 0,
+      "length": "#ArmSkyeHeightFront"
+    },
+    {
+      "id": 11,
+      "name": "A7",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 5,
+      "secondPoint": 7,
+      "angle": 0,
+      "length": "#ArmSkyeHeightFront"
+    },
+    {
+      "id": 12,
+      "name": "A8",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 2,
+      "secondPoint": 4,
+      "angle": 0,
+      "length": "Line_BustLine_A1"
+    },
+    {
+      "id": 13,
+      "name": "A9",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 4,
+      "secondPoint": 3,
+      "angle": 0,
+      "length": "Line_BustLine_A1"
+    },
+    {
+      "id": 14,
+      "name": "A10",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 2,
+      "secondPoint": 12,
+      "length": "Line_Hemline_A8/2"
+    },
+    {
+      "id": 15,
+      "name": "A11",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 4,
+      "secondPoint": 13,
+      "length": "Line_Waistline_A9/2"
+    },
+    {
+      "id": 16,
+      "name": "A12",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 1,
+      "secondPoint": 9,
+      "length": "#NecWidth+1"
+    },
+    {
+      "id": 17,
+      "name": "A13",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 16,
+      "secondPoint": 1,
+      "angle": 0,
+      "length": 2
+    },
+    {
+      "id": 18,
+      "name": "A14",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 9,
+      "secondPoint": 16,
+      "angle": 180,
+      "length": "#ShoulderDropBack"
+    },
+    {
+      "id": 19,
+      "name": "A15",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 17,
+      "secondPoint": 18,
+      "angle": 180,
+      "length": "#ShoulderShilft"
+    },
+    {
+      "id": 20,
+      "name": "A16",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 18,
+      "secondPoint": 17,
+      "angle": 0,
+      "length": 1.5
+    },
+    {
+      "id": 21,
+      "name": "A17",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 19,
+      "secondPoint": 20,
+      "length": "#ShoulderWidth"
+    },
+    {
+      "id": 22,
+      "name": "A18",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 11,
+      "secondPoint": 10,
+      "length": "#NecWidth"
+    },
+    {
+      "id": 23,
+      "name": "A19",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 10,
+      "secondPoint": 7,
+      "length": "#ShoulderDropFront"
+    },
+    {
+      "id": 24,
+      "name": "A20",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 11,
+      "secondPoint": 5,
+      "length": "#NeckLineHeightFront"
+    },
+    {
+      "id": 25,
+      "name": "A21",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 23,
+      "secondPoint": 7,
+      "length": "#ShoulderShilft"
+    },
+    {
+      "id": 26,
+      "name": "A22",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 22,
+      "secondPoint": 10,
+      "angle": 180,
+      "length": "#ShoulderShilft"
+    },
+    {
+      "id": 27,
+      "name": "A23",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 26,
+      "secondPoint": 25,
+      "length": "#ShoulderWidth"
+    },
+    {
+      "id": 28,
+      "name": "A24",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 8,
+      "secondPoint": 14,
+      "length": "#ArmSkyeDrop"
+    },
+    {
+      "id": 30,
+      "name": "A25",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 1,
+      "secondPoint": 3,
+      "length": "#YokeHeight"
+    },
+    {
+      "id": 31,
+      "name": "A26",
+      "type": "curveIntersectAxis",
+      "block": "Men shirt",
+      "basePoint": 30,
+      "angle": 180,
+      "curve": 29
+    },
+    {
+      "id": 32,
+      "name": "A27",
+      "type": "curveIntersectAxis",
+      "block": "Men shirt",
+      "basePoint": 30,
+      "angle": "180+180/3.14*atan(#YokeIntake/Line_A25_A26)",
+      "curve": 29
+    },
+    {
+      "id": 33,
+      "name": "A28",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 1,
+      "secondPoint": 30,
+      "length": "#NeckLineDropBack"
+    },
+    {
+      "id": 34,
+      "name": "A29",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 14,
+      "secondPoint": 15,
+      "length": "#HemlineCurve"
+    },
+    {
+      "id": 35,
+      "name": "A30",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 15,
+      "secondPoint": 13,
+      "length": "#SideIntake"
+    },
+    {
+      "id": 36,
+      "name": "A31",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 15,
+      "secondPoint": 4,
+      "length": "#SideIntake"
+    },
+    {
+      "id": 37,
+      "name": "A32",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 24,
+      "secondPoint": 5,
+      "angle": 180,
+      "length": "#ButtonPanelWidth"
+    },
+    {
+      "id": 38,
+      "name": "A33",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 12,
+      "secondPoint": 13,
+      "angle": 0,
+      "length": "#ButtonPanelWidth"
+    },
+    {
+      "id": 55,
+      "name": "A34",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 30,
+      "secondPoint": 33,
+      "angle": 180,
+      "length": "#BackPleat"
+    },
+    {
+      "id": 56,
+      "name": "A35",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 2,
+      "secondPoint": 4,
+      "angle": 180,
+      "length": "#BackPleat"
+    },
+    {
+      "id": 333,
+      "name": "A36",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 4,
+      "secondPoint": 15,
+      "length": "Line_Waistline_A11/2"
+    },
+    {
+      "id": 334,
+      "name": "A37",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 333,
+      "secondPoint": 4,
+      "angle": 0,
+      "length": "Line_ShoulderLine_Waistline-Line_ShoulderLine_BustLine"
+    },
+    {
+      "id": 335,
+      "name": "A38",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 333,
+      "secondPoint": 4,
+      "angle": 180,
+      "length": "(Line_ShoulderLine_Hemline-Line_ShoulderLine_Waistline)/2"
+    },
+    {
+      "id": 336,
+      "name": "A39",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 333,
+      "secondPoint": 4,
+      "length": "#BackIntake"
+    },
+    {
+      "id": 337,
+      "name": "A40",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 333,
+      "secondPoint": 15,
+      "length": "#BackIntake"
+    },
+    {
+      "id": 341,
+      "name": "A41",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 2,
+      "secondPoint": 14,
+      "length": "Line_Hemline_A10/2"
+    },
+    {
+      "id": 342,
+      "name": "A42",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 341,
+      "secondPoint": 2,
+      "length": "#BackIntakeWaist"
+    },
+    {
+      "id": 343,
+      "name": "A43",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 341,
+      "secondPoint": 14,
+      "length": "#BackIntakeWaist"
+    },
+    {
+      "id": 344,
+      "name": "A44",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 14,
+      "secondPoint": 2,
+      "length": "#SideIntakeWaist"
+    },
+    {
+      "id": 345,
+      "name": "A45",
+      "type": "alongLine",
+      "block": "Men shirt",
+      "firstPoint": 14,
+      "secondPoint": 12,
+      "length": "#SideIntakeWaist"
+    },
+    {
+      "id": 348,
+      "name": "A46",
+      "type": "normal",
+      "block": "Men shirt",
+      "firstPoint": 335,
+      "secondPoint": 333,
+      "angle": 0,
+      "length": "#PrintingFix"
+    },
+    {
+      "id": 385,
+      "name": "A47",
+      "type": "curveIntersectAxis",
+      "block": "Men shirt",
+      "basePoint": 345,
+      "angle": "AngleLine_A30_A45",
+      "curve": 50
+    },
+    {
+      "id": 388,
+      "name": "A48",
+      "type": "curveIntersectAxis",
+      "block": "Men shirt",
+      "basePoint": 344,
+      "angle": "AngleLine_A44_A31",
+      "curve": 50
+    },
+    {
+      "id": 402,
+      "name": "A49",
+      "type": "curveIntersectAxis",
+      "block": "Men shirt",
+      "basePoint": 343,
+      "angle": "AngleLine_A43_A46",
+      "curve": 50
+    },
+    {
+      "id": 405,
+      "name": "A50",
+      "type": "curveIntersectAxis",
+      "block": "Men shirt",
+      "basePoint": 342,
+      "angle": "AngleLine_A38_A42",
+      "curve": 50
+    },
+    {
+      "id": 41,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 38,
+      "secondPoint": 37,
+      "lineColor": "black"
+    },
+    {
+      "id": 43,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 26,
+      "secondPoint": 27,
+      "lineColor": "black"
+    },
+    {
+      "id": 44,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 21,
+      "secondPoint": 19,
+      "lineColor": "black"
+    },
+    {
+      "id": 51,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 28,
+      "secondPoint": 35,
+      "lineColor": "black"
+    },
+    {
+      "id": 53,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 28,
+      "secondPoint": 36,
+      "lineColor": "black"
+    },
+    {
+      "id": 57,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 33,
+      "secondPoint": 30,
+      "lineColor": "black"
+    },
+    {
+      "id": 58,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 55,
+      "secondPoint": 56,
+      "lineColor": "black"
+    },
+    {
+      "id": 349,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 343,
+      "secondPoint": 348,
+      "lineColor": "black"
+    },
+    {
+      "id": 350,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 348,
+      "secondPoint": 337,
+      "lineColor": "black"
+    },
+    {
+      "id": 351,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 337,
+      "secondPoint": 334,
+      "lineColor": "black"
+    },
+    {
+      "id": 352,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 334,
+      "secondPoint": 336,
+      "lineColor": "black"
+    },
+    {
+      "id": 353,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 336,
+      "secondPoint": 335,
+      "lineColor": "black"
+    },
+    {
+      "id": 354,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 335,
+      "secondPoint": 342,
+      "lineColor": "black"
+    },
+    {
+      "id": 383,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 35,
+      "secondPoint": 345,
+      "lineColor": "black"
+    },
+    {
+      "id": 384,
+      "name": "",
+      "type": "line",
+      "block": "Men shirt",
+      "firstPoint": 344,
+      "secondPoint": 36,
+      "lineColor": "black"
+    },
+    {
+      "id": 29,
+      "name": "",
+      "type": "splinePath",
+      "block": "Men shirt",
+      "pathPoints": [
+        {
+          "point": 27,
+          "angle1": 82.679,
+          "angle2": 262.679,
+          "length1": 0,
+          "length2": 14.1361
+        },
+        {
+          "point": 28,
+          "angle1": 182.66,
+          "angle2": 2.66009,
+          "length1": 10.8903,
+          "length2": 15.8268
+        },
+        {
+          "point": 21,
+          "angle1": 281.751,
+          "angle2": 101.751,
+          "length1": 15.8466,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "name": "",
+      "type": "spline",
+      "block": "Men shirt",
+      "point1": 24,
+      "point4": 26,
+      "angle1": 2.71281,
+      "angle2": 267.394,
+      "length1": 5.61197,
+      "length2": 4.27829
+    },
+    {
+      "id": 45,
+      "name": "",
+      "type": "spline",
+      "block": "Men shirt",
+      "point1": 19,
+      "point4": 33,
+      "angle1": 273.614,
+      "angle2": 185.832,
+      "length1": 1.64458,
+      "length2": 5.54349
+    },
+    {
+      "id": 47,
+      "name": "",
+      "type": "spline",
+      "block": "Men shirt",
+      "point1": 32,
+      "point4": 30,
+      "angle1": 9.62256,
+      "angle2": 180.368,
+      "length1": 7.57655,
+      "length2": 8.88116
+    },
+    {
+      "id": 50,
+      "name": "",
+      "type": "splinePath",
+      "block": "Men shirt",
+      "pathPoints": [
+        {
+          "point": 12,
+          "angle1": 180.025,
+          "angle2": 0.0254212,
+          "length1": 0,
+          "length2": 35.7433
+        },
+        {
+          "point": 34,
+          "angle1": 179.092,
+          "angle2": 359.092,
+          "length1": 10.5341,
+          "length2": 11.1528
+        },
+        {
+          "point": 2,
+          "angle1": 180.026,
+          "angle2": 0.0258405,
+          "length1": 36.0729,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "name": "P",
+      "type": "single",
+      "block": "Pocket",
+      "x": 19.3222,
+      "y": 6.36906
+    },
+    {
+      "id": 60,
+      "name": "P1",
+      "type": "endLine",
+      "block": "Pocket",
+      "basePoint": 59,
+      "angle": 0,
+      "length": "#PocketWidth"
+    },
+    {
+      "id": 61,
+      "name": "P2",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 60,
+      "secondPoint": 59,
+      "angle": 0,
+      "length": "#PocketHeight"
+    },
+    {
+      "id": 62,
+      "name": "P3",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 61,
+      "secondPoint": 60,
+      "angle": 0,
+      "length": "Line_P_P1/2"
+    },
+    {
+      "id": 63,
+      "name": "P4",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 62,
+      "secondPoint": 61,
+      "angle": 180,
+      "length": "#PocketBottomForm"
+    },
+    {
+      "id": 64,
+      "name": "P5",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 61,
+      "secondPoint": 60,
+      "angle": 0,
+      "length": "Line_P_P1"
+    },
+    {
+      "id": 69,
+      "name": "P6",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 59,
+      "secondPoint": 60,
+      "angle": 0,
+      "length": "#PocketFold"
+    },
+    {
+      "id": 70,
+      "name": "P7",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 60,
+      "secondPoint": 59,
+      "angle": 180,
+      "length": "#PocketFold"
+    },
+    {
+      "id": 301,
+      "name": "B1",
+      "type": "alongLine",
+      "block": "Pocket",
+      "firstPoint": 69,
+      "secondPoint": 70,
+      "length": "Line_P6_P7/2"
+    },
+    {
+      "id": 302,
+      "name": "B2",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 301,
+      "secondPoint": 70,
+      "angle": 0,
+      "length": "#PocketFoldCenter"
+    },
+    {
+      "id": 305,
+      "name": "B3",
+      "type": "alongLine",
+      "block": "Pocket",
+      "firstPoint": 59,
+      "secondPoint": 64,
+      "length": "#PocketFlap"
+    },
+    {
+      "id": 306,
+      "name": "B4",
+      "type": "alongLine",
+      "block": "Pocket",
+      "firstPoint": 60,
+      "secondPoint": 61,
+      "length": "#PocketFlap"
+    },
+    {
+      "id": 307,
+      "name": "B5",
+      "type": "alongLine",
+      "block": "Pocket",
+      "firstPoint": 305,
+      "secondPoint": 306,
+      "length": "Line_P6_P7/2"
+    },
+    {
+      "id": 308,
+      "name": "B6",
+      "type": "normal",
+      "block": "Pocket",
+      "firstPoint": 307,
+      "secondPoint": 305,
+      "angle": 0,
+      "length": "#PocketFlapCenter"
+    },
+    {
+      "id": 65,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 61,
+      "secondPoint": 63,
+      "lineColor": "black"
+    },
+    {
+      "id": 66,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 63,
+      "secondPoint": 64,
+      "lineColor": "black"
+    },
+    {
+      "id": 67,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 64,
+      "secondPoint": 59,
+      "lineColor": "black"
+    },
+    {
+      "id": 71,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 69,
+      "secondPoint": 70,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 303,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 69,
+      "secondPoint": 302,
+      "lineColor": "black"
+    },
+    {
+      "id": 304,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 302,
+      "secondPoint": 70,
+      "lineColor": "black"
+    },
+    {
+      "id": 309,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 305,
+      "secondPoint": 308,
+      "lineColor": "black"
+    },
+    {
+      "id": 310,
+      "name": "",
+      "type": "line",
+      "block": "Pocket",
+      "firstPoint": 308,
+      "secondPoint": 306,
+      "lineColor": "black"
+    },
+    {
+      "id": 311,
+      "name": "",
+      "type": "splinePath",
+      "block": "Pocket",
+      "pathPoints": [
+        {
+          "point": 64,
+          "angle1": 162.345,
+          "angle2": 342.345,
+          "length1": 0,
+          "length2": 1.62618
+        },
+        {
+          "point": 63,
+          "angle1": 178.208,
+          "angle2": 358.208,
+          "length1": 0.784351,
+          "length2": 0.759786
+        },
+        {
+          "point": 61,
+          "angle1": 200.538,
+          "angle2": 20.538,
+          "length1": 1.97939,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 312,
+      "name": "",
+      "type": "splinePath",
+      "block": "Pocket",
+      "pathPoints": [
+        {
+          "point": 305,
+          "angle1": 155.947,
+          "angle2": 335.947,
+          "length1": 0,
+          "length2": 1.60463
+        },
+        {
+          "point": 308,
+          "angle1": 180.976,
+          "angle2": 0.975753,
+          "length1": 1.23522,
+          "length2": 1.57482
+        },
+        {
+          "point": 306,
+          "angle1": 204.17,
+          "angle2": 24.1698,
+          "length1": 1.41679,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 313,
+      "name": "",
+      "type": "splinePath",
+      "block": "Pocket",
+      "pathPoints": [
+        {
+          "point": 69,
+          "angle1": 206.292,
+          "angle2": 26.2917,
+          "length1": 0,
+          "length2": 1.56068
+        },
+        {
+          "point": 302,
+          "angle1": 178.773,
+          "angle2": 358.773,
+          "length1": 1.09824,
+          "length2": 1.18106
+        },
+        {
+          "point": 70,
+          "angle1": 152.459,
+          "angle2": 332.459,
+          "length1": 1.15293,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "name": "C",
+      "type": "single",
+      "block": "Sleeve",
+      "x": 49.9886,
+      "y": 19.5508
+    },
+    {
+      "id": 73,
+      "name": "C1",
+      "type": "endLine",
+      "block": "Sleeve",
+      "basePoint": 72,
+      "angle": 270,
+      "length": "#ArmLength"
+    },
+    {
+      "id": 74,
+      "name": "C2",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 72,
+      "secondPoint": 73,
+      "length": "(SplPath_A23_A27+SplPath_A26_A17)/3-#SleeveCapHeightAdjust"
+    },
+    {
+      "id": 75,
+      "name": "C3",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 74,
+      "secondPoint": 72,
+      "angle": 0,
+      "length": 5
+    },
+    {
+      "id": 76,
+      "name": "C4",
+      "type": "shoulder",
+      "block": "Sleeve",
+      "p1Line": 74,
+      "p2Line": 75,
+      "pShoulder": 72,
+      "length": "(SplPath_A23_A27+SplPath_A26_A17)/2-0.5"
+    },
+    {
+      "id": 77,
+      "name": "C5",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 74,
+      "secondPoint": 72,
+      "angle": 180,
+      "length": "Line_C2_C4"
+    },
+    {
+      "id": 80,
+      "name": "C6",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 76,
+      "secondPoint": 72,
+      "length": "Line_C4_C/2"
+    },
+    {
+      "id": 81,
+      "name": "C7",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 76,
+      "secondPoint": 72,
+      "length": "Line_C4_C/4"
+    },
+    {
+      "id": 82,
+      "name": "C8",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 76,
+      "secondPoint": 72,
+      "length": "Line_C4_C/4*3"
+    },
+    {
+      "id": 83,
+      "name": "C9",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 81,
+      "secondPoint": 80,
+      "angle": 180,
+      "length": 1
+    },
+    {
+      "id": 84,
+      "name": "C10",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 82,
+      "secondPoint": 72,
+      "angle": 0,
+      "length": 1
+    },
+    {
+      "id": 85,
+      "name": "C11",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 72,
+      "secondPoint": 77,
+      "length": "Line_C_C5/3"
+    },
+    {
+      "id": 86,
+      "name": "C12",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 72,
+      "secondPoint": 77,
+      "length": "Line_C_C5/3*2"
+    },
+    {
+      "id": 87,
+      "name": "C13",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 85,
+      "secondPoint": 72,
+      "angle": 180,
+      "length": 2
+    },
+    {
+      "id": 89,
+      "name": "C14",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 73,
+      "secondPoint": 72,
+      "length": "#CuffWidth"
+    },
+    {
+      "id": 90,
+      "name": "C15",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 89,
+      "secondPoint": 73,
+      "angle": 0,
+      "length": "#SleeveWristGirth/2"
+    },
+    {
+      "id": 91,
+      "name": "C16",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 89,
+      "secondPoint": 73,
+      "angle": 180,
+      "length": "#SleeveWristGirth/2"
+    },
+    {
+      "id": 92,
+      "name": "C17",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 90,
+      "secondPoint": 89,
+      "length": "Line_C14_C15*0.4"
+    },
+    {
+      "id": 93,
+      "name": "C18",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 92,
+      "secondPoint": 90,
+      "angle": 0,
+      "length": "#PlacketDepth"
+    },
+    {
+      "id": 94,
+      "name": "C19",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 92,
+      "secondPoint": 91,
+      "length": 2
+    },
+    {
+      "id": 95,
+      "name": "C20",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 94,
+      "secondPoint": 91,
+      "length": "#SleeveDart"
+    },
+    {
+      "id": 96,
+      "name": "C21",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 95,
+      "secondPoint": 91,
+      "length": "#SleeveDart+0.5"
+    },
+    {
+      "id": 97,
+      "name": "C22",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 96,
+      "secondPoint": 91,
+      "length": "#SleeveDart"
+    },
+    {
+      "id": 98,
+      "name": "C23",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 95,
+      "secondPoint": 94,
+      "angle": 0,
+      "length": 4
+    },
+    {
+      "id": 99,
+      "name": "C24",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 97,
+      "secondPoint": 96,
+      "angle": 0,
+      "length": 4
+    },
+    {
+      "id": 100,
+      "name": "C25",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 92,
+      "secondPoint": 90,
+      "length": "#PrintingFix"
+    },
+    {
+      "id": 103,
+      "name": "C26",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 91,
+      "secondPoint": 89,
+      "length": "Line_C14_C16/6"
+    },
+    {
+      "id": 104,
+      "name": "C27",
+      "type": "height",
+      "block": "Sleeve",
+      "basePoint": 103,
+      "p1Line": 76,
+      "p2Line": 91
+    },
+    {
+      "id": 105,
+      "name": "C28",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 90,
+      "secondPoint": 89,
+      "length": "Line_C14_C15/6"
+    },
+    {
+      "id": 106,
+      "name": "C29",
+      "type": "height",
+      "block": "Sleeve",
+      "basePoint": 105,
+      "p1Line": 77,
+      "p2Line": 90
+    },
+    {
+      "id": 114,
+      "name": "C30",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 89,
+      "secondPoint": 73,
+      "angle": 0,
+      "length": "#CuffGirth+#PlacketWidth-1"
+    },
+    {
+      "id": 115,
+      "name": "C31",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 73,
+      "secondPoint": 89,
+      "angle": 180,
+      "length": "#CuffGirth+#PlacketWidth-1"
+    },
+    {
+      "id": 117,
+      "name": "C32",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 72,
+      "secondPoint": 89,
+      "length": "#ShortSleeveLength"
+    },
+    {
+      "id": 118,
+      "name": "C33",
+      "type": "lineIntersectAxis",
+      "block": "Sleeve",
+      "basePoint": 117,
+      "angle": 0,
+      "p1Line": 77,
+      "p2Line": 90
+    },
+    {
+      "id": 119,
+      "name": "C34",
+      "type": "lineIntersectAxis",
+      "block": "Sleeve",
+      "basePoint": 117,
+      "angle": 180,
+      "p1Line": 76,
+      "p2Line": 91
+    },
+    {
+      "id": 120,
+      "name": "C35",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 117,
+      "secondPoint": 72,
+      "length": "#SleeveHemLineTurn"
+    },
+    {
+      "id": 121,
+      "name": "C36",
+      "type": "lineIntersectAxis",
+      "block": "Sleeve",
+      "basePoint": 120,
+      "angle": 0,
+      "p1Line": 77,
+      "p2Line": 118
+    },
+    {
+      "id": 122,
+      "name": "C37",
+      "type": "lineIntersectAxis",
+      "block": "Sleeve",
+      "basePoint": 120,
+      "angle": 180,
+      "p1Line": 76,
+      "p2Line": 119
+    },
+    {
+      "id": 123,
+      "name": "C38",
+      "type": "alongLine",
+      "block": "Sleeve",
+      "firstPoint": 117,
+      "secondPoint": 89,
+      "length": "#SleeveHemLineTurn"
+    },
+    {
+      "id": 124,
+      "name": "C39",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 123,
+      "secondPoint": 117,
+      "angle": 0,
+      "length": "Line_C35_C37"
+    },
+    {
+      "id": 125,
+      "name": "C40",
+      "type": "normal",
+      "block": "Sleeve",
+      "firstPoint": 123,
+      "secondPoint": 117,
+      "angle": 180,
+      "length": "Line_C35_C36"
+    },
+    {
+      "id": 78,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 76,
+      "secondPoint": 72,
+      "lineColor": "green"
+    },
+    {
+      "id": 79,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 72,
+      "secondPoint": 77,
+      "lineColor": "green"
+    },
+    {
+      "id": 101,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 76,
+      "secondPoint": 91,
+      "lineColor": "black"
+    },
+    {
+      "id": 102,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 77,
+      "secondPoint": 90,
+      "lineColor": "black"
+    },
+    {
+      "id": 107,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 99,
+      "secondPoint": 96,
+      "lineColor": "black"
+    },
+    {
+      "id": 108,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 98,
+      "secondPoint": 94,
+      "lineColor": "black"
+    },
+    {
+      "id": 109,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 100,
+      "secondPoint": 93,
+      "lineColor": "black"
+    },
+    {
+      "id": 112,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 96,
+      "secondPoint": 95,
+      "lineColor": "black"
+    },
+    {
+      "id": 113,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 94,
+      "secondPoint": 92,
+      "lineColor": "black"
+    },
+    {
+      "id": 116,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 114,
+      "secondPoint": 115,
+      "lineColor": "black"
+    },
+    {
+      "id": 126,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 119,
+      "secondPoint": 124,
+      "lineColor": "black"
+    },
+    {
+      "id": 127,
+      "name": "",
+      "type": "line",
+      "block": "Sleeve",
+      "firstPoint": 118,
+      "secondPoint": 125,
+      "lineColor": "black"
+    },
+    {
+      "id": 88,
+      "name": "",
+      "type": "splinePath",
+      "block": "Sleeve",
+      "pathPoints": [
+        {
+          "point": 76,
+          "angle1": 133.043,
+          "angle2": 313.043,
+          "length1": 0,
+          "length2": 0.0815231
+        },
+        {
+          "point": 83,
+          "angle1": 211.702,
+          "angle2": 31.7019,
+          "length1": 2.95142,
+          "length2": 3.07339
+        },
+        {
+          "point": 80,
+          "angle1": 218.231,
+          "angle2": 38.2306,
+          "length1": 1.59834,
+          "length2": 1.82572
+        },
+        {
+          "point": 84,
+          "angle1": 215.201,
+          "angle2": 35.2008,
+          "length1": 1.35994,
+          "length2": 2.51616
+        },
+        {
+          "point": 72,
+          "angle1": 179.166,
+          "angle2": 359.166,
+          "length1": 3.23621,
+          "length2": 3.36832
+        },
+        {
+          "point": 87,
+          "angle1": 145.801,
+          "angle2": 325.801,
+          "length1": 3.96393,
+          "length2": 4.07466
+        },
+        {
+          "point": 86,
+          "angle1": 146.371,
+          "angle2": 326.371,
+          "length1": 0.882877,
+          "length2": 1.41727
+        },
+        {
+          "point": 77,
+          "angle1": 167.341,
+          "angle2": 347.341,
+          "length1": 0.0924647,
+          "length2": 0.567883
+        }
+      ]
+    },
+    {
+      "id": 110,
+      "name": "",
+      "type": "spline",
+      "block": "Sleeve",
+      "point1": 104,
+      "point4": 89,
+      "angle1": 12.2644,
+      "angle2": 208.953,
+      "length1": 4.83467,
+      "length2": 0.750071
+    },
+    {
+      "id": 111,
+      "name": "",
+      "type": "spline",
+      "block": "Sleeve",
+      "point1": 106,
+      "point4": 100,
+      "angle1": 164.47,
+      "angle2": 0,
+      "length1": 2.91869,
+      "length2": 0
+    },
+    {
+      "id": 140,
+      "name": "D",
+      "type": "single",
+      "block": "Collar",
+      "x": 71.6812,
+      "y": 8.99461
+    },
+    {
+      "id": 141,
+      "name": "D1",
+      "type": "endLine",
+      "block": "Collar",
+      "basePoint": 140,
+      "angle": 90,
+      "length": "#CollarHeight*2+1.5"
+    },
+    {
+      "id": 142,
+      "name": "D2",
+      "type": "alongLine",
+      "block": "Collar",
+      "firstPoint": 140,
+      "secondPoint": 141,
+      "length": 1
+    },
+    {
+      "id": 143,
+      "name": "D3",
+      "type": "alongLine",
+      "block": "Collar",
+      "firstPoint": 142,
+      "secondPoint": 141,
+      "length": "#CollarHeight-0.5"
+    },
+    {
+      "id": 144,
+      "name": "D4",
+      "type": "alongLine",
+      "block": "Collar",
+      "firstPoint": 141,
+      "secondPoint": 140,
+      "length": "#CollarHeight"
+    },
+    {
+      "id": 145,
+      "name": "D5",
+      "type": "normal",
+      "block": "Collar",
+      "firstPoint": 140,
+      "secondPoint": 141,
+      "angle": 0,
+      "length": "Spl_A15_A28+Spl_A20_A22"
+    },
+    {
+      "id": 146,
+      "name": "D6",
+      "type": "normal",
+      "block": "Collar",
+      "firstPoint": 145,
+      "secondPoint": 140,
+      "angle": 90,
+      "length": "#CollarButton"
+    },
+    {
+      "id": 147,
+      "name": "D7",
+      "type": "alongLine",
+      "block": "Collar",
+      "firstPoint": 145,
+      "secondPoint": 140,
+      "length": "Line_D_D5/4"
+    },
+    {
+      "id": 148,
+      "name": "D8",
+      "type": "normal",
+      "block": "Collar",
+      "firstPoint": 146,
+      "secondPoint": 145,
+      "angle": 0,
+      "length": 0.7
+    },
+    {
+      "id": 149,
+      "name": "D9",
+      "type": "normal",
+      "block": "Collar",
+      "firstPoint": 148,
+      "secondPoint": 147,
+      "angle": 0,
+      "length": "#CollarFrontBaseHeight"
+    },
+    {
+      "id": 152,
+      "name": "D10",
+      "type": "cutSpline",
+      "block": "Collar",
+      "spline": 151,
+      "length": "Spl_D3_D9-#CollarUpperButtonLength"
+    },
+    {
+      "id": 153,
+      "name": "D11",
+      "type": "endLine",
+      "block": "Collar",
+      "basePoint": 152,
+      "angle": "120-#CollarAngle/4",
+      "length": "#CollarFrontHeight"
+    },
+    {
+      "id": 246,
+      "name": "D12",
+      "type": "alongLine",
+      "block": "Collar",
+      "firstPoint": 152,
+      "secondPoint": 153,
+      "length": -1
+    },
+    {
+      "id": 247,
+      "name": "D13",
+      "type": "alongLine",
+      "block": "Collar",
+      "firstPoint": 144,
+      "secondPoint": 141,
+      "length": -1
+    },
+    {
+      "id": 150,
+      "name": "",
+      "type": "splinePath",
+      "block": "Collar",
+      "pathPoints": [
+        {
+          "point": 148,
+          "angle1": 351.569,
+          "angle2": 171.569,
+          "length1": 0,
+          "length2": 1.65293
+        },
+        {
+          "point": 147,
+          "angle1": 180.144,
+          "angle2": 0.144483,
+          "length1": 2.38305,
+          "length2": 3.25434
+        },
+        {
+          "point": 142,
+          "angle1": 179.147,
+          "angle2": 359.147,
+          "length1": 6.56058,
+          "length2": 0.513557
+        }
+      ]
+    },
+    {
+      "id": 151,
+      "name": "",
+      "type": "spline",
+      "block": "Collar",
+      "point1": 143,
+      "point4": 149,
+      "angle1": 179.937,
+      "angle2": 16.5873,
+      "length1": 17.1667,
+      "length2": 3.5551
+    },
+    {
+      "id": 154,
+      "name": "",
+      "type": "spline",
+      "block": "Collar",
+      "point1": 144,
+      "point4": 152,
+      "angle1": 179.851,
+      "angle2": 23.7671,
+      "length1": 4.50186,
+      "length2": 4.34589
+    },
+    {
+      "id": 155,
+      "name": "",
+      "type": "spline",
+      "block": "Collar",
+      "point1": 153,
+      "point4": 141,
+      "angle1": 307.984,
+      "angle2": 202.24,
+      "length1": 0.892797,
+      "length2": 0.50213
+    },
+    {
+      "id": 248,
+      "name": "",
+      "type": "spline",
+      "block": "Collar",
+      "point1": 247,
+      "point4": 246,
+      "angle1": 179.804,
+      "angle2": 14.73,
+      "length1": 7.80754,
+      "length2": 5.10539
+    },
+    {
+      "id": 256,
+      "name": "E",
+      "type": "single",
+      "block": "Placket",
+      "x": 50.0742,
+      "y": 99.1661
+    },
+    {
+      "id": 257,
+      "name": null,
+      "type": "endLine",
+      "block": "Placket",
+      "basePoint": 256,
+      "angle": 0,
+      "length": 15.2064
+    },
+    {
+      "id": 258,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 256,
+      "secondPoint": 257,
+      "angle": 0,
+      "length": "#PlacketWidth"
+    },
+    {
+      "id": 259,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 257,
+      "secondPoint": 256,
+      "angle": 180,
+      "length": "#PlacketWidth"
+    },
+    {
+      "id": 260,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 256,
+      "secondPoint": 257,
+      "angle": 180,
+      "length": "#PlacketWidth*2"
+    },
+    {
+      "id": 261,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 257,
+      "secondPoint": 256,
+      "angle": 0,
+      "length": "#PlacketWidth"
+    },
+    {
+      "id": 262,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 261,
+      "secondPoint": 257,
+      "angle": 180,
+      "length": "#PlacketWidth"
+    },
+    {
+      "id": 263,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 262,
+      "secondPoint": 261,
+      "angle": 0,
+      "length": "#PlacketWidth"
+    },
+    {
+      "id": 264,
+      "name": null,
+      "type": "alongLine",
+      "block": "Placket",
+      "firstPoint": 262,
+      "secondPoint": 263,
+      "length": "#PlacketWidth/2"
+    },
+    {
+      "id": 265,
+      "name": null,
+      "type": "normal",
+      "block": "Placket",
+      "firstPoint": 264,
+      "secondPoint": 263,
+      "angle": 0,
+      "length": "#PlacketWidth/2"
+    },
+    {
+      "id": 266,
+      "name": "",
+      "type": "line",
+      "block": "Placket",
+      "firstPoint": 258,
+      "secondPoint": 259,
+      "lineColor": "black"
+    },
+    {
+      "id": 267,
+      "name": "",
+      "type": "line",
+      "block": "Placket",
+      "firstPoint": 262,
+      "secondPoint": 265,
+      "lineColor": "black"
+    },
+    {
+      "id": 268,
+      "name": "",
+      "type": "line",
+      "block": "Placket",
+      "firstPoint": 265,
+      "secondPoint": 263,
+      "lineColor": "black"
+    },
+    {
+      "id": 269,
+      "name": "",
+      "type": "line",
+      "block": "Placket",
+      "firstPoint": 263,
+      "secondPoint": 260,
+      "lineColor": "black"
+    }
+  ],
+  "pieces": []
+}

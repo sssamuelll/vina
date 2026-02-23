@@ -1,3 +1,4 @@
+import { MessageSquare, PanelLeftClose, PanelRightClose, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRef, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -73,9 +74,7 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
     return (
       <div className={`copilot-side-panel collapsed ${position}`}>
         <div className="copilot-collapsed-tab" onClick={handleToggle}>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
-          </svg>
+          <MessageSquare size={16} style={{ color: 'var(--accent)' }} />
           <span className="copilot-collapsed-label">Chat</span>
         </div>
       </div>
@@ -96,9 +95,7 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
       {/* Header */}
       <div className="copilot-side-header">
         <div className="copilot-side-title">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
-          </svg>
+          <MessageSquare size={16} style={{ color: 'var(--accent)' }} />
           <span>Copilot</span>
         </div>
         
@@ -109,19 +106,7 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
             onClick={handlePositionCycle}
             title="Change position"
           >
-            {position === 'left' ? (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="3" width="5" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1"/>
-                <path d="M8 7H12" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                <path d="M10 5L12 7L10 9" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="8" y="3" width="5" height="8" rx="1" fill="none" stroke="currentColor" strokeWidth="1"/>
-                <path d="M6 7H2" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-                <path d="M4 5L2 7L4 9" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            )}
+            {position === 'left' ? <PanelLeftClose size={14} /> : <PanelRightClose size={14} />}
           </button>
           
           {/* Collapse button */}
@@ -130,10 +115,7 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
             onClick={handleToggle}
             title="Collapse panel"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d={position === 'left' ? "M9 4L5 7L9 10" : "M5 4L9 7L5 10"} 
-                stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            {position === 'left' ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
           </button>
         </div>
       </div>

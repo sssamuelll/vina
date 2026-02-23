@@ -1,3 +1,4 @@
+import { Undo2, Redo2, Plus, MessageSquare, Search } from 'lucide-react';
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -290,23 +291,15 @@ export default function Workspace() {
         <div className="toolbar-separator" />
         <div className="undo-redo-toolbar">
           <button className="toolbar-btn undo-btn" onClick={handleUndo} disabled={!canUndo()} title="Undo (Ctrl+Z)">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M4 7H12C13.1 7 14 7.9 14 9C14 10.1 13.1 11 12 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M6.5 4.5L4 7L6.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Undo2 size={16} />
           </button>
           <button className="toolbar-btn redo-btn" onClick={handleRedo} disabled={!canRedo()} title="Redo (Ctrl+Shift+Z)">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M12 7H4C2.9 7 2 7.9 2 9C2 10.1 2.9 11 4 11H8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              <path d="M9.5 4.5L12 7L9.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <Redo2 size={16} />
           </button>
         </div>
         <div className="toolbar-separator" />
         <button className="toolbar-btn template-btn" onClick={() => setShowTemplates(true)} title="Pattern Templates">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-            <path d="M6 2V10M2 6H10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
+          <Plus size={12} />
           Templates
         </button>
         <div className="toolbar-separator" />
@@ -326,9 +319,7 @@ export default function Workspace() {
           onClick={() => dispatch(cycleCopilotPosition())}
           title={`Copilot: ${copilotPosition} (click to cycle)`}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="none" stroke="currentColor" strokeWidth="1.2"/>
-          </svg>
+          <MessageSquare size={16} />
         </button>
 
         <div className="toolbar-spacer" />
@@ -339,10 +330,7 @@ export default function Workspace() {
           onClick={() => setCommandPaletteOpen(true)}
           title="Command Palette (⌘K)"
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.3"/>
-            <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
-          </svg>
+          <Search size={16} />
           <span className="command-palette-label">⌘K</span>
         </button>
       </header>

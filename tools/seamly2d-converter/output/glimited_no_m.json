@@ -1,0 +1,30 @@
+{
+  "name": "glimited_no_m",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Pattern piece 1",
+      "x": 0.79375,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 159.044,
+      "length": 10
+    }
+  ],
+  "pieces": []
+}

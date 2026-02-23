@@ -1,0 +1,3425 @@
+{
+  "name": "zigzag",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Élément de patron 1",
+      "x": -18.8407,
+      "y": 36.9939
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 1,
+      "angle": 360,
+      "length": "@Lignetailledos"
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 1,
+      "angle": 90.3609,
+      "length": "@Longueurdos"
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 3,
+      "secondPoint": 1,
+      "length": "@Profondeurencoluredos"
+    },
+    {
+      "id": 5,
+      "name": "A4",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 2,
+      "secondPoint": 4
+    },
+    {
+      "id": 6,
+      "name": "A5",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 4,
+      "secondPoint": 5,
+      "length": "@Largeurencoluredos"
+    },
+    {
+      "id": 9,
+      "name": "A8",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 1,
+      "secondPoint": 4,
+      "length": "@Hauteuremmanchure"
+    },
+    {
+      "id": 10,
+      "name": "A9",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 9,
+      "angle": 0,
+      "length": "@Lignetailledos"
+    },
+    {
+      "id": 11,
+      "name": "hauteurcarrure",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 9,
+      "secondPoint": 4,
+      "length": "@Hauteurcarrure"
+    },
+    {
+      "id": 12,
+      "name": "A11",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 11,
+      "angle": 0.611317,
+      "length": "@Demicarruredos"
+    },
+    {
+      "id": 13,
+      "name": "A7",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 6,
+      "angle": 90.8337,
+      "length": "@Profondeurencoluredos"
+    },
+    {
+      "id": 14,
+      "name": "A6",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 13,
+      "angle": 351.978,
+      "length": "@Longueurépaule"
+    },
+    {
+      "id": 15,
+      "name": "A12",
+      "type": "bisector",
+      "block": "Élément de patron 1",
+      "firstPoint": 4,
+      "secondPoint": 6,
+      "thirdPoint": 13,
+      "length": "@Bissectriceencoluredos"
+    },
+    {
+      "id": 17,
+      "name": "A13",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 12,
+      "secondPoint": 10
+    },
+    {
+      "id": 18,
+      "name": "A14",
+      "type": "bisector",
+      "block": "Élément de patron 1",
+      "firstPoint": 12,
+      "secondPoint": 17,
+      "thirdPoint": 10,
+      "length": 2
+    },
+    {
+      "id": 21,
+      "name": "A15",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 12,
+      "angle": 360,
+      "length": "@Aisancecarruredos"
+    },
+    {
+      "id": 22,
+      "name": "A16",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 14,
+      "angle": -18,
+      "length": "@Aisanceépaulelargeur"
+    },
+    {
+      "id": 23,
+      "name": "A17",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 10,
+      "secondPoint": 2,
+      "length": "@Aisanceprofondemmanchure"
+    },
+    {
+      "id": 24,
+      "name": "A18",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 23,
+      "angle": 0,
+      "length": "@Aisancelongueuremmanchure"
+    },
+    {
+      "id": 26,
+      "name": "A19",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 13,
+      "angle": 352.272,
+      "length": "@Aisanceencolurelargeuretprofondeur"
+    },
+    {
+      "id": 28,
+      "name": "A20",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 13,
+      "secondPoint": 14,
+      "length": "Line_A7_A6/2"
+    },
+    {
+      "id": 29,
+      "name": "A21",
+      "type": "normal",
+      "block": "Élément de patron 1",
+      "firstPoint": 28,
+      "secondPoint": 13,
+      "angle": 0,
+      "length": "@Longueurpinceépaule"
+    },
+    {
+      "id": 30,
+      "name": "A22",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 28,
+      "secondPoint": 13,
+      "length": "@Valeurpinceépaule/2"
+    },
+    {
+      "id": 31,
+      "name": "A23",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 28,
+      "secondPoint": 14,
+      "length": "@Valeurpinceépaule/2"
+    },
+    {
+      "id": 34,
+      "name": "A24",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "@Valeurpincemilieudos/2"
+    },
+    {
+      "id": 36,
+      "name": "A25",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2,
+      "secondPoint": 1,
+      "length": "@Valeurpincecôtédevantetdos"
+    },
+    {
+      "id": 39,
+      "name": "A26",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 34,
+      "secondPoint": 36,
+      "length": "Line_A24_A25/2"
+    },
+    {
+      "id": 40,
+      "name": "A27",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 39,
+      "secondPoint": 36,
+      "length": "@Valeurpincedevantetdos/2"
+    },
+    {
+      "id": 41,
+      "name": "A28",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 39,
+      "secondPoint": 34,
+      "length": "@Valeurpincedevantetdos/2"
+    },
+    {
+      "id": 42,
+      "name": "A29",
+      "type": "normal",
+      "block": "Élément de patron 1",
+      "firstPoint": 39,
+      "secondPoint": 40,
+      "angle": 0,
+      "length": "@Hauteuremmanchure"
+    },
+    {
+      "id": 45,
+      "name": "A30",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 36,
+      "secondPoint": 2,
+      "length": "@Aisancetaille"
+    },
+    {
+      "id": 48,
+      "name": "A31",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 9,
+      "secondPoint": 24
+    },
+    {
+      "id": 50,
+      "name": "A32",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 42,
+      "secondPoint": 48
+    },
+    {
+      "id": 53,
+      "name": "A33",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "@Hauteurdubassin"
+    },
+    {
+      "id": 55,
+      "name": "A35",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 1,
+      "secondPoint": 53,
+      "length": "@Hauteurpetiteshanches"
+    },
+    {
+      "id": 59,
+      "name": "rassemblement",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 2,
+      "angle": 0,
+      "length": 20
+    },
+    {
+      "id": 60,
+      "name": "A38",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 59,
+      "angle": 0,
+      "length": "@Lignetailledevant"
+    },
+    {
+      "id": 61,
+      "name": "A39",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 60,
+      "angle": 90,
+      "length": "@Longueurdevant"
+    },
+    {
+      "id": 62,
+      "name": "A40",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 61,
+      "secondPoint": 60,
+      "length": "@Profondeurencoluredevant"
+    },
+    {
+      "id": 63,
+      "name": "A41",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 3,
+      "angle": 270,
+      "length": 25
+    },
+    {
+      "id": 64,
+      "name": "A42",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 59,
+      "secondPoint": 62
+    },
+    {
+      "id": 65,
+      "name": "A43",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 62,
+      "secondPoint": 64,
+      "length": "@Largeurencoluredevant"
+    },
+    {
+      "id": 66,
+      "name": "A44",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 65,
+      "secondPoint": 61
+    },
+    {
+      "id": 67,
+      "name": "A45",
+      "type": "bisector",
+      "block": "Élément de patron 1",
+      "firstPoint": 62,
+      "secondPoint": 65,
+      "thirdPoint": 66,
+      "length": "@Bissectriceencoluredevant"
+    },
+    {
+      "id": 68,
+      "name": "A46",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 66,
+      "angle": 206,
+      "length": "@Longueurépaule"
+    },
+    {
+      "id": 71,
+      "name": "A48",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 59,
+      "secondPoint": 10
+    },
+    {
+      "id": 73,
+      "name": "A47",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 62,
+      "secondPoint": 12
+    },
+    {
+      "id": 74,
+      "name": "A49",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 73,
+      "angle": 180,
+      "length": "@Demicarruredevant"
+    },
+    {
+      "id": 75,
+      "name": "A50",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 74,
+      "secondPoint": 71
+    },
+    {
+      "id": 76,
+      "name": "A51",
+      "type": "bisector",
+      "block": "Élément de patron 1",
+      "firstPoint": 71,
+      "secondPoint": 75,
+      "thirdPoint": 74,
+      "length": "@Bissectriceemanchuredevant"
+    },
+    {
+      "id": 78,
+      "name": "A52",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 61,
+      "secondPoint": 60,
+      "length": "@Hauteurpoitrine"
+    },
+    {
+      "id": 79,
+      "name": "A53",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 78,
+      "angle": 180,
+      "length": "@Demiécartpoitrine"
+    },
+    {
+      "id": 80,
+      "name": "A54",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 60
+    },
+    {
+      "id": 82,
+      "name": "A55",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 80,
+      "secondPoint": 60,
+      "length": "@Valeurpincedevantetdos/2"
+    },
+    {
+      "id": 83,
+      "name": "A56",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 80,
+      "secondPoint": 59,
+      "length": "@Valeurpincedevantetdos/2"
+    },
+    {
+      "id": 87,
+      "name": "A57",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 66,
+      "secondPoint": 68,
+      "length": "Line_A44_A46/2"
+    },
+    {
+      "id": 89,
+      "name": "A58",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 87,
+      "secondPoint": 68,
+      "length": "@Valeurpincebretelle"
+    },
+    {
+      "id": 91,
+      "name": "A59",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 59,
+      "secondPoint": 83,
+      "length": "@Valeurpincecôtédevantetdos"
+    },
+    {
+      "id": 93,
+      "name": "A60",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 89,
+      "angle": "AngleLine_A58_A53+180",
+      "length": "Line_A53_A57-Line_A58_A53"
+    },
+    {
+      "id": 94,
+      "name": "A61",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 93,
+      "angle": "AngleLine_A58_A53-72",
+      "length": "Line_A57_A46"
+    },
+    {
+      "id": 95,
+      "name": "A62",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 73,
+      "secondPoint": 74,
+      "length": 12
+    },
+    {
+      "id": 98,
+      "name": "idemA63A62",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 74,
+      "angle": 180,
+      "length": 2.19673
+    },
+    {
+      "id": 100,
+      "name": "A65",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 71,
+      "secondPoint": 59,
+      "length": "@Aisanceprofondemmanchure"
+    },
+    {
+      "id": 101,
+      "name": "A66",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 100,
+      "angle": 180,
+      "length": "@Aisancelongueuremmanchure"
+    },
+    {
+      "id": 102,
+      "name": "A67",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 94,
+      "angle": "AngleLine_A60_A61",
+      "length": 0.5
+    },
+    {
+      "id": 104,
+      "name": "A68",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 98,
+      "angle": 198,
+      "length": "@Aisancecarruredevant"
+    },
+    {
+      "id": 107,
+      "name": "A70",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 62,
+      "secondPoint": 73,
+      "length": "@Aisanceencolurelargeuretprofondeur"
+    },
+    {
+      "id": 108,
+      "name": "A71",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 66,
+      "secondPoint": 87,
+      "length": "@Aisanceencolurelargeuretprofondeur"
+    },
+    {
+      "id": 116,
+      "name": "A76",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 1,
+      "angle": 0,
+      "length": "@Demitourdebassindos"
+    },
+    {
+      "id": 117,
+      "name": "A34",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 116,
+      "angle": 270,
+      "length": "@Hauteurdubassin"
+    },
+    {
+      "id": 118,
+      "name": "A36",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 60,
+      "angle": 180,
+      "length": "@Lignetailledevant"
+    },
+    {
+      "id": 119,
+      "name": "annulé",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 118,
+      "secondPoint": 117
+    },
+    {
+      "id": 120,
+      "name": "A73",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 60,
+      "secondPoint": 119
+    },
+    {
+      "id": 124,
+      "name": "A74",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 117,
+      "angle": 0,
+      "length": "@Aisancebassin"
+    },
+    {
+      "id": 125,
+      "name": "A75",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 119,
+      "angle": 180,
+      "length": "@Aisancebassin"
+    },
+    {
+      "id": 130,
+      "name": "A77",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 117,
+      "secondPoint": 55
+    },
+    {
+      "id": 132,
+      "name": "A78",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 119,
+      "secondPoint": 130
+    },
+    {
+      "id": 133,
+      "name": "A79",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 120,
+      "secondPoint": 132
+    },
+    {
+      "id": 137,
+      "name": "A82",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 91,
+      "angle": 180,
+      "length": "@Aisancetaille"
+    },
+    {
+      "id": 141,
+      "name": "A69",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 36,
+      "secondPoint": 130,
+      "length": 8
+    },
+    {
+      "id": 149,
+      "name": "A80",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 39,
+      "angle": 270,
+      "length": "@Longueurpincejupedos"
+    },
+    {
+      "id": 152,
+      "name": "A81",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 80,
+      "secondPoint": 133
+    },
+    {
+      "id": 156,
+      "name": "A86",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "@Longueurjupeàpartirtaille+1"
+    },
+    {
+      "id": 157,
+      "name": "A87",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 124,
+      "angle": 0,
+      "length": 70
+    },
+    {
+      "id": 158,
+      "name": "A88",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 120,
+      "secondPoint": 156
+    },
+    {
+      "id": 160,
+      "name": "A90",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 125,
+      "secondPoint": 158
+    },
+    {
+      "id": 163,
+      "name": "A89",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 124,
+      "secondPoint": 160
+    },
+    {
+      "id": 173,
+      "name": "A92",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 117,
+      "secondPoint": 163
+    },
+    {
+      "id": 176,
+      "name": "A93",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 157,
+      "angle": 90,
+      "length": "@Longueurmanchelongue"
+    },
+    {
+      "id": 178,
+      "name": "A94",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 101,
+      "angle": 90,
+      "length": 20.8
+    },
+    {
+      "id": 179,
+      "name": "A95",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 176,
+      "secondPoint": 157,
+      "length": "Line_A66_A94-(Line_A66_A94/5)"
+    },
+    {
+      "id": 180,
+      "name": "A96",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 179,
+      "angle": 0,
+      "length": "(23.2942*3)/4"
+    },
+    {
+      "id": 181,
+      "name": "A97",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 179,
+      "angle": 180,
+      "length": "(SplPath_A16_A18*3)/4"
+    },
+    {
+      "id": 185,
+      "name": "A98",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 157,
+      "angle": 0,
+      "length": "@Tourpoignet/2"
+    },
+    {
+      "id": 186,
+      "name": "A99",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 157,
+      "secondPoint": 120,
+      "length": "@Tourpoignet/2"
+    },
+    {
+      "id": 189,
+      "name": "A100",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 176,
+      "secondPoint": 179,
+      "length": "Line_A93_A95/2"
+    },
+    {
+      "id": 190,
+      "name": "A101",
+      "type": "height",
+      "block": "Élément de patron 1",
+      "basePoint": 189,
+      "p1Line": 176,
+      "p2Line": 180
+    },
+    {
+      "id": 191,
+      "name": "A102",
+      "type": "height",
+      "block": "Élément de patron 1",
+      "basePoint": 189,
+      "p1Line": 176,
+      "p2Line": 181
+    },
+    {
+      "id": 194,
+      "name": "A103",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 190,
+      "secondPoint": 180,
+      "length": "Line_A101_A96/2"
+    },
+    {
+      "id": 195,
+      "name": "A104",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 191,
+      "secondPoint": 181,
+      "length": "Line_A102_A97/2"
+    },
+    {
+      "id": 202,
+      "name": "A107",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 191,
+      "angle": "AngleLine_A100_A102",
+      "length": 2
+    },
+    {
+      "id": 203,
+      "name": "A108",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 190,
+      "angle": "AngleLine_A100_A101",
+      "length": 1.8
+    },
+    {
+      "id": 206,
+      "name": "A105",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 195,
+      "secondPoint": 181,
+      "length": "Line_A104_A97/2"
+    },
+    {
+      "id": 207,
+      "name": "A106",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 194,
+      "secondPoint": 180,
+      "length": "Line_A103_A96/2"
+    },
+    {
+      "id": 211,
+      "name": "A110",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 207,
+      "secondPoint": 179,
+      "length": 0.8
+    },
+    {
+      "id": 212,
+      "name": "A109",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 206,
+      "secondPoint": 179,
+      "length": 0.5
+    },
+    {
+      "id": 214,
+      "name": "A111",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 176,
+      "secondPoint": 157,
+      "length": 35.5
+    },
+    {
+      "id": 215,
+      "name": "A112",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 214,
+      "angle": 360,
+      "length": 12.5
+    },
+    {
+      "id": 216,
+      "name": "A113",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 214,
+      "angle": 180,
+      "length": 15.5
+    },
+    {
+      "id": 218,
+      "name": "A114",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 216,
+      "secondPoint": 214,
+      "length": 7
+    },
+    {
+      "id": 219,
+      "name": "A115",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 216,
+      "angle": 90,
+      "length": 1.5
+    },
+    {
+      "id": 220,
+      "name": "A116",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 216,
+      "angle": 270,
+      "length": 1.5
+    },
+    {
+      "id": 224,
+      "name": "A117",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 186,
+      "angle": "AngleLine_A97_A99",
+      "length": 3
+    },
+    {
+      "id": 229,
+      "name": "A118",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 78,
+      "secondPoint": 60,
+      "length": "@Hauteursouspoitrine"
+    },
+    {
+      "id": 233,
+      "name": "souspoitrine",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 137,
+      "secondPoint": 101,
+      "length": "@Hauteursouspoitrine+1"
+    },
+    {
+      "id": 235,
+      "name": "A121",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 48,
+      "secondPoint": 229
+    },
+    {
+      "id": 236,
+      "name": "A122",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 45,
+      "secondPoint": 24,
+      "length": "@Hauteursouspoitrine+1"
+    },
+    {
+      "id": 255,
+      "name": "A119",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 60,
+      "angle": 180,
+      "length": "@Demitourdebassindevant"
+    },
+    {
+      "id": 256,
+      "name": "A84",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 255,
+      "angle": 270,
+      "length": "@Hauteurdubassin"
+    },
+    {
+      "id": 257,
+      "name": "A72",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 256,
+      "secondPoint": 158
+    },
+    {
+      "id": 272,
+      "name": "A85",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 80,
+      "length": "@Hauteursouspoitrine"
+    },
+    {
+      "id": 288,
+      "name": "A91",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 41,
+      "secondPoint": 42,
+      "length": "Line_A_A121"
+    },
+    {
+      "id": 289,
+      "name": "A123",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 40,
+      "secondPoint": 42,
+      "length": "Line_A_A121"
+    },
+    {
+      "id": 325,
+      "name": "A37",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 68,
+      "angle": "AngleLine_A44_A46",
+      "length": "@Aisanceépaulelargeur"
+    },
+    {
+      "id": 457,
+      "name": "A136",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 160,
+      "angle": 180,
+      "length": 5
+    },
+    {
+      "id": 461,
+      "name": "A126",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 61,
+      "secondPoint": 78,
+      "length": 25
+    },
+    {
+      "id": 486,
+      "name": "A137",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 156,
+      "angle": 180,
+      "length": "5/2"
+    },
+    {
+      "id": 488,
+      "name": "A138",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 176,
+      "secondPoint": 214,
+      "length": 20
+    },
+    {
+      "id": 489,
+      "name": "A139",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 180,
+      "secondPoint": 488
+    },
+    {
+      "id": 490,
+      "name": "A140",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 181,
+      "secondPoint": 488
+    },
+    {
+      "id": 494,
+      "name": "A141",
+      "type": "pointFromCircleAndTangent",
+      "block": "Élément de patron 1",
+      "center": 79,
+      "radius": "@Tourdepoitrine-@Toursouspoitrine",
+      "tangent": 78,
+      "crossPoint": 1
+    },
+    {
+      "id": 495,
+      "name": "A142",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 79,
+      "angle": 90,
+      "length": 7
+    },
+    {
+      "id": 497,
+      "name": "A144",
+      "type": "height",
+      "block": "Élément de patron 1",
+      "basePoint": 495,
+      "p1Line": 95,
+      "p2Line": 79
+    },
+    {
+      "id": 498,
+      "name": "A145",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 497,
+      "angle": 180,
+      "length": "(@Tourdepoitrine-@Tourdessuspoitrine)/2"
+    },
+    {
+      "id": 504,
+      "name": "A147",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 195,
+      "angle": 270,
+      "length": 2
+    },
+    {
+      "id": 505,
+      "name": "A148",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 504,
+      "angle": 180,
+      "curve": 213
+    },
+    {
+      "id": 687,
+      "name": "A154",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 24,
+      "secondPoint": 236,
+      "length": 6.59003
+    },
+    {
+      "id": 688,
+      "name": "A155repère",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 149,
+      "secondPoint": 173
+    },
+    {
+      "id": 692,
+      "name": "A157",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 688,
+      "secondPoint": 156,
+      "length": 5
+    },
+    {
+      "id": 694,
+      "name": "A132",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 163,
+      "secondPoint": 457,
+      "length": 5
+    },
+    {
+      "id": 697,
+      "name": "A130repère",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 80,
+      "secondPoint": 158
+    },
+    {
+      "id": 698,
+      "name": "A125",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 697,
+      "secondPoint": 257,
+      "length": 5
+    },
+    {
+      "id": 699,
+      "name": "A127",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 697,
+      "secondPoint": 158,
+      "length": 5
+    },
+    {
+      "id": 702,
+      "name": "A128",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 130,
+      "angle": 180,
+      "curve": 129
+    },
+    {
+      "id": 703,
+      "name": "A129",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 132,
+      "angle": 180,
+      "curve": 139
+    },
+    {
+      "id": 742,
+      "name": "A158",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 63,
+      "secondPoint": 235,
+      "length": 6
+    },
+    {
+      "id": 747,
+      "name": "A159",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 45,
+      "secondPoint": 40,
+      "length": "@Valeurpincedevantetdos"
+    },
+    {
+      "id": 770,
+      "name": "A130",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 688,
+      "secondPoint": 173,
+      "length": "5/2"
+    },
+    {
+      "id": 782,
+      "name": "A149",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 235,
+      "angle": 360,
+      "curve": 769
+    },
+    {
+      "id": 784,
+      "name": "A155",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 63,
+      "angle": 360,
+      "curve": 769
+    },
+    {
+      "id": 1212,
+      "name": "A166",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 782,
+      "secondPoint": 742,
+      "length": "Line_A91_A123/2"
+    },
+    {
+      "id": 1270,
+      "name": "A134",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 236,
+      "secondPoint": 687,
+      "length": "Line_A91_A123/2"
+    },
+    {
+      "id": 1306,
+      "name": "A151",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 694,
+      "secondPoint": 702,
+      "length": 1.7
+    },
+    {
+      "id": 1307,
+      "name": "A152",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 692,
+      "secondPoint": 149,
+      "length": 1.7
+    },
+    {
+      "id": 1309,
+      "name": "A156",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 486,
+      "secondPoint": 55,
+      "length": 1.7
+    },
+    {
+      "id": 1310,
+      "name": "A163",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 770,
+      "secondPoint": 149,
+      "length": 1.7
+    },
+    {
+      "id": 1312,
+      "name": "A167",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 457,
+      "secondPoint": 703,
+      "length": 1.7
+    },
+    {
+      "id": 1313,
+      "name": "A174",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 698,
+      "secondPoint": 152,
+      "length": 1.7
+    },
+    {
+      "id": 1314,
+      "name": "A175",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 699,
+      "secondPoint": 152,
+      "length": 1.7
+    },
+    {
+      "id": 1315,
+      "name": "A177",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 158,
+      "secondPoint": 120,
+      "length": 1.7
+    },
+    {
+      "id": 1365,
+      "name": "A178",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 108,
+      "secondPoint": 87,
+      "length": 3
+    },
+    {
+      "id": 1367,
+      "name": "A179",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 26,
+      "secondPoint": 14,
+      "length": 3
+    },
+    {
+      "id": 1449,
+      "name": "A161",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 4,
+      "secondPoint": 11,
+      "length": 3
+    },
+    {
+      "id": 1619,
+      "name": "A160",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 87,
+      "length": 3
+    },
+    {
+      "id": 1902,
+      "name": "A162",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 89,
+      "length": "Line_A53_A85"
+    },
+    {
+      "id": 1903,
+      "name": "A172",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 87,
+      "length": "Line_A53_A85"
+    },
+    {
+      "id": 1996,
+      "name": "A10",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 101,
+      "secondPoint": 137,
+      "length": 4
+    },
+    {
+      "id": 1998,
+      "name": "A63",
+      "type": "lineIntersect",
+      "block": "Élément de patron 1",
+      "p1Line1": 98,
+      "p2Line1": 73,
+      "p1Line2": 89,
+      "p2Line2": 79
+    },
+    {
+      "id": 2000,
+      "name": "A64",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 74,
+      "secondPoint": 104,
+      "length": "@Aisancecarruredevant"
+    },
+    {
+      "id": 2003,
+      "name": "A83",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 87,
+      "secondPoint": 95,
+      "length": 8
+    },
+    {
+      "id": 2004,
+      "name": "A120",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 2003,
+      "angle": 210,
+      "curve": 2001
+    },
+    {
+      "id": 2007,
+      "name": "A124",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 93,
+      "secondPoint": 79,
+      "length": "Line_A57_A83"
+    },
+    {
+      "id": 2008,
+      "name": "A131",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 2007,
+      "angle": "AngleLine_A83_A120",
+      "curve": 165
+    },
+    {
+      "id": 2017,
+      "name": "A146",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 79,
+      "angle": 178.3,
+      "length": "Line_A53_A10"
+    },
+    {
+      "id": 2019,
+      "name": "A150",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 2017,
+      "angle": "-AngleLine_A10_A82",
+      "length": 4
+    },
+    {
+      "id": 2029,
+      "name": "A153",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2019,
+      "secondPoint": 2017,
+      "length": "Line_A18_A134"
+    },
+    {
+      "id": 2033,
+      "name": "A164",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 82,
+      "secondPoint": 229
+    },
+    {
+      "id": 2037,
+      "name": "A165",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 1",
+      "firstPoint": 83,
+      "secondPoint": 233
+    },
+    {
+      "id": 2042,
+      "name": "A168",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 233,
+      "secondPoint": 137,
+      "length": "Line_A162_A172/2"
+    },
+    {
+      "id": 2051,
+      "name": "A173",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 233,
+      "secondPoint": 2019,
+      "length": "Line_A162_A172"
+    },
+    {
+      "id": 2053,
+      "name": "A143",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 272,
+      "secondPoint": 2051,
+      "length": "Line_A162_A172"
+    },
+    {
+      "id": 2055,
+      "name": "A176",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 2051,
+      "angle": "AngleLine_A143_A173",
+      "length": 4.96358
+    },
+    {
+      "id": 2056,
+      "name": "A180",
+      "type": "height",
+      "block": "Élément de patron 1",
+      "basePoint": 2055,
+      "p1Line": 2029,
+      "p2Line": 2017
+    },
+    {
+      "id": 2058,
+      "name": "A181",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2056,
+      "secondPoint": 2019,
+      "length": "Line_A18_A134"
+    },
+    {
+      "id": 2136,
+      "name": "A182",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 89,
+      "length": "Line_A85_souspoitrine"
+    },
+    {
+      "id": 2137,
+      "name": "A183",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 87,
+      "length": "Line_A85_souspoitrine"
+    },
+    {
+      "id": 2437,
+      "name": "A184",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 60,
+      "secondPoint": 82,
+      "length": 2
+    },
+    {
+      "id": 2457,
+      "name": "A185",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 82,
+      "secondPoint": 60,
+      "length": 2
+    },
+    {
+      "id": 2458,
+      "name": "A186",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 83,
+      "secondPoint": 59,
+      "length": 2
+    },
+    {
+      "id": 2459,
+      "name": "A187",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 40,
+      "angle": 0,
+      "curve": 2257
+    },
+    {
+      "id": 2462,
+      "name": "A188",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2459,
+      "secondPoint": 40,
+      "length": 3
+    },
+    {
+      "id": 2463,
+      "name": "A189",
+      "type": "curveIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 255,
+      "angle": 0,
+      "curve": 2249
+    },
+    {
+      "id": 2464,
+      "name": "A190",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2463,
+      "secondPoint": 2458,
+      "length": 3
+    },
+    {
+      "id": 2475,
+      "name": "A191",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 152,
+      "secondPoint": 1314,
+      "length": 18
+    },
+    {
+      "id": 2476,
+      "name": "A192",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 152,
+      "secondPoint": 1313,
+      "length": 18
+    },
+    {
+      "id": 2477,
+      "name": "A193",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2475,
+      "secondPoint": 2476,
+      "length": 2
+    },
+    {
+      "id": 2480,
+      "name": "A194",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 703,
+      "secondPoint": 1312,
+      "length": 18
+    },
+    {
+      "id": 2481,
+      "name": "A195",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 2480,
+      "secondPoint": 2476,
+      "length": 2
+    },
+    {
+      "id": 2482,
+      "name": "A196",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 702,
+      "secondPoint": 1306,
+      "length": 18
+    },
+    {
+      "id": 2483,
+      "name": "A197",
+      "type": "endLine",
+      "block": "Élément de patron 1",
+      "basePoint": 2482,
+      "angle": 180,
+      "length": 2
+    },
+    {
+      "id": 2484,
+      "name": "A198",
+      "type": "lineIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 2483,
+      "angle": 180,
+      "p1Line": 149,
+      "p2Line": 1310
+    },
+    {
+      "id": 2485,
+      "name": "A199",
+      "type": "lineIntersectAxis",
+      "block": "Élément de patron 1",
+      "basePoint": 2484,
+      "angle": 180,
+      "p1Line": 1307,
+      "p2Line": 149
+    },
+    {
+      "id": 2486,
+      "name": "A200",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 40,
+      "secondPoint": 36,
+      "length": 2
+    },
+    {
+      "id": 2487,
+      "name": "A201",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 41,
+      "secondPoint": 34,
+      "length": 2
+    },
+    {
+      "id": 2712,
+      "name": "A202",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 21,
+      "secondPoint": 11,
+      "length": 3
+    },
+    {
+      "id": 2727,
+      "name": "A203",
+      "type": "alongLine",
+      "block": "Élément de patron 1",
+      "firstPoint": 11,
+      "secondPoint": 21,
+      "length": 3
+    },
+    {
+      "id": 20,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 10,
+      "secondPoint": 2,
+      "lineColor": "black"
+    },
+    {
+      "id": 32,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 30,
+      "secondPoint": 29,
+      "lineColor": "black"
+    },
+    {
+      "id": 33,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 31,
+      "secondPoint": 29,
+      "lineColor": "black"
+    },
+    {
+      "id": 37,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 10,
+      "secondPoint": 36,
+      "lineColor": "black"
+    },
+    {
+      "id": 38,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 34,
+      "secondPoint": 36,
+      "lineColor": "black"
+    },
+    {
+      "id": 43,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 42,
+      "secondPoint": 41,
+      "lineColor": "black"
+    },
+    {
+      "id": 44,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 42,
+      "secondPoint": 40,
+      "lineColor": "black"
+    },
+    {
+      "id": 46,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 24,
+      "secondPoint": 45,
+      "lineColor": "blue"
+    },
+    {
+      "id": 47,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 11,
+      "secondPoint": 34,
+      "lineColor": "black"
+    },
+    {
+      "id": 49,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 48,
+      "secondPoint": 24,
+      "lineColor": "black"
+    },
+    {
+      "id": 51,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 50,
+      "secondPoint": 40,
+      "lineColor": "black"
+    },
+    {
+      "id": 52,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 50,
+      "secondPoint": 41,
+      "lineColor": "black"
+    },
+    {
+      "id": 72,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 59,
+      "secondPoint": 71,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 86,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 66,
+      "secondPoint": 68,
+      "lineColor": "black"
+    },
+    {
+      "id": 88,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 87,
+      "lineColor": "black"
+    },
+    {
+      "id": 90,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 89,
+      "secondPoint": 79,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 92,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 71,
+      "secondPoint": 91,
+      "lineColor": "darkRed"
+    },
+    {
+      "id": 122,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 60,
+      "secondPoint": 120,
+      "lineColor": "black"
+    },
+    {
+      "id": 131,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 55,
+      "secondPoint": 130,
+      "lineColor": "black"
+    },
+    {
+      "id": 140,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 36,
+      "secondPoint": 130,
+      "lineColor": "black"
+    },
+    {
+      "id": 147,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 53,
+      "secondPoint": 117,
+      "lineColor": "black"
+    },
+    {
+      "id": 148,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 120,
+      "secondPoint": 119,
+      "lineColor": "black"
+    },
+    {
+      "id": 150,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 149,
+      "secondPoint": 41,
+      "lineColor": "black"
+    },
+    {
+      "id": 151,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 149,
+      "secondPoint": 40,
+      "lineColor": "black"
+    },
+    {
+      "id": 155,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 152,
+      "secondPoint": 82,
+      "lineColor": "deeppink"
+    },
+    {
+      "id": 164,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 124,
+      "secondPoint": 163,
+      "lineColor": "black"
+    },
+    {
+      "id": 174,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 117,
+      "secondPoint": 173,
+      "lineColor": "black"
+    },
+    {
+      "id": 182,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 181,
+      "secondPoint": 176,
+      "lineColor": "black"
+    },
+    {
+      "id": 183,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 176,
+      "secondPoint": 180,
+      "lineColor": "black"
+    },
+    {
+      "id": 184,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 176,
+      "secondPoint": 179,
+      "lineColor": "black"
+    },
+    {
+      "id": 187,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 181,
+      "secondPoint": 186,
+      "lineColor": "black"
+    },
+    {
+      "id": 188,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 180,
+      "secondPoint": 185,
+      "lineColor": "black"
+    },
+    {
+      "id": 192,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 190,
+      "secondPoint": 180,
+      "lineColor": "black"
+    },
+    {
+      "id": 193,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 191,
+      "secondPoint": 181,
+      "lineColor": "black"
+    },
+    {
+      "id": 196,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 179,
+      "secondPoint": 195,
+      "lineColor": "black"
+    },
+    {
+      "id": 197,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 179,
+      "secondPoint": 194,
+      "lineColor": "black"
+    },
+    {
+      "id": 198,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 194,
+      "secondPoint": 179,
+      "lineColor": "black"
+    },
+    {
+      "id": 199,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 195,
+      "secondPoint": 179,
+      "lineColor": "black"
+    },
+    {
+      "id": 204,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 195,
+      "secondPoint": 181,
+      "lineColor": "black"
+    },
+    {
+      "id": 205,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 194,
+      "secondPoint": 180,
+      "lineColor": "black"
+    },
+    {
+      "id": 208,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 179,
+      "secondPoint": 206,
+      "lineColor": "black"
+    },
+    {
+      "id": 209,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 179,
+      "secondPoint": 207,
+      "lineColor": "black"
+    },
+    {
+      "id": 221,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 218,
+      "secondPoint": 220,
+      "lineColor": "black"
+    },
+    {
+      "id": 222,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 218,
+      "secondPoint": 219,
+      "lineColor": "black"
+    },
+    {
+      "id": 232,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 60,
+      "secondPoint": 229,
+      "lineColor": "black"
+    },
+    {
+      "id": 258,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 256,
+      "secondPoint": 257,
+      "lineColor": "black"
+    },
+    {
+      "id": 261,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 125,
+      "secondPoint": 160,
+      "lineColor": "black"
+    },
+    {
+      "id": 262,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 120,
+      "secondPoint": 158,
+      "lineColor": "black"
+    },
+    {
+      "id": 287,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1,
+      "secondPoint": 235,
+      "lineColor": "black"
+    },
+    {
+      "id": 491,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 490,
+      "secondPoint": 489,
+      "lineColor": "black"
+    },
+    {
+      "id": 492,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 490,
+      "secondPoint": 181,
+      "lineColor": "black"
+    },
+    {
+      "id": 493,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 180,
+      "secondPoint": 489,
+      "lineColor": "black"
+    },
+    {
+      "id": 500,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 498,
+      "secondPoint": 79,
+      "lineColor": "black"
+    },
+    {
+      "id": 503,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 195,
+      "secondPoint": 194,
+      "lineColor": "black"
+    },
+    {
+      "id": 570,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 325,
+      "secondPoint": 87,
+      "lineColor": "blue"
+    },
+    {
+      "id": 736,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 22,
+      "secondPoint": 325,
+      "lineColor": "black"
+    },
+    {
+      "id": 758,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 149,
+      "secondPoint": 692,
+      "lineColor": "black"
+    },
+    {
+      "id": 760,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 702,
+      "secondPoint": 694,
+      "lineColor": "blue"
+    },
+    {
+      "id": 764,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 152,
+      "secondPoint": 698,
+      "lineColor": "black"
+    },
+    {
+      "id": 766,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 152,
+      "secondPoint": 699,
+      "lineColor": "black"
+    },
+    {
+      "id": 768,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 486,
+      "secondPoint": 55,
+      "lineColor": "black"
+    },
+    {
+      "id": 771,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 149,
+      "secondPoint": 770,
+      "lineColor": "black"
+    },
+    {
+      "id": 1123,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 288,
+      "secondPoint": 289,
+      "lineColor": "black"
+    },
+    {
+      "id": 1209,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 24,
+      "secondPoint": 45,
+      "lineColor": "black"
+    },
+    {
+      "id": 1509,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 41,
+      "secondPoint": 40,
+      "lineColor": "black"
+    },
+    {
+      "id": 1563,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 61,
+      "secondPoint": 73,
+      "lineColor": "black"
+    },
+    {
+      "id": 1584,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 229,
+      "secondPoint": 1315,
+      "lineColor": "black"
+    },
+    {
+      "id": 1585,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 60,
+      "secondPoint": 1315,
+      "lineColor": "black"
+    },
+    {
+      "id": 1654,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1619,
+      "secondPoint": 79,
+      "lineColor": "black"
+    },
+    {
+      "id": 1829,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 24,
+      "secondPoint": 1270,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 1904,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1902,
+      "secondPoint": 1903,
+      "lineColor": "black"
+    },
+    {
+      "id": 1905,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1902,
+      "secondPoint": 1903,
+      "lineColor": "black"
+    },
+    {
+      "id": 1991,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1212,
+      "secondPoint": 288,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 1992,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 289,
+      "secondPoint": 1270,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 1993,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 782,
+      "secondPoint": 288,
+      "lineColor": "black"
+    },
+    {
+      "id": 1994,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 236,
+      "secondPoint": 289,
+      "lineColor": "black"
+    },
+    {
+      "id": 1995,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 101,
+      "secondPoint": 137,
+      "lineColor": "black"
+    },
+    {
+      "id": 1997,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 1996,
+      "lineColor": "black"
+    },
+    {
+      "id": 1999,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1998,
+      "secondPoint": 95,
+      "lineColor": "black"
+    },
+    {
+      "id": 2018,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 1996,
+      "secondPoint": 2017,
+      "lineColor": "black"
+    },
+    {
+      "id": 2031,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2019,
+      "secondPoint": 2029,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2036,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2033,
+      "secondPoint": 82,
+      "lineColor": "black"
+    },
+    {
+      "id": 2039,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 83,
+      "secondPoint": 152,
+      "lineColor": "black"
+    },
+    {
+      "id": 2040,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 2037,
+      "lineColor": "black"
+    },
+    {
+      "id": 2041,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 79,
+      "secondPoint": 2033,
+      "lineColor": "black"
+    },
+    {
+      "id": 2048,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 235,
+      "secondPoint": 288,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2049,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 236,
+      "secondPoint": 289,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2052,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 272,
+      "secondPoint": 2051,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2054,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2053,
+      "secondPoint": 79,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2057,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2029,
+      "secondPoint": 2056,
+      "lineColor": "black"
+    },
+    {
+      "id": 2107,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 45,
+      "secondPoint": 702,
+      "lineColor": "black"
+    },
+    {
+      "id": 2108,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 137,
+      "secondPoint": 703,
+      "lineColor": "black"
+    },
+    {
+      "id": 2109,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 703,
+      "secondPoint": 1312,
+      "lineColor": "black"
+    },
+    {
+      "id": 2135,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 272,
+      "secondPoint": 233,
+      "lineColor": "black"
+    },
+    {
+      "id": 2138,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2137,
+      "secondPoint": 2136,
+      "lineColor": "black"
+    },
+    {
+      "id": 2372,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 272,
+      "secondPoint": 82,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2373,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 272,
+      "secondPoint": 83,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2375,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 272,
+      "secondPoint": 229,
+      "lineColor": "darkviolet"
+    },
+    {
+      "id": 2478,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2475,
+      "secondPoint": 2477,
+      "lineColor": "black"
+    },
+    {
+      "id": 2479,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 2476,
+      "secondPoint": 2477,
+      "lineColor": "black"
+    },
+    {
+      "id": 2773,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 21,
+      "secondPoint": 2712,
+      "lineColor": "black"
+    },
+    {
+      "id": 2790,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 1",
+      "firstPoint": 21,
+      "secondPoint": 2712,
+      "lineColor": "black"
+    },
+    {
+      "id": 16,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 4,
+      "point4": 13,
+      "angle1": 6.69384,
+      "angle2": 236.348,
+      "length1": 1.83957,
+      "length2": 4.60229
+    },
+    {
+      "id": 27,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 4,
+      "point4": 26,
+      "angle1": 352.681,
+      "angle2": 231.751,
+      "length1": 2.59277,
+      "length2": 3.92875
+    },
+    {
+      "id": 69,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 66,
+      "point4": 62,
+      "angle1": 270.397,
+      "angle2": 99.6874,
+      "length1": 10.9835,
+      "length2": 0.176059
+    },
+    {
+      "id": 109,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 108,
+      "point4": 107,
+      "angle1": 274.941,
+      "angle2": 177.31,
+      "length1": 6.49503,
+      "length2": 6.16814
+    },
+    {
+      "id": 128,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 36,
+      "point4": 117,
+      "angle1": 285.573,
+      "angle2": 89.2719,
+      "length1": 8.805,
+      "length2": 8.17158
+    },
+    {
+      "id": 129,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 45,
+      "point4": 124,
+      "angle1": 289,
+      "angle2": 90,
+      "length1": 8.3,
+      "length2": 3.4
+    },
+    {
+      "id": 139,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 125,
+      "point4": 137,
+      "angle1": 90,
+      "angle2": 259.158,
+      "length1": 3.4,
+      "length2": 8.3
+    },
+    {
+      "id": 165,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 101,
+          "angle1": 180,
+          "angle2": 360,
+          "length1": 0,
+          "length2": 6.4
+        },
+        {
+          "point": 104,
+          "angle1": 274,
+          "angle2": 94,
+          "length1": 2.28,
+          "length2": 0
+        },
+        {
+          "point": 102,
+          "angle1": 297,
+          "angle2": 117,
+          "length1": 5,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 168,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 22,
+          "angle1": 76,
+          "angle2": 256,
+          "length1": 0,
+          "length2": 3
+        },
+        {
+          "point": 21,
+          "angle1": 97,
+          "angle2": 277,
+          "length1": 4,
+          "length2": 4
+        },
+        {
+          "point": 24,
+          "angle1": 180,
+          "angle2": 0,
+          "length1": 3,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 169,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 14,
+          "angle1": 32,
+          "angle2": 212,
+          "length1": 0,
+          "length2": 1
+        },
+        {
+          "point": 12,
+          "angle1": 93.5127,
+          "angle2": 273.513,
+          "length1": 1.99614,
+          "length2": 2
+        },
+        {
+          "point": 18,
+          "angle1": 114,
+          "angle2": 294,
+          "length1": 2,
+          "length2": 1
+        },
+        {
+          "point": 10,
+          "angle1": 174,
+          "angle2": 354,
+          "length1": 0.8,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 213,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 181,
+          "angle1": 210,
+          "angle2": 30,
+          "length1": 0,
+          "length2": 2.4
+        },
+        {
+          "point": 212,
+          "angle1": 220,
+          "angle2": 40,
+          "length1": 0.3,
+          "length2": 2
+        },
+        {
+          "point": 195,
+          "angle1": 233,
+          "angle2": 53,
+          "length1": 1.6,
+          "length2": 3
+        },
+        {
+          "point": 202,
+          "angle1": 227,
+          "angle2": 47,
+          "length1": 2.2,
+          "length2": 2
+        },
+        {
+          "point": 176,
+          "angle1": 180,
+          "angle2": 0,
+          "length1": 3.5,
+          "length2": 2.3
+        },
+        {
+          "point": 203,
+          "angle1": 132,
+          "angle2": 312,
+          "length1": 1.7,
+          "length2": 3
+        },
+        {
+          "point": 194,
+          "angle1": 130,
+          "angle2": 310,
+          "length1": 2,
+          "length2": 1.6
+        },
+        {
+          "point": 211,
+          "angle1": 133,
+          "angle2": 313,
+          "length1": 2.6,
+          "length2": 0.1
+        },
+        {
+          "point": 180,
+          "angle1": 190,
+          "angle2": 10,
+          "length1": 0.7,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 217,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 180,
+          "angle1": 77.035,
+          "angle2": 257.035,
+          "length1": 0,
+          "length2": 7.60486
+        },
+        {
+          "point": 215,
+          "angle1": 78.716,
+          "angle2": 258.716,
+          "length1": 7.79149,
+          "length2": 13.1755
+        },
+        {
+          "point": 185,
+          "angle1": 87.244,
+          "angle2": 267.244,
+          "length1": 12.733,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 226,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 185,
+      "point4": 224,
+      "angle1": 190,
+      "angle2": 14.7642,
+      "length1": 6.55944,
+      "length2": 6.68033
+    },
+    {
+      "id": 227,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 224,
+      "point4": 220,
+      "angle1": 105.023,
+      "angle2": 281.126,
+      "length1": 13.2074,
+      "length2": 14.7593
+    },
+    {
+      "id": 228,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 219,
+      "point4": 181,
+      "angle1": 92.0123,
+      "angle2": 277.69,
+      "length1": 9.89629,
+      "length2": 6.78233
+    },
+    {
+      "id": 259,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 256,
+      "point4": 91,
+      "angle1": 89.6397,
+      "angle2": 259.264,
+      "length1": 7.89992,
+      "length2": 7.20405
+    },
+    {
+      "id": 260,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 256,
+      "point4": 91,
+      "angle1": 88.2671,
+      "angle2": 258.612,
+      "length1": 8.24226,
+      "length2": 6.77393
+    },
+    {
+      "id": 346,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": []
+    },
+    {
+      "id": 506,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 194,
+      "point4": 505,
+      "angle1": 183,
+      "angle2": 6.5,
+      "length1": 9.2,
+      "length2": 9.4
+    },
+    {
+      "id": 769,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 55,
+      "point4": 11,
+      "angle1": 86.4381,
+      "angle2": 271.469,
+      "length1": 8.82442,
+      "length2": 25.8892
+    },
+    {
+      "id": 1046,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": []
+    },
+    {
+      "id": 1308,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 1306,
+      "point4": 1307,
+      "angle1": 184,
+      "angle2": 354,
+      "length1": 5,
+      "length2": 5
+    },
+    {
+      "id": 1311,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 1310,
+      "point4": 1309,
+      "angle1": 182,
+      "angle2": 360,
+      "length1": 5,
+      "length2": 5
+    },
+    {
+      "id": 1316,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 1315,
+      "point4": 1313,
+      "angle1": 180,
+      "angle2": 354,
+      "length1": 5,
+      "length2": 5
+    },
+    {
+      "id": 1317,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 1314,
+      "point4": 1312,
+      "angle1": 184,
+      "angle2": 354,
+      "length1": 5,
+      "length2": 5
+    },
+    {
+      "id": 1369,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 1365,
+      "point4": 78,
+      "angle1": 253.509,
+      "angle2": 89.4091,
+      "length1": 25.7884,
+      "length2": 10.9468
+    },
+    {
+      "id": 1450,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 784,
+      "point4": 1449,
+      "angle1": 39,
+      "angle2": 24,
+      "length1": 22,
+      "length2": 9
+    },
+    {
+      "id": 1451,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 4,
+      "point4": 1367,
+      "angle1": 345.202,
+      "angle2": 244.317,
+      "length1": 2.78384,
+      "length2": 1.55754
+    },
+    {
+      "id": 2001,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 71,
+          "angle1": 181.2,
+          "angle2": 1.2,
+          "length1": 0,
+          "length2": 4
+        },
+        {
+          "point": 76,
+          "angle1": 226,
+          "angle2": 46,
+          "length1": 0.7,
+          "length2": 2
+        },
+        {
+          "point": 74,
+          "angle1": 269,
+          "angle2": 89,
+          "length1": 1.5,
+          "length2": 3
+        },
+        {
+          "point": 68,
+          "angle1": 274,
+          "angle2": 94,
+          "length1": 1.6,
+          "length2": 1.07381
+        }
+      ]
+    },
+    {
+      "id": 2002,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 101,
+          "angle1": 180,
+          "angle2": 360,
+          "length1": 0,
+          "length2": 4
+        },
+        {
+          "point": 2000,
+          "angle1": 267,
+          "angle2": 87,
+          "length1": 5.7,
+          "length2": 0
+        },
+        {
+          "point": 325,
+          "angle1": 278,
+          "angle2": 98,
+          "length1": 10,
+          "length2": 5.09989
+        }
+      ]
+    },
+    {
+      "id": 2020,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 2019,
+          "angle1": 180,
+          "angle2": 360,
+          "length1": 0,
+          "length2": 4
+        },
+        {
+          "point": 2000,
+          "angle1": 267,
+          "angle2": 87,
+          "length1": 5.7,
+          "length2": 0
+        },
+        {
+          "point": 325,
+          "angle1": 278,
+          "angle2": 98,
+          "length1": 10,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 2059,
+      "name": "",
+      "type": "splinePath",
+      "block": "Élément de patron 1",
+      "pathPoints": [
+        {
+          "point": 2058,
+          "angle1": 182.856,
+          "angle2": 2.85602,
+          "length1": 0,
+          "length2": 4.00497
+        },
+        {
+          "point": 2000,
+          "angle1": 267,
+          "angle2": 87,
+          "length1": 5.7,
+          "length2": 0
+        },
+        {
+          "point": 325,
+          "angle1": 278,
+          "angle2": 98,
+          "length1": 10,
+          "length2": 0
+        }
+      ]
+    },
+    {
+      "id": 2249,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 703,
+      "point4": 233,
+      "angle1": 86,
+      "angle2": 273,
+      "length1": 3,
+      "length2": 8.5
+    },
+    {
+      "id": 2257,
+      "name": "",
+      "type": "spline",
+      "block": "Élément de patron 1",
+      "point1": 236,
+      "point4": 702,
+      "angle1": -93,
+      "angle2": 94,
+      "length1": 8.5,
+      "length2": 3
+    },
+    {
+      "id": 1638,
+      "name": "B",
+      "type": "single",
+      "block": "Élément de patron 2",
+      "x": 0.79375,
+      "y": 117.766
+    },
+    {
+      "id": 1639,
+      "name": "B2",
+      "type": "endLine",
+      "block": "Élément de patron 2",
+      "basePoint": 1638,
+      "angle": 360,
+      "length": 5
+    },
+    {
+      "id": 1640,
+      "name": "B3",
+      "type": "endLine",
+      "block": "Élément de patron 2",
+      "basePoint": 1638,
+      "angle": 90,
+      "length": 5
+    },
+    {
+      "id": 1641,
+      "name": "B4",
+      "type": "pointOfIntersection",
+      "block": "Élément de patron 2",
+      "firstPoint": 1639,
+      "secondPoint": 1640
+    },
+    {
+      "id": 1642,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 2",
+      "firstPoint": 1640,
+      "secondPoint": 1641,
+      "lineColor": "black"
+    },
+    {
+      "id": 1643,
+      "name": "",
+      "type": "line",
+      "block": "Élément de patron 2",
+      "firstPoint": 1641,
+      "secondPoint": 1639,
+      "lineColor": "black"
+    }
+  ],
+  "pieces": []
+}

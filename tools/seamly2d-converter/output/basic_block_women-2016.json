@@ -1,0 +1,1656 @@
+{
+  "name": "basic_block_women-2016",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {
+    "#Primarymeasuremements": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#BH": {
+      "formula": "168",
+      "description": "Body height&#xa;Measure the height from the top of the head to the floor&#xa;&#xa;Seamly2D: height"
+    },
+    "#CG": {
+      "formula": "92",
+      "description": "Chest girth&#xa;Measure the fulles part of the bust&#xa;&#xa;Seamly2D: bust_circ"
+    },
+    "#WG": {
+      "formula": "74",
+      "description": "Waist girth&#xa;Measure the narrowest part of the waist&#xa;&#xa;Seamly2D: waist_circ"
+    },
+    "#HG": {
+      "formula": "98",
+      "description": "Hip Girth&#xa;Measure the fullest part of the hip&#xa;&#xa;Seamly2D: hip_circ"
+    },
+    "#SL": {
+      "formula": "60",
+      "description": "Sleeve length&#xa;Measure over the bend elbow from shoulder tip to the wristbone&#xa;&#xa;Seamly2D:  arm_shoulder_tip_to_wrist_bent"
+    },
+    "#Auxiliarymeasurements": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#SD": {
+      "formula": "#CG/10+(#CG<116?11:10.5 )",
+      "description": "Skye depth&#xa;Measured from the neck &#xa;Calculated&#xa;CG < 116  SD=CG/10+11, other wise CG/10+10,5 &#xa;&#xa;Seamly2D: height_neck_back - height_armpit"
+    },
+    "#BWL": {
+      "formula": "#BH/4-1",
+      "description": "Back waist length&#xa;Measured from the neck&#xa;Calculated:&#xa;BH/4-0...1&#xa;&#xa;Seamly2D: height_neck_back - height_waist_side"
+    },
+    "#HD": {
+      "formula": "#SD+#BWL",
+      "description": "Hip depth&#xa;Measured from the neck&#xa;Calculated: SD+BWL&#xa;Seamly2D: height_neck_back - height_hip"
+    },
+    "#L": {
+      "formula": "106",
+      "description": "Length"
+    },
+    "#NW": {
+      "formula": "#CG/20+2",
+      "description": "Nech width&#xa;Calculated: CG/20+2"
+    },
+    "#BL_I": {
+      "formula": "34",
+      "description": "Bust length I&#xa;Measured from the nape of the neck&#xa;Seamly2D: bustpoint_to_bustpoint_halter/2"
+    },
+    "#BL_II": {
+      "formula": "#CG/4+6-(#CG>96?1:0)-(#CG>116?1:0)",
+      "description": "Bust length II&#xa;Measured BL_I-NW&#xa;Calculated&#xa;CG < 96 BL_II=CG/4+6&#xa;CG < 116 BL_II=CG/4+5&#xa;other wise CG/4+4&#xa;"
+    },
+    "#FWL_I": {
+      "formula": "52",
+      "description": "Front waist length I&#xa;Measured from the nape of the neck&#xa;Seamly2D:"
+    },
+    "#FWL_II": {
+      "formula": "#BWL+4+(#CG > 90?0.5:0)+(#CG > 100?(#CG-100)/10:0)+(#CG >110?0.5:0)+(#CG >120?0.5:0)+(#CG >130?0.5:0)",
+      "description": "Front waist length II&#xa;Measured FWL_I-NW&#xa;Calculated&#xa;CG < 90: BWL+4&#xa;CG < 100: BWL+4+0,5&#xa;CG < 110: BWL+4+0,5+(CG-100)/10&#xa;CG < 120: BWL+4+0,5+0,5+(CG-100)/10&#xa;CG < 130: BWL+4+0,5+0,5+0,5+(CG-100)/10&#xa;CG > 130: BWL+4+0,5+0,5+0,5+0,5+(CG-100)/10&#xa;&#xa;"
+    },
+    "#BW": {
+      "formula": "#CG/8+5.5",
+      "description": "Back width&#xa;CG/8+5,5"
+    },
+    "#SW": {
+      "formula": "#CG/8-1.5",
+      "description": "Skye width&#xa;CG/8-1,5"
+    },
+    "#CW": {
+      "formula": "#CG/4-4",
+      "description": "Chest width&#xa;CG/4-4"
+    },
+    "#EaseValues": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#SD_ease": {
+      "formula": "1",
+      "description": "Fitted w/o sleeve 0...0,5&#xa;Fitted with sleeve 1...1,5&#xa;Loose fitting with sleeve 2...3"
+    },
+    "#BW_ease": {
+      "formula": "0.5",
+      "description": "Fitted w/o sleeve 0...0,5&#xa;Fitted with sleeve 0,5...1&#xa;Loose fitting with sleeve 1,5...2"
+    },
+    "#SW_ease": {
+      "formula": "1.5",
+      "description": "Fitted w/o sleeve 0,5...1&#xa;Fitted with sleeve 1,5...2&#xa;Loose fitting with sleeve 2,5...3,5"
+    },
+    "#CW_ease": {
+      "formula": "1.5",
+      "description": "Fitted w/o sleeve 1...1,5&#xa;Fitted with sleeve 1,5&#xa;Loose fitting with sleeve 1,5...2"
+    },
+    "#WG_ease": {
+      "formula": "2",
+      "description": "2...4"
+    },
+    "#HG_ease": {
+      "formula": "2",
+      "description": "1,5...2"
+    },
+    "#DrawingParameters": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#BackCenterInTake": {
+      "formula": "2",
+      "description": ""
+    },
+    "#SeparationOfPanels": {
+      "formula": "8",
+      "description": ""
+    },
+    "#NeckWidthReduction": {
+      "formula": "0",
+      "description": "Reduction of the neck width for large sizes&#xa;0,5"
+    },
+    "#NecklineToShoulder": {
+      "formula": "2",
+      "description": ""
+    },
+    "#BackShoulderDrop": {
+      "formula": "1.5",
+      "description": ""
+    },
+    "#BackShoulderLineExtension": {
+      "formula": "1.5",
+      "description": "Larger sizes 0...1&#xa;Medium Sizes 1...1,5&#xa;Small Sizes 1,5...2"
+    },
+    "#BackDartLocation": {
+      "formula": "#BW/3+1",
+      "description": ""
+    },
+    "#BackDartHeight1": {
+      "formula": "14",
+      "description": "14...16"
+    },
+    "#BackDartHeight2": {
+      "formula": "12",
+      "description": "12...14"
+    },
+    "#WaistSideIntake": {
+      "formula": "1",
+      "description": "1...2"
+    },
+    "#ShoulderDartLocation": {
+      "formula": "5",
+      "description": "3...5"
+    },
+    "#Fixes": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#PrintingFix": {
+      "formula": "0",
+      "description": ""
+    },
+    "#Modifications": {
+      "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
+      "description": ""
+    },
+    "#ShoulderSeamMove": {
+      "formula": "1",
+      "description": ""
+    }
+  },
+  "construction": [
+    {
+      "id": 1,
+      "name": "Neckline",
+      "type": "single",
+      "block": "Basic block women",
+      "x": 0.79,
+      "y": 1.06
+    },
+    {
+      "id": 2,
+      "name": "Hemline",
+      "type": "endLine",
+      "block": "Basic block women",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "#L"
+    },
+    {
+      "id": 3,
+      "name": "ChestLine",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#SD+#SD_ease"
+    },
+    {
+      "id": 4,
+      "name": "Waistline",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#BWL"
+    },
+    {
+      "id": 5,
+      "name": "Hipline",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 1,
+      "secondPoint": 2,
+      "length": "#HD"
+    },
+    {
+      "id": 6,
+      "name": "A1",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 4,
+      "secondPoint": 1,
+      "angle": 0,
+      "length": "#BackCenterInTake"
+    },
+    {
+      "id": 7,
+      "name": "A2",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 6,
+      "secondPoint": 5
+    },
+    {
+      "id": 8,
+      "name": "A3",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 6,
+      "secondPoint": 2
+    },
+    {
+      "id": 9,
+      "name": "A4",
+      "type": "lineIntersectAxis",
+      "block": "Basic block women",
+      "basePoint": 3,
+      "angle": 180,
+      "p1Line": 1,
+      "p2Line": 6
+    },
+    {
+      "id": 10,
+      "name": "A5",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 9,
+      "secondPoint": 3,
+      "angle": 90,
+      "length": "#CW+#CW_ease+#SW+#SW_ease+#BW+#BW_ease+#SeparationOfPanels"
+    },
+    {
+      "id": 11,
+      "name": "A6",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 9,
+      "secondPoint": 10,
+      "length": "#BW+#BW_ease"
+    },
+    {
+      "id": 12,
+      "name": "A7",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 10,
+      "secondPoint": 9,
+      "length": "#CW+#CW_ease"
+    },
+    {
+      "id": 13,
+      "name": "A8",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 12,
+      "secondPoint": 11,
+      "length": "(#SW+#SW_ease)/3"
+    },
+    {
+      "id": 14,
+      "name": "A9",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 11,
+      "secondPoint": 12,
+      "length": "(#SW+#SW_ease)-Line_A7_A8"
+    },
+    {
+      "id": 15,
+      "name": "A10",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 10,
+      "secondPoint": 12,
+      "length": "#CG/10+0.5"
+    },
+    {
+      "id": 16,
+      "name": "A11",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 14,
+      "secondPoint": 4
+    },
+    {
+      "id": 17,
+      "name": "A12",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 14,
+      "secondPoint": 5
+    },
+    {
+      "id": 18,
+      "name": "A13",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 13,
+      "secondPoint": 4
+    },
+    {
+      "id": 19,
+      "name": "A14",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 13,
+      "secondPoint": 5
+    },
+    {
+      "id": 20,
+      "name": "A15",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 15,
+      "secondPoint": 4
+    },
+    {
+      "id": 21,
+      "name": "A16",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 15,
+      "secondPoint": 5
+    },
+    {
+      "id": 22,
+      "name": "A17",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 10,
+      "secondPoint": 4
+    },
+    {
+      "id": 23,
+      "name": "A18",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 10,
+      "secondPoint": 5
+    },
+    {
+      "id": 24,
+      "name": "A19",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 10,
+      "secondPoint": 2
+    },
+    {
+      "id": 25,
+      "name": "A20",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 11,
+      "secondPoint": 1
+    },
+    {
+      "id": 26,
+      "name": "A21",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 1,
+      "secondPoint": 25,
+      "length": "#NW-#NeckWidthReduction"
+    },
+    {
+      "id": 27,
+      "name": "A22",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 26,
+      "secondPoint": 1,
+      "angle": 0,
+      "length": "#NecklineToShoulder"
+    },
+    {
+      "id": 28,
+      "name": "A23",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 25,
+      "secondPoint": 11,
+      "length": "#BackShoulderDrop"
+    },
+    {
+      "id": 29,
+      "name": "A24",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 28,
+      "secondPoint": 11,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 30,
+      "name": "A25",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 29,
+      "secondPoint": 11,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 31,
+      "name": "A26",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 27,
+      "secondPoint": 28,
+      "length": "CurrentLength+#BackShoulderLineExtension"
+    },
+    {
+      "id": 32,
+      "name": "A27",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 29,
+      "secondPoint": 25,
+      "angle": 0,
+      "length": 1
+    },
+    {
+      "id": 33,
+      "name": "A28",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 30,
+      "secondPoint": 25,
+      "angle": 0,
+      "length": 1.3
+    },
+    {
+      "id": 34,
+      "name": "A29",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 12,
+      "secondPoint": 30
+    },
+    {
+      "id": 35,
+      "name": "A30",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 20,
+      "secondPoint": 4,
+      "angle": 0,
+      "length": "#FWL_II"
+    },
+    {
+      "id": 36,
+      "name": "A31",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 35,
+      "secondPoint": 20,
+      "length": "#BL_II"
+    },
+    {
+      "id": 37,
+      "name": "A32",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 12,
+      "secondPoint": 3,
+      "angle": 0,
+      "length": "Line_A23_A6-2"
+    },
+    {
+      "id": 38,
+      "name": "A33",
+      "type": "endLine",
+      "block": "Basic block women",
+      "basePoint": 12,
+      "angle": "AngleLine_A7_A32-((#CG/20)/(Line_A7_A32*2*3.14))*360",
+      "length": "Line_A7_A32"
+    },
+    {
+      "id": 39,
+      "name": "A34",
+      "type": "pointOfIntersectionCircles",
+      "block": "Basic block women",
+      "c1Center": 38,
+      "c2Center": 20,
+      "c1Radius": "Line_A22_A26-1",
+      "c2Radius": "Line_A15_A30",
+      "crossPoint": 1
+    },
+    {
+      "id": 41,
+      "name": "A35",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 38,
+      "secondPoint": 34,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 42,
+      "name": "A36",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 41,
+      "secondPoint": 38,
+      "angle": 0,
+      "length": 1
+    },
+    {
+      "id": 43,
+      "name": "A37",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 10,
+      "secondPoint": 35
+    },
+    {
+      "id": 44,
+      "name": "A38",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 43,
+      "secondPoint": 35,
+      "length": "#NW-#NeckWidthReduction"
+    },
+    {
+      "id": 45,
+      "name": "A39",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 43,
+      "secondPoint": 10,
+      "length": "#NW+1.5"
+    },
+    {
+      "id": 46,
+      "name": "A40",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 39,
+      "secondPoint": 38,
+      "length": "Line_A38_A30"
+    },
+    {
+      "id": 48,
+      "name": "A41",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 36,
+      "secondPoint": 35,
+      "length": "Line_A31_A40"
+    },
+    {
+      "id": 49,
+      "name": "A42",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 12,
+      "secondPoint": 20
+    },
+    {
+      "id": 53,
+      "name": "A43",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 20,
+      "secondPoint": 49,
+      "length": "max(0;((Line_A17_A42-(#WG/4-1))/2))"
+    },
+    {
+      "id": 54,
+      "name": "A44",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 20,
+      "secondPoint": 22,
+      "length": "Line_A15_A43"
+    },
+    {
+      "id": 55,
+      "name": "A45",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 6,
+      "secondPoint": 16,
+      "length": "#BackDartLocation"
+    },
+    {
+      "id": 56,
+      "name": "A46",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 11,
+      "secondPoint": 4
+    },
+    {
+      "id": 57,
+      "name": "A47",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 56,
+      "secondPoint": 11,
+      "length": 0.5
+    },
+    {
+      "id": 58,
+      "name": "A48",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 55,
+      "secondPoint": 4,
+      "angle": 0,
+      "length": "#BackDartHeight1"
+    },
+    {
+      "id": 59,
+      "name": "A49",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 58,
+      "secondPoint": 55,
+      "length": "CurrentLength*2"
+    },
+    {
+      "id": 60,
+      "name": "A50",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 57,
+      "secondPoint": 56,
+      "angle": 90,
+      "length": "#BackDartHeight2"
+    },
+    {
+      "id": 61,
+      "name": "A51",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 60,
+      "secondPoint": 57,
+      "length": "CurrentLength*2"
+    },
+    {
+      "id": 62,
+      "name": "A52",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 55,
+      "secondPoint": 6,
+      "length": "min(2;(max(0;((Line_A17_A42+Line_A42_A13-2*Line_A15_A43+Line_A11_A1)-(#WG/2+#WG_ease))/2)))"
+    },
+    {
+      "id": 63,
+      "name": "A53",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 55,
+      "secondPoint": 16,
+      "length": "Line_A45_A52"
+    },
+    {
+      "id": 64,
+      "name": "A54",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 57,
+      "secondPoint": 56,
+      "angle": 0,
+      "length": "(max(0;((Line_A17_A42+Line_A42_A13-2*Line_A15_A43+Line_A11_A1)-(#WG/2+#WG_ease)-2*Line_A45_A52)/2))"
+    },
+    {
+      "id": 65,
+      "name": "A55",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 64,
+      "secondPoint": 57,
+      "length": "CurrentLength*2"
+    },
+    {
+      "id": 66,
+      "name": "A56",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 49,
+      "secondPoint": 5
+    },
+    {
+      "id": 69,
+      "name": "A57",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 21,
+      "secondPoint": 66,
+      "length": "max(0;((Line_A18_A56-(#WG/4+1))/2))"
+    },
+    {
+      "id": 70,
+      "name": "A58",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 21,
+      "secondPoint": 23,
+      "length": "Line_A16_A57"
+    },
+    {
+      "id": 72,
+      "name": "A59",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 19,
+      "secondPoint": 17,
+      "length": "max(0;(#HG/2+#HG_ease-(Line_A18_A56+Line_A56_A14+Line_A12_A2-2*Line_A16_A57))/2)"
+    },
+    {
+      "id": 73,
+      "name": "A60",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 17,
+      "secondPoint": 19,
+      "length": "Line_A14_A59"
+    },
+    {
+      "id": 74,
+      "name": "A61",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 16,
+      "secondPoint": 14,
+      "length": 1
+    },
+    {
+      "id": 75,
+      "name": "A62",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 18,
+      "secondPoint": 13,
+      "length": 1
+    },
+    {
+      "id": 76,
+      "name": "A63",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 74,
+      "secondPoint": 16,
+      "angle": 0,
+      "length": "#WaistSideIntake"
+    },
+    {
+      "id": 77,
+      "name": "A64",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 75,
+      "secondPoint": 18,
+      "angle": 180,
+      "length": "#WaistSideIntake"
+    },
+    {
+      "id": 78,
+      "name": "A65",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 27,
+      "secondPoint": 31,
+      "length": "#ShoulderDartLocation"
+    },
+    {
+      "id": 79,
+      "name": "A66",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 78,
+      "secondPoint": 32
+    },
+    {
+      "id": 80,
+      "name": "A67",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 32,
+      "secondPoint": 79,
+      "angle": 0,
+      "length": "1.5/2"
+    },
+    {
+      "id": 81,
+      "name": "A68",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 80,
+      "secondPoint": 32,
+      "length": "CurrentLength*2"
+    },
+    {
+      "id": 94,
+      "name": "A69",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 72,
+      "secondPoint": 2
+    },
+    {
+      "id": 95,
+      "name": "A70",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 73,
+      "secondPoint": 2
+    },
+    {
+      "id": 96,
+      "name": "A71",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 59,
+      "secondPoint": 2
+    },
+    {
+      "id": 97,
+      "name": "A72",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 61,
+      "secondPoint": 2
+    },
+    {
+      "id": 98,
+      "name": "A73",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 70,
+      "secondPoint": 2
+    },
+    {
+      "id": 99,
+      "name": "A74",
+      "type": "pointOfIntersection",
+      "block": "Basic block women",
+      "firstPoint": 69,
+      "secondPoint": 2
+    },
+    {
+      "id": 100,
+      "name": "A75",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 61,
+      "secondPoint": 57,
+      "angle": 0,
+      "length": "#PrintingFix"
+    },
+    {
+      "id": 101,
+      "name": "A76",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 59,
+      "secondPoint": 55,
+      "angle": 0,
+      "length": "#PrintingFix"
+    },
+    {
+      "id": 102,
+      "name": "A77",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 96,
+      "secondPoint": 59,
+      "angle": 0,
+      "length": "#PrintingFix"
+    },
+    {
+      "id": 103,
+      "name": "A78",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 97,
+      "secondPoint": 61,
+      "angle": 0,
+      "length": "#PrintingFix"
+    },
+    {
+      "id": 243,
+      "name": "A79",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 27,
+      "secondPoint": 31,
+      "angle": 180,
+      "length": "#ShoulderSeamMove"
+    },
+    {
+      "id": 244,
+      "name": "A80",
+      "type": "normal",
+      "block": "Basic block women",
+      "firstPoint": 31,
+      "secondPoint": 27,
+      "angle": 0,
+      "length": "#ShoulderSeamMove"
+    },
+    {
+      "id": 246,
+      "name": "A81",
+      "type": "cutSpline",
+      "block": "Basic block women",
+      "spline": 83,
+      "length": "Spl_A39_A38-#ShoulderSeamMove"
+    },
+    {
+      "id": 247,
+      "name": "A82",
+      "type": "lineIntersectAxis",
+      "block": "Basic block women",
+      "basePoint": 246,
+      "angle": "AngleLine_A38_A41",
+      "p1Line": 36,
+      "p2Line": 35
+    },
+    {
+      "id": 248,
+      "name": "A83",
+      "type": "alongLine",
+      "block": "Basic block women",
+      "firstPoint": 36,
+      "secondPoint": 46,
+      "length": "Line_A31_A82"
+    },
+    {
+      "id": 249,
+      "name": "A84",
+      "type": "curveIntersectAxis",
+      "block": "Basic block women",
+      "basePoint": 248,
+      "angle": "AngleLine_A40_A33",
+      "curve": 86
+    },
+    {
+      "id": 253,
+      "name": "A85",
+      "type": "lineIntersectAxis",
+      "block": "Basic block women",
+      "basePoint": 36,
+      "angle": 0,
+      "p1Line": 77,
+      "p2Line": 13
+    },
+    {
+      "id": 269,
+      "name": "A86",
+      "type": "lineIntersectAxis",
+      "block": "Basic block women",
+      "basePoint": 79,
+      "angle": 90,
+      "p1Line": 244,
+      "p2Line": 243
+    },
+    {
+      "id": 47,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 36,
+      "secondPoint": 46,
+      "lineColor": "black"
+    },
+    {
+      "id": 50,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 22,
+      "secondPoint": 49,
+      "lineColor": "black"
+    },
+    {
+      "id": 51,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 49,
+      "secondPoint": 18,
+      "lineColor": "black"
+    },
+    {
+      "id": 52,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 16,
+      "secondPoint": 6,
+      "lineColor": "black"
+    },
+    {
+      "id": 67,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 23,
+      "secondPoint": 66,
+      "lineColor": "black"
+    },
+    {
+      "id": 68,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 66,
+      "secondPoint": 19,
+      "lineColor": "black"
+    },
+    {
+      "id": 71,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 17,
+      "secondPoint": 7,
+      "lineColor": "black"
+    },
+    {
+      "id": 82,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 24,
+      "secondPoint": 45,
+      "lineColor": "black"
+    },
+    {
+      "id": 84,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 44,
+      "secondPoint": 48,
+      "lineColor": "black"
+    },
+    {
+      "id": 85,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 46,
+      "secondPoint": 38,
+      "lineColor": "black"
+    },
+    {
+      "id": 89,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 31,
+      "secondPoint": 27,
+      "lineColor": "black"
+    },
+    {
+      "id": 91,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 1,
+      "secondPoint": 6,
+      "lineColor": "black"
+    },
+    {
+      "id": 92,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 6,
+      "secondPoint": 7,
+      "lineColor": "black"
+    },
+    {
+      "id": 93,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 7,
+      "secondPoint": 8,
+      "lineColor": "black"
+    },
+    {
+      "id": 104,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 99,
+      "secondPoint": 69,
+      "lineColor": "black"
+    },
+    {
+      "id": 105,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 69,
+      "secondPoint": 53,
+      "lineColor": "black"
+    },
+    {
+      "id": 106,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 53,
+      "secondPoint": 36,
+      "lineColor": "black"
+    },
+    {
+      "id": 107,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 36,
+      "secondPoint": 54,
+      "lineColor": "black"
+    },
+    {
+      "id": 108,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 54,
+      "secondPoint": 70,
+      "lineColor": "black"
+    },
+    {
+      "id": 109,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 70,
+      "secondPoint": 98,
+      "lineColor": "black"
+    },
+    {
+      "id": 110,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 96,
+      "secondPoint": 59,
+      "lineColor": "black"
+    },
+    {
+      "id": 111,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 59,
+      "secondPoint": 62,
+      "lineColor": "black"
+    },
+    {
+      "id": 112,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 62,
+      "secondPoint": 58,
+      "lineColor": "black"
+    },
+    {
+      "id": 113,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 58,
+      "secondPoint": 63,
+      "lineColor": "black"
+    },
+    {
+      "id": 114,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 63,
+      "secondPoint": 101,
+      "lineColor": "black"
+    },
+    {
+      "id": 115,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 101,
+      "secondPoint": 102,
+      "lineColor": "black"
+    },
+    {
+      "id": 116,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 97,
+      "secondPoint": 61,
+      "lineColor": "black"
+    },
+    {
+      "id": 117,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 61,
+      "secondPoint": 64,
+      "lineColor": "black"
+    },
+    {
+      "id": 118,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 64,
+      "secondPoint": 60,
+      "lineColor": "black"
+    },
+    {
+      "id": 119,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 60,
+      "secondPoint": 65,
+      "lineColor": "black"
+    },
+    {
+      "id": 120,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 65,
+      "secondPoint": 100,
+      "lineColor": "black"
+    },
+    {
+      "id": 121,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 100,
+      "secondPoint": 103,
+      "lineColor": "black"
+    },
+    {
+      "id": 122,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 13,
+      "secondPoint": 77,
+      "lineColor": "black"
+    },
+    {
+      "id": 123,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 14,
+      "secondPoint": 76,
+      "lineColor": "black"
+    },
+    {
+      "id": 126,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 8,
+      "secondPoint": 96,
+      "lineColor": "black"
+    },
+    {
+      "id": 127,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 102,
+      "secondPoint": 97,
+      "lineColor": "black"
+    },
+    {
+      "id": 128,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 103,
+      "secondPoint": 95,
+      "lineColor": "black"
+    },
+    {
+      "id": 129,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 94,
+      "secondPoint": 99,
+      "lineColor": "black"
+    },
+    {
+      "id": 130,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 98,
+      "secondPoint": 24,
+      "lineColor": "black"
+    },
+    {
+      "id": 240,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 81,
+      "secondPoint": 79,
+      "lineColor": "black"
+    },
+    {
+      "id": 241,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 80,
+      "secondPoint": 79,
+      "lineColor": "black"
+    },
+    {
+      "id": 245,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 244,
+      "secondPoint": 243,
+      "lineColor": "black"
+    },
+    {
+      "id": 263,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 256,
+      "secondPoint": 257,
+      "lineColor": "black"
+    },
+    {
+      "id": 264,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 255,
+      "secondPoint": 258,
+      "lineColor": "black"
+    },
+    {
+      "id": 266,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 261,
+      "secondPoint": 262,
+      "lineColor": "black"
+    },
+    {
+      "id": 267,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 262,
+      "secondPoint": 36,
+      "lineColor": "black"
+    },
+    {
+      "id": 275,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 273,
+      "secondPoint": 274,
+      "lineColor": "black"
+    },
+    {
+      "id": 276,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 274,
+      "secondPoint": 79,
+      "lineColor": "black"
+    },
+    {
+      "id": 277,
+      "name": "",
+      "type": "line",
+      "block": "Basic block women",
+      "firstPoint": 269,
+      "secondPoint": 243,
+      "lineColor": "black"
+    },
+    {
+      "id": 83,
+      "name": "",
+      "type": "spline",
+      "block": "Basic block women",
+      "point1": 45,
+      "point4": 44,
+      "angle1": 4.81733,
+      "angle2": 268.233,
+      "length1": 5.92843,
+      "length2": 4.77142
+    },
+    {
+      "id": 86,
+      "name": "",
+      "type": "splinePath",
+      "block": "Basic block women",
+      "pathPoints": [
+        {
+          "point": 38,
+          "angle1": 54.2593,
+          "angle2": 234.259,
+          "length1": 0,
+          "length2": 2.56313
+        },
+        {
+          "point": 42,
+          "angle1": 68.4973,
+          "angle2": 248.497,
+          "length1": 1.53956,
+          "length2": 3.16154
+        },
+        {
+          "point": 34,
+          "angle1": 88.6841,
+          "angle2": 268.684,
+          "length1": 1.4791,
+          "length2": 1.36407
+        },
+        {
+          "point": 13,
+          "angle1": 185.711,
+          "angle2": 5.71084,
+          "length1": 2.51067,
+          "length2": 0.403221
+        }
+      ]
+    },
+    {
+      "id": 87,
+      "name": "",
+      "type": "splinePath",
+      "block": "Basic block women",
+      "pathPoints": [
+        {
+          "point": 14,
+          "angle1": 176.928,
+          "angle2": 356.928,
+          "length1": 0,
+          "length2": 3.09737
+        },
+        {
+          "point": 33,
+          "angle1": 253.51,
+          "angle2": 73.5103,
+          "length1": 1.50216,
+          "length2": 1.17981
+        },
+        {
+          "point": 81,
+          "angle1": 268.374,
+          "angle2": 88.374,
+          "length1": 1.65047,
+          "length2": 0.789833
+        }
+      ]
+    },
+    {
+      "id": 88,
+      "name": "",
+      "type": "spline",
+      "block": "Basic block women",
+      "point1": 80,
+      "point4": 31,
+      "angle1": 90.2047,
+      "angle2": 280.151,
+      "length1": 2.61499,
+      "length2": 2.77418
+    },
+    {
+      "id": 90,
+      "name": "",
+      "type": "spline",
+      "block": "Basic block women",
+      "point1": 27,
+      "point4": 1,
+      "angle1": 283.343,
+      "angle2": 179.604,
+      "length1": 1.35069,
+      "length2": 3.55012
+    },
+    {
+      "id": 124,
+      "name": "",
+      "type": "splinePath",
+      "block": "Basic block women",
+      "pathPoints": [
+        {
+          "point": 77,
+          "angle1": 90.9771,
+          "angle2": 270.977,
+          "length1": 0,
+          "length2": 9.68242
+        },
+        {
+          "point": 72,
+          "angle1": 90.8098,
+          "angle2": 270.81,
+          "length1": 6.69919,
+          "length2": 4.97643
+        },
+        {
+          "point": 94,
+          "angle1": 91.8167,
+          "angle2": 271.817,
+          "length1": 3.83704,
+          "length2": 0.722454
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "name": "",
+      "type": "splinePath",
+      "block": "Basic block women",
+      "pathPoints": [
+        {
+          "point": 76,
+          "angle1": 91.7529,
+          "angle2": 271.753,
+          "length1": 0,
+          "length2": 6.72577
+        },
+        {
+          "point": 73,
+          "angle1": 90.1909,
+          "angle2": 270.191,
+          "length1": 8.20711,
+          "length2": 3.78595
+        },
+        {
+          "point": 95,
+          "angle1": 90.9461,
+          "angle2": 270.946,
+          "length1": 9.66358,
+          "length2": 0.825579
+        }
+      ]
+    },
+    {
+      "id": 265,
+      "name": "",
+      "type": "splinePath",
+      "block": "Basic block women",
+      "pathPoints": [
+        {
+          "point": 257,
+          "angle1": 237.018,
+          "angle2": 57.0183,
+          "length1": 0,
+          "length2": 0.0817868
+        },
+        {
+          "point": 258,
+          "angle1": 75.0444,
+          "angle2": 255.044,
+          "length1": 0,
+          "length2": 1.7174
+        },
+        {
+          "point": 259,
+          "angle1": 84.6657,
+          "angle2": 264.666,
+          "length1": 2.01974,
+          "length2": 3.15983
+        },
+        {
+          "point": 260,
+          "angle1": 108.883,
+          "angle2": 288.883,
+          "length1": 1.7209,
+          "length2": 2.80344
+        },
+        {
+          "point": 261,
+          "angle1": 190.657,
+          "angle2": 10.657,
+          "length1": 2.41743,
+          "length2": 39.4222
+        }
+      ]
+    },
+    {
+      "id": 278,
+      "name": "",
+      "type": "spline",
+      "block": "Basic block women",
+      "point1": 272,
+      "point4": 273,
+      "angle1": 93.5988,
+      "angle2": 298.116,
+      "length1": 4.93464,
+      "length2": 2.21638
+    }
+  ],
+  "pieces": []
+}

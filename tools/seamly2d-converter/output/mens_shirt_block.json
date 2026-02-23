@@ -1,0 +1,543 @@
+{
+  "name": "mens_shirt_block",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Back",
+      "x": -0.878775,
+      "y": 1.17113
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Back",
+      "basePoint": 1,
+      "angle": 270,
+      "length": "neck_side_to_waist_b"
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "alongLine",
+      "block": "Back",
+      "firstPoint": 2,
+      "secondPoint": 1,
+      "length": "neck_back_to_waist_b * 1.05"
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "endLine",
+      "block": "Back",
+      "basePoint": 2,
+      "angle": 270,
+      "length": "height_waist_side_to_hip"
+    },
+    {
+      "id": 5,
+      "name": "A4",
+      "type": "alongLine",
+      "block": "Back",
+      "firstPoint": 2,
+      "secondPoint": 3,
+      "length": "0.88 * armpit_to_waist_side"
+    },
+    {
+      "id": 6,
+      "name": "A5",
+      "type": "endLine",
+      "block": "Back",
+      "basePoint": 1,
+      "angle": 0,
+      "length": "0.5 * shoulder_tip_to_shoulder_tip_b"
+    },
+    {
+      "id": 7,
+      "name": "A6",
+      "type": "endLine",
+      "block": "Back",
+      "basePoint": 5,
+      "angle": 0,
+      "length": "0.285 * bust_circ"
+    },
+    {
+      "id": 8,
+      "name": "A7",
+      "type": "alongLine",
+      "block": "Back",
+      "firstPoint": 3,
+      "secondPoint": 5,
+      "length": "Line_A4_A2 * 0.6"
+    },
+    {
+      "id": 9,
+      "name": "A8",
+      "type": "intersectXY",
+      "block": "Back",
+      "firstPoint": 6,
+      "secondPoint": 8
+    },
+    {
+      "id": 11,
+      "name": "A9",
+      "type": "intersectXY",
+      "block": "Back",
+      "firstPoint": 7,
+      "secondPoint": 2
+    },
+    {
+      "id": 12,
+      "name": "A10",
+      "type": "intersectXY",
+      "block": "Back",
+      "firstPoint": 7,
+      "secondPoint": 4
+    },
+    {
+      "id": 16,
+      "name": "A11",
+      "type": "alongLine",
+      "block": "Back",
+      "firstPoint": 1,
+      "secondPoint": 6,
+      "length": "neck_circ * 0.215"
+    },
+    {
+      "id": 17,
+      "name": "A12",
+      "type": "intersectXY",
+      "block": "Back",
+      "firstPoint": 16,
+      "secondPoint": 3
+    },
+    {
+      "id": 20,
+      "name": "A13",
+      "type": "pointOfContact",
+      "block": "Back",
+      "center": 16,
+      "firstPoint": 6,
+      "secondPoint": 9,
+      "radius": "shoulder_length"
+    },
+    {
+      "id": 32,
+      "name": "A18",
+      "type": "endLine",
+      "block": "Back",
+      "basePoint": 20,
+      "angle": 0,
+      "length": "Line_A11_A13 * 0.1"
+    },
+    {
+      "id": 34,
+      "name": "A19",
+      "type": "normal",
+      "block": "Back",
+      "firstPoint": 32,
+      "secondPoint": 16,
+      "angle": 0,
+      "length": "Line_A5_A8"
+    },
+    {
+      "id": 35,
+      "name": "A20",
+      "type": "intersectXY",
+      "block": "Back",
+      "firstPoint": 32,
+      "secondPoint": 8
+    },
+    {
+      "id": 10,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 8,
+      "secondPoint": 9,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 13,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 2,
+      "secondPoint": 11,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 14,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 4,
+      "secondPoint": 12,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 15,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 7,
+      "secondPoint": 12,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 19,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 6,
+      "secondPoint": 9,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 21,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 16,
+      "secondPoint": 20,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 33,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 16,
+      "secondPoint": 32,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 36,
+      "name": "",
+      "type": "line",
+      "block": "Back",
+      "firstPoint": 32,
+      "secondPoint": 35,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 18,
+      "name": "",
+      "type": "spline",
+      "block": "Back",
+      "point1": 3,
+      "point4": 16,
+      "angle1": 0,
+      "angle2": 250
+    },
+    {
+      "id": 37,
+      "name": "",
+      "type": "splinePath",
+      "block": "Back",
+      "pathPoints": [
+        {
+          "point": 32
+        },
+        {
+          "point": 9
+        },
+        {
+          "point": 7
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "name": "B",
+      "type": "single",
+      "block": "Front",
+      "x": 65.6021,
+      "y": 1.00193
+    },
+    {
+      "id": 28,
+      "name": "B1",
+      "type": "endLine",
+      "block": "Front",
+      "basePoint": 27,
+      "angle": 270,
+      "length": "Line_A_A1"
+    },
+    {
+      "id": 29,
+      "name": "B2",
+      "type": "endLine",
+      "block": "Front",
+      "basePoint": 28,
+      "angle": 270.065,
+      "length": "Line_A1_A3"
+    },
+    {
+      "id": 30,
+      "name": "B3",
+      "type": "alongLine",
+      "block": "Front",
+      "firstPoint": 28,
+      "secondPoint": 27,
+      "length": "Line_A1_A4"
+    },
+    {
+      "id": 31,
+      "name": "B4",
+      "type": "endLine",
+      "block": "Front",
+      "basePoint": 30,
+      "angle": 180,
+      "length": "bust_circ * 0.285"
+    },
+    {
+      "id": 38,
+      "name": "B5",
+      "type": "alongLine",
+      "block": "Front",
+      "firstPoint": 28,
+      "secondPoint": 27,
+      "length": "neck_front_to_waist_flat_f"
+    },
+    {
+      "id": 39,
+      "name": "B6",
+      "type": "alongLine",
+      "block": "Front",
+      "firstPoint": 28,
+      "secondPoint": 27,
+      "length": "neck_side_to_waist_f"
+    },
+    {
+      "id": 40,
+      "name": "B7",
+      "type": "endLine",
+      "block": "Front",
+      "basePoint": 39,
+      "angle": 180,
+      "length": "Line_A_A11"
+    },
+    {
+      "id": 41,
+      "name": "B8",
+      "type": "endLine",
+      "block": "Front",
+      "basePoint": 39,
+      "angle": 180,
+      "length": "shoulder_tip_to_shoulder_tip_f/2"
+    },
+    {
+      "id": 42,
+      "name": "B9",
+      "type": "endLine",
+      "block": "Front",
+      "basePoint": 41,
+      "angle": 180,
+      "length": "shoulder_length * 0.1"
+    },
+    {
+      "id": 44,
+      "name": "B10",
+      "type": "alongLine",
+      "block": "Front",
+      "firstPoint": 39,
+      "secondPoint": 30,
+      "length": "Line_B6_B3* 0.65"
+    },
+    {
+      "id": 45,
+      "name": "B11",
+      "type": "intersectXY",
+      "block": "Front",
+      "firstPoint": 41,
+      "secondPoint": 44
+    },
+    {
+      "id": 46,
+      "name": "B12",
+      "type": "intersectXY",
+      "block": "Front",
+      "firstPoint": 42,
+      "secondPoint": 44
+    },
+    {
+      "id": 50,
+      "name": "B13",
+      "type": "pointOfContact",
+      "block": "Front",
+      "center": 40,
+      "firstPoint": 41,
+      "secondPoint": 45,
+      "radius": "shoulder_length"
+    },
+    {
+      "id": 52,
+      "name": "B14",
+      "type": "intersectXY",
+      "block": "Front",
+      "firstPoint": 42,
+      "secondPoint": 50
+    },
+    {
+      "id": 56,
+      "name": "B15",
+      "type": "intersectXY",
+      "block": "Front",
+      "firstPoint": 31,
+      "secondPoint": 28
+    },
+    {
+      "id": 57,
+      "name": "B16",
+      "type": "intersectXY",
+      "block": "Front",
+      "firstPoint": 31,
+      "secondPoint": 29
+    },
+    {
+      "id": 61,
+      "name": "B17",
+      "type": "alongLine",
+      "block": "Front",
+      "firstPoint": 45,
+      "secondPoint": 44,
+      "length": "shoulder_length * 0.1"
+    },
+    {
+      "id": 43,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 39,
+      "secondPoint": 30,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 47,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 46,
+      "secondPoint": 44,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 48,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 41,
+      "secondPoint": 45,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 51,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 40,
+      "secondPoint": 50,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 53,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 50,
+      "secondPoint": 52,
+      "lineColor": "black",
+      "lineType": "dashDotDotLine"
+    },
+    {
+      "id": 54,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 40,
+      "secondPoint": 52,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 58,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 31,
+      "secondPoint": 57,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 59,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 56,
+      "secondPoint": 28,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 60,
+      "name": "",
+      "type": "line",
+      "block": "Front",
+      "firstPoint": 57,
+      "secondPoint": 29,
+      "lineColor": "black",
+      "lineType": "solidLine"
+    },
+    {
+      "id": 49,
+      "name": "",
+      "type": "spline",
+      "block": "Front",
+      "point1": 40,
+      "point4": 38,
+      "angle1": 300,
+      "angle2": 180
+    },
+    {
+      "id": 55,
+      "name": "",
+      "type": "splinePath",
+      "block": "Front",
+      "pathPoints": [
+        {
+          "point": 52
+        },
+        {
+          "point": 45
+        },
+        {
+          "point": 31
+        }
+      ]
+    }
+  ],
+  "pieces": []
+}

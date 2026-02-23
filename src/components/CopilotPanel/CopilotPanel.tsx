@@ -1,3 +1,4 @@
+import { MessageSquare, Maximize2, Minimize2, Settings, Trash2, X, Mic } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../../store';
@@ -501,9 +502,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
           onClick={() => setIsOpen(true)}
           title="Chat (Ctrl+K)"
         >
-          <svg width="20" height="20" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-          </svg>
+          <MessageSquare size={20} />
         </button>
       );
     }
@@ -520,9 +519,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     >
       <div className="copilot-header">
         <div className="copilot-title">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" fill="var(--accent)" stroke="var(--accent)" strokeWidth="1"/>
-          </svg>
+          <MessageSquare size={16} style={{ color: 'var(--accent)' }} />
           <span>Chat</span>
           {hasConnection && <span className="copilot-agent-badge">{providerLabel}</span>}
           {offline && <span className="copilot-agent-badge" style={{ color: '#ff9800' }}>Offline</span>}
@@ -534,34 +531,21 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
               onClick={() => setIsFullscreen(!isFullscreen)}
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                {isFullscreen ? (
-                  <path d="M4 2V4H2M10 2V4H8M8 10V8H10M2 10V8H4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                ) : (
-                  <path d="M2 4V2H4M8 2H10V4M10 8V10H8M4 10H2V8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                )}
-              </svg>
+              {isFullscreen ? <Minimize2 size={12} /> : <Maximize2 size={12} />}
             </button>
           )}
           <button className="copilot-btn-sm" onClick={() => setShowSettings(!showSettings)} title="Settings">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 7.5A1.5 1.5 0 1 0 6 4.5A1.5 1.5 0 0 0 6 7.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-              <path d="M9.73 7.27A.75.75 0 0 0 9.8 6.6L10.85 5.55A.75.75 0 0 0 10.85 4.45L9.8 3.4A.75.75 0 0 0 9.73 2.73L8.68 2.18A.75.75 0 0 0 7.82 2.27L6.77 2.82A.75.75 0 0 0 6.23 2.82L5.18 2.27A.75.75 0 0 0 4.32 2.18L3.27 2.73A.75.75 0 0 0 3.2 3.4L2.15 4.45A.75.75 0 0 0 2.15 5.55L3.2 6.6A.75.75 0 0 0 3.27 7.27L4.32 7.82A.75.75 0 0 0 5.18 7.73L6.23 7.18A.75.75 0 0 0 6.77 7.18L7.82 7.73A.75.75 0 0 0 8.68 7.82L9.73 7.27Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-            </svg>
+            <Settings size={12} />
           </button>
           <button className="copilot-btn-sm" onClick={handleClearConversation} title="Clear chat">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M2 3H10M4 3V2H8V3M3 3V10C3 10.5 3.5 11 4 11H8C8.5 11 9 10.5 9 10V3" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-            </svg>
+            <Trash2 size={12} />
           </button>
           <button
             className="copilot-btn-sm"
             onClick={isColumn ? onClose : () => setIsOpen(false)}
             title="Close"
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-            </svg>
+            <X size={12} />
           </button>
         </div>
       </div>
@@ -584,17 +568,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       <div className="copilot-messages">
         {messages.length === 0 && !hasConnection && (
           <div className="copilot-empty">
-            <svg className="copilot-empty-icon" width="40" height="40" viewBox="0 0 16 16" fill="none">
-              <path d="M3 3H13C13.55 3 14 3.45 14 4V10C14 10.55 13.55 11 13 11H5L2 14V4C2 3.45 2.45 3 3 3Z" stroke="var(--text-muted)" strokeWidth="0.8" fill="none"/>
-            </svg>
+            <MessageSquare className="copilot-empty-icon" size={40} style={{ color: 'var(--text-muted)' }} />
             <p className="copilot-empty-title">AI Pattern Assistant</p>
             <p className="copilot-empty-hint">
               Configure an AI provider to get started — or use quick actions below without AI.
             </p>
             <button className="copilot-setup-btn" onClick={() => setShowSettings(true)}>
-              <svg width="14" height="14" viewBox="0 0 12 12" fill="none">
-                <path d="M6 7.5A1.5 1.5 0 1 0 6 4.5A1.5 1.5 0 0 0 6 7.5Z" stroke="currentColor" strokeWidth="1" fill="none"/>
-              </svg>
+              <Settings size={14} />
               Configure Provider
             </button>
             <div className="copilot-suggestions" style={{ marginTop: 12 }}>
@@ -697,11 +677,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
             onClick={handleVoiceToggle}
             title="Voice input"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1C5.9 1 5 1.9 5 3V7C5 8.1 5.9 9 7 9C8.1 9 9 8.1 9 7V3C9 1.9 8.1 1 7 1Z" fill={isListening ? 'var(--accent)' : 'none'} stroke="currentColor" strokeWidth="1"/>
-              <path d="M3 6V7C3 9.2 4.8 11 7 11C9.2 11 11 9.2 11 7V6" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-              <path d="M7 11V13" stroke="currentColor" strokeWidth="1" strokeLinecap="round"/>
-            </svg>
+            <Mic size={14} style={isListening ? { color: 'var(--accent)' } : undefined} />
           </button>
         )}
         <input

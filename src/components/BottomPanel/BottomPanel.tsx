@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -146,9 +147,7 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
         <div className="bottom-panel-tabs-spacer" />
         {isOpen && (
           <button className="bottom-panel-close" onClick={onToggle} title="Close Panel">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M4 4L10 10M10 4L4 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
+            <X size={14} />
           </button>
         )}
       </div>

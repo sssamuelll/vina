@@ -1,0 +1,48 @@
+{
+  "name": "issue_372",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Чертеж 1",
+      "x": 0.926042,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Чертеж 1",
+      "basePoint": 1,
+      "angle": 0,
+      "length": 3
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "endLine",
+      "block": "Чертеж 1",
+      "basePoint": 2,
+      "angle": 270,
+      "length": 3
+    },
+    {
+      "id": 4,
+      "name": "",
+      "type": "line",
+      "block": "Чертеж 1",
+      "firstPoint": 1,
+      "secondPoint": 3,
+      "lineColor": "black"
+    }
+  ],
+  "pieces": []
+}

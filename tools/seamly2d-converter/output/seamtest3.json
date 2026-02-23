@@ -1,0 +1,163 @@
+{
+  "name": "seamtest3",
+  "source": "Seamly2D",
+  "unit": "cm",
+  "measurements": {
+    "required": [],
+    "defaults": {}
+  },
+  "variables": {},
+  "construction": [
+    {
+      "id": 1,
+      "name": "A",
+      "type": "single",
+      "block": "Pattern piece 1",
+      "x": 0.79375,
+      "y": 1.05833
+    },
+    {
+      "id": 2,
+      "name": "A1",
+      "type": "endLine",
+      "block": "Pattern piece 1",
+      "basePoint": 1,
+      "angle": 0,
+      "length": 10
+    },
+    {
+      "id": 3,
+      "name": "A2",
+      "type": "normal",
+      "block": "Pattern piece 1",
+      "firstPoint": 2,
+      "secondPoint": 1,
+      "angle": 0,
+      "length": 5
+    },
+    {
+      "id": 4,
+      "name": "A3",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 1,
+      "secondPoint": 3,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 5,
+      "name": "A4",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 4,
+      "secondPoint": 3,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 6,
+      "name": "A5",
+      "type": "alongLine",
+      "block": "Pattern piece 1",
+      "firstPoint": 1,
+      "secondPoint": 4,
+      "length": "CurrentLength/2"
+    },
+    {
+      "id": 7,
+      "name": "",
+      "type": "splinePath",
+      "block": "Pattern piece 1",
+      "pathPoints": [
+        {
+          "point": 3,
+          "angle1": 65.3764,
+          "angle2": 245.376,
+          "length1": 0,
+          "length2": 2.1538
+        },
+        {
+          "point": 5,
+          "angle1": 248.531,
+          "angle2": 68.531,
+          "length1": 1.80107,
+          "length2": 2.63289
+        },
+        {
+          "point": 4,
+          "angle1": 42.0794,
+          "angle2": 222.079,
+          "length1": 0.714555,
+          "length2": 3.76242
+        },
+        {
+          "point": 6,
+          "angle1": 50.1229,
+          "angle2": 230.123,
+          "length1": 2.19303,
+          "length2": 2.72501
+        },
+        {
+          "point": 1,
+          "angle1": 228.872,
+          "angle2": 48.872,
+          "length1": 0.486869,
+          "length2": 0
+        }
+      ]
+    }
+  ],
+  "pieces": [
+    {
+      "name": "",
+      "closed": false,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 8,
+          "type": "NodePoint"
+        },
+        {
+          "id": 9,
+          "type": "NodePoint"
+        },
+        {
+          "id": 10,
+          "type": "NodePoint"
+        },
+        {
+          "id": 11,
+          "type": "NodeSplinePath",
+          "reverse": false
+        },
+        {
+          "id": 12,
+          "type": "NodePoint"
+        },
+        {
+          "id": 13,
+          "type": "NodeSplinePath",
+          "reverse": false
+        },
+        {
+          "id": 14,
+          "type": "NodePoint"
+        },
+        {
+          "id": 15,
+          "type": "NodeSplinePath",
+          "reverse": false
+        },
+        {
+          "id": 16,
+          "type": "NodePoint"
+        },
+        {
+          "id": 17,
+          "type": "NodeSplinePath",
+          "reverse": false
+        }
+      ]
+    }
+  ]
+}
