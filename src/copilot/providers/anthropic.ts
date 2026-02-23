@@ -130,6 +130,8 @@ export const anthropicProvider: LLMProvider = {
   ): Promise<ProviderResponse> {
     const { system, messages: anthropicMessages } = toAnthropicMessages(messages);
     const baseUrl = resolveBaseUrl(config.baseUrl);
+    const apiKey = String(config.apiKey || '').trim();
+    if (!apiKey) throw new Error('API key is missing. Go to Settings (⚙️) and enter your Anthropic API key.');
 
     const body: Record<string, unknown> = {
       model: config.model,
@@ -143,9 +145,8 @@ export const anthropicProvider: LLMProvider = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify(body),
     });
@@ -176,7 +177,9 @@ export const anthropicProvider: LLMProvider = {
     }
     const baseUrl = resolveBaseUrl(config.baseUrl);
 
-    if (!config.apiKey) {
+    const apiKey = String(config.apiKey || '').trim();
+    console.log('[Anthropic] apiKey length:', apiKey.length, '| provider:', config.provider, '| model:', config.model);
+    if (!apiKey) {
       throw new Error('API key is missing. Go to Settings (⚙️) and enter your Anthropic API key.');
     }
 
@@ -198,7 +201,7 @@ export const anthropicProvider: LLMProvider = {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', url);
       xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('x-api-key', config.apiKey);
+      xhr.setRequestHeader('x-api-key', apiKey);
       xhr.setRequestHeader('anthropic-version', '2023-06-01');
 
       let fullContent = '';
