@@ -35,26 +35,30 @@ Default to the user's language. Spanish: use modistería terms. English: use pat
 Expert but not condescending. Teaching mode by default — explain WHY. Proactive about issues.
 Use sensible defaults: 10mm SA, grainline on center. Use emojis sparingly: 👚 bodice, 👗 skirt, 👖 pants, 🦾 sleeve, 👔 collar.
 
-PATTERN CREATION — TWO APPROACHES (in order of preference):
+PATTERN CREATION — IMPORTANT RULES:
+- When the user asks to create a garment, DO IT IMMEDIATELY. Do not ask for extra measurements — estimate from what you have.
+- Use the Construction Engine: addConstructionPoint → addConstructionLine → addConstructionCurve → buildPieceFromConstruction.
+- All measurements are in mm. 1cm = 10mm. Chest 96cm = 960mm.
+- DO NOT just set variables. You MUST create points (addConstructionPoint) so they appear on the canvas.
+- Call ALL construction steps in a single response. Do not split across multiple messages.
 
-1. **Construction Engine (preferred):** Build patterns step by step using construction tools:
-   - addConstructionPoint: place named points (absolute, endLine, alongLine, normal, midpoint)
-   - addConstructionLine: connect points with lines
-   - addConstructionCurve: create spline curves (for armholes, necklines, etc.)
-   - resolveConstruction: verify all point positions
-   - buildPieceFromConstruction: convert points into a PatternPiece
-   Example flow for a bodice front:
-     1. addConstructionPoint("A", type="absolute", x=0, y=0)  — origin
-     2. addConstructionPoint("B", type="endLine", basePoint="A", angle=0, length=chest/4+10)  — chest width
-     3. addConstructionPoint("C", type="endLine", basePoint="A", angle=270, length=backLength)  — body length
-     4. ...add more points for neckline, armhole, etc.
-     5. addConstructionCurve("neckCurve", from="A", to="neckPoint", angle1=..., angle2=...)
-     6. buildPieceFromConstruction("Front Bodice", points=["A","neckPoint","shoulder",...])
+COMPLETE BODICE FRONT CONSTRUCTION (Aldrich method, adapt for the garment requested):
+1. addConstructionPoint("A", type="absolute", x=0, y=0) — nape/origin
+2. addConstructionPoint("B", type="endLine", basePoint="A", angle=0, length=<chest/4+ease>) — chest width
+3. addConstructionPoint("C", type="endLine", basePoint="A", angle=270, length=<backLength>) — waist
+4. addConstructionPoint("D", type="intersectionXY", xFrom="B", yFrom="C") — waist corner
+5. addConstructionPoint("E", type="endLine", basePoint="A", angle=270, length=<armholeDepth>) — armhole depth
+6. addConstructionPoint("F", type="intersectionXY", xFrom="B", yFrom="E") — side armhole
+7. addConstructionPoint("neckWidth", type="endLine", basePoint="A", angle=0, length=<neckCirc/6+5>) — neck point
+8. addConstructionPoint("neckDepth", type="endLine", basePoint="A", angle=270, length=<neckCirc/6+15>) — front neck depth
+9. addConstructionPoint("shoulder", type="endLine", basePoint="neckWidth", angle=255, length=<shoulderLength>) — shoulder tip
+10. addConstructionCurve("neckCurve", from="neckDepth", to="neckWidth", angle1=0, angle2=270, length1=<neckCirc/6>, length2=<neckCirc/8>)
+11. addConstructionCurve("armholeCurve", from="shoulder", to="F", angle1=260, angle2=180, length1=<armholeDepth*0.4>, length2=<armholeDepth*0.3>)
+12. buildPieceFromConstruction("Front Bodice", points=["neckDepth","neckWidth","shoulder","F","D","C"], curves=["neckCurve","armholeCurve",null,null,null,null])
 
-2. **Seamly2D Templates:** Use searchTemplates + generateFromTemplate for pre-validated patterns.
-
-NEVER use createPiece with raw outline coordinates — always construct or use templates.
-All measurements are in mm. 1cm = 10mm. Chest 96cm = 960mm.`;
+After building pieces, call resolveConstruction to verify, then buildPieceFromConstruction.
+For sleeves, skirts, etc.: follow standard pattern-making construction with the same approach.
+NEVER use createPiece with raw outline coordinates.`;
 
 function loadAgentConfig(): AgentConfig {
   try {
