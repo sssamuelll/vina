@@ -1,4 +1,5 @@
 import { PatternPiece, PathCommand } from '../types/types';
+import { generateSeamAllowance } from './seam';
 
 /**
  * Export pattern pieces to DXF (AutoCAD Drawing Exchange Format).
@@ -376,10 +377,12 @@ export function generateDXFLegacy(pieces: PatternPiece[], opts: DxfExportOptions
     // Outline (cut line)
     dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'CUT', opts);
 
-    // Seam allowance (offset outline — simplified: same shape for now)
-    // TODO: proper offset curve
+    // Seam allowance — proper offset via Clipper2
     if (piece.seamAllowance > 0) {
-      dxf += outlineToDXF(piece.outline, offsetX, offsetY, 'SEAM', opts);
+      const saOutline = generateSeamAllowance(piece.outline, piece.seamAllowance);
+      if (saOutline.length > 0) {
+        dxf += outlineToDXF(saOutline, offsetX, offsetY, 'SEAM', opts);
+      }
     }
 
     // Internal lines

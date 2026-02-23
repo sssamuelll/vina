@@ -1,6 +1,7 @@
 import type { PathCommand, Point2D } from '../../types/types';
 import { AngleType, SAPoint } from './types';
 import { equidistant } from './equidistant';
+import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
 
 export { AngleType } from './types';
 export type { SAPoint, SeamAllowanceOptions } from './types';
@@ -101,10 +102,97 @@ export function flattenPath(commands: PathCommand[], resolution: number = CURVE_
   return points;
 }
 
+// Clipper2 scale: integer coords at 100x for 0.01mm precision
+const CLIPPER_SCALE = 100;
+
+export type SeamJoinType = 'round' | 'miter' | 'square';
+
 /**
- * Convert outline PathCommand[] + width → offset PathCommand[].
+ * Convert outline PathCommand[] + width → offset PathCommand[] using Clipper2.
+ *
+ * Uses Clipper2's robust polygon offsetting which correctly handles:
+ * - Concave corners (no self-intersections)
+ * - Acute angles (proper miter limiting)
+ * - Complex shapes with loops
+ *
+ * @param outline  Source path commands
+ * @param width    Seam allowance width in mm (positive = outward)
+ * @param joinType Corner style: 'round' (default, best for fabric), 'miter', or 'square'
  */
-export function generateSeamAllowance(outline: PathCommand[], width: number): PathCommand[] {
+export function generateSeamAllowance(
+  outline: PathCommand[],
+  width: number,
+  joinType: SeamJoinType = 'round',
+): PathCommand[] {
+  if (width <= 0) return [];
+
+  const flat = flattenPath(outline);
+  if (flat.length < 3) return [];
+
+  // Remove closing duplicate if present
+  const last = flat[flat.length - 1];
+  const pts = (Math.abs(flat[0].x - last.x) < 0.001 && Math.abs(flat[0].y - last.y) < 0.001)
+    ? flat.slice(0, -1)
+    : flat;
+
+  if (pts.length < 3) return [];
+
+  // Convert to Clipper2 integer path
+  const clipperPath = new Path64();
+  for (const p of pts) {
+    clipperPath.push(new Point64(
+      Math.round(p.x * CLIPPER_SCALE),
+      Math.round(p.y * CLIPPER_SCALE),
+    ));
+  }
+
+  // Map join type
+  const jt = joinType === 'miter' ? JoinType.Miter
+    : joinType === 'square' ? JoinType.Square
+    : JoinType.Round;
+
+  const co = new ClipperOffset();
+  co.addPath(clipperPath, jt, EndType.Polygon);
+
+  const result = new Paths64();
+  co.execute(width * CLIPPER_SCALE, result);
+
+  if (result.length === 0) return [];
+
+  // Take the largest path (outer offset)
+  let largest = result[0];
+  let largestArea = 0;
+  for (const path of result) {
+    let area = 0;
+    for (let i = 0, n = path.length; i < n; i++) {
+      const j = (i + 1) % n;
+      area += Number(path[i].x) * Number(path[j].y);
+      area -= Number(path[j].x) * Number(path[i].y);
+    }
+    area = Math.abs(area);
+    if (area > largestArea) {
+      largestArea = area;
+      largest = path;
+    }
+  }
+
+  // Convert back to PathCommand[]
+  const commands: PathCommand[] = [
+    { type: 'M', values: [Number(largest[0].x) / CLIPPER_SCALE, Number(largest[0].y) / CLIPPER_SCALE] },
+  ];
+  for (let i = 1; i < largest.length; i++) {
+    commands.push({ type: 'L', values: [Number(largest[i].x) / CLIPPER_SCALE, Number(largest[i].y) / CLIPPER_SCALE] });
+  }
+  commands.push({ type: 'Z', values: [] });
+
+  return commands;
+}
+
+/**
+ * Legacy equidistant-based seam allowance (kept for per-point SA width control).
+ * Use generateSeamAllowance for standard uniform-width offsets.
+ */
+export function generateSeamAllowanceLegacy(outline: PathCommand[], width: number): PathCommand[] {
   if (width <= 0) return [];
 
   const flat = flattenPath(outline);
