@@ -83,8 +83,8 @@ export const HUMAN_JOINTS: Record<string, AnatomicalJoint> = {
   LeftForeArm: {
     type: 'hinge',
     hingeAxis: new THREE.Vector3(0, 0, 1),  // Z axis = elbow flexion only
-    hingeMin: -145,
-    hingeMax: 0,
+    hingeMin: 0,       // mirrored: left elbow flexes on +Z
+    hingeMax: 145,
   },
   RightForeArm: {
     type: 'hinge',
