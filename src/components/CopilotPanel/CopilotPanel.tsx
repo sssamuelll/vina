@@ -8,6 +8,7 @@ import { executeCommands } from '../../copilot/commandExecutor';
 import { getDefaultRegistry } from '../../copilot/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
+import { deepseekProvider } from '../../copilot/providers/deepseek';
 import { ollamaProvider } from '../../copilot/providers/ollama';
 import { claudeBridgeProvider } from '../../copilot/providers/claudeBridge';
 import {
@@ -52,6 +53,7 @@ function getProvider(config: ProviderConfig) {
     case 'claude-bridge': return claudeBridgeProvider;
     case 'anthropic': return anthropicProvider;
     case 'openai': return openaiProvider;
+    case 'deepseek': return deepseekProvider;
     case 'ollama': return ollamaProvider;
     default: return anthropicProvider;
   }

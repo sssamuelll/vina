@@ -104,7 +104,7 @@ export default function AgentSettings({
   const existingConfig = loadProviderConfig();
   const ollamaConfig = loadOllamaConfig();
 
-  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'ollama' | 'claude-bridge'>(
+  const [provider, setProvider] = useState<ProviderConfig['provider']>(
     existingConfig?.provider ?? 'anthropic'
   );
   const [apiKey, setApiKey] = useState(existingConfig?.apiKey ?? '');
@@ -135,7 +135,7 @@ export default function AgentSettings({
 
   // Update model when provider changes
   const handleProviderChange = useCallback((newProvider: string) => {
-    const p = newProvider as 'anthropic' | 'openai' | 'ollama';
+    const p = newProvider as ProviderConfig['provider'];
     setProvider(p);
     const opt = PROVIDER_OPTIONS.find(o => o.value === p);
     if (opt) setModel(opt.defaultModel);
