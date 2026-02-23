@@ -89,6 +89,37 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
+  const [avatarHidden, setAvatarHidden] = useState(false);
+
+  // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
+  // F10 — Snapshot 3D viewport (CLO3D: File > Snapshot > 3D Window)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setAvatarHidden(h => !h);
+      }
+      if (e.key === 'F10') {
+        e.preventDefault();
+        snapshot3D();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  const snapshot3D = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const canvas = container.querySelector('canvas');
+    if (!canvas) return;
+    // Force a fresh render to ensure preserveDrawingBuffer captures current frame
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `openclo-fitmap-${Date.now()}.png`;
+    link.href = dataUrl;
+    link.click();
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -113,7 +144,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
         onCreated={({ scene }) => { scene.background = new THREE.Color('#f0f0f0'); }}
       >
         <ambientLight intensity={0.5} />
@@ -122,8 +153,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         <directionalLight position={[0, 2, 5]} intensity={0.3} />
         <hemisphereLight args={['#ffffff', '#b0c4de', 0.3]} />
 
-        {avatarMode === 'dressform' && <Mannequin />}
-        {avatarMode === 'model' && avatarModelUrl && (
+        {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
+        {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
           <Suspense fallback={null}>
             <AvatarModel url={avatarModelUrl} height={avatar.measurements.height / 100} />
           </Suspense>
@@ -174,7 +205,13 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       </Canvas>
 
       {/* Fit Map Toggle Bar */}
-      <FitMapToggle stats={fitMapStats} inspectedValue={inspectedValue} />
+      <FitMapToggle
+        stats={fitMapStats}
+        inspectedValue={inspectedValue}
+        avatarHidden={avatarHidden}
+        onToggleAvatar={() => setAvatarHidden(h => !h)}
+        onSnapshot={snapshot3D}
+      />
 
       {/* Status indicators */}
       <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>

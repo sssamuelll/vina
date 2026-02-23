@@ -25,6 +25,12 @@ interface FitMapToggleProps {
   stats?: FitMapStats | null;
   /** Value at clicked point (from raycaster) */
   inspectedValue?: number | null;
+  /** Whether avatar is hidden */
+  avatarHidden?: boolean;
+  /** Toggle avatar visibility */
+  onToggleAvatar?: () => void;
+  /** Snapshot the 3D viewport */
+  onSnapshot?: () => void;
 }
 
 // ─── CLO3D 8-stop color scale (exact match) ────────────────────────────────
@@ -176,7 +182,7 @@ const S = {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function FitMapToggle({ stats, inspectedValue }: FitMapToggleProps) {
+export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onToggleAvatar, onSnapshot }: FitMapToggleProps) {
   const dispatch = useDispatch();
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
@@ -233,6 +239,30 @@ export default function FitMapToggle({ stats, inspectedValue }: FitMapToggleProp
             </svg>
           </button>
         ))}
+        {/* Separator + Avatar toggle */}
+        <div style={{ width: 1, background: '#555', margin: '4px 2px' }} />
+        <button
+          onClick={onToggleAvatar}
+          title={`${avatarHidden ? 'Show' : 'Hide'} Avatar (Shift+A)`}
+          style={S.toggleBtn(!avatarHidden)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(!avatarHidden)}>
+            <path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8ZM6 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2" />
+            {avatarHidden && <path d="M1 1l22 22" strokeWidth={2.5} stroke="#ff4444" />}
+          </svg>
+        </button>
+
+        <button
+          onClick={onSnapshot}
+          title="Snapshot 3D Window (F10)"
+          style={S.toggleBtn(false)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(false)}>
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+
         {/* Hover tooltip */}
         {hovered && (
           <div style={{

@@ -394,6 +394,47 @@ describe('color scale correctness', () => {
   });
 });
 
+// ─── Fit Map contact-only behavior ──────────────────────────────────────────
+
+describe('computeFitMap contact-only (CLO3D behavior)', () => {
+  it('non-contact vertices are neutral gray', () => {
+    const sys = twoParticleSystem(1.0, 1.05);
+    // Avatar is far away — no contact
+    const avatarFar = new Float32Array([100, 100, 100]);
+    const result = computeFitMap(sys.positions, sys.numParticles, sys.edges, defaultFabric, DEFAULT_FIT_MAP_CONFIG, avatarFar);
+    // Both vertices should be gray (0.85, 0.85, 0.85) — no contact
+    expect(result.colors[0]).toBeCloseTo(0.85);
+    expect(result.colors[1]).toBeCloseTo(0.85);
+    expect(result.colors[2]).toBeCloseTo(0.85);
+  });
+
+  it('contact vertices get fit colors', () => {
+    const sys = twoParticleSystem(1.0, 1.05);
+    // Avatar right next to vertex 0
+    const avatarNear = new Float32Array([0, 0, 0.001]);
+    const result = computeFitMap(sys.positions, sys.numParticles, sys.edges, defaultFabric, DEFAULT_FIT_MAP_CONFIG, avatarNear);
+    // Vertex 0 is in contact — should NOT be gray
+    // It should be white-ish (low fit ratio for 5% elongation on 8% max = 62.5%)
+    expect(result.colors[0]).toBeGreaterThan(0.86); // Not neutral gray
+  });
+
+  it('percentages are relative to contact area', () => {
+    const sys = twoParticleSystem(1.0, 1.10); // 10% elongation = 125% of 8% max = can't wear
+    // Only vertex 0 in contact
+    const avatarNear = new Float32Array([0, 0, 0.001]);
+    const result = computeFitMap(sys.positions, sys.numParticles, sys.edges, defaultFabric, DEFAULT_FIT_MAP_CONFIG, avatarNear);
+    // 1 contact vertex, which is can't-wear → 100% can't-wear
+    expect(result.stats.cantWearPct).toBe(100);
+  });
+
+  it('no avatar = fallback to all vertices', () => {
+    const sys = twoParticleSystem(1.0, 1.05);
+    const result = computeFitMap(sys.positions, sys.numParticles, sys.edges, defaultFabric);
+    // Without avatar, all vertices should be colored (not gray)
+    expect(result.colors[0]).not.toBeCloseTo(0.85);
+  });
+});
+
 // ─── Edge cases ─────────────────────────────────────────────────────────────
 
 describe('edge cases', () => {

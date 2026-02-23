@@ -312,21 +312,59 @@ export function computeFitMap(
   edges: SolverEdgeData,
   fabric: FabricFitParams,
   config: FitMapConfig = DEFAULT_FIT_MAP_CONFIG,
+  avatarPositions?: Float32Array | null,
 ): FitMapData {
   const strain = computePerVertexStrain(positions, numParticles, edges);
   const values = new Float32Array(numParticles);
   const colors = new Float32Array(numParticles * 3);
 
+  // CLO3D: "Fit Map is calculated for the areas in which fabric and avatar are in contact."
+  // Build contact mask — vertices within pressureDistance of avatar are "in contact"
+  const contactMask = new Uint8Array(numParticles);
+  if (avatarPositions && avatarPositions.length >= 3) {
+    const threshold = config.pressureDistance * 3; // Slightly wider for fit map (contact zone, not just touching)
+    const thresholdSq = threshold * threshold;
+    const numAvatarVerts = avatarPositions.length / 3;
+    for (let i = 0; i < numParticles; i++) {
+      const gx = positions[3 * i], gy = positions[3 * i + 1], gz = positions[3 * i + 2];
+      for (let j = 0; j < numAvatarVerts; j++) {
+        const dx = gx - avatarPositions[3 * j];
+        const dy = gy - avatarPositions[3 * j + 1];
+        const dz = gz - avatarPositions[3 * j + 2];
+        if (dx * dx + dy * dy + dz * dz < thresholdSq) {
+          contactMask[i] = 1;
+          break;
+        }
+      }
+    }
+  } else {
+    // No avatar data — show fit map on all vertices (fallback)
+    contactMask.fill(1);
+  }
+
   const maxStretch = Math.max(fabric.maxStretchRatio, 0.001);
   const [tightThreshold, cantWearThreshold] = config.fitThresholds;
   let min = Infinity, max = -Infinity, sum = 0;
   let tightCount = 0, cantWearCount = 0;
+  let contactCount = 0;
+
+  /** Non-contact color: neutral light gray */
+  const NO_CONTACT: [number, number, number] = [0.85, 0.85, 0.85];
 
   for (let i = 0; i < numParticles; i++) {
     const elongation = Math.max(0, strain[i] - 1.0);
-    const fitRatio = elongation / maxStretch; // 0 = no stretch, 1 = at limit
+    const fitRatio = elongation / maxStretch;
     values[i] = fitRatio;
 
+    // Only color contact areas; non-contact = neutral gray
+    if (!contactMask[i]) {
+      colors[3 * i] = NO_CONTACT[0];
+      colors[3 * i + 1] = NO_CONTACT[1];
+      colors[3 * i + 2] = NO_CONTACT[2];
+      continue;
+    }
+
+    contactCount++;
     if (fitRatio < min) min = fitRatio;
     if (fitRatio > max) max = fitRatio;
     sum += fitRatio;
@@ -336,12 +374,10 @@ export function computeFitMap(
       color = FIT_COLOR_CANT_WEAR;
       cantWearCount++;
     } else if (fitRatio > tightThreshold) {
-      // Interpolate yellow → red in the tight zone
       const t = (fitRatio - tightThreshold) / (cantWearThreshold - tightThreshold);
       color = lerpColor(FIT_COLOR_TIGHT, FIT_COLOR_CANT_WEAR, t);
       tightCount++;
     } else {
-      // Interpolate white → yellow in the OK zone
       const t = fitRatio / tightThreshold;
       color = lerpColor(FIT_COLOR_OK, FIT_COLOR_TIGHT, t);
     }
@@ -351,7 +387,8 @@ export function computeFitMap(
     colors[3 * i + 2] = color[2];
   }
 
-  const total = numParticles || 1;
+  // Percentages relative to contact area (not total garment)
+  const total = contactCount || 1;
 
   return {
     mode: 'fit',
@@ -474,7 +511,7 @@ export function computeFitMapData(
     case 'strain':
       return computeStrainMap(positions, numParticles, edges, config);
     case 'fit':
-      return computeFitMap(positions, numParticles, edges, fabric, config);
+      return computeFitMap(positions, numParticles, edges, fabric, config, avatarPositions);
     case 'pressure':
       return computePressurePoints(positions, numParticles, avatarPositions ?? null, config);
     case 'none':
