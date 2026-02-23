@@ -16,6 +16,13 @@ import { RootState } from '../../store';
 import { PatternPiece, PathCommand } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
+import {
+  computeFitMapData,
+  fabricToFitParams,
+  type SolverEdgeData,
+  type FitMapStats,
+} from '../../utils/cloth/fitMaps';
+import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -184,6 +191,8 @@ interface ClothMeshProps {
   color: string;
   /** 3D position when not simulating */
   position: [number, number, number];
+  /** Callback with fit map stats (for legend display) */
+  onFitMapStats?: (stats: FitMapStats | null) => void;
 }
 
 /**
@@ -192,14 +201,18 @@ interface ClothMeshProps {
  * When the simulation slice is 'running', initializes a ClothWorkerClient
  * and updates geometry from worker frames. When idle, renders as a static mesh.
  */
-export default function ClothMesh({ piece, isSelected, color, position }: ClothMeshProps) {
+export default function ClothMesh({ piece, isSelected, color, position, onFitMapStats }: ClothMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const positionsRef = useRef<Float32Array | null>(null);
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const triIdsRef = useRef<Int32Array | null>(null);
+  const edgeDataRef = useRef<SolverEdgeData | null>(null);
+  const colorsRef = useRef<Float32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
+  const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) =>
     s.simulation.pieceFabrics[piece.id] ?? s.simulation.defaultFabricId
   );
@@ -232,9 +245,14 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
       const client = new ClothWorkerClient();
       clientRef.current = client;
       client.onFrame = onFrame;
+      client.onEdgeData = (ids, lengths) => {
+        edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+      };
 
       client.init(meshData).then(async () => {
         client.setFabric(fabricId);
+        // Request edge data for fit map computation
+        client.requestEdgeData();
 
         // Generate and set avatar body SDF for collision
         if (avatarModelUrl) {
@@ -255,6 +273,7 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
         client.dispose();
         clientRef.current = null;
         positionsRef.current = null;
+        edgeDataRef.current = null;
       };
     } else if (simulationState === 'idle') {
       if (clientRef.current) {
@@ -275,18 +294,49 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
     }
   }, [fabricId, simulationState]);
 
-  // Per-frame geometry update from worker positions
+  // Per-frame geometry update from worker positions + fit map colors
   useFrame(() => {
     if (!meshRef.current) return;
     const positions = positionsRef.current;
     if (!positions || !geometryRef.current) return;
 
-    const posAttr = geometryRef.current.getAttribute('position') as THREE.BufferAttribute;
+    const geo = geometryRef.current;
+    const posAttr = geo.getAttribute('position') as THREE.BufferAttribute;
     if (posAttr && posAttr.array.length === positions.length) {
       (posAttr.array as Float32Array).set(positions);
       posAttr.needsUpdate = true;
-      geometryRef.current.computeVertexNormals();
-      geometryRef.current.computeBoundingSphere();
+      geo.computeVertexNormals();
+      geo.computeBoundingSphere();
+    }
+
+    // Compute fit map vertex colors
+    if (fitMapMode !== 'none' && edgeDataRef.current) {
+      const numP = positions.length / 3;
+      const fabric = PHYSICAL_FABRIC_LIBRARY.find((f: { id: string }) => f.id === fabricId);
+      const fitParams = fabric ? fabricToFitParams(fabric) : {
+        maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
+      };
+      const mapData = computeFitMapData(
+        fitMapMode, positions, numP, edgeDataRef.current, fitParams, null, fitMapConfig,
+      );
+      if (mapData) {
+        let colorAttr = geo.getAttribute('color') as THREE.BufferAttribute | null;
+        if (!colorAttr || colorAttr.array.length !== mapData.colors.length) {
+          colorAttr = new THREE.BufferAttribute(new Float32Array(mapData.colors.length), 3);
+          geo.setAttribute('color', colorAttr);
+        }
+        (colorAttr.array as Float32Array).set(mapData.colors);
+        colorAttr.needsUpdate = true;
+        colorsRef.current = mapData.colors;
+        onFitMapStats?.(mapData.stats);
+      }
+    } else {
+      // Remove vertex colors when fit map is off
+      if (geo.getAttribute('color')) {
+        geo.deleteAttribute('color');
+        colorsRef.current = null;
+        onFitMapStats?.(null);
+      }
     }
   });
 
@@ -309,10 +359,11 @@ export default function ClothMesh({ piece, isSelected, color, position }: ClothM
     <group position={simulationState !== 'idle' ? [0, 0, 0] : position}>
       <mesh ref={meshRef} geometry={staticGeometry}>
         <meshStandardMaterial
-          color={isSelected ? '#ffd700' : color}
+          color={fitMapMode !== 'none' ? '#ffffff' : (isSelected ? '#ffd700' : color)}
+          vertexColors={fitMapMode !== 'none'}
           side={THREE.DoubleSide}
           transparent
-          opacity={0.85}
+          opacity={fitMapMode !== 'none' ? 0.95 : 0.85}
           roughness={0.7}
           metalness={0}
         />

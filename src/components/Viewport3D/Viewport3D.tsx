@@ -9,6 +9,7 @@ import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
 import JointGizmos from './JointGizmos';
+import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
@@ -86,6 +87,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   // Force Canvas to resize continuously during CSS transitions
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -129,7 +131,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
 
         {useClothSim ? (
-          <GarmentSimulation pieces={pieces} seams={seams} />
+          <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} />
         ) : (
           (() => {
             const placements = placeGarmentPieces(pieces, avatar.measurements);
@@ -169,6 +171,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           target={[0, 0.75, 0]}
         />
       </Canvas>
+
+      {/* Fit Map Toggle Bar */}
+      <FitMapToggle stats={fitMapStats} />
 
       {/* Status indicators */}
       <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>

@@ -223,6 +223,17 @@ export class ClothWorkerClient {
     this.postMessage({ type: 'unpinParticle', index });
   }
 
+  /** Callback for edge data response (for fit maps). */
+  onEdgeData: ((stretchingIds: Int32Array, stretchingLengths: Float32Array) => void) | null = null;
+
+  /**
+   * Request edge constraint data from the worker (for fit map computation).
+   * Results arrive asynchronously via onEdgeData callback.
+   */
+  requestEdgeData(): void {
+    this.postMessage({ type: 'getEdgeData' });
+  }
+
   /**
    * Terminate the worker and release resources.
    */
@@ -260,6 +271,10 @@ export class ClothWorkerClient {
 
       case 'error':
         this.onError?.(msg.message);
+        break;
+
+      case 'edgeData':
+        this.onEdgeData?.(msg.stretchingIds, msg.stretchingLengths);
         break;
     }
   }

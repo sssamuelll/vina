@@ -12,7 +12,10 @@ import {
   startSimulation as startSimAction,
   pauseSimulation as pauseSimAction,
   resetSimulation,
+  setFitMapMode,
+  updateFitMapConfig,
 } from '../../../store/simulationSlice';
+import type { FitMapMode } from '../../../utils/cloth/fitMaps';
 import { FABRIC_LIBRARY } from '../../../utils/cloth/fabricLibrary';
 
 // ─── setFabric ──────────────────────────────────────────────────────────────
@@ -129,9 +132,77 @@ const pauseSimulationTool: ToolDefinition = {
 
 // ─── Export ─────────────────────────────────────────────────────────────────
 
+// ─── setFitMapMode ──────────────────────────────────────────────────────────
+
+const setFitMapModeTool: ToolDefinition = {
+  name: 'setFitMapMode',
+  description:
+    'Toggle garment fit map visualization (CLO3D-style). Shows stress, strain, fit, or pressure overlay on the simulated garment. ' +
+    '/ Alternar visualización de mapa de ajuste (estilo CLO3D). Muestra estrés, deformación, ajuste o presión.',
+  parameters: {
+    type: 'object',
+    properties: {
+      mode: {
+        type: 'string',
+        enum: ['none', 'stress', 'strain', 'fit', 'pressure'],
+        description:
+          'none=off, stress=kPa pressure, strain=% stretch, fit=% of max distortion, pressure=avatar contact points',
+      },
+    },
+    required: ['mode'],
+  },
+  execute: async (params, dispatch): Promise<ToolResult> => {
+    const mode = params.mode as FitMapMode;
+    dispatch(setFitMapMode(mode));
+    const descriptions: Record<string, string> = {
+      none: 'Fit map visualization disabled',
+      stress: 'Stress Map: force per unit area (kPa). Blue=0, Red=100kPa',
+      strain: 'Strain Map: % elongation. Blue=100% (rest), Red=120%',
+      fit: 'Fit Map: % of max fabric distortion. White=OK, Yellow=Tight(>80%), Red=Can\'t Wear(>100%)',
+      pressure: 'Pressure Points: avatar-garment contact visualization',
+    };
+    return { success: true, data: { mode, description: descriptions[mode] } };
+  },
+};
+
+// ─── configureFitMap ────────────────────────────────────────────────────────
+
+const configureFitMapTool: ToolDefinition = {
+  name: 'configureFitMap',
+  description:
+    'Adjust fit map visualization ranges and thresholds (CLO3D "Garment Fit Properties"). ' +
+    '/ Ajustar rangos y umbrales de visualización del mapa de ajuste.',
+  parameters: {
+    type: 'object',
+    properties: {
+      stressMax: { type: 'number', description: 'Max stress range in kPa (default 100)' },
+      strainMax: { type: 'number', description: 'Max strain range as ratio (default 1.2 = 120%)' },
+      tightThreshold: { type: 'number', description: 'Tight fit threshold as fraction of max (default 0.8)' },
+      cantWearThreshold: { type: 'number', description: "Can't wear threshold (default 1.0)" },
+      pressureDistance: { type: 'number', description: 'Contact distance in meters (default 0.002)' },
+    },
+  },
+  execute: async (params, dispatch): Promise<ToolResult> => {
+    const patch: Record<string, unknown> = {};
+    if (params.stressMax !== undefined) patch.stressRange = [0, params.stressMax as number];
+    if (params.strainMax !== undefined) patch.strainRange = [1.0, params.strainMax as number];
+    if (params.tightThreshold !== undefined || params.cantWearThreshold !== undefined) {
+      patch.fitThresholds = [
+        (params.tightThreshold as number) ?? 0.8,
+        (params.cantWearThreshold as number) ?? 1.0,
+      ];
+    }
+    if (params.pressureDistance !== undefined) patch.pressureDistance = params.pressureDistance;
+    dispatch(updateFitMapConfig(patch));
+    return { success: true, data: { updated: Object.keys(patch) } };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   setFabricTool,
   listFabricsTool,
   startSimulationTool,
   pauseSimulationTool,
+  setFitMapModeTool,
+  configureFitMapTool,
 ];

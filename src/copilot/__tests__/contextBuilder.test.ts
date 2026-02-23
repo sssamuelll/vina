@@ -98,6 +98,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       defaultFabricId: 'cotton-poplin',
       particleDistance: 5,
       pieceParticleDistance: {},
+      fitMapMode: 'none' as const,
+      fitMapConfig: { stressRange: [0, 100] as [number, number], strainRange: [1.0, 1.2] as [number, number], fitThresholds: [0.8, 1.0] as [number, number], pressureDistance: 0.002 },
     },
     plugins: {
       installedPlugins: [],

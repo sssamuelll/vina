@@ -837,6 +837,24 @@ export class XPBDClothSolver {
   get numBendingConstraints(): number {
     return this.bendingLengths.length;
   }
+
+  /**
+   * Get edge data for fit map computation.
+   * Returns read-only views of stretching constraint arrays.
+   */
+  getEdgeData(): { stretchingIds: Int32Array; stretchingLengths: Float32Array } {
+    return {
+      stretchingIds: this.stretchingIds,
+      stretchingLengths: this.stretchingLengths,
+    };
+  }
+
+  /**
+   * Get current positions as a read-only view.
+   */
+  getPositions(): Float32Array {
+    return this.pos;
+  }
 }
 
 // ─── Mesh Generation Utilities ──────────────────────────────────────────────

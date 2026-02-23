@@ -17,6 +17,8 @@ import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
 import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
+import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
+import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
@@ -67,19 +69,24 @@ function seamsToInitData(seams: Seam[]): SeamInitData[] {
 interface GarmentSimulationProps {
   pieces: PatternPiece[];
   seams: Seam[];
+  onFitMapStats?: (stats: import('../../utils/cloth/fitMaps').FitMapStats | null) => void;
 }
 
 /**
  * Merged multi-piece simulation component.
  * Renders all pieces as a single merged mesh with vertex colors.
  */
-function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
+function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const positionsRef = useRef<Float32Array | null>(null);
   const clientRef = useRef<ClothWorkerClient | null>(null);
+  const edgeDataRef = useRef<import('../../utils/cloth/fitMaps').SolverEdgeData | null>(null);
+  const pieceColorsRef = useRef<Float32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
+  const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
@@ -200,9 +207,13 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       const client = new ClothWorkerClient();
       clientRef.current = client;
       client.onFrame = onFrame;
+      client.onEdgeData = (ids, lengths) => {
+        edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+      };
 
       client.initMultiPiece(pieceMeshes, seamInitData).then(async () => {
         client.setFabric(fabricId);
+        client.requestEdgeData();
 
         // Generate and set avatar body SDF for collision
         if (avatarModelUrl) {
@@ -247,6 +258,34 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       staticGeometry.computeVertexNormals();
       staticGeometry.computeBoundingSphere();
     }
+
+    // Compute fit map overlay colors
+    const colorAttr = staticGeometry.getAttribute('color') as THREE.BufferAttribute;
+    if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr) {
+      // Save original piece colors on first fit-map frame
+      if (!pieceColorsRef.current) {
+        pieceColorsRef.current = new Float32Array(colorAttr.array as Float32Array);
+      }
+      const numP = positions.length / 3;
+      const fabric = PHYSICAL_FABRIC_LIBRARY.find((f: { id: string }) => f.id === fabricId);
+      const fitParams = fabric ? fabricToFitParams(fabric) : {
+        maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
+      };
+      const mapData = computeFitMapData(
+        fitMapMode, positions, numP, edgeDataRef.current, fitParams, null, fitMapConfig,
+      );
+      if (mapData) {
+        (colorAttr.array as Float32Array).set(mapData.colors);
+        colorAttr.needsUpdate = true;
+        onFitMapStats?.(mapData.stats);
+      }
+    } else if (fitMapMode === 'none' && pieceColorsRef.current && colorAttr) {
+      // Restore original piece colors
+      (colorAttr.array as Float32Array).set(pieceColorsRef.current);
+      colorAttr.needsUpdate = true;
+      pieceColorsRef.current = null;
+      onFitMapStats?.(null);
+    }
   });
 
   useEffect(() => {
@@ -272,14 +311,14 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
 /**
  * GarmentSimulation — decides whether to use merged or individual simulation.
  */
-export default function GarmentSimulation({ pieces, seams }: GarmentSimulationProps) {
+export default function GarmentSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const hasSeams = seams.length > 0;
 
   if (hasSeams) {
     return (
       <Suspense fallback={null}>
-        <MergedSimulation pieces={pieces} seams={seams} />
+        <MergedSimulation pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} />
       </Suspense>
     );
   }
@@ -296,6 +335,7 @@ export default function GarmentSimulation({ pieces, seams }: GarmentSimulationPr
           isSelected={selectedPieceIds.includes(piece.id)}
           color={PIECE_COLORS[i % PIECE_COLORS.length]}
           position={placements[i].position}
+          onFitMapStats={i === 0 ? onFitMapStats : undefined}
         />
       ))}
     </Suspense>

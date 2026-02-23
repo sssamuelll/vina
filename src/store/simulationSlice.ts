@@ -7,6 +7,7 @@
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import type { FitMapMode, FitMapConfig } from '../utils/cloth/fitMaps';
 
 /** Simulation lifecycle state. */
 export type SimulationState = 'idle' | 'running' | 'paused';
@@ -22,6 +23,10 @@ interface SimulationSliceState {
   particleDistance: number;
   /** Per-piece particle distance overrides in mm, keyed by piece ID */
   pieceParticleDistance: Record<string, number>;
+  /** Active fit map visualization mode */
+  fitMapMode: FitMapMode;
+  /** Fit map visualization configuration */
+  fitMapConfig: FitMapConfig;
 }
 
 const initialState: SimulationSliceState = {
@@ -30,6 +35,13 @@ const initialState: SimulationSliceState = {
   defaultFabricId: 'cotton-poplin',
   particleDistance: 5,
   pieceParticleDistance: {},
+  fitMapMode: 'none' as FitMapMode,
+  fitMapConfig: {
+    stressRange: [0, 100],
+    strainRange: [1.0, 1.2],
+    fitThresholds: [0.8, 1.0],
+    pressureDistance: 0.002,
+  },
 };
 
 const simulationSlice = createSlice({
@@ -64,6 +76,14 @@ const simulationSlice = createSlice({
     setPieceParticleDistance(state, action: PayloadAction<{ pieceId: string; distance: number }>) {
       state.pieceParticleDistance[action.payload.pieceId] = Math.max(2, Math.min(20, action.payload.distance));
     },
+    /** Set the active fit map visualization mode. */
+    setFitMapMode(state, action: PayloadAction<FitMapMode>) {
+      state.fitMapMode = action.payload;
+    },
+    /** Update fit map configuration (partial merge). */
+    updateFitMapConfig(state, action: PayloadAction<Partial<FitMapConfig>>) {
+      Object.assign(state.fitMapConfig, action.payload);
+    },
   },
 });
 
@@ -75,6 +95,8 @@ export const {
   setDefaultFabric,
   setParticleDistance,
   setPieceParticleDistance,
+  setFitMapMode,
+  updateFitMapConfig,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

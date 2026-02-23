@@ -42,12 +42,14 @@ export type WorkerInMessage =
   | { type: 'setCapsuleColliders'; colliders: CapsuleCollider[] }
   | { type: 'setSDF'; sdf: SDFData }
   | { type: 'pinParticle'; index: number }
-  | { type: 'unpinParticle'; index: number };
+  | { type: 'unpinParticle'; index: number }
+  | { type: 'getEdgeData' };
 
 /** Messages sent from worker → main thread */
 export type WorkerOutMessage =
   | { type: 'ready' }
   | { type: 'frame'; positions: Float32Array; numParticles: number; triIds: Int32Array }
+  | { type: 'edgeData'; stretchingIds: Int32Array; stretchingLengths: Float32Array }
   | { type: 'stopped' }
   | { type: 'error'; message: string };
 
@@ -279,6 +281,21 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       case 'unpinParticle': {
         if (solver) {
           solver.unpinParticle(msg.index);
+        }
+        break;
+      }
+      case 'getEdgeData': {
+        if (solver) {
+          const edgeData = solver.getEdgeData();
+          const outMsg: WorkerOutMessage = {
+            type: 'edgeData',
+            stretchingIds: new Int32Array(edgeData.stretchingIds),
+            stretchingLengths: new Float32Array(edgeData.stretchingLengths),
+          };
+          (self as unknown as Worker).postMessage(outMsg, [
+            (outMsg as { stretchingIds: Int32Array }).stretchingIds.buffer,
+            (outMsg as { stretchingLengths: Float32Array }).stretchingLengths.buffer,
+          ]);
         }
         break;
       }
