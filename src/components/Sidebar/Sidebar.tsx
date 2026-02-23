@@ -10,6 +10,7 @@ import {
 } from '../views';
 import PluginManager from '../PluginManager/PluginManager';
 import SimulationView from './SimulationView';
+import ParametricView from './ParametricView';
 import '../views/views.css';
 import './Sidebar.css';
 
@@ -27,6 +28,7 @@ const viewTitles: Record<SidebarView, string> = {
   plugins: 'Plugins',
   settings: 'Settings',
   simulation: 'Simulation',
+  parametric: 'Parametric',
 };
 
 export default function Sidebar({ activeView, onClose }: SidebarProps) {
@@ -51,6 +53,7 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             {activeView === 'plugins' && <PluginManager />}
             {activeView === 'settings' && <SettingsView />}
             {activeView === 'simulation' && <SimulationView />}
+            {activeView === 'parametric' && <ParametricView />}
           </div>
         </>
       )}

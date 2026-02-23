@@ -1,0 +1,336 @@
+/* ─── Parametric View ─────────────────────────────────────────────────────
+ * Design: clean, premium feel. Every element earns its space.
+ * Sliders are the hero — large, responsive, satisfying to use.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+.parametric-view {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0;
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* ─── Template selector ─────────────────────────────────────────────────── */
+
+.parametric-template-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.parametric-template-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.parametric-template-meta {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+/* ─── Category groups ───────────────────────────────────────────────────── */
+
+.parametric-group {
+  border-bottom: 1px solid var(--border);
+}
+
+.parametric-group:last-child {
+  border-bottom: none;
+}
+
+.parametric-group-header {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.parametric-group-header:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.parametric-group-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.parametric-group-label svg {
+  opacity: 0.5;
+}
+
+.parametric-group-chevron {
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.parametric-group-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.parametric-group-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.2s ease;
+  overflow: hidden;
+}
+
+.parametric-group-body.collapsed {
+  grid-template-rows: 0fr;
+}
+
+.parametric-group-body > .parametric-group-content {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.parametric-group-content {
+  padding: 4px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ─── Individual slider ─────────────────────────────────────────────────── */
+
+.parametric-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.parametric-slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.parametric-slider-name {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.parametric-slider-value {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.parametric-slider-number {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+  background: none;
+  border: none;
+  padding: 0;
+  outline: none;
+  cursor: text;
+}
+
+.parametric-slider-number:focus {
+  color: var(--accent);
+}
+
+.parametric-slider-unit {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* ─── Range input — custom styled ───────────────────────────────────────── */
+
+.parametric-range-wrap {
+  position: relative;
+  height: 20px;
+  display: flex;
+  align-items: center;
+}
+
+.parametric-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Track fill (accent color up to thumb position) — done via CSS gradient */
+.parametric-range::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+}
+
+/* Thumb */
+.parametric-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-secondary);
+  cursor: grab;
+  transition: box-shadow 0.15s, transform 0.1s;
+  box-shadow: 0 0 0 0 rgba(74, 158, 255, 0);
+  margin-top: -5.5px;
+}
+
+.parametric-range::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 0 4px rgba(74, 158, 255, 0.15);
+  transform: scale(1.1);
+}
+
+.parametric-range::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  box-shadow: 0 0 0 6px rgba(74, 158, 255, 0.2);
+  transform: scale(1.15);
+}
+
+/* Firefox */
+.parametric-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg-secondary);
+  cursor: grab;
+}
+
+.parametric-range::-moz-range-track {
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ─── Range labels (min/max) ────────────────────────────────────────────── */
+
+.parametric-range-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.parametric-range-label {
+  font-size: 9px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.6;
+}
+
+/* ─── Empty state ───────────────────────────────────────────────────────── */
+
+.parametric-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.parametric-empty-icon {
+  color: var(--text-muted);
+  opacity: 0.3;
+}
+
+.parametric-empty-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.parametric-empty-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  max-width: 200px;
+}
+
+/* ─── Fabric bar ────────────────────────────────────────────────────────── */
+
+.parametric-fabric-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(74, 158, 255, 0.04);
+  border-bottom: 1px solid var(--border);
+}
+
+.parametric-fabric-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--border-light);
+  flex-shrink: 0;
+}
+
+.parametric-fabric-name {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.parametric-fabric-weight {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Reset button ──────────────────────────────────────────────────────── */
+
+.parametric-reset-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px 14px 14px;
+  padding: 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: var(--btn-transition);
+}
+
+.parametric-reset-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+  background: var(--accent-dim);
+}
