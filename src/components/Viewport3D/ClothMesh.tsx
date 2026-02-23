@@ -193,6 +193,8 @@ interface ClothMeshProps {
   position: [number, number, number];
   /** Callback with fit map stats (for legend display) */
   onFitMapStats?: (stats: FitMapStats | null) => void;
+  /** Callback with inspected value when user clicks a point */
+  onInspect?: (value: number | null) => void;
 }
 
 /**
@@ -201,7 +203,7 @@ interface ClothMeshProps {
  * When the simulation slice is 'running', initializes a ClothWorkerClient
  * and updates geometry from worker frames. When idle, renders as a static mesh.
  */
-export default function ClothMesh({ piece, isSelected, color, position, onFitMapStats }: ClothMeshProps) {
+export default function ClothMesh({ piece, isSelected, color, position, onFitMapStats, onInspect }: ClothMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const positionsRef = useRef<Float32Array | null>(null);
@@ -209,6 +211,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
   const triIdsRef = useRef<Int32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
   const colorsRef = useRef<Float32Array | null>(null);
+  const fitValuesRef = useRef<Float32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
@@ -328,6 +331,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
         (colorAttr.array as Float32Array).set(mapData.colors);
         colorAttr.needsUpdate = true;
         colorsRef.current = mapData.colors;
+        fitValuesRef.current = mapData.values;
         onFitMapStats?.(mapData.stats);
       }
     } else {
@@ -335,6 +339,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
       if (geo.getAttribute('color')) {
         geo.deleteAttribute('color');
         colorsRef.current = null;
+        fitValuesRef.current = null;
         onFitMapStats?.(null);
       }
     }
@@ -357,7 +362,29 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
 
   return (
     <group position={simulationState !== 'idle' ? [0, 0, 0] : position}>
-      <mesh ref={meshRef} geometry={staticGeometry}>
+      <mesh
+        ref={meshRef}
+        geometry={staticGeometry}
+        onClick={(e) => {
+          if (fitMapMode === 'none' || !fitValuesRef.current) return;
+          e.stopPropagation();
+          // Find nearest vertex to intersection point
+          const point = e.point;
+          const pos = positionsRef.current;
+          if (!pos) return;
+          const numP = pos.length / 3;
+          let minDist = Infinity;
+          let nearestIdx = 0;
+          for (let i = 0; i < numP; i++) {
+            const dx = pos[3 * i] - point.x;
+            const dy = pos[3 * i + 1] - point.y;
+            const dz = pos[3 * i + 2] - point.z;
+            const d = dx * dx + dy * dy + dz * dz;
+            if (d < minDist) { minDist = d; nearestIdx = i; }
+          }
+          onInspect?.(fitValuesRef.current[nearestIdx]);
+        }}
+      >
         <meshStandardMaterial
           color={fitMapMode !== 'none' ? '#ffffff' : (isSelected ? '#ffd700' : color)}
           vertexColors={fitMapMode !== 'none'}

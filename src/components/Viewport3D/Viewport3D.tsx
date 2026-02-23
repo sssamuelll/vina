@@ -88,6 +88,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
+  const [inspectedValue, setInspectedValue] = useState<number | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -131,7 +132,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
 
         {useClothSim ? (
-          <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} />
+          <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
         ) : (
           (() => {
             const placements = placeGarmentPieces(pieces, avatar.measurements);
@@ -173,7 +174,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       </Canvas>
 
       {/* Fit Map Toggle Bar */}
-      <FitMapToggle stats={fitMapStats} />
+      <FitMapToggle stats={fitMapStats} inspectedValue={inspectedValue} />
 
       {/* Status indicators */}
       <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>

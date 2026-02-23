@@ -70,6 +70,7 @@ interface GarmentSimulationProps {
   pieces: PatternPiece[];
   seams: Seam[];
   onFitMapStats?: (stats: import('../../utils/cloth/fitMaps').FitMapStats | null) => void;
+  onInspect?: (value: number | null) => void;
 }
 
 /**
@@ -311,14 +312,14 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 /**
  * GarmentSimulation — decides whether to use merged or individual simulation.
  */
-export default function GarmentSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
+export default function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const hasSeams = seams.length > 0;
 
   if (hasSeams) {
     return (
       <Suspense fallback={null}>
-        <MergedSimulation pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} />
+        <MergedSimulation pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} onInspect={onInspect} />
       </Suspense>
     );
   }
@@ -336,6 +337,7 @@ export default function GarmentSimulation({ pieces, seams, onFitMapStats }: Garm
           color={PIECE_COLORS[i % PIECE_COLORS.length]}
           position={placements[i].position}
           onFitMapStats={i === 0 ? onFitMapStats : undefined}
+          onInspect={onInspect}
         />
       ))}
     </Suspense>
