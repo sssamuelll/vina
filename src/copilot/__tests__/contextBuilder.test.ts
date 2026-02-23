@@ -156,6 +156,15 @@ function mockState(overrides?: Partial<RootState>): RootState {
       variableDefaults: {},
       generatedPieceIds: [],
     },
+    construction: {
+      points: [],
+      lines: [],
+      curves: [],
+      pieces: [],
+      variables: {},
+      selectedEntity: null,
+      showConstruction: true,
+    },
   };
 
   if (overrides) {

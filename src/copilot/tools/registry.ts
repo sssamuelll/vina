@@ -24,6 +24,7 @@ import { tools as autoSewToolDefs } from './definitions/autoSewTools';
 import { tools as templateToolDefs } from './definitions/templateTools';
 import { tools as fabricToolDefs } from './definitions/fabricTools';
 import { tools as semanticToolDefs } from './definitions/semanticTools';
+import { tools as constructionToolDefs } from './definitions/constructionTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -277,6 +278,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   templateToolDefs,
   fabricToolDefs,
   semanticToolDefs,
+  constructionToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

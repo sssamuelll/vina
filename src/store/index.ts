@@ -8,6 +8,7 @@ import markerReducer from './markerSlice';
 import avatarReducer from './avatarSlice';
 import toolReducer from './toolSlice';
 import parametricReducer from './parametricSlice';
+import constructionReducer from './constructionSlice';
 import { undoMiddleware } from './undoMiddleware';
 
 export const store = configureStore({
@@ -21,6 +22,7 @@ export const store = configureStore({
     avatar: avatarReducer,
     tools: toolReducer,
     parametric: parametricReducer,
+    construction: constructionReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
