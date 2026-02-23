@@ -7,8 +7,7 @@ import { addPiece, updatePiece, removePiece, movePiece, addInternalLine } from '
 import { selectPiece } from '../store/editorSlice';
 import { CopilotCommand } from './protocol';
 import { PatternPiece, PathCommand, InternalLine } from '../types/types';
-
-const uid = () => `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+import { uid } from '../utils/pathHelpers';
 
 export function executeCommands(
   commands: CopilotCommand[],

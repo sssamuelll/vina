@@ -10,8 +10,7 @@ import type { AppDispatch, RootState } from '../../../store';
 import { addPiece, updatePiece, removePiece, movePiece, rotatePiece } from '../../../store/projectSlice';
 import { selectPiece } from '../../../store/editorSlice';
 import type { PatternPiece, PathCommand } from '../../../types/types';
-
-const uid = () => `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+import { uid } from '../../../utils/pathHelpers';
 
 /** Compute bounding box from outline */
 function computeBounds(outline: PathCommand[]): { width: number; height: number } {

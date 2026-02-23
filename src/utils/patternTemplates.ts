@@ -9,6 +9,7 @@
  */
 
 import { PatternPiece, PathCommand, InternalLine } from '../types/types';
+import { uid, M, L, C, Z } from './pathHelpers';
 
 interface BodyMeasurements {
   height: number;     // cm
@@ -28,15 +29,7 @@ interface BodyMeasurements {
 /** Convert cm to mm (our SVG units) */
 const mm = (cm: number) => cm * 10;
 
-/** Generate unique ID */
-const uid = () => `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-
-/** Create a PathCommand for Move */
-const M = (x: number, y: number): PathCommand => ({ type: 'M', values: [x, y] });
-const L = (x: number, y: number): PathCommand => ({ type: 'L', values: [x, y] });
-const C = (cx1: number, cy1: number, cx2: number, cy2: number, x: number, y: number): PathCommand => 
-  ({ type: 'C', values: [cx1, cy1, cx2, cy2, x, y] });
-const Z = (): PathCommand => ({ type: 'Z', values: [] });
+/* Path helpers imported from ./pathHelpers */
 
 /** Derive measurements that aren't directly provided */
 function deriveMeasurements(m: BodyMeasurements): Required<BodyMeasurements> {

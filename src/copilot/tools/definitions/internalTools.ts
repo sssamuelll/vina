@@ -8,11 +8,7 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { addInternalLine, setInternalLine } from '../../../store/projectSlice';
 import type { PathCommand, InternalLine } from '../../../types/types';
-
-const lineId = () => `int-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`;
-
-const M = (x: number, y: number): PathCommand => ({ type: 'M', values: [x, y] });
-const L = (x: number, y: number): PathCommand => ({ type: 'L', values: [x, y] });
+import { lineId, M, L } from '../../../utils/pathHelpers';
 
 // ─── addDart ────────────────────────────────────────────────────────────────
 

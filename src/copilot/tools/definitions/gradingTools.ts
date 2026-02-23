@@ -8,8 +8,7 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { addPiece } from '../../../store/projectSlice';
 import { gradePiece, standardGradeTable } from '../../../utils/grading';
-
-const uid = () => `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+import { uid } from '../../../utils/pathHelpers';
 
 // ─── gradePiece ─────────────────────────────────────────────────────────────
 

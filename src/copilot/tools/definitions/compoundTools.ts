@@ -16,11 +16,7 @@ import { scaleOutline } from '../../../utils/grading';
 import { getPieceDefaults } from '../../defaults';
 import { detectLanguage } from '../../languageDetection';
 import type { PatternPiece, PathCommand, InternalLine } from '../../../types/types';
-
-const uid = () => `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-const lineId = () => `int-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`;
-const M = (x: number, y: number): PathCommand => ({ type: 'M', values: [x, y] });
-const L = (x: number, y: number): PathCommand => ({ type: 'L', values: [x, y] });
+import { uid, lineId, M, L } from '../../../utils/pathHelpers';
 
 /** Standard size table key for EU women */
 const EU_WOMEN_SIZES: Record<string, Record<string, number>> = {
