@@ -148,7 +148,15 @@ export const anthropicProvider: LLMProvider = {
     config: ProviderConfig,
     onChunk: (chunk: StreamChunk) => void,
   ): Promise<ProviderResponse> {
-    const { system, messages: anthropicMessages } = toAnthropicMessages(messages);
+    let anthropicMessages: AnthropicMessage[];
+    let system: string;
+    try {
+      const converted = toAnthropicMessages(messages);
+      system = converted.system;
+      anthropicMessages = converted.messages;
+    } catch (e) {
+      throw new Error(`Message conversion failed: ${e instanceof Error ? e.message : e}`);
+    }
     const baseUrl = config.baseUrl || 'https://api.anthropic.com';
 
     const body: Record<string, unknown> = {
@@ -174,6 +182,12 @@ export const anthropicProvider: LLMProvider = {
     if (!response.ok) {
       const text = await response.text();
       throw new Error(`Anthropic API error ${response.status}: ${text}`);
+    }
+
+    if (!response.body) {
+      // Fallback to non-streaming if ReadableStream not available
+      const data = await response.json();
+      return parseAnthropicResponse(data);
     }
 
     // Read SSE stream

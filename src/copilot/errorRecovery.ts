@@ -220,7 +220,11 @@ export async function retryWithBackoff<T>(
  * @returns User-facing error message
  */
 export function getErrorMessage(errorType: ErrorType, error: unknown): string {
-  const rawMsg = error instanceof Error ? error.message : String(error);
+  // Avoid double-wrapping already-formatted errors
+  if (error instanceof Error && (error as Error & { _formatted?: boolean })._formatted) {
+    return error.message;
+  }
+  const rawMsg = error instanceof Error ? (error.message || error.constructor.name) : String(error);
 
   switch (errorType) {
     case 'auth':
@@ -479,11 +483,17 @@ export class RecoveryStrategy {
     try {
       return await operation();
     } catch (error) {
+      // Log full error for debugging
+      console.error('[RecoveryStrategy] Operation failed:', error);
+
       const recovery = await this.recover(error, operation);
       if (recovery.result !== undefined) {
         return recovery.result as T;
       }
-      throw new Error(recovery.message);
+      // Throw with the formatted message directly; mark it to avoid double-wrapping
+      const wrapped = new Error(recovery.message);
+      (wrapped as Error & { _formatted: boolean })._formatted = true;
+      throw wrapped;
     }
   }
 }
