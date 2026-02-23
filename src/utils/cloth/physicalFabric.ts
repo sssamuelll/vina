@@ -1,0 +1,741 @@
+/**
+ * Physical Fabric Library — real-world textile properties with engineering units.
+ *
+ * This extends the basic FabricMaterial with anisotropic properties (warp/weft),
+ * shear data, tensile strength, and composition metadata. Values are sourced from
+ * textile engineering literature (Kawabata KES, FAST system, ISO standards).
+ *
+ * The basic FabricMaterial in fabricLibrary.ts remains for backward compatibility.
+ * PhysicalFabric is the professional-grade version used by the diagnostic system.
+ *
+ * @module physicalFabric
+ */
+
+import type { FabricMaterial, XPBDCompliance } from './fabricLibrary';
+
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+export type WeaveType =
+  | 'plain'           // poplin, broadcloth, muslin
+  | 'twill'           // denim, gabardine, herringbone
+  | 'satin'           // charmeuse, duchess
+  | 'knit-jersey'     // single jersey, t-shirt fabric
+  | 'knit-rib'        // 1x1 rib, 2x2 rib
+  | 'knit-interlock'  // ponte roma, double knit
+  | 'nonwoven'        // felt, interfacing
+  | 'leather'         // leather, suede, faux leather
+  | 'mesh'            // tulle, net
+  | 'pile'            // velvet, fleece, terry
+  | 'technical';      // neoprene, ripstop, gore-tex
+
+export type FabricSource = 'library' | 'custom' | 'lab-tested' | 'community';
+
+export interface PhysicalFabric {
+  /** Unique ID (slug format) */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  /** Localized name (Spanish) */
+  nameEs: string;
+
+  // ─── Composition ───
+  composition: string;         // "100% Cotton", "95% Polyester 5% Elastane"
+  weaveType: WeaveType;
+
+  // ─── Mass & dimensions ───
+  weight: number;              // g/m² (GSM)
+  thickness: number;           // mm
+
+  // ─── Stretch (% elongation at standard load) ───
+  stretchWarp: number;         // % along grainline (warp direction)
+  stretchWeft: number;         // % across grain (weft direction)
+  stretchBias: number;         // % at 45° diagonal
+  recoveryRate: number;        // 0-1 (1 = full elastic recovery)
+
+  // ─── Bending rigidity (Kawabata units: mN·cm) ───
+  bendingWarp: number;         // mN·cm in warp direction
+  bendingWeft: number;         // mN·cm in weft direction
+  drapeCoefficient: number;    // 0-1 (0 = stiff like cardboard, 1 = fluid like water)
+
+  // ─── Shear ───
+  shearStiffness: number;      // N/m (resistance to diagonal distortion)
+  shearHysteresis: number;     // N/m (energy lost in shear cycle — wrinkle tendency)
+
+  // ─── Surface ───
+  friction: number;            // kinetic friction coefficient (fabric-on-fabric)
+  frictionBody: number;        // friction against skin/body
+  surfaceRoughness: number;    // 0-1 (0 = smooth, 1 = rough)
+
+  // ─── Strength (for stress/strain maps) ───
+  tensileStrengthWarp: number; // N/5cm (force at break, warp direction, ISO 13934)
+  tensileStrengthWeft: number; // N/5cm (force at break, weft direction)
+  tearStrength: number;        // N (Elmendorf tear test, ISO 13937)
+  maxStretchBeforeBreak: number; // % elongation at break
+
+  // ─── Metadata ───
+  source: FabricSource;
+  supplier?: string;
+  articleNumber?: string;
+  notes?: string;
+  /** Tags for search */
+  tags: string[];
+}
+
+// ─── Library ────────────────────────────────────────────────────────────────
+
+export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
+
+  // ─── WOVENS: Plain weave ──────────────────────────────────────────────
+  {
+    id: 'cotton-poplin',
+    name: 'Cotton Poplin',
+    nameEs: 'Popelina de Algodón',
+    composition: '100% Cotton',
+    weaveType: 'plain',
+    weight: 130,
+    thickness: 0.3,
+    stretchWarp: 2, stretchWeft: 3, stretchBias: 12, recoveryRate: 0.3,
+    bendingWarp: 0.8, bendingWeft: 0.5, drapeCoefficient: 0.45,
+    shearStiffness: 45, shearHysteresis: 18,
+    friction: 0.5, frictionBody: 0.4, surfaceRoughness: 0.3,
+    tensileStrengthWarp: 450, tensileStrengthWeft: 280, tearStrength: 15, maxStretchBeforeBreak: 8,
+    source: 'library', tags: ['cotton', 'woven', 'plain', 'shirt', 'dress', 'lightweight'],
+  },
+  {
+    id: 'cotton-broadcloth',
+    name: 'Cotton Broadcloth',
+    nameEs: 'Percal de Algodón',
+    composition: '100% Cotton',
+    weaveType: 'plain',
+    weight: 115,
+    thickness: 0.25,
+    stretchWarp: 1.5, stretchWeft: 2.5, stretchBias: 10, recoveryRate: 0.25,
+    bendingWarp: 0.6, bendingWeft: 0.4, drapeCoefficient: 0.5,
+    shearStiffness: 38, shearHysteresis: 15,
+    friction: 0.45, frictionBody: 0.35, surfaceRoughness: 0.25,
+    tensileStrengthWarp: 380, tensileStrengthWeft: 240, tearStrength: 12, maxStretchBeforeBreak: 7,
+    source: 'library', tags: ['cotton', 'woven', 'plain', 'shirt', 'lightweight'],
+  },
+  {
+    id: 'muslin',
+    name: 'Muslin (Toile)',
+    nameEs: 'Muselina (Toile)',
+    composition: '100% Cotton',
+    weaveType: 'plain',
+    weight: 90,
+    thickness: 0.2,
+    stretchWarp: 2, stretchWeft: 3, stretchBias: 15, recoveryRate: 0.2,
+    bendingWarp: 0.3, bendingWeft: 0.2, drapeCoefficient: 0.6,
+    shearStiffness: 20, shearHysteresis: 8,
+    friction: 0.45, frictionBody: 0.35, surfaceRoughness: 0.35,
+    tensileStrengthWarp: 200, tensileStrengthWeft: 150, tearStrength: 8, maxStretchBeforeBreak: 12,
+    source: 'library', tags: ['cotton', 'woven', 'toile', 'muslin', 'test', 'prototype'],
+  },
+  {
+    id: 'cotton-voile',
+    name: 'Cotton Voile',
+    nameEs: 'Voile de Algodón',
+    composition: '100% Cotton',
+    weaveType: 'plain',
+    weight: 70,
+    thickness: 0.15,
+    stretchWarp: 2, stretchWeft: 4, stretchBias: 14, recoveryRate: 0.2,
+    bendingWarp: 0.15, bendingWeft: 0.1, drapeCoefficient: 0.7,
+    shearStiffness: 15, shearHysteresis: 6,
+    friction: 0.35, frictionBody: 0.3, surfaceRoughness: 0.2,
+    tensileStrengthWarp: 180, tensileStrengthWeft: 120, tearStrength: 6, maxStretchBeforeBreak: 10,
+    source: 'library', tags: ['cotton', 'woven', 'sheer', 'lightweight', 'summer'],
+  },
+
+  // ─── WOVENS: Twill ────────────────────────────────────────────────────
+  {
+    id: 'denim-12oz',
+    name: 'Denim 12oz',
+    nameEs: 'Denim 12oz',
+    composition: '100% Cotton',
+    weaveType: 'twill',
+    weight: 400,
+    thickness: 0.9,
+    stretchWarp: 1, stretchWeft: 2, stretchBias: 8, recoveryRate: 0.15,
+    bendingWarp: 3.5, bendingWeft: 2.8, drapeCoefficient: 0.15,
+    shearStiffness: 120, shearHysteresis: 50,
+    friction: 0.7, frictionBody: 0.55, surfaceRoughness: 0.6,
+    tensileStrengthWarp: 800, tensileStrengthWeft: 500, tearStrength: 35, maxStretchBeforeBreak: 5,
+    source: 'library', tags: ['denim', 'cotton', 'twill', 'heavy', 'jeans', 'rigid'],
+  },
+  {
+    id: 'stretch-denim',
+    name: 'Stretch Denim',
+    nameEs: 'Denim Elástico',
+    composition: '98% Cotton 2% Elastane',
+    weaveType: 'twill',
+    weight: 350,
+    thickness: 0.8,
+    stretchWarp: 3, stretchWeft: 15, stretchBias: 20, recoveryRate: 0.85,
+    bendingWarp: 2.8, bendingWeft: 2.0, drapeCoefficient: 0.22,
+    shearStiffness: 90, shearHysteresis: 35,
+    friction: 0.65, frictionBody: 0.5, surfaceRoughness: 0.55,
+    tensileStrengthWarp: 700, tensileStrengthWeft: 450, tearStrength: 30, maxStretchBeforeBreak: 20,
+    source: 'library', tags: ['denim', 'stretch', 'twill', 'jeans', 'elastane'],
+  },
+  {
+    id: 'gabardine',
+    name: 'Wool Gabardine',
+    nameEs: 'Gabardina de Lana',
+    composition: '100% Wool',
+    weaveType: 'twill',
+    weight: 260,
+    thickness: 0.6,
+    stretchWarp: 2, stretchWeft: 3, stretchBias: 10, recoveryRate: 0.5,
+    bendingWarp: 2.0, bendingWeft: 1.5, drapeCoefficient: 0.3,
+    shearStiffness: 65, shearHysteresis: 28,
+    friction: 0.55, frictionBody: 0.45, surfaceRoughness: 0.35,
+    tensileStrengthWarp: 500, tensileStrengthWeft: 350, tearStrength: 20, maxStretchBeforeBreak: 8,
+    source: 'library', tags: ['wool', 'twill', 'suiting', 'trousers', 'tailoring'],
+  },
+  {
+    id: 'cotton-twill',
+    name: 'Cotton Twill (Chino)',
+    nameEs: 'Sarga de Algodón (Chino)',
+    composition: '100% Cotton',
+    weaveType: 'twill',
+    weight: 220,
+    thickness: 0.5,
+    stretchWarp: 1.5, stretchWeft: 3, stretchBias: 10, recoveryRate: 0.2,
+    bendingWarp: 1.2, bendingWeft: 0.8, drapeCoefficient: 0.35,
+    shearStiffness: 55, shearHysteresis: 22,
+    friction: 0.55, frictionBody: 0.45, surfaceRoughness: 0.4,
+    tensileStrengthWarp: 550, tensileStrengthWeft: 350, tearStrength: 18, maxStretchBeforeBreak: 7,
+    source: 'library', tags: ['cotton', 'twill', 'chino', 'trouser', 'workwear'],
+  },
+
+  // ─── WOVENS: Satin ────────────────────────────────────────────────────
+  {
+    id: 'silk-charmeuse',
+    name: 'Silk Charmeuse',
+    nameEs: 'Charmeuse de Seda',
+    composition: '100% Silk',
+    weaveType: 'satin',
+    weight: 75,
+    thickness: 0.15,
+    stretchWarp: 4, stretchWeft: 6, stretchBias: 18, recoveryRate: 0.4,
+    bendingWarp: 0.1, bendingWeft: 0.08, drapeCoefficient: 0.9,
+    shearStiffness: 15, shearHysteresis: 5,
+    friction: 0.25, frictionBody: 0.2, surfaceRoughness: 0.05,
+    tensileStrengthWarp: 250, tensileStrengthWeft: 180, tearStrength: 8, maxStretchBeforeBreak: 18,
+    source: 'library', tags: ['silk', 'satin', 'luxury', 'evening', 'lightweight', 'fluid'],
+  },
+  {
+    id: 'duchess-satin',
+    name: 'Duchess Satin',
+    nameEs: 'Satín Duquesa',
+    composition: '100% Polyester',
+    weaveType: 'satin',
+    weight: 200,
+    thickness: 0.5,
+    stretchWarp: 2, stretchWeft: 3, stretchBias: 10, recoveryRate: 0.3,
+    bendingWarp: 1.8, bendingWeft: 1.2, drapeCoefficient: 0.35,
+    shearStiffness: 50, shearHysteresis: 20,
+    friction: 0.2, frictionBody: 0.15, surfaceRoughness: 0.05,
+    tensileStrengthWarp: 600, tensileStrengthWeft: 400, tearStrength: 25, maxStretchBeforeBreak: 10,
+    source: 'library', tags: ['satin', 'polyester', 'bridal', 'evening', 'structured'],
+  },
+
+  // ─── KNITS ────────────────────────────────────────────────────────────
+  {
+    id: 'cotton-jersey',
+    name: 'Cotton Jersey',
+    nameEs: 'Jersey de Algodón',
+    composition: '100% Cotton',
+    weaveType: 'knit-jersey',
+    weight: 180,
+    thickness: 0.6,
+    stretchWarp: 8, stretchWeft: 40, stretchBias: 25, recoveryRate: 0.6,
+    bendingWarp: 0.2, bendingWeft: 0.15, drapeCoefficient: 0.75,
+    shearStiffness: 10, shearHysteresis: 4,
+    friction: 0.45, frictionBody: 0.4, surfaceRoughness: 0.35,
+    tensileStrengthWarp: 300, tensileStrengthWeft: 200, tearStrength: 12, maxStretchBeforeBreak: 80,
+    source: 'library', tags: ['cotton', 'jersey', 'knit', 'tshirt', 'casual', 'stretch'],
+  },
+  {
+    id: 'ponte-roma',
+    name: 'Ponte Roma',
+    nameEs: 'Ponte Roma',
+    composition: '65% Rayon 30% Nylon 5% Spandex',
+    weaveType: 'knit-interlock',
+    weight: 280,
+    thickness: 0.8,
+    stretchWarp: 5, stretchWeft: 25, stretchBias: 15, recoveryRate: 0.9,
+    bendingWarp: 0.6, bendingWeft: 0.4, drapeCoefficient: 0.55,
+    shearStiffness: 25, shearHysteresis: 10,
+    friction: 0.4, frictionBody: 0.35, surfaceRoughness: 0.2,
+    tensileStrengthWarp: 400, tensileStrengthWeft: 300, tearStrength: 18, maxStretchBeforeBreak: 60,
+    source: 'library', tags: ['ponte', 'knit', 'interlock', 'dress', 'trouser', 'structured-knit'],
+  },
+  {
+    id: 'rib-knit',
+    name: 'Rib Knit 2x2',
+    nameEs: 'Punto Canalé 2x2',
+    composition: '95% Cotton 5% Elastane',
+    weaveType: 'knit-rib',
+    weight: 220,
+    thickness: 0.7,
+    stretchWarp: 10, stretchWeft: 80, stretchBias: 40, recoveryRate: 0.9,
+    bendingWarp: 0.15, bendingWeft: 0.1, drapeCoefficient: 0.7,
+    shearStiffness: 8, shearHysteresis: 3,
+    friction: 0.5, frictionBody: 0.4, surfaceRoughness: 0.4,
+    tensileStrengthWarp: 250, tensileStrengthWeft: 150, tearStrength: 10, maxStretchBeforeBreak: 120,
+    source: 'library', tags: ['rib', 'knit', 'cuff', 'collar', 'stretch', 'trim'],
+  },
+  {
+    id: 'lycra-spandex',
+    name: 'Lycra/Spandex (4-way stretch)',
+    nameEs: 'Licra/Spandex (4 vías)',
+    composition: '80% Nylon 20% Spandex',
+    weaveType: 'knit-jersey',
+    weight: 220,
+    thickness: 0.5,
+    stretchWarp: 60, stretchWeft: 80, stretchBias: 70, recoveryRate: 0.95,
+    bendingWarp: 0.05, bendingWeft: 0.04, drapeCoefficient: 0.85,
+    shearStiffness: 5, shearHysteresis: 2,
+    friction: 0.35, frictionBody: 0.3, surfaceRoughness: 0.15,
+    tensileStrengthWarp: 350, tensileStrengthWeft: 280, tearStrength: 15, maxStretchBeforeBreak: 200,
+    source: 'library', tags: ['lycra', 'spandex', 'sportswear', 'swimwear', 'activewear', 'compression'],
+  },
+  {
+    id: 'athletic-mesh',
+    name: 'Athletic Mesh',
+    nameEs: 'Malla Deportiva',
+    composition: '100% Polyester',
+    weaveType: 'mesh',
+    weight: 120,
+    thickness: 0.4,
+    stretchWarp: 15, stretchWeft: 30, stretchBias: 20, recoveryRate: 0.7,
+    bendingWarp: 0.1, bendingWeft: 0.08, drapeCoefficient: 0.7,
+    shearStiffness: 8, shearHysteresis: 3,
+    friction: 0.3, frictionBody: 0.25, surfaceRoughness: 0.5,
+    tensileStrengthWarp: 200, tensileStrengthWeft: 150, tearStrength: 8, maxStretchBeforeBreak: 60,
+    source: 'library', tags: ['mesh', 'polyester', 'sportswear', 'breathable', 'lightweight'],
+  },
+  {
+    id: 'scuba-knit',
+    name: 'Scuba Knit',
+    nameEs: 'Neopreno Textil (Scuba)',
+    composition: '95% Polyester 5% Spandex',
+    weaveType: 'knit-interlock',
+    weight: 320,
+    thickness: 1.2,
+    stretchWarp: 8, stretchWeft: 20, stretchBias: 15, recoveryRate: 0.85,
+    bendingWarp: 1.5, bendingWeft: 1.2, drapeCoefficient: 0.3,
+    shearStiffness: 40, shearHysteresis: 15,
+    friction: 0.35, frictionBody: 0.3, surfaceRoughness: 0.2,
+    tensileStrengthWarp: 500, tensileStrengthWeft: 400, tearStrength: 22, maxStretchBeforeBreak: 50,
+    source: 'library', tags: ['scuba', 'neoprene', 'structured', 'dress', 'modern'],
+  },
+
+  // ─── SHEER ────────────────────────────────────────────────────────────
+  {
+    id: 'organza',
+    name: 'Organza',
+    nameEs: 'Organza',
+    composition: '100% Polyester',
+    weaveType: 'plain',
+    weight: 55,
+    thickness: 0.1,
+    stretchWarp: 1, stretchWeft: 2, stretchBias: 8, recoveryRate: 0.2,
+    bendingWarp: 0.3, bendingWeft: 0.2, drapeCoefficient: 0.35,
+    shearStiffness: 30, shearHysteresis: 12,
+    friction: 0.2, frictionBody: 0.15, surfaceRoughness: 0.1,
+    tensileStrengthWarp: 200, tensileStrengthWeft: 150, tearStrength: 5, maxStretchBeforeBreak: 6,
+    source: 'library', tags: ['organza', 'sheer', 'crisp', 'bridal', 'evening'],
+  },
+  {
+    id: 'chiffon',
+    name: 'Chiffon',
+    nameEs: 'Gasa',
+    composition: '100% Polyester',
+    weaveType: 'plain',
+    weight: 45,
+    thickness: 0.1,
+    stretchWarp: 3, stretchWeft: 5, stretchBias: 15, recoveryRate: 0.3,
+    bendingWarp: 0.05, bendingWeft: 0.04, drapeCoefficient: 0.92,
+    shearStiffness: 8, shearHysteresis: 3,
+    friction: 0.2, frictionBody: 0.15, surfaceRoughness: 0.1,
+    tensileStrengthWarp: 120, tensileStrengthWeft: 80, tearStrength: 3, maxStretchBeforeBreak: 12,
+    source: 'library', tags: ['chiffon', 'sheer', 'fluid', 'evening', 'blouse', 'lightweight'],
+  },
+  {
+    id: 'tulle',
+    name: 'Tulle',
+    nameEs: 'Tul',
+    composition: '100% Nylon',
+    weaveType: 'mesh',
+    weight: 30,
+    thickness: 0.15,
+    stretchWarp: 5, stretchWeft: 8, stretchBias: 20, recoveryRate: 0.4,
+    bendingWarp: 0.02, bendingWeft: 0.02, drapeCoefficient: 0.8,
+    shearStiffness: 3, shearHysteresis: 1,
+    friction: 0.15, frictionBody: 0.1, surfaceRoughness: 0.6,
+    tensileStrengthWarp: 80, tensileStrengthWeft: 60, tearStrength: 2, maxStretchBeforeBreak: 20,
+    source: 'library', tags: ['tulle', 'mesh', 'bridal', 'ballet', 'sheer'],
+  },
+
+  // ─── NATURAL FIBERS ───────────────────────────────────────────────────
+  {
+    id: 'linen',
+    name: 'Linen',
+    nameEs: 'Lino',
+    composition: '100% Linen',
+    weaveType: 'plain',
+    weight: 170,
+    thickness: 0.4,
+    stretchWarp: 2, stretchWeft: 3, stretchBias: 10, recoveryRate: 0.15,
+    bendingWarp: 1.5, bendingWeft: 1.0, drapeCoefficient: 0.4,
+    shearStiffness: 60, shearHysteresis: 25,
+    friction: 0.5, frictionBody: 0.4, surfaceRoughness: 0.5,
+    tensileStrengthWarp: 500, tensileStrengthWeft: 350, tearStrength: 18, maxStretchBeforeBreak: 4,
+    source: 'library', tags: ['linen', 'natural', 'summer', 'crisp', 'woven'],
+  },
+  {
+    id: 'wool-crepe',
+    name: 'Wool Crepe',
+    nameEs: 'Crepé de Lana',
+    composition: '100% Wool',
+    weaveType: 'plain',
+    weight: 200,
+    thickness: 0.5,
+    stretchWarp: 3, stretchWeft: 5, stretchBias: 12, recoveryRate: 0.5,
+    bendingWarp: 0.9, bendingWeft: 0.7, drapeCoefficient: 0.55,
+    shearStiffness: 40, shearHysteresis: 16,
+    friction: 0.55, frictionBody: 0.45, surfaceRoughness: 0.35,
+    tensileStrengthWarp: 400, tensileStrengthWeft: 280, tearStrength: 15, maxStretchBeforeBreak: 12,
+    source: 'library', tags: ['wool', 'crepe', 'drape', 'dress', 'suiting'],
+  },
+  {
+    id: 'wool-flannel',
+    name: 'Wool Flannel',
+    nameEs: 'Franela de Lana',
+    composition: '100% Wool',
+    weaveType: 'twill',
+    weight: 280,
+    thickness: 0.8,
+    stretchWarp: 2, stretchWeft: 4, stretchBias: 10, recoveryRate: 0.4,
+    bendingWarp: 1.8, bendingWeft: 1.3, drapeCoefficient: 0.35,
+    shearStiffness: 55, shearHysteresis: 22,
+    friction: 0.6, frictionBody: 0.5, surfaceRoughness: 0.5,
+    tensileStrengthWarp: 450, tensileStrengthWeft: 300, tearStrength: 18, maxStretchBeforeBreak: 8,
+    source: 'library', tags: ['wool', 'flannel', 'suiting', 'coat', 'winter'],
+  },
+
+  // ─── HEAVY / STRUCTURED ───────────────────────────────────────────────
+  {
+    id: 'canvas-12oz',
+    name: 'Canvas 12oz',
+    nameEs: 'Lona 12oz',
+    composition: '100% Cotton',
+    weaveType: 'plain',
+    weight: 500,
+    thickness: 1.2,
+    stretchWarp: 1, stretchWeft: 1, stretchBias: 5, recoveryRate: 0.1,
+    bendingWarp: 4.0, bendingWeft: 3.5, drapeCoefficient: 0.08,
+    shearStiffness: 150, shearHysteresis: 60,
+    friction: 0.7, frictionBody: 0.6, surfaceRoughness: 0.7,
+    tensileStrengthWarp: 1000, tensileStrengthWeft: 700, tearStrength: 45, maxStretchBeforeBreak: 3,
+    source: 'library', tags: ['canvas', 'heavy', 'bag', 'upholstery', 'workwear', 'rigid'],
+  },
+  {
+    id: 'ripstop-nylon',
+    name: 'Ripstop Nylon',
+    nameEs: 'Nylon Ripstop',
+    composition: '100% Nylon',
+    weaveType: 'technical',
+    weight: 70,
+    thickness: 0.1,
+    stretchWarp: 3, stretchWeft: 5, stretchBias: 12, recoveryRate: 0.4,
+    bendingWarp: 0.15, bendingWeft: 0.1, drapeCoefficient: 0.65,
+    shearStiffness: 20, shearHysteresis: 8,
+    friction: 0.25, frictionBody: 0.2, surfaceRoughness: 0.15,
+    tensileStrengthWarp: 600, tensileStrengthWeft: 500, tearStrength: 40, maxStretchBeforeBreak: 15,
+    source: 'library', tags: ['ripstop', 'nylon', 'outdoor', 'jacket', 'technical', 'lightweight'],
+  },
+
+  // ─── LEATHER & FAUX ───────────────────────────────────────────────────
+  {
+    id: 'lambskin-leather',
+    name: 'Lambskin Leather',
+    nameEs: 'Cuero de Cordero',
+    composition: 'Natural leather',
+    weaveType: 'leather',
+    weight: 600,
+    thickness: 0.8,
+    stretchWarp: 15, stretchWeft: 25, stretchBias: 20, recoveryRate: 0.2,
+    bendingWarp: 5.0, bendingWeft: 4.0, drapeCoefficient: 0.2,
+    shearStiffness: 80, shearHysteresis: 35,
+    friction: 0.6, frictionBody: 0.5, surfaceRoughness: 0.15,
+    tensileStrengthWarp: 200, tensileStrengthWeft: 150, tearStrength: 25, maxStretchBeforeBreak: 40,
+    source: 'library', tags: ['leather', 'lambskin', 'jacket', 'luxury', 'natural'],
+  },
+  {
+    id: 'faux-leather',
+    name: 'Faux Leather (PU)',
+    nameEs: 'Cuero Sintético (PU)',
+    composition: 'PU-coated Polyester',
+    weaveType: 'leather',
+    weight: 450,
+    thickness: 0.6,
+    stretchWarp: 8, stretchWeft: 12, stretchBias: 10, recoveryRate: 0.3,
+    bendingWarp: 3.5, bendingWeft: 3.0, drapeCoefficient: 0.25,
+    shearStiffness: 70, shearHysteresis: 30,
+    friction: 0.5, frictionBody: 0.4, surfaceRoughness: 0.1,
+    tensileStrengthWarp: 350, tensileStrengthWeft: 250, tearStrength: 15, maxStretchBeforeBreak: 25,
+    source: 'library', tags: ['faux-leather', 'PU', 'vegan', 'jacket', 'bag'],
+  },
+
+  // ─── SPECIALTY ────────────────────────────────────────────────────────
+  {
+    id: 'neoprene-3mm',
+    name: 'Neoprene 3mm',
+    nameEs: 'Neopreno 3mm',
+    composition: 'CR/SBR Rubber + Nylon lining',
+    weaveType: 'technical',
+    weight: 450,
+    thickness: 3.0,
+    stretchWarp: 15, stretchWeft: 20, stretchBias: 18, recoveryRate: 0.85,
+    bendingWarp: 8.0, bendingWeft: 8.0, drapeCoefficient: 0.1,
+    shearStiffness: 200, shearHysteresis: 80,
+    friction: 0.75, frictionBody: 0.6, surfaceRoughness: 0.3,
+    tensileStrengthWarp: 300, tensileStrengthWeft: 250, tearStrength: 20, maxStretchBeforeBreak: 40,
+    source: 'library', tags: ['neoprene', 'wetsuit', 'technical', 'structured', 'insulation'],
+  },
+  {
+    id: 'felt',
+    name: 'Wool Felt',
+    nameEs: 'Fieltro de Lana',
+    composition: '100% Wool',
+    weaveType: 'nonwoven',
+    weight: 350,
+    thickness: 2.0,
+    stretchWarp: 3, stretchWeft: 3, stretchBias: 5, recoveryRate: 0.1,
+    bendingWarp: 6.0, bendingWeft: 6.0, drapeCoefficient: 0.1,
+    shearStiffness: 180, shearHysteresis: 70,
+    friction: 0.7, frictionBody: 0.6, surfaceRoughness: 0.8,
+    tensileStrengthWarp: 150, tensileStrengthWeft: 150, tearStrength: 10, maxStretchBeforeBreak: 5,
+    source: 'library', tags: ['felt', 'nonwoven', 'craft', 'hat', 'rigid'],
+  },
+  {
+    id: 'fleece',
+    name: 'Polar Fleece',
+    nameEs: 'Polar',
+    composition: '100% Polyester',
+    weaveType: 'pile',
+    weight: 250,
+    thickness: 2.5,
+    stretchWarp: 10, stretchWeft: 15, stretchBias: 12, recoveryRate: 0.5,
+    bendingWarp: 0.3, bendingWeft: 0.3, drapeCoefficient: 0.55,
+    shearStiffness: 12, shearHysteresis: 5,
+    friction: 0.6, frictionBody: 0.5, surfaceRoughness: 0.7,
+    tensileStrengthWarp: 250, tensileStrengthWeft: 200, tearStrength: 12, maxStretchBeforeBreak: 35,
+    source: 'library', tags: ['fleece', 'polar', 'polyester', 'winter', 'casual', 'soft'],
+  },
+  {
+    id: 'velvet',
+    name: 'Silk Velvet',
+    nameEs: 'Terciopelo de Seda',
+    composition: '82% Rayon 18% Silk',
+    weaveType: 'pile',
+    weight: 280,
+    thickness: 1.0,
+    stretchWarp: 3, stretchWeft: 5, stretchBias: 12, recoveryRate: 0.3,
+    bendingWarp: 0.8, bendingWeft: 0.6, drapeCoefficient: 0.65,
+    shearStiffness: 30, shearHysteresis: 12,
+    friction: 0.7, frictionBody: 0.6, surfaceRoughness: 0.15,
+    tensileStrengthWarp: 300, tensileStrengthWeft: 200, tearStrength: 10, maxStretchBeforeBreak: 10,
+    source: 'library', tags: ['velvet', 'pile', 'luxury', 'evening', 'drape'],
+  },
+
+  // ─── LININGS & INTERFACINGS ───────────────────────────────────────────
+  {
+    id: 'polyester-lining',
+    name: 'Polyester Lining',
+    nameEs: 'Forro de Poliéster',
+    composition: '100% Polyester',
+    weaveType: 'plain',
+    weight: 60,
+    thickness: 0.1,
+    stretchWarp: 2, stretchWeft: 3, stretchBias: 10, recoveryRate: 0.3,
+    bendingWarp: 0.08, bendingWeft: 0.06, drapeCoefficient: 0.85,
+    shearStiffness: 10, shearHysteresis: 4,
+    friction: 0.15, frictionBody: 0.1, surfaceRoughness: 0.05,
+    tensileStrengthWarp: 300, tensileStrengthWeft: 200, tearStrength: 8, maxStretchBeforeBreak: 15,
+    source: 'library', tags: ['lining', 'polyester', 'jacket', 'coat', 'lightweight'],
+  },
+  {
+    id: 'fusible-interfacing-medium',
+    name: 'Fusible Interfacing (Medium)',
+    nameEs: 'Entretela Termoadhesiva (Media)',
+    composition: 'Polyester nonwoven + adhesive',
+    weaveType: 'nonwoven',
+    weight: 90,
+    thickness: 0.3,
+    stretchWarp: 1, stretchWeft: 1, stretchBias: 2, recoveryRate: 0.05,
+    bendingWarp: 2.5, bendingWeft: 2.5, drapeCoefficient: 0.1,
+    shearStiffness: 100, shearHysteresis: 40,
+    friction: 0.4, frictionBody: 0.3, surfaceRoughness: 0.3,
+    tensileStrengthWarp: 150, tensileStrengthWeft: 150, tearStrength: 5, maxStretchBeforeBreak: 3,
+    source: 'library', tags: ['interfacing', 'fusible', 'nonwoven', 'structure', 'collar', 'cuff'],
+  },
+];
+
+// ─── Conversion: PhysicalFabric → basic FabricMaterial ──────────────────
+
+/** Convert a PhysicalFabric to the basic FabricMaterial for backward compatibility. */
+export function toBasicMaterial(pf: PhysicalFabric): FabricMaterial {
+  const avgStretch = (pf.stretchWarp + pf.stretchWeft) / 2;
+  const avgBend = (pf.bendingWarp + pf.bendingWeft) / 2;
+  return {
+    name: pf.name,
+    weight: pf.weight,
+    // Map % stretch to 0-1 stiffness (inverse): 0% → 1.0, 80% → ~0.05
+    stretchStiffness: Math.max(0, 1 - avgStretch / 100),
+    // Map mN·cm bending to 0-1: 0 → 0.0, 8 → 1.0
+    bendStiffness: Math.min(1, avgBend / 8),
+    friction: pf.friction,
+    thickness: pf.thickness,
+  };
+}
+
+// ─── Conversion: PhysicalFabric → XPBD solver params ────────────────────
+
+export interface PhysicalXPBDParams extends XPBDCompliance {
+  /** Anisotropic stretch compliance (warp direction) */
+  stretchComplianceWarp: number;
+  /** Anisotropic stretch compliance (weft direction) */
+  stretchComplianceWeft: number;
+  /** Bending compliance in warp direction */
+  bendComplianceWarp: number;
+  /** Bending compliance in weft direction */
+  bendComplianceWeft: number;
+  /** Shear compliance */
+  shearCompliance: number;
+  /** Maximum stretch before break (for strain map threshold) */
+  maxStretchPercent: number;
+  /** Tensile strength for stress map (N/5cm, warp) */
+  tensileStrengthWarp: number;
+  /** Tensile strength for stress map (N/5cm, weft) */
+  tensileStrengthWeft: number;
+  /** Density in kg/m² */
+  density: number;
+}
+
+/**
+ * Convert PhysicalFabric to full XPBD solver parameters.
+ * 
+ * Compliance = inverse stiffness. For XPBD:
+ *   compliance = 1 / (stiffness * dt²)
+ * We simplify to a normalized mapping suitable for the solver.
+ */
+export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
+  // Stretch: % elongation → compliance (higher % = higher compliance = easier to stretch)
+  // Scale: 1% → 0.1 compliance, 80% → 8.0 compliance
+  const stretchComplianceWarp = pf.stretchWarp / 10;
+  const stretchComplianceWeft = pf.stretchWeft / 10;
+
+  // Bending: mN·cm → compliance (inverse: higher rigidity = lower compliance)
+  // Scale: 0.04 mN·cm → 20.0 compliance (chiffon), 8.0 mN·cm → 0.1 compliance (neoprene)
+  const bendComplianceWarp = Math.max(0.05, 1 / (pf.bendingWarp + 0.05));
+  const bendComplianceWeft = Math.max(0.05, 1 / (pf.bendingWeft + 0.05));
+
+  // Shear: N/m → compliance (inverse)
+  const shearCompliance = Math.max(0.01, 10 / (pf.shearStiffness + 1));
+
+  // Damping from weight
+  const weightFactor = Math.min(pf.weight / 500, 1.0);
+  const damping = 0.95 + weightFactor * 0.049;
+
+  // Basic compliance (backward compat)
+  const avgStretchCompliance = (stretchComplianceWarp + stretchComplianceWeft) / 2;
+  const avgBendCompliance = (bendComplianceWarp + bendComplianceWeft) / 2;
+
+  return {
+    // Basic XPBDCompliance
+    stretchingCompliance: avgStretchCompliance,
+    bendingCompliance: avgBendCompliance,
+    damping,
+    groundFriction: pf.friction,
+    // Anisotropic
+    stretchComplianceWarp,
+    stretchComplianceWeft,
+    bendComplianceWarp,
+    bendComplianceWeft,
+    shearCompliance,
+    // Diagnostic thresholds
+    maxStretchPercent: pf.maxStretchBeforeBreak,
+    tensileStrengthWarp: pf.tensileStrengthWarp,
+    tensileStrengthWeft: pf.tensileStrengthWeft,
+    density: pf.weight / 1000, // g/m² → kg/m²
+  };
+}
+
+// ─── Search & Lookup ────────────────────────────────────────────────────
+
+/** Get all physical fabrics. */
+export function getAllPhysicalFabrics(): PhysicalFabric[] {
+  return PHYSICAL_FABRIC_LIBRARY;
+}
+
+/** Get physical fabric by ID. */
+export function getPhysicalFabric(id: string): PhysicalFabric | undefined {
+  return PHYSICAL_FABRIC_LIBRARY.find(f => f.id === id);
+}
+
+/** Search fabrics by keyword (name, composition, tags). */
+export function searchPhysicalFabrics(query: string): PhysicalFabric[] {
+  const q = query.toLowerCase().trim();
+  const tokens = q.split(/\s+/);
+
+  return PHYSICAL_FABRIC_LIBRARY
+    .map(fabric => {
+      const searchText = [
+        fabric.name, fabric.nameEs, fabric.composition,
+        fabric.weaveType, ...fabric.tags,
+      ].join(' ').toLowerCase();
+
+      let score = 0;
+      for (const token of tokens) {
+        if (searchText.includes(token)) score++;
+        if (fabric.tags.includes(token)) score += 2;
+        if (fabric.name.toLowerCase().includes(token)) score += 2;
+      }
+      return { fabric, score };
+    })
+    .filter(r => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map(r => r.fabric);
+}
+
+/** Filter fabrics by weave type. */
+export function getFabricsByWeave(weaveType: WeaveType): PhysicalFabric[] {
+  return PHYSICAL_FABRIC_LIBRARY.filter(f => f.weaveType === weaveType);
+}
+
+/** Filter fabrics by weight range (g/m²). */
+export function getFabricsByWeight(minGSM: number, maxGSM: number): PhysicalFabric[] {
+  return PHYSICAL_FABRIC_LIBRARY.filter(f => f.weight >= minGSM && f.weight <= maxGSM);
+}
+
+/** Validate a PhysicalFabric has sensible values. */
+export function isValidPhysicalFabric(pf: PhysicalFabric): boolean {
+  return (
+    typeof pf.id === 'string' && pf.id.length > 0 &&
+    typeof pf.name === 'string' && pf.name.length > 0 &&
+    pf.weight > 0 && pf.weight <= 2000 &&
+    pf.thickness > 0 && pf.thickness <= 20 &&
+    pf.stretchWarp >= 0 && pf.stretchWarp <= 500 &&
+    pf.stretchWeft >= 0 && pf.stretchWeft <= 500 &&
+    pf.recoveryRate >= 0 && pf.recoveryRate <= 1 &&
+    pf.bendingWarp >= 0 && pf.bendingWeft >= 0 &&
+    pf.friction >= 0 && pf.friction <= 1 &&
+    pf.tensileStrengthWarp > 0 && pf.tensileStrengthWeft > 0 &&
+    pf.maxStretchBeforeBreak > 0
+  );
+}
