@@ -36,11 +36,11 @@ export default function AvatarProperties({ collapsed, onToggle }: AvatarProperti
       {/* Load GLB/GLTF */}
       <div className="panel-field file-field">
         <label className="file-label">
-          Load GLB / GLTF avatar
+          Load GLB / GLTF / VRM avatar
         </label>
         <input
           type="file"
-          accept=".glb,.gltf"
+          accept=".glb,.gltf,.vrm"
           className="file-input"
           onChange={e => {
             const file = e.target.files?.[0];

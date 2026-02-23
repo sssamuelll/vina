@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { generateSDF, type SDFData } from './sdfGenerator';
+import { isVRMFile, loadVRM } from '../avatar/vrmLoader';
 
 // ─── Cache ───────────────────────────────────────────────────────────────────
 
@@ -164,10 +165,16 @@ export async function buildAvatarSDF(
   const cached = sdfCache.get(key);
   if (cached) return cached;
 
-  // Load GLB
-  const loader = new GLTFLoader();
-  const gltf = await loader.loadAsync(avatarUrl);
-  const scene = gltf.scene;
+  // Load avatar (GLB or VRM)
+  let scene: THREE.Group;
+  if (isVRMFile(avatarUrl)) {
+    const result = await loadVRM(avatarUrl);
+    scene = result.scene;
+  } else {
+    const loader = new GLTFLoader();
+    const gltf = await loader.loadAsync(avatarUrl);
+    scene = gltf.scene as THREE.Group;
+  }
 
   // 1. Scale to target height (same as AvatarModel)
   const box = new THREE.Box3().setFromObject(scene);

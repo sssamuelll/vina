@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLoader, useFrame } from "@react-three/fiber";
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js';
@@ -7,6 +7,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
 import { setJointRotation, clampJointRotation } from '../../store/avatarSlice';
+import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
+import type { VRM } from '@pixiv/three-vrm';
 
 interface AvatarModelProps {
   url: string;
@@ -150,7 +152,11 @@ function discoverBoneAxes(boneMap: Map<string, THREE.Bone>, bindPoses: Map<strin
 
 export default function AvatarModel({ url, autoScale = true, height = 1.80 }: AvatarModelProps) {
   const groupRef = useRef<THREE.Group>(null);
-  const gltf = useLoader(GLTFLoader, url);
+  const isVrm = isVRMFile(url);
+  // useLoader is always called (hooks can't be conditional), but VRM files are loaded separately
+  const gltf = useLoader(GLTFLoader, isVrm ? '/default-avatar.glb' : url);
+  const [vrmInstance, setVrmInstance] = useState<VRM | null>(null);
+  const [vrmScene, setVrmScene] = useState<THREE.Group | null>(null);
   const boneMap = useRef<Map<string, THREE.Bone>>(new Map());
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
   const ikSolver = useRef<CCDIKSolver | null>(null);
@@ -162,51 +168,82 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
   const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
   const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
 
+  // Load VRM files separately
   useEffect(() => {
-    if (!gltf?.scene || !groupRef.current) return;
+    if (!isVrm) {
+      setVrmInstance(null);
+      setVrmScene(null);
+      return;
+    }
+    let cancelled = false;
+    loadVRM(url).then((result) => {
+      if (cancelled) return;
+      setVrmInstance(result.vrm);
+      setVrmScene(result.scene);
+    }).catch((err) => {
+      console.error('[AvatarModel] Failed to load VRM:', err);
+    });
+    return () => { cancelled = true; };
+  }, [url, isVrm]);
 
-    const scene = gltf.scene;
+  useEffect(() => {
+    const scene = isVrm ? vrmScene : gltf?.scene;
+    if (!scene || !groupRef.current) return;
     boneMap.current.clear();
     bindPoses.current.clear();
 
-    // Collect bones from skeleton (not traverse) to ensure we modify the actual rendered bones
-    let skeleton: THREE.Skeleton | null = null;
-    scene.traverse((obj) => {
-      if ((obj as THREE.SkinnedMesh).isSkinnedMesh && !skeleton) {
-        skeleton = (obj as THREE.SkinnedMesh).skeleton;
-      }
-    });
-
-    if (skeleton) {
-      for (const bone of (skeleton as THREE.Skeleton).bones) {
-        boneMap.current.set(bone.name, bone);
-        bindPoses.current.set(bone.name, bone.quaternion.clone());
-      }
-      // Apply initial pose
-      boneMap.current.forEach((bone, name) => {
-        const jointRot = joints[name];
-        if (jointRot) {
-          const bindQ = bindPoses.current.get(name)!;
-          // Use Euler with 'ZYX' order for more natural rotations
-          const euler = new THREE.Euler(jointRot.x * DEG2RAD, jointRot.y * DEG2RAD, jointRot.z * DEG2RAD, 'ZYX');
-          const rotQ = new THREE.Quaternion().setFromEuler(euler);
-          // POST-multiply: bindPose first, then local rotation (local space)
-          bone.quaternion.copy(bindQ).multiply(rotQ);
-          console.log(`[AvatarModel] Applied ${name} z:${jointRot.z}°`);
+    if (isVrm && vrmInstance) {
+      // For VRM: use humanoid bone mapping so joints are addressed by Mixamo-style names
+      const humanoid = vrmInstance.humanoid;
+      if (humanoid) {
+        for (const [vrmBoneName, mixamoBoneName] of Object.entries(VRM_TO_MIXAMO_BONE_MAP)) {
+          const boneNode = humanoid.getNormalizedBoneNode(vrmBoneName as any);
+          if (boneNode && (boneNode as THREE.Bone).isBone) {
+            const bone = boneNode as THREE.Bone;
+            boneMap.current.set(mixamoBoneName, bone);
+            bindPoses.current.set(mixamoBoneName, bone.quaternion.clone());
+          }
         }
-      });
-      // Run axis discovery diagnostic (enable with ?axisDiscovery in URL)
-      if (window.location.search.includes('axisDiscovery')) {
-        discoverBoneAxes(boneMap.current, bindPoses.current, scene);
       }
     } else {
-      // Fallback: traverse for bones
+      // GLB: Collect bones from skeleton (not traverse) to ensure we modify the actual rendered bones
+      let skeleton: THREE.Skeleton | null = null;
       scene.traverse((obj) => {
-        if (!(obj as THREE.Bone).isBone) return;
-        const bone = obj as THREE.Bone;
-        boneMap.current.set(bone.name, bone);
-        bindPoses.current.set(bone.name, bone.quaternion.clone());
+        if ((obj as THREE.SkinnedMesh).isSkinnedMesh && !skeleton) {
+          skeleton = (obj as THREE.SkinnedMesh).skeleton;
+        }
       });
+
+      if (skeleton) {
+        for (const bone of (skeleton as THREE.Skeleton).bones) {
+          boneMap.current.set(bone.name, bone);
+          bindPoses.current.set(bone.name, bone.quaternion.clone());
+        }
+      } else {
+        // Fallback: traverse for bones
+        scene.traverse((obj) => {
+          if (!(obj as THREE.Bone).isBone) return;
+          const bone = obj as THREE.Bone;
+          boneMap.current.set(bone.name, bone);
+          bindPoses.current.set(bone.name, bone.quaternion.clone());
+        });
+      }
+    }
+
+    // Apply initial pose
+    boneMap.current.forEach((bone, name) => {
+      const jointRot = joints[name];
+      if (jointRot) {
+        const bindQ = bindPoses.current.get(name)!;
+        const euler = new THREE.Euler(jointRot.x * DEG2RAD, jointRot.y * DEG2RAD, jointRot.z * DEG2RAD, 'ZYX');
+        const rotQ = new THREE.Quaternion().setFromEuler(euler);
+        bone.quaternion.copy(bindQ).multiply(rotQ);
+        console.log(`[AvatarModel] Applied ${name} z:${jointRot.z}°`);
+      }
+    });
+    // Run axis discovery diagnostic (enable with ?axisDiscovery in URL)
+    if (!isVrm && window.location.search.includes('axisDiscovery')) {
+      discoverBoneAxes(boneMap.current, bindPoses.current, scene);
     }
 
     // Compute bounding box for auto-scaling
@@ -255,7 +292,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
 
     // Apply initial pose immediately after loading
     requestAnimationFrame(() => applyPose.current());
-  }, [gltf, autoScale, height]);
+  }, [isVrm ? vrmScene : gltf, autoScale, height, vrmInstance]);
 
   // Initialize IK solver and chains
   const initializeIK = () => {
@@ -386,8 +423,13 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     }
   }, [joints, measurements]);
 
-  // Also apply every frame for smooth animation
-  useFrame(() => { applyPose.current(); });
+  // Also apply every frame for smooth animation + VRM spring bones
+  useFrame((_, delta) => {
+    applyPose.current();
+    if (vrmInstance) {
+      vrmInstance.update(delta);
+    }
+  });
 
   return <group ref={groupRef} />;
 }
