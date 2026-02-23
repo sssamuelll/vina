@@ -39,13 +39,7 @@ function readBody(req) {
 
 // ─── System prompt ──────────────────────────────────────────────────────────
 
-const DEFAULT_SYSTEM = `You are an AI pattern-making assistant inside OpenClo (open-source CLO3D alternative).
-You think like a patronista. You use proper pattern-making terminology.
-You understand the FULL workflow: measurements → base pattern → adjustments → fitting → grading → nesting → cutting.
-Default to the user's language. Spanish: use modistería terms. English: use pattern-making terms.
-Expert but not condescending. Teaching mode by default — explain WHY.
-Use sensible defaults: 10mm SA, grainline on center.
-Keep responses concise and actionable.`;
+const DEFAULT_SYSTEM = `You are an AI assistant inside OpenClo, an open-source CLO3D alternative. Be concise. Match user's language.`;
 
 // ─── Chat handler ───────────────────────────────────────────────────────────
 
@@ -96,7 +90,7 @@ async function handleChat(req, res) {
   const proc = spawn(CLAUDE_PATH, args, {
     cwd: '/tmp', // Don't scan project directory (faster startup)
     env: { ...process.env, TERM: 'dumb' },
-    stdio: ['pipe', 'pipe', 'pipe'],
+    stdio: ['ignore', 'pipe', 'pipe'], // stdin must be closed or claude hangs
   });
 
   let fullContent = '';
