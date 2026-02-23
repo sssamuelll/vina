@@ -62,7 +62,7 @@ export function loadOllamaConfig(): OllamaConfig {
  */
 export function saveOllamaConfig(config: OllamaConfig): void {
   try {
-    localStorage.setItem(OLLAMA_CONFIG_KEY, JSON.stringify(config));
+    import("../../utils/storage").then(({ storageSet }) => { storageSet("settings", "ollama-config", config); }).catch(() => {}); try { localStorage.setItem(OLLAMA_CONFIG_KEY, JSON.stringify(config)); } catch { /* ignore */ }
   } catch { /* ignore */ }
 }
 

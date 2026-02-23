@@ -1,0 +1,184 @@
+/**
+ * Async storage abstraction — IndexedDB primary, localStorage fallback.
+ *
+ * All project data, avatars, plugins, and copilot state goes through here.
+ * Small settings (layout, theme) can stay in localStorage directly.
+ *
+ * Database schema:
+ * - `projects` store: project JSON keyed by id, plus 'autosave' key
+ * - `avatars` store: avatar profiles and saved poses
+ * - `plugins` store: installed plugin metadata
+ * - `settings` store: copilot config, provider config, misc key-value
+ *
+ * @module storage
+ */
+
+import { openDB, type IDBPDatabase } from 'idb';
+
+// ─── Schema ─────────────────────────────────────────────────────────────────
+
+const DB_NAME = 'openclo';
+const DB_VERSION = 1;
+
+type StoreNames = 'projects' | 'avatars' | 'plugins' | 'settings';
+
+// ─── DB Singleton ───────────────────────────────────────────────────────────
+
+let dbPromise: Promise<IDBPDatabase> | null = null;
+
+function getDB(): Promise<IDBPDatabase> {
+  if (!dbPromise) {
+    dbPromise = openDB(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        if (!db.objectStoreNames.contains('projects')) db.createObjectStore('projects');
+        if (!db.objectStoreNames.contains('avatars')) db.createObjectStore('avatars');
+        if (!db.objectStoreNames.contains('plugins')) db.createObjectStore('plugins');
+        if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+      },
+    });
+  }
+  return dbPromise;
+}
+
+// ─── Core API ───────────────────────────────────────────────────────────────
+
+/**
+ * Get a value from IndexedDB.
+ * Falls back to localStorage if IndexedDB is unavailable.
+ */
+export async function storageGet<T = unknown>(store: StoreNames, key: string): Promise<T | undefined> {
+  try {
+    const db = await getDB();
+    return await db.get(store, key) as T | undefined;
+  } catch {
+    // Fallback to localStorage
+    try {
+      const raw = localStorage.getItem(`${DB_NAME}:${store}:${key}`);
+      return raw ? JSON.parse(raw) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Set a value in IndexedDB.
+ * Falls back to localStorage if IndexedDB is unavailable.
+ */
+export async function storageSet(store: StoreNames, key: string, value: unknown): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.put(store, value, key);
+  } catch {
+    // Fallback to localStorage
+    try {
+      localStorage.setItem(`${DB_NAME}:${store}:${key}`, JSON.stringify(value));
+    } catch {
+      // Quota exceeded or unavailable — silent fail
+    }
+  }
+}
+
+/**
+ * Delete a value from IndexedDB.
+ */
+export async function storageDel(store: StoreNames, key: string): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.delete(store, key);
+  } catch {
+    try {
+      localStorage.removeItem(`${DB_NAME}:${store}:${key}`);
+    } catch { /* ignore */ }
+  }
+}
+
+/**
+ * Get all keys from a store.
+ */
+export async function storageKeys(store: StoreNames): Promise<string[]> {
+  try {
+    const db = await getDB();
+    return (await db.getAllKeys(store)) as string[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Clear all data in a store.
+ */
+export async function storageClear(store: StoreNames): Promise<void> {
+  try {
+    const db = await getDB();
+    await db.clear(store);
+  } catch { /* ignore */ }
+}
+
+/**
+ * Clear ALL OpenClo data (all stores). For full reset.
+ */
+export async function storageClearAll(): Promise<void> {
+  try {
+    const db = await getDB();
+    const tx = db.transaction(['projects', 'avatars', 'plugins', 'settings'], 'readwrite');
+    await Promise.all([
+      tx.objectStore('projects').clear(),
+      tx.objectStore('avatars').clear(),
+      tx.objectStore('plugins').clear(),
+      tx.objectStore('settings').clear(),
+      tx.done,
+    ]);
+  } catch { /* ignore */ }
+}
+
+// ─── Migration Helper ───────────────────────────────────────────────────────
+
+/**
+ * Migrate a localStorage key to IndexedDB.
+ * Reads from localStorage, writes to IndexedDB, removes from localStorage.
+ * Returns the migrated value or undefined.
+ */
+export async function migrateFromLocalStorage<T = unknown>(
+  localKey: string,
+  store: StoreNames,
+  idbKey: string,
+): Promise<T | undefined> {
+  try {
+    const raw = localStorage.getItem(localKey);
+    if (!raw) return undefined;
+    const value = JSON.parse(raw) as T;
+    await storageSet(store, idbKey, value);
+    localStorage.removeItem(localKey);
+    return value;
+  } catch {
+    return undefined;
+  }
+}
+
+// ─── Convenience: Project Autosave ──────────────────────────────────────────
+
+const AUTOSAVE_KEY = 'autosave';
+const LEGACY_AUTOSAVE_KEY = 'openclo-autosave';
+
+/** Save project to IndexedDB autosave slot. */
+export async function saveProject(project: unknown): Promise<void> {
+  await storageSet('projects', AUTOSAVE_KEY, project);
+}
+
+/** Load project from IndexedDB autosave slot. Migrates from localStorage if needed. */
+export async function loadProject(): Promise<unknown | undefined> {
+  // Try IndexedDB first
+  const existing = await storageGet('projects', AUTOSAVE_KEY);
+  if (existing) return existing;
+
+  // Migrate from localStorage
+  return migrateFromLocalStorage(LEGACY_AUTOSAVE_KEY, 'projects', AUTOSAVE_KEY);
+}
+
+/** Clear the autosave. */
+export async function clearProject(): Promise<void> {
+  await storageDel('projects', AUTOSAVE_KEY);
+  // Also clear legacy
+  try { localStorage.removeItem(LEGACY_AUTOSAVE_KEY); } catch { /* ignore */ }
+}

@@ -182,6 +182,7 @@ export interface SavedPose {
 const POSES_STORAGE_KEY = 'openclo-saved-poses';
 
 function loadSavedPoses(): SavedPose[] {
+  // Sync fallback for initial state — async migration happens in loadSavedPosesFromStorage
   try {
     const raw = localStorage.getItem(POSES_STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
@@ -189,7 +190,11 @@ function loadSavedPoses(): SavedPose[] {
 }
 
 function persistPoses(poses: SavedPose[]) {
-  localStorage.setItem(POSES_STORAGE_KEY, JSON.stringify(poses));
+  // Write to both IndexedDB and localStorage (for sync access)
+  import('../utils/storage').then(({ storageSet }) => {
+    storageSet('avatars', 'saved-poses', poses);
+  });
+  try { localStorage.setItem(POSES_STORAGE_KEY, JSON.stringify(poses)); } catch { /* ignore */ }
 }
 
 const initialState: AvatarState = {

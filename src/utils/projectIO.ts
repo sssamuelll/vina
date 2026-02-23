@@ -1,47 +1,58 @@
-import { OpenCloProject } from '../types/types';
+/**
+ * Project I/O — save/load/export/import with IndexedDB persistence.
+ *
+ * Uses `storage.ts` abstraction (IndexedDB primary, localStorage fallback).
+ * Legacy localStorage autosave is auto-migrated on first load.
+ *
+ * @module projectIO
+ */
 
-const LOCAL_STORAGE_KEY = 'openclo-autosave';
+import { OpenCloProject } from '../types/types';
+import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 
 interface ProjectState {
   id: string;
   name: string;
-  pieces: any[];
-  seams: any[];
-  fabrics: any[];
-  avatar: any;
+  pieces: unknown[];
+  seams: unknown[];
+  fabrics: unknown[];
+  avatar: unknown;
   avatarMode?: string;
   avatarModelUrl?: string | null;
   isDirty?: boolean;
 }
 
-function serializeDates(obj: any): any {
+// ─── Serialization ──────────────────────────────────────────────────────────
+
+function serializeDates(obj: unknown): unknown {
   if (obj instanceof Date) return { __date__: obj.toISOString() };
   if (Array.isArray(obj)) return obj.map(serializeDates);
   if (obj && typeof obj === 'object') {
-    const result: any = {};
+    const result: Record<string, unknown> = {};
     for (const key of Object.keys(obj)) {
-      result[key] = serializeDates(obj[key]);
+      result[key] = serializeDates((obj as Record<string, unknown>)[key]);
     }
     return result;
   }
   return obj;
 }
 
-function deserializeDates(obj: any): any {
+function deserializeDates(obj: unknown): unknown {
   if (Array.isArray(obj)) return obj.map(deserializeDates);
   if (obj && typeof obj === 'object') {
-    if (obj.__date__) return new Date(obj.__date__).getTime();
-    const result: any = {};
-    for (const key of Object.keys(obj)) {
-      result[key] = deserializeDates(obj[key]);
+    const rec = obj as Record<string, unknown>;
+    if (rec.__date__) return new Date(rec.__date__ as string).getTime();
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(rec)) {
+      result[key] = deserializeDates(rec[key]);
     }
     return result;
   }
   return obj;
 }
 
-export function saveProjectToJSON(state: ProjectState): string {
-  const project = {
+function stateToProject(state: ProjectState): Record<string, unknown> {
+  return {
     id: state.id,
     name: state.name,
     pieces: state.pieces,
@@ -51,7 +62,12 @@ export function saveProjectToJSON(state: ProjectState): string {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
-  return JSON.stringify(serializeDates(project), null, 2);
+}
+
+// ─── JSON Export/Import ─────────────────────────────────────────────────────
+
+export function saveProjectToJSON(state: ProjectState): string {
+  return JSON.stringify(serializeDates(stateToProject(state)), null, 2);
 }
 
 export function loadProjectFromJSON(json: string): OpenCloProject {
@@ -59,18 +75,43 @@ export function loadProjectFromJSON(json: string): OpenCloProject {
   return deserializeDates(raw) as OpenCloProject;
 }
 
-export function saveToLocalStorage(state: ProjectState): void {
+// ─── IndexedDB Autosave (async) ─────────────────────────────────────────────
+
+/** Save project to IndexedDB (debounced by caller). */
+export async function saveToStorage(state: ProjectState): Promise<void> {
+  const project = serializeDates(stateToProject(state));
+  await saveProject(project);
+}
+
+/** Load project from IndexedDB (with automatic localStorage migration). */
+export async function loadFromStorage(): Promise<OpenCloProject | null> {
+  const raw = await loadProjectFromIDB();
+  if (!raw) return null;
   try {
-    const json = saveProjectToJSON(state);
-    localStorage.setItem(LOCAL_STORAGE_KEY, json);
+    return deserializeDates(raw) as OpenCloProject;
   } catch {
-    // silently fail (quota exceeded, etc.)
+    return null;
   }
 }
 
+/** Clear the autosave from IndexedDB + legacy localStorage. */
+export async function clearStorageProject(): Promise<void> {
+  await clearProject();
+}
+
+// ─── Legacy Sync API (deprecated, kept for backward compat during migration) ──
+
+/** @deprecated Use saveToStorage() instead */
+export function saveToLocalStorage(state: ProjectState): void {
+  // Now delegates to async — fire and forget
+  saveToStorage(state).catch(() => {});
+}
+
+/** @deprecated Use loadFromStorage() instead */
 export function loadFromLocalStorage(): OpenCloProject | null {
+  // Sync fallback: check localStorage directly (migration happens on async load)
   try {
-    const json = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const json = localStorage.getItem('openclo-autosave');
     if (!json) return null;
     return loadProjectFromJSON(json);
   } catch {
@@ -78,10 +119,12 @@ export function loadFromLocalStorage(): OpenCloProject | null {
   }
 }
 
-/** Clear the autosave from localStorage (for New Project). */
+/** @deprecated Use clearStorageProject() instead */
 export function clearLocalStorageProject(): void {
-  localStorage.removeItem(LOCAL_STORAGE_KEY);
+  clearStorageProject().catch(() => {});
 }
+
+// ─── File Download/Upload ───────────────────────────────────────────────────
 
 export function downloadProjectFile(state: ProjectState, filename?: string): void {
   const json = saveProjectToJSON(state);

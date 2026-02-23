@@ -156,5 +156,6 @@ export function loadProviderConfig(): ProviderConfig | null {
  * @param config - Provider configuration to save
  */
 export function saveProviderConfig(config: ProviderConfig): void {
-  localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(config));
+  import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'provider-config', config); }).catch(() => {});
+  try { localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(config)); } catch { /* ignore */ }
 }

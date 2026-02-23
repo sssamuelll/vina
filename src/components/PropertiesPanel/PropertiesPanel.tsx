@@ -43,7 +43,7 @@ export default function PropertiesPanel() {
 
   const handleNew = useCallback(() => {
     if (isDirty && !window.confirm('You have unsaved changes. Create new project?')) return;
-    import('../../utils/projectIO').then(m => m.clearLocalStorageProject());
+    import('../../utils/projectIO').then(m => m.clearStorageProject());
     import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
   }, [dispatch, isDirty]);
 

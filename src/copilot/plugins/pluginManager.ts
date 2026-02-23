@@ -46,7 +46,7 @@ export function loadInstalledPluginsList(): InstalledPlugin[] {
  * @param plugins - Array of InstalledPlugin entries to persist
  */
 export function saveInstalledPluginsList(plugins: InstalledPlugin[]): void {
-  localStorage.setItem(INSTALLED_PLUGINS_KEY, JSON.stringify(plugins));
+  import("../../utils/storage").then(({ storageSet }) => { storageSet("plugins", "installed", plugins); }).catch(() => {}); try { localStorage.setItem(INSTALLED_PLUGINS_KEY, JSON.stringify(plugins)); } catch { /* ignore */ }
 }
 
 // ─── Install / Remove ───────────────────────────────────────────────────────
@@ -297,5 +297,5 @@ export function loadAndRegisterPlugin(
  * Reset all plugin manager state (for testing).
  */
 export function resetPluginManager(): void {
-  localStorage.removeItem(INSTALLED_PLUGINS_KEY);
+  import("../../utils/storage").then(({ storageDel }) => { storageDel("plugins", "installed"); }).catch(() => {}); try { localStorage.removeItem(INSTALLED_PLUGINS_KEY); } catch { /* ignore */ }
 }

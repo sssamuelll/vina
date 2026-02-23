@@ -42,7 +42,8 @@ function loadAgentConfig(): AgentConfig {
 }
 
 function saveAgentConfig(config: AgentConfig) {
-  localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(config));
+  import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'agent-config', config); });
+  try { localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(config)); } catch { /* ignore */ }
 }
 
 function getProvider(config: ProviderConfig) {

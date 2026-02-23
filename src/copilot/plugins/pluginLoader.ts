@@ -458,14 +458,16 @@ export function readPluginStorage(pluginId: string): Record<string, unknown> | n
  * @param data - Data to persist
  */
 export function writePluginStorage(pluginId: string, data: Record<string, unknown>): void {
-  localStorage.setItem(getPluginStorageKey(pluginId), JSON.stringify(data));
+  import('../../utils/storage').then(({ storageSet }) => { storageSet('plugins', `plugin:${pluginId}`, data); }).catch(() => {});
+  try { localStorage.setItem(getPluginStorageKey(pluginId), JSON.stringify(data)); } catch { /* ignore */ }
 }
 
 /**
- * Clear plugin-scoped data from localStorage.
+ * Clear plugin-scoped data from localStorage and IndexedDB.
  *
  * @param pluginId - The plugin id
  */
 export function clearPluginStorage(pluginId: string): void {
-  localStorage.removeItem(getPluginStorageKey(pluginId));
+  import('../../utils/storage').then(({ storageDel }) => { storageDel('plugins', `plugin:${pluginId}`); }).catch(() => {});
+  try { localStorage.removeItem(getPluginStorageKey(pluginId)); } catch { /* ignore */ }
 }

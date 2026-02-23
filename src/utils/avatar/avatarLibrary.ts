@@ -64,10 +64,13 @@ export function saveProfile(profile: AvatarProfile): void {
   } else {
     profiles.push(profile);
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+  // Write to both IndexedDB and localStorage
+  import('../storage').then(({ storageSet }) => { storageSet('avatars', 'profiles', profiles); });
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
 }
 
 export function deleteProfile(id: string): void {
   const profiles = loadProfiles().filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+  import('../storage').then(({ storageSet }) => { storageSet('avatars', 'profiles', profiles); });
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
 }

@@ -23,7 +23,7 @@ import StatusBar from '../StatusBar/StatusBar';
 import BottomPanel from '../BottomPanel/BottomPanel';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { createCopilotKeyHandler } from '../../copilot/keyboardShortcuts';
-import { saveToLocalStorage, loadFromLocalStorage } from '../../utils/projectIO';
+import { saveToStorage, loadFromStorage } from '../../utils/projectIO';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
@@ -148,14 +148,15 @@ export default function Workspace() {
   }, []);
 
   useEffect(() => {
-    const saved = loadFromLocalStorage();
-    if (saved) dispatch(loadProject(saved));
+    loadFromStorage().then(saved => {
+      if (saved) dispatch(loadProject(saved));
+    });
   }, [dispatch]);
 
   useEffect(() => {
-    // Debounced save on every change + periodic backup
-    const debounce = setTimeout(() => saveToLocalStorage(project), 500);
-    const interval = setInterval(() => saveToLocalStorage(project), 30000);
+    // Debounced async save + periodic backup
+    const debounce = setTimeout(() => { saveToStorage(project); }, 500);
+    const interval = setInterval(() => { saveToStorage(project); }, 30000);
     return () => { clearTimeout(debounce); clearInterval(interval); };
   }, [project]);
 

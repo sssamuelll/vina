@@ -314,7 +314,7 @@ export function loadFallbackProvider(): ProviderConfig | null {
  */
 export function saveFallbackProvider(config: ProviderConfig): void {
   try {
-    localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(config));
+    import("../utils/storage").then(({ storageSet }) => { storageSet("settings", "fallback-provider", config); }).catch(() => {}); try { localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(config)); } catch { /* ignore */ }
   } catch { /* ignore */ }
 }
 
