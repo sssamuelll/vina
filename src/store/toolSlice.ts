@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NEW_PROJECT } from './actions';
 
 interface ToolState {
   activeTool2D: string;     // tool id
@@ -56,6 +57,9 @@ const toolSlice = createSlice({
     resetAllToolOptions(state) {
       state.toolOptions = {};
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

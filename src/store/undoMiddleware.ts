@@ -63,8 +63,8 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     undoState.batchingAction = actionType;
   }
 
-  // On loadProject, clear history and batching state
-  if (actionType === 'project/loadProject') {
+  // On loadProject or newProject, clear history and batching state
+  if (actionType === 'project/loadProject' || actionType === 'global/newProject') {
     undoState.past.length = 0;
     undoState.future.length = 0;
     undoState.lastSnapshotTime = 0;

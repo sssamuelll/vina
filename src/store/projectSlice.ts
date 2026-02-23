@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand } from '../types/types';
+import { NEW_PROJECT } from './actions';
 
 const defaultAvatar: Avatar = {
   id: 'default',
@@ -176,6 +177,12 @@ const projectSlice = createSlice({
       state.avatarModelUrl = action.payload;
       if (action.payload) state.avatarMode = 'model';
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => ({
+      ...initialState,
+      id: 'new-project-' + Date.now(),
+    }));
   },
 });
 

@@ -78,6 +78,11 @@ export function loadFromLocalStorage(): OpenCloProject | null {
   }
 }
 
+/** Clear the autosave from localStorage (for New Project). */
+export function clearLocalStorageProject(): void {
+  localStorage.removeItem(LOCAL_STORAGE_KEY);
+}
+
 export function downloadProjectFile(state: ProjectState, filename?: string): void {
   const json = saveProjectToJSON(state);
   const blob = new Blob([json], { type: 'application/json' });

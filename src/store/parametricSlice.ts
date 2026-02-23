@@ -6,6 +6,7 @@
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NEW_PROJECT } from './actions';
 import type { SeamlyPattern } from '../utils/seamly2d/templateEngine';
 import type { BodyMeasurements } from '../types/types';
 import type { StandardSize, SizeSystem } from '../utils/seamly2d/sizeTables';
@@ -101,6 +102,9 @@ const parametricSlice = createSlice({
     setGeneratedPieceIds(state, action: PayloadAction<string[]>) {
       state.generatedPieceIds = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

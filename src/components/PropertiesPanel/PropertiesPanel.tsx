@@ -43,16 +43,8 @@ export default function PropertiesPanel() {
 
   const handleNew = useCallback(() => {
     if (isDirty && !window.confirm('You have unsaved changes. Create new project?')) return;
-    dispatch(loadProject({
-      id: 'new-project-' + Date.now(),
-      name: 'Untitled Project',
-      pieces: [],
-      seams: [],
-      fabrics: [{ id: 'default-cotton', name: 'Cotton', color: '#e8e4df', weight: 150, stretch: 0.05, stiffness: 0.4, friction: 0.5 }],
-      avatar: { id: 'default', name: 'Default Avatar', modelUrl: '', measurements: { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } },
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    }));
+    import('../../utils/projectIO').then(m => m.clearLocalStorageProject());
+    import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
   }, [dispatch, isDirty]);
 
   // Undo/redo handled by top toolbar

@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem } from '../types/types';
+import { NEW_PROJECT } from './actions';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -81,6 +82,9 @@ const editorSlice = createSlice({
     // These are intercepted by undoMiddleware — they never actually modify editor state
     undo() {},
     redo() {},
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

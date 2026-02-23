@@ -294,11 +294,12 @@ export default function FileExplorerView() {
   );
 
   const handleNewProject = useCallback(() => {
-    // Reload to reset state (simple approach)
     if (window.confirm('Create a new project? Unsaved changes will be lost.')) {
-      window.location.reload();
+      // Clear persisted project and reset all Redux slices
+      import('../../utils/projectIO').then(m => m.clearLocalStorageProject());
+      import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
     }
-  }, []);
+  }, [dispatch]);
 
   return (
     <div className="sidebar-view">

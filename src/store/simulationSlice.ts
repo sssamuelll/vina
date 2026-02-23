@@ -7,6 +7,7 @@
  */
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NEW_PROJECT } from './actions';
 import type { FitMapMode, FitMapConfig } from '../utils/cloth/fitMaps';
 
 /** Simulation lifecycle state. */
@@ -84,6 +85,9 @@ const simulationSlice = createSlice({
     updateFitMapConfig(state, action: PayloadAction<Partial<FitMapConfig>>) {
       Object.assign(state.fitMapConfig, action.payload);
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

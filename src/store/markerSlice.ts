@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NEW_PROJECT } from './actions';
 import type { PaperSize, LayoutResult } from '../utils/export/cuttingLayout';
 
 export interface MarkerState {
@@ -156,6 +157,9 @@ const markerSlice = createSlice({
     setFabricUtilization(state, action: PayloadAction<number>) {
       state.fabricUtilization = action.payload;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 
