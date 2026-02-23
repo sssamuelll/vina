@@ -35,6 +35,10 @@ function getDB(): Promise<IDBPDatabase> {
         if (!db.objectStoreNames.contains('plugins')) db.createObjectStore('plugins');
         if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
       },
+    }).catch((err) => {
+      // Reset so next call retries (e.g. after environment becomes available)
+      dbPromise = null;
+      throw err;
     });
   }
   return dbPromise;

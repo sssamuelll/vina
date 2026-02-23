@@ -1,26 +1,34 @@
 /**
  * Tests for IndexedDB storage abstraction.
- * Mocks localStorage since jsdom isn't available.
+ * Mocks the `idb` module so openDB always rejects, forcing localStorage fallback.
  * @module storage.test
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// Mock localStorage
+// ─── Mock localStorage ──────────────────────────────────────────────────────
 const store: Record<string, string> = {};
 const localStorageMock = {
   getItem: vi.fn((key: string) => store[key] ?? null),
   setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
   removeItem: vi.fn((key: string) => { delete store[key]; }),
   clear: vi.fn(() => { Object.keys(store).forEach(k => delete store[k]); }),
+  get length() { return Object.keys(store).length; },
+  key: vi.fn((_i: number) => null),
 };
 vi.stubGlobal('localStorage', localStorageMock);
 
-// Mock indexedDB to be unavailable (force localStorage fallback)
-vi.stubGlobal('indexedDB', undefined);
+// ─── Mock idb so openDB always rejects (forces localStorage fallback) ───────
+vi.mock('idb', () => ({
+  openDB: () => Promise.reject(new Error('IndexedDB unavailable in test')),
+}));
 
-// Now import storage (it will use localStorage fallback)
-import { storageGet, storageSet, storageDel, saveProject, loadProject, clearProject, migrateFromLocalStorage } from '../storage';
+// Now import storage — every call will fall through to localStorage
+import {
+  storageGet, storageSet, storageDel,
+  saveProject, loadProject, clearProject,
+  migrateFromLocalStorage,
+} from '../storage';
 
 describe('storage abstraction (localStorage fallback)', () => {
   beforeEach(() => {
@@ -74,7 +82,6 @@ describe('storage abstraction (localStorage fallback)', () => {
       store['openclo-autosave'] = JSON.stringify(legacy);
       const loaded = await loadProject();
       expect(loaded).toEqual(legacy);
-      // Legacy key should be removed after migration
       expect(store['openclo-autosave']).toBeUndefined();
     });
   });
