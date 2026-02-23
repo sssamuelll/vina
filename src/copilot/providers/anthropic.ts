@@ -1,6 +1,9 @@
 /**
  * Anthropic Claude Provider — Messages API with tool use.
  *
+ * In production (openclo.sdar.dev), routes through /api/anthropic/ proxy
+ * to avoid CORS issues with direct browser→API calls.
+ *
  * @module anthropicProvider
  */
 
@@ -13,6 +16,20 @@ import type {
   ProviderToolCall,
   StreamChunk,
 } from './types';
+
+/**
+ * Resolve the Anthropic API base URL.
+ * In production, use the CORS proxy at /api/anthropic to avoid browser CORS blocks.
+ * In development (localhost), call Anthropic directly.
+ */
+function resolveBaseUrl(configBaseUrl?: string): string {
+  if (configBaseUrl) return configBaseUrl;
+  // Use proxy in production to avoid CORS
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    return `${window.location.origin}/api/anthropic`;
+  }
+  return 'https://api.anthropic.com';
+}
 
 interface AnthropicMessage {
   role: 'user' | 'assistant';
@@ -112,7 +129,7 @@ export const anthropicProvider: LLMProvider = {
     config: ProviderConfig,
   ): Promise<ProviderResponse> {
     const { system, messages: anthropicMessages } = toAnthropicMessages(messages);
-    const baseUrl = config.baseUrl || 'https://api.anthropic.com';
+    const baseUrl = resolveBaseUrl(config.baseUrl);
 
     const body: Record<string, unknown> = {
       model: config.model,
@@ -157,7 +174,7 @@ export const anthropicProvider: LLMProvider = {
     } catch (e) {
       throw new Error(`Message conversion failed: ${e instanceof Error ? e.message : e}`);
     }
-    const baseUrl = config.baseUrl || 'https://api.anthropic.com';
+    const baseUrl = resolveBaseUrl(config.baseUrl);
 
     const body: Record<string, unknown> = {
       model: config.model,

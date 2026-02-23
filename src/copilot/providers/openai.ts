@@ -1,8 +1,18 @@
 /**
  * OpenAI Provider — ChatCompletions API with function calling.
  *
+ * In production, routes through /api/openai/ proxy to avoid CORS.
+ *
  * @module openaiProvider
  */
+
+function resolveOpenAIBaseUrl(configBaseUrl?: string): string {
+  if (configBaseUrl) return configBaseUrl;
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    return `${window.location.origin}/api/openai`;
+  }
+  return 'https://api.openai.com';
+}
 
 import type {
   LLMProvider,
@@ -83,7 +93,7 @@ export const openaiProvider: LLMProvider = {
     tools: ProviderToolDef[],
     config: ProviderConfig,
   ): Promise<ProviderResponse> {
-    const baseUrl = config.baseUrl || 'https://api.openai.com';
+    const baseUrl = resolveOpenAIBaseUrl(config.baseUrl);
 
     const body: Record<string, unknown> = {
       model: config.model,
@@ -119,7 +129,7 @@ export const openaiProvider: LLMProvider = {
     config: ProviderConfig,
     onChunk: (chunk: StreamChunk) => void,
   ): Promise<ProviderResponse> {
-    const baseUrl = config.baseUrl || 'https://api.openai.com';
+    const baseUrl = resolveOpenAIBaseUrl(config.baseUrl);
 
     const body: Record<string, unknown> = {
       model: config.model,
