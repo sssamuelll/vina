@@ -10,10 +10,12 @@
 import { useCallback, useMemo, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../store';
-import { updatePiece } from '../store/projectSlice';
-import { setVariableOverride, resetOverrides, resetVariable } from '../store/parametricSlice';
+import { updatePiece, addSeam } from '../store/projectSlice';
+import { setVariableOverride, resetOverrides, resetVariable, activateTemplate } from '../store/parametricSlice';
 import { PatternTemplateEngine } from '../utils/seamly2d/templateEngine';
-import { getSizeMeasurements, type StandardSize } from '../utils/seamly2d/sizeTables';
+import { resolveVariables } from '../utils/seamly2d/formulaEvaluator';
+import { getSizeMeasurements, buildMeasurements, getAvailableSizes, type StandardSize } from '../utils/seamly2d/sizeTables';
+import { autoSew } from '../utils/autoSew';
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type SliderCategory = 'fit' | 'length' | 'proportions' | 'ease' | 'construction';
@@ -267,14 +269,91 @@ export function useParametricEngine() {
     dispatch(resetVariable(key));
   }, [dispatch]);
 
+  // Change size — re-generate from scratch with new measurements
+  const handleChangeSize = useCallback((newSize: StandardSize) => {
+    if (!activePattern) return;
+
+    const measurements = buildMeasurements(newSize, sizeSystem);
+    const engine = new PatternTemplateEngine();
+    engine.loadPattern(activePattern);
+
+    try {
+      const newPieces = engine.generate(measurements);
+
+      // Resolve variables at new size for slider defaults
+      const measMap: Record<string, number> = {};
+      for (const [k, v] of Object.entries(measurements)) {
+        if (typeof v === 'number') measMap[k] = v;
+      }
+      if (activePattern.measurements?.defaults) {
+        for (const [k, v] of Object.entries(activePattern.measurements.defaults)) {
+          if (measMap[k] === undefined) measMap[k] = v;
+        }
+      }
+      const resolvedVars = resolveVariables(activePattern.variables, measMap);
+
+      // Update pieces in place
+      for (const newPiece of newPieces) {
+        const existing = pieces.find(p => p.id === newPiece.id);
+        if (existing) {
+          dispatch(updatePiece({
+            ...existing,
+            outline: newPiece.outline,
+            updatedAt: Date.now(),
+          }));
+        }
+      }
+
+      // Re-activate template with new defaults
+      dispatch(activateTemplate({
+        pattern: activePattern,
+        measurements,
+        size: newSize,
+        sizeSystem,
+        resolvedVariables: resolvedVars,
+        pieceIds: newPieces.map(p => p.id),
+      }));
+
+      // Re-match seams if we have multiple pieces
+      if (newPieces.length >= 2) {
+        reMatchSeams(newPieces);
+      }
+    } catch { /* ignore */ }
+  }, [activePattern, sizeSystem, pieces, dispatch]);
+
+  // Re-match seams when edges change significantly
+  const reMatchSeams = useCallback((updatedPieces: typeof pieces) => {
+    if (updatedPieces.length < 2) return;
+
+    try {
+      const result = autoSew(updatedPieces);
+      const genIds = new Set(generatedPieceIds);
+
+      for (const proposed of result.seams) {
+        if (proposed.confidence >= 0.6) {
+          const isOurPiece = genIds.has(proposed.seam.pieceA.pieceId) || genIds.has(proposed.seam.pieceB.pieceId);
+          if (isOurPiece) {
+            dispatch(addSeam(proposed.seam));
+          }
+        }
+      }
+    } catch { /* auto-sew failure is non-critical */ }
+  }, [generatedPieceIds, dispatch]);
+
+  // Available sizes for the selector
+  const availableSizes = useMemo(() => getAvailableSizes(sizeSystem), [sizeSystem]);
+
   return {
     isActive: activePattern !== null,
     patternName: activePattern?.name || null,
+    currentSize: parametric.currentSize,
+    availableSizes,
     variables,
     groups,
     generatedPieceIds,
     handleSliderChange,
     handleReset,
     handleResetVariable,
+    handleChangeSize,
   };
 }

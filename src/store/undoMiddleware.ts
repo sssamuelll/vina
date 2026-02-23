@@ -2,15 +2,20 @@ import { Middleware } from '@reduxjs/toolkit';
 import { RootState } from './index';
 
 const MAX_HISTORY = 50;
+const UNDO_BATCH_MS = 500; // Batch rapid changes (e.g. slider drags) into one undo step
 
 interface UndoState {
   past: unknown[];
   future: unknown[];
+  lastSnapshotTime: number;
+  batchingAction: string | null;
 }
 
 const undoState: UndoState = {
   past: [],
   future: [],
+  lastSnapshotTime: 0,
+  batchingAction: null,
 };
 
 export function canUndo() { return undoState.past.length > 0; }
@@ -39,18 +44,31 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
 
   // Track project actions (except restoreState and loadProject)
   if (actionType.startsWith('project/') && actionType !== 'project/restoreState' && actionType !== 'project/loadProject') {
-    const currentProject = (store.getState() as RootState).project;
-    undoState.past.push(JSON.parse(JSON.stringify(currentProject)));
-    if (undoState.past.length > MAX_HISTORY) {
-      undoState.past.shift();
+    const now = Date.now();
+    const isSameAction = actionType === undoState.batchingAction;
+    const isRecent = (now - undoState.lastSnapshotTime) < UNDO_BATCH_MS;
+
+    // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step
+    if (!(isSameAction && isRecent)) {
+      const currentProject = (store.getState() as RootState).project;
+      undoState.past.push(JSON.parse(JSON.stringify(currentProject)));
+      if (undoState.past.length > MAX_HISTORY) {
+        undoState.past.shift();
+      }
     }
-    undoState.future.length = 0; // clear redo on new action
+    // Always clear redo on any new project action (even batched)
+    undoState.future.length = 0;
+
+    undoState.lastSnapshotTime = now;
+    undoState.batchingAction = actionType;
   }
 
-  // On loadProject, clear history
+  // On loadProject, clear history and batching state
   if (actionType === 'project/loadProject') {
     undoState.past.length = 0;
     undoState.future.length = 0;
+    undoState.lastSnapshotTime = 0;
+    undoState.batchingAction = null;
   }
 
   return next(action);

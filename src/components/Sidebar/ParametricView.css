@@ -39,6 +39,40 @@
   letter-spacing: 0.03em;
 }
 
+/* ─── Size selector ─────────────────────────────────────────────────────── */
+
+.parametric-size-bar {
+  display: flex;
+  gap: 2px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.parametric-size-btn {
+  flex: 1;
+  padding: 6px 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: var(--btn-transition);
+}
+
+.parametric-size-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-secondary);
+}
+
+.parametric-size-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--bg-primary);
+}
+
 /* ─── Category groups ───────────────────────────────────────────────────── */
 
 .parametric-group {

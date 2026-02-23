@@ -127,7 +127,7 @@ function ParametricSlider({ variable, onChange, onReset }: SliderProps) {
 export default function ParametricView() {
   const fabrics = useSelector((s: RootState) => s.project.fabrics);
   const pieces = useSelector((s: RootState) => s.project.pieces);
-  const { isActive, patternName, variables, groups, handleSliderChange, handleReset, handleResetVariable } = useParametricEngine();
+  const { isActive, patternName, currentSize, availableSizes, variables, groups, handleSliderChange, handleReset, handleResetVariable, handleChangeSize } = useParametricEngine();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = useCallback((category: string) => {
@@ -177,6 +177,21 @@ export default function ParametricView() {
           {variables.length} params{overriddenCount > 0 ? ` · ${overriddenCount} modified` : ''}
         </span>
       </div>
+
+      {/* Size selector */}
+      {availableSizes.length > 0 && (
+        <div className="parametric-size-bar">
+          {availableSizes.map(size => (
+            <button
+              key={size}
+              className={`parametric-size-btn ${size === currentSize ? 'parametric-size-btn--active' : ''}`}
+              onClick={() => handleChangeSize(size)}
+            >
+              {size}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Fabric info bar */}
       {currentFabric && (
