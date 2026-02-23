@@ -9,6 +9,7 @@ import { getDefaultRegistry } from '../../copilot/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
 import { ollamaProvider } from '../../copilot/providers/ollama';
+import { claudeBridgeProvider } from '../../copilot/providers/claudeBridge';
 import {
   ProviderConfig,
   loadProviderConfig,
@@ -48,6 +49,7 @@ function saveAgentConfig(config: AgentConfig) {
 
 function getProvider(config: ProviderConfig) {
   switch (config.provider) {
+    case 'claude-bridge': return claudeBridgeProvider;
     case 'anthropic': return anthropicProvider;
     case 'openai': return openaiProvider;
     case 'ollama': return ollamaProvider;
@@ -112,7 +114,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   }, [project.id]);
 
   const isProviderMode = providerConfig !== null && (
-    providerConfig.provider === 'ollama' || providerConfig.apiKey.length > 0
+    providerConfig.provider === 'ollama' || providerConfig.provider === 'claude-bridge' || providerConfig.apiKey.length > 0
   );
   const offline = isOfflineMode(providerConfig);
   const hasConnection = isProviderMode || agentConfig.type !== 'builtin';

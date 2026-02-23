@@ -104,7 +104,7 @@ export default function AgentSettings({
   const existingConfig = loadProviderConfig();
   const ollamaConfig = loadOllamaConfig();
 
-  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'ollama'>(
+  const [provider, setProvider] = useState<'anthropic' | 'openai' | 'ollama' | 'claude-bridge'>(
     existingConfig?.provider ?? 'anthropic'
   );
   const [apiKey, setApiKey] = useState(existingConfig?.apiKey ?? '');
@@ -147,7 +147,16 @@ export default function AgentSettings({
     setTeachingMode(teachingMode);
     saveLanguagePreference(language);
 
-    if (provider === 'ollama') {
+    if (provider === 'claude-bridge') {
+      const config: ProviderConfig = {
+        provider: 'claude-bridge',
+        apiKey: '', // Uses Claude Code CLI, no API key needed
+        model: 'claude-code',
+        baseUrl: apiKey.trim() || undefined, // Reuse API key field for bridge URL
+      };
+      saveProviderConfig(config);
+      onSave(config);
+    } else if (provider === 'ollama') {
       saveOllamaConfig({ url: ollamaUrl, model, autoDetect: true });
       const config: ProviderConfig = {
         provider: 'ollama',
@@ -303,8 +312,8 @@ export default function AgentSettings({
         </select>
       </div>
 
-      {/* API Key (not for Ollama) */}
-      {provider !== 'ollama' && (
+      {/* API Key (not for Ollama or Claude Bridge) */}
+      {provider !== 'ollama' && provider !== 'claude-bridge' && (
         <div style={fieldStyle}>
           <label style={labelStyle}>API Key</label>
           <input
@@ -316,6 +325,23 @@ export default function AgentSettings({
           />
           <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
             {provider === 'anthropic' ? 'console.anthropic.com/settings/keys' : 'platform.openai.com/api-keys'}
+          </span>
+        </div>
+      )}
+
+      {/* Claude Bridge URL */}
+      {provider === 'claude-bridge' && (
+        <div style={fieldStyle}>
+          <label style={labelStyle}>Bridge URL (optional)</label>
+          <input
+            type="text"
+            style={inputStyle}
+            placeholder="http://localhost:3200"
+            value={apiKey}
+            onChange={e => setApiKey(e.target.value)}
+          />
+          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+            Leave empty for default. Run: node server/claude-bridge.mjs
           </span>
         </div>
       )}
