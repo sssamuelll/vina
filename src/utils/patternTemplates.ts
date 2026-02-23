@@ -388,15 +388,51 @@ export interface PatternTemplate {
   generate: (measurements: BodyMeasurements) => PatternPiece[];
 }
 
-/** Generate a complete t-shirt: front bodice, back bodice, 2 sleeves */
+/** Generate a short sleeve for t-shirts (~22cm length) */
+export function generateShortSleeve(m: BodyMeasurements): PatternPiece {
+  const d = deriveMeasurements(m);
+  const chestHalf = mm(d.chest) / 4;
+  const sleeveW = chestHalf * 0.85; // slightly wider than long sleeve for comfort
+  const capH = mm(d.armholeDepth) * 0.5; // sleeve cap height
+  const sleeveL = 220; // ~22cm short sleeve length (from cap to hem)
+  const totalH = capH + sleeveL;
+  const hemW = sleeveW * 0.9; // slight taper
+
+  const outline: PathCommand[] = [
+    M(0, capH),
+    // Sleeve cap — wide bell shape
+    C(0, capH * 0.25, sleeveW * 0.2, 0, sleeveW / 2, 0),
+    C(sleeveW * 0.8, 0, sleeveW, capH * 0.25, sleeveW, capH),
+    // Side seam to hem (slight taper)
+    L(sleeveW / 2 + hemW / 2, totalH),
+    // Hem
+    L(sleeveW / 2 - hemW / 2, totalH),
+    Z(),
+  ];
+
+  return {
+    id: uid(),
+    name: 'Short Sleeve',
+    outline,
+    internals: [grainline(sleeveW / 2, capH * 0.5, totalH - 20)],
+    position: { x: 50, y: 400 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+/** Generate a complete t-shirt: front bodice, back bodice, 2 short sleeves */
 export function generateTShirt(m: BodyMeasurements): PatternPiece[] {
   const front = generateBodiceFront(m);
   front.name = 'Delantero Camiseta';
   const back = generateBodiceBack(m);
   back.name = 'Espalda Camiseta';
-  const sleeveL = generateSleeve(m);
+  const sleeveL = generateShortSleeve(m);
   sleeveL.name = 'Manga Izquierda';
-  const sleeveR = generateSleeve(m);
+  const sleeveR = generateShortSleeve(m);
   sleeveR.name = 'Manga Derecha';
   sleeveR.mirrored = true;
 
