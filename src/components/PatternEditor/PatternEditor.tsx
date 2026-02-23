@@ -18,6 +18,7 @@ import PieceRenderer from './renderers/PieceRenderer';
 import SeamRenderer from './renderers/SeamRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
 import HintText from './renderers/HintText';
+import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
 import './PatternEditor.css';
 
@@ -170,6 +171,7 @@ export default function PatternEditor() {
             onPieceNameSave={handlePieceNameSave}
             onPieceNameCancel={handlePieceNameCancel}
           />
+          <ConstructionOverlay zoom2D={zoom2D} />
           <SeamRenderer
             seams={seams}
             pieces={pieces}
