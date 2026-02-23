@@ -47,16 +47,64 @@ const constructionSlice = createSlice({
     // ─── Points ───
     addPoint(state, action: PayloadAction<{ label: string; definition: PointDefinition; visible?: boolean }>) {
       const { label, definition, visible } = action.payload;
-      // Resolve immediately for absolute/manual types
+
+      // Build lookup from existing points (by id and label)
+      const lookup = (ref: string): { x: number; y: number } | null => {
+        const pt = state.points.find(p => p.id === ref || p.label === ref);
+        return pt ? { x: pt.x, y: pt.y } : null;
+      };
+
+      // Resolve immediately based on definition type
       let x = 0, y = 0;
-      if (definition.type === 'absolute') {
-        x = typeof definition.x === 'number' ? definition.x : 0;
-        y = typeof definition.y === 'number' ? definition.y : 0;
-      } else if (definition.type === 'manual') {
-        x = definition.x;
-        y = definition.y;
-      }
-      // Other types need resolution pass — set to 0,0 initially
+      try {
+        if (definition.type === 'absolute') {
+          x = typeof definition.x === 'number' ? definition.x : 0;
+          y = typeof definition.y === 'number' ? definition.y : 0;
+        } else if (definition.type === 'manual') {
+          x = definition.x;
+          y = definition.y;
+        } else if (definition.type === 'endLine') {
+          const base = lookup(definition.basePoint);
+          if (base) {
+            const angle = typeof definition.angle === 'number' ? definition.angle : 0;
+            const length = typeof definition.length === 'number' ? definition.length : 0;
+            const rad = (angle * Math.PI) / 180;
+            x = base.x + length * Math.cos(rad);
+            y = base.y - length * Math.sin(rad); // Y down
+          }
+        } else if (definition.type === 'alongLine') {
+          const from = lookup(definition.from);
+          const to = lookup(definition.to);
+          if (from && to) {
+            const length = typeof definition.length === 'number' ? definition.length : 0;
+            const totalDist = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2);
+            const ratio = totalDist > 0 ? length / totalDist : 0;
+            x = from.x + (to.x - from.x) * ratio;
+            y = from.y + (to.y - from.y) * ratio;
+          }
+        } else if (definition.type === 'midpoint') {
+          const from = lookup(definition.from);
+          const to = lookup(definition.to);
+          if (from && to) { x = (from.x + to.x) / 2; y = (from.y + to.y) / 2; }
+        } else if (definition.type === 'intersectionXY') {
+          const px = lookup(definition.xFrom);
+          const py = lookup(definition.yFrom);
+          if (px) x = px.x;
+          if (py) y = py.y;
+        } else if (definition.type === 'normal') {
+          const from = lookup(definition.from);
+          const to = lookup(definition.to);
+          if (from && to) {
+            const lineAngle = Math.atan2(to.y - from.y, to.x - from.x) * (180 / Math.PI);
+            const normalAngle = lineAngle + (typeof definition.angle === 'number' ? definition.angle : 90);
+            const length = typeof definition.length === 'number' ? definition.length : 0;
+            const rad = (normalAngle * Math.PI) / 180;
+            x = from.x + length * Math.cos(rad);
+            y = from.y - length * Math.sin(rad);
+          }
+        }
+      } catch { /* fallback to 0,0 */ }
+
       state.points.push({
         id: cid('pt'),
         label,
