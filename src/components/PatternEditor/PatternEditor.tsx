@@ -18,6 +18,7 @@ import PieceRenderer from './renderers/PieceRenderer';
 import SeamRenderer from './renderers/SeamRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
 import HintText from './renderers/HintText';
+import ContextMenu, { type ContextMenuState } from './ContextMenu';
 import './PatternEditor.css';
 
 export default function PatternEditor() {
@@ -29,6 +30,50 @@ export default function PatternEditor() {
   
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
+
+  // Context menu state
+  const [ctxMenu, setCtxMenu] = useState<ContextMenuState>({
+    visible: false, x: 0, y: 0, pieceId: null,
+  });
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // Determine which piece (if any) is under the cursor
+    const svg = e.currentTarget as SVGSVGElement;
+    const rect = svg.getBoundingClientRect();
+    const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
+    const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+
+    // Hit-test: find piece whose bounding box contains the point
+    let hitPiece: typeof pieces[0] | null = null;
+    for (const piece of pieces) {
+      if (!piece.outline?.length) continue;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const cmd of piece.outline) {
+        const v = cmd.values;
+        for (let i = 0; i < v.length; i += 2) {
+          const px = v[i] + (piece.position?.x ?? 0);
+          const py = v[i + 1] + (piece.position?.y ?? 0);
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+      if (canvasX >= minX && canvasX <= maxX && canvasY >= minY && canvasY <= maxY) {
+        hitPiece = piece;
+        break;
+      }
+    }
+
+    setCtxMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      pieceId: hitPiece?.id ?? null,
+      pieceName: hitPiece?.name,
+    });
+  }, [pieces, pan2D, zoom2D]);
 
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
@@ -107,7 +152,7 @@ export default function PatternEditor() {
         onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
         onWheel={handleWheel}
-        onContextMenu={e => e.preventDefault()}
+        onContextMenu={handleContextMenu}
       >
         <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} />
 
@@ -171,6 +216,11 @@ export default function PatternEditor() {
           nodeEditorIsEditing={nodeEditor.isEditing}
         />
       </svg>
+      <ContextMenu
+        menu={ctxMenu}
+        onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
+        onRename={(id) => setEditingPieceNameId(id)}
+      />
     </div>
   );
 }

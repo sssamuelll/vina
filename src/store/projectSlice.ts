@@ -143,6 +143,82 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    /** Duplicate a piece with a new ID and offset position. */
+    duplicatePiece(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        const clone = JSON.parse(JSON.stringify(piece));
+        clone.id = `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        clone.name = `${piece.name} (copy)`;
+        clone.position = { x: (piece.position?.x ?? 0) + 30, y: (piece.position?.y ?? 0) + 30 };
+        state.pieces.push(clone);
+        state.isDirty = true;
+      }
+    },
+    /** Mirror/flip a piece horizontally (negate X coordinates). */
+    flipPieceH(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece && piece.outline) {
+        // Find center X
+        let minX = Infinity, maxX = -Infinity;
+        for (const cmd of piece.outline) {
+          const v = cmd.values;
+          for (let i = 0; i < v.length; i += 2) {
+            if (v[i] < minX) minX = v[i];
+            if (v[i] > maxX) maxX = v[i];
+          }
+        }
+        const cx = (minX + maxX) / 2;
+        // Flip X around center
+        for (const cmd of piece.outline) {
+          const v = cmd.values;
+          if (cmd.type === 'M' || cmd.type === 'L') {
+            v[0] = 2 * cx - v[0];
+          } else if (cmd.type === 'H') {
+            v[0] = 2 * cx - v[0];
+          } else if (cmd.type === 'C') {
+            v[0] = 2 * cx - v[0];
+            v[2] = 2 * cx - v[2];
+            v[4] = 2 * cx - v[4];
+          } else if (cmd.type === 'Q') {
+            v[0] = 2 * cx - v[0];
+            v[2] = 2 * cx - v[2];
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    /** Mirror/flip a piece vertically (negate Y coordinates). */
+    flipPieceV(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece && piece.outline) {
+        let minY = Infinity, maxY = -Infinity;
+        for (const cmd of piece.outline) {
+          const v = cmd.values;
+          for (let i = 1; i < v.length; i += 2) {
+            if (v[i] < minY) minY = v[i];
+            if (v[i] > maxY) maxY = v[i];
+          }
+        }
+        const cy = (minY + maxY) / 2;
+        for (const cmd of piece.outline) {
+          const v = cmd.values;
+          if (cmd.type === 'M' || cmd.type === 'L') {
+            v[1] = 2 * cy - v[1];
+          } else if (cmd.type === 'V') {
+            v[0] = 2 * cy - v[0];
+          } else if (cmd.type === 'C') {
+            v[1] = 2 * cy - v[1];
+            v[3] = 2 * cy - v[3];
+            v[5] = 2 * cy - v[5];
+          } else if (cmd.type === 'Q') {
+            v[1] = 2 * cy - v[1];
+            v[3] = 2 * cy - v[3];
+          }
+        }
+        state.isDirty = true;
+      }
+    },
 
     // ─── Seams ───
     addSeam(state, action: PayloadAction<Seam>) {
@@ -188,7 +264,7 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, setProjectName,
-  addPiece, updatePiece, removePiece, movePiece, rotatePiece,
+  addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addSeam, removeSeam,
   addFabric, updateFabric,
