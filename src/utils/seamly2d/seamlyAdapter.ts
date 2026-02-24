@@ -98,7 +98,7 @@ export function adaptSeamlyPattern(
   }
 
   // 2. Resolve all construction points with pre-resolved variables
-  const { points: resolvedPoints } = resolveConstruction(
+  const { points: resolvedPoints, stepCurves } = resolveConstruction(
     pattern.construction, ctx,
   );
 
@@ -211,6 +211,9 @@ export function adaptSeamlyPattern(
                      typeof (lastNode as any).kAsm1 === 'number' ? (lastNode as any).kAsm1 * kCurve * (dist / 3) :
                      dist / 3;
 
+          // Get pre-resolved multi-segment commands from resolver
+          const resolvedCmds = stepCurves.get(step.id);
+
           cCurves.push({
             id: cvId,
             label: step.name || `SplPath_${fromPt.label}_${toPt.label}`,
@@ -225,6 +228,7 @@ export function adaptSeamlyPattern(
             },
             visible: true,
             blockId: step.block || 'main',
+            resolvedCommands: resolvedCmds,
           });
         }
       }

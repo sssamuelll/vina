@@ -92,3 +92,58 @@ describe('male_shirt integration', () => {
     expect(pt!.x !== 0 || pt!.y !== 0).toBe(true);
   });
 });
+
+describe('tshirt_test integration', () => {
+  const pattern = loadPattern('tshirt_test');
+  const result = adaptSeamlyPattern(pattern);
+
+  it('no points are NaN', () => {
+    for (const pt of result.points) {
+      expect(Number.isNaN(pt.x), `${pt.label} has NaN x`).toBe(false);
+      expect(Number.isNaN(pt.y), `${pt.label} has NaN y`).toBe(false);
+    }
+  });
+
+  it('no points at (0,0) except actual origin points', () => {
+    const originsAtZero = result.points.filter(p => p.x === 0 && p.y === 0);
+    const originSteps = pattern.construction.filter(
+      s => s.type === 'single' && (s.x ?? 0) === 0 && (s.y ?? 0) === 0,
+    );
+    expect(originsAtZero.length).toBeLessThanOrEqual(originSteps.length);
+  });
+
+  it('sleeve points have varying X coordinates (bug #54 fix)', () => {
+    // Sleeve points start with C
+    const sleevePoints = result.points.filter(p => p.label.startsWith('C'));
+    expect(sleevePoints.length).toBeGreaterThan(3);
+    const uniqueX = new Set(sleevePoints.map(p => Math.round(p.x * 10) / 10));
+    expect(uniqueX.size, 'Sleeve points should have varying X, not all the same').toBeGreaterThan(2);
+  });
+
+  it('all 5 pieces have non-degenerate bounding boxes', () => {
+    expect(result.pieces.length).toBe(5);
+    for (const piece of result.pieces) {
+      const pts = piece.nodes
+        .map(n => result.points.find(p => p.label === n.pointId))
+        .filter(Boolean);
+      const xs = pts.map(p => p!.x);
+      const ys = pts.map(p => p!.y);
+      const width = Math.max(...xs) - Math.min(...xs);
+      const height = Math.max(...ys) - Math.min(...ys);
+      expect(width > 1 && height > 1, `Piece "${piece.name}" is degenerate: ${width}x${height}`).toBe(true);
+    }
+  });
+
+  it('cutSplinePath points C10 and C11 are not at (0,0) (bug #56)', () => {
+    const c10 = result.points.find(p => p.label === 'C10');
+    const c11 = result.points.find(p => p.label === 'C11');
+    expect(c10, 'C10 should exist').toBeDefined();
+    expect(c11, 'C11 should exist').toBeDefined();
+    if (c10) expect(c10.x !== 0 || c10.y !== 0, 'C10 should not be at origin').toBe(true);
+    if (c11) expect(c11.x !== 0 || c11.y !== 0, 'C11 should not be at origin').toBe(true);
+  });
+
+  it('has no adapter errors', () => {
+    expect(result.errors).toEqual([]);
+  });
+});

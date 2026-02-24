@@ -67,6 +67,8 @@ export interface CCurve {
   visible: boolean;
   /** Block this curve belongs to */
   blockId?: string;
+  /** Pre-resolved path commands (e.g. multi-segment splinePath) — pieceBuilder uses these directly */
+  resolvedCommands?: import('../types/types').PathCommand[];
 }
 
 export type CurveDefinition =

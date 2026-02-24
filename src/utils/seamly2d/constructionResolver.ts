@@ -97,6 +97,8 @@ export interface ConstructionStep {
 export interface ConstructionResult {
   points: Map<number, Point>;
   curves: PathCommand[];
+  /** Per-step curve commands (step id → PathCommand[]) */
+  stepCurves: Map<number, PathCommand[]>;
 }
 
 // ─── Helpers ───
@@ -111,6 +113,11 @@ function distance(a: Point, b: Point): number {
 
 function angleBetween(a: Point, b: Point): number {
   return Math.atan2(b.y - a.y, b.x - a.x) * (180 / Math.PI);
+}
+
+/** Angle in math convention (y-up): compatible with angleToOffset which does y = -len*sin */
+function mathAngleBetween(a: Point, b: Point): number {
+  return Math.atan2(-(b.y - a.y), b.x - a.x) * (180 / Math.PI);
 }
 
 function resolveLength(val: number | string | undefined, context: FormulaContext): number {
@@ -285,6 +292,7 @@ export function resolveConstruction(
   const lineDistances: Record<string, number> = {};
   const lineAngles: Record<string, number> = {};
   const splineLengths: Record<string, number> = {};
+  const nameToPoint = new Map<string, Point>();
 
   function getPoint(id: number): Point {
     const p = points.get(id);
@@ -652,8 +660,10 @@ export function resolveConstruction(
         case 'normal': {
           const p1 = getPoint(step.firstPoint!);
           const p2 = getPoint(step.secondPoint!);
-          const lineAngle = angleBetween(p1, p2);
-          const normalAngle = lineAngle + resolveAngle(step.angle, ctx);
+          // Seamly2D: normalVector = lineAngle + 90, then + userAngle
+          // Use math convention angle (y-up) since angleToOffset expects it
+          const lineAngle = mathAngleBetween(p1, p2);
+          const normalAngle = lineAngle + 90 + resolveAngle(step.angle, ctx);
           const len = resolveLength(step.length, ctx);
           const offset = angleToOffset(normalAngle, len);
           point = { x: p1.x + offset.x, y: p1.y + offset.y };
@@ -869,6 +879,21 @@ export function resolveConstruction(
         if (step.firstPoint != null && (step.type === 'alongLine' || step.type === 'normal')) {
           recordLine(step.firstPoint, step.id, getPoint(step.firstPoint), point);
         }
+
+        // Bug #55: Record all-pairs Line_X_Y and AngleLine_X_Y for arbitrary formula references
+        if (step.name) {
+          nameToPoint.set(step.name, point);
+          for (const [otherName, otherPt] of nameToPoint.entries()) {
+            if (otherName === step.name) continue;
+            const d = distance(point, otherPt);
+            lineDistances[`Line_${step.name}_${otherName}`] = d;
+            lineDistances[`Line_${otherName}_${step.name}`] = d;
+            const ang = Math.atan2(-(otherPt.y - point.y), otherPt.x - point.x) * 180 / Math.PI;
+            lineAngles[`AngleLine_${step.name}_${otherName}`] = ang;
+            const angRev = Math.atan2(-(point.y - otherPt.y), point.x - otherPt.x) * 180 / Math.PI;
+            lineAngles[`AngleLine_${otherName}_${step.name}`] = angRev;
+          }
+        }
       }
     } catch {
       // Gracefully skip unresolvable points
@@ -881,5 +906,5 @@ export function resolveConstruction(
   pending.push(...deferred);
   } // end while
 
-  return { points, curves };
+  return { points, curves, stepCurves };
 }

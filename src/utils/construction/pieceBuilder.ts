@@ -67,7 +67,20 @@ export function buildPieceWithOffset(
 
     if (node.connection === 'curve' && node.curveId) {
       const curve = curveMap.get(node.curveId);
-      if (curve) {
+      if (curve?.resolvedCommands && curve.resolvedCommands.length > 0) {
+        // Use pre-resolved multi-segment commands (e.g. splinePath)
+        // Skip the initial M command since we're already positioned
+        for (const cmd of curve.resolvedCommands) {
+          if (cmd.type === 'M') continue;
+          if (node.reverse) {
+            // For reverse, we need to reverse the entire path — fall back to spline definition
+            const cmds = resolveCurve(curve, point, nextPoint, ctx, node.reverse);
+            outline.push(...cmds);
+            break;
+          }
+          outline.push(cmd);
+        }
+      } else if (curve) {
         const cmds = resolveCurve(curve, point, nextPoint, ctx, node.reverse);
         outline.push(...cmds);
       } else {

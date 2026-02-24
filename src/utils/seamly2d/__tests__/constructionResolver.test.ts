@@ -79,16 +79,16 @@ describe('resolveConstruction', () => {
   });
 
   it('resolves normal point', () => {
-    // Normal to a horizontal line at angle 0 → perpendicular up
+    // Normal to a horizontal line with userAngle=0 → perpendicular up (90° from line)
     const steps: ConstructionStep[] = [
       { id: 1, name: 'A', type: 'single', x: 0, y: 50 },
       { id: 2, name: 'B', type: 'single', x: 100, y: 50 },
-      { id: 3, name: 'N', type: 'normal', firstPoint: 1, secondPoint: 2, angle: 90, length: 20 },
+      { id: 3, name: 'N', type: 'normal', firstPoint: 1, secondPoint: 2, angle: 0, length: 20 },
     ];
     const { points } = resolveConstruction(steps, emptyCtx);
     const p = points.get(3)!;
-    // Line A→B is at angle 0°. Normal angle = 0 + 90 = 90°. 
-    // angleToOffset(90, 20) → x=0, y=-20 (up in screen). So y=50-20=30
+    // Line A→B is at math angle 0°. Normal = 0 + 90 + 0 = 90°.
+    // angleToOffset(90, 20) → x=0, y=-20 (up in screen). So point = (0, 50-20) = (0, 30)
     expect(p.x).toBeCloseTo(0);
     expect(p.y).toBeCloseTo(30);
   });
