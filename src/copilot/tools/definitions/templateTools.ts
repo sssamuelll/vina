@@ -8,6 +8,7 @@
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
+import type { Recipe } from '../../../types/recipe';
 import { searchCatalog, getCatalog, getCatalogEntry, type CatalogEntry } from '../../../utils/seamly2d/catalog';
 import { PatternTemplateEngine, type SeamlyPattern } from '../../../utils/seamly2d/templateEngine';
 import { buildMeasurements, inferSizeSystem, type StandardSize, type SizeSystem } from '../../../utils/seamly2d/sizeTables';
@@ -145,10 +146,9 @@ const searchTemplatesTool: ToolDefinition = {
 const generateFromTemplateTool: ToolDefinition = {
   name: 'generateFromTemplate',
   description:
-    'Generate pattern pieces from a Seamly2D template with body measurements or standard size. ' +
-    'Optionally auto-detect seams between generated pieces. ' +
-    'Example: generateFromTemplate("male_shirt", size="M") ' +
-    '/ Generar piezas de patrón desde una plantilla Seamly2D con medidas o talla estándar.',
+    'FALLBACK ONLY — use executeRecipe first! Generate pattern pieces from a Seamly2D template. ' +
+    'Most templates lack piece definitions and will fail. Prefer searchRecipes → executeRecipe. ' +
+    '/ SOLO COMO FALLBACK — usa executeRecipe primero.',
   parameters: {
     type: 'object',
     properties: {
@@ -189,7 +189,7 @@ const generateFromTemplateTool: ToolDefinition = {
     },
     required: ['templateId'],
   },
-  execute: async (params, dispatch, _getState): Promise<ToolResult> => {
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const templateId = params.templateId as string;
 
     // Validate template exists in catalog
@@ -246,11 +246,27 @@ const generateFromTemplateTool: ToolDefinition = {
     try {
       pieces = engine.generate(measurements);
     } catch (err) {
+      // If template has no piece definitions, redirect to recipe system
+      const recipes = getState().recipes.recipes;
+      const query = entry.name.toLowerCase();
+      const matchingRecipes = recipes.filter((r: Recipe) => {
+        const searchText = [r.name, r.nameEs, r.description, r.descriptionEs, ...r.tags]
+          .filter(Boolean).join(' ').toLowerCase();
+        return searchText.includes(query) || entry.keywords.some((t: string) => searchText.includes(t));
+      });
+      if (matchingRecipes.length > 0) {
+        return {
+          success: false,
+          error: `Template "${templateId}" has no piece definitions. ` +
+            `Use executeRecipe instead with one of these recipes: ${matchingRecipes.map((r: Recipe) => r.id).join(', ')}. ` +
+            `Call executeRecipe("${matchingRecipes[0].id}") to build the garment.`,
+        };
+      }
       return { success: false, error: `Generation error: ${(err as Error).message}` };
     }
 
     if (pieces.length === 0) {
-      return { success: false, error: 'Template generated 0 pieces' };
+      return { success: false, error: 'Template generated 0 pieces. Use searchRecipes to find a construction recipe instead.' };
     }
 
     // Resolve fabric
