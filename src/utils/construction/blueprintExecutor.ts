@@ -2,14 +2,13 @@
  * Blueprint Executor
  * 
  * Takes a Blueprint and body measurements, resolves all formula variables,
- * and returns the list of Redux actions to dispatch.
+ * and returns the list of Redux actions to dispatch — across all blocks.
  * 
  * The executor does NOT dispatch directly — it returns actions so the
- * caller (copilot tool or UI) can dispatch them one by one (for step-by-step)
- * or all at once (for instant execution).
+ * caller can dispatch them all at once or step-by-step.
  */
 
-import type { Blueprint, PointStep } from '../../types/blueprint';
+import type { Blueprint, Block, PointStep } from '../../types/blueprint';
 import type { PointDefinition } from '../../types/construction';
 import { evaluateFormula, type FormulaContext } from '../seamly2d/formulaEvaluator';
 import {
@@ -29,18 +28,19 @@ function resolveFormula(val: string | number | undefined, ctx: FormulaContext): 
   }
 }
 
-// ─── Build FormulaContext from measurements + blueprint variables ───────────────
+// ─── Build FormulaContext from measurements + variables ──────────────────────
 
 function buildContext(
   measurements: Record<string, number>,
   blueprintVars: Blueprint['variables'],
+  blockVars: Block['variables'],
   userOverrides?: Record<string, number>,
 ): FormulaContext {
   const variables: Record<string, number> = {};
+  const baseCtx: FormulaContext = { measurements, variables: {} };
 
-  // First resolve blueprint variable defaults
+  // Blueprint-level variables first
   if (blueprintVars) {
-    const baseCtx: FormulaContext = { measurements, variables: {} };
     for (const [name, def] of Object.entries(blueprintVars)) {
       const override = userOverrides?.[name];
       if (override !== undefined) {
@@ -53,21 +53,36 @@ function buildContext(
     }
   }
 
+  // Block-level variables (can reference blueprint variables)
+  const blockCtx: FormulaContext = { measurements, variables: { ...variables } };
+  if (blockVars) {
+    for (const [name, def] of Object.entries(blockVars)) {
+      const override = userOverrides?.[name];
+      if (override !== undefined) {
+        variables[name] = override;
+      } else {
+        variables[name] = typeof def.default === 'number'
+          ? def.default
+          : evaluateFormula(def.default, blockCtx);
+      }
+    }
+  }
+
   return { measurements, variables };
 }
 
 // ─── Execute a single step ──────────────────────────────────────────────────
 
 export interface StepAction {
-  /** Redux action to dispatch */
   action: ReturnType<typeof addPoint> | ReturnType<typeof addLine> | ReturnType<typeof addCurve> |
           ReturnType<typeof addConstructionPiece> | ReturnType<typeof setVariable>;
-  /** Human-readable description of what this step does */
   description: string;
   descriptionEs?: string;
+  blockId: string;
+  blockName: string;
 }
 
-function executePointStep(step: PointStep, ctx: FormulaContext): StepAction {
+function executePointStep(step: PointStep, ctx: FormulaContext): Omit<StepAction, 'blockId' | 'blockName'> {
   let definition: PointDefinition;
 
   switch (step.type) {
@@ -120,85 +135,90 @@ function executePointStep(step: PointStep, ctx: FormulaContext): StepAction {
   };
 }
 
+// ─── Execute all blocks in a blueprint ──────────────────────────────────────
+
 export function executeBlueprint(
   blueprint: Blueprint,
   measurements: Record<string, number>,
   userOverrides?: Record<string, number>,
 ): StepAction[] {
-  const ctx = buildContext(measurements, blueprint.variables, userOverrides);
   const actions: StepAction[] = [];
 
-  // Set blueprint variables in construction state
-  for (const [name, val] of Object.entries(ctx.variables)) {
-    actions.push({
-      action: setVariable({ name, value: val }),
-      description: `Variable "${name}" = ${val}`,
-    });
-  }
+  for (const block of blueprint.blocks) {
+    const ctx = buildContext(measurements, blueprint.variables, block.variables, userOverrides);
 
-  for (const step of blueprint.steps) {
-    switch (step.tool) {
-      case 'addConstructionPoint':
-        actions.push(executePointStep(step, ctx));
-        break;
+    // Set variables for this block
+    const allVars = { ...ctx.variables };
+    for (const [name, val] of Object.entries(allVars)) {
+      actions.push({
+        action: setVariable({ name, value: val }),
+        description: `Variable "${name}" = ${val}`,
+        blockId: block.id,
+        blockName: block.name,
+      });
+    }
 
-      case 'addConstructionLine':
-        actions.push({
-          action: addLine({
-            label: step.label,
-            from: step.from,
-            to: step.to,
-            style: step.style,
-          }),
-          description: step.comment || `Line "${step.label}" (${step.from} → ${step.to})`,
-          descriptionEs: step.commentEs,
-        });
-        break;
+    for (const step of block.steps) {
+      const base = { blockId: block.id, blockName: block.name };
 
-      case 'addConstructionCurve':
-        actions.push({
-          action: addCurve({
-            label: step.label,
-            definition: {
-              type: 'spline',
-              from: step.from,
-              to: step.to,
-              angle1: resolveFormula(step.angle1, ctx),
-              angle2: resolveFormula(step.angle2, ctx),
-              length1: resolveFormula(step.length1, ctx),
-              length2: resolveFormula(step.length2, ctx),
-            },
-          }),
-          description: step.comment || `Curve "${step.label}" (${step.from} → ${step.to})`,
-          descriptionEs: step.commentEs,
-        });
-        break;
+      switch (step.tool) {
+        case 'addConstructionPoint':
+          actions.push({ ...executePointStep(step, ctx), ...base });
+          break;
 
-      case 'buildPieceFromConstruction':
-        // This step is special — we store the piece definition but the actual
-        // PatternPiece building happens after all points are dispatched.
-        // We use addConstructionPiece here.
-        actions.push({
-          action: addConstructionPiece({
-            name: step.name,
-            nodes: step.points.map((label, i) => ({
-              pointId: label, // Will be resolved by label in the builder
-              connection: (step.curves?.[i] && step.curves[i] !== null) ? 'curve' as const : 'line' as const,
-              curveId: step.curves?.[i] ?? undefined,
-            })),
-            seamAllowance: step.seamAllowance ?? 10,
-          }),
-          description: step.comment || `Build piece "${step.name}" from ${step.points.length} points`,
-          descriptionEs: step.commentEs,
-        });
-        break;
+        case 'addConstructionLine':
+          actions.push({
+            action: addLine({ label: step.label, from: step.from, to: step.to, style: step.style }),
+            description: step.comment || `Line "${step.label}" (${step.from} → ${step.to})`,
+            descriptionEs: step.commentEs,
+            ...base,
+          });
+          break;
+
+        case 'addConstructionCurve':
+          actions.push({
+            action: addCurve({
+              label: step.label,
+              definition: {
+                type: 'spline',
+                from: step.from,
+                to: step.to,
+                angle1: resolveFormula(step.angle1, ctx),
+                angle2: resolveFormula(step.angle2, ctx),
+                length1: resolveFormula(step.length1, ctx),
+                length2: resolveFormula(step.length2, ctx),
+              },
+            }),
+            description: step.comment || `Curve "${step.label}" (${step.from} → ${step.to})`,
+            descriptionEs: step.commentEs,
+            ...base,
+          });
+          break;
+
+        case 'buildPieceFromConstruction':
+          actions.push({
+            action: addConstructionPiece({
+              name: step.name,
+              nodes: step.points.map((label, i) => ({
+                pointId: label,
+                connection: (step.curves?.[i] && step.curves[i] !== null) ? 'curve' as const : 'line' as const,
+                curveId: step.curves?.[i] ?? undefined,
+              })),
+              seamAllowance: step.seamAllowance ?? 10,
+            }),
+            description: step.comment || `Build piece "${step.name}" from ${step.points.length} points`,
+            descriptionEs: step.commentEs,
+            ...base,
+          });
+          break;
+      }
     }
   }
 
   return actions;
 }
 
-// ─── Validate blueprint against available measurements ─────────────────────────
+// ─── Validate blueprint against available measurements ──────────────────────
 
 export interface ValidationResult {
   valid: boolean;
@@ -213,13 +233,11 @@ export function validateBlueprint(blueprint: Blueprint, measurements: Record<str
   });
 
   const warnings: string[] = [];
-  if (blueprint.steps.length === 0) warnings.push('Blueprint has no steps');
-  const buildSteps = blueprint.steps.filter(s => s.tool === 'buildPieceFromConstruction');
-  if (buildSteps.length === 0) warnings.push('Blueprint has no buildPieceFromConstruction step');
+  if (blueprint.blocks.length === 0) warnings.push('Blueprint has no blocks');
+  const hasBuilds = blueprint.blocks.some(b =>
+    b.steps.some(s => s.tool === 'buildPieceFromConstruction')
+  );
+  if (!hasBuilds) warnings.push('Blueprint has no buildPieceFromConstruction steps');
 
-  return {
-    valid: missing.length === 0 && warnings.length === 0,
-    missing,
-    warnings,
-  };
+  return { valid: missing.length === 0 && warnings.length === 0, missing, warnings };
 }

@@ -168,7 +168,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
     blueprints: {
       blueprints: [],
       activeBlueprintId: null,
-      activeStepIndex: 0,
+      activeBlockIndex: 0, activeStepIndex: 0,
       paused: false,
     },
   };

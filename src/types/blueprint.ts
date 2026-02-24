@@ -1,50 +1,42 @@
 /**
  * Construction Blueprint Types
  * 
- * A blueprint is a reusable, step-by-step blueprint for constructing a garment piece.
- * Blueprints can come from:
- * - Built-in library (Seamly2D imports, standard methods)
- * - User-created (patronista records their own method)
- * - Community-shared (future)
+ * Architecture:
+ *   Blueprint → Block[] → Step[]
+ * 
+ * A Blueprint is a complete garment plan (e.g., "Basic T-shirt").
+ * It contains one or more Blocks (e.g., Front Body, Back Body, Sleeve).
+ * Each Block uses a Method (e.g., Aldrich, Müller) and has ordered construction steps.
  * 
  * The LLM does NOT invent construction steps. It finds the right blueprint
- * and executes it with the user's measurements. The patronista can edit
- * any blueprint or create new ones from scratch.
+ * and executes all its blocks with the user's measurements.
  */
 
-// ─── Blueprint Step Types ──────────────────────────────────────────────────────
+// ─── Step Types ─────────────────────────────────────────────────────────────
 
-export interface BlueprintStepBase {
+export interface StepBase {
   /** Optional comment explaining this step (shown to patronista) */
   comment?: string;
   /** Optional comment in Spanish */
   commentEs?: string;
 }
 
-export interface PointStep extends BlueprintStepBase {
+export interface PointStep extends StepBase {
   tool: 'addConstructionPoint';
   label: string;
   type: 'absolute' | 'endLine' | 'alongLine' | 'normal' | 'midpoint' | 'intersectionXY';
-  /** For absolute: x coordinate. Can be number or formula string (e.g., "chest/4+10") */
   x?: string | number;
-  /** For absolute: y coordinate */
   y?: string | number;
-  /** For endLine: base point label */
   basePoint?: string;
-  /** For endLine/normal: angle in degrees */
   angle?: string | number;
-  /** For endLine/alongLine/normal: distance. Formula string or number (mm) */
   length?: string | number;
-  /** For alongLine/normal/midpoint: start point */
   from?: string;
-  /** For alongLine/normal/midpoint: end point */
   to?: string;
-  /** For intersectionXY */
   xFrom?: string;
   yFrom?: string;
 }
 
-export interface LineStep extends BlueprintStepBase {
+export interface LineStep extends StepBase {
   tool: 'addConstructionLine';
   label: string;
   from: string;
@@ -52,7 +44,7 @@ export interface LineStep extends BlueprintStepBase {
   style?: 'solid' | 'dashed' | 'construction';
 }
 
-export interface CurveStep extends BlueprintStepBase {
+export interface CurveStep extends StepBase {
   tool: 'addConstructionCurve';
   label: string;
   from: string;
@@ -63,7 +55,7 @@ export interface CurveStep extends BlueprintStepBase {
   length2: string | number;
 }
 
-export interface BuildPieceStep extends BlueprintStepBase {
+export interface BuildPieceStep extends StepBase {
   tool: 'buildPieceFromConstruction';
   name: string;
   /** Ordered point labels forming the outline */
@@ -75,33 +67,55 @@ export interface BuildPieceStep extends BlueprintStepBase {
 
 export type BlueprintStep = PointStep | LineStep | CurveStep | BuildPieceStep;
 
-// ─── Blueprint ─────────────────────────────────────────────────────────────────
+// ─── Block ──────────────────────────────────────────────────────────────────
 
+/** A Block is a single pattern piece construction (e.g., "Front Bodice Block") */
+export interface Block {
+  /** Unique ID within the blueprint */
+  id: string;
+  /** Human-readable name */
+  name: string;
+  nameEs?: string;
+  /** Construction method used (e.g., "Aldrich", "Müller") */
+  method: string;
+  /** Block type */
+  type: 'body' | 'sleeve' | 'collar' | 'cuff' | 'waistband' | 'pocket' | 'hood' | 'other';
+  /** Variables specific to this block (merged with blueprint-level variables) */
+  variables?: Record<string, {
+    label: string;
+    labelEs?: string;
+    default: string | number;
+    description?: string;
+  }>;
+  /** Ordered construction steps */
+  steps: BlueprintStep[];
+}
+
+// ─── Blueprint ──────────────────────────────────────────────────────────────
+
+/** A Blueprint is a complete garment plan containing one or more Blocks */
 export interface Blueprint {
   /** Unique ID */
   id: string;
   /** Human-readable name */
   name: string;
-  /** Localized name */
   nameEs?: string;
   /** Description of what this blueprint produces */
   description: string;
   descriptionEs?: string;
-  /** Category */
-  category: 'tops' | 'bottoms' | 'dresses' | 'outerwear' | 'underwear' | 'sleeves' | 'collars' | 'blocks' | 'other';
-  /** Source method (e.g., "Aldrich", "Müller", "Custom", "Seamly2D") */
-  method: string;
+  /** Garment category */
+  category: 'tops' | 'bottoms' | 'dresses' | 'outerwear' | 'underwear' | 'accessories' | 'blocks' | 'other';
   /** Required measurements (keys from BodyMeasurements) */
   requiredMeasurements: string[];
-  /** Optional variables with default values or formulas */
-  variables?: Record<string, { 
-    label: string; 
+  /** Blueprint-level variables (shared across all blocks) */
+  variables?: Record<string, {
+    label: string;
     labelEs?: string;
-    default: string | number; 
+    default: string | number;
     description?: string;
   }>;
-  /** Ordered construction steps */
-  steps: BlueprintStep[];
+  /** Ordered blocks to construct */
+  blocks: Block[];
   /** Who created this blueprint */
   source: 'builtin' | 'user' | 'community';
   /** Tags for search */
@@ -113,14 +127,16 @@ export interface Blueprint {
   updatedAt: number;
 }
 
-// ─── Blueprint Library State ───────────────────────────────────────────────────
+// ─── Library State ──────────────────────────────────────────────────────────
 
 export interface BlueprintLibraryState {
   /** All available blueprints */
   blueprints: Blueprint[];
   /** Currently executing blueprint (null if none) */
   activeBlueprintId: string | null;
-  /** Current step index in active blueprint execution */
+  /** Currently executing block index */
+  activeBlockIndex: number;
+  /** Current step index within active block */
   activeStepIndex: number;
   /** Whether execution is paused (patronista reviewing) */
   paused: boolean;

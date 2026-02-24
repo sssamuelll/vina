@@ -1,19 +1,15 @@
 /**
  * Builtin Blueprint Library
  * 
- * All validated construction blueprints that ship with OpenClo.
- * Users can add their own blueprints on top of these.
+ * Complete garment blueprints that ship with OpenClo.
+ * Each blueprint contains one or more blocks (body, sleeve, collar, etc.)
  */
 
 import type { Blueprint } from '../../../types/blueprint';
-import { bodiceFrontBlock } from './bodiceFrontBlock';
-import { bodiceBackBlock } from './bodiceBackBlock';
-import { basicSleeve } from './basicSleeve';
+import { basicTshirt } from './tshirt';
 
 export const BUILTIN_BLUEPRINTS: Blueprint[] = [
-  bodiceFrontBlock,
-  bodiceBackBlock,
-  basicSleeve,
+  basicTshirt,
 ];
 
-export { bodiceFrontBlock, bodiceBackBlock, basicSleeve };
+export { basicTshirt };
