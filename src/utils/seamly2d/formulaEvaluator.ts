@@ -15,7 +15,7 @@ export interface FormulaContext {
 }
 
 /** Characters/tokens allowed in a sanitized formula (after variable substitution). */
-const SAFE_FORMULA_RE = /^[\d\s+\-*/().?:<>=!&|,]+$/;
+const SAFE_FORMULA_RE = /^[\d\s+\-*/().?:<>=!&|,A-Za-z_]+$/;
 
 /**
  * Evaluate a single Seamly2D formula string given a context.
@@ -33,10 +33,8 @@ export function evaluateFormula(
 
   let expr = formula.trim();
 
-  // Replace function-style references like Line_A_B, AngleLine_A_B etc. with 0 placeholder
-  // These are geometric functions resolved at construction time, not formula time
-  expr = expr.replace(/\b(Line|AngleLine|CurrentLength|CurrentSeamAllowance)_[A-Za-z0-9_]+/g, (match) => {
-    // Check if context has it as a variable
+  // Replace function-style references like Line_A_B, AngleLine_A_B, Spl_A_B, SplPath_A_B etc.
+  expr = expr.replace(/\b(Line|AngleLine|CurrentLength|CurrentSeamAllowance|Spl|SplPath)_[A-Za-z0-9_]+/g, (match) => {
     if (context.variables[match] !== undefined) return String(context.variables[match]);
     if (context.variables[`#${match}`] !== undefined) return String(context.variables[`#${match}`]);
     return '0';
@@ -66,6 +64,9 @@ export function evaluateFormula(
     const re = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
     expr = expr.replace(re, String(context.variables[name]));
   }
+
+  // Replace math functions with Math.* equivalents
+  expr = expr.replace(/\b(atan|asin|acos|sin|cos|tan|sqrt|abs|min|max|pow|floor|ceil|round)\b/g, 'Math.$1');
 
   // Validate the expression is safe
   if (!SAFE_FORMULA_RE.test(expr)) {
