@@ -203,11 +203,22 @@ export async function runAgentLoop(
     }
 
     // Execute tool calls
-    const calls: LLMToolCall[] = response.toolCalls.map(tc => ({
-      id: tc.id,
-      name: tc.name,
-      arguments: JSON.parse(tc.arguments),
-    }));
+    const calls: LLMToolCall[] = response.toolCalls.map(tc => {
+      let args: Record<string, unknown>;
+      try {
+        args = JSON.parse(tc.arguments);
+      } catch {
+        // LLM sometimes returns unquoted enum values — try fixing common issues
+        try {
+          const fixed = tc.arguments.replace(/:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*([,}])/g, ': "$1"$2');
+          args = JSON.parse(fixed);
+        } catch {
+          console.warn('[agentLoop] Failed to parse tool arguments:', tc.arguments);
+          args = {};
+        }
+      }
+      return { id: tc.id, name: tc.name, arguments: args };
+    });
 
     const batchResult = await executeToolCalls(calls, registry, dispatch, getState);
     totalToolCalls += calls.length;
