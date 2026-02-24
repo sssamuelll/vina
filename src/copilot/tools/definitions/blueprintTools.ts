@@ -126,7 +126,9 @@ const executeBlueprintTool: ToolDefinition = {
     for (const [k, v] of Object.entries(rawMeasurements)) {
       measurements[k] = typeof v === 'number' ? v * 10 : v;
     }
+    console.log('[executeBlueprint] measurements (mm):', JSON.stringify(measurements));
     const validation = validateBlueprint(blueprint, measurements);
+    console.log('[executeBlueprint] validation:', JSON.stringify(validation));
 
     if (validation.missing.length > 0) {
       return {
@@ -147,10 +149,17 @@ const executeBlueprintTool: ToolDefinition = {
     dispatch(startBlueprint(blueprint.id));
 
     let dispatched = 0;
+    const dispatchErrors: string[] = [];
     for (const stepAction of actions) {
-      dispatch(stepAction.action);
-      dispatched++;
+      try {
+        dispatch(stepAction.action);
+        dispatched++;
+      } catch (e) {
+        dispatchErrors.push(`${stepAction.description}: ${(e as Error).message}`);
+      }
     }
+    console.log('[executeBlueprint] dispatched:', dispatched, 'errors:', dispatchErrors.length);
+    if (dispatchErrors.length > 0) console.error('[executeBlueprint] dispatch errors:', dispatchErrors);
 
     // Build actual PatternPieces from construction pieces
     const updatedState = getState();
@@ -159,6 +168,7 @@ const executeBlueprintTool: ToolDefinition = {
     const builtPieces: { id: string; name: string; block: string }[] = [];
     const buildErrors: string[] = [];
 
+    console.log('[executeBlueprint] construction state — points:', construction.points.length, 'curves:', construction.curves.length, 'pieces:', construction.pieces.length);
     if (construction.pieces.length === 0) {
       buildErrors.push(`No construction pieces found after dispatching ${dispatched} actions. Points: ${construction.points.length}, Curves: ${construction.curves.length}`);
     }
