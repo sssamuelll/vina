@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // Was 56, removed generateFromDescription (-1) = 55
-      expect(registry.size).toBe(63);
+      expect(registry.size).toBe(67);
     });
   });
 });

@@ -9,6 +9,7 @@ import avatarReducer from './avatarSlice';
 import toolReducer from './toolSlice';
 import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
+import recipeReducer from './recipeSlice';
 import { undoMiddleware } from './undoMiddleware';
 
 export const store = configureStore({
@@ -23,6 +24,7 @@ export const store = configureStore({
     tools: toolReducer,
     parametric: parametricReducer,
     construction: constructionReducer,
+    recipes: recipeReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -31,6 +33,11 @@ export const store = configureStore({
         ignoredActions: ['project/loadProject', 'project/restoreState'],
       },
     }).concat(undoMiddleware),
+});
+
+// Load builtin recipes
+import('../utils/construction/recipes').then(({ BUILTIN_RECIPES }) => {
+  store.dispatch({ type: 'recipes/loadRecipes', payload: BUILTIN_RECIPES });
 });
 
 // Expose store for debugging (remove in production)

@@ -165,6 +165,12 @@ function mockState(overrides?: Partial<RootState>): RootState {
       selectedEntity: null,
       showConstruction: true,
     },
+    recipes: {
+      recipes: [],
+      activeRecipeId: null,
+      activeStepIndex: 0,
+      paused: false,
+    },
   };
 
   if (overrides) {

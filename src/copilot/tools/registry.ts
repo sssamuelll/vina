@@ -25,6 +25,7 @@ import { tools as templateToolDefs } from './definitions/templateTools';
 import { tools as fabricToolDefs } from './definitions/fabricTools';
 import { tools as semanticToolDefs } from './definitions/semanticTools';
 import { tools as constructionToolDefs } from './definitions/constructionTools';
+import { tools as recipeToolDefs } from './definitions/recipeTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -279,6 +280,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   fabricToolDefs,
   semanticToolDefs,
   constructionToolDefs,
+  recipeToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
