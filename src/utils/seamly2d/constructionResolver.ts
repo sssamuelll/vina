@@ -366,7 +366,9 @@ export function resolveConstruction(
     }
 
     const off1 = angleToOffset(a1, l1);
-    const off2 = angleToOffset(a2 + 180, l2);
+    // Seamly2D GetP3: p4p3.setAngle(angle2) — cp2 placed directly at angle2 from p4.
+    // No additional +180 needed.
+    const off2 = angleToOffset(a2, l2);
     const cp1: Point = { x: sp1.x + off1.x, y: sp1.y + off1.y };
     const cp2: Point = { x: sp4.x + off2.x, y: sp4.y + off2.y };
     const cmds: PathCommand[] = [
@@ -404,17 +406,16 @@ export function resolveConstruction(
         a1 = angleBetween(pA, pB);
       }
 
+      // a2 = the angle FROM p4 TOWARD cp2 (matching Seamly2D's GetP3 convention).
+      // Seamly2D: VSpline::GetP3() does p4p3.setAngle(angle2), placing cp2 at angle2 from p4.
+      // For splinePath segments, angle2 = p2.Angle1() = incoming angle at p2.
       let a2: number;
       if (nB.angle1 != null) {
+        // New format: angle1 = incoming angle = Angle1() — use directly
         a2 = resolveAngle(nB.angle1, ctx);
       } else if (nB.angle != null) {
-        // Old format: angle = outgoing tangent direction at this point.
-        // Seamly2D's VSplinePoint: Angle1() (incoming) = angle + 180.
-        // VSpline uses angle2 = p2.Angle1() = angle + 180, then
-        // GetP3 does p4p3.setAngle(angle2) placing cp2 at (angle + 180) from p4.
-        // Since off2 = angleToOffset(a2 + 180), we need a2 = angle (NOT angle + 180)
-        // so that off2 = angleToOffset(angle + 180) — matching Seamly2D exactly.
-        a2 = resolveAngle(nB.angle, ctx);
+        // Old format: angle = outgoing direction. Angle1() = angle + 180
+        a2 = resolveAngle(nB.angle, ctx) + 180;
       } else if (nB.angle2 != null) {
         a2 = resolveAngle(nB.angle2, ctx);
       } else {
@@ -441,7 +442,8 @@ export function resolveConstruction(
       }
 
       const off1 = angleToOffset(a1, l1);
-      const off2 = angleToOffset(a2 + 180, l2);
+      // cp2 placed at direction a2 from pB — NO additional +180
+      const off2 = angleToOffset(a2, l2);
       const cp1: Point = { x: pA.x + off1.x, y: pA.y + off1.y };
       const cp2: Point = { x: pB.x + off2.x, y: pB.y + off2.y };
       cmds.push({ type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, pB.x, pB.y] });

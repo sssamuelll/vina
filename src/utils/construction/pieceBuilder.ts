@@ -158,7 +158,8 @@ function resolveCurve(
     const l1 = resolveValue(def.length1, ctx);
     const l2 = resolveValue(def.length2, ctx);
     const rad1 = (a1 * Math.PI) / 180;
-    const rad2 = ((a2 + 180) * Math.PI) / 180;
+    // Seamly2D GetP3: p4p3.setAngle(angle2) — angle2 points directly from p4 toward cp2
+    const rad2 = (a2 * Math.PI) / 180;
     const cp1x = from.x + l1 * Math.cos(rad1);
     const cp1y = from.y - l1 * Math.sin(rad1);
     const cp2x = to.x + l2 * Math.cos(rad2);
