@@ -173,9 +173,15 @@ const executeBlueprintTool: ToolDefinition = {
       buildErrors.push(`No construction pieces found after dispatching ${dispatched} actions. Points: ${construction.points.length}, Curves: ${construction.curves.length}`);
     }
 
+    let xOffset = 50;
     for (const cPiece of construction.pieces) {
       try {
         const piece = buildPiece(cPiece, construction.points, construction.curves, ctx);
+        // Position pieces side by side with 30mm gap
+        const xs = piece.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
+        const pieceWidth = xs.length > 0 ? Math.max(...xs) - Math.min(...xs) : 200;
+        piece.position = { x: xOffset, y: 50 };
+        xOffset += pieceWidth + 30;
         dispatch(addPiece(piece));
         builtPieces.push({ id: piece.id, name: piece.name, block: cPiece.name });
       } catch (e) {
