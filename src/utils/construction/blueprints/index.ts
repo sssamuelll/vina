@@ -1,15 +1,11 @@
 /**
  * Builtin Blueprint Library
  * 
- * Complete garment blueprints that ship with OpenClo.
- * Each blueprint contains one or more blocks (body, sleeve, collar, etc.)
+ * Only contains user-saved blueprints at runtime.
+ * No AI-generated blueprints ship with OpenClo.
+ * Real patterns come from Seamly2D (listSeamlyPatterns / loadSeamlyPattern).
  */
 
 import type { Blueprint } from '../../../types/blueprint';
-import { basicTshirt } from './tshirt';
 
-export const BUILTIN_BLUEPRINTS: Blueprint[] = [
-  basicTshirt,
-];
-
-export { basicTshirt };
+export const BUILTIN_BLUEPRINTS: Blueprint[] = [];

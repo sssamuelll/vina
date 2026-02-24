@@ -100,12 +100,10 @@ describe('buildCopilotContext', () => {
 describe('DEFAULT_SYSTEM_PROMPT', () => {
   it('includes coordinate system docs', () => {
     expect(DEFAULT_SYSTEM_PROMPT).toContain('1 unit = 1mm');
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('PathCommand');
   });
 
-  it('includes command types', () => {
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('modify');
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('RESPONSE FORMAT');
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('PathCommand');
+  it('prioritizes Seamly2D patterns', () => {
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('Seamly2D');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('loadSeamlyPattern');
   });
 });
