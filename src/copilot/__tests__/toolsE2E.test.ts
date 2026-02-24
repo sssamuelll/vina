@@ -73,8 +73,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 55 tools registered', () => {
-      expect(registry.size).toBe(67);
+    it('has 69 tools registered', () => {
+      expect(registry.size).toBe(69);
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -411,9 +411,9 @@ describe('Tools E2E', () => {
   // ─── Coverage Summary ─────────────────────────────────────────────
 
   describe('Coverage', () => {
-    it('all 56 tool names present', () => {
+    it('all 58 tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(67);
+      expect(names.length).toBe(69);
 
       // Key tools from every category
       const expected = [
@@ -426,6 +426,7 @@ describe('Tools E2E', () => {
         'searchFabrics', 'getFabricDetails', 'compareFabrics',
         'searchTemplates', 'generateFromTemplate',
         'adjustFit', 'adjustLength', 'adjustSleeve', 'adjustProportions',
+        'listSeamlyPatterns', 'loadSeamlyPattern',
       ];
       for (const name of expected) {
         expect(names).toContain(name);
