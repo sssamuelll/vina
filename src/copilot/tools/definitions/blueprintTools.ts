@@ -11,10 +11,10 @@ import type { ToolDefinition, ToolResult } from '../registry';
 import type { Blueprint, BlueprintStep } from '../../../types/blueprint';
 import { executeBlueprint, validateBlueprint } from '../../../utils/construction/blueprintExecutor';
 import { saveBlueprint, startBlueprint } from '../../../store/blueprintSlice';
-import { clearConstruction } from '../../../store/constructionSlice';
+import { clearConstruction, setConstructionPieceNormOffset } from '../../../store/constructionSlice';
 import { addPiece } from '../../../store/projectSlice';
 import { selectPiece } from '../../../store/editorSlice';
-import { buildPiece } from '../../../utils/construction/pieceBuilder';
+import { buildPieceWithOffset } from '../../../utils/construction/pieceBuilder';
 
 // ─── searchBlueprints ───────────────────────────────────────────────────────
 
@@ -176,7 +176,9 @@ const executeBlueprintTool: ToolDefinition = {
     let xOffset = 50;
     for (const cPiece of construction.pieces) {
       try {
-        const piece = buildPiece(cPiece, construction.points, construction.curves, ctx);
+        const { piece, normOffset } = buildPieceWithOffset(cPiece, construction.points, construction.curves, ctx);
+        // Store normOffset on CPiece for overlay alignment
+        dispatch(setConstructionPieceNormOffset({ pieceId: cPiece.id, normOffset }));
         // Position pieces side by side with 30mm gap
         const xs = piece.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
         const pieceWidth = xs.length > 0 ? Math.max(...xs) - Math.min(...xs) : 200;
