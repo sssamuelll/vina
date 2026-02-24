@@ -289,22 +289,35 @@ function extractConstruction(
         angle2: attr(s, "angle2"),
         length1: attr(s, "length1"),
         length2: attr(s, "length2"),
+        // Old format fields
+        kAsm1: attr(s, "kAsm1"),
+        kAsm2: attr(s, "kAsm2"),
+        kCurve: attr(s, "kCurve"),
       });
     } else if (sType === "pathInteractive" || sType === "path") {
       const pathPoints = ensureArray(s.pathPoint).map((pp: any) => ({
         point: attr(pp, "pSpline"),
+        // New format
         angle1: attr(pp, "angle1"),
         angle2: attr(pp, "angle2"),
         length1: attr(pp, "length1"),
         length2: attr(pp, "length2"),
+        // Old format
+        angle: attr(pp, "angle"),
+        kAsm1: attr(pp, "kAsm1"),
+        kAsm2: attr(pp, "kAsm2"),
       }));
-      steps.push({
+      const step: any = {
         id: attr(s, "id"),
         name: "",
         type: "splinePath",
         block: blockName,
         pathPoints,
-      });
+      };
+      // Old format kCurve on parent element
+      const kCurve = attr(s, "kCurve");
+      if (kCurve != null) step.kCurve = kCurve;
+      steps.push(step);
     } else if (sType === "cubicBezier") {
       steps.push({
         id: attr(s, "id"),

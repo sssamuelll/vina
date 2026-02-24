@@ -318,7 +318,10 @@
       "point1": 10,
       "point4": 11,
       "angle1": 274.169,
-      "angle2": 187.017
+      "angle2": 187.017,
+      "kAsm1": 0.722178,
+      "kAsm2": 0.676466,
+      "kCurve": 1
     },
     {
       "id": 19,
@@ -327,15 +330,25 @@
       "block": "Bra",
       "pathPoints": [
         {
-          "point": 14
+          "point": 14,
+          "angle": 10.7913,
+          "kAsm1": 1,
+          "kAsm2": 1.00957
         },
         {
-          "point": 18
+          "point": 18,
+          "angle": 0.832637,
+          "kAsm1": 1.0069,
+          "kAsm2": 1.01803
         },
         {
-          "point": 16
+          "point": 16,
+          "angle": 346.792,
+          "kAsm1": 0.966617,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 37,
@@ -344,24 +357,43 @@
       "block": "Bra",
       "pathPoints": [
         {
-          "point": 24
+          "point": 24,
+          "angle": 285.289,
+          "kAsm1": 1,
+          "kAsm2": 1
         },
         {
-          "point": 33
+          "point": 33,
+          "angle": 288.038,
+          "kAsm1": 0.947578,
+          "kAsm2": 1.20549
         },
         {
-          "point": 36
+          "point": 36,
+          "angle": 323.362,
+          "kAsm1": 0.918205,
+          "kAsm2": 0.343325
         },
         {
-          "point": 20
+          "point": 20,
+          "angle": 9.78436,
+          "kAsm1": 0.975465,
+          "kAsm2": 1
         },
         {
-          "point": 31
+          "point": 31,
+          "angle": 46.6117,
+          "kAsm1": 1.08715,
+          "kAsm2": 0.728559
         },
         {
-          "point": 28
+          "point": 28,
+          "angle": 77.5159,
+          "kAsm1": 1,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     }
   ],
   "pieces": []

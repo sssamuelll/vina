@@ -149,8 +149,13 @@ export function adaptSeamlyPattern(
       const a1 = typeof step.angle1 === 'number' ? step.angle1 : 0;
       const a2 = typeof step.angle2 === 'number' ? step.angle2 : 0;
       const dist = Math.sqrt((toPt.x - fromPt.x) ** 2 + (toPt.y - fromPt.y) ** 2);
-      const l1 = typeof step.length1 === 'number' ? step.length1 : dist / 3;
-      const l2 = typeof step.length2 === 'number' ? step.length2 : dist / 3;
+      const kCurve = (step as any).kCurve ?? 1;
+      const l1 = typeof step.length1 === 'number' ? step.length1 :
+                 typeof (step as any).kAsm1 === 'number' ? (step as any).kAsm1 * kCurve * (dist / 3) :
+                 dist / 3;
+      const l2 = typeof step.length2 === 'number' ? step.length2 :
+                 typeof (step as any).kAsm2 === 'number' ? (step as any).kAsm2 * kCurve * (dist / 3) :
+                 dist / 3;
 
       const definition: CurveDefinition = {
         type: 'spline',
@@ -171,15 +176,16 @@ export function adaptSeamlyPattern(
       });
     }
 
-    if (step.type === 'splinePath' && step.nodes && step.nodes.length >= 2) {
+    if (step.type === 'splinePath' && (step.nodes || step.pathPoints) && (step.nodes ?? step.pathPoints)!.length >= 2) {
       // A splinePath is a multi-segment spline — we split into individual curves
       const cvId = uid('sc');
       curveIdMap.set(step.id, cvId);
 
       // For piece building, we store the full path as a sequence of curves
       // We'll use the first/last point as from/to
-      const firstNode = step.nodes[0];
-      const lastNode = step.nodes[step.nodes.length - 1];
+      const pathNodes = step.nodes ?? step.pathPoints!;
+      const firstNode = pathNodes[0];
+      const lastNode = pathNodes[pathNodes.length - 1];
       const fromId = pointIdMap.get(firstNode.point);
       const toId = pointIdMap.get(lastNode.point);
 
@@ -188,16 +194,22 @@ export function adaptSeamlyPattern(
         const toPt = cPoints.find(p => p.id === toId);
 
         if (fromPt && toPt) {
-          // Store as cubicBezier with computed control points
-          // For multi-segment paths, we approximate with a single bezier
-          // (the piece builder will use this for the outline)
+          const kCurve = (step as any).kCurve ?? 1;
+          // Resolve angles: prefer new format, fall back to old format
           const a1 = typeof firstNode.angle2 === 'number' ? firstNode.angle2 :
+                     typeof (firstNode as any).angle === 'number' ? (firstNode as any).angle :
                      typeof firstNode.angle1 === 'number' ? firstNode.angle1 : 0;
           const a2 = typeof lastNode.angle1 === 'number' ? lastNode.angle1 :
+                     typeof (lastNode as any).angle === 'number' ? ((lastNode as any).angle + 180) :
                      typeof lastNode.angle2 === 'number' ? lastNode.angle2 : 0;
           const dist = Math.sqrt((toPt.x - fromPt.x) ** 2 + (toPt.y - fromPt.y) ** 2);
-          const l1 = typeof firstNode.length2 === 'number' ? firstNode.length2 : dist / 3;
-          const l2 = typeof lastNode.length1 === 'number' ? lastNode.length1 : dist / 3;
+          // Resolve lengths: prefer new format, fall back to kAsm
+          const l1 = typeof firstNode.length2 === 'number' ? firstNode.length2 :
+                     typeof (firstNode as any).kAsm2 === 'number' ? (firstNode as any).kAsm2 * kCurve * (dist / 3) :
+                     dist / 3;
+          const l2 = typeof lastNode.length1 === 'number' ? lastNode.length1 :
+                     typeof (lastNode as any).kAsm1 === 'number' ? (lastNode as any).kAsm1 * kCurve * (dist / 3) :
+                     dist / 3;
 
           cCurves.push({
             id: cvId,

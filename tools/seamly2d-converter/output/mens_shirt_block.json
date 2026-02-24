@@ -245,7 +245,10 @@
       "point1": 3,
       "point4": 16,
       "angle1": 0,
-      "angle2": 250
+      "angle2": 250,
+      "kAsm1": 1.22,
+      "kAsm2": 0.66,
+      "kCurve": 1
     },
     {
       "id": 37,
@@ -254,15 +257,25 @@
       "block": "Back",
       "pathPoints": [
         {
-          "point": 32
+          "point": 32,
+          "angle": 260.133,
+          "kAsm1": 1,
+          "kAsm2": 0.673267
         },
         {
-          "point": 9
+          "point": 9,
+          "angle": 269.414,
+          "kAsm1": 0.797003,
+          "kAsm2": 1.19812
         },
         {
-          "point": 7
+          "point": 7,
+          "angle": 358.963,
+          "kAsm1": 1.02006,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 27,
@@ -519,7 +532,10 @@
       "point1": 40,
       "point4": 38,
       "angle1": 300,
-      "angle2": 180
+      "angle2": 180,
+      "kAsm1": 0.25,
+      "kAsm2": 1.08,
+      "kCurve": 1
     },
     {
       "id": 55,
@@ -528,15 +544,25 @@
       "block": "Front",
       "pathPoints": [
         {
-          "point": 52
+          "point": 52,
+          "angle": 297.248,
+          "kAsm1": 1,
+          "kAsm2": 0.522647
         },
         {
-          "point": 45
+          "point": 45,
+          "angle": 267.363,
+          "kAsm1": 0.775282,
+          "kAsm2": 1.76673
         },
         {
-          "point": 31
+          "point": 31,
+          "angle": 179.515,
+          "kAsm1": 0.791954,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     }
   ],
   "pieces": []

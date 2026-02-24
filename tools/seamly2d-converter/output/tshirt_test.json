@@ -213,15 +213,25 @@
       "block": "Front Bodice",
       "pathPoints": [
         {
-          "point": 14
+          "point": 14,
+          "angle": 245.889,
+          "kAsm1": 1,
+          "kAsm2": 0.809934
         },
         {
-          "point": 7
+          "point": 7,
+          "angle": 270,
+          "kAsm1": 0.826562,
+          "kAsm2": 1
         },
         {
-          "point": 10
+          "point": 10,
+          "angle": 0,
+          "kAsm1": 0.604716,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 18,
@@ -230,15 +240,25 @@
       "block": "Front Bodice",
       "pathPoints": [
         {
-          "point": 10
+          "point": 10,
+          "angle": 270,
+          "kAsm1": 1,
+          "kAsm2": 0.5
         },
         {
-          "point": 12
+          "point": 12,
+          "angle": 270,
+          "kAsm1": 0.5,
+          "kAsm2": 0.5
         },
         {
-          "point": 9
+          "point": 9,
+          "angle": 270,
+          "kAsm1": 0.5,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 19,
@@ -386,15 +406,25 @@
       "block": "Back Bodice",
       "pathPoints": [
         {
-          "point": 32
+          "point": 32,
+          "angle": 309.579,
+          "kAsm1": 1,
+          "kAsm2": 0.605233
         },
         {
-          "point": 29
+          "point": 29,
+          "angle": 269.369,
+          "kAsm1": 0.972746,
+          "kAsm2": 1.30028
         },
         {
-          "point": 25
+          "point": 25,
+          "angle": 180.552,
+          "kAsm1": 0.984333,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 36,
@@ -404,7 +434,10 @@
       "point1": 22,
       "point4": 35,
       "angle1": 300,
-      "angle2": 180
+      "angle2": 180,
+      "kAsm1": 0.24,
+      "kAsm2": 0.98,
+      "kCurve": 1
     },
     {
       "id": 37,
@@ -413,15 +446,25 @@
       "block": "Back Bodice",
       "pathPoints": [
         {
-          "point": 23
+          "point": 23,
+          "angle": 90,
+          "kAsm1": 1,
+          "kAsm2": 0.5
         },
         {
-          "point": 27
+          "point": 27,
+          "angle": 90,
+          "kAsm1": 0.5,
+          "kAsm2": 0.5
         },
         {
-          "point": 25
+          "point": 25,
+          "angle": 90,
+          "kAsm1": 0.5,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 89,
@@ -430,15 +473,25 @@
       "block": "Back Bodice",
       "pathPoints": [
         {
-          "point": 25
+          "point": 25,
+          "angle": 4.14855e-14,
+          "kAsm1": 1,
+          "kAsm2": 0.852217
         },
         {
-          "point": 29
+          "point": 29,
+          "angle": 90,
+          "kAsm1": 1,
+          "kAsm2": 1
         },
         {
-          "point": 32
+          "point": 32,
+          "angle": 118.266,
+          "kAsm1": 0.511847,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 38,
@@ -580,15 +633,25 @@
       "block": "Sleeve",
       "pathPoints": [
         {
-          "point": 43
+          "point": 43,
+          "angle": 181.469,
+          "kAsm1": 1,
+          "kAsm2": 0.566091
         },
         {
-          "point": 46
+          "point": 46,
+          "angle": 209.709,
+          "kAsm1": 1.03032,
+          "kAsm2": 1.20713
         },
         {
-          "point": 38
+          "point": 38,
+          "angle": 205.405,
+          "kAsm1": 0.328337,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 53,
@@ -597,15 +660,25 @@
       "block": "Sleeve",
       "pathPoints": [
         {
-          "point": 43
+          "point": 43,
+          "angle": 1.63944,
+          "kAsm1": 1,
+          "kAsm2": 1.82426
         },
         {
-          "point": 47
+          "point": 47,
+          "angle": 329.99,
+          "kAsm1": 0.33989,
+          "kAsm2": 0.505145
         },
         {
-          "point": 41
+          "point": 41,
+          "angle": 324.192,
+          "kAsm1": 0.26995,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 60,
@@ -615,7 +688,10 @@
       "point1": 50,
       "point4": 58,
       "angle1": 270,
-      "angle2": 90
+      "angle2": 90,
+      "kAsm1": 0.3,
+      "kAsm2": 0.3,
+      "kCurve": 1
     },
     {
       "id": 61,
@@ -625,7 +701,10 @@
       "point1": 54,
       "point4": 59,
       "angle1": 270,
-      "angle2": 90
+      "angle2": 90,
+      "kAsm1": 0.3,
+      "kAsm2": 0.3,
+      "kCurve": 1
     },
     {
       "id": 62,
@@ -634,15 +713,25 @@
       "block": "Sleeve",
       "pathPoints": [
         {
-          "point": 58
+          "point": 58,
+          "angle": 350,
+          "kAsm1": 1,
+          "kAsm2": 0.294928
         },
         {
-          "point": 57
+          "point": 57,
+          "angle": 10,
+          "kAsm1": 1.05828,
+          "kAsm2": 1.03033
         },
         {
-          "point": 59
+          "point": 59,
+          "angle": 350,
+          "kAsm1": 0.460618,
+          "kAsm2": 1
         }
-      ]
+      ],
+      "kCurve": 1
     },
     {
       "id": 68,

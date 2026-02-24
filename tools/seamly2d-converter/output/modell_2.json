@@ -275,7 +275,10 @@
       "point1": 30,
       "point4": 31,
       "angle1": 270,
-      "angle2": 270
+      "angle2": 270,
+      "kAsm1": 1.2,
+      "kAsm2": 1.2,
+      "kCurve": 1
     },
     {
       "id": 37,
@@ -285,7 +288,10 @@
       "point1": 36,
       "point4": 19,
       "angle1": 290,
-      "angle2": 17
+      "angle2": 17,
+      "kAsm1": 1.44,
+      "kAsm2": 0.55,
+      "kCurve": 1
     },
     {
       "id": 38,
@@ -295,7 +301,10 @@
       "point1": 35,
       "point4": 20,
       "angle1": 250,
-      "angle2": 163
+      "angle2": 163,
+      "kAsm1": 1.22,
+      "kAsm2": 0.55,
+      "kCurve": 1
     },
     {
       "id": 62,
@@ -573,7 +582,10 @@
       "point1": 220,
       "point4": 219,
       "angle1": 270,
-      "angle2": 270
+      "angle2": 270,
+      "kAsm1": 1.2,
+      "kAsm2": 1.2,
+      "kCurve": 1
     },
     {
       "id": 224,
@@ -583,7 +595,10 @@
       "point1": 221,
       "point4": 207,
       "angle1": 290,
-      "angle2": 17
+      "angle2": 17,
+      "kAsm1": 1.44,
+      "kAsm2": 0.55,
+      "kCurve": 1
     },
     {
       "id": 225,
@@ -593,7 +608,10 @@
       "point1": 222,
       "point4": 208,
       "angle1": 250,
-      "angle2": 163
+      "angle2": 163,
+      "kAsm1": 1.22,
+      "kAsm2": 0.55,
+      "kCurve": 1
     },
     {
       "id": 239,
@@ -737,7 +755,10 @@
       "point1": 251,
       "point4": 250,
       "angle1": 265,
-      "angle2": 275
+      "angle2": 275,
+      "kAsm1": 1.6,
+      "kAsm2": 1.6,
+      "kCurve": 1
     },
     {
       "id": 255,
@@ -747,7 +768,10 @@
       "point1": 252,
       "point4": 244,
       "angle1": 284,
-      "angle2": 5
+      "angle2": 5,
+      "kAsm1": 1.4,
+      "kAsm2": 0.4,
+      "kCurve": 1
     },
     {
       "id": 256,
@@ -757,7 +781,10 @@
       "point1": 253,
       "point4": 245,
       "angle1": 256,
-      "angle2": 175
+      "angle2": 175,
+      "kAsm1": 1.4,
+      "kAsm2": 0.4,
+      "kCurve": 1
     }
   ],
   "pieces": [

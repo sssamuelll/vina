@@ -43,6 +43,10 @@ export interface ConstructionStep {
   angle2?: number | string;
   length1?: number | string;
   length2?: number | string;
+  // Old-format spline fields
+  kAsm1?: number;
+  kAsm2?: number;
+  kCurve?: number;
   // splinePath — supports both `nodes` and `pathPoints` (JSON uses pathPoints)
   nodes?: Array<{
     point: number;
@@ -50,6 +54,10 @@ export interface ConstructionStep {
     angle2?: number | string;
     length1?: number | string;
     length2?: number | string;
+    // Old format
+    angle?: number | string;
+    kAsm1?: number;
+    kAsm2?: number;
   }>;
   pathPoints?: Array<{
     point: number;
@@ -57,7 +65,13 @@ export interface ConstructionStep {
     angle2?: number | string;
     length1?: number | string;
     length2?: number | string;
+    // Old format
+    angle?: number | string;
+    kAsm1?: number;
+    kAsm2?: number;
   }>;
+  // cutSplinePath
+  splinePath?: number;
   // lineIntersect
   p1Line1?: number;
   p2Line1?: number;
@@ -72,6 +86,9 @@ export interface ConstructionStep {
   pShoulder?: number;
   // cutSpline
   spline?: number;
+  // pointOfContact
+  center?: number;
+  radius?: number | string;
   // line styling (ignored for computation)
   lineColor?: string;
   lineType?: string;
@@ -312,8 +329,25 @@ export function resolveConstruction(
     const a1 = resolveAngle(step.angle1, ctx);
     const a2 = resolveAngle(step.angle2, ctx);
     const d14 = distance(sp1, sp4);
-    const l1 = step.length1 != null ? resolveLength(step.length1, ctx) : d14 / 3;
-    const l2 = step.length2 != null ? resolveLength(step.length2, ctx) : d14 / 3;
+
+    // Handle old-format kAsm lengths
+    let l1: number, l2: number;
+    const kCurve = step.kCurve ?? 1;
+    if (step.length1 != null) {
+      l1 = resolveLength(step.length1, ctx);
+    } else if (step.kAsm1 != null) {
+      l1 = step.kAsm1 * kCurve * (d14 / 3);
+    } else {
+      l1 = d14 / 3;
+    }
+    if (step.length2 != null) {
+      l2 = resolveLength(step.length2, ctx);
+    } else if (step.kAsm2 != null) {
+      l2 = step.kAsm2 * kCurve * (d14 / 3);
+    } else {
+      l2 = d14 / 3;
+    }
+
     const off1 = angleToOffset(a1, l1);
     const off2 = angleToOffset(a2 + 180, l2);
     const cp1: Point = { x: sp1.x + off1.x, y: sp1.y + off1.y };
@@ -329,6 +363,7 @@ export function resolveConstruction(
   function buildSplinePathCurve(step: ConstructionStep, ctx: FormulaContext): PathCommand[] {
     const pathNodes = getPathNodes(step);
     if (!pathNodes || pathNodes.length < 2) return [];
+    const kCurve = (step as any).kCurve ?? 1;
     const cmds: PathCommand[] = [];
     const sp = getPoint(pathNodes[0].point);
     cmds.push({ type: 'M', values: [sp.x, sp.y] });
@@ -338,10 +373,51 @@ export function resolveConstruction(
       const pA = getPoint(nA.point);
       const pB = getPoint(nB.point);
       const dAB = distance(pA, pB);
-      const a1 = resolveAngle(nA.angle2 ?? nA.angle1, ctx);
-      const a2 = resolveAngle(nB.angle1 ?? nB.angle2, ctx);
-      const l1 = nA.length2 != null ? resolveLength(nA.length2, ctx) : dAB / 3;
-      const l2 = nB.length1 != null ? resolveLength(nB.length1, ctx) : dAB / 3;
+
+      // Resolve angles: prefer new format, fall back to old format
+      let a1: number;
+      if (nA.angle2 != null) {
+        a1 = resolveAngle(nA.angle2, ctx);
+      } else if (nA.angle != null) {
+        // Old format: angle = outgoing tangent direction
+        a1 = resolveAngle(nA.angle, ctx);
+      } else if (nA.angle1 != null) {
+        a1 = resolveAngle(nA.angle1, ctx);
+      } else {
+        a1 = angleBetween(pA, pB);
+      }
+
+      let a2: number;
+      if (nB.angle1 != null) {
+        a2 = resolveAngle(nB.angle1, ctx);
+      } else if (nB.angle != null) {
+        // Old format: angle = outgoing direction, so incoming = angle + 180
+        a2 = resolveAngle(nB.angle, ctx) + 180;
+      } else if (nB.angle2 != null) {
+        a2 = resolveAngle(nB.angle2, ctx);
+      } else {
+        a2 = angleBetween(pB, pA);
+      }
+
+      // Resolve lengths: prefer new format, fall back to kAsm
+      let l1: number;
+      if (nA.length2 != null) {
+        l1 = resolveLength(nA.length2, ctx);
+      } else if (nA.kAsm2 != null) {
+        l1 = nA.kAsm2 * kCurve * (dAB / 3);
+      } else {
+        l1 = dAB / 3;
+      }
+
+      let l2: number;
+      if (nB.length1 != null) {
+        l2 = resolveLength(nB.length1, ctx);
+      } else if (nB.kAsm1 != null) {
+        l2 = nB.kAsm1 * kCurve * (dAB / 3);
+      } else {
+        l2 = dAB / 3;
+      }
+
       const off1 = angleToOffset(a1, l1);
       const off2 = angleToOffset(a2 + 180, l2);
       const cp1: Point = { x: pA.x + off1.x, y: pA.y + off1.y };
@@ -500,6 +576,7 @@ export function resolveConstruction(
     for (const step of pending) {
     // Check if this step needs a curve that hasn't been built yet
     const neededCurveId = step.type === 'cutSpline' ? step.spline
+      : step.type === 'cutSplinePath' ? step.splinePath
       : step.type === 'curveIntersectAxis' ? step.curve
       : undefined;
     if (neededCurveId != null && !stepCurves.has(neededCurveId) && pass < maxPasses) {
@@ -523,6 +600,7 @@ export function resolveConstruction(
     if (step.point4 != null) neededPoints.push(step.point4);
     if (step.refPointX != null) neededPoints.push(step.refPointX);
     if (step.refPointY != null) neededPoints.push(step.refPointY);
+    if (step.center != null) neededPoints.push(step.center);
     const pathNodes = step.nodes ?? step.pathPoints;
     if (pathNodes) {
       for (const n of pathNodes) neededPoints.push(n.point);
@@ -709,6 +787,53 @@ export function resolveConstruction(
             }
           } else {
             point = { x: 0, y: 0 };
+          }
+          break;
+        }
+
+        case 'cutSplinePath': {
+          const splinePathId = step.splinePath!;
+          const cmds = stepCurves.get(splinePathId);
+          const len = resolveLength(step.length, ctx);
+          if (cmds && cmds.length >= 2) {
+            point = pointAtCurveArcLength(cmds, len);
+            if (step.name && point) {
+              recordPartialArcLengths(splinePathId, step.name, point);
+            }
+          } else {
+            point = { x: 0, y: 0 };
+          }
+          break;
+        }
+
+        case 'pointOfContact': {
+          // Intersection of circle (center, radius) with line (firstPoint→secondPoint)
+          const ctr = getPoint(step.center!);
+          const lp1 = getPoint(step.firstPoint!);
+          const lp2 = getPoint(step.secondPoint!);
+          const r = resolveLength(step.radius, ctx);
+
+          const dx = lp2.x - lp1.x;
+          const dy = lp2.y - lp1.y;
+          const ex = lp1.x - ctr.x;
+          const ey = lp1.y - ctr.y;
+          const a = dx * dx + dy * dy;
+          const b = 2 * (ex * dx + ey * dy);
+          const c = ex * ex + ey * ey - r * r;
+          const disc = b * b - 4 * a * c;
+
+          if (disc < 0 || a < 1e-10) {
+            // No intersection, use closest point on line to center
+            const t = -(ex * dx + ey * dy) / a;
+            point = { x: lp1.x + t * dx, y: lp1.y + t * dy };
+          } else {
+            const sqrtDisc = Math.sqrt(disc);
+            const t1 = (-b + sqrtDisc) / (2 * a);
+            const t2 = (-b - sqrtDisc) / (2 * a);
+            const pt1: Point = { x: lp1.x + t1 * dx, y: lp1.y + t1 * dy };
+            const pt2: Point = { x: lp1.x + t2 * dx, y: lp1.y + t2 * dy };
+            // Pick point closest to firstPoint
+            point = distance(pt1, lp1) < distance(pt2, lp1) ? pt1 : pt2;
           }
           break;
         }
