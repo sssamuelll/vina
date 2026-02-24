@@ -7,8 +7,10 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { adaptSeamlyPattern, type SeamlyPattern } from '../../../utils/seamly2d/seamlyAdapter';
 import { loadConstruction } from '../../../store/constructionSlice';
-import { addPiece } from '../../../store/projectSlice';
+import { addPiece, addSeam } from '../../../store/projectSlice';
 import { selectPiece } from '../../../store/editorSlice';
+import { startSimulation } from '../../../store/simulationSlice';
+import { autoSew } from '../../../utils/autoSew';
 import { buildPieceWithOffset } from '../../../utils/construction/pieceBuilder';
 import { setConstructionPieceNormOffset } from '../../../store/constructionSlice';
 import { clearConstruction } from '../../../store/constructionSlice';
@@ -81,6 +83,8 @@ const loadSeamlyPatternTool: ToolDefinition = {
     properties: {
       patternId: { type: 'string', description: 'Pattern ID from listSeamlyPatterns' },
       clearFirst: { type: 'boolean', description: 'Clear existing pieces first (default: true)' },
+      autoSew: { type: 'boolean', description: 'Auto-detect and apply seams after loading (default: true)' },
+      simulate: { type: 'boolean', description: 'Start 3D simulation after loading and sewing (default: false)' },
     },
     required: ['patternId'],
   },
@@ -295,6 +299,35 @@ const loadSeamlyPatternTool: ToolDefinition = {
       dispatch(selectPiece(builtPieces[0].id));
     }
 
+    // ─── Auto-sew ─────────────────────────────────────────────────────
+    let sewInfo: { detected: number; applied: number; details: Array<{ pieceA: string; pieceB: string; confidence: string }> } | undefined;
+
+    const shouldAutoSew = (params.autoSew as boolean) !== false; // default true
+    if (shouldAutoSew && builtPieces.length >= 2) {
+      const currentPieces = getState().project.pieces;
+      const sewResult = autoSew(currentPieces, { minConfidence: 0.3 });
+      sewInfo = { detected: sewResult.seams.length, applied: 0, details: [] };
+      const pieceLookup = new Map(currentPieces.map(p => [p.id, p.name]));
+
+      for (const proposed of sewResult.seams) {
+        if (proposed.confidence >= 0.6) {
+          dispatch(addSeam(proposed.seam));
+          sewInfo.applied++;
+        }
+        sewInfo.details.push({
+          pieceA: pieceLookup.get(proposed.seam.pieceA.pieceId) || proposed.seam.pieceA.pieceId,
+          pieceB: pieceLookup.get(proposed.seam.pieceB.pieceId) || proposed.seam.pieceB.pieceId,
+          confidence: Math.round(proposed.confidence * 100) + '%',
+        });
+      }
+    }
+
+    // ─── Start simulation ─────────────────────────────────────────────
+    const shouldSimulate = params.simulate as boolean ?? false;
+    if (shouldSimulate && builtPieces.length > 0) {
+      dispatch(startSimulation());
+    }
+
     return {
       success: builtPieces.length > 0,
       data: {
@@ -304,6 +337,8 @@ const loadSeamlyPatternTool: ToolDefinition = {
         pointsResolved: result.points.filter(p => p.x !== 0 || p.y !== 0).length,
         pointsTotal: result.points.length,
         piecesBuilt: builtPieces,
+        ...(sewInfo ? { seams: sewInfo } : {}),
+        ...(shouldSimulate ? { simulationStarted: true } : {}),
         ...(buildErrors.length > 0 ? { buildErrors } : {}),
         ...(result.errors.length > 0 ? { adapterErrors: result.errors } : {}),
       },

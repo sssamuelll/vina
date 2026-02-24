@@ -29,7 +29,7 @@ describe('Seamly2D E2E Pipeline', () => {
   });
 
   it('pipeline summary', { timeout: 30000 }, () => {
-    let totalPieces = 0, builtOk = 0, adaptFail = 0;
+    let totalPieces = 0, builtOk = 0, buildFail = 0, adaptFail = 0;
     const errors: Record<string, number> = {};
 
     for (const { name, data } of patternsWithPieces) {
