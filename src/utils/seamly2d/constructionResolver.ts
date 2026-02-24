@@ -408,8 +408,13 @@ export function resolveConstruction(
       if (nB.angle1 != null) {
         a2 = resolveAngle(nB.angle1, ctx);
       } else if (nB.angle != null) {
-        // Old format: angle = outgoing direction, so incoming = angle + 180
-        a2 = resolveAngle(nB.angle, ctx) + 180;
+        // Old format: angle = outgoing tangent direction at this point.
+        // Seamly2D's VSplinePoint: Angle1() (incoming) = angle + 180.
+        // VSpline uses angle2 = p2.Angle1() = angle + 180, then
+        // GetP3 does p4p3.setAngle(angle2) placing cp2 at (angle + 180) from p4.
+        // Since off2 = angleToOffset(a2 + 180), we need a2 = angle (NOT angle + 180)
+        // so that off2 = angleToOffset(angle + 180) — matching Seamly2D exactly.
+        a2 = resolveAngle(nB.angle, ctx);
       } else if (nB.angle2 != null) {
         a2 = resolveAngle(nB.angle2, ctx);
       } else {
