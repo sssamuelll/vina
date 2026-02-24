@@ -15,7 +15,7 @@ export interface FormulaContext {
 }
 
 /** Characters/tokens allowed in a sanitized formula (after variable substitution). */
-const SAFE_FORMULA_RE = /^[\d\s+\-*/().?:<>=!&|,A-Za-z_]+$/;
+const SAFE_FORMULA_RE = /^[\d\s+\-*/().?:<>=!&|,A-Za-z_\u00C0-\u024F\u0400-\u04FF\u0500-\u052F]+$/;
 
 /**
  * Evaluate a single Seamly2D formula string given a context.
@@ -40,8 +40,18 @@ export function evaluateFormula(
     return '0';
   });
 
-  // Replace #VariableName references with their numeric values
-  expr = expr.replace(/#([A-Za-z_][A-Za-z0-9_]*)/g, (_match, name) => {
+  // Replace @MeasurementName references (Cyrillic/Unicode measurement names)
+  expr = expr.replace(/@([\p{L}_][\p{L}\p{N}_]*)/gu, (_match, name) => {
+    const val = context.measurements[name] ?? context.measurements[`@${name}`];
+    if (val !== undefined) return String(val);
+    // Try as variable
+    const vval = context.variables[`@${name}`] ?? context.variables[name];
+    if (vval !== undefined) return String(vval);
+    return '0';
+  });
+
+  // Replace #VariableName references with their numeric values (Unicode-aware)
+  expr = expr.replace(/#([\p{L}_][\p{L}\p{N}_]*)/gu, (_match, name) => {
     const val = context.variables[`#${name}`] ?? context.variables[name];
     if (val === undefined) {
       throw new Error(`Unknown variable: #${name}`);
@@ -65,8 +75,16 @@ export function evaluateFormula(
     expr = expr.replace(re, String(context.variables[name]));
   }
 
+  // Replace Seamly2D-specific math functions (aliases)
+  expr = expr.replace(/\brint\b/g, '__ROUND__');
+  expr = expr.replace(/\bsign\b/g, '__SIGN__');
+
   // Replace math functions with Math.* equivalents
-  expr = expr.replace(/\b(atan|asin|acos|sin|cos|tan|sqrt|abs|min|max|pow|floor|ceil|round)\b/g, 'Math.$1');
+  expr = expr.replace(/\b(atan2|atan|asin|acos|sin|cos|tan|sqrt|abs|min|max|pow|floor|ceil|round)\b/g, 'Math.$1');
+
+  // Now replace aliases (after main pass to avoid double-replacement)
+  expr = expr.replace(/__ROUND__/g, 'Math.round');
+  expr = expr.replace(/__SIGN__/g, 'Math.sign');
 
   // Validate the expression is safe
   if (!SAFE_FORMULA_RE.test(expr)) {
@@ -110,8 +128,8 @@ export function resolveVariables(
   for (const name of varNames) {
     const formula = variables[name].formula;
     const varDeps: string[] = [];
-    // Find #Variable references
-    const varRefRe = /#([A-Za-z_][A-Za-z0-9_]*)/g;
+    // Find #Variable references (Unicode-aware)
+    const varRefRe = /#([\p{L}_][\p{L}\p{N}_]*)/gu;
     let m: RegExpExecArray | null;
     while ((m = varRefRe.exec(formula)) !== null) {
       const depName = `#${m[1]}`;
