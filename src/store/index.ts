@@ -9,9 +9,9 @@ import avatarReducer from './avatarSlice';
 import toolReducer from './toolSlice';
 import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
-import recipeReducer, { loadRecipes } from './recipeSlice';
+import blueprintReducer, { loadBlueprints } from './blueprintSlice';
 import { undoMiddleware } from './undoMiddleware';
-import { BUILTIN_RECIPES } from '../utils/construction/recipes';
+import { BUILTIN_BLUEPRINTS } from '../utils/construction/blueprints';
 
 export const store = configureStore({
   reducer: {
@@ -25,7 +25,7 @@ export const store = configureStore({
     tools: toolReducer,
     parametric: parametricReducer,
     construction: constructionReducer,
-    recipes: recipeReducer,
+    blueprints: blueprintReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -37,7 +37,7 @@ export const store = configureStore({
 });
 
 // Load builtin recipes synchronously — must be available before first copilot turn
-store.dispatch(loadRecipes(BUILTIN_RECIPES));
+store.dispatch(loadBlueprints(BUILTIN_BLUEPRINTS));
 
 // Expose store for debugging (remove in production)
 (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ = store;

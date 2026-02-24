@@ -165,9 +165,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       selectedEntity: null,
       showConstruction: true,
     },
-    recipes: {
-      recipes: [],
-      activeRecipeId: null,
+    blueprints: {
+      blueprints: [],
+      activeBlueprintId: null,
       activeStepIndex: 0,
       paused: false,
     },

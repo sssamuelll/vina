@@ -2,9 +2,9 @@
  * Bodice Back Block — Aldrich method (simplified)
  */
 
-import type { Recipe } from '../../../types/recipe';
+import type { Blueprint } from '../../../types/blueprint';
 
-export const bodiceBackBlock: Recipe = {
+export const bodiceBackBlock: Blueprint = {
   id: 'aldrich-bodice-back',
   name: 'Bodice Back Block (Aldrich)',
   nameEs: 'Bloque Base Espalda (Aldrich)',

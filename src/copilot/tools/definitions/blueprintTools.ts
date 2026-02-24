@@ -1,27 +1,27 @@
 /**
- * Recipe Tools — copilot tools for finding, executing, and managing construction recipes.
+ * Blueprint Tools — copilot tools for finding, executing, and managing construction blueprints.
  * 
- * The LLM does NOT invent construction steps. It finds the right recipe
- * and executes it. The patronista can edit recipes or create new ones.
+ * The LLM does NOT invent construction steps. It finds the right blueprint
+ * and executes it. The patronista can edit blueprints or create new ones.
  * 
- * @module recipeTools
+ * @module blueprintTools
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
-import type { Recipe } from '../../../types/recipe';
-import { executeRecipe, validateRecipe } from '../../../utils/construction/recipeExecutor';
-import { saveRecipe, startRecipe } from '../../../store/recipeSlice';
+import type { Blueprint } from '../../../types/blueprint';
+import { executeBlueprint, validateBlueprint } from '../../../utils/construction/blueprintExecutor';
+import { saveBlueprint, startBlueprint } from '../../../store/blueprintSlice';
 import { clearConstruction } from '../../../store/constructionSlice';
 import { addPiece } from '../../../store/projectSlice';
 import { selectPiece } from '../../../store/editorSlice';
 import { buildPiece } from '../../../utils/construction/pieceBuilder';
 
-// ─── searchRecipes ──────────────────────────────────────────────────────────
+// ─── searchBlueprints ──────────────────────────────────────────────────────────
 
-const searchRecipesTool: ToolDefinition = {
-  name: 'searchRecipes',
+const searchBlueprintsTool: ToolDefinition = {
+  name: 'searchBlueprints',
   description:
-    'Search the recipe library for construction blueprints. Returns matching recipes with metadata. ' +
+    'Search the blueprint library for construction blueprints. Returns matching blueprints with metadata. ' +
     'ALWAYS search before constructing a garment — never invent construction steps. ' +
     '/ Buscar recetas de construcción en la biblioteca. SIEMPRE buscar antes de construir.',
   parameters: {
@@ -36,13 +36,13 @@ const searchRecipesTool: ToolDefinition = {
   },
   execute: async (params, _dispatch, getState): Promise<ToolResult> => {
     const state = getState();
-    const recipes = state.recipes.recipes;
+    const blueprints = state.blueprints.blueprints;
     const query = ((params.query as string) || '').toLowerCase();
 
-    let results = recipes;
+    let results = blueprints;
 
     if (query) {
-      results = recipes.filter(r => {
+      results = blueprints.filter(r => {
         const searchText = [
           r.name, r.nameEs, r.description, r.descriptionEs,
           r.method, r.category, ...r.tags,
@@ -61,7 +61,7 @@ const searchRecipesTool: ToolDefinition = {
         data: {
           results: [],
           total: 0,
-          hint: 'No recipes found. The patronista can create a new recipe, or you can use the Seamly2D templates (searchTemplates).',
+          hint: 'No blueprints found. The patronista can create a new blueprint, or you can use the Seamly2D templates (searchTemplates).',
         },
       };
     }
@@ -87,18 +87,18 @@ const searchRecipesTool: ToolDefinition = {
   },
 };
 
-// ─── executeRecipe ──────────────────────────────────────────────────────────
+// ─── executeBlueprint ──────────────────────────────────────────────────────────
 
-const executeRecipeTool: ToolDefinition = {
-  name: 'executeRecipe',
+const executeBlueprintTool: ToolDefinition = {
+  name: 'executeBlueprint',
   description:
-    'Execute a construction recipe to build a garment. Clears current construction and builds from the recipe steps. ' +
-    'Optionally override recipe variables (e.g., ease, length). ' +
+    'Execute a construction blueprint to build a garment. Clears current construction and builds from the blueprint steps. ' +
+    'Optionally override blueprint variables (e.g., ease, length). ' +
     '/ Ejecutar una receta de construcción para crear una prenda.',
   parameters: {
     type: 'object',
     properties: {
-      recipeId: { type: 'string', description: 'Recipe ID from searchRecipes' },
+      blueprintId: { type: 'string', description: 'Blueprint ID from searchBlueprints' },
       overrides: {
         type: 'object',
         description: 'Variable overrides (e.g., {"ease": 20, "length": 600})',
@@ -108,19 +108,19 @@ const executeRecipeTool: ToolDefinition = {
         description: 'Clear existing construction before executing (default: true)',
       },
     },
-    required: ['recipeId'],
+    required: ['blueprintId'],
   },
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const state = getState();
-    const recipe = state.recipes.recipes.find(r => r.id === params.recipeId);
+    const blueprint = state.blueprints.blueprints.find(r => r.id === params.blueprintId);
 
-    if (!recipe) {
-      return { success: false, error: `Recipe "${params.recipeId}" not found. Use searchRecipes to find available recipes.` };
+    if (!blueprint) {
+      return { success: false, error: `Blueprint "${params.blueprintId}" not found. Use searchBlueprints to find available blueprints.` };
     }
 
     // Validate measurements
     const measurements = state.project.avatar.measurements as unknown as Record<string, number>;
-    const validation = validateRecipe(recipe, measurements);
+    const validation = validateBlueprint(blueprint, measurements);
 
     if (validation.missing.length > 0) {
       return {
@@ -134,12 +134,12 @@ const executeRecipeTool: ToolDefinition = {
       dispatch(clearConstruction());
     }
 
-    // Execute recipe
+    // Execute blueprint
     const overrides = params.overrides as Record<string, number> | undefined;
-    const actions = executeRecipe(recipe, measurements, overrides);
+    const actions = executeBlueprint(blueprint, measurements, overrides);
 
-    // Track recipe execution
-    dispatch(startRecipe(recipe.id));
+    // Track blueprint execution
+    dispatch(startBlueprint(blueprint.id));
 
     // Dispatch all actions
     let dispatched = 0;
@@ -174,10 +174,10 @@ const executeRecipeTool: ToolDefinition = {
     return {
       success: builtPieces.length > 0,
       data: {
-        recipe: recipe.name,
-        method: recipe.method,
+        blueprint: blueprint.name,
+        method: blueprint.method,
         stepsExecuted: dispatched,
-        variables: recipe.variables ? Object.entries(recipe.variables).map(([k, v]) => ({
+        variables: blueprint.variables ? Object.entries(blueprint.variables).map(([k, v]) => ({
           name: k,
           label: v.label,
           value: overrides?.[k] ?? v.default,
@@ -190,19 +190,19 @@ const executeRecipeTool: ToolDefinition = {
   },
 };
 
-// ─── saveUserRecipe ─────────────────────────────────────────────────────────
+// ─── saveUserBlueprint ─────────────────────────────────────────────────────────
 
-const saveUserRecipeTool: ToolDefinition = {
-  name: 'saveUserRecipe',
+const saveUserBlueprintTool: ToolDefinition = {
+  name: 'saveUserBlueprint',
   description:
-    'Save the current construction as a reusable recipe. The patronista can then re-execute it with different measurements. ' +
+    'Save the current construction as a reusable blueprint. The patronista can then re-execute it with different measurements. ' +
     '/ Guardar la construcción actual como una receta reutilizable.',
   parameters: {
     type: 'object',
     properties: {
-      name: { type: 'string', description: 'Recipe name' },
-      nameEs: { type: 'string', description: 'Recipe name in Spanish' },
-      description: { type: 'string', description: 'What this recipe creates' },
+      name: { type: 'string', description: 'Blueprint name' },
+      nameEs: { type: 'string', description: 'Blueprint name in Spanish' },
+      description: { type: 'string', description: 'What this blueprint creates' },
       category: {
         type: 'string',
         enum: ['tops', 'bottoms', 'dresses', 'outerwear', 'underwear', 'sleeves', 'collars', 'blocks', 'other'],
@@ -224,11 +224,11 @@ const saveUserRecipeTool: ToolDefinition = {
       return { success: false, error: 'No construction to save. Build something first.' };
     }
 
-    // Convert current construction state back to recipe steps
-    const steps: Recipe['steps'] = [];
+    // Convert current construction state back to blueprint steps
+    const steps: Blueprint['steps'] = [];
 
     for (const pt of points) {
-      const step: Recipe['steps'][0] = {
+      const step: Blueprint['steps'][0] = {
         tool: 'addConstructionPoint',
         label: pt.label,
         type: pt.definition.type as 'absolute',
@@ -281,18 +281,18 @@ const saveUserRecipeTool: ToolDefinition = {
     }
 
     const now = Date.now();
-    const recipe: Recipe = {
+    const blueprint: Blueprint = {
       id: `user_${now.toString(36)}`,
       name: params.name as string,
       nameEs: params.nameEs as string | undefined,
       description: params.description as string,
-      category: (params.category as Recipe['category']) || 'other',
+      category: (params.category as Blueprint['category']) || 'other',
       method: (params.method as string) || 'Custom',
       requiredMeasurements: ['chest', 'waist', 'height'], // TODO: detect from formulas
       variables: Object.entries(variables).reduce((acc, [k, v]) => {
         acc[k] = { label: k, default: v };
         return acc;
-      }, {} as NonNullable<Recipe['variables']>),
+      }, {} as NonNullable<Blueprint['variables']>),
       steps,
       source: 'user',
       tags: (params.tags as string[]) || [],
@@ -301,13 +301,13 @@ const saveUserRecipeTool: ToolDefinition = {
       updatedAt: now,
     };
 
-    dispatch(saveRecipe(recipe));
+    dispatch(saveBlueprint(blueprint));
 
     return {
       success: true,
       data: {
-        recipeId: recipe.id,
-        name: recipe.name,
+        blueprintId: blueprint.id,
+        name: blueprint.name,
         steps: steps.length,
         source: 'user',
       },
@@ -315,18 +315,18 @@ const saveUserRecipeTool: ToolDefinition = {
   },
 };
 
-// ─── listRecipes ────────────────────────────────────────────────────────────
+// ─── listBlueprints ────────────────────────────────────────────────────────────
 
-const listRecipesTool: ToolDefinition = {
-  name: 'listRecipes',
-  description: 'List all available recipes in the library. / Listar todas las recetas disponibles.',
+const listBlueprintsTool: ToolDefinition = {
+  name: 'listBlueprints',
+  description: 'List all available blueprints in the library. / Listar todas las recetas disponibles.',
   parameters: { type: 'object', properties: {} },
   execute: async (_params, _dispatch, getState): Promise<ToolResult> => {
-    const recipes = getState().recipes.recipes;
+    const blueprints = getState().blueprints.blueprints;
     return {
       success: true,
       data: {
-        recipes: recipes.map(r => ({
+        blueprints: blueprints.map(r => ({
           id: r.id,
           name: r.name,
           category: r.category,
@@ -334,7 +334,7 @@ const listRecipesTool: ToolDefinition = {
           source: r.source,
           steps: r.steps.length,
         })),
-        total: recipes.length,
+        total: blueprints.length,
       },
     };
   },
@@ -343,8 +343,8 @@ const listRecipesTool: ToolDefinition = {
 // ─── Export ──────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
-  searchRecipesTool,
-  executeRecipeTool,
-  saveUserRecipeTool,
-  listRecipesTool,
+  searchBlueprintsTool,
+  executeBlueprintTool,
+  saveUserBlueprintTool,
+  listBlueprintsTool,
 ];

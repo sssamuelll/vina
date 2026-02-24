@@ -1,7 +1,7 @@
 /**
- * Recipe Executor
+ * Blueprint Executor
  * 
- * Takes a Recipe and body measurements, resolves all formula variables,
+ * Takes a Blueprint and body measurements, resolves all formula variables,
  * and returns the list of Redux actions to dispatch.
  * 
  * The executor does NOT dispatch directly — it returns actions so the
@@ -9,7 +9,7 @@
  * or all at once (for instant execution).
  */
 
-import type { Recipe, PointStep } from '../../types/recipe';
+import type { Blueprint, PointStep } from '../../types/blueprint';
 import type { PointDefinition } from '../../types/construction';
 import { evaluateFormula, type FormulaContext } from '../seamly2d/formulaEvaluator';
 import {
@@ -29,19 +29,19 @@ function resolveFormula(val: string | number | undefined, ctx: FormulaContext): 
   }
 }
 
-// ─── Build FormulaContext from measurements + recipe variables ───────────────
+// ─── Build FormulaContext from measurements + blueprint variables ───────────────
 
 function buildContext(
   measurements: Record<string, number>,
-  recipeVars: Recipe['variables'],
+  blueprintVars: Blueprint['variables'],
   userOverrides?: Record<string, number>,
 ): FormulaContext {
   const variables: Record<string, number> = {};
 
-  // First resolve recipe variable defaults
-  if (recipeVars) {
+  // First resolve blueprint variable defaults
+  if (blueprintVars) {
     const baseCtx: FormulaContext = { measurements, variables: {} };
-    for (const [name, def] of Object.entries(recipeVars)) {
+    for (const [name, def] of Object.entries(blueprintVars)) {
       const override = userOverrides?.[name];
       if (override !== undefined) {
         variables[name] = override;
@@ -120,15 +120,15 @@ function executePointStep(step: PointStep, ctx: FormulaContext): StepAction {
   };
 }
 
-export function executeRecipe(
-  recipe: Recipe,
+export function executeBlueprint(
+  blueprint: Blueprint,
   measurements: Record<string, number>,
   userOverrides?: Record<string, number>,
 ): StepAction[] {
-  const ctx = buildContext(measurements, recipe.variables, userOverrides);
+  const ctx = buildContext(measurements, blueprint.variables, userOverrides);
   const actions: StepAction[] = [];
 
-  // Set recipe variables in construction state
+  // Set blueprint variables in construction state
   for (const [name, val] of Object.entries(ctx.variables)) {
     actions.push({
       action: setVariable({ name, value: val }),
@@ -136,7 +136,7 @@ export function executeRecipe(
     });
   }
 
-  for (const step of recipe.steps) {
+  for (const step of blueprint.steps) {
     switch (step.tool) {
       case 'addConstructionPoint':
         actions.push(executePointStep(step, ctx));
@@ -198,7 +198,7 @@ export function executeRecipe(
   return actions;
 }
 
-// ─── Validate recipe against available measurements ─────────────────────────
+// ─── Validate blueprint against available measurements ─────────────────────────
 
 export interface ValidationResult {
   valid: boolean;
@@ -206,16 +206,16 @@ export interface ValidationResult {
   warnings: string[];
 }
 
-export function validateRecipe(recipe: Recipe, measurements: Record<string, number>): ValidationResult {
-  const missing = recipe.requiredMeasurements.filter(m => {
+export function validateBlueprint(blueprint: Blueprint, measurements: Record<string, number>): ValidationResult {
+  const missing = blueprint.requiredMeasurements.filter(m => {
     const val = measurements[m];
     return val === undefined || val === 0;
   });
 
   const warnings: string[] = [];
-  if (recipe.steps.length === 0) warnings.push('Recipe has no steps');
-  const buildSteps = recipe.steps.filter(s => s.tool === 'buildPieceFromConstruction');
-  if (buildSteps.length === 0) warnings.push('Recipe has no buildPieceFromConstruction step');
+  if (blueprint.steps.length === 0) warnings.push('Blueprint has no steps');
+  const buildSteps = blueprint.steps.filter(s => s.tool === 'buildPieceFromConstruction');
+  if (buildSteps.length === 0) warnings.push('Blueprint has no buildPieceFromConstruction step');
 
   return {
     valid: missing.length === 0 && warnings.length === 0,

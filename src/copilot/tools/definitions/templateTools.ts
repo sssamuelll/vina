@@ -8,7 +8,7 @@
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
-import type { Recipe } from '../../../types/recipe';
+import type { Blueprint } from '../../../types/blueprint';
 import { searchCatalog, getCatalog, getCatalogEntry, type CatalogEntry } from '../../../utils/seamly2d/catalog';
 import { PatternTemplateEngine, type SeamlyPattern } from '../../../utils/seamly2d/templateEngine';
 import { buildMeasurements, inferSizeSystem, type StandardSize, type SizeSystem } from '../../../utils/seamly2d/sizeTables';
@@ -146,9 +146,9 @@ const searchTemplatesTool: ToolDefinition = {
 const generateFromTemplateTool: ToolDefinition = {
   name: 'generateFromTemplate',
   description:
-    'FALLBACK ONLY — use executeRecipe first! Generate pattern pieces from a Seamly2D template. ' +
-    'Most templates lack piece definitions and will fail. Prefer searchRecipes → executeRecipe. ' +
-    '/ SOLO COMO FALLBACK — usa executeRecipe primero.',
+    'FALLBACK ONLY — use executeBlueprint first! Generate pattern pieces from a Seamly2D template. ' +
+    'Most templates lack piece definitions and will fail. Prefer searchBlueprints → executeBlueprint. ' +
+    '/ SOLO COMO FALLBACK — usa executeBlueprint primero.',
   parameters: {
     type: 'object',
     properties: {
@@ -246,27 +246,27 @@ const generateFromTemplateTool: ToolDefinition = {
     try {
       pieces = engine.generate(measurements);
     } catch (err) {
-      // If template has no piece definitions, redirect to recipe system
-      const recipes = getState().recipes.recipes;
+      // If template has no piece definitions, redirect to blueprint system
+      const blueprints = getState().blueprints.blueprints;
       const query = entry.name.toLowerCase();
-      const matchingRecipes = recipes.filter((r: Recipe) => {
+      const matchingBlueprints = blueprints.filter((r: Blueprint) => {
         const searchText = [r.name, r.nameEs, r.description, r.descriptionEs, ...r.tags]
           .filter(Boolean).join(' ').toLowerCase();
         return searchText.includes(query) || entry.keywords.some((t: string) => searchText.includes(t));
       });
-      if (matchingRecipes.length > 0) {
+      if (matchingBlueprints.length > 0) {
         return {
           success: false,
           error: `Template "${templateId}" has no piece definitions. ` +
-            `Use executeRecipe instead with one of these recipes: ${matchingRecipes.map((r: Recipe) => r.id).join(', ')}. ` +
-            `Call executeRecipe("${matchingRecipes[0].id}") to build the garment.`,
+            `Use executeBlueprint instead with one of these blueprints: ${matchingBlueprints.map((r: Blueprint) => r.id).join(', ')}. ` +
+            `Call executeBlueprint("${matchingBlueprints[0].id}") to build the garment.`,
         };
       }
       return { success: false, error: `Generation error: ${(err as Error).message}` };
     }
 
     if (pieces.length === 0) {
-      return { success: false, error: 'Template generated 0 pieces. Use searchRecipes to find a construction recipe instead.' };
+      return { success: false, error: 'Template generated 0 pieces. Use searchBlueprints to find a construction blueprint instead.' };
     }
 
     // Resolve fabric

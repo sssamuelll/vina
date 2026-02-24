@@ -2,9 +2,9 @@
  * Basic Sleeve Block — Aldrich method
  */
 
-import type { Recipe } from '../../../types/recipe';
+import type { Blueprint } from '../../../types/blueprint';
 
-export const basicSleeve: Recipe = {
+export const basicSleeve: Blueprint = {
   id: 'aldrich-sleeve',
   name: 'Basic Sleeve Block (Aldrich)',
   nameEs: 'Manga Básica (Aldrich)',

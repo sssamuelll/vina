@@ -1,27 +1,27 @@
 /**
- * Construction Recipe Types
+ * Construction Blueprint Types
  * 
- * A recipe is a reusable, step-by-step blueprint for constructing a garment piece.
- * Recipes can come from:
+ * A blueprint is a reusable, step-by-step blueprint for constructing a garment piece.
+ * Blueprints can come from:
  * - Built-in library (Seamly2D imports, standard methods)
  * - User-created (patronista records their own method)
  * - Community-shared (future)
  * 
- * The LLM does NOT invent construction steps. It finds the right recipe
+ * The LLM does NOT invent construction steps. It finds the right blueprint
  * and executes it with the user's measurements. The patronista can edit
- * any recipe or create new ones from scratch.
+ * any blueprint or create new ones from scratch.
  */
 
-// ─── Recipe Step Types ──────────────────────────────────────────────────────
+// ─── Blueprint Step Types ──────────────────────────────────────────────────────
 
-export interface RecipeStepBase {
+export interface BlueprintStepBase {
   /** Optional comment explaining this step (shown to patronista) */
   comment?: string;
   /** Optional comment in Spanish */
   commentEs?: string;
 }
 
-export interface PointStep extends RecipeStepBase {
+export interface PointStep extends BlueprintStepBase {
   tool: 'addConstructionPoint';
   label: string;
   type: 'absolute' | 'endLine' | 'alongLine' | 'normal' | 'midpoint' | 'intersectionXY';
@@ -44,7 +44,7 @@ export interface PointStep extends RecipeStepBase {
   yFrom?: string;
 }
 
-export interface LineStep extends RecipeStepBase {
+export interface LineStep extends BlueprintStepBase {
   tool: 'addConstructionLine';
   label: string;
   from: string;
@@ -52,7 +52,7 @@ export interface LineStep extends RecipeStepBase {
   style?: 'solid' | 'dashed' | 'construction';
 }
 
-export interface CurveStep extends RecipeStepBase {
+export interface CurveStep extends BlueprintStepBase {
   tool: 'addConstructionCurve';
   label: string;
   from: string;
@@ -63,7 +63,7 @@ export interface CurveStep extends RecipeStepBase {
   length2: string | number;
 }
 
-export interface BuildPieceStep extends RecipeStepBase {
+export interface BuildPieceStep extends BlueprintStepBase {
   tool: 'buildPieceFromConstruction';
   name: string;
   /** Ordered point labels forming the outline */
@@ -73,18 +73,18 @@ export interface BuildPieceStep extends RecipeStepBase {
   seamAllowance?: number;
 }
 
-export type RecipeStep = PointStep | LineStep | CurveStep | BuildPieceStep;
+export type BlueprintStep = PointStep | LineStep | CurveStep | BuildPieceStep;
 
-// ─── Recipe ─────────────────────────────────────────────────────────────────
+// ─── Blueprint ─────────────────────────────────────────────────────────────────
 
-export interface Recipe {
+export interface Blueprint {
   /** Unique ID */
   id: string;
   /** Human-readable name */
   name: string;
   /** Localized name */
   nameEs?: string;
-  /** Description of what this recipe produces */
+  /** Description of what this blueprint produces */
   description: string;
   descriptionEs?: string;
   /** Category */
@@ -101,8 +101,8 @@ export interface Recipe {
     description?: string;
   }>;
   /** Ordered construction steps */
-  steps: RecipeStep[];
-  /** Who created this recipe */
+  steps: BlueprintStep[];
+  /** Who created this blueprint */
   source: 'builtin' | 'user' | 'community';
   /** Tags for search */
   tags: string[];
@@ -113,14 +113,14 @@ export interface Recipe {
   updatedAt: number;
 }
 
-// ─── Recipe Library State ───────────────────────────────────────────────────
+// ─── Blueprint Library State ───────────────────────────────────────────────────
 
-export interface RecipeLibraryState {
-  /** All available recipes */
-  recipes: Recipe[];
-  /** Currently executing recipe (null if none) */
-  activeRecipeId: string | null;
-  /** Current step index in active recipe execution */
+export interface BlueprintLibraryState {
+  /** All available blueprints */
+  blueprints: Blueprint[];
+  /** Currently executing blueprint (null if none) */
+  activeBlueprintId: string | null;
+  /** Current step index in active blueprint execution */
   activeStepIndex: number;
   /** Whether execution is paused (patronista reviewing) */
   paused: boolean;

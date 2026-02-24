@@ -10,12 +10,12 @@
  * - shoulder: shoulder length (nape to shoulder tip)
  * - height: body height (for derivations)
  * 
- * The recipe derives missing measurements from standard proportions.
+ * The blueprint derives missing measurements from standard proportions.
  */
 
-import type { Recipe } from '../../../types/recipe';
+import type { Blueprint } from '../../../types/blueprint';
 
-export const bodiceFrontBlock: Recipe = {
+export const bodiceFrontBlock: Blueprint = {
   id: 'aldrich-bodice-front',
   name: 'Bodice Front Block (Aldrich)',
   nameEs: 'Bloque Base Delantero (Aldrich)',
