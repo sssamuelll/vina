@@ -71,15 +71,29 @@ export function buildPieceWithOffset(
         // Use pre-resolved multi-segment commands (e.g. splinePath)
         // Skip the initial M command since we're already positioned
         // Clone each command — originals may be frozen by Immer/Redux
-        for (const cmd of curve.resolvedCommands) {
-          if (cmd.type === 'M') continue;
-          if (node.reverse) {
-            // For reverse, we need to reverse the entire path — fall back to spline definition
-            const cmds = resolveCurve(curve, point, nextPoint, ctx, node.reverse);
-            outline.push(...cmds);
-            break;
+        if (node.reverse) {
+          // Reverse multi-segment path: reverse order, swap control points, fix endpoints
+          const cCmds = curve.resolvedCommands.filter(c => c.type === 'C');
+          // Collect the chain of endpoints: M start, then each C endpoint
+          const mCmd = curve.resolvedCommands.find(c => c.type === 'M');
+          const chainPts: Array<{x: number; y: number}> = [];
+          if (mCmd) chainPts.push({ x: mCmd.values[0], y: mCmd.values[1] });
+          for (const c of cCmds) chainPts.push({ x: c.values[4], y: c.values[5] });
+          // Walk reversed: for segment i (0-indexed), reversed segment uses:
+          //   cp1 = original cp2, cp2 = original cp1, endpoint = previous chain point
+          for (let i = cCmds.length - 1; i >= 0; i--) {
+            const orig = cCmds[i].values;
+            const endPt = chainPts[i]; // previous point in original chain = new endpoint
+            outline.push({
+              type: 'C',
+              values: [orig[2], orig[3], orig[0], orig[1], endPt.x, endPt.y],
+            });
           }
-          outline.push({ type: cmd.type, values: [...cmd.values] });
+        } else {
+          for (const cmd of curve.resolvedCommands) {
+            if (cmd.type === 'M') continue;
+            outline.push({ type: cmd.type, values: [...cmd.values] });
+          }
         }
       } else if (curve) {
         const cmds = resolveCurve(curve, point, nextPoint, ctx, node.reverse);
