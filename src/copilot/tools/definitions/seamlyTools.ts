@@ -134,31 +134,46 @@ const loadSeamlyPatternTool: ToolDefinition = {
       wristCirc: 'hand_circ', // closest match
     };
 
-    // Build overrides: user avatar measurements mapped to Seamly2D names
+    // Only override measurements the pattern actually uses
+    const patternDefaults = patternData.measurements?.defaults ?? {};
+    const patternKeys = new Set(Object.keys(patternDefaults));
+
     const overrides: Record<string, number> = {};
     for (const [ourName, seamlyName] of Object.entries(measMapping)) {
-      if (userMeas[ourName] != null) {
+      if (userMeas[ourName] != null && patternKeys.has(seamlyName)) {
         overrides[seamlyName] = userMeas[ourName];
       }
     }
 
     // Derive missing measurements ONLY if absent from both user avatar AND pattern defaults
-    const patternDefaults = patternData.measurements?.defaults ?? {};
+    // has: measurement exists in user overrides or pattern defaults
     const has = (key: string) => overrides[key] != null || patternDefaults[key] != null;
+    // needs: pattern formulas/variables reference this measurement (scan all formula strings)
+    // For simplicity, we check if the key appears in any variable formula or pattern defaults
+    const allFormulas = Object.values(patternData.variables ?? {}).map(v => v.formula).join(' ');
+    const needs = (key: string) => patternKeys.has(key) || allFormulas.includes(key);
 
     const h = overrides['height'] ?? patternDefaults['height'] ?? userMeas.height ?? 168;
-    if (!has('leg_crotch_to_floor')) {
+    if (needs('leg_crotch_to_floor') && !has('leg_crotch_to_floor'))
       overrides['leg_crotch_to_floor'] = userMeas.inseam ?? h * 0.45;
-    }
-    if (!has('height_waist_side'))      overrides['height_waist_side'] = h * 0.58;
-    if (!has('height_knee'))            overrides['height_knee'] = h * 0.285;
-    if (!has('neck_back_to_waist_b'))   overrides['neck_back_to_waist_b'] = h * 0.245;
-    if (!has('leg_waist_side_to_floor'))overrides['leg_waist_side_to_floor'] = h * 0.62;
-    if (!has('neck_circ'))              overrides['neck_circ'] = (overrides['bust_circ'] ?? patternDefaults['bust_circ'] ?? 92) * 0.395;
-    if (!has('hand_circ'))              overrides['hand_circ'] = 20;
-    if (!has('leg_knee_circ'))          overrides['leg_knee_circ'] = (overrides['hip_circ'] ?? patternDefaults['hip_circ'] ?? 98) * 0.39;
-    if (!has('leg_ankle_circ'))         overrides['leg_ankle_circ'] = 23;
-    if (!has('leg_ankle_high_circ'))    overrides['leg_ankle_high_circ'] = (overrides['leg_ankle_circ'] ?? patternDefaults['leg_ankle_circ'] ?? 23) + 2;
+    if (needs('height_waist_side') && !has('height_waist_side'))
+      overrides['height_waist_side'] = h * 0.58;
+    if (needs('height_knee') && !has('height_knee'))
+      overrides['height_knee'] = h * 0.285;
+    if (needs('neck_back_to_waist_b') && !has('neck_back_to_waist_b'))
+      overrides['neck_back_to_waist_b'] = h * 0.245;
+    if (needs('leg_waist_side_to_floor') && !has('leg_waist_side_to_floor'))
+      overrides['leg_waist_side_to_floor'] = h * 0.62;
+    if (needs('neck_circ') && !has('neck_circ'))
+      overrides['neck_circ'] = (overrides['bust_circ'] ?? patternDefaults['bust_circ'] ?? 92) * 0.395;
+    if (needs('hand_circ') && !has('hand_circ'))
+      overrides['hand_circ'] = 20;
+    if (needs('leg_knee_circ') && !has('leg_knee_circ'))
+      overrides['leg_knee_circ'] = (overrides['hip_circ'] ?? patternDefaults['hip_circ'] ?? 98) * 0.39;
+    if (needs('leg_ankle_circ') && !has('leg_ankle_circ'))
+      overrides['leg_ankle_circ'] = 23;
+    if (needs('leg_ankle_high_circ') && !has('leg_ankle_high_circ'))
+      overrides['leg_ankle_high_circ'] = (overrides['leg_ankle_circ'] ?? patternDefaults['leg_ankle_circ'] ?? 23) + 2;
 
     // Adapt the pattern
     console.log('[loadSeamlyPattern] adapting pattern:', patternId, 'overrides:', JSON.stringify(overrides));
