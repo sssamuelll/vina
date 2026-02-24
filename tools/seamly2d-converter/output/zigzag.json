@@ -3421,5 +3421,44 @@
       "lineColor": "black"
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Pièce de patron",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 1212,
+          "modelingId": 2686,
+          "type": "NodePoint"
+        },
+        {
+          "id": 4,
+          "modelingId": 2687,
+          "type": "NodePoint"
+        },
+        {
+          "id": 784,
+          "modelingId": 2677,
+          "type": "NodePoint"
+        },
+        {
+          "id": 4,
+          "modelingId": 2678,
+          "type": "NodePoint"
+        },
+        {
+          "id": 1367,
+          "modelingId": 2679,
+          "type": "NodePoint"
+        },
+        {
+          "id": 288,
+          "modelingId": 2685,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

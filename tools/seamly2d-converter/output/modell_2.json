@@ -760,5 +760,177 @@
       "angle2": 175
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 68,
+          "modelingId": 171,
+          "type": "NodePoint"
+        },
+        {
+          "id": 67,
+          "modelingId": 172,
+          "type": "NodePoint"
+        },
+        {
+          "id": 65,
+          "modelingId": 173,
+          "type": "NodePoint"
+        },
+        {
+          "id": 64,
+          "modelingId": 174,
+          "type": "NodePoint"
+        },
+        {
+          "id": 68,
+          "modelingId": 175,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 221,
+          "modelingId": 226,
+          "type": "NodePoint"
+        },
+        {
+          "id": 219,
+          "modelingId": 227,
+          "type": "NodePoint"
+        },
+        {
+          "id": 223,
+          "modelingId": 228,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 220,
+          "modelingId": 229,
+          "type": "NodePoint"
+        },
+        {
+          "id": 222,
+          "modelingId": 230,
+          "type": "NodePoint"
+        },
+        {
+          "id": 225,
+          "modelingId": 231,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 208,
+          "modelingId": 232,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 233,
+          "type": "NodePoint"
+        },
+        {
+          "id": 213,
+          "modelingId": 234,
+          "type": "NodePoint"
+        },
+        {
+          "id": 207,
+          "modelingId": 235,
+          "type": "NodePoint"
+        },
+        {
+          "id": 224,
+          "modelingId": 236,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 255,
+          "modelingId": 257,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 252,
+          "modelingId": 258,
+          "type": "NodePoint"
+        },
+        {
+          "id": 250,
+          "modelingId": 259,
+          "type": "NodePoint"
+        },
+        {
+          "id": 254,
+          "modelingId": 260,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 251,
+          "modelingId": 261,
+          "type": "NodePoint"
+        },
+        {
+          "id": 253,
+          "modelingId": 262,
+          "type": "NodePoint"
+        },
+        {
+          "id": 256,
+          "modelingId": 263,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 245,
+          "modelingId": 264,
+          "type": "NodePoint"
+        },
+        {
+          "id": 242,
+          "modelingId": 265,
+          "type": "NodePoint"
+        },
+        {
+          "id": 241,
+          "modelingId": 266,
+          "type": "NodePoint"
+        },
+        {
+          "id": 244,
+          "modelingId": 267,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

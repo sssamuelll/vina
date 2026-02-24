@@ -151,5 +151,68 @@
       "angle2": 90.4241
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 1,
+          "modelingId": 16,
+          "type": "NodePoint"
+        },
+        {
+          "id": 8,
+          "modelingId": 17,
+          "type": "NodePoint"
+        },
+        {
+          "id": 12,
+          "modelingId": 18,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 10,
+          "modelingId": 19,
+          "type": "NodePoint"
+        },
+        {
+          "id": 13,
+          "modelingId": 20,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 9,
+          "modelingId": 21,
+          "type": "NodePoint"
+        },
+        {
+          "id": 4,
+          "modelingId": 22,
+          "type": "NodePoint"
+        },
+        {
+          "id": 3,
+          "modelingId": 23,
+          "type": "NodePoint"
+        },
+        {
+          "id": 2,
+          "modelingId": 24,
+          "type": "NodePoint"
+        },
+        {
+          "id": 1,
+          "modelingId": 25,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

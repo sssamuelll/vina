@@ -61,5 +61,39 @@
       "lineColor": "black"
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 1,
+          "modelingId": 7,
+          "type": "NodePoint"
+        },
+        {
+          "id": 2,
+          "modelingId": 8,
+          "type": "NodePoint"
+        },
+        {
+          "id": 4,
+          "modelingId": 9,
+          "type": "NodePoint"
+        },
+        {
+          "id": 3,
+          "modelingId": 10,
+          "type": "NodePoint"
+        },
+        {
+          "id": 1,
+          "modelingId": 11,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

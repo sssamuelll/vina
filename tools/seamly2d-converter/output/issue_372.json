@@ -44,5 +44,34 @@
       "lineColor": "black"
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Деталь",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 1,
+          "modelingId": 5,
+          "type": "NodePoint"
+        },
+        {
+          "id": 2,
+          "modelingId": 6,
+          "type": "NodePoint"
+        },
+        {
+          "id": 3,
+          "modelingId": 7,
+          "type": "NodePoint"
+        },
+        {
+          "id": 1,
+          "modelingId": 8,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

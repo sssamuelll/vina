@@ -45,15 +45,24 @@ const listSeamlyPatternsTool: ToolDefinition = {
     '/ Listar patrones Seamly2D disponibles.',
   parameters: { type: 'object', properties: {} },
   execute: async (): Promise<ToolResult> => {
+    // Pre-check which patterns have pieces (lazy but cached)
+    const withPieces: { id: string; name: string; pieces?: number }[] = [];
+    for (const p of patternIndex) {
+      try {
+        const mod = await p.loader() as { default: { pieces?: unknown[] } };
+        const data = mod.default || mod as unknown as { pieces?: unknown[] };
+        const count = data.pieces?.length ?? 0;
+        if (count > 0) {
+          withPieces.push({ id: p.id, name: p.filename.replace(/_/g, ' '), pieces: count });
+        }
+      } catch { /* skip unloadable */ }
+    }
     return {
       success: true,
       data: {
-        patterns: patternIndex.map(p => ({
-          id: p.id,
-          name: p.filename.replace(/_/g, ' '),
-        })),
-        total: patternIndex.length,
-        hint: 'Use loadSeamlyPattern with the id to load a pattern.',
+        patterns: withPieces,
+        total: withPieces.length,
+        hint: 'Use loadSeamlyPattern with the id to load a pattern. Only patterns with buildable pieces are shown.',
       },
     };
   },

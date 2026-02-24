@@ -2014,5 +2014,43 @@
       "angle2": 171.978
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Деталь",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 14,
+          "modelingId": 291,
+          "type": "NodePoint"
+        },
+        {
+          "id": 86,
+          "modelingId": 292,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 280,
+          "modelingId": 293,
+          "type": "NodePoint"
+        },
+        {
+          "id": 86,
+          "modelingId": 294,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 235,
+          "modelingId": 295,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

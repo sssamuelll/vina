@@ -656,5 +656,166 @@
       "lineColor": "black"
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 10,
+      "nodes": [
+        {
+          "id": 86,
+          "modelingId": 161,
+          "type": "NodePoint"
+        },
+        {
+          "id": 20,
+          "modelingId": 162,
+          "type": "NodePoint"
+        },
+        {
+          "id": 37,
+          "modelingId": 163,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 22,
+          "modelingId": 164,
+          "type": "NodePoint"
+        },
+        {
+          "id": 35,
+          "modelingId": 165,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 31,
+          "modelingId": 166,
+          "type": "NodePoint"
+        },
+        {
+          "id": 33,
+          "modelingId": 167,
+          "type": "NodePoint"
+        },
+        {
+          "id": 87,
+          "modelingId": 168,
+          "type": "NodePoint"
+        },
+        {
+          "id": 96,
+          "modelingId": 169,
+          "type": "NodePoint"
+        },
+        {
+          "id": 95,
+          "modelingId": 170,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 10,
+      "nodes": [
+        {
+          "id": 108,
+          "modelingId": 172,
+          "type": "NodePoint"
+        },
+        {
+          "id": 45,
+          "modelingId": 173,
+          "type": "NodePoint"
+        },
+        {
+          "id": 49,
+          "modelingId": 174,
+          "type": "NodePoint"
+        },
+        {
+          "id": 51,
+          "modelingId": 175,
+          "type": "NodeSpline",
+          "curveType": "spline"
+        },
+        {
+          "id": 50,
+          "modelingId": 176,
+          "type": "NodePoint"
+        },
+        {
+          "id": 55,
+          "modelingId": 177,
+          "type": "NodeSpline",
+          "curveType": "spline"
+        },
+        {
+          "id": 52,
+          "modelingId": 178,
+          "type": "NodePoint"
+        },
+        {
+          "id": 53,
+          "modelingId": 179,
+          "type": "NodePoint"
+        },
+        {
+          "id": 112,
+          "modelingId": 180,
+          "type": "NodePoint"
+        },
+        {
+          "id": 111,
+          "modelingId": 181,
+          "type": "NodePoint"
+        },
+        {
+          "id": 110,
+          "modelingId": 182,
+          "type": "NodePoint"
+        },
+        {
+          "id": 109,
+          "modelingId": 183,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 147,
+          "modelingId": 156,
+          "type": "NodePoint"
+        },
+        {
+          "id": 148,
+          "modelingId": 157,
+          "type": "NodePoint"
+        },
+        {
+          "id": 149,
+          "modelingId": 158,
+          "type": "NodePoint"
+        },
+        {
+          "id": 154,
+          "modelingId": 159,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

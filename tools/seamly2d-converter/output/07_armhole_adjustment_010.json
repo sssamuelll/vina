@@ -2214,5 +2214,99 @@
       "angle2": 247.458
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 306,
+          "modelingId": 655,
+          "type": "NodePoint"
+        },
+        {
+          "id": 289,
+          "modelingId": 656,
+          "type": "NodePoint"
+        },
+        {
+          "id": 237,
+          "modelingId": 657,
+          "type": "NodePoint"
+        },
+        {
+          "id": 242,
+          "modelingId": 658,
+          "type": "NodePoint"
+        },
+        {
+          "id": 168,
+          "modelingId": 659,
+          "type": "NodePoint"
+        },
+        {
+          "id": 241,
+          "modelingId": 660,
+          "type": "NodePoint"
+        },
+        {
+          "id": 202,
+          "modelingId": 661,
+          "type": "NodePoint"
+        },
+        {
+          "id": 216,
+          "modelingId": 662,
+          "type": "NodePoint"
+        },
+        {
+          "id": 168,
+          "modelingId": 663,
+          "type": "NodePoint"
+        },
+        {
+          "id": 215,
+          "modelingId": 664,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 665,
+          "type": "NodePoint"
+        },
+        {
+          "id": 191,
+          "modelingId": 666,
+          "type": "NodePoint"
+        },
+        {
+          "id": 174,
+          "modelingId": 667,
+          "type": "NodePoint"
+        },
+        {
+          "id": 220,
+          "modelingId": 668,
+          "type": "NodePoint"
+        },
+        {
+          "id": 183,
+          "modelingId": 669,
+          "type": "NodePoint"
+        },
+        {
+          "id": 168,
+          "modelingId": 670,
+          "type": "NodePoint"
+        },
+        {
+          "id": 309,
+          "modelingId": 671,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

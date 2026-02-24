@@ -3516,5 +3516,2227 @@
       "length2": 4.65843
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Takakappale",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 42,
+          "modelingId": 55,
+          "type": "NodePoint"
+        },
+        {
+          "id": 35,
+          "modelingId": 56,
+          "type": "NodePoint"
+        },
+        {
+          "id": 36,
+          "modelingId": 57,
+          "type": "NodePoint"
+        },
+        {
+          "id": 33,
+          "modelingId": 58,
+          "type": "NodePoint"
+        },
+        {
+          "id": 46,
+          "modelingId": 59,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 21,
+          "modelingId": 60,
+          "type": "NodePoint"
+        },
+        {
+          "id": 19,
+          "modelingId": 61,
+          "type": "NodePoint"
+        },
+        {
+          "id": 23,
+          "modelingId": 62,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 1,
+          "modelingId": 63,
+          "type": "NodePoint"
+        },
+        {
+          "id": 6,
+          "modelingId": 64,
+          "type": "NodePoint"
+        },
+        {
+          "id": 48,
+          "modelingId": 65,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 31,
+          "modelingId": 66,
+          "type": "NodePoint"
+        },
+        {
+          "id": 41,
+          "modelingId": 67,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Takapalahalkio",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 42,
+          "modelingId": 81,
+          "type": "NodePoint"
+        },
+        {
+          "id": 35,
+          "modelingId": 82,
+          "type": "NodePoint"
+        },
+        {
+          "id": 36,
+          "modelingId": 83,
+          "type": "NodePoint"
+        },
+        {
+          "id": 33,
+          "modelingId": 84,
+          "type": "NodePoint"
+        },
+        {
+          "id": 50,
+          "modelingId": 85,
+          "type": "NodePoint"
+        },
+        {
+          "id": 51,
+          "modelingId": 86,
+          "type": "NodePoint"
+        },
+        {
+          "id": 53,
+          "modelingId": 87,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Takakappalehartia",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 1,
+          "modelingId": 91,
+          "type": "NodePoint"
+        },
+        {
+          "id": 89,
+          "modelingId": 92,
+          "type": "NodePoint"
+        },
+        {
+          "id": 90,
+          "modelingId": 93,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 13,
+          "modelingId": 94,
+          "type": "NodePoint"
+        },
+        {
+          "id": 46,
+          "modelingId": 95,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 21,
+          "modelingId": 96,
+          "type": "NodePoint"
+        },
+        {
+          "id": 19,
+          "modelingId": 97,
+          "type": "NodePoint"
+        },
+        {
+          "id": 23,
+          "modelingId": 98,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        }
+      ]
+    },
+    {
+      "name": "Sivupala",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 138,
+          "modelingId": 153,
+          "type": "NodePoint"
+        },
+        {
+          "id": 136,
+          "modelingId": 154,
+          "type": "NodePoint"
+        },
+        {
+          "id": 114,
+          "modelingId": 155,
+          "type": "NodePoint"
+        },
+        {
+          "id": 142,
+          "modelingId": 156,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 104,
+          "modelingId": 157,
+          "type": "NodePoint"
+        },
+        {
+          "id": 143,
+          "modelingId": 158,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 118,
+          "modelingId": 159,
+          "type": "NodePoint"
+        },
+        {
+          "id": 144,
+          "modelingId": 160,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 124,
+          "modelingId": 161,
+          "type": "NodePoint"
+        },
+        {
+          "id": 127,
+          "modelingId": 162,
+          "type": "NodePoint"
+        },
+        {
+          "id": 126,
+          "modelingId": 163,
+          "type": "NodePoint"
+        },
+        {
+          "id": 140,
+          "modelingId": 164,
+          "type": "NodePoint"
+        },
+        {
+          "id": 139,
+          "modelingId": 165,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Sivupalavuori",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 146,
+          "modelingId": 167,
+          "type": "NodePoint"
+        },
+        {
+          "id": 136,
+          "modelingId": 168,
+          "type": "NodePoint"
+        },
+        {
+          "id": 114,
+          "modelingId": 169,
+          "type": "NodePoint"
+        },
+        {
+          "id": 142,
+          "modelingId": 170,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 104,
+          "modelingId": 171,
+          "type": "NodePoint"
+        },
+        {
+          "id": 143,
+          "modelingId": 172,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 118,
+          "modelingId": 173,
+          "type": "NodePoint"
+        },
+        {
+          "id": 147,
+          "modelingId": 174,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 127,
+          "modelingId": 175,
+          "type": "NodePoint"
+        },
+        {
+          "id": 126,
+          "modelingId": 176,
+          "type": "NodePoint"
+        },
+        {
+          "id": 140,
+          "modelingId": 177,
+          "type": "NodePoint"
+        },
+        {
+          "id": 139,
+          "modelingId": 178,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "SIvupalahalkio",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 149,
+          "modelingId": 180,
+          "type": "NodePoint"
+        },
+        {
+          "id": 148,
+          "modelingId": 181,
+          "type": "NodePoint"
+        },
+        {
+          "id": 124,
+          "modelingId": 182,
+          "type": "NodePoint"
+        },
+        {
+          "id": 127,
+          "modelingId": 183,
+          "type": "NodePoint"
+        },
+        {
+          "id": 126,
+          "modelingId": 184,
+          "type": "NodePoint"
+        },
+        {
+          "id": 140,
+          "modelingId": 185,
+          "type": "NodePoint"
+        },
+        {
+          "id": 139,
+          "modelingId": 186,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Sivupalakainalo",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 118,
+          "modelingId": 188,
+          "type": "NodePoint"
+        },
+        {
+          "id": 144,
+          "modelingId": 189,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 103,
+          "modelingId": 190,
+          "type": "NodePoint"
+        },
+        {
+          "id": 151,
+          "modelingId": 191,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 150,
+          "modelingId": 192,
+          "type": "NodePoint"
+        },
+        {
+          "id": 142,
+          "modelingId": 193,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 104,
+          "modelingId": 194,
+          "type": "NodePoint"
+        },
+        {
+          "id": 143,
+          "modelingId": 195,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        }
+      ]
+    },
+    {
+      "name": "Takakappalevuori",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 51,
+          "modelingId": 428,
+          "type": "NodePoint"
+        },
+        {
+          "id": 52,
+          "modelingId": 429,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 21,
+          "modelingId": 430,
+          "type": "NodePoint"
+        },
+        {
+          "id": 19,
+          "modelingId": 431,
+          "type": "NodePoint"
+        },
+        {
+          "id": 23,
+          "modelingId": 432,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 1,
+          "modelingId": 433,
+          "type": "NodePoint"
+        },
+        {
+          "id": 400,
+          "modelingId": 434,
+          "type": "NodePoint"
+        },
+        {
+          "id": 401,
+          "modelingId": 435,
+          "type": "NodePoint"
+        },
+        {
+          "id": 402,
+          "modelingId": 436,
+          "type": "NodePoint"
+        },
+        {
+          "id": 403,
+          "modelingId": 437,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Rintaliina2",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 471,
+          "modelingId": 476,
+          "type": "NodePoint"
+        },
+        {
+          "id": 465,
+          "modelingId": 477,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 478,
+          "type": "NodePoint"
+        },
+        {
+          "id": 210,
+          "modelingId": 479,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 480,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 106,
+          "modelingId": 481,
+          "type": "NodePoint"
+        },
+        {
+          "id": 472,
+          "modelingId": 482,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        }
+      ]
+    },
+    {
+      "name": "Rintaliina",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 471,
+          "modelingId": 484,
+          "type": "NodePoint"
+        },
+        {
+          "id": 465,
+          "modelingId": 485,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 486,
+          "type": "NodePoint"
+        },
+        {
+          "id": 210,
+          "modelingId": 487,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 488,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 106,
+          "modelingId": 489,
+          "type": "NodePoint"
+        },
+        {
+          "id": 472,
+          "modelingId": 490,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        }
+      ]
+    },
+    {
+      "name": "Rintaliinatuki",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 473,
+          "modelingId": 492,
+          "type": "NodePoint"
+        },
+        {
+          "id": 465,
+          "modelingId": 493,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 494,
+          "type": "NodePoint"
+        },
+        {
+          "id": 210,
+          "modelingId": 495,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 496,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 474,
+          "modelingId": 497,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Rintatasku",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 504,
+          "modelingId": 511,
+          "type": "NodePoint"
+        },
+        {
+          "id": 505,
+          "modelingId": 512,
+          "type": "NodePoint"
+        },
+        {
+          "id": 506,
+          "modelingId": 513,
+          "type": "NodePoint"
+        },
+        {
+          "id": 503,
+          "modelingId": 514,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Rintataskutaka",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 508,
+          "modelingId": 516,
+          "type": "NodePoint"
+        },
+        {
+          "id": 504,
+          "modelingId": 517,
+          "type": "NodePoint"
+        },
+        {
+          "id": 503,
+          "modelingId": 518,
+          "type": "NodePoint"
+        },
+        {
+          "id": 509,
+          "modelingId": 519,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Rintataskuetu",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 508,
+          "modelingId": 521,
+          "type": "NodePoint"
+        },
+        {
+          "id": 505,
+          "modelingId": 522,
+          "type": "NodePoint"
+        },
+        {
+          "id": 506,
+          "modelingId": 523,
+          "type": "NodePoint"
+        },
+        {
+          "id": 509,
+          "modelingId": 524,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Taskukansi/peite",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 577,
+          "modelingId": 583,
+          "type": "NodePoint"
+        },
+        {
+          "id": 575,
+          "modelingId": 584,
+          "type": "NodePoint"
+        },
+        {
+          "id": 574,
+          "modelingId": 585,
+          "type": "NodePoint"
+        },
+        {
+          "id": 576,
+          "modelingId": 586,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Taskunauha",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 588,
+          "modelingId": 590,
+          "type": "NodePoint"
+        },
+        {
+          "id": 575,
+          "modelingId": 591,
+          "type": "NodePoint"
+        },
+        {
+          "id": 574,
+          "modelingId": 592,
+          "type": "NodePoint"
+        },
+        {
+          "id": 589,
+          "modelingId": 593,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Taskupussi",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 579,
+          "modelingId": 595,
+          "type": "NodePoint"
+        },
+        {
+          "id": 575,
+          "modelingId": 596,
+          "type": "NodePoint"
+        },
+        {
+          "id": 574,
+          "modelingId": 597,
+          "type": "NodePoint"
+        },
+        {
+          "id": 580,
+          "modelingId": 598,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Etuvuori",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 603,
+          "modelingId": 610,
+          "type": "NodePoint"
+        },
+        {
+          "id": 609,
+          "modelingId": 611,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 608,
+          "modelingId": 612,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 613,
+          "type": "NodePoint"
+        },
+        {
+          "id": 210,
+          "modelingId": 614,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 615,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 106,
+          "modelingId": 616,
+          "type": "NodePoint"
+        },
+        {
+          "id": 134,
+          "modelingId": 617,
+          "type": "NodePoint"
+        },
+        {
+          "id": 110,
+          "modelingId": 618,
+          "type": "NodePoint"
+        },
+        {
+          "id": 554,
+          "modelingId": 619,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Etukappale",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 605,
+          "modelingId": 673,
+          "type": "NodePoint"
+        },
+        {
+          "id": 602,
+          "modelingId": 674,
+          "type": "NodePoint"
+        },
+        {
+          "id": 670,
+          "modelingId": 675,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 624,
+          "modelingId": 676,
+          "type": "NodePoint"
+        },
+        {
+          "id": 627,
+          "modelingId": 677,
+          "type": "NodePoint"
+        },
+        {
+          "id": 628,
+          "modelingId": 678,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 465,
+          "modelingId": 679,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 680,
+          "type": "NodePoint"
+        },
+        {
+          "id": 210,
+          "modelingId": 681,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 682,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 116,
+          "modelingId": 683,
+          "type": "NodePoint"
+        },
+        {
+          "id": 506,
+          "modelingId": 684,
+          "type": "NodePoint"
+        },
+        {
+          "id": 505,
+          "modelingId": 685,
+          "type": "NodePoint"
+        },
+        {
+          "id": 504,
+          "modelingId": 686,
+          "type": "NodePoint"
+        },
+        {
+          "id": 503,
+          "modelingId": 687,
+          "type": "NodePoint"
+        },
+        {
+          "id": 671,
+          "modelingId": 688,
+          "type": "NodePoint"
+        },
+        {
+          "id": 672,
+          "modelingId": 689,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 690,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 106,
+          "modelingId": 691,
+          "type": "NodePoint"
+        },
+        {
+          "id": 549,
+          "modelingId": 692,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 548,
+          "modelingId": 693,
+          "type": "NodePoint"
+        },
+        {
+          "id": 547,
+          "modelingId": 694,
+          "type": "NodePoint"
+        },
+        {
+          "id": 546,
+          "modelingId": 695,
+          "type": "NodePoint"
+        },
+        {
+          "id": 442,
+          "modelingId": 696,
+          "type": "NodePoint"
+        },
+        {
+          "id": 559,
+          "modelingId": 697,
+          "type": "NodePoint"
+        },
+        {
+          "id": 558,
+          "modelingId": 698,
+          "type": "NodePoint"
+        },
+        {
+          "id": 557,
+          "modelingId": 699,
+          "type": "NodePoint"
+        },
+        {
+          "id": 556,
+          "modelingId": 700,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 555,
+          "modelingId": 701,
+          "type": "NodePoint"
+        },
+        {
+          "id": 554,
+          "modelingId": 702,
+          "type": "NodePoint"
+        },
+        {
+          "id": 604,
+          "modelingId": 703,
+          "type": "NodePoint"
+        },
+        {
+          "id": 607,
+          "modelingId": 704,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Laitavaate",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 605,
+          "modelingId": 706,
+          "type": "NodePoint"
+        },
+        {
+          "id": 602,
+          "modelingId": 707,
+          "type": "NodePoint"
+        },
+        {
+          "id": 670,
+          "modelingId": 708,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 624,
+          "modelingId": 709,
+          "type": "NodePoint"
+        },
+        {
+          "id": 627,
+          "modelingId": 710,
+          "type": "NodePoint"
+        },
+        {
+          "id": 465,
+          "modelingId": 711,
+          "type": "NodePoint"
+        },
+        {
+          "id": 608,
+          "modelingId": 712,
+          "type": "NodePoint"
+        },
+        {
+          "id": 609,
+          "modelingId": 713,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 603,
+          "modelingId": 714,
+          "type": "NodePoint"
+        },
+        {
+          "id": 607,
+          "modelingId": 715,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Laitavaatetuki",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 605,
+          "modelingId": 717,
+          "type": "NodePoint"
+        },
+        {
+          "id": 602,
+          "modelingId": 718,
+          "type": "NodePoint"
+        },
+        {
+          "id": 670,
+          "modelingId": 719,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 624,
+          "modelingId": 720,
+          "type": "NodePoint"
+        },
+        {
+          "id": 627,
+          "modelingId": 721,
+          "type": "NodePoint"
+        },
+        {
+          "id": 628,
+          "modelingId": 722,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 465,
+          "modelingId": 723,
+          "type": "NodePoint"
+        },
+        {
+          "id": 608,
+          "modelingId": 724,
+          "type": "NodePoint"
+        },
+        {
+          "id": 609,
+          "modelingId": 725,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 603,
+          "modelingId": 726,
+          "type": "NodePoint"
+        },
+        {
+          "id": 607,
+          "modelingId": 727,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Etukappaletuki",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 605,
+          "modelingId": 729,
+          "type": "NodePoint"
+        },
+        {
+          "id": 602,
+          "modelingId": 730,
+          "type": "NodePoint"
+        },
+        {
+          "id": 670,
+          "modelingId": 731,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 624,
+          "modelingId": 732,
+          "type": "NodePoint"
+        },
+        {
+          "id": 627,
+          "modelingId": 733,
+          "type": "NodePoint"
+        },
+        {
+          "id": 628,
+          "modelingId": 734,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 465,
+          "modelingId": 735,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 736,
+          "type": "NodePoint"
+        },
+        {
+          "id": 210,
+          "modelingId": 737,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 738,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 106,
+          "modelingId": 739,
+          "type": "NodePoint"
+        },
+        {
+          "id": 549,
+          "modelingId": 740,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 548,
+          "modelingId": 741,
+          "type": "NodePoint"
+        },
+        {
+          "id": 547,
+          "modelingId": 742,
+          "type": "NodePoint"
+        },
+        {
+          "id": 546,
+          "modelingId": 743,
+          "type": "NodePoint"
+        },
+        {
+          "id": 442,
+          "modelingId": 744,
+          "type": "NodePoint"
+        },
+        {
+          "id": 559,
+          "modelingId": 745,
+          "type": "NodePoint"
+        },
+        {
+          "id": 558,
+          "modelingId": 746,
+          "type": "NodePoint"
+        },
+        {
+          "id": 557,
+          "modelingId": 747,
+          "type": "NodePoint"
+        },
+        {
+          "id": 555,
+          "modelingId": 748,
+          "type": "NodePoint"
+        },
+        {
+          "id": 554,
+          "modelingId": 749,
+          "type": "NodePoint"
+        },
+        {
+          "id": 604,
+          "modelingId": 750,
+          "type": "NodePoint"
+        },
+        {
+          "id": 607,
+          "modelingId": 751,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Alakaulus",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 625,
+          "modelingId": 781,
+          "type": "NodePoint"
+        },
+        {
+          "id": 626,
+          "modelingId": 782,
+          "type": "NodePoint"
+        },
+        {
+          "id": 630,
+          "modelingId": 783,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 467,
+          "modelingId": 784,
+          "type": "NodePoint"
+        },
+        {
+          "id": 770,
+          "modelingId": 785,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 771,
+          "modelingId": 786,
+          "type": "NodePoint"
+        },
+        {
+          "id": 772,
+          "modelingId": 787,
+          "type": "NodePoint"
+        },
+        {
+          "id": 776,
+          "modelingId": 788,
+          "type": "NodePoint"
+        },
+        {
+          "id": 777,
+          "modelingId": 789,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 464,
+          "modelingId": 790,
+          "type": "NodePoint"
+        },
+        {
+          "id": 628,
+          "modelingId": 791,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 627,
+          "modelingId": 792,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Alakaulussauma",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 625,
+          "modelingId": 800,
+          "type": "NodePoint"
+        },
+        {
+          "id": 626,
+          "modelingId": 801,
+          "type": "NodePoint"
+        },
+        {
+          "id": 630,
+          "modelingId": 802,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 467,
+          "modelingId": 803,
+          "type": "NodePoint"
+        },
+        {
+          "id": 770,
+          "modelingId": 804,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 771,
+          "modelingId": 805,
+          "type": "NodePoint"
+        },
+        {
+          "id": 772,
+          "modelingId": 806,
+          "type": "NodePoint"
+        },
+        {
+          "id": 773,
+          "modelingId": 807,
+          "type": "NodePoint"
+        },
+        {
+          "id": 779,
+          "modelingId": 808,
+          "type": "NodePoint"
+        },
+        {
+          "id": 780,
+          "modelingId": 809,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 466,
+          "modelingId": 810,
+          "type": "NodePoint"
+        },
+        {
+          "id": 629,
+          "modelingId": 811,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 462,
+          "modelingId": 812,
+          "type": "NodePoint"
+        },
+        {
+          "id": 623,
+          "modelingId": 813,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Yläkaulustuki",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 625,
+          "modelingId": 815,
+          "type": "NodePoint"
+        },
+        {
+          "id": 626,
+          "modelingId": 816,
+          "type": "NodePoint"
+        },
+        {
+          "id": 630,
+          "modelingId": 817,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 467,
+          "modelingId": 818,
+          "type": "NodePoint"
+        },
+        {
+          "id": 770,
+          "modelingId": 819,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 771,
+          "modelingId": 820,
+          "type": "NodePoint"
+        },
+        {
+          "id": 772,
+          "modelingId": 821,
+          "type": "NodePoint"
+        },
+        {
+          "id": 774,
+          "modelingId": 822,
+          "type": "NodePoint"
+        },
+        {
+          "id": 778,
+          "modelingId": 823,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 634,
+          "modelingId": 824,
+          "type": "NodePoint"
+        },
+        {
+          "id": 636,
+          "modelingId": 825,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 635,
+          "modelingId": 826,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Yläkaulus",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 625,
+          "modelingId": 828,
+          "type": "NodePoint"
+        },
+        {
+          "id": 626,
+          "modelingId": 829,
+          "type": "NodePoint"
+        },
+        {
+          "id": 630,
+          "modelingId": 830,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 467,
+          "modelingId": 831,
+          "type": "NodePoint"
+        },
+        {
+          "id": 770,
+          "modelingId": 832,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 771,
+          "modelingId": 833,
+          "type": "NodePoint"
+        },
+        {
+          "id": 772,
+          "modelingId": 834,
+          "type": "NodePoint"
+        },
+        {
+          "id": 774,
+          "modelingId": 835,
+          "type": "NodePoint"
+        },
+        {
+          "id": 778,
+          "modelingId": 836,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 634,
+          "modelingId": 837,
+          "type": "NodePoint"
+        },
+        {
+          "id": 635,
+          "modelingId": 838,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Tikkutuki",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 635,
+          "modelingId": 840,
+          "type": "NodePoint"
+        },
+        {
+          "id": 636,
+          "modelingId": 841,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 634,
+          "modelingId": 842,
+          "type": "NodePoint"
+        },
+        {
+          "id": 778,
+          "modelingId": 843,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 774,
+          "modelingId": 844,
+          "type": "NodePoint"
+        },
+        {
+          "id": 775,
+          "modelingId": 845,
+          "type": "NodePoint"
+        },
+        {
+          "id": 776,
+          "modelingId": 846,
+          "type": "NodePoint"
+        },
+        {
+          "id": 777,
+          "modelingId": 847,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 464,
+          "modelingId": 848,
+          "type": "NodePoint"
+        },
+        {
+          "id": 628,
+          "modelingId": 849,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 627,
+          "modelingId": 850,
+          "type": "NodePoint"
+        },
+        {
+          "id": 637,
+          "modelingId": 851,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Tikku",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 635,
+          "modelingId": 853,
+          "type": "NodePoint"
+        },
+        {
+          "id": 636,
+          "modelingId": 854,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 634,
+          "modelingId": 855,
+          "type": "NodePoint"
+        },
+        {
+          "id": 778,
+          "modelingId": 856,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 774,
+          "modelingId": 857,
+          "type": "NodePoint"
+        },
+        {
+          "id": 775,
+          "modelingId": 858,
+          "type": "NodePoint"
+        },
+        {
+          "id": 776,
+          "modelingId": 859,
+          "type": "NodePoint"
+        },
+        {
+          "id": 777,
+          "modelingId": 860,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 464,
+          "modelingId": 861,
+          "type": "NodePoint"
+        },
+        {
+          "id": 628,
+          "modelingId": 862,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 627,
+          "modelingId": 863,
+          "type": "NodePoint"
+        },
+        {
+          "id": 637,
+          "modelingId": 864,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Hihayläosa",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 268,
+          "modelingId": 282,
+          "type": "NodePoint"
+        },
+        {
+          "id": 236,
+          "modelingId": 283,
+          "type": "NodePoint"
+        },
+        {
+          "id": 234,
+          "modelingId": 284,
+          "type": "NodePoint"
+        },
+        {
+          "id": 274,
+          "modelingId": 285,
+          "type": "NodePoint"
+        },
+        {
+          "id": 277,
+          "modelingId": 286,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 253,
+          "modelingId": 287,
+          "type": "NodePoint"
+        },
+        {
+          "id": 281,
+          "modelingId": 288,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 254,
+          "modelingId": 289,
+          "type": "NodePoint"
+        },
+        {
+          "id": 256,
+          "modelingId": 290,
+          "type": "NodePoint"
+        },
+        {
+          "id": 258,
+          "modelingId": 291,
+          "type": "NodePoint"
+        },
+        {
+          "id": 271,
+          "modelingId": 292,
+          "type": "NodePoint"
+        },
+        {
+          "id": 272,
+          "modelingId": 293,
+          "type": "NodePoint"
+        },
+        {
+          "id": 261,
+          "modelingId": 294,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Hiha-alaosa",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 261,
+          "modelingId": 296,
+          "type": "NodePoint"
+        },
+        {
+          "id": 237,
+          "modelingId": 297,
+          "type": "NodePoint"
+        },
+        {
+          "id": 235,
+          "modelingId": 298,
+          "type": "NodePoint"
+        },
+        {
+          "id": 255,
+          "modelingId": 299,
+          "type": "NodePoint"
+        },
+        {
+          "id": 275,
+          "modelingId": 300,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 251,
+          "modelingId": 301,
+          "type": "NodePoint"
+        },
+        {
+          "id": 278,
+          "modelingId": 302,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 254,
+          "modelingId": 303,
+          "type": "NodePoint"
+        },
+        {
+          "id": 256,
+          "modelingId": 304,
+          "type": "NodePoint"
+        },
+        {
+          "id": 258,
+          "modelingId": 305,
+          "type": "NodePoint"
+        },
+        {
+          "id": 263,
+          "modelingId": 306,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Hihaylävuori",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 236,
+          "modelingId": 315,
+          "type": "NodePoint"
+        },
+        {
+          "id": 234,
+          "modelingId": 316,
+          "type": "NodePoint"
+        },
+        {
+          "id": 309,
+          "modelingId": 317,
+          "type": "NodePoint"
+        },
+        {
+          "id": 311,
+          "modelingId": 318,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 310,
+          "modelingId": 319,
+          "type": "NodePoint"
+        },
+        {
+          "id": 253,
+          "modelingId": 320,
+          "type": "NodePoint"
+        },
+        {
+          "id": 281,
+          "modelingId": 321,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 256,
+          "modelingId": 322,
+          "type": "NodePoint"
+        },
+        {
+          "id": 231,
+          "modelingId": 323,
+          "type": "NodePoint"
+        },
+        {
+          "id": 237,
+          "modelingId": 324,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Hiha-alavuori",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 237,
+          "modelingId": 334,
+          "type": "NodePoint"
+        },
+        {
+          "id": 235,
+          "modelingId": 335,
+          "type": "NodePoint"
+        },
+        {
+          "id": 312,
+          "modelingId": 336,
+          "type": "NodePoint"
+        },
+        {
+          "id": 314,
+          "modelingId": 337,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 313,
+          "modelingId": 338,
+          "type": "NodePoint"
+        },
+        {
+          "id": 251,
+          "modelingId": 339,
+          "type": "NodePoint"
+        },
+        {
+          "id": 278,
+          "modelingId": 340,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 254,
+          "modelingId": 341,
+          "type": "NodePoint"
+        },
+        {
+          "id": 231,
+          "modelingId": 342,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Hiha-alakainalo",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 348,
+          "modelingId": 365,
+          "type": "NodePoint"
+        },
+        {
+          "id": 255,
+          "modelingId": 366,
+          "type": "NodePoint"
+        },
+        {
+          "id": 275,
+          "modelingId": 367,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 278,
+          "modelingId": 368,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 347,
+          "modelingId": 369,
+          "type": "NodePoint"
+        },
+        {
+          "id": 353,
+          "modelingId": 370,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "Hihayläkainalo",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 345,
+          "modelingId": 372,
+          "type": "NodePoint"
+        },
+        {
+          "id": 274,
+          "modelingId": 373,
+          "type": "NodePoint"
+        },
+        {
+          "id": 277,
+          "modelingId": 374,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 253,
+          "modelingId": 375,
+          "type": "NodePoint"
+        },
+        {
+          "id": 281,
+          "modelingId": 376,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 346,
+          "modelingId": 377,
+          "type": "NodePoint"
+        },
+        {
+          "id": 351,
+          "modelingId": 378,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "Hihayläsuu",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 268,
+          "modelingId": 380,
+          "type": "NodePoint"
+        },
+        {
+          "id": 236,
+          "modelingId": 381,
+          "type": "NodePoint"
+        },
+        {
+          "id": 349,
+          "modelingId": 382,
+          "type": "NodePoint"
+        },
+        {
+          "id": 352,
+          "modelingId": 383,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 350,
+          "modelingId": 384,
+          "type": "NodePoint"
+        },
+        {
+          "id": 256,
+          "modelingId": 385,
+          "type": "NodePoint"
+        },
+        {
+          "id": 258,
+          "modelingId": 386,
+          "type": "NodePoint"
+        },
+        {
+          "id": 271,
+          "modelingId": 387,
+          "type": "NodePoint"
+        },
+        {
+          "id": 272,
+          "modelingId": 388,
+          "type": "NodePoint"
+        },
+        {
+          "id": 261,
+          "modelingId": 389,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "HIha-alasuu",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 0.5,
+      "nodes": [
+        {
+          "id": 261,
+          "modelingId": 391,
+          "type": "NodePoint"
+        },
+        {
+          "id": 237,
+          "modelingId": 392,
+          "type": "NodePoint"
+        },
+        {
+          "id": 355,
+          "modelingId": 393,
+          "type": "NodePoint"
+        },
+        {
+          "id": 356,
+          "modelingId": 394,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 350,
+          "modelingId": 395,
+          "type": "NodePoint"
+        },
+        {
+          "id": 256,
+          "modelingId": 396,
+          "type": "NodePoint"
+        },
+        {
+          "id": 258,
+          "modelingId": 397,
+          "type": "NodePoint"
+        },
+        {
+          "id": 263,
+          "modelingId": 398,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

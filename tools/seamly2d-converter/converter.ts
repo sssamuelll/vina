@@ -26,6 +26,7 @@ const parser = new XMLParser({
       "arc",
       "pathPoint",
       "piece",
+      "detail",
       "node",
       "m",
       "draftBlock",
@@ -414,8 +415,17 @@ function parseModeling(modelingNode: any): Map<number, ModelingEntry> {
 function extractPieces(piecesNode: any, modelingMap: Map<number, ModelingEntry>): Piece[] {
   if (!piecesNode) return [];
   const pieces: Piece[] = [];
-  for (const p of ensureArray(piecesNode.piece)) {
-    const nodes = ensureArray(p?.nodes?.node).map((n: any) => {
+
+  // Support both new format (<piece>) and old format (<detail>)
+  const rawPieces = [
+    ...ensureArray(piecesNode.piece),
+    ...ensureArray(piecesNode.detail),
+  ];
+
+  for (const p of rawPieces) {
+    // Nodes can be under <nodes><node> (new) or directly <node> (old detail format)
+    const nodeList = p?.nodes?.node ?? p?.node;
+    const nodes = ensureArray(nodeList).map((n: any) => {
       const modelingId = attr(n, "idObject") as number;
       const nodeType = attr(n, "type") as string;
 
@@ -436,10 +446,15 @@ function extractPieces(piecesNode: any, modelingMap: Map<number, ModelingEntry>)
       }
       return entry;
     });
+
+    // "supplement" is old-format for seamAllowance, "seamAllowance" is new-format
+    const hasSA = attr(p, "seamAllowance") === 1 || attr(p, "seamAllowance") === true
+      || attr(p, "supplement") === 1 || attr(p, "supplement") === true;
+
     pieces.push({
       name: attr(p, "name") ?? `piece_${attr(p, "id")}`,
       closed: attr(p, "closed") === 1 || attr(p, "closed") === true,
-      seamAllowance: attr(p, "seamAllowance") === 1 || attr(p, "seamAllowance") === true ? 1 : 0,
+      seamAllowance: hasSA ? 1 : 0,
       width: attr(p, "width") ?? 0,
       nodes,
     });
