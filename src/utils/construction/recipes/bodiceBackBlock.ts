@@ -91,7 +91,7 @@ export const bodiceBackBlock: Recipe = {
     },
   ],
   source: 'builtin',
-  tags: ['bodice', 'corpiño', 'back', 'espalda', 'block', 'sloper', 'aldrich'],
+  tags: ['bodice', 'corpiño', 'back', 'espalda', 'block', 'sloper', 'aldrich', 'tshirt', 't-shirt', 'camiseta', 'shirt', 'camisa', 'blouse', 'blusa', 'top'],
   version: 1,
   createdAt: 0,
   updatedAt: 0,

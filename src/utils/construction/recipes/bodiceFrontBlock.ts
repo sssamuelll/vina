@@ -146,7 +146,7 @@ export const bodiceFrontBlock: Recipe = {
     },
   ],
   source: 'builtin',
-  tags: ['bodice', 'corpiño', 'blouse', 'blusa', 'block', 'sloper', 'aldrich', 'front', 'delantero', 'top'],
+  tags: ['bodice', 'corpiño', 'blouse', 'blusa', 'block', 'sloper', 'aldrich', 'front', 'delantero', 'top', 'tshirt', 't-shirt', 'camiseta', 'shirt', 'camisa'],
   version: 1,
   createdAt: 0,
   updatedAt: 0,

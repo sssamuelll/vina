@@ -67,7 +67,7 @@ export const basicSleeve: Recipe = {
     },
   ],
   source: 'builtin',
-  tags: ['sleeve', 'manga', 'short', 'corta', 'set-in', 'montada', 'aldrich'],
+  tags: ['sleeve', 'manga', 'short', 'corta', 'set-in', 'montada', 'aldrich', 'tshirt', 't-shirt', 'camiseta', 'shirt', 'camisa', 'blouse', 'blusa'],
   version: 1,
   createdAt: 0,
   updatedAt: 0,
