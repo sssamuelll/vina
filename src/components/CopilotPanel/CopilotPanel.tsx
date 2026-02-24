@@ -1,7 +1,7 @@
 import { MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '../../store';
+import { RootState, AppDispatch, store } from '../../store';
 import { AgentConfig, CopilotMessage, buildCopilotContext } from '../../copilot/protocol';
 import { sendToAgent } from '../../copilot/agentConnector';
 import { executeCommands } from '../../copilot/commandExecutor';
@@ -160,7 +160,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       };
       setMessages(prev => [...prev, assistantMsg]);
 
-      const getState = () => rootState;
+      const getState = () => store.getState();
       const result: AgentLoopResult = await recoveryRef.current.withRecovery(() =>
         runAgentLoop(
           text, provider, providerConfig, registry, dispatch, getState, memoryRef.current, PATRONAJE_SOUL,
