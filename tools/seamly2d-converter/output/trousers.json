@@ -3,8 +3,26 @@
   "source": "Seamly2D",
   "unit": "cm",
   "measurements": {
-    "required": [],
-    "defaults": {}
+    "required": [
+      "height_waist_side",
+      "height_knee",
+      "waist_circ",
+      "hip_circ",
+      "leg_crotch_to_floor",
+      "leg_knee_circ",
+      "leg_ankle_high_circ",
+      "leg_ankle_circ"
+    ],
+    "defaults": {
+      "height_waist_side": 107,
+      "height_knee": 50,
+      "waist_circ": 84,
+      "hip_circ": 100,
+      "leg_crotch_to_floor": 83,
+      "leg_knee_circ": 50,
+      "leg_ankle_high_circ": 28,
+      "leg_ankle_circ": 28
+    }
   },
   "variables": {
     "#Size_Length": {
@@ -13,11 +31,11 @@
     },
     "#WaistCircumference": {
       "formula": "waist_circ+2",
-      "description": "*** CHECK ***&#xa;Waist Circumference + Ease"
+      "description": "*** CHECK ***\nWaist Circumference + Ease"
     },
     "#HipCircumference": {
       "formula": "hip_circ",
-      "description": "*** CHECK ***&#xa;Hip Circumference + Ease"
+      "description": "*** CHECK ***\nHip Circumference + Ease"
     },
     "#WaistHeight": {
       "formula": "height_waist_side",
@@ -29,43 +47,43 @@
     },
     "#KneeCircumference": {
       "formula": "52",
-      "description": "*** CHECK ***&#xa;Knee Circumference + Ease"
+      "description": "*** CHECK ***\nKnee Circumference + Ease"
     },
     "#KneeHeight": {
       "formula": "height_knee",
-      "description": "Knee Height or CrotchHeight * 0,6&#xa;"
+      "description": "Knee Height or CrotchHeight * 0,6\n"
     },
     "#AnkleCircumfence": {
       "formula": "42",
-      "description": "*** CHECK ***&#xa;Ankle level circumference of full length trouser&#xa;&#xa;Calculateted&#xa;leg_ankle_circ + ease&#xa;leg_ankle_high_circ+ ease&#xa;"
+      "description": "*** CHECK ***\nAnkle level circumference of full length trouser\n\nCalculateted\nleg_ankle_circ + ease\nleg_ankle_high_circ+ ease\n"
     },
     "#HipLineHeight": {
       "formula": "hip_circ/20+3 + leg_crotch_to_floor",
-      "description": "* DO NOT CHANGE *&#xa;Calculated:&#xa;HipCircumference/20+3 + CrotchHeight&#xa;&#xa;&#xa;"
+      "description": "* DO NOT CHANGE *\nCalculated:\nHipCircumference/20+3 + CrotchHeight\n\n\n"
     },
     "#FrontPanelWaistFront": {
       "formula": "waist_circ/10",
-      "description": "* DO NOT CHANGE *&#xa;&#xa;Front panel front side width at Waist line&#xa;Calculated:&#xa;&#xa;WaistGirth/10 or FrontPanelWidthFront - 0,5..1&#xa;&#xa;"
+      "description": "* DO NOT CHANGE *\n\nFront panel front side width at Waist line\nCalculated:\n\nWaistGirth/10 or FrontPanelWidthFront - 0,5..1\n\n"
     },
     "#FrontPanelWidth": {
       "formula": "hip_circ/4",
-      "description": "* DO NOT CHANGE *&#xa;&#xa;Total Front panel width at Hip line&#xa;&#xa;Calculated:&#xa;HipCircumference/4"
+      "description": "* DO NOT CHANGE *\n\nTotal Front panel width at Hip line\n\nCalculated:\nHipCircumference/4"
     },
     "#FrontPanelWidthFront": {
       "formula": "waist_circ/10+1.5",
-      "description": "* DO NOT CHANGE *&#xa;&#xa;Front panel front side width at Hip line&#xa;&#xa;Calculated:&#xa;1/10 WaistCircumfence+1,5"
+      "description": "* DO NOT CHANGE *\n\nFront panel front side width at Hip line\n\nCalculated:\n1/10 WaistCircumfence+1,5"
     },
     "#FrontCrotchHookWidth": {
       "formula": "hip_circ/20+1",
-      "description": "* DO NOT CHANGE *&#xa;&#xa;Front Crotch hook guidance point at Hip line&#xa;&#xa;Calculated:&#xa;HipCircumference/20 + 0,5...1&#xa;"
+      "description": "* DO NOT CHANGE *\n\nFront Crotch hook guidance point at Hip line\n\nCalculated:\nHipCircumference/20 + 0,5...1\n"
     },
     "#BackPanelWidth": {
       "formula": "hip_circ/4+2",
-      "description": "*** CHECK ***&#xa;Calculated:&#xa;HipCircumference/4 + ease (0...4)"
+      "description": "*** CHECK ***\nCalculated:\nHipCircumference/4 + ease (0...4)"
     },
     "#BackPanelWidthBack": {
       "formula": "(hip_circ/4+2)/4",
-      "description": "*** CHECK ***&#xa;Buttock shape&#xa;Square &#x9;H-shape &#x9;(hip_circ/4+2)/4+0,5 &#x9;&#xa;Round&#x9;O-shape&#x9;(hip_circ/4+2)/4-0,5&#xa;Pear&#x9;A-shape&#x9;(hip_circ/4+2)/4+1…1,5 cm&#xa;Inverted&#x9;V-shape&#x9;(hip_circ/4+2)/4&#xa;"
+      "description": "*** CHECK ***\nButtock shape\nSquare &#9;H-shape &#9;(hip_circ/4+2)/4+0,5 &#9;\nRound&#9;O-shape&#9;(hip_circ/4+2)/4-0,5\nPear&#9;A-shape&#9;(hip_circ/4+2)/4+1…1,5 cm\nInverted&#9;V-shape&#9;(hip_circ/4+2)/4\n"
     },
     "#Hemline_Side": {
       "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
@@ -73,23 +91,23 @@
     },
     "#HemlineHeight": {
       "formula": "2",
-      "description": "*** CHECK ***&#xa;Height of the hemline from heel&#xa;&#xa;This defines the length of trousers"
+      "description": "*** CHECK ***\nHeight of the hemline from heel\n\nThis defines the length of trousers"
     },
     "#HemlineAddition": {
       "formula": "3",
-      "description": "*** CHECK ***&#xa;Additional length to hemline for turns, cuffs etc."
+      "description": "*** CHECK ***\nAdditional length to hemline for turns, cuffs etc."
     },
     "#HemLineStreightHeight": {
       "formula": "4",
-      "description": "*** CHECK ***&#xa;Streigth part  in the hemline for shortening etc."
+      "description": "*** CHECK ***\nStreigth part  in the hemline for shortening etc."
     },
     "#HemLineFrontBackDiffrence": {
       "formula": "1",
-      "description": "*** CHECK ***&#xa;Shifting side seam from back to front in knee and ankle&#xa;Men &#x9;1&#xa;Women &#x9;2"
+      "description": "*** CHECK ***\nShifting side seam from back to front in knee and ankle\nMen &#9;1\nWomen &#9;2"
     },
     "#SideShift": {
       "formula": "0",
-      "description": "* SPECIAL CASE *&#xa;Width of the stripe&#xa;The difference between front and back panels for trousers with stripe in the side seam."
+      "description": "* SPECIAL CASE *\nWidth of the stripe\nThe difference between front and back panels for trousers with stripe in the side seam."
     },
     "#Waist_Back_Center": {
       "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
@@ -97,11 +115,11 @@
     },
     "#BackPanelCenterShift": {
       "formula": "2",
-      "description": "*** CHECK ***&#xa;Shifting back panel center 0 ... 2&#xa;&#xa;Change shape of the back panel"
+      "description": "*** CHECK ***\nShifting back panel center 0 ... 2\n\nChange shape of the back panel"
     },
     "#BackPanelForm": {
       "formula": "3",
-      "description": "*** CHECK ***&#xa;Changes the straightness of the back center&#xa;&#xa;Back panel form 2...5&#xa;2..3 Round buttocks&#xa;4 normal&#xa;5 slim&#xa;"
+      "description": "*** CHECK ***\nChanges the straightness of the back center\n\nBack panel form 2...5\n2..3 Round buttocks\n4 normal\n5 slim\n"
     },
     "#BackCenterInc": {
       "formula": "0",
@@ -109,11 +127,11 @@
     },
     "#BackPanelFittingInc": {
       "formula": "4",
-      "description": "*** CHECK ***&#xa;Fitting addition to the back seam&#xa;Reservation for further resizing of waistline. Mainly in men trousers"
+      "description": "*** CHECK ***\nFitting addition to the back seam\nReservation for further resizing of waistline. Mainly in men trousers"
     },
     "#BackCenterShift": {
       "formula": "0",
-      "description": "Shifting Center&#xa;Adjust for body shape"
+      "description": "Shifting Center\nAdjust for body shape"
     },
     "#BackCenterDrop": {
       "formula": "0",
@@ -137,7 +155,7 @@
     },
     "#FrontCenterShift": {
       "formula": "0",
-      "description": "Shifting Center seam&#xa;Adjust for body shape"
+      "description": "Shifting Center seam\nAdjust for body shape"
     },
     "#FrontDartDepth": {
       "formula": "6",
@@ -149,7 +167,7 @@
     },
     "#SideCurve": {
       "formula": "1.5",
-      "description": "*** CHECK ***&#xa;Side curvature at Waist line&#xa;How much is the side seam curving in"
+      "description": "*** CHECK ***\nSide curvature at Waist line\nHow much is the side seam curving in"
     },
     "#SideDrop": {
       "formula": "0",
@@ -157,7 +175,7 @@
     },
     "#WaistLineCurve": {
       "formula": "2",
-      "description": "* DO NOT CHANGE *&#xa;The distance to create 90 degree seams&#xa;"
+      "description": "* DO NOT CHANGE *\nThe distance to create 90 degree seams\n"
     },
     "#Pleats": {
       "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
@@ -165,11 +183,11 @@
     },
     "#Pleat1": {
       "formula": "4",
-      "description": "*** CHECK ***&#xa;&#xa;Front panet pleat amount. &#xa;Pleat widens the whole front panel"
+      "description": "*** CHECK ***\n\nFront panet pleat amount. \nPleat widens the whole front panel"
     },
     "#Pleat2": {
       "formula": "2",
-      "description": "*** CHECK ***&#xa;Front panet pleat amount. &#xa;Pleat widens the front panel to knee level"
+      "description": "*** CHECK ***\nFront panet pleat amount. \nPleat widens the front panel to knee level"
     },
     "#Pocket": {
       "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
@@ -177,19 +195,19 @@
     },
     "#PocketOpeningWidth": {
       "formula": "4",
-      "description": "*** CHECK ***&#xa;The pocket mouth distance from the side seam"
+      "description": "*** CHECK ***\nThe pocket mouth distance from the side seam"
     },
     "#PocketOpeningHeight": {
       "formula": "17",
-      "description": "*** CHECK ***&#xa;The height of the pocket mount from the waistline"
+      "description": "*** CHECK ***\nThe height of the pocket mount from the waistline"
     },
     "#PocketWidth": {
       "formula": "14",
-      "description": "*** CHECK ***&#xa;The width of the pocket in the waistline"
+      "description": "*** CHECK ***\nThe width of the pocket in the waistline"
     },
     "#PocketDepth": {
       "formula": "28",
-      "description": "*** CHECK ***&#xa;Depth of the pocket in the front"
+      "description": "*** CHECK ***\nDepth of the pocket in the front"
     },
     "#PocketPanelWidth": {
       "formula": "5",
@@ -205,11 +223,11 @@
     },
     "#WaistBandWidth": {
       "formula": "4",
-      "description": "*** CHECK ***&#xa;Waist band width"
+      "description": "*** CHECK ***\nWaist band width"
     },
     "#ButtonPanelWidth": {
       "formula": "8",
-      "description": "*** CHECK ***&#xa;The width of the additional button panel in the waistband"
+      "description": "*** CHECK ***\nThe width of the additional button panel in the waistband"
     }
   },
   "construction": [
@@ -912,7 +930,7 @@
     {
       "id": 110,
       "name": "A48",
-      "type": "pointOfIntersection",
+      "type": "intersectXY",
       "block": "Trousers",
       "firstPoint": 109,
       "secondPoint": 108
@@ -929,7 +947,7 @@
     {
       "id": 114,
       "name": "A50",
-      "type": "pointOfIntersection",
+      "type": "intersectXY",
       "block": "Trousers",
       "firstPoint": 113,
       "secondPoint": 103
@@ -1061,7 +1079,8 @@
       "block": "Trousers",
       "firstPoint": 20,
       "secondPoint": 19,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 29,
@@ -1070,7 +1089,8 @@
       "block": "Trousers",
       "firstPoint": 5,
       "secondPoint": 28,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 41,
@@ -1079,7 +1099,8 @@
       "block": "Trousers",
       "firstPoint": 39,
       "secondPoint": 19,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 42,
@@ -1088,7 +1109,8 @@
       "block": "Trousers",
       "firstPoint": 40,
       "secondPoint": 14,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 66,
@@ -1097,7 +1119,8 @@
       "block": "Trousers",
       "firstPoint": 63,
       "secondPoint": 65,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 76,
@@ -1106,7 +1129,8 @@
       "block": "Trousers",
       "firstPoint": 27,
       "secondPoint": 26,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 83,
@@ -1115,7 +1139,8 @@
       "block": "Trousers",
       "firstPoint": 78,
       "secondPoint": 82,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 84,
@@ -1124,7 +1149,8 @@
       "block": "Trousers",
       "firstPoint": 82,
       "secondPoint": 77,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 85,
@@ -1133,7 +1159,8 @@
       "block": "Trousers",
       "firstPoint": 32,
       "secondPoint": 31,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 86,
@@ -1142,7 +1169,8 @@
       "block": "Trousers",
       "firstPoint": 61,
       "secondPoint": 39,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 97,
@@ -1151,7 +1179,8 @@
       "block": "Trousers",
       "firstPoint": 89,
       "secondPoint": 93,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 98,
@@ -1160,7 +1189,8 @@
       "block": "Trousers",
       "firstPoint": 93,
       "secondPoint": 90,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 99,
@@ -1169,7 +1199,8 @@
       "block": "Trousers",
       "firstPoint": 90,
       "secondPoint": 91,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 100,
@@ -1178,7 +1209,8 @@
       "block": "Trousers",
       "firstPoint": 91,
       "secondPoint": 94,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 101,
@@ -1187,7 +1219,8 @@
       "block": "Trousers",
       "firstPoint": 94,
       "secondPoint": 92,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 111,
@@ -1196,7 +1229,8 @@
       "block": "Trousers",
       "firstPoint": 109,
       "secondPoint": 110,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 112,
@@ -1205,7 +1239,8 @@
       "block": "Trousers",
       "firstPoint": 108,
       "secondPoint": 110,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 115,
@@ -1214,7 +1249,8 @@
       "block": "Trousers",
       "firstPoint": 103,
       "secondPoint": 114,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 116,
@@ -1223,7 +1259,8 @@
       "block": "Trousers",
       "firstPoint": 114,
       "secondPoint": 113,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 117,
@@ -1232,7 +1269,8 @@
       "block": "Trousers",
       "firstPoint": 109,
       "secondPoint": 107,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 141,
@@ -1241,7 +1279,8 @@
       "block": "Trousers",
       "firstPoint": 73,
       "secondPoint": 25,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 146,
@@ -1250,7 +1289,8 @@
       "block": "Trousers",
       "firstPoint": 142,
       "secondPoint": 144,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 152,
@@ -1259,7 +1299,8 @@
       "block": "Trousers",
       "firstPoint": 149,
       "secondPoint": 151,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 156,
@@ -1268,7 +1309,8 @@
       "block": "Trousers",
       "firstPoint": 71,
       "secondPoint": 14,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 277,
@@ -1277,7 +1319,8 @@
       "block": "Trousers",
       "firstPoint": 103,
       "secondPoint": 102,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 415,
@@ -1286,7 +1329,8 @@
       "block": "Trousers",
       "firstPoint": 406,
       "secondPoint": 410,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 37,
@@ -1690,7 +1734,8 @@
       "block": "Waistband",
       "firstPoint": 162,
       "secondPoint": 158,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 166,
@@ -1699,7 +1744,8 @@
       "block": "Waistband",
       "firstPoint": 164,
       "secondPoint": 165,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 171,
@@ -1708,7 +1754,8 @@
       "block": "Waistband",
       "firstPoint": 167,
       "secondPoint": 168,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 172,
@@ -1717,7 +1764,8 @@
       "block": "Waistband",
       "firstPoint": 169,
       "secondPoint": 170,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 160,
@@ -1732,5 +1780,727 @@
       "length2": 2.3439
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Front_no_pocket",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 148,
+          "modelingId": 173,
+          "type": "NodePoint"
+        },
+        {
+          "id": 62,
+          "modelingId": 174,
+          "type": "NodePoint"
+        },
+        {
+          "id": 48,
+          "modelingId": 175,
+          "type": "NodePoint"
+        },
+        {
+          "id": 37,
+          "modelingId": 176,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 70,
+          "modelingId": 177,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 178,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 105,
+          "modelingId": 179,
+          "type": "NodePoint"
+        },
+        {
+          "id": 82,
+          "modelingId": 180,
+          "type": "NodePoint"
+        },
+        {
+          "id": 77,
+          "modelingId": 181,
+          "type": "NodePoint"
+        },
+        {
+          "id": 81,
+          "modelingId": 182,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 71,
+          "modelingId": 183,
+          "type": "NodePoint"
+        },
+        {
+          "id": 14,
+          "modelingId": 184,
+          "type": "NodePoint"
+        },
+        {
+          "id": 43,
+          "modelingId": 185,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 16,
+          "modelingId": 186,
+          "type": "NodePoint"
+        },
+        {
+          "id": 45,
+          "modelingId": 187,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 54,
+          "modelingId": 188,
+          "type": "NodePoint"
+        },
+        {
+          "id": 64,
+          "modelingId": 189,
+          "type": "NodePoint"
+        },
+        {
+          "id": 150,
+          "modelingId": 190,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Front_with_pocket",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 148,
+          "modelingId": 192,
+          "type": "NodePoint"
+        },
+        {
+          "id": 62,
+          "modelingId": 193,
+          "type": "NodePoint"
+        },
+        {
+          "id": 48,
+          "modelingId": 194,
+          "type": "NodePoint"
+        },
+        {
+          "id": 37,
+          "modelingId": 195,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 103,
+          "modelingId": 196,
+          "type": "NodePoint"
+        },
+        {
+          "id": 104,
+          "modelingId": 197,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 102,
+          "modelingId": 198,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 199,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 78,
+          "modelingId": 200,
+          "type": "NodePoint"
+        },
+        {
+          "id": 82,
+          "modelingId": 201,
+          "type": "NodePoint"
+        },
+        {
+          "id": 77,
+          "modelingId": 202,
+          "type": "NodePoint"
+        },
+        {
+          "id": 81,
+          "modelingId": 203,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 71,
+          "modelingId": 204,
+          "type": "NodePoint"
+        },
+        {
+          "id": 14,
+          "modelingId": 205,
+          "type": "NodePoint"
+        },
+        {
+          "id": 43,
+          "modelingId": 206,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 16,
+          "modelingId": 207,
+          "type": "NodePoint"
+        },
+        {
+          "id": 45,
+          "modelingId": 208,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 54,
+          "modelingId": 209,
+          "type": "NodePoint"
+        },
+        {
+          "id": 64,
+          "modelingId": 210,
+          "type": "NodePoint"
+        },
+        {
+          "id": 150,
+          "modelingId": 211,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Back",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 149,
+          "modelingId": 235,
+          "type": "NodePoint"
+        },
+        {
+          "id": 63,
+          "modelingId": 236,
+          "type": "NodePoint"
+        },
+        {
+          "id": 51,
+          "modelingId": 237,
+          "type": "NodePoint"
+        },
+        {
+          "id": 38,
+          "modelingId": 238,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 75,
+          "modelingId": 239,
+          "type": "NodePoint"
+        },
+        {
+          "id": 95,
+          "modelingId": 240,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 89,
+          "modelingId": 241,
+          "type": "NodePoint"
+        },
+        {
+          "id": 93,
+          "modelingId": 242,
+          "type": "NodePoint"
+        },
+        {
+          "id": 90,
+          "modelingId": 243,
+          "type": "NodePoint"
+        },
+        {
+          "id": 91,
+          "modelingId": 244,
+          "type": "NodePoint"
+        },
+        {
+          "id": 94,
+          "modelingId": 245,
+          "type": "NodePoint"
+        },
+        {
+          "id": 92,
+          "modelingId": 246,
+          "type": "NodePoint"
+        },
+        {
+          "id": 96,
+          "modelingId": 247,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 73,
+          "modelingId": 248,
+          "type": "NodePoint"
+        },
+        {
+          "id": 142,
+          "modelingId": 249,
+          "type": "NodePoint"
+        },
+        {
+          "id": 144,
+          "modelingId": 250,
+          "type": "NodePoint"
+        },
+        {
+          "id": 145,
+          "modelingId": 251,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 25,
+          "modelingId": 252,
+          "type": "NodePoint"
+        },
+        {
+          "id": 46,
+          "modelingId": 253,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 57,
+          "modelingId": 254,
+          "type": "NodePoint"
+        },
+        {
+          "id": 65,
+          "modelingId": 255,
+          "type": "NodePoint"
+        },
+        {
+          "id": 151,
+          "modelingId": 256,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "PocketMouth",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 102,
+          "modelingId": 259,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 260,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 109,
+          "modelingId": 261,
+          "type": "NodePoint"
+        },
+        {
+          "id": 107,
+          "modelingId": 262,
+          "type": "NodePoint"
+        },
+        {
+          "id": 113,
+          "modelingId": 263,
+          "type": "NodePoint"
+        },
+        {
+          "id": 114,
+          "modelingId": 264,
+          "type": "NodePoint"
+        },
+        {
+          "id": 104,
+          "modelingId": 258,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        }
+      ]
+    },
+    {
+      "name": "PocketPanel",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 110,
+          "modelingId": 266,
+          "type": "NodePoint"
+        },
+        {
+          "id": 108,
+          "modelingId": 267,
+          "type": "NodePoint"
+        },
+        {
+          "id": 37,
+          "modelingId": 268,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 70,
+          "modelingId": 269,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 270,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 109,
+          "modelingId": 271,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "PocketBack",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 118,
+          "modelingId": 273,
+          "type": "NodePoint"
+        },
+        {
+          "id": 122,
+          "modelingId": 274,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 119,
+          "modelingId": 275,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "PocketFront",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 118,
+          "modelingId": 297,
+          "type": "NodePoint"
+        },
+        {
+          "id": 122,
+          "modelingId": 298,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 120,
+          "modelingId": 299,
+          "type": "NodePoint"
+        },
+        {
+          "id": 102,
+          "modelingId": 300,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 301,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 78,
+          "modelingId": 302,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Front_Pleats",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 393,
+          "modelingId": 416,
+          "type": "NodePoint"
+        },
+        {
+          "id": 394,
+          "modelingId": 417,
+          "type": "NodePoint"
+        },
+        {
+          "id": 395,
+          "modelingId": 418,
+          "type": "NodePoint"
+        },
+        {
+          "id": 414,
+          "modelingId": 419,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 406,
+          "modelingId": 420,
+          "type": "NodePoint"
+        },
+        {
+          "id": 410,
+          "modelingId": 421,
+          "type": "NodePoint"
+        },
+        {
+          "id": 409,
+          "modelingId": 422,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 411,
+          "modelingId": 423,
+          "type": "NodePoint"
+        },
+        {
+          "id": 78,
+          "modelingId": 424,
+          "type": "NodePoint"
+        },
+        {
+          "id": 82,
+          "modelingId": 425,
+          "type": "NodePoint"
+        },
+        {
+          "id": 77,
+          "modelingId": 426,
+          "type": "NodePoint"
+        },
+        {
+          "id": 81,
+          "modelingId": 427,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 71,
+          "modelingId": 428,
+          "type": "NodePoint"
+        },
+        {
+          "id": 14,
+          "modelingId": 429,
+          "type": "NodePoint"
+        },
+        {
+          "id": 43,
+          "modelingId": 430,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 16,
+          "modelingId": 431,
+          "type": "NodePoint"
+        },
+        {
+          "id": 45,
+          "modelingId": 432,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 54,
+          "modelingId": 433,
+          "type": "NodePoint"
+        },
+        {
+          "id": 64,
+          "modelingId": 434,
+          "type": "NodePoint"
+        },
+        {
+          "id": 150,
+          "modelingId": 435,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 157,
+          "modelingId": 304,
+          "type": "NodePoint"
+        },
+        {
+          "id": 161,
+          "modelingId": 305,
+          "type": "NodePoint"
+        },
+        {
+          "id": 162,
+          "modelingId": 306,
+          "type": "NodePoint"
+        },
+        {
+          "id": 159,
+          "modelingId": 307,
+          "type": "NodePoint"
+        },
+        {
+          "id": 160,
+          "modelingId": 308,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "WaistBand1",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 169,
+          "modelingId": 310,
+          "type": "NodePoint"
+        },
+        {
+          "id": 162,
+          "modelingId": 311,
+          "type": "NodePoint"
+        },
+        {
+          "id": 158,
+          "modelingId": 312,
+          "type": "NodePoint"
+        },
+        {
+          "id": 170,
+          "modelingId": 313,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Waistband2",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 168,
+          "modelingId": 315,
+          "type": "NodePoint"
+        },
+        {
+          "id": 165,
+          "modelingId": 316,
+          "type": "NodePoint"
+        },
+        {
+          "id": 164,
+          "modelingId": 317,
+          "type": "NodePoint"
+        },
+        {
+          "id": 167,
+          "modelingId": 318,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

@@ -3,8 +3,28 @@
   "source": "Seamly2D",
   "unit": "cm",
   "measurements": {
-    "required": [],
-    "defaults": {}
+    "required": [
+      "height",
+      "hand_circ",
+      "neck_circ",
+      "bust_circ",
+      "waist_circ",
+      "hip_circ",
+      "neck_back_to_waist_b",
+      "shoulder_length",
+      "arm_shoulder_tip_to_wrist_bent"
+    ],
+    "defaults": {
+      "height": 173,
+      "hand_circ": 24,
+      "neck_circ": 41,
+      "bust_circ": 102,
+      "waist_circ": 92,
+      "hip_circ": 101,
+      "neck_back_to_waist_b": 50,
+      "shoulder_length": 13,
+      "arm_shoulder_tip_to_wrist_bent": 65
+    }
   },
   "variables": {
     "#ToBeVerified": {
@@ -13,11 +33,11 @@
     },
     "#BackHeight": {
       "formula": "neck_back_to_waist_b",
-      "description": "Calculation&#xa;&#xa;(1/4 Height )+ Ease&#xa;&#xa;+3,0 cm Slim Fit Ease &#xa;+3,0 cm Normal Fit Ease&#xa;+3,0 cm Loose Fit Ease"
+      "description": "Calculation\n\n(1/4 Height )+ Ease\n\n+3,0 cm Slim Fit Ease \n+3,0 cm Normal Fit Ease\n+3,0 cm Loose Fit Ease"
     },
     "#ArmSkyeHeightBack": {
       "formula": "(bust_circ/10+12)+5",
-      "description": "Calculate:&#xa;(1/10 BustGirth + 12cm) + ease&#xa;&#xa;+3,0 cm Slim Fit Ease &#xa;+4,0 cm Normal Fit Ease&#xa;+5,0 cm Loose Fit Ease"
+      "description": "Calculate:\n(1/10 BustGirth + 12cm) + ease\n\n+3,0 cm Slim Fit Ease \n+4,0 cm Normal Fit Ease\n+5,0 cm Loose Fit Ease"
     },
     "#BustCircumfence": {
       "formula": "bust_circ+4",
@@ -25,23 +45,23 @@
     },
     "#FrontWidth": {
       "formula": "(#BustCircumfence < 112 ? #BustCircumfence/5-1 : #BustCircumfence/2-(#BustCircumfence/10+2+#BustCircumfence/10+10.5))+1.5",
-      "description": "Calculation&#xa;&#xa;2/10 BustGirth - 1cm+Ease, when BustGirth < 112 cm&#xa;1/2 BustGirth - (ArmSkyeWidth + BackWidth)+ Ease, when BustGirth > 112 cm&#xa;&#xa;+0,75 cm Slim Fit Ease &#xa;+1,0 cm   Normal Fit Ease&#xa;+1,5 cm   Loose Fit Ease&#xa;&#xa;&#xa;"
+      "description": "Calculation\n\n2/10 BustGirth - 1cm+Ease, when BustGirth < 112 cm\n1/2 BustGirth - (ArmSkyeWidth + BackWidth)+ Ease, when BustGirth > 112 cm\n\n+0,75 cm Slim Fit Ease \n+1,0 cm   Normal Fit Ease\n+1,5 cm   Loose Fit Ease\n\n\n"
     },
     "#BackWidth": {
       "formula": "(#BustCircumfence < 100 ? #BustCircumfence/5-1: #BustCircumfence/10+10.5)+3",
-      "description": "Calculation&#xa;&#xa;2/10 BustGirth - 1cm+Ease, when BustGirth < 100 cm&#xa;1/10 BustGirth + 10.5+Ease, when BustGirth > 100 cm&#xa;&#xa;+1,25 cm Slim Fit Ease &#xa;+2,0 cm   Normal Fit Ease&#xa;+3.0 cm   Loose Fit Ease&#xa;&#xa;&#xa;"
+      "description": "Calculation\n\n2/10 BustGirth - 1cm+Ease, when BustGirth < 100 cm\n1/10 BustGirth + 10.5+Ease, when BustGirth > 100 cm\n\n+1,25 cm Slim Fit Ease \n+2,0 cm   Normal Fit Ease\n+3.0 cm   Loose Fit Ease\n\n\n"
     },
     "#ArmSkyeHeightFront": {
       "formula": "(#BustCircumfence/10+12-1)+5",
-      "description": "Calculation&#xa;&#xa;ArmSkyeWidth - 1 cm + Ease = (bust_circ/10+12-1) + Ease&#xa;&#xa;+3,0 cm Slim Fit Ease &#xa;+4,0 cm Normal Fit Ease&#xa;+5,0 cm Loose Fit Ease"
+      "description": "Calculation\n\nArmSkyeWidth - 1 cm + Ease = (bust_circ/10+12-1) + Ease\n\n+3,0 cm Slim Fit Ease \n+4,0 cm Normal Fit Ease\n+5,0 cm Loose Fit Ease"
     },
     "#ArmSkyeWidth": {
       "formula": "(bust_circ/10+2)+5.5",
-      "description": "Calculation:&#xa;(1/10 BustGirth + 2cm) + Ease&#xa;&#xa;+3,5 cm Slim Fit Ease &#xa;+4,5 cm Normal Fit Ease&#xa;+5,5 cm Loose Fit Ease"
+      "description": "Calculation:\n(1/10 BustGirth + 2cm) + Ease\n\n+3,5 cm Slim Fit Ease \n+4,5 cm Normal Fit Ease\n+5,5 cm Loose Fit Ease"
     },
     "#Hemline": {
       "formula": "height/2-10",
-      "description": "Calculation&#xa;1/2 Height - 10 cm"
+      "description": "Calculation\n1/2 Height - 10 cm"
     },
     "#Modifications": {
       "formula": "0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0-0",
@@ -69,19 +89,19 @@
     },
     "#SideIntake": {
       "formula": "(bust_circ-waist_circ)/2/2/2<0?0:(bust_circ-waist_circ)/2/2/2",
-      "description": "The amount intake in the side.&#xa;Can be adjusted manually."
+      "description": "The amount intake in the side.\nCan be adjusted manually."
     },
     "#SideIntakeWaist": {
       "formula": "(bust_circ-hip_circ)/8",
-      "description": "The amount intake in the side of the hemline.&#xa;Can be adjusted manually."
+      "description": "The amount intake in the side of the hemline.\nCan be adjusted manually."
     },
     "#BackIntake": {
       "formula": "(bust_circ-waist_circ)/2/2/2<0?0:(bust_circ-waist_circ)/2/2/2",
-      "description": "The amount intake in the back.&#xa;Can be adjusted manually."
+      "description": "The amount intake in the back.\nCan be adjusted manually."
     },
     "#BackIntakeWaist": {
       "formula": "(bust_circ-hip_circ)/8",
-      "description": "The amount intake in the back in the hemline.&#xa;Can be adjusted manually."
+      "description": "The amount intake in the back in the hemline.\nCan be adjusted manually."
     },
     "#BackPleat": {
       "formula": "3",
@@ -161,11 +181,11 @@
     },
     "#NecWidth": {
       "formula": "neck_circ/6",
-      "description": "Calculation&#xa;&#xa;1/6 Neck Girth"
+      "description": "Calculation\n\n1/6 Neck Girth"
     },
     "#ShoulderWidth": {
       "formula": "shoulder_length+5",
-      "description": "Calculation:&#xa;Shoulder length + ease"
+      "description": "Calculation:\nShoulder length + ease"
     },
     "#ShoulderDropBack": {
       "formula": "2",
@@ -173,7 +193,7 @@
     },
     "#ShoulderDropFront": {
       "formula": "4",
-      "description": "Shoulder point drop on front&#xa;"
+      "description": "Shoulder point drop on front\n"
     },
     "#ShoulderShilft": {
       "formula": "1.5",
@@ -731,7 +751,8 @@
       "block": "Men shirt",
       "firstPoint": 38,
       "secondPoint": 37,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 43,
@@ -740,7 +761,8 @@
       "block": "Men shirt",
       "firstPoint": 26,
       "secondPoint": 27,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 44,
@@ -749,7 +771,8 @@
       "block": "Men shirt",
       "firstPoint": 21,
       "secondPoint": 19,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 51,
@@ -758,7 +781,8 @@
       "block": "Men shirt",
       "firstPoint": 28,
       "secondPoint": 35,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 53,
@@ -767,7 +791,8 @@
       "block": "Men shirt",
       "firstPoint": 28,
       "secondPoint": 36,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 57,
@@ -776,7 +801,8 @@
       "block": "Men shirt",
       "firstPoint": 33,
       "secondPoint": 30,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 58,
@@ -785,7 +811,8 @@
       "block": "Men shirt",
       "firstPoint": 55,
       "secondPoint": 56,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 349,
@@ -794,7 +821,8 @@
       "block": "Men shirt",
       "firstPoint": 343,
       "secondPoint": 348,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 350,
@@ -803,7 +831,8 @@
       "block": "Men shirt",
       "firstPoint": 348,
       "secondPoint": 337,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 351,
@@ -812,7 +841,8 @@
       "block": "Men shirt",
       "firstPoint": 337,
       "secondPoint": 334,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 352,
@@ -821,7 +851,8 @@
       "block": "Men shirt",
       "firstPoint": 334,
       "secondPoint": 336,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 353,
@@ -830,7 +861,8 @@
       "block": "Men shirt",
       "firstPoint": 336,
       "secondPoint": 335,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 354,
@@ -839,7 +871,8 @@
       "block": "Men shirt",
       "firstPoint": 335,
       "secondPoint": 342,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 383,
@@ -848,7 +881,8 @@
       "block": "Men shirt",
       "firstPoint": 35,
       "secondPoint": 345,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 384,
@@ -857,7 +891,8 @@
       "block": "Men shirt",
       "firstPoint": 344,
       "secondPoint": 36,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 29,
@@ -1093,7 +1128,8 @@
       "block": "Pocket",
       "firstPoint": 61,
       "secondPoint": 63,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 66,
@@ -1102,7 +1138,8 @@
       "block": "Pocket",
       "firstPoint": 63,
       "secondPoint": 64,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 67,
@@ -1111,7 +1148,8 @@
       "block": "Pocket",
       "firstPoint": 64,
       "secondPoint": 59,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 71,
@@ -1120,7 +1158,8 @@
       "block": "Pocket",
       "firstPoint": 69,
       "secondPoint": 70,
-      "lineColor": "darkRed"
+      "lineColor": "darkRed",
+      "lineType": "dotLine"
     },
     {
       "id": 303,
@@ -1129,7 +1168,8 @@
       "block": "Pocket",
       "firstPoint": 69,
       "secondPoint": 302,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 304,
@@ -1138,7 +1178,8 @@
       "block": "Pocket",
       "firstPoint": 302,
       "secondPoint": 70,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 309,
@@ -1147,7 +1188,8 @@
       "block": "Pocket",
       "firstPoint": 305,
       "secondPoint": 308,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 310,
@@ -1156,7 +1198,8 @@
       "block": "Pocket",
       "firstPoint": 308,
       "secondPoint": 306,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 311,
@@ -1639,7 +1682,8 @@
       "block": "Sleeve",
       "firstPoint": 76,
       "secondPoint": 72,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 79,
@@ -1648,7 +1692,8 @@
       "block": "Sleeve",
       "firstPoint": 72,
       "secondPoint": 77,
-      "lineColor": "green"
+      "lineColor": "green",
+      "lineType": "dotLine"
     },
     {
       "id": 101,
@@ -1657,7 +1702,8 @@
       "block": "Sleeve",
       "firstPoint": 76,
       "secondPoint": 91,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 102,
@@ -1666,7 +1712,8 @@
       "block": "Sleeve",
       "firstPoint": 77,
       "secondPoint": 90,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 107,
@@ -1675,7 +1722,8 @@
       "block": "Sleeve",
       "firstPoint": 99,
       "secondPoint": 96,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 108,
@@ -1684,7 +1732,8 @@
       "block": "Sleeve",
       "firstPoint": 98,
       "secondPoint": 94,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 109,
@@ -1693,7 +1742,8 @@
       "block": "Sleeve",
       "firstPoint": 100,
       "secondPoint": 93,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 112,
@@ -1702,7 +1752,8 @@
       "block": "Sleeve",
       "firstPoint": 96,
       "secondPoint": 95,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 113,
@@ -1711,7 +1762,8 @@
       "block": "Sleeve",
       "firstPoint": 94,
       "secondPoint": 92,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 116,
@@ -1720,7 +1772,8 @@
       "block": "Sleeve",
       "firstPoint": 114,
       "secondPoint": 115,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 126,
@@ -1729,7 +1782,8 @@
       "block": "Sleeve",
       "firstPoint": 119,
       "secondPoint": 124,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 127,
@@ -1738,7 +1792,8 @@
       "block": "Sleeve",
       "firstPoint": 118,
       "secondPoint": 125,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 88,
@@ -1812,7 +1867,7 @@
       "point1": 104,
       "point4": 89,
       "angle1": 12.2644,
-      "angle2": 208.953,
+      "angle2": 180,
       "length1": 4.83467,
       "length2": 0.750071
     },
@@ -2136,7 +2191,8 @@
       "block": "Placket",
       "firstPoint": 258,
       "secondPoint": 259,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 267,
@@ -2145,7 +2201,8 @@
       "block": "Placket",
       "firstPoint": 262,
       "secondPoint": 265,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 268,
@@ -2154,7 +2211,8 @@
       "block": "Placket",
       "firstPoint": 265,
       "secondPoint": 263,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 269,
@@ -2163,8 +2221,834 @@
       "block": "Placket",
       "firstPoint": 263,
       "secondPoint": 260,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Yoke",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 31,
+          "modelingId": 167,
+          "type": "NodePoint"
+        },
+        {
+          "id": 29,
+          "modelingId": 168,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 21,
+          "modelingId": 169,
+          "type": "NodePoint"
+        },
+        {
+          "id": 19,
+          "modelingId": 170,
+          "type": "NodePoint"
+        },
+        {
+          "id": 45,
+          "modelingId": 171,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 33,
+          "modelingId": 172,
+          "type": "NodePoint"
+        },
+        {
+          "id": 30,
+          "modelingId": 173,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "FrontPanel",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 38,
+          "modelingId": 389,
+          "type": "NodePoint"
+        },
+        {
+          "id": 37,
+          "modelingId": 390,
+          "type": "NodePoint"
+        },
+        {
+          "id": 24,
+          "modelingId": 391,
+          "type": "NodePoint"
+        },
+        {
+          "id": 42,
+          "modelingId": 392,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 26,
+          "modelingId": 393,
+          "type": "NodePoint"
+        },
+        {
+          "id": 27,
+          "modelingId": 394,
+          "type": "NodePoint"
+        },
+        {
+          "id": 29,
+          "modelingId": 395,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 28,
+          "modelingId": 396,
+          "type": "NodePoint"
+        },
+        {
+          "id": 35,
+          "modelingId": 397,
+          "type": "NodePoint"
+        },
+        {
+          "id": 385,
+          "modelingId": 398,
+          "type": "NodePoint"
+        },
+        {
+          "id": 50,
+          "modelingId": 399,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 12,
+          "modelingId": 400,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "BackPanel",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 56,
+          "modelingId": 422,
+          "type": "NodePoint"
+        },
+        {
+          "id": 2,
+          "modelingId": 423,
+          "type": "NodePoint"
+        },
+        {
+          "id": 50,
+          "modelingId": 424,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 405,
+          "modelingId": 425,
+          "type": "NodePoint"
+        },
+        {
+          "id": 335,
+          "modelingId": 426,
+          "type": "NodePoint"
+        },
+        {
+          "id": 336,
+          "modelingId": 427,
+          "type": "NodePoint"
+        },
+        {
+          "id": 334,
+          "modelingId": 428,
+          "type": "NodePoint"
+        },
+        {
+          "id": 337,
+          "modelingId": 429,
+          "type": "NodePoint"
+        },
+        {
+          "id": 348,
+          "modelingId": 430,
+          "type": "NodePoint"
+        },
+        {
+          "id": 402,
+          "modelingId": 431,
+          "type": "NodePoint"
+        },
+        {
+          "id": 50,
+          "modelingId": 432,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 388,
+          "modelingId": 433,
+          "type": "NodePoint"
+        },
+        {
+          "id": 36,
+          "modelingId": 434,
+          "type": "NodePoint"
+        },
+        {
+          "id": 28,
+          "modelingId": 435,
+          "type": "NodePoint"
+        },
+        {
+          "id": 29,
+          "modelingId": 436,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 32,
+          "modelingId": 437,
+          "type": "NodePoint"
+        },
+        {
+          "id": 47,
+          "modelingId": 438,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 30,
+          "modelingId": 439,
+          "type": "NodePoint"
+        },
+        {
+          "id": 55,
+          "modelingId": 440,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Pocket",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 59,
+          "modelingId": 175,
+          "type": "NodePoint"
+        },
+        {
+          "id": 69,
+          "modelingId": 176,
+          "type": "NodePoint"
+        },
+        {
+          "id": 70,
+          "modelingId": 177,
+          "type": "NodePoint"
+        },
+        {
+          "id": 60,
+          "modelingId": 178,
+          "type": "NodePoint"
+        },
+        {
+          "id": 61,
+          "modelingId": 179,
+          "type": "NodePoint"
+        },
+        {
+          "id": 63,
+          "modelingId": 180,
+          "type": "NodePoint"
+        },
+        {
+          "id": 64,
+          "modelingId": 181,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "PocketRound",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 64,
+          "modelingId": 314,
+          "type": "NodePoint"
+        },
+        {
+          "id": 69,
+          "modelingId": 315,
+          "type": "NodePoint"
+        },
+        {
+          "id": 313,
+          "modelingId": 316,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 70,
+          "modelingId": 317,
+          "type": "NodePoint"
+        },
+        {
+          "id": 61,
+          "modelingId": 318,
+          "type": "NodePoint"
+        },
+        {
+          "id": 311,
+          "modelingId": 319,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "PocketFlap",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 305,
+          "modelingId": 321,
+          "type": "NodePoint"
+        },
+        {
+          "id": 59,
+          "modelingId": 322,
+          "type": "NodePoint"
+        },
+        {
+          "id": 60,
+          "modelingId": 323,
+          "type": "NodePoint"
+        },
+        {
+          "id": 306,
+          "modelingId": 324,
+          "type": "NodePoint"
+        },
+        {
+          "id": 307,
+          "modelingId": 325,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "PocketFlapRound",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 305,
+          "modelingId": 327,
+          "type": "NodePoint"
+        },
+        {
+          "id": 59,
+          "modelingId": 328,
+          "type": "NodePoint"
+        },
+        {
+          "id": 60,
+          "modelingId": 329,
+          "type": "NodePoint"
+        },
+        {
+          "id": 306,
+          "modelingId": 330,
+          "type": "NodePoint"
+        },
+        {
+          "id": 312,
+          "modelingId": 331,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "Cuff",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 73,
+          "modelingId": 200,
+          "type": "NodePoint"
+        },
+        {
+          "id": 89,
+          "modelingId": 201,
+          "type": "NodePoint"
+        },
+        {
+          "id": 114,
+          "modelingId": 202,
+          "type": "NodePoint"
+        },
+        {
+          "id": 115,
+          "modelingId": 203,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "CuffInterface",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 73,
+          "modelingId": 205,
+          "type": "NodePoint"
+        },
+        {
+          "id": 89,
+          "modelingId": 206,
+          "type": "NodePoint"
+        },
+        {
+          "id": 114,
+          "modelingId": 207,
+          "type": "NodePoint"
+        },
+        {
+          "id": 115,
+          "modelingId": 208,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "ShortSleeve",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 124,
+          "modelingId": 210,
+          "type": "NodePoint"
+        },
+        {
+          "id": 119,
+          "modelingId": 211,
+          "type": "NodePoint"
+        },
+        {
+          "id": 76,
+          "modelingId": 212,
+          "type": "NodePoint"
+        },
+        {
+          "id": 88,
+          "modelingId": 213,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 77,
+          "modelingId": 214,
+          "type": "NodePoint"
+        },
+        {
+          "id": 118,
+          "modelingId": 215,
+          "type": "NodePoint"
+        },
+        {
+          "id": 125,
+          "modelingId": 216,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "FullSleeve",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 89,
+          "modelingId": 283,
+          "type": "NodePoint"
+        },
+        {
+          "id": 110,
+          "modelingId": 284,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 104,
+          "modelingId": 285,
+          "type": "NodePoint"
+        },
+        {
+          "id": 76,
+          "modelingId": 286,
+          "type": "NodePoint"
+        },
+        {
+          "id": 88,
+          "modelingId": 287,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 77,
+          "modelingId": 288,
+          "type": "NodePoint"
+        },
+        {
+          "id": 106,
+          "modelingId": 289,
+          "type": "NodePoint"
+        },
+        {
+          "id": 111,
+          "modelingId": 290,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 92,
+          "modelingId": 291,
+          "type": "NodePoint"
+        },
+        {
+          "id": 93,
+          "modelingId": 292,
+          "type": "NodePoint"
+        },
+        {
+          "id": 100,
+          "modelingId": 293,
+          "type": "NodePoint"
+        },
+        {
+          "id": 94,
+          "modelingId": 294,
+          "type": "NodePoint"
+        },
+        {
+          "id": 98,
+          "modelingId": 295,
+          "type": "NodePoint"
+        },
+        {
+          "id": 95,
+          "modelingId": 296,
+          "type": "NodePoint"
+        },
+        {
+          "id": 96,
+          "modelingId": 297,
+          "type": "NodePoint"
+        },
+        {
+          "id": 99,
+          "modelingId": 298,
+          "type": "NodePoint"
+        },
+        {
+          "id": 97,
+          "modelingId": 299,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "CollarBase",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 142,
+          "modelingId": 218,
+          "type": "NodePoint"
+        },
+        {
+          "id": 150,
+          "modelingId": 219,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 148,
+          "modelingId": 220,
+          "type": "NodePoint"
+        },
+        {
+          "id": 149,
+          "modelingId": 221,
+          "type": "NodePoint"
+        },
+        {
+          "id": 151,
+          "modelingId": 222,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 143,
+          "modelingId": 223,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "CollarBaseInterface",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 142,
+          "modelingId": 225,
+          "type": "NodePoint"
+        },
+        {
+          "id": 150,
+          "modelingId": 226,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 148,
+          "modelingId": 227,
+          "type": "NodePoint"
+        },
+        {
+          "id": 149,
+          "modelingId": 228,
+          "type": "NodePoint"
+        },
+        {
+          "id": 151,
+          "modelingId": 229,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 143,
+          "modelingId": 230,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "CollarTop",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 144,
+          "modelingId": 232,
+          "type": "NodePoint"
+        },
+        {
+          "id": 154,
+          "modelingId": 233,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 152,
+          "modelingId": 234,
+          "type": "NodePoint"
+        },
+        {
+          "id": 153,
+          "modelingId": 235,
+          "type": "NodePoint"
+        },
+        {
+          "id": 155,
+          "modelingId": 236,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 141,
+          "modelingId": 237,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "CollarTopInterface",
+      "closed": true,
+      "seamAllowance": 0,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 246,
+          "modelingId": 249,
+          "type": "NodePoint"
+        },
+        {
+          "id": 153,
+          "modelingId": 250,
+          "type": "NodePoint"
+        },
+        {
+          "id": 155,
+          "modelingId": 251,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 141,
+          "modelingId": 252,
+          "type": "NodePoint"
+        },
+        {
+          "id": 247,
+          "modelingId": 253,
+          "type": "NodePoint"
+        },
+        {
+          "id": 248,
+          "modelingId": 254,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        }
+      ]
+    },
+    {
+      "name": "PlacketUnder",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 256,
+          "modelingId": 270,
+          "type": "NodePoint"
+        },
+        {
+          "id": 258,
+          "modelingId": 271,
+          "type": "NodePoint"
+        },
+        {
+          "id": 259,
+          "modelingId": 272,
+          "type": "NodePoint"
+        },
+        {
+          "id": 257,
+          "modelingId": 273,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "PlacketTop",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 1,
+      "nodes": [
+        {
+          "id": 256,
+          "modelingId": 275,
+          "type": "NodePoint"
+        },
+        {
+          "id": 257,
+          "modelingId": 276,
+          "type": "NodePoint"
+        },
+        {
+          "id": 261,
+          "modelingId": 277,
+          "type": "NodePoint"
+        },
+        {
+          "id": 262,
+          "modelingId": 278,
+          "type": "NodePoint"
+        },
+        {
+          "id": 265,
+          "modelingId": 279,
+          "type": "NodePoint"
+        },
+        {
+          "id": 263,
+          "modelingId": 280,
+          "type": "NodePoint"
+        },
+        {
+          "id": 260,
+          "modelingId": 281,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }

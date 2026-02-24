@@ -118,19 +118,23 @@
       "width": 1,
       "nodes": [
         {
-          "id": 14,
+          "id": 1,
+          "modelingId": 14,
           "type": "NodePoint"
         },
         {
-          "id": 15,
+          "id": 2,
+          "modelingId": 15,
           "type": "NodePoint"
         },
         {
-          "id": 16,
+          "id": 11,
+          "modelingId": 16,
           "type": "NodePoint"
         },
         {
-          "id": 17,
+          "id": 1,
+          "modelingId": 17,
           "type": "NodePoint"
         }
       ]
@@ -142,24 +146,30 @@
       "width": 1,
       "nodes": [
         {
-          "id": 19,
+          "id": 1,
+          "modelingId": 19,
           "type": "NodePoint"
         },
         {
-          "id": 20,
+          "id": 5,
+          "modelingId": 20,
           "type": "NodePoint"
         },
         {
-          "id": 21,
+          "id": 4,
+          "modelingId": 21,
           "type": "NodeSpline",
+          "curveType": "spline",
           "reverse": false
         },
         {
-          "id": 22,
+          "id": 2,
+          "modelingId": 22,
           "type": "NodePoint"
         },
         {
-          "id": 23,
+          "id": 1,
+          "modelingId": 23,
           "type": "NodePoint"
         }
       ]
@@ -171,19 +181,23 @@
       "width": 1,
       "nodes": [
         {
-          "id": 25,
+          "id": 1,
+          "modelingId": 25,
           "type": "NodePoint"
         },
         {
-          "id": 26,
+          "id": 3,
+          "modelingId": 26,
           "type": "NodePoint"
         },
         {
-          "id": 27,
+          "id": 9,
+          "modelingId": 27,
           "type": "NodePoint"
         },
         {
-          "id": 28,
+          "id": 1,
+          "modelingId": 28,
           "type": "NodePoint"
         }
       ]
@@ -195,20 +209,25 @@
       "width": 1,
       "nodes": [
         {
-          "id": 30,
+          "id": 3,
+          "modelingId": 30,
           "type": "NodePoint"
         },
         {
-          "id": 31,
+          "id": 4,
+          "modelingId": 31,
           "type": "NodeSpline",
+          "curveType": "spline",
           "reverse": false
         },
         {
-          "id": 32,
+          "id": 5,
+          "modelingId": 32,
           "type": "NodePoint"
         },
         {
-          "id": 33,
+          "id": 9,
+          "modelingId": 33,
           "type": "NodePoint"
         }
       ]

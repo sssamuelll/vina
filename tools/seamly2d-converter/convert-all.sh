@@ -7,7 +7,8 @@ mkdir -p "$OUTPUT_DIR"
 
 SEAMLY_DIR="${1:-/tmp/seamly2d}"
 
-find "$SEAMLY_DIR" -name "*.sm2d" -type f | sort | while read -r f; do
+# Prefer samples/patterns first (real patterns), then test files. Skip duplicates.
+{ find "$SEAMLY_DIR/src/app/share/samples" -name "*.sm2d" -type f 2>/dev/null; find "$SEAMLY_DIR" -name "*.sm2d" -type f 2>/dev/null; } | awk -F/ '{f=$NF; if (!seen[f]++) print}' | sort | while read -r f; do
   npx tsx "$SCRIPT_DIR/converter.ts" "$f" "$OUTPUT_DIR" || echo "  ✗ Failed: $f"
 done
 

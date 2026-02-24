@@ -831,45 +831,57 @@
       "width": 1,
       "nodes": [
         {
-          "id": 155,
+          "id": 4,
+          "modelingId": 155,
           "type": "NodePoint"
         },
         {
-          "id": 156,
+          "id": 1,
+          "modelingId": 156,
           "type": "NodePoint"
         },
         {
-          "id": 157,
+          "id": 49,
+          "modelingId": 157,
           "type": "NodeSpline",
+          "curveType": "spline",
           "reverse": false
         },
         {
-          "id": 158,
+          "id": 48,
+          "modelingId": 158,
           "type": "NodePoint"
         },
         {
-          "id": 159,
+          "id": 58,
+          "modelingId": 159,
           "type": "NodePoint"
         },
         {
-          "id": 160,
+          "id": 32,
+          "modelingId": 160,
           "type": "NodePoint"
         },
         {
-          "id": 161,
+          "id": 59,
+          "modelingId": 161,
           "type": "NodePoint"
         },
         {
-          "id": 162,
+          "id": 56,
+          "modelingId": 162,
           "type": "NodePoint"
         },
         {
-          "id": 163,
+          "id": 117,
+          "modelingId": 163,
           "type": "NodeSplinePath",
+          "curveType": "splinePath",
           "reverse": false
         },
         {
-          "id": 164,
+          "id": 29,
+          "modelingId": 164,
           "type": "NodePoint"
         }
       ]

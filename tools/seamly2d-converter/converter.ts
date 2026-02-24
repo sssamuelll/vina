@@ -364,16 +364,72 @@ function extractConstruction(
 }
 
 // ---------------------------------------------------------------------------
-// Extract pieces from <pieces> (could also be under <details>)
+// Parse <modeling> section — maps modeling IDs to construction IDs
 // ---------------------------------------------------------------------------
-function extractPieces(piecesNode: any): Piece[] {
+interface ModelingEntry {
+  id: number;
+  constructionId: number;
+  type: 'point' | 'spline' | 'splinePath' | 'arc' | 'unknown';
+}
+
+function parseModeling(modelingNode: any): Map<number, ModelingEntry> {
+  const map = new Map<number, ModelingEntry>();
+  if (!modelingNode) return map;
+
+  // Points
+  for (const p of ensureArray(modelingNode.point)) {
+    const id = attr(p, "id");
+    const idObject = attr(p, "idObject");
+    if (id !== undefined && idObject !== undefined) {
+      map.set(id, { id, constructionId: idObject, type: 'point' });
+    }
+  }
+
+  // Splines
+  for (const s of ensureArray(modelingNode.spline)) {
+    const id = attr(s, "id");
+    const idObject = attr(s, "idObject");
+    const sType = attr(s, "type") as string;
+    if (id !== undefined && idObject !== undefined) {
+      const type = sType?.includes("Path") ? 'splinePath' : 'spline';
+      map.set(id, { id, constructionId: idObject, type });
+    }
+  }
+
+  // Arcs
+  for (const a of ensureArray(modelingNode.arc)) {
+    const id = attr(a, "id");
+    const idObject = attr(a, "idObject");
+    if (id !== undefined && idObject !== undefined) {
+      map.set(id, { id, constructionId: idObject, type: 'arc' });
+    }
+  }
+
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// Extract pieces from <pieces> — resolves modeling IDs to construction IDs
+// ---------------------------------------------------------------------------
+function extractPieces(piecesNode: any, modelingMap: Map<number, ModelingEntry>): Piece[] {
   if (!piecesNode) return [];
   const pieces: Piece[] = [];
   for (const p of ensureArray(piecesNode.piece)) {
     const nodes = ensureArray(p?.nodes?.node).map((n: any) => {
+      const modelingId = attr(n, "idObject") as number;
+      const nodeType = attr(n, "type") as string;
+
+      // Resolve modeling ID → construction ID
+      const modeling = modelingMap.get(modelingId);
+      const constructionId = modeling?.constructionId ?? modelingId;
+
       const entry: any = {
-        id: attr(n, "idObject"),
-        type: attr(n, "type"),
+        id: constructionId,
+        modelingId: modelingId !== constructionId ? modelingId : undefined,
+        type: nodeType,
+        // Preserve modeling type info for curves
+        curveType: modeling?.type === 'spline' || modeling?.type === 'splinePath' || modeling?.type === 'arc'
+          ? modeling.type : undefined,
       };
       if (attr(n, "reverse") !== undefined) {
         entry.reverse = attr(n, "reverse") === 1 || attr(n, "reverse") === true;
@@ -443,10 +499,12 @@ function convert(sm2dPath: string, outputDir: string): void {
     if (calc) {
       construction.push(...extractConstruction(calc, blockName));
     }
+    // Parse modeling section (maps modeling IDs → construction IDs)
+    const modelingMap = parseModeling(block.modeling);
     // pieces can be under <pieces> or <details>
     const pNode = block.pieces ?? block.details;
     if (pNode) {
-      pieces.push(...extractPieces(pNode));
+      pieces.push(...extractPieces(pNode, modelingMap));
     }
   }
 

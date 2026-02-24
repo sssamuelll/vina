@@ -590,7 +590,7 @@
       "name": "О4",
       "type": "cutSplinePath",
       "block": "Куртка",
-      "splinePath": 205,
+      "splinePath": 80,
       "length": 50
     },
     {
@@ -614,7 +614,7 @@
       "name": "О7",
       "type": "cutSplinePath",
       "block": "Куртка",
-      "splinePath": 204,
+      "splinePath": 80,
       "length": 20
     },
     {
@@ -632,7 +632,8 @@
       "block": "Куртка",
       "firstPoint": 51,
       "secondPoint": 52,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 60,
@@ -641,7 +642,8 @@
       "block": "Куртка",
       "firstPoint": 59,
       "secondPoint": 40,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 63,
@@ -650,7 +652,8 @@
       "block": "Куртка",
       "firstPoint": 62,
       "secondPoint": 61,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 68,
@@ -659,7 +662,8 @@
       "block": "Куртка",
       "firstPoint": 39,
       "secondPoint": 67,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 70,
@@ -668,7 +672,8 @@
       "block": "Куртка",
       "firstPoint": 40,
       "secondPoint": 69,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 72,
@@ -677,7 +682,8 @@
       "block": "Куртка",
       "firstPoint": 69,
       "secondPoint": 71,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 74,
@@ -686,7 +692,8 @@
       "block": "Куртка",
       "firstPoint": 56,
       "secondPoint": 73,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 75,
@@ -695,7 +702,8 @@
       "block": "Куртка",
       "firstPoint": 65,
       "secondPoint": 66,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 81,
@@ -704,7 +712,8 @@
       "block": "Куртка",
       "firstPoint": 43,
       "secondPoint": 50,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 82,
@@ -713,7 +722,8 @@
       "block": "Куртка",
       "firstPoint": 47,
       "secondPoint": 51,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 88,
@@ -722,7 +732,8 @@
       "block": "Куртка",
       "firstPoint": 87,
       "secondPoint": 83,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 94,
@@ -731,7 +742,8 @@
       "block": "Куртка",
       "firstPoint": 92,
       "secondPoint": 93,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 96,
@@ -740,7 +752,8 @@
       "block": "Куртка",
       "firstPoint": 73,
       "secondPoint": 71,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 212,
@@ -749,7 +762,8 @@
       "block": "Куртка",
       "firstPoint": 203,
       "secondPoint": 201,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 213,
@@ -758,7 +772,8 @@
       "block": "Куртка",
       "firstPoint": 209,
       "secondPoint": 202,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 220,
@@ -767,7 +782,8 @@
       "block": "Куртка",
       "firstPoint": 217,
       "secondPoint": 214,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 237,
@@ -776,7 +792,8 @@
       "block": "Куртка",
       "firstPoint": 221,
       "secondPoint": 234,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 77,
@@ -1183,7 +1200,8 @@
       "block": "Рукав",
       "firstPoint": 128,
       "secondPoint": 130,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 133,
@@ -1192,7 +1210,8 @@
       "block": "Рукав",
       "firstPoint": 129,
       "secondPoint": 132,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 140,
@@ -1201,7 +1220,8 @@
       "block": "Рукав",
       "firstPoint": 125,
       "secondPoint": 138,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 141,
@@ -1210,7 +1230,8 @@
       "block": "Рукав",
       "firstPoint": 125,
       "secondPoint": 139,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 152,
@@ -1219,7 +1240,8 @@
       "block": "Рукав",
       "firstPoint": 148,
       "secondPoint": 150,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 153,
@@ -1228,7 +1250,8 @@
       "block": "Рукав",
       "firstPoint": 149,
       "secondPoint": 151,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 232,
@@ -1237,7 +1260,8 @@
       "block": "Рукав",
       "firstPoint": 226,
       "secondPoint": 225,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 233,
@@ -1246,7 +1270,8 @@
       "block": "Рукав",
       "firstPoint": 229,
       "secondPoint": 224,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     },
     {
       "id": 166,
@@ -1362,8 +1387,343 @@
       "block": "Комір",
       "firstPoint": 194,
       "secondPoint": 192,
-      "lineColor": "black"
+      "lineColor": "black",
+      "lineType": "solidLine"
     }
   ],
-  "pieces": []
+  "pieces": [
+    {
+      "name": "Подборт",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 50,
+          "modelingId": 117,
+          "type": "NodePoint"
+        },
+        {
+          "id": 76,
+          "modelingId": 118,
+          "type": "NodeArc",
+          "curveType": "arc",
+          "reverse": false
+        },
+        {
+          "id": 61,
+          "modelingId": 119,
+          "type": "NodePoint"
+        },
+        {
+          "id": 71,
+          "modelingId": 120,
+          "type": "NodePoint"
+        },
+        {
+          "id": 97,
+          "modelingId": 121,
+          "type": "NodePoint"
+        },
+        {
+          "id": 98,
+          "modelingId": 122,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 95,
+          "modelingId": 123,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": false,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 33,
+          "modelingId": 245,
+          "type": "NodePoint"
+        },
+        {
+          "id": 77,
+          "modelingId": 246,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 217,
+          "modelingId": 247,
+          "type": "NodePoint"
+        },
+        {
+          "id": 214,
+          "modelingId": 248,
+          "type": "NodePoint"
+        },
+        {
+          "id": 78,
+          "modelingId": 249,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 87,
+          "modelingId": 250,
+          "type": "NodePoint"
+        },
+        {
+          "id": 73,
+          "modelingId": 251,
+          "type": "NodePoint"
+        },
+        {
+          "id": 37,
+          "modelingId": 252,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 221,
+          "modelingId": 292,
+          "type": "NodePoint"
+        },
+        {
+          "id": 234,
+          "modelingId": 293,
+          "type": "NodePoint"
+        },
+        {
+          "id": 76,
+          "modelingId": 294,
+          "type": "NodeArc",
+          "curveType": "arc",
+          "reverse": false
+        },
+        {
+          "id": 61,
+          "modelingId": 295,
+          "type": "NodePoint"
+        },
+        {
+          "id": 201,
+          "modelingId": 296,
+          "type": "NodePoint"
+        },
+        {
+          "id": 203,
+          "modelingId": 297,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 298,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 201,
+          "modelingId": 300,
+          "type": "NodePoint"
+        },
+        {
+          "id": 202,
+          "modelingId": 301,
+          "type": "NodePoint"
+        },
+        {
+          "id": 209,
+          "modelingId": 302,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 303,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 203,
+          "modelingId": 304,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 202,
+          "modelingId": 306,
+          "type": "NodePoint"
+        },
+        {
+          "id": 71,
+          "modelingId": 307,
+          "type": "NodePoint"
+        },
+        {
+          "id": 73,
+          "modelingId": 308,
+          "type": "NodePoint"
+        },
+        {
+          "id": 87,
+          "modelingId": 309,
+          "type": "NodePoint"
+        },
+        {
+          "id": 80,
+          "modelingId": 310,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 209,
+          "modelingId": 311,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 225,
+          "modelingId": 320,
+          "type": "NodePoint"
+        },
+        {
+          "id": 226,
+          "modelingId": 321,
+          "type": "NodePoint"
+        },
+        {
+          "id": 166,
+          "modelingId": 322,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": false
+        },
+        {
+          "id": 138,
+          "modelingId": 323,
+          "type": "NodePoint"
+        },
+        {
+          "id": 168,
+          "modelingId": 324,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": true
+        },
+        {
+          "id": 130,
+          "modelingId": 325,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Detail",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 7,
+      "nodes": [
+        {
+          "id": 224,
+          "modelingId": 327,
+          "type": "NodePoint"
+        },
+        {
+          "id": 132,
+          "modelingId": 328,
+          "type": "NodePoint"
+        },
+        {
+          "id": 169,
+          "modelingId": 329,
+          "type": "NodeSpline",
+          "curveType": "spline",
+          "reverse": false
+        },
+        {
+          "id": 139,
+          "modelingId": 330,
+          "type": "NodePoint"
+        },
+        {
+          "id": 167,
+          "modelingId": 331,
+          "type": "NodeSplinePath",
+          "curveType": "splinePath",
+          "reverse": true
+        },
+        {
+          "id": 229,
+          "modelingId": 332,
+          "type": "NodePoint"
+        }
+      ]
+    },
+    {
+      "name": "Комір",
+      "closed": true,
+      "seamAllowance": 1,
+      "width": 10,
+      "nodes": [
+        {
+          "id": 193,
+          "modelingId": 196,
+          "type": "NodePoint"
+        },
+        {
+          "id": 194,
+          "modelingId": 197,
+          "type": "NodePoint"
+        },
+        {
+          "id": 192,
+          "modelingId": 198,
+          "type": "NodePoint"
+        },
+        {
+          "id": 190,
+          "modelingId": 199,
+          "type": "NodePoint"
+        }
+      ]
+    }
+  ]
 }
