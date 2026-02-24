@@ -689,6 +689,18 @@ export function resolveConstruction(
     if (step.refPointX != null) neededPoints.push(step.refPointX);
     if (step.refPointY != null) neededPoints.push(step.refPointY);
     if (step.center != null) neededPoints.push(step.center);
+    // For operations: sourceId may be a point OR a curve
+    if (step.sourceId != null && !stepCurves.has(step.sourceId)) {
+      neededPoints.push(step.sourceId);
+    }
+    if (step.tangent != null) neededPoints.push(step.tangent);
+    if (step.axisP1 != null) neededPoints.push(step.axisP1);
+    if (step.axisP2 != null) neededPoints.push(step.axisP2);
+    if (step.c1Center != null) neededPoints.push(step.c1Center);
+    if (step.c2Center != null) neededPoints.push(step.c2Center);
+    if (step.d1 != null) neededPoints.push(step.d1);
+    if (step.d2 != null) neededPoints.push(step.d2);
+    if (step.d3 != null) neededPoints.push(step.d3);
     const pathNodes = step.nodes ?? step.pathPoints;
     if (pathNodes) {
       for (const n of pathNodes) neededPoints.push(n.point);
@@ -1286,73 +1298,73 @@ export function resolveConstruction(
 
         // ─── Operations (transforms) ──────────────────────────────────────
         case 'op_rotation': {
-          const src = getPoint(step.sourceId!);
           const center = getPoint(step.center!);
           const angleDeg = resolveAngle(step.angle, ctx);
           const rad = degToRad(angleDeg);
-          // Rotate src around center
-          const dx = src.x - center.x;
-          const dy = src.y - center.y;
-          // Screen-space rotation (y down): standard rotation matrix
-          point = {
-            x: center.x + dx * Math.cos(rad) - dy * Math.sin(rad),
-            y: center.y + dx * Math.sin(rad) + dy * Math.cos(rad),
-          };
-          // If source is a curve, also rotate its commands
+          const rotatePt = (px: number, py: number): Point => ({
+            x: center.x + (px - center.x) * Math.cos(rad) - (py - center.y) * Math.sin(rad),
+            y: center.y + (px - center.x) * Math.sin(rad) + (py - center.y) * Math.cos(rad),
+          });
+
+          // Source is a curve (no point registered)
           const srcCurve = stepCurves.get(step.sourceId!);
-          if (srcCurve) {
+          if (srcCurve && !points.has(step.sourceId!)) {
             const rotated = srcCurve.map(cmd => ({
               type: cmd.type,
-              values: cmd.values.map((v, i) => {
-                if (i % 2 === 0) { // x
-                  const cx = v - center.x;
-                  const cy = cmd.values[i + 1] - center.y;
-                  return center.x + cx * Math.cos(rad) - cy * Math.sin(rad);
-                } else { // y
-                  const cx = cmd.values[i - 1] - center.x;
-                  const cy = v - center.y;
-                  return center.y + cx * Math.sin(rad) + cy * Math.cos(rad);
-                }
-              }),
+              values: cmd.values.map((v, i) =>
+                i % 2 === 0 ? rotatePt(v, cmd.values[i + 1]).x : rotatePt(cmd.values[i - 1], v).y
+              ),
             }));
             stepCurves.set(step.id, rotated);
             curves.push(...rotated);
+            continue; // Curve operation — no point to register
           }
+
+          // Source is a point
+          const src = getPoint(step.sourceId!);
+          point = rotatePt(src.x, src.y);
           break;
         }
 
         case 'op_flippingByLine': {
-          const src = getPoint(step.sourceId!);
           const flp1 = getPoint(step.p1Line!);
           const flp2 = getPoint(step.p2Line!);
           const fldx = flp2.x - flp1.x;
           const fldy = flp2.y - flp1.y;
           const flLen2 = fldx * fldx + fldy * fldy;
-          if (flLen2 < 1e-10) {
-            point = { ...src };
-          } else {
-            const reflectPt = (px: number, py: number): [number, number] => {
-              const t = ((px - flp1.x) * fldx + (py - flp1.y) * fldy) / flLen2;
-              return [2 * (flp1.x + t * fldx) - px, 2 * (flp1.y + t * fldy) - py];
-            };
-            const [rx, ry] = reflectPt(src.x, src.y);
-            point = { x: rx, y: ry };
-            // If source is a curve, also flip its commands
-            const srcCurveFlip = stepCurves.get(step.sourceId!);
-            if (srcCurveFlip) {
-              const flipped = srcCurveFlip.map(cmd => ({
-                type: cmd.type,
-                values: cmd.values.map((v, i) => {
-                  if (i % 2 === 0) {
-                    return reflectPt(v, cmd.values[i + 1])[0];
-                  } else {
-                    return reflectPt(cmd.values[i - 1], v)[1];
-                  }
-                }),
-              }));
-              stepCurves.set(step.id, flipped);
-              curves.push(...flipped);
-            }
+          const reflectPt = (px: number, py: number): [number, number] => {
+            if (flLen2 < 1e-10) return [px, py];
+            const t = ((px - flp1.x) * fldx + (py - flp1.y) * fldy) / flLen2;
+            return [2 * (flp1.x + t * fldx) - px, 2 * (flp1.y + t * fldy) - py];
+          };
+
+          // Source is a curve
+          const srcCurveFlip = stepCurves.get(step.sourceId!);
+          if (srcCurveFlip && !points.has(step.sourceId!)) {
+            const flipped = srcCurveFlip.map(cmd => ({
+              type: cmd.type,
+              values: cmd.values.map((v, i) =>
+                i % 2 === 0 ? reflectPt(v, cmd.values[i + 1])[0] : reflectPt(cmd.values[i - 1], v)[1]
+              ),
+            }));
+            stepCurves.set(step.id, flipped);
+            curves.push(...flipped);
+            continue;
+          }
+
+          const src = getPoint(step.sourceId!);
+          const [rx, ry] = reflectPt(src.x, src.y);
+          point = { x: rx, y: ry };
+          // If source also has curves, flip them
+          if (srcCurveFlip) {
+            const flipped = srcCurveFlip.map(cmd => ({
+              type: cmd.type,
+              values: cmd.values.map((v, i) =>
+                i % 2 === 0 ? reflectPt(v, cmd.values[i + 1])[0] : reflectPt(cmd.values[i - 1], v)[1]
+              ),
+            }));
+            stepCurves.set(step.id, flipped);
+            curves.push(...flipped);
           }
           break;
         }
@@ -1369,20 +1381,28 @@ export function resolveConstruction(
         }
 
         case 'op_moving': {
-          const src = getPoint(step.sourceId!);
           const angleDeg = resolveAngle(step.angle, ctx);
           const len = resolveLength(step.length, ctx);
           const rad = degToRad(angleDeg);
-          // Screen-space: y is inverted for math angles
-          point = {
-            x: src.x + len * Math.cos(rad),
-            y: src.y - len * Math.sin(rad),
-          };
-          // If source is a curve, also move its commands
+          const ox = len * Math.cos(rad);
+          const oy = -len * Math.sin(rad);
+
+          // Source is a curve
           const srcCurveMove = stepCurves.get(step.sourceId!);
+          if (srcCurveMove && !points.has(step.sourceId!)) {
+            const moved = srcCurveMove.map(cmd => ({
+              type: cmd.type,
+              values: cmd.values.map((v, i) => i % 2 === 0 ? v + ox : v + oy),
+            }));
+            stepCurves.set(step.id, moved);
+            curves.push(...moved);
+            continue;
+          }
+
+          const src = getPoint(step.sourceId!);
+          point = { x: src.x + ox, y: src.y + oy };
+          // If source also has a curve, move it too
           if (srcCurveMove) {
-            const ox = point.x - src.x;
-            const oy = point.y - src.y;
             const moved = srcCurveMove.map(cmd => ({
               type: cmd.type,
               values: cmd.values.map((v, i) => i % 2 === 0 ? v + ox : v + oy),
@@ -1425,8 +1445,9 @@ export function resolveConstruction(
           }
         }
       }
-    } catch {
+    } catch (err) {
       // Gracefully skip unresolvable points
+      console.warn(`[resolver] step ${step.id} (${step.type} "${step.name}") failed:`, (err as Error).message);
       points.set(step.id, { x: 0, y: 0 });
     }
   } // end for
