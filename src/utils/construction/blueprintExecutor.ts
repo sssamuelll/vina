@@ -82,7 +82,7 @@ export interface StepAction {
   blockName: string;
 }
 
-function executePointStep(step: PointStep, ctx: FormulaContext): Omit<StepAction, 'blockId' | 'blockName'> {
+function executePointStep(step: PointStep, ctx: FormulaContext, blockId?: string): Omit<StepAction, 'blockId' | 'blockName'> {
   let definition: PointDefinition;
 
   switch (step.type) {
@@ -129,7 +129,7 @@ function executePointStep(step: PointStep, ctx: FormulaContext): Omit<StepAction
   }
 
   return {
-    action: addPoint({ label: step.label, definition }),
+    action: addPoint({ label: step.label, definition, blockId }),
     description: step.comment || `Point "${step.label}" (${step.type})`,
     descriptionEs: step.commentEs,
   };
@@ -163,7 +163,7 @@ export function executeBlueprint(
 
       switch (step.tool) {
         case 'addConstructionPoint':
-          actions.push({ ...executePointStep(step, ctx), ...base });
+          actions.push({ ...executePointStep(step, ctx, block.id), ...base });
           break;
 
         case 'addConstructionLine':
@@ -179,6 +179,7 @@ export function executeBlueprint(
           actions.push({
             action: addCurve({
               label: step.label,
+              blockId: block.id,
               definition: {
                 type: 'spline',
                 from: step.from,
@@ -199,6 +200,7 @@ export function executeBlueprint(
           actions.push({
             action: addConstructionPiece({
               name: step.name,
+              blockId: block.id,
               nodes: step.points.map((label, i) => ({
                 pointId: label,
                 connection: (step.curves?.[i] && step.curves[i] !== null) ? 'curve' as const : 'line' as const,

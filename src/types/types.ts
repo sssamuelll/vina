@@ -38,6 +38,8 @@ export interface PatternPiece {
   seamAllowance: number;
   /** Fabric assignment */
   fabricId?: string;
+  /** Link to construction piece (for overlay alignment) */
+  constructionPieceId?: string;
   createdAt: number;
   updatedAt: number;
 }

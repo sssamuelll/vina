@@ -27,6 +27,8 @@ export interface CPoint {
   definition: PointDefinition;
   /** Visual: whether to show label on canvas */
   visible: boolean;
+  /** Block this point belongs to (for overlay grouping) */
+  blockId?: string;
 }
 
 export type PointDefinition =
@@ -63,6 +65,8 @@ export interface CCurve {
   definition: CurveDefinition;
   /** Visual */
   visible: boolean;
+  /** Block this curve belongs to */
+  blockId?: string;
 }
 
 export type CurveDefinition =
@@ -95,6 +99,10 @@ export interface CPiece {
   seamAllowance: number;
   /** Whether this piece is complete (closed outline) */
   closed: boolean;
+  /** Block this piece belongs to */
+  blockId?: string;
+  /** Normalization offset applied by buildPiece (for overlay alignment) */
+  normOffset?: { x: number; y: number };
 }
 
 // ─── Construction State ─────────────────────────────────────────────────────

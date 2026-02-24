@@ -45,8 +45,8 @@ const constructionSlice = createSlice({
   initialState,
   reducers: {
     // ─── Points ───
-    addPoint(state, action: PayloadAction<{ label: string; definition: PointDefinition; visible?: boolean }>) {
-      const { label, definition, visible } = action.payload;
+    addPoint(state, action: PayloadAction<{ label: string; definition: PointDefinition; visible?: boolean; blockId?: string }>) {
+      const { label, definition, visible, blockId } = action.payload;
 
       // Build lookup from existing points (by id and label)
       const lookup = (ref: string): { x: number; y: number } | null => {
@@ -111,6 +111,7 @@ const constructionSlice = createSlice({
         x, y,
         definition,
         visible: visible ?? true,
+        blockId,
       });
     },
 
@@ -147,12 +148,13 @@ const constructionSlice = createSlice({
     },
 
     // ─── Curves ───
-    addCurve(state, action: PayloadAction<{ label: string; definition: CurveDefinition }>) {
+    addCurve(state, action: PayloadAction<{ label: string; definition: CurveDefinition; blockId?: string }>) {
       state.curves.push({
         id: cid('cv'),
         label: action.payload.label,
         definition: action.payload.definition,
         visible: true,
+        blockId: action.payload.blockId,
       });
     },
 
@@ -161,14 +163,15 @@ const constructionSlice = createSlice({
     },
 
     // ─── Pieces ───
-    addConstructionPiece(state, action: PayloadAction<{ name: string; nodes: PieceNode[]; seamAllowance?: number }>) {
-      const { name, nodes, seamAllowance } = action.payload;
+    addConstructionPiece(state, action: PayloadAction<{ name: string; nodes: PieceNode[]; seamAllowance?: number; blockId?: string }>) {
+      const { name, nodes, seamAllowance, blockId } = action.payload;
       state.pieces.push({
         id: cid('cp'),
         name,
         nodes,
         seamAllowance: seamAllowance ?? 10,
         closed: true,
+        blockId,
       });
     },
 

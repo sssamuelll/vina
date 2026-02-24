@@ -171,7 +171,7 @@ export default function PatternEditor() {
             onPieceNameSave={handlePieceNameSave}
             onPieceNameCancel={handlePieceNameCancel}
           />
-          <ConstructionOverlay zoom2D={zoom2D} />
+          <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
           <SeamRenderer
             seams={seams}
             pieces={pieces}

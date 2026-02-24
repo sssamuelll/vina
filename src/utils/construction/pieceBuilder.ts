@@ -71,6 +71,9 @@ export function buildPiece(
   const minX = allX.length > 0 ? Math.min(...allX) : 0;
   const minY = allY.length > 0 ? Math.min(...allY) : 0;
 
+  // Store normalization offset on the CPiece for overlay alignment
+  cPiece.normOffset = { x: minX, y: minY };
+
   if (minX !== 0 || minY !== 0) {
     for (const cmd of outline) {
       for (let i = 0; i < cmd.values.length; i += 2) {
@@ -89,6 +92,7 @@ export function buildPiece(
     rotation: 0,
     mirrored: false,
     seamAllowance: cPiece.seamAllowance,
+    constructionPieceId: cPiece.id,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
