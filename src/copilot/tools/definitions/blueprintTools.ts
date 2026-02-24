@@ -120,8 +120,12 @@ const executeBlueprintTool: ToolDefinition = {
       return { success: false, error: `Blueprint "${params.blueprintId}" not found. Use searchBlueprints to find available blueprints.` };
     }
 
-    // Validate measurements
-    const measurements = state.project.avatar.measurements as unknown as Record<string, number>;
+    // Validate measurements — convert cm → mm (BodyMeasurements stores cm, blueprints use mm)
+    const rawMeasurements = state.project.avatar.measurements as unknown as Record<string, number>;
+    const measurements: Record<string, number> = {};
+    for (const [k, v] of Object.entries(rawMeasurements)) {
+      measurements[k] = typeof v === 'number' ? v * 10 : v;
+    }
     const validation = validateBlueprint(blueprint, measurements);
 
     if (validation.missing.length > 0) {
