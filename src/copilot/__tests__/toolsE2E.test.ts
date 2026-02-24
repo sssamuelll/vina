@@ -74,7 +74,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 69 tools registered', () => {
-      expect(registry.size).toBe(69);
+      expect(registry.size).toBe(65);
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -295,22 +295,7 @@ describe('Tools E2E', () => {
     });
   });
 
-  // ─── Template Tools ───────────────────────────────────────────────
-
-  describe('Template Tools', () => {
-    it('searchTemplates returns results', async () => {
-      const tool = registry.get('searchTemplates')!;
-      const result = await executeTool(store, tool, { query: 'shirt' });
-      expect(result.success).toBe(true);
-    });
-
-    it('searchTemplates with no query returns all', async () => {
-      const tool = registry.get('searchTemplates')!;
-      const result = await executeTool(store, tool, {});
-      expect(result.success).toBe(true);
-      expect(result.data!.total).toBeGreaterThan(0);
-    });
-  });
+  // ─── Template Tools (removed — replaced by seamlyTools) ─────────
 
   // ─── Semantic Fit Tools ───────────────────────────────────────────
 
@@ -413,7 +398,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all 58 tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(69);
+      expect(names.length).toBe(65);
 
       // Key tools from every category
       const expected = [
@@ -424,7 +409,7 @@ describe('Tools E2E', () => {
         'setMeasurements',
         'autoDetectSeams',
         'searchFabrics', 'getFabricDetails', 'compareFabrics',
-        'searchTemplates', 'generateFromTemplate',
+        'listSeamlyPatterns', 'loadSeamlyPattern',
         'adjustFit', 'adjustLength', 'adjustSleeve', 'adjustProportions',
         'listSeamlyPatterns', 'loadSeamlyPattern',
       ];
