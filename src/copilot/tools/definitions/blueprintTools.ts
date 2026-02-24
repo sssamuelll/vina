@@ -179,11 +179,11 @@ const executeBlueprintTool: ToolDefinition = {
         const { piece, normOffset } = buildPieceWithOffset(cPiece, construction.points, construction.curves, ctx);
         // Store normOffset on CPiece for overlay alignment
         dispatch(setConstructionPieceNormOffset({ pieceId: cPiece.id, normOffset }));
-        // Position pieces side by side with 30mm gap
+        // Position pieces side by side with 80mm gap
         const xs = piece.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
         const pieceWidth = xs.length > 0 ? Math.max(...xs) - Math.min(...xs) : 200;
         piece.position = { x: xOffset, y: 50 };
-        xOffset += pieceWidth + 30;
+        xOffset += pieceWidth + 80;
         dispatch(addPiece(piece));
         builtPieces.push({ id: piece.id, name: piece.name, block: cPiece.name });
       } catch (e) {
