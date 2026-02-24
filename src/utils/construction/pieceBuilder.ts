@@ -70,6 +70,7 @@ export function buildPieceWithOffset(
       if (curve?.resolvedCommands && curve.resolvedCommands.length > 0) {
         // Use pre-resolved multi-segment commands (e.g. splinePath)
         // Skip the initial M command since we're already positioned
+        // Clone each command — originals may be frozen by Immer/Redux
         for (const cmd of curve.resolvedCommands) {
           if (cmd.type === 'M') continue;
           if (node.reverse) {
@@ -78,7 +79,7 @@ export function buildPieceWithOffset(
             outline.push(...cmds);
             break;
           }
-          outline.push(cmd);
+          outline.push({ type: cmd.type, values: [...cmd.values] });
         }
       } else if (curve) {
         const cmds = resolveCurve(curve, point, nextPoint, ctx, node.reverse);

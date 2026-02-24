@@ -127,7 +127,26 @@ const loadSeamlyPatternTool: ToolDefinition = {
     }
 
     // Adapt the pattern
+    console.log('[loadSeamlyPattern] adapting pattern:', patternId, 'overrides:', JSON.stringify(overrides));
     const result = adaptSeamlyPattern(patternData, overrides);
+    console.log('[loadSeamlyPattern] adapter result:', {
+      points: result.points.length,
+      curves: result.curves.length,
+      pieces: result.pieces.length,
+      errors: result.errors,
+    });
+
+    // Log all points for debugging
+    for (const p of result.points) {
+      if (isNaN(p.x) || isNaN(p.y)) {
+        console.warn('[loadSeamlyPattern] NaN point:', p.label, p.x, p.y, p.blockId);
+      }
+    }
+    // Log pieces summary
+    for (const cp of result.pieces) {
+      console.log('[loadSeamlyPattern] piece:', cp.name, 'nodes:', cp.nodes.length,
+        'nodeIds:', cp.nodes.map(n => n.pointId + (n.connection === 'curve' ? '→curve' : '')).join(', '));
+    }
 
     if (result.pieces.length === 0) {
       return {
@@ -162,10 +181,23 @@ const loadSeamlyPatternTool: ToolDefinition = {
 
     // Convert cm → mm for piece coordinates (Seamly2D works in cm)
     const scale = patternData.unit === 'cm' ? 10 : 1;
+    console.log('[loadSeamlyPattern] scale:', scale, 'unit:', patternData.unit);
 
     for (const cPiece of result.pieces) {
+      console.log('[loadSeamlyPattern] building piece:', cPiece.name, 'id:', cPiece.id);
       try {
         const { piece, normOffset } = buildPieceWithOffset(cPiece, result.points, result.curves, ctx);
+        console.log('[loadSeamlyPattern] built:', cPiece.name, 'outline:', piece.outline.length, 'cmds',
+          piece.outline.map(c => c.type).join(' '));
+
+        // Check for NaN/Infinity in outline
+        for (const cmd of piece.outline) {
+          for (let vi = 0; vi < cmd.values.length; vi++) {
+            if (!isFinite(cmd.values[vi])) {
+              console.error('[loadSeamlyPattern] BAD VALUE in', cPiece.name, cmd.type, 'index', vi, '=', cmd.values[vi]);
+            }
+          }
+        }
 
         // Scale to mm if needed
         if (scale !== 1) {
@@ -183,8 +215,11 @@ const loadSeamlyPatternTool: ToolDefinition = {
         const pieceWidth = xs.length > 0 ? Math.max(...xs) - Math.min(...xs) : 200;
         const pieceHeight = ys.length > 0 ? Math.max(...ys) - Math.min(...ys) : 200;
 
+        console.log('[loadSeamlyPattern]', cPiece.name, 'dimensions:', pieceWidth.toFixed(0) + 'x' + pieceHeight.toFixed(0) + 'mm');
+
         // Skip degenerate pieces (0 width or height)
         if (pieceWidth < 5 && pieceHeight < 5) {
+          console.warn('[loadSeamlyPattern] SKIPPING degenerate:', cPiece.name, pieceWidth.toFixed(0) + 'x' + pieceHeight.toFixed(0));
           buildErrors.push(`${cPiece.name}: degenerate (${pieceWidth.toFixed(0)}×${pieceHeight.toFixed(0)}mm)`);
           continue;
         }
@@ -192,6 +227,7 @@ const loadSeamlyPatternTool: ToolDefinition = {
         piece.position = { x: xOffset, y: 50 };
         xOffset += pieceWidth + 80;
 
+        console.log('[loadSeamlyPattern] dispatching addPiece:', cPiece.name, 'id:', piece.id);
         dispatch(addPiece(piece));
         builtPieces.push({
           id: piece.id,
@@ -199,7 +235,9 @@ const loadSeamlyPatternTool: ToolDefinition = {
           width: (pieceWidth / 10).toFixed(1) + 'cm',
           height: (pieceHeight / 10).toFixed(1) + 'cm',
         });
+        console.log('[loadSeamlyPattern] ✓ piece added:', cPiece.name);
       } catch (e) {
+        console.error('[loadSeamlyPattern] ✗ FAILED:', cPiece.name, (e as Error).message, (e as Error).stack);
         buildErrors.push(`${cPiece.name}: ${(e as Error).message}`);
       }
     }
