@@ -159,13 +159,21 @@ const executeBlueprintTool: ToolDefinition = {
     const builtPieces: { id: string; name: string; block: string }[] = [];
     const buildErrors: string[] = [];
 
+    if (construction.pieces.length === 0) {
+      buildErrors.push(`No construction pieces found after dispatching ${dispatched} actions. Points: ${construction.points.length}, Curves: ${construction.curves.length}`);
+    }
+
     for (const cPiece of construction.pieces) {
       try {
         const piece = buildPiece(cPiece, construction.points, construction.curves, ctx);
         dispatch(addPiece(piece));
         builtPieces.push({ id: piece.id, name: piece.name, block: cPiece.name });
       } catch (e) {
-        buildErrors.push(`${cPiece.name}: ${(e as Error).message}`);
+        const nodeInfo = cPiece.nodes.map(n => {
+          const pt = construction.points.find(p => p.id === n.pointId || p.label === n.pointId);
+          return `${n.pointId}(${pt ? 'found' : 'MISSING'})`;
+        }).join(', ');
+        buildErrors.push(`${cPiece.name}: ${(e as Error).message} [nodes: ${nodeInfo}]`);
       }
     }
 
