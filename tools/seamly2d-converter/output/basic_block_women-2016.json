@@ -1650,6 +1650,105 @@
       "angle2": 298.116,
       "length1": 4.93464,
       "length2": 2.21638
+    },
+    {
+      "id": 255,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 248,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 256,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 46,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 257,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 38,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 258,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 249,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 259,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 42,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 260,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 34,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 261,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 13,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 262,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 253,
+      "center": 36,
+      "angle": "AngleLine_A15_A30-AngleLine_A31_A40"
+    },
+    {
+      "id": 272,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 80,
+      "center": 79,
+      "angle": "AngleLine_A68_A66-AngleLine_A67_A66+360"
+    },
+    {
+      "id": 273,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 244,
+      "center": 79,
+      "angle": "AngleLine_A68_A66-AngleLine_A67_A66+360"
+    },
+    {
+      "id": 274,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Basic block women",
+      "sourceId": 269,
+      "center": 79,
+      "angle": "AngleLine_A68_A66-AngleLine_A67_A66+360"
     }
   ],
   "pieces": [

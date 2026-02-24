@@ -1330,6 +1330,15 @@
           "point": 124
         }
       ]
+    },
+    {
+      "id": 124,
+      "name": "a5",
+      "type": "op_rotation",
+      "block": "Front",
+      "sourceId": 27,
+      "center": 29,
+      "angle": "-(AngleLine_A18_A37 - AngleLine_A18_A28)"
     }
   ],
   "pieces": [

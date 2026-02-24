@@ -732,6 +732,33 @@
       "angle2": 180
     },
     {
+      "id": 72,
+      "name": "а1",
+      "type": "op_rotation",
+      "block": "Чертеж 1",
+      "sourceId": 46,
+      "center": 23,
+      "angle": "AngleLine_А15_А40-AngleLine_А15_А38"
+    },
+    {
+      "id": 150,
+      "name": "a1",
+      "type": "op_moving",
+      "block": "Чертеж 1",
+      "sourceId": 117,
+      "angle": 90.6703,
+      "length": 40.35
+    },
+    {
+      "id": 151,
+      "name": "a1",
+      "type": "op_moving",
+      "block": "Чертеж 1",
+      "sourceId": 100,
+      "angle": 90.6703,
+      "length": 40.35
+    },
+    {
       "id": 141,
       "name": "Б",
       "type": "single",

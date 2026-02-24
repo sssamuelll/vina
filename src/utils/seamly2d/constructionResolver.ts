@@ -113,6 +113,9 @@ export interface ConstructionStep {
   d1?: number;
   d2?: number;
   d3?: number;
+  // operations (rotation, flippingByLine, moving)
+  sourceId?: number;
+  axisType?: string;
   // line styling (ignored for computation)
   lineColor?: string;
   lineType?: string;
@@ -1278,6 +1281,115 @@ export function resolveConstruction(
             x: d3.x + dist1 * Math.cos(bisect),
             y: d3.y + dist1 * Math.sin(bisect),
           };
+          break;
+        }
+
+        // ─── Operations (transforms) ──────────────────────────────────────
+        case 'op_rotation': {
+          const src = getPoint(step.sourceId!);
+          const center = getPoint(step.center!);
+          const angleDeg = resolveAngle(step.angle, ctx);
+          const rad = degToRad(angleDeg);
+          // Rotate src around center
+          const dx = src.x - center.x;
+          const dy = src.y - center.y;
+          // Screen-space rotation (y down): standard rotation matrix
+          point = {
+            x: center.x + dx * Math.cos(rad) - dy * Math.sin(rad),
+            y: center.y + dx * Math.sin(rad) + dy * Math.cos(rad),
+          };
+          // If source is a curve, also rotate its commands
+          const srcCurve = stepCurves.get(step.sourceId!);
+          if (srcCurve) {
+            const rotated = srcCurve.map(cmd => ({
+              type: cmd.type,
+              values: cmd.values.map((v, i) => {
+                if (i % 2 === 0) { // x
+                  const cx = v - center.x;
+                  const cy = cmd.values[i + 1] - center.y;
+                  return center.x + cx * Math.cos(rad) - cy * Math.sin(rad);
+                } else { // y
+                  const cx = cmd.values[i - 1] - center.x;
+                  const cy = v - center.y;
+                  return center.y + cx * Math.sin(rad) + cy * Math.cos(rad);
+                }
+              }),
+            }));
+            stepCurves.set(step.id, rotated);
+            curves.push(...rotated);
+          }
+          break;
+        }
+
+        case 'op_flippingByLine': {
+          const src = getPoint(step.sourceId!);
+          const flp1 = getPoint(step.p1Line!);
+          const flp2 = getPoint(step.p2Line!);
+          const fldx = flp2.x - flp1.x;
+          const fldy = flp2.y - flp1.y;
+          const flLen2 = fldx * fldx + fldy * fldy;
+          if (flLen2 < 1e-10) {
+            point = { ...src };
+          } else {
+            const reflectPt = (px: number, py: number): [number, number] => {
+              const t = ((px - flp1.x) * fldx + (py - flp1.y) * fldy) / flLen2;
+              return [2 * (flp1.x + t * fldx) - px, 2 * (flp1.y + t * fldy) - py];
+            };
+            const [rx, ry] = reflectPt(src.x, src.y);
+            point = { x: rx, y: ry };
+            // If source is a curve, also flip its commands
+            const srcCurveFlip = stepCurves.get(step.sourceId!);
+            if (srcCurveFlip) {
+              const flipped = srcCurveFlip.map(cmd => ({
+                type: cmd.type,
+                values: cmd.values.map((v, i) => {
+                  if (i % 2 === 0) {
+                    return reflectPt(v, cmd.values[i + 1])[0];
+                  } else {
+                    return reflectPt(cmd.values[i - 1], v)[1];
+                  }
+                }),
+              }));
+              stepCurves.set(step.id, flipped);
+              curves.push(...flipped);
+            }
+          }
+          break;
+        }
+
+        case 'op_flippingByAxis': {
+          const src = getPoint(step.sourceId!);
+          const center = getPoint(step.center!);
+          if (step.axisType === 'vertical') {
+            point = { x: 2 * center.x - src.x, y: src.y };
+          } else {
+            point = { x: src.x, y: 2 * center.y - src.y };
+          }
+          break;
+        }
+
+        case 'op_moving': {
+          const src = getPoint(step.sourceId!);
+          const angleDeg = resolveAngle(step.angle, ctx);
+          const len = resolveLength(step.length, ctx);
+          const rad = degToRad(angleDeg);
+          // Screen-space: y is inverted for math angles
+          point = {
+            x: src.x + len * Math.cos(rad),
+            y: src.y - len * Math.sin(rad),
+          };
+          // If source is a curve, also move its commands
+          const srcCurveMove = stepCurves.get(step.sourceId!);
+          if (srcCurveMove) {
+            const ox = point.x - src.x;
+            const oy = point.y - src.y;
+            const moved = srcCurveMove.map(cmd => ({
+              type: cmd.type,
+              values: cmd.values.map((v, i) => i % 2 === 0 ? v + ox : v + oy),
+            }));
+            stepCurves.set(step.id, moved);
+            curves.push(...moved);
+          }
           break;
         }
 

@@ -2766,6 +2766,258 @@
       ]
     },
     {
+      "id": 540,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 450,
+      "center": 443,
+      "angle": "AngleLine_A71_A128-AngleLine_A71_A123"
+    },
+    {
+      "id": 541,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 533,
+      "center": 443,
+      "angle": "AngleLine_A71_A128-AngleLine_A71_A123"
+    },
+    {
+      "id": 542,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 532,
+      "center": 443,
+      "angle": "AngleLine_A71_A128-AngleLine_A71_A123"
+    },
+    {
+      "id": 543,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 534,
+      "center": 443,
+      "angle": "AngleLine_A71_A128-AngleLine_A71_A123"
+    },
+    {
+      "id": 546,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 446,
+      "center": 442,
+      "angle": "180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 547,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 448,
+      "center": 442,
+      "angle": "180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 548,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 451,
+      "center": 442,
+      "angle": "180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 549,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 454,
+      "center": 442,
+      "angle": "180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 551,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 197,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 552,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 530,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 553,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 537,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 554,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 543,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 555,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 542,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 556,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 541,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 557,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 540,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 558,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 447,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 559,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Miesten takki",
+      "sourceId": 445,
+      "center": 442,
+      "angle": "-180/3.14*atan(0.5/Line_A93_A94)"
+    },
+    {
+      "id": 770,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 630,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 771,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 626,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 772,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 625,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 773,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 623,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 774,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 635,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 775,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 637,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 776,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 627,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 777,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 628,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 778,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 636,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 779,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 462,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
+      "id": 780,
+      "name": "a4",
+      "type": "op_flippingByLine",
+      "block": "Miesten takki",
+      "sourceId": 629,
+      "p1Line": 467,
+      "p2Line": 464
+    },
+    {
       "id": 225,
       "name": "B",
       "type": "single",

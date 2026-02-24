@@ -1611,6 +1611,186 @@
       ]
     },
     {
+      "id": 144,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 19,
+      "center": 25,
+      "angle": "-180/3.14*atan(#BackPanelFittingInc/Line_BackCenter_CrotchPointBack)"
+    },
+    {
+      "id": 145,
+      "name": "a1",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 44,
+      "center": 25,
+      "angle": "-180/3.14*atan(#BackPanelFittingInc/Line_BackCenter_CrotchPointBack)"
+    },
+    {
+      "id": 393,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 148,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 394,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 62,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 395,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 48,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 396,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 10,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 397,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 108,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 398,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 103,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 399,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 35,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 400,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 70,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 401,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 80,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 402,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 102,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 403,
+      "name": "a2",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 78,
+      "center": 1,
+      "angle": "180/3.14*atan(#Pleat1/#WaistHeight)"
+    },
+    {
+      "id": 405,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 397,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
+      "id": 406,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 398,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
+      "id": 407,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 399,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
+      "id": 408,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 400,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
+      "id": 409,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 401,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
+      "id": 410,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 402,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
+      "id": 411,
+      "name": "a3",
+      "type": "op_rotation",
+      "block": "Trousers",
+      "sourceId": 403,
+      "center": 5,
+      "angle": "180/3.14*atan(#Pleat2/(#WaistHeight-#KneeHeight))"
+    },
+    {
       "id": 154,
       "name": "B",
       "type": "single",
