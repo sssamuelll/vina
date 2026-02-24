@@ -17,6 +17,9 @@ const mockPattern: SeamlyPattern = {
   measurements: {
     defaults: { bust_circ: 920, waist_circ: 740, height: 1680 },
   },
+  pieces: [
+    { name: 'Main', nodes: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }], seamAllowance: 10 },
+  ],
 };
 
 describe('batchGrade', () => {

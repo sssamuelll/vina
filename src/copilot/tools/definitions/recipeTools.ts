@@ -12,6 +12,9 @@ import type { Recipe } from '../../../types/recipe';
 import { executeRecipe, validateRecipe } from '../../../utils/construction/recipeExecutor';
 import { saveRecipe, startRecipe } from '../../../store/recipeSlice';
 import { clearConstruction } from '../../../store/constructionSlice';
+import { addPiece } from '../../../store/projectSlice';
+import { selectPiece } from '../../../store/editorSlice';
+import { buildPiece } from '../../../utils/construction/pieceBuilder';
 
 // ─── searchRecipes ──────────────────────────────────────────────────────────
 
@@ -145,8 +148,31 @@ const executeRecipeTool: ToolDefinition = {
       dispatched++;
     }
 
+    // After all construction actions dispatched, build actual PatternPieces
+    // from the construction pieces that were added
+    const updatedState = getState();
+    const construction = updatedState.construction;
+    const ctx = { measurements, variables: construction.variables as Record<string, number> };
+    const builtPieces: { id: string; name: string }[] = [];
+    const buildErrors: string[] = [];
+
+    for (const cPiece of construction.pieces) {
+      try {
+        const piece = buildPiece(cPiece, construction.points, construction.curves, ctx);
+        dispatch(addPiece(piece));
+        builtPieces.push({ id: piece.id, name: piece.name });
+      } catch (e) {
+        buildErrors.push(`${cPiece.name}: ${(e as Error).message}`);
+      }
+    }
+
+    // Select first built piece
+    if (builtPieces.length > 0) {
+      dispatch(selectPiece(builtPieces[0].id));
+    }
+
     return {
-      success: true,
+      success: builtPieces.length > 0,
       data: {
         recipe: recipe.name,
         method: recipe.method,
@@ -156,10 +182,10 @@ const executeRecipeTool: ToolDefinition = {
           label: v.label,
           value: overrides?.[k] ?? v.default,
         })) : [],
-        pieces: recipe.steps.filter(s => s.tool === 'buildPieceFromConstruction').map(s =>
-          s.tool === 'buildPieceFromConstruction' ? s.name : ''
-        ),
+        piecesBuilt: builtPieces,
+        ...(buildErrors.length > 0 ? { buildErrors } : {}),
       },
+      ...(buildErrors.length > 0 ? { error: `Some pieces failed to build: ${buildErrors.join('; ')}` } : {}),
     };
   },
 };

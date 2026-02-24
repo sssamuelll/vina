@@ -133,30 +133,13 @@ export class PatternTemplateEngine {
         });
       }
     } else {
-      // No pieces defined — return a single piece with all construction points
-      const allPoints = Array.from(points.values());
-      const outline: PathCommand[] = [];
-      if (allPoints.length > 0) {
-        outline.push({ type: 'M', values: [allPoints[0].x, allPoints[0].y] });
-        for (let i = 1; i < allPoints.length; i++) {
-          outline.push({ type: 'L', values: [allPoints[i].x, allPoints[i].y] });
-        }
-        outline.push({ type: 'Z', values: [] });
-      }
-
-      const now = Date.now();
-      pieces.push({
-        id: `${this.pattern.name}_main`,
-        name: this.pattern.name,
-        outline: outline.length > 0 ? outline : curves,
-        internals: [],
-        position: { x: 0, y: 0 },
-        rotation: 0,
-        mirrored: false,
-        seamAllowance: 10,
-        createdAt: now,
-        updatedAt: now,
-      });
+      // No pieces defined — template has construction data but no piece outlines.
+      // Don't create garbage by connecting random construction points.
+      // The caller should use the construction engine / recipes instead.
+      throw new Error(
+        'Template has construction data but no piece definitions. ' +
+        'Use a recipe (searchRecipes) or the construction engine to build pieces from this pattern.'
+      );
     }
 
     return pieces;

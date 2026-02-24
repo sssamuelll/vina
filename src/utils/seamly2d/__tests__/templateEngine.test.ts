@@ -30,7 +30,9 @@ const SIMPLE_PATTERN: SeamlyPattern = {
     { id: 3, name: 'C', type: 'endLine', basePoint: 2, angle: 270, length: '400' },
     { id: 4, name: 'D', type: 'endLine', basePoint: 3, angle: 180, length: '#Width' },
   ],
-  pieces: [],
+  pieces: [
+    { name: 'Main', nodes: [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }], seamAllowance: 10 },
+  ],
 };
 
 /** Pattern with defined pieces (nodes referencing construction points) */
@@ -78,7 +80,9 @@ const TERNARY_PATTERN: SeamlyPattern = {
     { id: 1, name: 'Origin', type: 'single', x: 0, y: 0 },
     { id: 2, name: 'FrontEdge', type: 'endLine', basePoint: 1, angle: 0, length: '#FrontWidth' },
   ],
-  pieces: [],
+  pieces: [
+    { name: 'Main', nodes: [{ id: 1 }, { id: 2 }], seamAllowance: 10 },
+  ],
 };
 
 const DEFAULT_MEASUREMENTS: BodyMeasurements = {
@@ -106,14 +110,14 @@ describe('PatternTemplateEngine', () => {
     });
   });
 
-  describe('generate — simple pattern (no pieces defined)', () => {
+  describe('generate — simple pattern', () => {
     it('generates a single piece from construction points', () => {
       const engine = new PatternTemplateEngine();
       engine.loadPattern(SIMPLE_PATTERN);
       const pieces = engine.generate(DEFAULT_MEASUREMENTS);
 
       expect(pieces.length).toBe(1);
-      expect(pieces[0].name).toBe('test_simple');
+      expect(pieces[0].name).toBe('Main');
       expect(pieces[0].outline.length).toBeGreaterThan(0);
     });
 
