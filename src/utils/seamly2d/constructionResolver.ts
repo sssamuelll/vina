@@ -111,6 +111,15 @@ function distance(a: Point, b: Point): number {
   return Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 }
 
+/**
+ * Seamly2D GetL: compute base handle length for old kAsm spline format.
+ * From vspline_p.h: radius = dist / sqrt(2); L = kCurve * radius * 4/3 * tan(π/8)
+ */
+function seamlyGetL(dist: number, kCurve: number): number {
+  const radius = dist / Math.SQRT2;
+  return kCurve * radius * (4 / 3) * Math.tan(Math.PI / 8);
+}
+
 function angleBetween(a: Point, b: Point): number {
   return Math.atan2(b.y - a.y, b.x - a.x) * (180 / Math.PI);
 }
@@ -344,16 +353,16 @@ export function resolveConstruction(
     if (step.length1 != null) {
       l1 = resolveLength(step.length1, ctx);
     } else if (step.kAsm1 != null) {
-      l1 = step.kAsm1 * kCurve * (d14 / 3);
+      l1 = step.kAsm1 * seamlyGetL(d14, kCurve);
     } else {
-      l1 = d14 / 3;
+      l1 = seamlyGetL(d14, kCurve);
     }
     if (step.length2 != null) {
       l2 = resolveLength(step.length2, ctx);
     } else if (step.kAsm2 != null) {
-      l2 = step.kAsm2 * kCurve * (d14 / 3);
+      l2 = step.kAsm2 * seamlyGetL(d14, kCurve);
     } else {
-      l2 = d14 / 3;
+      l2 = seamlyGetL(d14, kCurve);
     }
 
     const off1 = angleToOffset(a1, l1);
@@ -412,18 +421,18 @@ export function resolveConstruction(
       if (nA.length2 != null) {
         l1 = resolveLength(nA.length2, ctx);
       } else if (nA.kAsm2 != null) {
-        l1 = nA.kAsm2 * kCurve * (dAB / 3);
+        l1 = nA.kAsm2 * seamlyGetL(dAB, kCurve);
       } else {
-        l1 = dAB / 3;
+        l1 = seamlyGetL(dAB, kCurve);
       }
 
       let l2: number;
       if (nB.length1 != null) {
         l2 = resolveLength(nB.length1, ctx);
       } else if (nB.kAsm1 != null) {
-        l2 = nB.kAsm1 * kCurve * (dAB / 3);
+        l2 = nB.kAsm1 * seamlyGetL(dAB, kCurve);
       } else {
-        l2 = dAB / 3;
+        l2 = seamlyGetL(dAB, kCurve);
       }
 
       const off1 = angleToOffset(a1, l1);

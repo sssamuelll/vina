@@ -12,6 +12,12 @@ import type { CPoint, CCurve, CPiece, PieceNode, CurveDefinition } from '../../t
 import { resolveConstruction, type ConstructionStep } from './constructionResolver';
 import { evaluateFormula, type FormulaContext } from './formulaEvaluator';
 
+/** Seamly2D GetL: base handle length for old kAsm format (from vspline_p.h) */
+function seamlyGetL(dist: number, kCurve: number): number {
+  const radius = dist / Math.SQRT2;
+  return kCurve * radius * (4 / 3) * Math.tan(Math.PI / 8);
+}
+
 // ─── Types from Seamly2D JSON ────────────────────────────────────────────────
 
 interface SeamlyPieceNode {
@@ -151,11 +157,11 @@ export function adaptSeamlyPattern(
       const dist = Math.sqrt((toPt.x - fromPt.x) ** 2 + (toPt.y - fromPt.y) ** 2);
       const kCurve = (step as any).kCurve ?? 1;
       const l1 = typeof step.length1 === 'number' ? step.length1 :
-                 typeof (step as any).kAsm1 === 'number' ? (step as any).kAsm1 * kCurve * (dist / 3) :
-                 dist / 3;
+                 typeof (step as any).kAsm1 === 'number' ? (step as any).kAsm1 * seamlyGetL(dist, kCurve) :
+                 seamlyGetL(dist, kCurve);
       const l2 = typeof step.length2 === 'number' ? step.length2 :
-                 typeof (step as any).kAsm2 === 'number' ? (step as any).kAsm2 * kCurve * (dist / 3) :
-                 dist / 3;
+                 typeof (step as any).kAsm2 === 'number' ? (step as any).kAsm2 * seamlyGetL(dist, kCurve) :
+                 seamlyGetL(dist, kCurve);
 
       const definition: CurveDefinition = {
         type: 'spline',
@@ -205,11 +211,11 @@ export function adaptSeamlyPattern(
           const dist = Math.sqrt((toPt.x - fromPt.x) ** 2 + (toPt.y - fromPt.y) ** 2);
           // Resolve lengths: prefer new format, fall back to kAsm
           const l1 = typeof firstNode.length2 === 'number' ? firstNode.length2 :
-                     typeof (firstNode as any).kAsm2 === 'number' ? (firstNode as any).kAsm2 * kCurve * (dist / 3) :
-                     dist / 3;
+                     typeof (firstNode as any).kAsm2 === 'number' ? (firstNode as any).kAsm2 * seamlyGetL(dist, kCurve) :
+                     seamlyGetL(dist, kCurve);
           const l2 = typeof lastNode.length1 === 'number' ? lastNode.length1 :
-                     typeof (lastNode as any).kAsm1 === 'number' ? (lastNode as any).kAsm1 * kCurve * (dist / 3) :
-                     dist / 3;
+                     typeof (lastNode as any).kAsm1 === 'number' ? (lastNode as any).kAsm1 * seamlyGetL(dist, kCurve) :
+                     seamlyGetL(dist, kCurve);
 
           // Get pre-resolved multi-segment commands from resolver
           const resolvedCmds = stepCurves.get(step.id);
