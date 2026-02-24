@@ -88,9 +88,31 @@ export interface ConstructionStep {
   pShoulder?: number;
   // cutSpline
   spline?: number;
-  // pointOfContact
+  // pointOfContact / arc
   center?: number;
   radius?: number | string;
+  // arc
+  // (angle1, angle2, center, radius already covered)
+  // cutArc
+  arc?: number;
+  // pointOfIntersectionCircles
+  c1Center?: number;
+  c2Center?: number;
+  c1Radius?: number | string;
+  c2Radius?: number | string;
+  crossPoint?: number;
+  // triangle
+  axisP1?: number;
+  axisP2?: number;
+  // pointFromCircleAndTangent
+  tangent?: number;
+  // pointOfIntersectionArcs
+  firstArc?: number;
+  secondArc?: number;
+  // trueDarts
+  d1?: number;
+  d2?: number;
+  d3?: number;
   // line styling (ignored for computation)
   lineColor?: string;
   lineType?: string;
@@ -150,6 +172,36 @@ function angleToOffset(angleDeg: number, len: number): Point {
     x: len * Math.cos(rad),
     y: -len * Math.sin(rad),
   };
+}
+
+function sampleCurveToPolyline(cmds: PathCommand[], numSamples = 20): Point[] {
+  const pts: Point[] = [];
+  let cur: Point = { x: 0, y: 0 };
+  for (const cmd of cmds) {
+    if (cmd.type === 'M') {
+      cur = { x: cmd.values[0], y: cmd.values[1] };
+      pts.push(cur);
+    } else if (cmd.type === 'C') {
+      const [cx1, cy1, cx2, cy2, ex, ey] = cmd.values;
+      for (let i = 1; i <= numSamples; i++) {
+        const t = i / numSamples;
+        pts.push(sampleBezier(cur, { x: cx1, y: cy1 }, { x: cx2, y: cy2 }, { x: ex, y: ey }, t));
+      }
+      cur = { x: ex, y: ey };
+    } else if (cmd.type === 'L') {
+      cur = { x: cmd.values[0], y: cmd.values[1] };
+      pts.push(cur);
+    }
+  }
+  return pts;
+}
+
+function isOnSegment(a: Point, b: Point, p: Point, eps = 0.5): boolean {
+  const minX = Math.min(a.x, b.x) - eps;
+  const maxX = Math.max(a.x, b.x) + eps;
+  const minY = Math.min(a.y, b.y) - eps;
+  const maxY = Math.max(a.y, b.y) + eps;
+  return p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY;
 }
 
 function lineLineIntersect(p1: Point, p2: Point, p3: Point, p4: Point): Point | null {
@@ -309,6 +361,13 @@ export function resolveConstruction(
     const p = points.get(id);
     if (!p) throw new Error(`Point ${id} not yet resolved`);
     return p;
+  }
+
+  function nameFromId(id: number): string | undefined {
+    for (const s of steps) {
+      if (s.id === id && s.name) return s.name;
+    }
+    return undefined;
   }
 
   function recordLine(id1: number, id2: number, p1: Point, p2: Point): void {
@@ -912,6 +971,312 @@ export function resolveConstruction(
           point = {
             x: p2.x + len * Math.cos(bisectAngle),
             y: p2.y + len * Math.sin(bisectAngle),
+          };
+          break;
+        }
+
+        // ─── Arc (circular arc as bezier approximation) ──────────────────
+        case 'arc_simple': {
+          // Arc defined by center, radius, angle1, angle2
+          const center = getPoint(step.center!);
+          const radius = resolveLength(step.radius, ctx);
+          const a1 = resolveAngle(step.angle1, ctx);
+          const a2 = resolveAngle(step.angle2, ctx);
+
+          // Generate bezier approximation (same as Seamly2D VArc::getPoints)
+          let totalAngle = a2 - a1;
+          if (totalAngle <= 0) totalAngle += 360;
+          if (totalAngle > 360) totalAngle = ((totalAngle % 360) + 360) % 360;
+
+          const cmds: PathCommand[] = [];
+          const startRad = degToRad(a1);
+          // Screen-space: y is inverted
+          let px = center.x + radius * Math.cos(startRad);
+          let py = center.y - radius * Math.sin(startRad);
+          cmds.push({ type: 'M', values: [px, py] });
+
+          // Split into 45° sections
+          const sectionAngle = 45;
+          const sections = Math.floor(totalAngle / sectionAngle);
+          const sectionAngles: number[] = [];
+          for (let i = 0; i < sections; i++) sectionAngles.push(sectionAngle);
+          const tail = totalAngle - sections * sectionAngle;
+          if (tail > 0.001) sectionAngles.push(tail);
+
+          let currentAngle = a1;
+          for (const sa of sectionAngles) {
+            const lDist = radius * (4 / 3) * Math.tan(degToRad(sa) * 0.25);
+
+            // cp1: perpendicular from current point (90° CCW in screen space)
+            const curRad = degToRad(currentAngle);
+            const cp1x = px + lDist * Math.sin(curRad);  // perpendicular: +sin, +cos in screen
+            const cp1y = py + lDist * Math.cos(curRad);
+
+            const nextAngle = currentAngle + sa;
+            const nextRad = degToRad(nextAngle);
+            const nx = center.x + radius * Math.cos(nextRad);
+            const ny = center.y - radius * Math.sin(nextRad);
+
+            // cp2: perpendicular from next point (opposite direction)
+            const cp2x = nx - lDist * Math.sin(nextRad);
+            const cp2y = ny - lDist * Math.cos(nextRad);
+
+            cmds.push({ type: 'C', values: [cp1x, cp1y, cp2x, cp2y, nx, ny] });
+
+            px = nx;
+            py = ny;
+            currentAngle = nextAngle;
+          }
+
+          curves.push(...cmds);
+          recordSplineLength(step.id, cmds, step);
+
+          // Store in stepCurves for arc references (cutArc, pointOfIntersectionArcs)
+          stepCurves.set(step.id, cmds);
+
+          // Record arc length for Arc_X_Y formula references
+          if (step.name || step.center) {
+            const arcLen = curveArcLength(cmds);
+            const centerName = nameFromId(step.center!);
+            if (centerName) {
+              ctx.variables[`Arc_${centerName}_${step.id}`] = arcLen;
+            }
+          }
+          continue;
+        }
+
+        case 'arc_arcWithLength': {
+          // Arc defined by center, radius, start angle, and arc LENGTH (not end angle)
+          const center = getPoint(step.center!);
+          const radius = resolveLength(step.radius, ctx);
+          const a1 = resolveAngle(step.angle1, ctx);
+          const len = resolveLength(step.length, ctx);
+          // arc length = radius * angle(rad) → angle = length / radius
+          const arcAngleDeg = (len / radius) * (180 / Math.PI);
+
+          // Reuse arc_simple logic
+          let totalAngle = arcAngleDeg;
+          if (totalAngle <= 0) totalAngle = 0.001;
+
+          const cmds: PathCommand[] = [];
+          const startRad = degToRad(a1);
+          let px = center.x + radius * Math.cos(startRad);
+          let py = center.y - radius * Math.sin(startRad);
+          cmds.push({ type: 'M', values: [px, py] });
+
+          const sectionAngle = 45;
+          const sections = Math.floor(totalAngle / sectionAngle);
+          const sectionAngles: number[] = [];
+          for (let i = 0; i < sections; i++) sectionAngles.push(sectionAngle);
+          const arcTail = totalAngle - sections * sectionAngle;
+          if (arcTail > 0.001) sectionAngles.push(arcTail);
+
+          let currentAngle = a1;
+          for (const sa of sectionAngles) {
+            const lDist = radius * (4 / 3) * Math.tan(degToRad(sa) * 0.25);
+            const curRad = degToRad(currentAngle);
+            const cp1x = px + lDist * Math.sin(curRad);
+            const cp1y = py + lDist * Math.cos(curRad);
+            const nextAngle = currentAngle + sa;
+            const nextRad = degToRad(nextAngle);
+            const nx = center.x + radius * Math.cos(nextRad);
+            const ny = center.y - radius * Math.sin(nextRad);
+            const cp2x = nx - lDist * Math.sin(nextRad);
+            const cp2y = ny - lDist * Math.cos(nextRad);
+            cmds.push({ type: 'C', values: [cp1x, cp1y, cp2x, cp2y, nx, ny] });
+            px = nx; py = ny; currentAngle = nextAngle;
+          }
+
+          curves.push(...cmds);
+          recordSplineLength(step.id, cmds, step);
+          stepCurves.set(step.id, cmds);
+
+          if (step.center) {
+            const arcLen = curveArcLength(cmds);
+            const centerName = nameFromId(step.center!);
+            if (centerName) {
+              ctx.variables[`Arc_${centerName}_${step.id}`] = arcLen;
+            }
+          }
+          continue;
+        }
+
+        case 'cutArc': {
+          // Point on arc at given arc length from start
+          const arcId = step.arc!;
+          const len = resolveLength(step.length, ctx);
+          const arcCmds = stepCurves.get(arcId);
+          if (arcCmds) {
+            point = pointAtCurveArcLength(arcCmds, len);
+          } else {
+            point = { x: 0, y: 0 };
+          }
+          break;
+        }
+
+        case 'pointOfIntersectionCircles': {
+          // Intersection of two circles: (c1, r1) and (c2, r2)
+          const c1 = getPoint(step.c1Center!);
+          const c2 = getPoint(step.c2Center!);
+          const r1 = resolveLength(step.c1Radius, ctx);
+          const r2 = resolveLength(step.c2Radius, ctx);
+          const crossPoint = step.crossPoint ?? 1;
+
+          const dx = c2.x - c1.x;
+          const dy = c2.y - c1.y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+
+          if (d > r1 + r2 || d < Math.abs(r1 - r2) || d === 0) {
+            // No intersection — fallback to midpoint
+            point = { x: (c1.x + c2.x) / 2, y: (c1.y + c2.y) / 2 };
+          } else {
+            const a = (r1 * r1 - r2 * r2 + d * d) / (2 * d);
+            const h = Math.sqrt(r1 * r1 - a * a);
+            const mx = c1.x + a * dx / d;
+            const my = c1.y + a * dy / d;
+            if (crossPoint === 1) {
+              point = { x: mx + h * dy / d, y: my - h * dx / d };
+            } else {
+              point = { x: mx - h * dy / d, y: my + h * dx / d };
+            }
+          }
+          break;
+        }
+
+        case 'triangle': {
+          // Seamly2D Triangle tool: find point on axis (axisP1→axisP2) such that
+          // distance(result, firstPoint) + distance(result, secondPoint) is minimized
+          // In Seamly2D: point where perpendicular from firstPoint meets the axis,
+          // then adjusted so dist(result, firstPoint) = dist(secondPoint, firstPoint projected)
+          // Actually: intersection of axis with perpendicular from firstPoint
+          const ap1 = getPoint(step.axisP1!);
+          const ap2 = getPoint(step.axisP2!);
+          const fp = getPoint(step.firstPoint!);
+          const sp = getPoint(step.secondPoint!);
+
+          // Project firstPoint onto axis line
+          const adx = ap2.x - ap1.x;
+          const ady = ap2.y - ap1.y;
+          const alen2 = adx * adx + ady * ady;
+          if (alen2 < 1e-10) {
+            point = { ...ap1 };
+          } else {
+            // Seamly2D triangle: finds point on axis where
+            // the perpendicular from that point has length = dist(firstPoint, secondPoint)
+            // Using the algorithm from VToolTriangle::FindPoint
+            const distFpSp = distance(fp, sp);
+            // Project fp onto axis
+            const t = ((fp.x - ap1.x) * adx + (fp.y - ap1.y) * ady) / alen2;
+            const projX = ap1.x + t * adx;
+            const projY = ap1.y + t * ady;
+            const projDist = distance(fp, { x: projX, y: projY });
+
+            // Move along axis from projection by sqrt(distFpSp² - projDist²)
+            const under = distFpSp * distFpSp - projDist * projDist;
+            if (under < 0) {
+              point = { x: projX, y: projY };
+            } else {
+              const along = Math.sqrt(under);
+              const axisLen = Math.sqrt(alen2);
+              point = {
+                x: projX + along * adx / axisLen,
+                y: projY + along * ady / axisLen,
+              };
+            }
+          }
+          break;
+        }
+
+        case 'pointFromCircleAndTangent': {
+          // Point on circle (center, radius) that forms a tangent from tangent point
+          const center = getPoint(step.center!);
+          const radius = resolveLength(step.radius, ctx);
+          const tangent = getPoint(step.tangent!);
+          const crossPoint = step.crossPoint ?? 1;
+
+          // Tangent from external point to circle:
+          // midpoint of (tangent, center), then intersection with circle of radius = half-dist
+          const mx = (tangent.x + center.x) / 2;
+          const my = (tangent.y + center.y) / 2;
+          const d = distance(tangent, center);
+          const halfD = d / 2;
+
+          if (halfD < radius) {
+            // Point inside circle — no tangent, fallback
+            point = { x: center.x + radius, y: center.y };
+          } else {
+            // Intersect circle(center, radius) with circle(midpoint, halfD)
+            const dc = distance(center, { x: mx, y: my });
+            const aa = (radius * radius - halfD * halfD + dc * dc) / (2 * dc);
+            const hh = Math.sqrt(Math.max(0, radius * radius - aa * aa));
+            const px2 = center.x + aa * (mx - center.x) / dc;
+            const py2 = center.y + aa * (my - center.y) / dc;
+            if (crossPoint === 1) {
+              point = {
+                x: px2 + hh * (my - center.y) / dc,
+                y: py2 - hh * (mx - center.x) / dc,
+              };
+            } else {
+              point = {
+                x: px2 - hh * (my - center.y) / dc,
+                y: py2 + hh * (mx - center.x) / dc,
+              };
+            }
+          }
+          break;
+        }
+
+        case 'pointOfIntersectionArcs': {
+          // Intersection point of two arcs
+          const arc1Cmds = stepCurves.get(step.firstArc!);
+          const arc2Cmds = stepCurves.get(step.secondArc!);
+          const crossPoint = step.crossPoint ?? 1;
+
+          if (arc1Cmds && arc2Cmds) {
+            // Sample both arcs into polylines and find intersection
+            const pts1 = sampleCurveToPolyline(arc1Cmds);
+            const pts2 = sampleCurveToPolyline(arc2Cmds);
+            const intersections: Point[] = [];
+
+            for (let i = 0; i < pts1.length - 1; i++) {
+              for (let j = 0; j < pts2.length - 1; j++) {
+                const ix = lineLineIntersect(pts1[i], pts1[i + 1], pts2[j], pts2[j + 1]);
+                if (ix) {
+                  // Check if intersection is within both segments
+                  const onSeg1 = isOnSegment(pts1[i], pts1[i + 1], ix);
+                  const onSeg2 = isOnSegment(pts2[j], pts2[j + 1], ix);
+                  if (onSeg1 && onSeg2) intersections.push(ix);
+                }
+              }
+            }
+
+            if (intersections.length > 0) {
+              point = intersections[Math.min(crossPoint - 1, intersections.length - 1)];
+            } else {
+              point = { x: 0, y: 0 };
+            }
+          } else {
+            point = { x: 0, y: 0 };
+          }
+          break;
+        }
+
+        case 'trueDarts': {
+          // True darts: rotates dart points to close a dart
+          // d1, d2 = dart legs endpoints, d3 = dart tip
+          // Result is typically two points; we register the first as this step's point
+          const d1 = getPoint(step.d1!);
+          const d2 = getPoint(step.d2!);
+          const d3 = getPoint(step.d3!);
+          // Dart bisector angle
+          const a1td = Math.atan2(d1.y - d3.y, d1.x - d3.x);
+          const a2td = Math.atan2(d2.y - d3.y, d2.x - d3.x);
+          const bisect = (a1td + a2td) / 2;
+          // Rotate d1 to bisector
+          const dist1 = distance(d3, d1);
+          point = {
+            x: d3.x + dist1 * Math.cos(bisect),
+            y: d3.y + dist1 * Math.sin(bisect),
           };
           break;
         }
