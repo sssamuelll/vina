@@ -60,6 +60,13 @@ export function evaluateFormula(
     expr = expr.replace(re, String(context.measurements[name]));
   }
 
+  // Replace plain variable names (camelCase, no # prefix) — process longer first
+  const varNames = Object.keys(context.variables).filter(n => !n.startsWith('#')).sort((a, b) => b.length - a.length);
+  for (const name of varNames) {
+    const re = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'g');
+    expr = expr.replace(re, String(context.variables[name]));
+  }
+
   // Validate the expression is safe
   if (!SAFE_FORMULA_RE.test(expr)) {
     throw new Error(`Unsafe formula expression: ${expr} (original: ${formula})`);

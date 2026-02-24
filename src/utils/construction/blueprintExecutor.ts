@@ -37,7 +37,8 @@ function buildContext(
   userOverrides?: Record<string, number>,
 ): FormulaContext {
   const variables: Record<string, number> = {};
-  const baseCtx: FormulaContext = { measurements, variables: {} };
+  // Context grows as variables are resolved — later vars can reference earlier ones
+  const ctx: FormulaContext = { measurements, variables };
 
   // Blueprint-level variables first
   if (blueprintVars) {
@@ -48,13 +49,12 @@ function buildContext(
       } else {
         variables[name] = typeof def.default === 'number'
           ? def.default
-          : evaluateFormula(def.default, baseCtx);
+          : evaluateFormula(def.default, ctx);
       }
     }
   }
 
-  // Block-level variables (can reference blueprint variables)
-  const blockCtx: FormulaContext = { measurements, variables: { ...variables } };
+  // Block-level variables (can reference blueprint + earlier block variables)
   if (blockVars) {
     for (const [name, def] of Object.entries(blockVars)) {
       const override = userOverrides?.[name];
@@ -63,7 +63,7 @@ function buildContext(
       } else {
         variables[name] = typeof def.default === 'number'
           ? def.default
-          : evaluateFormula(def.default, blockCtx);
+          : evaluateFormula(def.default, ctx);
       }
     }
   }
