@@ -108,15 +108,30 @@ const loadSeamlyPatternTool: ToolDefinition = {
     const state = getState();
     const userMeas = state.project.avatar.measurements as unknown as Record<string, number>;
 
-    // Map our measurement names to Seamly2D names
+    // Map our measurement names (cm) to Seamly2D names (cm)
     const measMapping: Record<string, string> = {
+      // Primary
       height: 'height',
       chest: 'bust_circ',
       waist: 'waist_circ',
       hips: 'hip_circ',
       shoulder: 'shoulder_length',
       armLength: 'arm_shoulder_tip_to_wrist_bent',
+      inseam: 'leg_crotch_to_floor',
+      // Torso
       neckCirc: 'neck_circ',
+      // Vertical heights
+      kneeHeight: 'height_knee',
+      waistHeight: 'height_waist_side',
+      // Lengths back
+      neckToWaistBack: 'neck_back_to_waist_b',
+      waistToFloor: 'leg_waist_side_to_floor',
+      crotchLength: 'leg_crotch_to_floor', // alias
+      // Legs
+      kneeCirc: 'leg_knee_circ',
+      ankleCirc: 'leg_ankle_circ',
+      // Arms
+      wristCirc: 'hand_circ', // closest match
     };
 
     const overrides: Record<string, number> = {};
@@ -124,6 +139,43 @@ const loadSeamlyPatternTool: ToolDefinition = {
       if (userMeas[ourName] != null) {
         overrides[seamlyName] = userMeas[ourName];
       }
+    }
+
+    // Derive missing measurements from anthropometric ratios
+    const h = overrides['height'] ?? userMeas.height ?? 168;
+    if (!overrides['leg_crotch_to_floor'] && userMeas.inseam) {
+      overrides['leg_crotch_to_floor'] = userMeas.inseam;
+    } else if (!overrides['leg_crotch_to_floor']) {
+      overrides['leg_crotch_to_floor'] = h * 0.45;
+    }
+    if (!overrides['height_waist_side']) {
+      overrides['height_waist_side'] = h * 0.58;
+    }
+    if (!overrides['height_knee']) {
+      overrides['height_knee'] = h * 0.285;
+    }
+    if (!overrides['neck_back_to_waist_b']) {
+      overrides['neck_back_to_waist_b'] = h * 0.245;
+    }
+    if (!overrides['leg_waist_side_to_floor']) {
+      overrides['leg_waist_side_to_floor'] = h * 0.62;
+    }
+    if (!overrides['neck_circ']) {
+      // ~21% of chest circ is a rough approximation
+      const chest = overrides['bust_circ'] ?? 92;
+      overrides['neck_circ'] = chest * 0.395;
+    }
+    if (!overrides['hand_circ']) {
+      overrides['hand_circ'] = 20; // average adult hand circumference cm
+    }
+    if (!overrides['leg_knee_circ']) {
+      overrides['leg_knee_circ'] = (overrides['hip_circ'] ?? 98) * 0.39;
+    }
+    if (!overrides['leg_ankle_circ']) {
+      overrides['leg_ankle_circ'] = 23; // average adult
+    }
+    if (!overrides['leg_ankle_high_circ']) {
+      overrides['leg_ankle_high_circ'] = overrides['leg_ankle_circ'] + 2;
     }
 
     // Adapt the pattern
