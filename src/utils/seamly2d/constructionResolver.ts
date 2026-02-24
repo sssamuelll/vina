@@ -36,8 +36,10 @@ export interface ConstructionStep {
   // lineIntersectAxis
   p1Line?: number;
   p2Line?: number;
-  // spline
+  // spline / cubicBezier
   point1?: number;
+  point2?: number;
+  point3?: number;
   point4?: number;
   angle1?: number | string;
   angle2?: number | string;
@@ -497,7 +499,7 @@ export function resolveConstruction(
   function recordSplineLength(stepId: number, cmds: PathCommand[], step: ConstructionStep): void {
     const len = curveArcLength(cmds);
     // For simple spline: Spl_Point1Name_Point4Name
-    if (step.type === 'spline' && step.point1 != null && step.point4 != null) {
+    if ((step.type === 'spline' || step.type === 'cubicBezier') && step.point1 != null && step.point4 != null) {
       const n1 = nameById.get(step.point1);
       const n4 = nameById.get(step.point4);
       if (n1 && n4) {
@@ -733,6 +735,41 @@ export function resolveConstruction(
           // Record line distance and angle
           recordLine(step.firstPoint!, step.secondPoint!, p1, p2);
           continue; // no new point
+        }
+
+        case 'cubicBezier': {
+          // Explicit 4-point bezier: point1, point2 (cp1), point3 (cp2), point4
+          const p1 = getPoint(step.point1!);
+          const p2 = getPoint(step.point2!); // cp1
+          const p3 = getPoint(step.point3!); // cp2
+          const p4 = getPoint(step.point4!);
+          const cmds: PathCommand[] = [
+            { type: 'M', values: [p1.x, p1.y] },
+            { type: 'C', values: [p2.x, p2.y, p3.x, p3.y, p4.x, p4.y] },
+          ];
+          curves.push(...cmds);
+          recordSplineLength(step.id, cmds, step);
+          continue;
+        }
+
+        case 'cubicBezierPath': {
+          // Multi-segment explicit bezier: list of points [p1, cp1, cp2, p2, cp3, cp4, p3, ...]
+          // Every 3 points after the first define a new segment
+          const pathPts = step.pathPoints ?? step.nodes ?? [];
+          const cmds: PathCommand[] = [];
+          if (pathPts.length >= 4) {
+            const first = getPoint(pathPts[0].point ?? pathPts[0]);
+            cmds.push({ type: 'M', values: [first.x, first.y] });
+            for (let i = 1; i + 2 < pathPts.length; i += 3) {
+              const cp1 = getPoint(pathPts[i].point ?? pathPts[i]);
+              const cp2 = getPoint(pathPts[i + 1].point ?? pathPts[i + 1]);
+              const end = getPoint(pathPts[i + 2].point ?? pathPts[i + 2]);
+              cmds.push({ type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, end.x, end.y] });
+            }
+          }
+          curves.push(...cmds);
+          recordSplineLength(step.id, cmds, step);
+          continue;
         }
 
         case 'spline': {
