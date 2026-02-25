@@ -238,15 +238,48 @@ function entitiesToPiece(
   const internals: InternalLine[] = [];
   let name = defaultName;
 
-  // Find piece name from TEXT entities
+  // Find piece name from TEXT entities — prefer "Piece Name: XXX" (AAMA convention)
   for (const e of entities) {
     if (e.type === 'TEXT' || e.type === 'MTEXT') {
-      const text = (e.data as DXFTextData).text;
-      if (text.trim()) { name = text.trim(); break; }
+      const text = (e.data as DXFTextData).text.trim();
+      const match = text.match(/^Piece\s*Name:\s*(.+)/i);
+      if (match) { name = match[1].trim(); break; }
+    }
+  }
+  // Fallback: first non-label, non-notch text
+  if (name === defaultName) {
+    for (const e of entities) {
+      if (e.type === 'TEXT' || e.type === 'MTEXT') {
+        const text = (e.data as DXFTextData).text.trim();
+        if (text && !text.match(/^#\s*\d+$/) && !text.match(/^Piece\s*Name:/i) && !text.match(/^Size\s/i)) {
+          name = text; break;
+        }
+      }
     }
   }
 
-  // Group entities by layer role
+  // Extract notch points from TEXT entities on notch layer (AAMA layer 4)
+  for (const e of entities) {
+    if ((e.type === 'TEXT' || e.type === 'MTEXT') && layerRole(e.layer) === 'notch') {
+      const td = e.data as DXFTextData;
+      let nx = td.x, ny = td.y;
+      if (insertData) {
+        const rad = (insertData.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        const sx = nx * insertData.scaleX, sy = ny * insertData.scaleY;
+        nx = sx * cos - sy * sin + insertData.x;
+        ny = sx * sin + sy * cos + insertData.y;
+      }
+      ny = -ny; // Y-flip
+      const notchPath: PathCommand[] = [
+        { type: 'M', values: [nx, ny - 3] },
+        { type: 'L', values: [nx, ny + 3] },
+      ];
+      internals.push({ id: crypto.randomUUID(), type: 'notch', path: notchPath });
+    }
+  }
+
+  // Group geometry entities by layer role
   for (const e of entities) {
     if (e.type === 'TEXT' || e.type === 'MTEXT' || e.type === 'INSERT') continue;
     const role = layerRole(e.layer);
@@ -269,7 +302,9 @@ function entitiesToPiece(
         }
         break;
       case 'notch':
-        internals.push({ id: crypto.randomUUID(), type: 'notch', path: flipPathY(path) });
+        if (path.length > 0) {
+          internals.push({ id: crypto.randomUUID(), type: 'notch', path: flipPathY(path) });
+        }
         break;
       case 'grainline':
         internals.push({ id: crypto.randomUUID(), type: 'grainline', path: flipPathY(path) });
