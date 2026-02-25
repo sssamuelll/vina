@@ -9,6 +9,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
 import type { FitMapMode, FitMapConfig } from '../utils/cloth/fitMaps';
+import type { QualityLevel } from '../utils/cloth/gpu/qualityPresets';
 
 /** Simulation lifecycle state. */
 export type SimulationState = 'idle' | 'running' | 'paused';
@@ -28,6 +29,10 @@ interface SimulationSliceState {
   fitMapMode: FitMapMode;
   /** Fit map visualization configuration */
   fitMapConfig: FitMapConfig;
+  /** Quality preset level */
+  qualityLevel: QualityLevel;
+  /** Auto-quality detection enabled */
+  autoQuality: boolean;
 }
 
 const initialState: SimulationSliceState = {
@@ -43,6 +48,8 @@ const initialState: SimulationSliceState = {
     fitThresholds: [0.8, 1.0],
     pressureDistance: 0.002,
   },
+  qualityLevel: 'standard' as QualityLevel,
+  autoQuality: true,
 };
 
 const simulationSlice = createSlice({
@@ -85,6 +92,14 @@ const simulationSlice = createSlice({
     updateFitMapConfig(state, action: PayloadAction<Partial<FitMapConfig>>) {
       Object.assign(state.fitMapConfig, action.payload);
     },
+    /** Set quality preset level. */
+    setQualityLevel(state, action: PayloadAction<QualityLevel>) {
+      state.qualityLevel = action.payload;
+    },
+    /** Toggle auto-quality detection. */
+    setAutoQuality(state, action: PayloadAction<boolean>) {
+      state.autoQuality = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -101,6 +116,8 @@ export const {
   setPieceParticleDistance,
   setFitMapMode,
   updateFitMapConfig,
+  setQualityLevel,
+  setAutoQuality,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

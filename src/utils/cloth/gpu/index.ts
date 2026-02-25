@@ -26,3 +26,18 @@ export type {
   SimParams,
   GpuClothBuffers,
 } from './gpuBuffers';
+
+export {
+  QUALITY_PRESETS,
+  presetToSolverConfig,
+  FrameTimeTracker,
+  autoSelectQuality,
+  estimateGPUMemoryMB,
+  buildBenchmarkResult,
+  logBenchmark,
+} from './qualityPresets';
+export type {
+  QualityLevel,
+  QualityPreset,
+  BenchmarkResult,
+} from './qualityPresets';
