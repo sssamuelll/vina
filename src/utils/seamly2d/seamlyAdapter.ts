@@ -293,6 +293,37 @@ export function adaptSeamlyPattern(
     });
   }
 
+  // Seamly2D coordinates are in cm — convert to mm (OpenClo standard)
+  const CM_TO_MM = 10;
+  for (const pt of cPoints) {
+    pt.x *= CM_TO_MM;
+    pt.y *= CM_TO_MM;
+  }
+  for (const curve of cCurves) {
+    if (curve.resolvedCommands) {
+      for (const cmd of curve.resolvedCommands) {
+        if (cmd.values) {
+          for (let i = 0; i < cmd.values.length; i++) {
+            cmd.values[i] *= CM_TO_MM;
+          }
+        }
+      }
+    }
+    // Scale numeric values in curve definition
+    const def = curve.definition;
+    if (def.type === 'cubicBezier') {
+      if (typeof def.cp1x === 'number') def.cp1x *= CM_TO_MM;
+      if (typeof def.cp1y === 'number') def.cp1y *= CM_TO_MM;
+      if (typeof def.cp2x === 'number') def.cp2x *= CM_TO_MM;
+      if (typeof def.cp2y === 'number') def.cp2y *= CM_TO_MM;
+    } else if (def.type === 'spline') {
+      if (typeof def.length1 === 'number') def.length1 *= CM_TO_MM;
+      if (typeof def.length2 === 'number') def.length2 *= CM_TO_MM;
+    } else if (def.type === 'arc') {
+      if (typeof def.radius === 'number') def.radius *= CM_TO_MM;
+    }
+  }
+
   return {
     points: cPoints,
     curves: cCurves,

@@ -76,12 +76,25 @@ async function loadSDFInWorker(
     const { vertices, indices } = extractMeshData(scene);
     if (vertices.length === 0 || indices.length === 0) return null;
 
-    // Heavy SDF generation runs in the worker
-    return initClient.generateSDF(vertices, indices, 64);
+    // Heavy SDF generation runs in the worker — cascade: 32³ → 16³
+    // Copy buffers since generateSDF transfers ownership
+    try {
+      return await initClient.generateSDF(
+        new Float32Array(vertices), new Uint32Array(indices), 32);
+    } catch {
+      console.warn('[SDF] 32³ failed, trying 16³ fallback');
+      try {
+        return await initClient.generateSDF(
+          new Float32Array(vertices), new Uint32Array(indices), 16);
+      } catch {
+        console.warn('[SDF] 16³ also failed');
+        return null;
+      }
+    }
   }
 
-  // Fallback: run everything on main thread (will block, but at least works)
-  return buildAvatarSDF(avatarUrl, avatarHeight);
+  // Fallback: run everything on main thread with lower resolution
+  return buildAvatarSDF(avatarUrl, avatarHeight, 32);
 }
 
 /**

@@ -113,7 +113,7 @@ export class SimulationInitClient {
       this.pendingMesh.set(piece.id, { resolve, reject });
       this.worker!.postMessage({ type: 'meshPiece', piece, options });
 
-      // Timeout: 10s per piece
+      // Timeout: 30s per piece (large pieces at 5mm can generate 5K+ interior points)
       setTimeout(() => {
         if (this.pendingMesh.has(piece.id)) {
           this.pendingMesh.delete(piece.id);
@@ -140,13 +140,13 @@ export class SimulationInitClient {
         [vertices.buffer, indices.buffer],
       );
 
-      // Timeout: 30s for SDF
+      // Timeout: 60s for SDF (32³ grid should complete in <15s)
       setTimeout(() => {
         if (this.pendingSDF) {
           this.pendingSDF = null;
           reject(new Error('SDF generation timeout'));
         }
-      }, 30000);
+      }, 60000);
     });
   }
 
