@@ -36,6 +36,8 @@ export interface PatternPiece {
   mirrored: boolean;
   /** Seam allowance in mm (0 = none) */
   seamAllowance: number;
+  /** Rich dart entities */
+  darts?: Dart[];
   /** Piece type classification */
   category?: PieceCategory;
   /** Which side of the garment */
@@ -48,6 +50,25 @@ export interface PatternPiece {
   constructionPieceId?: string;
   createdAt: number;
   updatedAt: number;
+}
+
+// ─── Rich Dart Entity ───
+
+/** A dart with full geometric and semantic data */
+export interface Dart {
+  id: string;
+  /** Intake (width absorbed) in mm */
+  intake: number;
+  /** Apex point (dart vertex) */
+  apex: Point2D;
+  /** Two dart legs: arrays of points from edge to apex */
+  legs: [Point2D[], Point2D[]];
+  /** Which SemanticEdge the dart sits on */
+  edgeId?: string;
+  /** Fold direction */
+  foldDirection: 'left' | 'right' | 'toward-center';
+  /** Dart depth (length from edge to apex) in mm */
+  depth?: number;
 }
 
 export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat';
