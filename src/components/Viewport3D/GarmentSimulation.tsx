@@ -22,6 +22,7 @@ import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from
 import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
+import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
@@ -199,6 +200,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   // GPU solver client ref
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
+  const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
 
   // Apply placement transforms
   const placedMeshes = useMemo(() => {
@@ -287,30 +289,46 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
           }
         }
 
-        // ─── Fallback: CPU Web Worker ─────────────────────────────────
-        if (cancelled) return;
-        console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
-        const client = new ClothWorkerClient();
-        clientRef.current = client;
-        client.onFrame = onFrame;
-        client.onEdgeData = (ids, lengths) => {
-          edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
-        };
+        // ─── Tier 3: CPU Web Worker ──────────────────────────────────
+        if (!cancelled) {
+          try {
+            console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
+            const client = new ClothWorkerClient();
+            clientRef.current = client;
+            client.onFrame = onFrame;
+            client.onEdgeData = (ids, lengths) => {
+              edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+            };
 
-        await client.initMultiPiece(placedMeshes, seamInitData);
-        client.setFabric(fabricId);
-        client.requestEdgeData();
+            await client.initMultiPiece(placedMeshes, seamInitData);
+            client.setFabric(fabricId);
+            client.requestEdgeData();
 
-        if (!cancelled) client.start();
+            if (!cancelled) client.start();
 
-        // SDF loaded async after simulation starts (non-blocking)
-        if (avatarModelUrl && !cancelled) {
-          import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
-            buildAvatarSDF(avatarModelUrl, avatarHeight)
-          ).then(sdf => {
-            if (!cancelled) client.setSDF(sdf);
-          }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+            // SDF loaded async after simulation starts (non-blocking)
+            if (avatarModelUrl && !cancelled) {
+              import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
+                buildAvatarSDF(avatarModelUrl, avatarHeight)
+              ).then(sdf => {
+                if (!cancelled) client.setSDF(sdf);
+              }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+            }
+            return;
+          } catch (e) {
+            console.warn('[GarmentSimulation] CPU worker failed, falling back to Neural Drape:', e);
+          }
         }
+
+        // ─── Tier 4: Neural Drape (analytical fallback) ─────────────
+        if (cancelled) return;
+        console.log('[GarmentSimulation] 🔵 Using Neural Drape (analytical preview)');
+        const neuralClient = new NeuralDrapeClient();
+        neuralClientRef.current = neuralClient;
+        neuralClient.onFrame = onFrame;
+
+        await neuralClient.initMultiPiece(placedMeshes);
+        if (!cancelled) neuralClient.start();
       };
 
       startSim().catch(e => console.error('[GarmentSimulation] Start failed:', e));
@@ -323,6 +341,8 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         gpuClientRef.current = null;
         wasmClientRef.current?.dispose();
         wasmClientRef.current = null;
+        neuralClientRef.current?.dispose();
+        neuralClientRef.current = null;
         positionsRef.current = null;
       };
     } else if (simulationState === 'idle') {
@@ -332,11 +352,14 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       gpuClientRef.current = null;
       wasmClientRef.current?.dispose();
       wasmClientRef.current = null;
+      neuralClientRef.current?.dispose();
+      neuralClientRef.current = null;
       positionsRef.current = null;
     } else if (simulationState === 'paused') {
       clientRef.current?.stop();
       gpuClientRef.current?.stop();
       wasmClientRef.current?.stop();
+      neuralClientRef.current?.stop();
     }
     return undefined;
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
