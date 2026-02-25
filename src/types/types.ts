@@ -36,6 +36,8 @@ export interface PatternPiece {
   mirrored: boolean;
   /** Seam allowance in mm (0 = none) */
   seamAllowance: number;
+  /** Rich grainline */
+  grainLine?: GrainLine;
   /** Rich dart entities */
   darts?: Dart[];
   /** Piece type classification */
@@ -69,6 +71,23 @@ export interface Dart {
   foldDirection: 'left' | 'right' | 'toward-center';
   /** Dart depth (length from edge to apex) in mm */
   depth?: number;
+}
+
+// ─── GrainLine Semantics ───
+
+export type GrainDirection = 'lengthwise' | 'crosswise' | 'bias' | 'custom';
+
+/** Rich grainline with direction semantics */
+export interface GrainLine {
+  id: string;
+  /** Grain direction relative to fabric */
+  direction: GrainDirection;
+  /** Angle in degrees relative to piece (0 = vertical/lengthwise) */
+  angle: number;
+  /** Reference edge: "parallel to CB", "perpendicular to hem" */
+  referenceEdge?: string;
+  /** Visual path representation */
+  path: PathCommand[];
 }
 
 export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat';

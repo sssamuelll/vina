@@ -40,6 +40,61 @@ export const tools: ToolDefinition[] = [
     },
   },
   {
+    name: 'getGrainLine',
+    description: 'Get grainline info for a piece (direction, angle, reference edge)',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+      },
+      required: ['pieceId'],
+    },
+    execute: async (
+      params: Record<string, unknown>,
+      _dispatch: AppDispatch,
+      getState: () => RootState,
+    ): Promise<ToolResult> => {
+      const { extractGrainLine } = await import('../../../utils/grainLine');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+      const gl = piece.grainLine ?? extractGrainLine(piece);
+      if (!gl) return { success: true, data: { pieceId: piece.id, grainLine: null, message: 'No grainline found' } };
+
+      return { success: true, data: { pieceId: piece.id, grainLine: gl } };
+    },
+  },
+  {
+    name: 'setGrainDirection',
+    description: 'Set grain direction on a piece: lengthwise, crosswise, bias, or custom',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        direction: { type: 'string', description: 'lengthwise | crosswise | bias | custom' },
+      },
+      required: ['pieceId', 'direction'],
+    },
+    execute: async (
+      params: Record<string, unknown>,
+      dispatch: AppDispatch,
+      getState: () => RootState,
+    ): Promise<ToolResult> => {
+      const { setGrainDirection } = await import('../../../utils/grainLine');
+      const { updatePiece } = await import('../../../store/projectSlice');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+      const dir = params.direction as 'lengthwise' | 'crosswise' | 'bias' | 'custom';
+      const gl = setGrainDirection(piece, dir);
+      dispatch(updatePiece({ ...piece, grainLine: gl }));
+
+      return { success: true, data: { pieceId: piece.id, grainLine: gl } };
+    },
+  },
+  {
     name: 'listEdges',
     description: 'List semantic edges of a pattern piece (armhole, shoulder, hemline, etc.). Omit pieceId for all pieces.',
     parameters: {
