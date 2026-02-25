@@ -21,6 +21,7 @@ import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps'
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
+import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
@@ -197,6 +198,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
   // GPU solver client ref
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
+  const wasmClientRef = useRef<WasmSolverClient | null>(null);
 
   // Apply placement transforms
   const placedMeshes = useMemo(() => {
@@ -256,6 +258,35 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
           }
         }
 
+        // ─── Try Wasm XPBD (~3x faster than JS) ──────────────────────
+        if (!cancelled) {
+          try {
+            const wasmAvailable = await isWasmSolverAvailable();
+            if (wasmAvailable && !cancelled) {
+              console.log('[GarmentSimulation] 🟠 Using Wasm XPBD solver');
+              const wasmClient = new WasmSolverClient();
+              wasmClientRef.current = wasmClient;
+              wasmClient.onFrame = onFrame;
+
+              await wasmClient.initMultiPiece(placedMeshes);
+
+              if (!cancelled) wasmClient.start();
+
+              // SDF loaded async
+              if (avatarModelUrl && !cancelled) {
+                import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
+                  buildAvatarSDF(avatarModelUrl, avatarHeight)
+                ).then(sdf => {
+                  if (!cancelled) wasmClient.setSDF(sdf);
+                }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+              }
+              return;
+            }
+          } catch (e) {
+            console.warn('[GarmentSimulation] Wasm failed, falling back to CPU:', e);
+          }
+        }
+
         // ─── Fallback: CPU Web Worker ─────────────────────────────────
         if (cancelled) return;
         console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
@@ -290,6 +321,8 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         clientRef.current = null;
         gpuClientRef.current?.dispose();
         gpuClientRef.current = null;
+        wasmClientRef.current?.dispose();
+        wasmClientRef.current = null;
         positionsRef.current = null;
       };
     } else if (simulationState === 'idle') {
@@ -297,10 +330,13 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       clientRef.current = null;
       gpuClientRef.current?.dispose();
       gpuClientRef.current = null;
+      wasmClientRef.current?.dispose();
+      wasmClientRef.current = null;
       positionsRef.current = null;
     } else if (simulationState === 'paused') {
       clientRef.current?.stop();
       gpuClientRef.current?.stop();
+      wasmClientRef.current?.stop();
     }
     return undefined;
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);

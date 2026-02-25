@@ -6,3 +6,4 @@ dist-server
 # Playwright
 test-results/
 playwright-report/
+crates/*/target/

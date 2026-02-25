@@ -1,0 +1,365 @@
+//! XPBD Cloth Simulation — WebAssembly solver
+//!
+//! Implements Extended Position Based Dynamics for cloth simulation.
+//! Designed to be called from JavaScript via wasm-bindgen.
+//! Positions are stored in a flat f32 array accessible via shared memory.
+//!
+//! Based on Matthias Müller's "Ten Minute Physics" XPBD approach.
+
+use wasm_bindgen::prelude::*;
+
+/// Main XPBD cloth solver.
+#[wasm_bindgen]
+pub struct XpbdSolver {
+    num_particles: usize,
+    positions: Vec<f32>,      // [x,y,z, x,y,z, ...]
+    prev_positions: Vec<f32>,
+    velocities: Vec<f32>,
+    inv_mass: Vec<f32>,
+
+    // Stretch constraints: pairs of particle indices + rest length
+    stretch_ids: Vec<u32>,      // [a,b, a,b, ...]
+    stretch_rest: Vec<f32>,
+
+    // Bend constraints (optional)
+    bend_ids: Vec<u32>,         // [a,b,c,d, ...]
+    bend_rest: Vec<f32>,        // rest dihedral angle
+
+    // Seam constraints
+    seam_ids: Vec<u32>,         // [a,b, a,b, ...]
+    seam_target: Vec<f32>,      // target distance (usually 0)
+
+    // SDF collision
+    sdf_data: Vec<f32>,
+    sdf_resolution: u32,
+    sdf_min: [f32; 3],
+    sdf_cell_size: f32,
+    has_sdf: bool,
+
+    // Self-collision
+    self_collision: bool,
+    thickness: f32,
+    adjacency_offsets: Vec<u32>,
+    adjacency_neighbors: Vec<u32>,
+
+    // Config
+    gravity: [f32; 3],
+    damping: f32,
+    substeps: u32,
+    stretch_compliance: f32,
+    bend_compliance: f32,
+    ground_y: f32,
+    collision_margin: f32,
+}
+
+#[wasm_bindgen]
+impl XpbdSolver {
+    /// Create a new solver with particle positions and inverse masses.
+    #[wasm_bindgen(constructor)]
+    pub fn new(positions: &[f32], inv_mass: &[f32]) -> XpbdSolver {
+        let num_particles = inv_mass.len();
+        let positions = positions.to_vec();
+        let prev_positions = positions.clone();
+        let velocities = vec![0.0; num_particles * 3];
+        let inv_mass = inv_mass.to_vec();
+
+        XpbdSolver {
+            num_particles,
+            positions,
+            prev_positions,
+            velocities,
+            inv_mass,
+            stretch_ids: Vec::new(),
+            stretch_rest: Vec::new(),
+            bend_ids: Vec::new(),
+            bend_rest: Vec::new(),
+            seam_ids: Vec::new(),
+            seam_target: Vec::new(),
+            sdf_data: Vec::new(),
+            sdf_resolution: 0,
+            sdf_min: [0.0; 3],
+            sdf_cell_size: 0.0,
+            has_sdf: false,
+            self_collision: false,
+            thickness: 0.002,
+            adjacency_offsets: Vec::new(),
+            adjacency_neighbors: Vec::new(),
+            gravity: [0.0, -9.81, 0.0],
+            damping: 0.99,
+            substeps: 15,
+            stretch_compliance: 0.0,
+            bend_compliance: 0.01,
+            ground_y: -2.0,
+            collision_margin: 0.005,
+        }
+    }
+
+    /// Set stretch constraints (pairs of ids + rest lengths).
+    pub fn set_stretch(&mut self, ids: &[u32], rest_lengths: &[f32]) {
+        self.stretch_ids = ids.to_vec();
+        self.stretch_rest = rest_lengths.to_vec();
+    }
+
+    /// Set bend constraints.
+    pub fn set_bend(&mut self, ids: &[u32], rest_angles: &[f32]) {
+        self.bend_ids = ids.to_vec();
+        self.bend_rest = rest_angles.to_vec();
+    }
+
+    /// Set seam constraints.
+    pub fn set_seams(&mut self, ids: &[u32], target_dist: &[f32]) {
+        self.seam_ids = ids.to_vec();
+        self.seam_target = target_dist.to_vec();
+    }
+
+    /// Upload SDF volume for body collision.
+    pub fn set_sdf(&mut self, data: &[f32], resolution: u32, min_x: f32, min_y: f32, min_z: f32, cell_size: f32) {
+        self.sdf_data = data.to_vec();
+        self.sdf_resolution = resolution;
+        self.sdf_min = [min_x, min_y, min_z];
+        self.sdf_cell_size = cell_size;
+        self.has_sdf = true;
+    }
+
+    /// Set adjacency for self-collision.
+    pub fn set_adjacency(&mut self, offsets: &[u32], neighbors: &[u32]) {
+        self.adjacency_offsets = offsets.to_vec();
+        self.adjacency_neighbors = neighbors.to_vec();
+    }
+
+    /// Configure solver parameters.
+    pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
+                     stretch_compliance: f32, bend_compliance: f32,
+                     self_collision: bool, thickness: f32, collision_margin: f32) {
+        self.substeps = substeps;
+        self.damping = damping;
+        self.gravity[1] = gravity_y;
+        self.stretch_compliance = stretch_compliance;
+        self.bend_compliance = bend_compliance;
+        self.self_collision = self_collision;
+        self.thickness = thickness;
+        self.collision_margin = collision_margin;
+    }
+
+    /// Step the simulation forward one frame.
+    pub fn step(&mut self, dt: f32) {
+        let sdt = dt / self.substeps as f32;
+
+        for _ in 0..self.substeps {
+            self.pre_solve(sdt);
+            self.solve_stretch(sdt);
+            self.solve_seams(sdt);
+            if self.has_sdf {
+                self.solve_sdf_collision();
+            }
+            self.post_solve(sdt);
+        }
+    }
+
+    /// Get pointer to positions buffer (for zero-copy JS access).
+    pub fn positions_ptr(&self) -> *const f32 {
+        self.positions.as_ptr()
+    }
+
+    /// Get number of particles.
+    pub fn num_particles(&self) -> usize {
+        self.num_particles
+    }
+
+    // ─── Internal solver passes ─────────────────────────────────────────
+
+    fn pre_solve(&mut self, sdt: f32) {
+        for i in 0..self.num_particles {
+            if self.inv_mass[i] == 0.0 { continue; }
+            let idx = i * 3;
+
+            // Save previous position
+            self.prev_positions[idx] = self.positions[idx];
+            self.prev_positions[idx + 1] = self.positions[idx + 1];
+            self.prev_positions[idx + 2] = self.positions[idx + 2];
+
+            // Apply gravity
+            self.velocities[idx] += self.gravity[0] * sdt;
+            self.velocities[idx + 1] += self.gravity[1] * sdt;
+            self.velocities[idx + 2] += self.gravity[2] * sdt;
+
+            // Damping
+            self.velocities[idx] *= self.damping;
+            self.velocities[idx + 1] *= self.damping;
+            self.velocities[idx + 2] *= self.damping;
+
+            // Integrate
+            self.positions[idx] += self.velocities[idx] * sdt;
+            self.positions[idx + 1] += self.velocities[idx + 1] * sdt;
+            self.positions[idx + 2] += self.velocities[idx + 2] * sdt;
+
+            // Ground collision
+            if self.positions[idx + 1] < self.ground_y {
+                self.positions[idx + 1] = self.ground_y;
+            }
+        }
+    }
+
+    fn solve_stretch(&mut self, sdt: f32) {
+        let num_constraints = self.stretch_ids.len() / 2;
+        let alpha = self.stretch_compliance / (sdt * sdt);
+
+        for c in 0..num_constraints {
+            let a = self.stretch_ids[c * 2] as usize;
+            let b = self.stretch_ids[c * 2 + 1] as usize;
+            let wa = self.inv_mass[a];
+            let wb = self.inv_mass[b];
+            let w_sum = wa + wb;
+            if w_sum == 0.0 { continue; }
+
+            let ai = a * 3;
+            let bi = b * 3;
+            let dx = self.positions[bi] - self.positions[ai];
+            let dy = self.positions[bi + 1] - self.positions[ai + 1];
+            let dz = self.positions[bi + 2] - self.positions[ai + 2];
+            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+            if dist < 1e-12 { continue; }
+
+            let rest = self.stretch_rest[c];
+            let c_val = dist - rest;
+            let s = -c_val / (w_sum + alpha);
+
+            let nx = dx / dist;
+            let ny = dy / dist;
+            let nz = dz / dist;
+
+            self.positions[ai] -= nx * s * wa;
+            self.positions[ai + 1] -= ny * s * wa;
+            self.positions[ai + 2] -= nz * s * wa;
+            self.positions[bi] += nx * s * wb;
+            self.positions[bi + 1] += ny * s * wb;
+            self.positions[bi + 2] += nz * s * wb;
+        }
+    }
+
+    fn solve_seams(&mut self, sdt: f32) {
+        let num = self.seam_ids.len() / 2;
+        let alpha = 0.0 / (sdt * sdt); // zero compliance = rigid seams
+
+        for c in 0..num {
+            let a = self.seam_ids[c * 2] as usize;
+            let b = self.seam_ids[c * 2 + 1] as usize;
+            let wa = self.inv_mass[a];
+            let wb = self.inv_mass[b];
+            let w_sum = wa + wb;
+            if w_sum == 0.0 { continue; }
+
+            let ai = a * 3;
+            let bi = b * 3;
+            let dx = self.positions[bi] - self.positions[ai];
+            let dy = self.positions[bi + 1] - self.positions[ai + 1];
+            let dz = self.positions[bi + 2] - self.positions[ai + 2];
+            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+            if dist < 1e-12 { continue; }
+
+            let target = self.seam_target[c];
+            let c_val = dist - target;
+            let s = -c_val / (w_sum + alpha);
+
+            let nx = dx / dist;
+            let ny = dy / dist;
+            let nz = dz / dist;
+
+            self.positions[ai] -= nx * s * wa;
+            self.positions[ai + 1] -= ny * s * wa;
+            self.positions[ai + 2] -= nz * s * wa;
+            self.positions[bi] += nx * s * wb;
+            self.positions[bi + 1] += ny * s * wb;
+            self.positions[bi + 2] += nz * s * wb;
+        }
+    }
+
+    fn solve_sdf_collision(&mut self) {
+        let res = self.sdf_resolution as usize;
+        if res == 0 || self.sdf_data.is_empty() { return; }
+
+        for i in 0..self.num_particles {
+            if self.inv_mass[i] == 0.0 { continue; }
+            let idx = i * 3;
+            let px = self.positions[idx];
+            let py = self.positions[idx + 1];
+            let pz = self.positions[idx + 2];
+
+            let dist = self.sample_sdf(px, py, pz);
+            if dist < self.collision_margin {
+                let (gx, gy, gz) = self.sdf_gradient(px, py, pz);
+                let correction = self.collision_margin - dist;
+                self.positions[idx] += gx * correction;
+                self.positions[idx + 1] += gy * correction;
+                self.positions[idx + 2] += gz * correction;
+            }
+        }
+    }
+
+    fn sample_sdf(&self, px: f32, py: f32, pz: f32) -> f32 {
+        let res = self.sdf_resolution as usize;
+        let gx = (px - self.sdf_min[0]) / self.sdf_cell_size;
+        let gy = (py - self.sdf_min[1]) / self.sdf_cell_size;
+        let gz = (pz - self.sdf_min[2]) / self.sdf_cell_size;
+
+        let fres = (res - 1) as f32;
+        if gx < 0.0 || gx >= fres || gy < 0.0 || gy >= fres || gz < 0.0 || gz >= fres {
+            return 1.0;
+        }
+
+        let x0 = gx as usize;
+        let y0 = gy as usize;
+        let z0 = gz as usize;
+        let x1 = (x0 + 1).min(res - 1);
+        let y1 = (y0 + 1).min(res - 1);
+        let z1 = (z0 + 1).min(res - 1);
+
+        let fx = gx - x0 as f32;
+        let fy = gy - y0 as f32;
+        let fz = gz - z0 as f32;
+
+        let idx = |x: usize, y: usize, z: usize| -> usize { z * res * res + y * res + x };
+
+        let c000 = self.sdf_data[idx(x0, y0, z0)];
+        let c100 = self.sdf_data[idx(x1, y0, z0)];
+        let c010 = self.sdf_data[idx(x0, y1, z0)];
+        let c110 = self.sdf_data[idx(x1, y1, z0)];
+        let c001 = self.sdf_data[idx(x0, y0, z1)];
+        let c101 = self.sdf_data[idx(x1, y0, z1)];
+        let c011 = self.sdf_data[idx(x0, y1, z1)];
+        let c111 = self.sdf_data[idx(x1, y1, z1)];
+
+        let c00 = c000 * (1.0 - fx) + c100 * fx;
+        let c01 = c001 * (1.0 - fx) + c101 * fx;
+        let c10 = c010 * (1.0 - fx) + c110 * fx;
+        let c11 = c011 * (1.0 - fx) + c111 * fx;
+
+        let c0 = c00 * (1.0 - fy) + c10 * fy;
+        let c1 = c01 * (1.0 - fy) + c11 * fy;
+
+        c0 * (1.0 - fz) + c1 * fz
+    }
+
+    fn sdf_gradient(&self, px: f32, py: f32, pz: f32) -> (f32, f32, f32) {
+        let h = self.sdf_cell_size * 0.5;
+        let dx = self.sample_sdf(px + h, py, pz) - self.sample_sdf(px - h, py, pz);
+        let dy = self.sample_sdf(px, py + h, pz) - self.sample_sdf(px, py - h, pz);
+        let dz = self.sample_sdf(px, py, pz + h) - self.sample_sdf(px, py, pz - h);
+        let len = (dx * dx + dy * dy + dz * dz).sqrt();
+        if len < 1e-12 {
+            return (0.0, 1.0, 0.0);
+        }
+        (dx / len, dy / len, dz / len)
+    }
+
+    fn post_solve(&mut self, sdt: f32) {
+        let inv_sdt = 1.0 / sdt;
+        for i in 0..self.num_particles {
+            if self.inv_mass[i] == 0.0 { continue; }
+            let idx = i * 3;
+            self.velocities[idx] = (self.positions[idx] - self.prev_positions[idx]) * inv_sdt;
+            self.velocities[idx + 1] = (self.positions[idx + 1] - self.prev_positions[idx + 1]) * inv_sdt;
+            self.velocities[idx + 2] = (self.positions[idx + 2] - self.prev_positions[idx + 2]) * inv_sdt;
+        }
+    }
+}
