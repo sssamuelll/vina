@@ -31,6 +31,7 @@ import { tools as garmentPipelineToolDefs } from './definitions/garmentPipelineT
 import { tools as edgeToolDefs } from './definitions/edgeTools';
 import { tools as dartToolDefs } from './definitions/dartTools';
 import { tools as easeToolDefs } from './definitions/easeTools';
+import { tools as patternOpsToolDefs } from './definitions/patternOpsTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -291,6 +292,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   edgeToolDefs,
   dartToolDefs,
   easeToolDefs,
+  patternOpsToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
