@@ -100,6 +100,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pieceParticleDistance: {},
       fitMapMode: 'none' as const,
       fitMapConfig: { stressRange: [0, 100] as [number, number], strainRange: [1.0, 1.2] as [number, number], fitThresholds: [0.8, 1.0] as [number, number], pressureDistance: 0.002 },
+      qualityLevel: 'standard' as const,
+      autoQuality: true,
     },
     plugins: {
       installedPlugins: [],

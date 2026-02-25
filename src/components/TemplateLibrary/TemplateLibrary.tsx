@@ -1,5 +1,5 @@
-import { useSelector } from 'react-redux';
-import { RootState } from '../../store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch } from '../../store';
 import { getCatalog, getCatalogByCategory, type CatalogEntry, type GarmentCategory } from '../../utils/seamly2d/catalog';
 import { useState } from 'react';
 import './TemplateLibrary.css';
@@ -25,19 +25,59 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
   const [filter, setFilter] = useState<GarmentCategory | 'all'>('all');
   const [loading, setLoading] = useState<string | null>(null);
 
+  const dispatch = useDispatch<AppDispatch>();
   const catalog = filter === 'all' ? getCatalog() : getCatalogByCategory(filter);
   const categories = [...new Set(getCatalog().map(e => e.category))];
 
   const handleGenerate = async (entry: CatalogEntry) => {
     setLoading(entry.id);
     try {
-      // Dispatch a custom event that the CopilotPanel can pick up,
-      // or directly use the template engine
-      const event = new CustomEvent('openclo:generate-template', {
-        detail: { templateId: entry.id },
-      });
-      window.dispatchEvent(event);
+      // Dynamically import to avoid circular deps and keep initial bundle small
+      const { adaptSeamlyPattern } = await import('../../utils/seamly2d/seamlyAdapter');
+      const { buildPiece } = await import('../../utils/construction/pieceBuilder');
+      const { loadConstruction } = await import('../../store/constructionSlice');
+      const { addPiece } = await import('../../store/projectSlice');
+
+      // Load the pattern JSON via Vite glob
+      const modules = import.meta.glob('../../../tools/seamly2d-converter/output/*.json') as Record<string, () => Promise<{ default: unknown }>>;
+      const key = Object.keys(modules).find(k => k.includes(entry.id));
+      if (!key) { console.error(`Pattern file not found for ${entry.id}`); return; }
+      const mod = await modules[key]();
+      const patternData = mod.default as import('../../utils/seamly2d/seamlyAdapter').SeamlyPattern;
+
+      // Get measurements from avatar state
+      const m = avatar.measurements;
+      const measurements: Record<string, number> = {
+        chest: m.chest,
+        waist: m.waist,
+        hips: m.hips,
+        shoulderWidth: m.shoulderWidth ?? 40,
+        height: m.height,
+        armLength: m.armLength ?? 60,
+        inseam: m.inseam ?? 80,
+      };
+
+      // Adapt Seamly2D pattern
+      const adapted = adaptSeamlyPattern(patternData, measurements);
+      dispatch(loadConstruction({
+        points: adapted.points,
+        lines: [],
+        curves: adapted.curves,
+        pieces: adapted.pieces,
+        variables: adapted.variables ?? {},
+      }));
+
+      // Build each piece and add to editor
+      const formulaCtx = { measurements, variables: adapted.variables ?? {} };
+      for (const cPiece of adapted.pieces) {
+        const builtPiece = buildPiece(cPiece, adapted.points, adapted.curves, formulaCtx);
+        if (builtPiece) {
+          dispatch(addPiece(builtPiece));
+        }
+      }
       onClose();
+    } catch (err) {
+      console.error('[TemplateLibrary] Failed to load pattern:', err);
     } finally {
       setLoading(null);
     }
