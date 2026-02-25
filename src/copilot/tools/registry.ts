@@ -35,6 +35,7 @@ import { tools as patternOpsToolDefs } from './definitions/patternOpsTools';
 import { tools as ruleToolDefs } from './definitions/ruleTools';
 import { tools as uiStateToolDefs } from './definitions/uiStateTools';
 import { tools as memoryToolDefs } from './definitions/memoryTools';
+import { tools as uiBridgeToolDefs } from './definitions/uiBridgeTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -299,6 +300,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   ruleToolDefs,
   uiStateToolDefs,
   memoryToolDefs,
+  uiBridgeToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
