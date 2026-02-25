@@ -38,7 +38,7 @@ describe('UI State Tools (#80)', () => {
   it('getEditorState returns tool and view info', async () => {
     const registry = getDefaultRegistry();
     const tool = registry.get('getEditorState')!;
-    const result = await tool.execute({}, dispatch as any, getState);
+    const result: any = await tool.execute({}, dispatch as any, getState);
     expect(result.success).toBe(true);
     expect(result.activeTool).toBe('select');
     expect(result.viewMode).toBe('split');
@@ -49,7 +49,7 @@ describe('UI State Tools (#80)', () => {
   it('getSelection returns enriched piece data', async () => {
     const registry = getDefaultRegistry();
     const tool = registry.get('getSelection')!;
-    const result = await tool.execute({}, dispatch as any, getState);
+    const result: any = await tool.execute({}, dispatch as any, getState);
     expect(result.success).toBe(true);
     expect(result.selectedCount).toBe(1);
     expect((result as any).pieces[0].name).toBe('Front Bodice');
@@ -62,14 +62,14 @@ describe('UI State Tools (#80)', () => {
     const emptyState = { ...mockState, editor: { ...mockState.editor, selectedPieceIds: [] } };
     const registry = getDefaultRegistry();
     const tool = registry.get('getSelection')!;
-    const result = await tool.execute({}, dispatch as any, () => emptyState as any);
+    const result: any = await tool.execute({}, dispatch as any, () => emptyState as any);
     expect(result.selectedCount).toBe(0);
   });
 
   it('getProjectSummary returns counts', async () => {
     const registry = getDefaultRegistry();
     const tool = registry.get('getProjectSummary')!;
-    const result = await tool.execute({}, dispatch as any, getState);
+    const result: any = await tool.execute({}, dispatch as any, getState);
     expect(result.success).toBe(true);
     expect(result.pieceCount).toBe(2);
     expect(result.seamCount).toBe(1);
@@ -81,7 +81,7 @@ describe('UI State Tools (#80)', () => {
   it('getSimulationState returns solver info', async () => {
     const registry = getDefaultRegistry();
     const tool = registry.get('getSimulationState')!;
-    const result = await tool.execute({}, dispatch as any, getState);
+    const result: any = await tool.execute({}, dispatch as any, getState);
     expect(result.success).toBe(true);
     expect(result.state).toBe('idle');
     expect(result.solverTier).toBe('none');
@@ -90,7 +90,7 @@ describe('UI State Tools (#80)', () => {
   it('getUndoState returns availability', async () => {
     const registry = getDefaultRegistry();
     const tool = registry.get('getUndoState')!;
-    const result = await tool.execute({}, dispatch as any, getState);
+    const result: any = await tool.execute({}, dispatch as any, getState);
     expect(result.success).toBe(true);
     expect(typeof result.canUndo).toBe('boolean');
     expect(typeof result.canRedo).toBe('boolean');

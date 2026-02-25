@@ -1,266 +1,138 @@
 /**
- * Per-project Memory — persists conversation history and agent decisions per project.
+ * #81 — Copilot Memory: Project Context Persistence
  *
- * Stored in localStorage with key `openclo_memory_${projectId}`.
- * Max 50 messages (FIFO) with older messages summarized.
+ * Class-based API (ProjectMemory) for session-level message history + decisions.
+ * Stored in localStorage for synchronous access from CopilotPanel.
  *
- * @module memory
+ * Functional API (loadMemory/saveMemory) for IndexedDB-backed long-term memory
+ * with preferences, notes, and cross-session recall via copilot tools.
  */
 
-/**
- * A single message in the conversation history.
- */
-export interface MemoryMessage {
-  role: 'user' | 'assistant';
+import { storageGet, storageSet } from '../utils/storage';
+
+// ─── Message types ───────────────────────────────────────────────────────────
+
+export interface CopilotMessage {
+  role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
-  /** Tool names that were called (for assistant messages) */
   toolsCalled?: string[];
 }
 
-/**
- * Per-project memory data structure.
- */
-export interface ProjectMemoryData {
-  projectId: string;
-  messages: MemoryMessage[];
-  /** Key decisions made during the project */
-  decisions: string[];
-  /** Summary of older messages that were trimmed */
-  summary: string;
-  /** Last updated timestamp */
-  updatedAt: number;
-}
+// ─── Class-based API (localStorage, synchronous) ─────────────────────────────
 
-const MAX_MESSAGES = 50;
 const STORAGE_PREFIX = 'openclo_memory_';
+const MAX_MESSAGES = 50;
+const MAX_DECISIONS = 20;
 
-/**
- * Per-project memory manager.
- *
- * Handles saving, loading, and trimming conversation history
- * with per-project isolation in localStorage.
- *
- * @example
- * ```ts
- * const memory = new ProjectMemory('project-123');
- * memory.addMessage({ role: 'user', content: 'Create a bodice', timestamp: Date.now() });
- * memory.save();
- * ```
- */
 export class ProjectMemory {
-  private data: ProjectMemoryData;
+  projectId: string;
+  messages: CopilotMessage[];
+  decisions: string[];
+  summary: string;
 
-  /**
-   * Create a new ProjectMemory instance.
-   * Automatically loads existing data from localStorage.
-   *
-   * @param projectId - Unique project identifier
-   */
   constructor(projectId: string) {
-    this.data = this.load(projectId);
+    this.projectId = projectId;
+    this.messages = [];
+    this.decisions = [];
+    this.summary = '';
+    this._load();
   }
 
-  /** Get the project ID */
-  get projectId(): string {
-    return this.data.projectId;
-  }
-
-  /** Get all messages */
-  get messages(): MemoryMessage[] {
-    return this.data.messages;
-  }
-
-  /** Get decisions */
-  get decisions(): string[] {
-    return this.data.decisions;
-  }
-
-  /** Get the summary of older trimmed messages */
-  get summary(): string {
-    return this.data.summary;
-  }
-
-  /**
-   * Add a message to the conversation history.
-   * If the history exceeds MAX_MESSAGES, older messages are trimmed
-   * and a summary is generated.
-   *
-   * @param message - The message to add
-   */
-  addMessage(message: MemoryMessage): void {
-    this.data.messages.push(message);
-    this.data.updatedAt = Date.now();
-
-    // Trim if exceeding max
-    if (this.data.messages.length > MAX_MESSAGES) {
-      this.trim();
-    }
-  }
-
-  /**
-   * Add a decision to the project memory.
-   *
-   * @param decision - Description of the decision
-   */
-  addDecision(decision: string): void {
-    this.data.decisions.push(decision);
-    // Keep last 20 decisions
-    if (this.data.decisions.length > 20) {
-      this.data.decisions = this.data.decisions.slice(-20);
-    }
-    this.data.updatedAt = Date.now();
-  }
-
-  /**
-   * Get recent messages (last N).
-   *
-   * @param count - Number of recent messages to return (default 20)
-   * @returns Array of recent messages
-   */
-  getRecent(count: number = 20): MemoryMessage[] {
-    return this.data.messages.slice(-count);
-  }
-
-  /**
-   * Clear all messages and decisions.
-   */
-  clear(): void {
-    this.data.messages = [];
-    this.data.decisions = [];
-    this.data.summary = '';
-    this.data.updatedAt = Date.now();
-  }
-
-  /**
-   * Save current state to localStorage.
-   */
-  save(): void {
+  private _load(): void {
     try {
-      const key = STORAGE_PREFIX + this.data.projectId;
-      localStorage.setItem(key, JSON.stringify(this.data));
-    } catch {
-      // Silently fail (quota exceeded, etc.)
-    }
-  }
-
-  /**
-   * Delete this project's memory from localStorage.
-   */
-  delete(): void {
-    try {
-      localStorage.removeItem(STORAGE_PREFIX + this.data.projectId);
-    } catch {
-      // ignore
-    }
-  }
-
-  /**
-   * Get the full memory data (for serialization into agent context).
-   */
-  toJSON(): ProjectMemoryData {
-    return { ...this.data };
-  }
-
-  /**
-   * Build a context string for the agent system prompt.
-   * Includes summary of previous conversations and recent decisions.
-   *
-   * @returns Context string for the LLM
-   */
-  toContextString(): string {
-    const parts: string[] = [];
-
-    if (this.data.summary) {
-      parts.push(`Previous conversation summary: ${this.data.summary}`);
-    }
-
-    if (this.data.decisions.length > 0) {
-      parts.push(`Decisions made:\n${this.data.decisions.map(d => `- ${d}`).join('\n')}`);
-    }
-
-    return parts.join('\n\n');
-  }
-
-  // ─── Private ──────────────────────────────────────────────────────────
-
-  /**
-   * Load memory from localStorage.
-   */
-  private load(projectId: string): ProjectMemoryData {
-    try {
-      const key = STORAGE_PREFIX + projectId;
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved) as ProjectMemoryData;
-        // Validate structure
-        if (parsed.projectId === projectId && Array.isArray(parsed.messages)) {
-          return parsed;
-        }
+      const raw = localStorage.getItem(`${STORAGE_PREFIX}${this.projectId}`);
+      if (raw) {
+        const data = JSON.parse(raw);
+        this.messages = data.messages || [];
+        this.decisions = data.decisions || [];
+        this.summary = data.summary || '';
       }
     } catch {
+      // ignore parse errors
+    }
+  }
+
+  addMessage(msg: CopilotMessage): void {
+    this.messages.push(msg);
+    if (this.messages.length > MAX_MESSAGES) {
+      this._trim();
+    }
+  }
+
+  addDecision(decision: string): void {
+    this.decisions.push(decision);
+    if (this.decisions.length > MAX_DECISIONS) {
+      this.decisions = this.decisions.slice(-MAX_DECISIONS);
+    }
+  }
+
+  private _trim(): void {
+    const removed = this.messages.splice(0, this.messages.length - MAX_MESSAGES);
+    // Generate summary from removed messages
+    const userMsgs = removed.filter(m => m.role === 'user');
+    if (userMsgs.length > 0) {
+      const topics = userMsgs.map(m => m.content.slice(0, 50)).join(', ');
+      this.summary = `User asked about: ${topics}`;
+    }
+  }
+
+  getRecent(count: number): CopilotMessage[] {
+    return this.messages.slice(-count);
+  }
+
+  save(): void {
+    try {
+      localStorage.setItem(
+        `${STORAGE_PREFIX}${this.projectId}`,
+        JSON.stringify({ messages: this.messages, decisions: this.decisions, summary: this.summary })
+      );
+    } catch {
+      // quota exceeded, ignore
+    }
+  }
+
+  clear(): void {
+    this.messages = [];
+    this.decisions = [];
+    this.summary = '';
+  }
+
+  delete(): void {
+    this.clear();
+    try {
+      localStorage.removeItem(`${STORAGE_PREFIX}${this.projectId}`);
+    } catch {
       // ignore
     }
+  }
 
+  toJSON() {
     return {
-      projectId,
-      messages: [],
-      decisions: [],
-      summary: '',
-      updatedAt: Date.now(),
+      projectId: this.projectId,
+      messages: this.messages,
+      decisions: this.decisions,
+      summary: this.summary,
     };
   }
 
-  /**
-   * Trim messages to MAX_MESSAGES, generating a summary of removed messages.
-   */
-  private trim(): void {
-    const excess = this.data.messages.length - MAX_MESSAGES;
-    if (excess <= 0) return;
-
-    const removed = this.data.messages.splice(0, excess);
-
-    // Generate a simple summary from removed messages
-    const userMessages = removed
-      .filter(m => m.role === 'user')
-      .map(m => m.content.slice(0, 100));
-
-    const assistantActions = removed
-      .filter(m => m.role === 'assistant' && m.toolsCalled && m.toolsCalled.length > 0)
-      .flatMap(m => m.toolsCalled || []);
-
-    const summaryParts: string[] = [];
-    if (userMessages.length > 0) {
-      summaryParts.push(`User asked about: ${userMessages.join('; ')}`);
+  toContextString(): string {
+    const parts: string[] = [];
+    if (this.summary) parts.push(`Previous context: ${this.summary}`);
+    if (this.decisions.length > 0) {
+      parts.push('Decisions made:');
+      for (const d of this.decisions) parts.push(`- ${d}`);
     }
-    if (assistantActions.length > 0) {
-      const uniqueActions = [...new Set(assistantActions)];
-      summaryParts.push(`Tools used: ${uniqueActions.join(', ')}`);
-    }
-
-    const newSummary = summaryParts.join('. ');
-    this.data.summary = this.data.summary
-      ? `${this.data.summary}. ${newSummary}`
-      : newSummary;
-
-    // Keep summary under 500 chars
-    if (this.data.summary.length > 500) {
-      this.data.summary = this.data.summary.slice(-500);
-    }
+    return parts.join('\n');
   }
 }
 
-/**
- * List all project IDs that have saved memory.
- *
- * @returns Array of project IDs
- */
 export function listProjectMemories(): string[] {
   const ids: string[] = [];
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith(STORAGE_PREFIX)) {
+      if (key?.startsWith(STORAGE_PREFIX)) {
         ids.push(key.slice(STORAGE_PREFIX.length));
       }
     }
@@ -268,4 +140,92 @@ export function listProjectMemories(): string[] {
     // ignore
   }
   return ids;
+}
+
+// ─── IndexedDB-backed long-term memory (async) ──────────────────────────────
+
+export interface CopilotDecision {
+  timestamp: number;
+  decision: string;
+  context: string;
+}
+
+export interface CopilotLongTermMemory {
+  projectId: string;
+  decisions: CopilotDecision[];
+  preferences: Record<string, string>;
+  notes: string[];
+  lastAccessed: number;
+}
+
+const IDB_MEMORY_PREFIX = 'copilot-memory-';
+
+function idbKey(projectId: string): string {
+  return `${IDB_MEMORY_PREFIX}${projectId}`;
+}
+
+function emptyLongTermMemory(projectId: string): CopilotLongTermMemory {
+  return { projectId, decisions: [], preferences: {}, notes: [], lastAccessed: Date.now() };
+}
+
+export async function loadLongTermMemory(projectId: string): Promise<CopilotLongTermMemory> {
+  if (!projectId) return emptyLongTermMemory('default');
+  try {
+    const mem = await storageGet<CopilotLongTermMemory>('settings', idbKey(projectId));
+    if (mem) { mem.lastAccessed = Date.now(); return mem; }
+  } catch { /* ignore */ }
+  return emptyLongTermMemory(projectId);
+}
+
+export async function saveLongTermMemory(memory: CopilotLongTermMemory): Promise<void> {
+  memory.lastAccessed = Date.now();
+  await storageSet('settings', idbKey(memory.projectId), memory);
+}
+
+export async function addLongTermDecision(projectId: string, decision: string, context: string): Promise<CopilotLongTermMemory> {
+  const mem = await loadLongTermMemory(projectId);
+  mem.decisions.push({ timestamp: Date.now(), decision, context });
+  if (mem.decisions.length > 100) mem.decisions = mem.decisions.slice(-100);
+  await saveLongTermMemory(mem);
+  return mem;
+}
+
+export async function setLongTermPreference(projectId: string, key: string, value: string): Promise<CopilotLongTermMemory> {
+  const mem = await loadLongTermMemory(projectId);
+  mem.preferences[key] = value;
+  await saveLongTermMemory(mem);
+  return mem;
+}
+
+export async function addLongTermNote(projectId: string, note: string): Promise<CopilotLongTermMemory> {
+  const mem = await loadLongTermMemory(projectId);
+  mem.notes.push(note);
+  if (mem.notes.length > 50) mem.notes = mem.notes.slice(-50);
+  await saveLongTermMemory(mem);
+  return mem;
+}
+
+export async function clearLongTermMemory(projectId: string): Promise<void> {
+  await storageSet('settings', idbKey(projectId), emptyLongTermMemory(projectId));
+}
+
+export function longTermMemoryToContext(memory: CopilotLongTermMemory): string {
+  const parts: string[] = [];
+  if (Object.keys(memory.preferences).length > 0) {
+    parts.push('## User Preferences');
+    for (const [k, v] of Object.entries(memory.preferences)) parts.push(`- ${k}: ${v}`);
+  }
+  if (memory.decisions.length > 0) {
+    const recent = memory.decisions.slice(-10);
+    parts.push('## Recent Decisions');
+    for (const d of recent) {
+      const date = new Date(d.timestamp).toLocaleDateString();
+      parts.push(`- [${date}] ${d.decision}${d.context ? ` (${d.context})` : ''}`);
+    }
+  }
+  if (memory.notes.length > 0) {
+    parts.push('## Notes');
+    for (const n of memory.notes.slice(-5)) parts.push(`- ${n}`);
+  }
+  return parts.join('\n');
 }

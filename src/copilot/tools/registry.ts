@@ -34,6 +34,7 @@ import { tools as easeToolDefs } from './definitions/easeTools';
 import { tools as patternOpsToolDefs } from './definitions/patternOpsTools';
 import { tools as ruleToolDefs } from './definitions/ruleTools';
 import { tools as uiStateToolDefs } from './definitions/uiStateTools';
+import { tools as memoryToolDefs } from './definitions/memoryTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -297,6 +298,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   patternOpsToolDefs,
   ruleToolDefs,
   uiStateToolDefs,
+  memoryToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
