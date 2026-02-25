@@ -1,4 +1,9 @@
 /**
+ * @deprecated Since #96, GarmentSimulation always uses MergedSimulation.
+ * ClothMesh is no longer imported anywhere. Kept for reference only.
+ * CDT meshing in this file runs on the main thread (useMemo) — do NOT
+ * reintroduce this component without moving meshing to a Web Worker.
+ *
  * ClothMesh — React Three Fiber component that renders a simulated cloth piece.
  *
  * Reads particle positions from the cloth simulation worker and updates a
