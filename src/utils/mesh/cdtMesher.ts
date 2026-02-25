@@ -13,7 +13,8 @@ import cleanPSLG from 'clean-pslg';
 import type { PatternPiece, Point2D, PathCommand } from '../../types/types';
 import type { ClothMeshData } from '../cloth/xpbdSolver';
 import { flattenPath } from '../seam/index';
-import { refineMesh } from './refine';
+// refineMesh kept for potential future use but replaced by interior grid approach
+// import { refineMesh } from './refine';
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -141,25 +142,104 @@ export function meshPieceOutline(
     }
   }
 
-  // Apply refinement for better quality triangles (with fallback)
-  try {
-    const refined = refineMesh(points, triangles, edges, config.maxEdgeLength, config.minAngle, config.maxRefinementPasses);
-    
-    // Only use refined result if it produced valid triangles
-    if (refined.triangles.length > 0) {
-      return convertToClothMeshData(refined.points, refined.triangles, config);
-    } else {
-      console.warn('Refinement produced no triangles, falling back to basic CDT');
+  // Dense interior point insertion for particle-distance-based meshing.
+  // Instead of Ruppert-style refinement (too slow, often fails), generate a
+  // grid of interior points at maxEdgeLength spacing and re-triangulate.
+  const numBoundaryPoints = points.length;
+  const interiorPoints = generateInteriorGrid(points, edges, numBoundaryPoints, config.maxEdgeLength);
+
+  if (interiorPoints.length > 0) {
+    const densePoints = [...points, ...interiorPoints];
+    try {
+      const denseTriangles = cdt2d(densePoints, edges, {
+        interior: true,
+        exterior: false,
+      });
+      if (denseTriangles.length > 0) {
+        return convertToClothMeshData(densePoints, denseTriangles, config);
+      }
+    } catch {
+      // Fall through to basic CDT
     }
-  } catch (error) {
-    console.warn('Refinement failed, falling back to basic CDT:', error);
   }
-  
-  // Fallback to basic CDT mesh
+
+  // Fallback to basic CDT mesh (boundary-only, coarse)
   return convertToClothMeshData(points, triangles, config);
 }
 
 // ─── Helper Functions ───────────────────────────────────────────────────────
+
+/**
+ * Generate interior grid points inside a polygon at the given spacing.
+ * Uses ray casting (point-in-polygon) to keep only points inside the boundary.
+ */
+function generateInteriorGrid(
+  points: number[][],
+  _edges: number[][],
+  numBoundaryPoints: number,
+  spacing: number,
+): number[][] {
+  if (spacing <= 0 || numBoundaryPoints < 3) return [];
+
+  // Compute bounding box of boundary points
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (let i = 0; i < numBoundaryPoints; i++) {
+    const p = points[i];
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
+  }
+
+  // Build boundary polygon from edges (use only boundary edges = first numBoundaryPoints edges)
+  // The boundary is the first closed loop of edges
+  const boundaryPoly: number[][] = [];
+  for (let i = 0; i < numBoundaryPoints; i++) {
+    boundaryPoly.push(points[i]);
+  }
+
+  const interior: number[][] = [];
+  const halfSpacing = spacing * 0.5;
+
+  // Offset grid by half spacing so points don't land exactly on edges
+  for (let y = minY + halfSpacing; y < maxY; y += spacing) {
+    for (let x = minX + halfSpacing; x < maxX; x += spacing) {
+      if (pointInPolygon(x, y, boundaryPoly)) {
+        // Check minimum distance to boundary points to avoid near-duplicates
+        let tooClose = false;
+        for (let i = 0; i < points.length; i++) {
+          const dx = x - points[i][0];
+          const dy = y - points[i][1];
+          if (dx * dx + dy * dy < halfSpacing * halfSpacing) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (!tooClose) {
+          interior.push([x, y]);
+        }
+      }
+    }
+  }
+
+  return interior;
+}
+
+/**
+ * Ray casting point-in-polygon test.
+ */
+function pointInPolygon(x: number, y: number, polygon: number[][]): boolean {
+  let inside = false;
+  const n = polygon.length;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
 
 /**
  * Remove consecutive duplicate points from a polygon outline.
