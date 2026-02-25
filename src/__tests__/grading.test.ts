@@ -50,7 +50,10 @@ describe('Grading System', () => {
     };
     const graded = gradePiece(piece, { chest: 88 }, { chest: 96 });
     const ratio = 96 / 88;
-    expect(graded.outline[1].values[0]).toBeCloseTo(100 * ratio);
+    // Scaling is now from centroid, not origin — verify piece grew proportionally
+    const baseWidth = 100; // L(100,0) - M(0,0)
+    const gradedWidth = graded.outline[1].values[0] - graded.outline[0].values[0];
+    expect(gradedWidth).toBeCloseTo(baseWidth * ratio);
   });
 
   it('gradePoints applies delta rules correctly', () => {

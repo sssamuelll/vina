@@ -42,6 +42,20 @@ export function gradePoints(
   });
 }
 
+/** Compute centroid of outline path commands */
+function computeCentroid(outline: PathCommand[]): Point2D {
+  let sx = 0, sy = 0, count = 0;
+  for (const cmd of outline) {
+    if (cmd.type === 'Z' || cmd.values.length < 2) continue;
+    for (let i = 0; i < cmd.values.length - 1; i += 2) {
+      sx += cmd.values[i];
+      sy += cmd.values[i + 1];
+      count++;
+    }
+  }
+  return count > 0 ? { x: sx / count, y: sy / count } : { x: 0, y: 0 };
+}
+
 function scalePoint(val: number, center: number, factor: number): number {
   return center + (val - center) * factor;
 }
@@ -133,10 +147,18 @@ export function gradePiece(
   if (!baseVal || !targetVal || baseVal === 0) return { ...piece };
 
   const scaleFactor = targetVal / baseVal;
-  const scaledOutline = scaleOutline(piece.outline, scaleFactor);
+  const center = computeCentroid(piece.outline);
+  const scaledOutline = scaleOutline(piece.outline, scaleFactor, center);
+
+  // Scale internals (notches, grainlines, darts) with the same factor
+  const scaledInternals = piece.internals.map(internal => ({
+    ...internal,
+    path: scaleOutline(internal.path, scaleFactor, center),
+  }));
 
   return {
     ...piece,
     outline: scaledOutline,
+    internals: scaledInternals,
   };
 }
