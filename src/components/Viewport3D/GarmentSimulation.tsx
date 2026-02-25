@@ -246,11 +246,22 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     if (simulationState === 'running' && placedMeshes.length > 0) {
       let cancelled = false;
 
+      // Race a promise against a timeout
+      function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+        return Promise.race([
+          p,
+          new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} timed out (${ms}ms)`)), ms)),
+        ]);
+      }
+
       const startSim = async () => {
-        // ─── Try WebGPU ───────────────────────────────────────────────
-        if (isWebGPUAvailable()) {
+        // ─── WebGPU (DISABLED) ─────────────────────────────────────────
+        // WebGPU shader compilation blocks the main thread (sync GPU calls).
+        // WGSL shaders are unvalidated on real GPU. Skipping until validated.
+        // TODO: Re-enable after shader validation + async compilation.
+        if (false as boolean && isWebGPUAvailable()) {
           try {
-            const gpuCtx = await initWebGPU();
+            const gpuCtx = await withTimeout(initWebGPU(), 5000, 'WebGPU init');
             if (gpuCtx && !cancelled) {
               console.log('[GarmentSimulation] 🟢 Using WebGPU solver');
               dispatch(setSolverTier('webgpu'));
@@ -258,7 +269,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               gpuClientRef.current = gpuClient;
               gpuClient.onFrame = onFrame;
 
-              await gpuClient.initMultiPiece(placedMeshes);
+              await withTimeout(gpuClient.initMultiPiece(placedMeshes), 10000, 'GPU solver init');
 
               if (!cancelled) gpuClient.start();
 
@@ -273,14 +284,14 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               return;
             }
           } catch (e) {
-            console.warn('[GarmentSimulation] WebGPU failed, falling back to CPU:', e);
+            console.warn('[GarmentSimulation] WebGPU failed, falling back:', e);
           }
         }
 
         // ─── Try Wasm XPBD (~3x faster than JS) ──────────────────────
         if (!cancelled) {
           try {
-            const wasmAvailable = await isWasmSolverAvailable();
+            const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 3000, 'Wasm check').catch(() => false);
             if (wasmAvailable && !cancelled) {
               console.log('[GarmentSimulation] 🟠 Using Wasm XPBD solver');
               dispatch(setSolverTier('wasm'));
@@ -288,7 +299,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               wasmClientRef.current = wasmClient;
               wasmClient.onFrame = onFrame;
 
-              await wasmClient.initMultiPiece(placedMeshes);
+              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 10000, 'Wasm solver init');
 
               if (!cancelled) wasmClient.start();
 
@@ -319,7 +330,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
             };
 
-            await client.initMultiPiece(placedMeshes, seamInitData);
+            await withTimeout(client.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU worker init');
             client.setFabric(fabricId);
             client.requestEdgeData();
 
