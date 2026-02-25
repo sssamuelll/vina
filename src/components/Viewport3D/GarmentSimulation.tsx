@@ -15,7 +15,7 @@ import { RootState } from '../../store';
 import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
+import { SimulationInitClient, type MeshedPiece } from '../../utils/cloth/simulationInitClient';
 import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
@@ -24,33 +24,7 @@ import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
-const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
-
-/**
- * Build mesh data for a piece using CDT mesher.
- */
-function buildMeshFromPiece(
-  piece: PatternPiece,
-  meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null,
-  particleDistance: number = 5,
-): { vertices: number[]; triIds: number[] } | null {
-  try {
-    if (!meshPieceFn) return null;
-    const meshData = meshPieceFn(piece, {
-      yHeight: 1.2,
-      scale: SCALE,
-      maxEdgeLength: particleDistance,
-      minAngle: 25,
-      maxRefinementPasses: 3,
-      curveResolution: 12,
-    });
-    if (meshData.vertices.length === 0 || meshData.triIds.length === 0) return null;
-    return { vertices: Array.from(meshData.vertices), triIds: Array.from(meshData.triIds) };
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
@@ -96,35 +70,52 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const globalParticleDistance = useSelector((s: RootState) => s.simulation.particleDistance);
   const pieceParticleDistances = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
 
-  // Lazy-load CDT mesher
-  const [meshPieceFn, setMeshPieceFn] = useState<((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null>(null);
-  useEffect(() => {
-    import('../../utils/mesh').then(mod => {
-      setMeshPieceFn(() => mod.meshPiece);
-    }).catch(() => {});
-  }, []);
+  // Async meshing via Web Worker (never blocks main thread)
+  const [pieceMeshes, setPieceMeshes] = useState<Array<{
+    pieceId: string;
+    vertices: number[];
+    triIds: number[];
+    outline: Array<{ type: string; values: number[] }>;
+  }>>([]);
+  const [meshingStatus, setMeshingStatus] = useState<string | null>(null);
+  const initClientRef = useRef<SimulationInitClient | null>(null);
 
-  // Build mesh data for all pieces
-  const pieceMeshes = useMemo(() => {
-    const result: Array<{
-      pieceId: string;
-      vertices: number[];
-      triIds: number[];
-      outline: Array<{ type: string; values: number[] }>;
-    }> = [];
-    for (const piece of pieces) {
-      const pd = pieceParticleDistances[piece.id] ?? globalParticleDistance;
-      const mesh = buildMeshFromPiece(piece, meshPieceFn, pd);
-      if (!mesh) continue;
-      result.push({
-        pieceId: piece.id,
-        vertices: mesh.vertices,
-        triIds: mesh.triIds,
-        outline: piece.outline as Array<{ type: string; values: number[] }>,
+  useEffect(() => {
+    let cancelled = false;
+    const client = new SimulationInitClient();
+    initClientRef.current = client;
+    client.onProgress = (p) => {
+      if (!cancelled) setMeshingStatus(`${p.stage} (${p.current}/${p.total})`);
+    };
+
+    (async () => {
+      setMeshingStatus('Meshing pieces...');
+      const meshed = await client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance);
+      if (cancelled) return;
+
+      const result = meshed.map(m => {
+        const piece = pieces.find(p => p.id === m.pieceId);
+        return {
+          ...m,
+          outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
+        };
       });
-    }
-    return result;
-  }, [pieces, meshPieceFn, globalParticleDistance, pieceParticleDistances]);
+
+      setPieceMeshes(result);
+      setMeshingStatus(null);
+    })().catch(err => {
+      if (!cancelled) {
+        console.error('[GarmentSimulation] Async meshing failed:', err);
+        setMeshingStatus(null);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      client.dispose();
+      initClientRef.current = null;
+    };
+  }, [pieces, globalParticleDistance, pieceParticleDistances]);
 
   // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
@@ -248,16 +239,16 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
               await gpuClient.initMultiPiece(placedMeshes);
 
-              if (avatarModelUrl && !cancelled) {
-                try {
-                  const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
-                  gpuClient.setSDF(sdf);
-                } catch (e) {
-                  console.warn('[GarmentSimulation] Avatar SDF failed:', e);
-                }
-              }
-
               if (!cancelled) gpuClient.start();
+
+              // SDF loaded async after simulation starts (non-blocking)
+              if (avatarModelUrl && !cancelled) {
+                import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
+                  buildAvatarSDF(avatarModelUrl, avatarHeight)
+                ).then(sdf => {
+                  if (!cancelled) gpuClient.setSDF(sdf);
+                }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+              }
               return;
             }
           } catch (e) {
@@ -279,16 +270,16 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         client.setFabric(fabricId);
         client.requestEdgeData();
 
-        if (avatarModelUrl && !cancelled) {
-          try {
-            const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
-            client.setSDF(sdf);
-          } catch (e) {
-            console.warn('[GarmentSimulation] Avatar SDF failed:', e);
-          }
-        }
-
         if (!cancelled) client.start();
+
+        // SDF loaded async after simulation starts (non-blocking)
+        if (avatarModelUrl && !cancelled) {
+          import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
+            buildAvatarSDF(avatarModelUrl, avatarHeight)
+          ).then(sdf => {
+            if (!cancelled) client.setSDF(sdf);
+          }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+        }
       };
 
       startSim().catch(e => console.error('[GarmentSimulation] Start failed:', e));
