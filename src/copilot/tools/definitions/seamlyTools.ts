@@ -280,6 +280,15 @@ const loadSeamlyPatternTool: ToolDefinition = {
         piece.position = { x: xOffset, y: 50 };
         xOffset += pieceWidth + 80;
 
+        // Auto-detect semantic edges
+        try {
+          const { detectSemanticEdges } = await import('../../../utils/semanticEdges');
+          piece.edges = detectSemanticEdges(piece);
+          console.log('[loadSeamlyPattern]', cPiece.name, 'edges:', piece.edges.map(e => e.name).join(', '));
+        } catch (edgeErr) {
+          console.warn('[loadSeamlyPattern] edge detection failed:', edgeErr);
+        }
+
         console.log('[loadSeamlyPattern] dispatching addPiece:', cPiece.name, 'id:', piece.id);
         dispatch(addPiece(piece));
         builtPieces.push({

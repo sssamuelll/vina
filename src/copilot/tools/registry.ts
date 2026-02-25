@@ -28,6 +28,7 @@ import { tools as constructionToolDefs } from './definitions/constructionTools';
 import { tools as blueprintToolDefs } from './definitions/blueprintTools';
 import { tools as seamlyToolDefs } from './definitions/seamlyTools';
 import { tools as garmentPipelineToolDefs } from './definitions/garmentPipelineTool';
+import { tools as edgeToolDefs } from './definitions/edgeTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -285,6 +286,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   blueprintToolDefs,
   seamlyToolDefs,
   garmentPipelineToolDefs,
+  edgeToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

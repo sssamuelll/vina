@@ -36,6 +36,8 @@ export interface PatternPiece {
   mirrored: boolean;
   /** Seam allowance in mm (0 = none) */
   seamAllowance: number;
+  /** Named semantic edges (armhole, shoulder, hemline, etc.) */
+  edges?: SemanticEdge[];
   /** Fabric assignment */
   fabricId?: string;
   /** Link to construction piece (for overlay alignment) */
@@ -63,6 +65,29 @@ export interface InternalLine {
   type: InternalLineType;
   path: PathCommand[];
   notchOptions?: NotchOptions;
+}
+
+// ─── Semantic Edges ───
+
+export type SemanticEdgeType = 'seam' | 'fold' | 'hem' | 'opening' | 'dart-leg' | 'unknown';
+
+/**
+ * A named edge on a pattern piece — enables copilot reasoning,
+ * auto-sew matching, and labeled export (DXF/PDF).
+ */
+export interface SemanticEdge {
+  /** Unique id within the piece */
+  id: string;
+  /** Human-readable name: "armhole", "shoulder", "sideSeam", "hemline", "centerBack" */
+  name: string;
+  /** Index range [start, end) in the outline PathCommand array */
+  segmentRange: [number, number];
+  /** Edge classification */
+  edgeType: SemanticEdgeType;
+  /** Helps auto-sew: "pairs with back-armhole" */
+  matchHint?: string;
+  /** Length in mm (computed) */
+  length?: number;
 }
 
 // ─── Seams (connections between pieces) ───
