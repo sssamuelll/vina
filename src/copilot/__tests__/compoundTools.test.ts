@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // Updated after #79-#82 copilot epic completion
-      expect(registry.size).toBe(104);
+      expect(registry.size).toBe(105);
     });
   });
 });
