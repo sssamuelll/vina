@@ -30,6 +30,63 @@ const ClothMesh = lazy(() => import('./ClothMesh'));
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
 /**
+ * Load avatar mesh and generate SDF off the main thread.
+ * GLB loading + mesh extraction happen on main thread (fast, async IO),
+ * but the heavy generateSDF computation runs in the simulation worker.
+ */
+async function loadSDFInWorker(
+  avatarUrl: string,
+  avatarHeight: number,
+  initClient: SimulationInitClient | null,
+): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
+  const { buildAvatarSDF } = await import('../../utils/cloth/avatarSDF');
+  const { extractMeshData } = await import('../../utils/cloth/avatarSDF');
+
+  // If we have a worker client, use it for the heavy SDF computation
+  if (initClient) {
+    // Load and extract mesh data on main thread (fast — just GLB parse + bone transforms)
+    const THREE = await import('three');
+    const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+    const { isVRMFile, loadVRM } = await import('../../utils/avatar/vrmLoader');
+
+    let scene: THREE.Group;
+    if (isVRMFile(avatarUrl)) {
+      const result = await loadVRM(avatarUrl);
+      scene = result.scene;
+    } else {
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync(avatarUrl);
+      scene = gltf.scene as THREE.Group;
+    }
+
+    // Scale + center (same as avatarSDF.ts)
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    if (size.y > 0) {
+      const scale = avatarHeight / size.y;
+      scene.scale.setScalar(scale);
+      const scaledBox = new THREE.Box3().setFromObject(scene);
+      const scaledCenter = new THREE.Vector3();
+      scaledBox.getCenter(scaledCenter);
+      scene.position.y = -scaledBox.min.y;
+      scene.position.x = -scaledCenter.x;
+      scene.position.z = -scaledCenter.z;
+    }
+    scene.updateMatrixWorld(true);
+
+    const { vertices, indices } = extractMeshData(scene);
+    if (vertices.length === 0 || indices.length === 0) return null;
+
+    // Heavy SDF generation runs in the worker
+    return initClient.generateSDF(vertices, indices, 64);
+  }
+
+  // Fallback: run everything on main thread (will block, but at least works)
+  return buildAvatarSDF(avatarUrl, avatarHeight);
+}
+
+/**
  * Convert Seam[] to SeamInitData[] for the worker.
  */
 function seamsToInitData(seams: Seam[]): SeamInitData[] {
@@ -280,12 +337,10 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
               if (!cancelled) gpuClient.start();
 
-              // SDF loaded async after simulation starts (non-blocking)
+              // SDF loaded via worker after simulation starts (truly non-blocking)
               if (avatarModelUrl && !cancelled) {
-                import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
-                  buildAvatarSDF(avatarModelUrl, avatarHeight)
-                ).then(sdf => {
-                  if (!cancelled) gpuClient.setSDF(sdf);
+                loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+                  if (sdf && !cancelled) gpuClient.setSDF(sdf);
                 }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
               }
               return;
@@ -310,12 +365,10 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
               if (!cancelled) wasmClient.start();
 
-              // SDF loaded async
+              // SDF loaded via worker (truly non-blocking)
               if (avatarModelUrl && !cancelled) {
-                import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
-                  buildAvatarSDF(avatarModelUrl, avatarHeight)
-                ).then(sdf => {
-                  if (!cancelled) wasmClient.setSDF(sdf);
+                loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+                  if (sdf && !cancelled) wasmClient.setSDF(sdf);
                 }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
               }
               return;
@@ -343,12 +396,10 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
             if (!cancelled) client.start();
 
-            // SDF loaded async after simulation starts (non-blocking)
+            // SDF loaded via worker (truly non-blocking)
             if (avatarModelUrl && !cancelled) {
-              import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
-                buildAvatarSDF(avatarModelUrl, avatarHeight)
-              ).then(sdf => {
-                if (!cancelled) client.setSDF(sdf);
+              loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+                if (sdf && !cancelled) client.setSDF(sdf);
               }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
             }
             return;

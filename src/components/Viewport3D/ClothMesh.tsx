@@ -15,7 +15,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, PathCommand } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
-import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
+// buildAvatarSDF moved to dynamic import to avoid main-thread SDF generation
 import {
   computeFitMapData,
   fabricToFitParams,
@@ -270,17 +270,19 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
         // Request edge data for fit map computation
         client.requestEdgeData();
 
-        // Generate and set avatar body SDF for collision
-        if (avatarModelUrl) {
-          try {
-            const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
-            client.setSDF(sdf);
-          } catch (e) {
-            console.warn('[ClothMesh] Avatar SDF generation failed:', e);
-          }
-        }
-
+        // Start simulation immediately — SDF loads later (non-blocking)
         client.start();
+
+        // Generate SDF in background (non-blocking via worker)
+        if (avatarModelUrl) {
+          import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
+            buildAvatarSDF(avatarModelUrl, avatarHeight)
+          ).then(sdf => {
+            client.setSDF(sdf);
+          }).catch(e => {
+            console.warn('[ClothMesh] Avatar SDF generation failed:', e);
+          });
+        }
       }).catch(() => {
         // Worker init failed — simulation won't run for this piece
       });
