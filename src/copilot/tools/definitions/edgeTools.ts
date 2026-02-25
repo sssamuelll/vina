@@ -7,6 +7,39 @@ import type { AppDispatch, RootState } from '../../../store';
 
 export const tools: ToolDefinition[] = [
   {
+    name: 'classifyPiece',
+    description: 'Classify a piece by category (bodice/sleeve/collar/skirt/trouser/etc.) and side (front/back/left/right)',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID (omit for all pieces)' },
+      },
+    },
+    execute: async (
+      params: Record<string, unknown>,
+      dispatch: AppDispatch,
+      getState: () => RootState,
+    ): Promise<ToolResult> => {
+      const { classifyPiece } = await import('../../../utils/pieceClassifier');
+      const { updatePiece } = await import('../../../store/projectSlice');
+      const state = getState();
+      const pieces = state.project.pieces;
+      const targetId = params.pieceId as string | undefined;
+
+      const results: Record<string, unknown>[] = [];
+      for (const piece of pieces) {
+        if (targetId && piece.id !== targetId) continue;
+        const { category, side } = classifyPiece(piece);
+        if (category !== piece.category || side !== piece.side) {
+          dispatch(updatePiece({ ...piece, category, side }));
+        }
+        results.push({ id: piece.id, name: piece.name, category, side });
+      }
+
+      return { success: true, data: { pieces: results } };
+    },
+  },
+  {
     name: 'listEdges',
     description: 'List semantic edges of a pattern piece (armhole, shoulder, hemline, etc.). Omit pieceId for all pieces.',
     parameters: {

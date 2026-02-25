@@ -36,6 +36,10 @@ export interface PatternPiece {
   mirrored: boolean;
   /** Seam allowance in mm (0 = none) */
   seamAllowance: number;
+  /** Piece type classification */
+  category?: PieceCategory;
+  /** Which side of the garment */
+  side?: PieceSide;
   /** Named semantic edges (armhole, shoulder, hemline, etc.) */
   edges?: SemanticEdge[];
   /** Fabric assignment */
@@ -66,6 +70,11 @@ export interface InternalLine {
   path: PathCommand[];
   notchOptions?: NotchOptions;
 }
+
+// ─── Piece Classification ───
+
+export type PieceCategory = 'bodice' | 'sleeve' | 'collar' | 'skirt' | 'trouser' | 'waistband' | 'facing' | 'lining' | 'pocket' | 'cuff' | 'hood' | 'yoke' | 'other';
+export type PieceSide = 'front' | 'back' | 'left' | 'right' | 'center' | 'both';
 
 // ─── Semantic Edges ───
 
