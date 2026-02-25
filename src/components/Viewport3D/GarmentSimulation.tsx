@@ -127,6 +127,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
 
   // Build merged geometry for rendering (static initial state)
+  // Uses pure math Euler rotation — no per-vertex Three.js object allocation
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
@@ -155,19 +156,22 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
       const placement = placements[pi];
 
-      // Build rotation matrix from Euler angles
-      const euler = new THREE.Euler(placement.rotation[0], placement.rotation[1], placement.rotation[2]);
-      const rotMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
-      const pos = new THREE.Vector3(...placement.position);
+      // Pure math Euler rotation (XYZ order) — no Three.js objects per vertex
+      const [rx, ry, rz] = placement.rotation;
+      const [px, py, pz] = placement.position;
+      const cx = Math.cos(rx), sx = Math.sin(rx);
+      const cy = Math.cos(ry), sy = Math.sin(ry);
+      const cz = Math.cos(rz), sz = Math.sin(rz);
 
-      // Copy vertices with placement transform applied
       for (let vi = 0; vi < numVerts; vi++) {
-        const v = new THREE.Vector3(p.vertices[vi * 3], p.vertices[vi * 3 + 1], p.vertices[vi * 3 + 2]);
-        v.applyMatrix4(rotMatrix);
-        v.add(pos);
-        positions[(vOffset + vi) * 3] = v.x;
-        positions[(vOffset + vi) * 3 + 1] = v.y;
-        positions[(vOffset + vi) * 3 + 2] = v.z;
+        const vx = p.vertices[vi * 3], vy = p.vertices[vi * 3 + 1], vz = p.vertices[vi * 3 + 2];
+        // Euler XYZ: Rz * Ry * Rx * v
+        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
+        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
+        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
+        positions[(vOffset + vi) * 3] = x3 + px;
+        positions[(vOffset + vi) * 3 + 1] = y3 + py;
+        positions[(vOffset + vi) * 3 + 2] = z2 + pz;
       }
 
       // Set vertex colors
@@ -218,24 +222,27 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
   const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
 
-  // Apply placement transforms
+  // Apply placement transforms (pure math, no Three.js objects per vertex)
   const placedMeshes = useMemo(() => {
     return pieceMeshes.map((pm, i) => {
       const region = detectBodyRegion(pieces[i]?.name ?? '');
       const placement = computePlacement(region, avatarMeasurements, i, pieces.length);
-      const euler = new THREE.Euler(placement.rotation[0], placement.rotation[1], placement.rotation[2]);
-      const rotMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
-      const pos = new THREE.Vector3(...placement.position);
+      const [rx, ry, rz] = placement.rotation;
+      const [px, py, pz] = placement.position;
+      const cx = Math.cos(rx), sx = Math.sin(rx);
+      const cy = Math.cos(ry), sy = Math.sin(ry);
+      const cz = Math.cos(rz), sz = Math.sin(rz);
 
       const numVerts = pm.vertices.length / 3;
       const transformed = new Array<number>(pm.vertices.length);
       for (let vi = 0; vi < numVerts; vi++) {
-        const v = new THREE.Vector3(pm.vertices[vi * 3], pm.vertices[vi * 3 + 1], pm.vertices[vi * 3 + 2]);
-        v.applyMatrix4(rotMatrix);
-        v.add(pos);
-        transformed[vi * 3] = v.x;
-        transformed[vi * 3 + 1] = v.y;
-        transformed[vi * 3 + 2] = v.z;
+        const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
+        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
+        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
+        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
+        transformed[vi * 3] = x3 + px;
+        transformed[vi * 3 + 1] = y3 + py;
+        transformed[vi * 3 + 2] = z2 + pz;
       }
       return { ...pm, vertices: transformed };
     });
