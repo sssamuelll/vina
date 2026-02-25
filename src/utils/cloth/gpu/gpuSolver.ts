@@ -15,6 +15,8 @@ import clothShaderSrc from './shaders/cloth.wgsl?raw';
 import constraintsShaderSrc from './shaders/constraints.wgsl?raw';
 import normalsShaderSrc from './shaders/normals.wgsl?raw';
 import collisionShaderSrc from './shaders/collision.wgsl?raw';
+import selfCollisionShaderSrc from './shaders/selfCollision.wgsl?raw';
+import { buildAdjacency } from '../selfCollision';
 
 import type { SDFData } from '../sdfGenerator';
 
@@ -81,6 +83,21 @@ export class GpuClothSolver {
   private collisionParamsBuffer: GPUBuffer | null = null;
   private hasSDF: boolean = false;
 
+  // Self-collision spatial hash
+  private scHashCountPipeline: GPUComputePipeline | null = null;
+  private scPrefixSumPipeline: GPUComputePipeline | null = null;
+  private scScatterPipeline: GPUComputePipeline | null = null;
+  private scResolvePipeline: GPUComputePipeline | null = null;
+  private scBindGroup: GPUBindGroup | null = null;
+  private scAdjBindGroup: GPUBindGroup | null = null;
+  private scParamsBuffer: GPUBuffer | null = null;
+  private scCellCountBuffer: GPUBuffer | null = null;
+  private scCellStartBuffer: GPUBuffer | null = null;
+  private scCellEntriesBuffer: GPUBuffer | null = null;
+  private scAdjOffsetsBuffer: GPUBuffer | null = null;
+  private scAdjNeighborsBuffer: GPUBuffer | null = null;
+  private scTableSize: number = 0;
+
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.device = device;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -135,12 +152,18 @@ export class GpuClothSolver {
     await this.createPipelines();
     this.createBindGroups();
 
+    // Self-collision setup
+    if (this.config.selfCollision) {
+      this.initSelfCollision(triangles, mesh.positions.length / 3);
+    }
+
     console.log('[GpuSolver] Initialized:', {
       particles: this.buffers.numParticles,
       stretchConstraints: this.buffers.numStretchConstraints,
       bendConstraints: this.buffers.numBendConstraints,
       seamConstraints: this.buffers.numSeamConstraints,
       triangles: this.numTriangles,
+      selfCollision: this.config.selfCollision,
     });
   }
 
@@ -198,6 +221,42 @@ export class GpuClothSolver {
         col.setBindGroup(0, this.collisionBindGroup);
         col.dispatchWorkgroups(particleWG);
         col.end();
+      }
+
+      // Self-collision (4 passes: hash, prefix sum, scatter, resolve)
+      if (this.config.selfCollision && this.scHashCountPipeline && this.scBindGroup && this.scAdjBindGroup) {
+        // Clear cellCount buffer
+        encoder.clearBuffer(this.scCellCountBuffer!, 0, this.scTableSize * 4);
+
+        const scWG = particleWG;
+
+        const h = encoder.beginComputePass({ label: 'sc-hashCount' });
+        h.setPipeline(this.scHashCountPipeline);
+        h.setBindGroup(0, this.scBindGroup);
+        h.setBindGroup(1, this.scAdjBindGroup);
+        h.dispatchWorkgroups(scWG);
+        h.end();
+
+        const ps = encoder.beginComputePass({ label: 'sc-prefixSum' });
+        ps.setPipeline(this.scPrefixSumPipeline!);
+        ps.setBindGroup(0, this.scBindGroup);
+        ps.setBindGroup(1, this.scAdjBindGroup);
+        ps.dispatchWorkgroups(1);
+        ps.end();
+
+        const sc = encoder.beginComputePass({ label: 'sc-scatter' });
+        sc.setPipeline(this.scScatterPipeline!);
+        sc.setBindGroup(0, this.scBindGroup);
+        sc.setBindGroup(1, this.scAdjBindGroup);
+        sc.dispatchWorkgroups(scWG);
+        sc.end();
+
+        const res = encoder.beginComputePass({ label: 'sc-resolve' });
+        res.setPipeline(this.scResolvePipeline!);
+        res.setBindGroup(0, this.scBindGroup);
+        res.setBindGroup(1, this.scAdjBindGroup);
+        res.dispatchWorkgroups(scWG);
+        res.end();
       }
 
       // Post-solve: velocity update
@@ -390,6 +449,26 @@ export class GpuClothSolver {
     this.sdfBuffer = null;
     this.collisionParamsBuffer = null;
     this.hasSDF = false;
+    // Self-collision cleanup
+    this.scParamsBuffer?.destroy();
+    this.scCellCountBuffer?.destroy();
+    this.scCellStartBuffer?.destroy();
+    this.scCellEntriesBuffer?.destroy();
+    this.scAdjOffsetsBuffer?.destroy();
+    this.scAdjNeighborsBuffer?.destroy();
+    this.scParamsBuffer = null;
+    this.scCellCountBuffer = null;
+    this.scCellStartBuffer = null;
+    this.scCellEntriesBuffer = null;
+    this.scAdjOffsetsBuffer = null;
+    this.scAdjNeighborsBuffer = null;
+    this.scHashCountPipeline = null;
+    this.scPrefixSumPipeline = null;
+    this.scScatterPipeline = null;
+    this.scResolvePipeline = null;
+    this.scBindGroup = null;
+    this.scAdjBindGroup = null;
+    this.scTableSize = 0;
   }
 
   // ─── Private ────────────────────────────────────────────────────────────
@@ -549,6 +628,184 @@ export class GpuClothSolver {
       label: 'collision',
       layout: this.device.createPipelineLayout({ bindGroupLayouts: [collisionLayout] }),
       compute: { module: collisionModule, entryPoint: 'solveCollision' },
+    });
+  }
+
+  /**
+   * Initialize self-collision buffers, pipelines, and bind groups.
+   * Builds adjacency from triangle data (CSR format), allocates hash table buffers.
+   */
+  private initSelfCollision(triangles: Uint32Array, numParticles: number): void {
+    if (!this.buffers) return;
+
+    // ─── Build adjacency in CSR format ──────────────────────────────
+    const adjSets = buildAdjacency(new Int32Array(triangles.buffer, triangles.byteOffset, triangles.length), numParticles);
+    const offsets = new Uint32Array(numParticles + 1);
+    let totalNeighbors = 0;
+    for (let i = 0; i < numParticles; i++) {
+      offsets[i] = totalNeighbors;
+      totalNeighbors += adjSets[i].size;
+    }
+    offsets[numParticles] = totalNeighbors;
+
+    const neighbors = new Uint32Array(Math.max(totalNeighbors, 1));
+    for (let i = 0; i < numParticles; i++) {
+      let k = offsets[i];
+      for (const n of adjSets[i]) {
+        neighbors[k++] = n;
+      }
+    }
+
+    // ─── Hash table sizing ──────────────────────────────────────────
+    // Prime table size ~2× particles
+    let ts = numParticles * 2;
+    // Simple next-odd prime search
+    if (ts % 2 === 0) ts++;
+    outer: while (true) {
+      const lim = Math.floor(Math.sqrt(ts));
+      for (let d = 3; d <= lim; d += 2) {
+        if (ts % d === 0) { ts += 2; continue outer; }
+      }
+      break;
+    }
+    this.scTableSize = ts;
+
+    // ─── Create buffers ─────────────────────────────────────────────
+    // Params uniform
+    const paramsData = new ArrayBuffer(16);
+    const pView = new DataView(paramsData);
+    pView.setUint32(0, numParticles, true);
+    pView.setUint32(4, ts, true);
+    pView.setFloat32(8, this.config.clothThickness, true);
+    pView.setUint32(12, 0, true); // pad
+
+    this.scParamsBuffer = this.device.createBuffer({
+      label: 'sc-params',
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+    new Uint8Array(this.scParamsBuffer.getMappedRange()).set(new Uint8Array(paramsData));
+    this.scParamsBuffer.unmap();
+
+    // Cell count (atomic u32)
+    this.scCellCountBuffer = this.device.createBuffer({
+      label: 'sc-cellCount',
+      size: ts * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    // Cell start
+    this.scCellStartBuffer = this.device.createBuffer({
+      label: 'sc-cellStart',
+      size: ts * 4,
+      usage: GPUBufferUsage.STORAGE,
+    });
+
+    // Cell entries
+    this.scCellEntriesBuffer = this.device.createBuffer({
+      label: 'sc-cellEntries',
+      size: numParticles * 4,
+      usage: GPUBufferUsage.STORAGE,
+    });
+
+    // Adjacency offsets
+    this.scAdjOffsetsBuffer = this.device.createBuffer({
+      label: 'sc-adjOffsets',
+      size: offsets.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+    new Uint32Array(this.scAdjOffsetsBuffer.getMappedRange()).set(offsets);
+    this.scAdjOffsetsBuffer.unmap();
+
+    // Adjacency neighbors
+    this.scAdjNeighborsBuffer = this.device.createBuffer({
+      label: 'sc-adjNeighbors',
+      size: Math.max(neighbors.byteLength, 4),
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+    new Uint32Array(this.scAdjNeighborsBuffer.getMappedRange()).set(neighbors);
+    this.scAdjNeighborsBuffer.unmap();
+
+    // ─── Pipelines ──────────────────────────────────────────────────
+    const scModule = this.device.createShaderModule({
+      label: 'selfCollision',
+      code: selfCollisionShaderSrc,
+    });
+
+    const scLayout = this.device.createBindGroupLayout({
+      label: 'sc-main',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    });
+
+    const adjLayout = this.device.createBindGroupLayout({
+      label: 'sc-adj',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+      ],
+    });
+
+    const scPipelineLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: [scLayout, adjLayout],
+    });
+
+    this.scHashCountPipeline = this.device.createComputePipeline({
+      label: 'sc-hashCount',
+      layout: scPipelineLayout,
+      compute: { module: scModule, entryPoint: 'hashCount' },
+    });
+    this.scPrefixSumPipeline = this.device.createComputePipeline({
+      label: 'sc-prefixSum',
+      layout: scPipelineLayout,
+      compute: { module: scModule, entryPoint: 'prefixSum' },
+    });
+    this.scScatterPipeline = this.device.createComputePipeline({
+      label: 'sc-scatter',
+      layout: scPipelineLayout,
+      compute: { module: scModule, entryPoint: 'scatter' },
+    });
+    this.scResolvePipeline = this.device.createComputePipeline({
+      label: 'sc-resolve',
+      layout: scPipelineLayout,
+      compute: { module: scModule, entryPoint: 'resolveCollisions' },
+    });
+
+    // ─── Bind groups ────────────────────────────────────────────────
+    this.scBindGroup = this.device.createBindGroup({
+      label: 'sc-main',
+      layout: scLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.scParamsBuffer } },
+        { binding: 1, resource: { buffer: this.buffers.positions } },
+        { binding: 2, resource: { buffer: this.buffers.invMass } },
+        { binding: 3, resource: { buffer: this.scCellCountBuffer } },
+        { binding: 4, resource: { buffer: this.scCellStartBuffer } },
+        { binding: 5, resource: { buffer: this.scCellEntriesBuffer } },
+      ],
+    });
+
+    this.scAdjBindGroup = this.device.createBindGroup({
+      label: 'sc-adj',
+      layout: adjLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.scAdjOffsetsBuffer } },
+        { binding: 1, resource: { buffer: this.scAdjNeighborsBuffer } },
+      ],
+    });
+
+    console.log('[GpuSolver] Self-collision initialized:', {
+      tableSize: ts,
+      adjNeighbors: totalNeighbors,
     });
   }
 
