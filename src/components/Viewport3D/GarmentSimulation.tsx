@@ -27,22 +27,95 @@ import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision } from 
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
+// ─── SDF Cache + Deduplication ────────────────────────────────────────────────
+
+/** In-flight deduplication: same avatar+height returns same promise */
+const _sdfInflight = new Map<string, Promise<import('../../utils/cloth/sdfGenerator').SDFData | null>>();
+
+function sdfCacheKey(url: string, height: number): string {
+  return `sdf|${url}|${height.toFixed(4)}`;
+}
+
+const SDF_IDB_STORE = 'sdf-cache';
+const SDF_IDB_VERSION = 1;
+
+async function openSdfIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('openclo-sdf', SDF_IDB_VERSION);
+    req.onupgradeneeded = () => { req.result.createObjectStore(SDF_IDB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getSdfFromIdb(key: string): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
+  try {
+    const db = await openSdfIdb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(SDF_IDB_STORE, 'readonly');
+      const req = tx.objectStore(SDF_IDB_STORE).get(key);
+      req.onsuccess = () => {
+        const val = req.result;
+        if (val && val.distances && val.resolution) {
+          // Reconstruct Float32Array from stored ArrayBuffer
+          resolve({
+            ...val,
+            distances: val.distances instanceof Float32Array ? val.distances : new Float32Array(val.distances),
+          });
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function putSdfToIdb(key: string, sdf: import('../../utils/cloth/sdfGenerator').SDFData): Promise<void> {
+  try {
+    const db = await openSdfIdb();
+    const tx = db.transaction(SDF_IDB_STORE, 'readwrite');
+    // Store distances as plain ArrayBuffer for IDB compatibility
+    tx.objectStore(SDF_IDB_STORE).put({
+      distances: sdf.distances.buffer.slice(0),
+      resolution: sdf.resolution,
+      min: sdf.min,
+      max: sdf.max,
+      cellSize: sdf.cellSize,
+    }, key);
+  } catch { /* best effort */ }
+}
+
 /**
  * Load avatar mesh and generate SDF off the main thread.
- * GLB loading + mesh extraction happen on main thread (fast, async IO),
- * but the heavy generateSDF computation runs in the simulation worker.
+ * Features: in-flight deduplication, IndexedDB persistence, worker-only generation.
  */
 async function loadSDFInWorker(
   avatarUrl: string,
   avatarHeight: number,
   initClient: SimulationInitClient | null,
 ): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
-  const { buildAvatarSDF } = await import('../../utils/cloth/avatarSDF');
-  const { extractMeshData } = await import('../../utils/cloth/avatarSDF');
+  const key = sdfCacheKey(avatarUrl, avatarHeight);
 
-  // If we have a worker client, use it for the heavy SDF computation
-  if (initClient) {
-    // Load and extract mesh data on main thread (fast — just GLB parse + bone transforms)
+  // 1. In-flight deduplication
+  const inflight = _sdfInflight.get(key);
+  if (inflight) {
+    console.log('[SDF] Returning in-flight promise (deduplicated)');
+    return inflight;
+  }
+
+  const promise = (async () => {
+    // 2. Check IndexedDB cache
+    const cached = await getSdfFromIdb(key);
+    if (cached) {
+      console.log('[SDF] Loaded from IndexedDB cache');
+      return cached;
+    }
+
+    // 3. Extract mesh data on main thread (fast — GLB parse + bone transforms)
+    const { extractMeshData } = await import('../../utils/cloth/avatarSDF');
     const THREE = await import('three');
     const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
     const { isVRMFile, loadVRM } = await import('../../utils/avatar/vrmLoader');
@@ -76,25 +149,37 @@ async function loadSDFInWorker(
     const { vertices, indices } = extractMeshData(scene);
     if (vertices.length === 0 || indices.length === 0) return null;
 
-    // Heavy SDF generation runs in the worker — cascade: 32³ → 16³
-    // Copy buffers since generateSDF transfers ownership
-    try {
-      return await initClient.generateSDF(
-        new Float32Array(vertices), new Uint32Array(indices), 32);
-    } catch {
-      console.warn('[SDF] 32³ failed, trying 16³ fallback');
+    // 4. Heavy SDF generation in worker — cascade: 32³ → 16³
+    if (initClient) {
       try {
-        return await initClient.generateSDF(
-          new Float32Array(vertices), new Uint32Array(indices), 16);
+        const sdf = await initClient.generateSDF(
+          new Float32Array(vertices), new Uint32Array(indices), 32);
+        if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 32³ in worker, cached to IDB'); }
+        return sdf;
       } catch {
-        console.warn('[SDF] 16³ also failed');
-        return null;
+        console.warn('[SDF] 32³ failed, trying 16³ fallback');
+        try {
+          const sdf = await initClient.generateSDF(
+            new Float32Array(vertices), new Uint32Array(indices), 16);
+          if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 16³ in worker, cached to IDB'); }
+          return sdf;
+        } catch {
+          console.warn('[SDF] 16³ also failed');
+          return null;
+        }
       }
     }
-  }
 
-  // Fallback: run everything on main thread with lower resolution
-  return buildAvatarSDF(avatarUrl, avatarHeight, 32);
+    // 5. No worker available — generate directly (still off main React render)
+    const { generateSDF } = await import('../../utils/cloth/sdfGenerator');
+    const sdf = generateSDF(vertices, indices, 32);
+    if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 32³ directly, cached to IDB'); }
+    return sdf;
+  })();
+
+  _sdfInflight.set(key, promise);
+  promise.finally(() => _sdfInflight.delete(key));
+  return promise;
 }
 
 /**
