@@ -32,6 +32,7 @@ import { tools as edgeToolDefs } from './definitions/edgeTools';
 import { tools as dartToolDefs } from './definitions/dartTools';
 import { tools as easeToolDefs } from './definitions/easeTools';
 import { tools as patternOpsToolDefs } from './definitions/patternOpsTools';
+import { tools as ruleToolDefs } from './definitions/ruleTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -293,6 +294,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   dartToolDefs,
   easeToolDefs,
   patternOpsToolDefs,
+  ruleToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
