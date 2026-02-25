@@ -14,6 +14,9 @@ import type { QualityLevel } from '../utils/cloth/gpu/qualityPresets';
 /** Simulation lifecycle state. */
 export type SimulationState = 'idle' | 'running' | 'paused';
 
+/** Which solver tier is currently active. */
+export type SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape';
+
 interface SimulationSliceState {
   /** Current simulation state */
   simulationState: SimulationState;
@@ -33,6 +36,12 @@ interface SimulationSliceState {
   qualityLevel: QualityLevel;
   /** Auto-quality detection enabled */
   autoQuality: boolean;
+  /** Currently active solver tier */
+  solverTier: SolverTier;
+  /** Frame time in ms (rolling average) */
+  frameTimeMs: number;
+  /** Particle count in active simulation */
+  particleCount: number;
 }
 
 const initialState: SimulationSliceState = {
@@ -50,6 +59,9 @@ const initialState: SimulationSliceState = {
   },
   qualityLevel: 'standard' as QualityLevel,
   autoQuality: true,
+  solverTier: 'none' as SolverTier,
+  frameTimeMs: 0,
+  particleCount: 0,
 };
 
 const simulationSlice = createSlice({
@@ -100,6 +112,18 @@ const simulationSlice = createSlice({
     setAutoQuality(state, action: PayloadAction<boolean>) {
       state.autoQuality = action.payload;
     },
+    /** Set which solver tier is active. */
+    setSolverTier(state, action: PayloadAction<SolverTier>) {
+      state.solverTier = action.payload;
+    },
+    /** Update frame time (rolling average). */
+    setFrameTime(state, action: PayloadAction<number>) {
+      state.frameTimeMs = action.payload;
+    },
+    /** Set particle count. */
+    setParticleCount(state, action: PayloadAction<number>) {
+      state.particleCount = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -118,6 +142,9 @@ export const {
   updateFitMapConfig,
   setQualityLevel,
   setAutoQuality,
+  setSolverTier,
+  setFrameTime,
+  setParticleCount,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

@@ -9,6 +9,7 @@ import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
 import { SimulationErrorBoundary } from './SimulationErrorBoundary';
+import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
@@ -166,7 +167,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   }, []);
 
   return (
-    <div className="viewport3d" ref={containerRef}>
+    <div className="viewport3d" ref={containerRef} style={{ position: 'relative' }}>
+      <SimulationStatusOverlay />
       <Canvas
         camera={{ position: [0, 0.8, 2.8], fov: 35 }}
         shadows

@@ -10,7 +10,7 @@
 import { Suspense, lazy, useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
@@ -23,6 +23,7 @@ import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetec
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
+import { setSolverTier, setFrameTime, setParticleCount } from '../../store/simulationSlice';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
@@ -56,6 +57,7 @@ interface GarmentSimulationProps {
  * Renders all pieces as a single merged mesh with vertex colors.
  */
 function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
+  const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const positionsRef = useRef<Float32Array | null>(null);
@@ -104,6 +106,8 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       });
 
       setPieceMeshes(result);
+      const totalParticles = result.reduce((sum, p) => sum + p.vertices.length / 3, 0);
+      dispatch(setParticleCount(totalParticles));
       setMeshingStatus(null);
     })().catch(err => {
       if (!cancelled) {
@@ -193,9 +197,21 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
   const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
 
+  const lastFrameTimeRef = useRef(0);
+  const frameCountRef = useRef(0);
   const onFrame = useCallback((positions: Float32Array) => {
     positionsRef.current = positions;
-  }, []);
+    // Track frame time (report every 30 frames to avoid Redux spam)
+    const now = performance.now();
+    if (lastFrameTimeRef.current > 0) {
+      frameCountRef.current++;
+      if (frameCountRef.current % 30 === 0) {
+        const avgMs = (now - lastFrameTimeRef.current) / 30;
+        dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
+      }
+    }
+    lastFrameTimeRef.current = now;
+  }, [dispatch]);
 
   // GPU solver client ref
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
@@ -237,6 +253,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
             const gpuCtx = await initWebGPU();
             if (gpuCtx && !cancelled) {
               console.log('[GarmentSimulation] 🟢 Using WebGPU solver');
+              dispatch(setSolverTier('webgpu'));
               const gpuClient = new GpuSolverClient(gpuCtx.device);
               gpuClientRef.current = gpuClient;
               gpuClient.onFrame = onFrame;
@@ -266,6 +283,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
             const wasmAvailable = await isWasmSolverAvailable();
             if (wasmAvailable && !cancelled) {
               console.log('[GarmentSimulation] 🟠 Using Wasm XPBD solver');
+              dispatch(setSolverTier('wasm'));
               const wasmClient = new WasmSolverClient();
               wasmClientRef.current = wasmClient;
               wasmClient.onFrame = onFrame;
@@ -293,6 +311,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         if (!cancelled) {
           try {
             console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
+            dispatch(setSolverTier('cpu-worker'));
             const client = new ClothWorkerClient();
             clientRef.current = client;
             client.onFrame = onFrame;
@@ -323,6 +342,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         // ─── Tier 4: Neural Drape (analytical fallback) ─────────────
         if (cancelled) return;
         console.log('[GarmentSimulation] 🔵 Using Neural Drape (analytical preview)');
+        dispatch(setSolverTier('neural-drape'));
         const neuralClient = new NeuralDrapeClient();
         neuralClientRef.current = neuralClient;
         neuralClient.onFrame = onFrame;
@@ -355,6 +375,8 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       neuralClientRef.current?.dispose();
       neuralClientRef.current = null;
       positionsRef.current = null;
+      dispatch(setSolverTier('none'));
+      dispatch(setFrameTime(0));
     } else if (simulationState === 'paused') {
       clientRef.current?.stop();
       gpuClientRef.current?.stop();
