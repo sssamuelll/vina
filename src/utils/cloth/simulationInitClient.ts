@@ -194,6 +194,74 @@ export class SimulationInitClient {
     }
   }
 
+  /**
+   * Apply placement transforms to meshed pieces off the main thread.
+   * Falls back to inline math if worker unavailable.
+   */
+  async applyPlacements(
+    pieces: Array<{
+      pieceId: string; vertices: number[]; triIds: number[];
+      outline: Array<{ type: string; values: number[] }>;
+      rotation: [number, number, number];
+      position: [number, number, number];
+    }>,
+  ): Promise<Array<{ pieceId: string; vertices: number[]; triIds: number[]; outline: Array<{ type: string; values: number[] }> }>> {
+    // Use a dedicated placement worker
+    try {
+      const placementWorker = new Worker(
+        new URL('./placementWorker.ts', import.meta.url),
+        { type: 'module' },
+      );
+
+      return new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          placementWorker.terminate();
+          reject(new Error('Placement transform timeout'));
+        }, 5000);
+
+        placementWorker.addEventListener('message', (event) => {
+          clearTimeout(timeout);
+          placementWorker.terminate();
+          if (event.data.type === 'transformed') {
+            resolve(event.data.pieces);
+          } else {
+            reject(new Error('Unexpected placement response'));
+          }
+        });
+
+        placementWorker.addEventListener('error', (e) => {
+          clearTimeout(timeout);
+          placementWorker.terminate();
+          reject(new Error(`Placement worker error: ${e.message}`));
+        });
+
+        placementWorker.postMessage({ type: 'transform', pieces });
+      });
+    } catch {
+      // Fallback: inline transforms (pure math, no Three.js)
+      return pieces.map(p => {
+        const numVerts = p.vertices.length / 3;
+        const transformed = new Array<number>(p.vertices.length);
+        const [rx, ry, rz] = p.rotation;
+        const [px, py, pz] = p.position;
+        const cx = Math.cos(rx), sx = Math.sin(rx);
+        const cy = Math.cos(ry), sy = Math.sin(ry);
+        const cz = Math.cos(rz), sz = Math.sin(rz);
+
+        for (let i = 0; i < numVerts; i++) {
+          const vx = p.vertices[i * 3], vy = p.vertices[i * 3 + 1], vz = p.vertices[i * 3 + 2];
+          const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
+          const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
+          const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
+          transformed[i * 3] = x3 + px;
+          transformed[i * 3 + 1] = y3 + py;
+          transformed[i * 3 + 2] = z2 + pz;
+        }
+        return { pieceId: p.pieceId, vertices: transformed, triIds: p.triIds, outline: p.outline };
+      });
+    }
+  }
+
   dispose() {
     this.worker?.terminate();
     this.worker = null;

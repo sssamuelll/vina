@@ -8,6 +8,7 @@ import PieceMesh from './PieceMesh';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
+import { SimulationErrorBoundary } from './SimulationErrorBoundary';
 import JointGizmos from './JointGizmos';
 import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
@@ -196,7 +197,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
 
         {useClothSim ? (
-          <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
+          <SimulationErrorBoundary>
+            <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
+          </SimulationErrorBoundary>
         ) : (
           (() => {
             const placements = placeGarmentPieces(pieces, avatar.measurements);

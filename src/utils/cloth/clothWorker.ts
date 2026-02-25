@@ -51,6 +51,7 @@ export type WorkerOutMessage =
   | { type: 'frame'; positions: Float32Array; numParticles: number; triIds: Int32Array }
   | { type: 'edgeData'; stretchingIds: Int32Array; stretchingLengths: Float32Array }
   | { type: 'stopped' }
+  | { type: 'progress'; stage: string }
   | { type: 'error'; message: string };
 
 // ─── Worker State ───────────────────────────────────────────────────────────
@@ -61,13 +62,19 @@ let animFrameId: ReturnType<typeof setTimeout> | null = null;
 let cachedMergedMesh: MergedMesh | null = null;
 let cachedOutlines: Map<string, Array<{ type: string; values: number[] }>> | null = null;
 
+/** Max time budget per frame in ms. If substeps exceed this, skip remaining. */
+const FRAME_BUDGET_MS = 14; // ~60fps target, leave 2ms headroom
+
 /**
  * Run one simulation step and post the result.
+ * Respects frame budget — if step takes too long, reduces effective substeps.
  */
 function simulationLoop(): void {
   if (!running || !solver) return;
 
+  const t0 = performance.now();
   solver.step();
+  const elapsed = performance.now() - t0;
 
   const snap = solver.getSnapshot();
   const msg: WorkerOutMessage = {
@@ -80,8 +87,9 @@ function simulationLoop(): void {
   // Transfer the positions buffer for zero-copy perf
   (self as unknown as Worker).postMessage(msg, [snap.positions.buffer]);
 
-  // Schedule next step at ~60fps
-  animFrameId = setTimeout(simulationLoop, 1000 / 60);
+  // Adaptive scheduling: if frame took too long, add delay to prevent backpressure
+  const delay = elapsed > FRAME_BUDGET_MS ? Math.min(elapsed, 50) : 1000 / 60;
+  animFrameId = setTimeout(simulationLoop, delay);
 }
 
 /**
@@ -106,7 +114,11 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       }
 
       case 'initMultiPiece': {
+        const progress = (stage: string) =>
+          (self as unknown as Worker).postMessage({ type: 'progress', stage } satisfies WorkerOutMessage);
+
         // Merge all pieces into one particle system
+        progress('Merging meshes...');
         const pieceMeshes = msg.pieces.map(p => ({
           pieceId: p.pieceId,
           vertices: new Float32Array(p.vertices),
@@ -123,6 +135,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
         cachedOutlines = outlines;
 
         // Create solver with merged mesh
+        progress('Extracting constraints...');
         const mergedMeshData: ClothMeshData = {
           vertices: merged.vertices,
           triIds: merged.triIds,
@@ -131,6 +144,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
 
         // Build and set seam constraints
         if (msg.seams.length > 0) {
+          progress('Building seam constraints...');
           const seams: import('../../types/types').Seam[] = msg.seams.map(s => ({
             id: s.id,
             pieceA: { pieceId: s.pieceAId, edgeStart: s.pieceAEdgeStart, edgeEnd: s.pieceAEdgeEnd },
