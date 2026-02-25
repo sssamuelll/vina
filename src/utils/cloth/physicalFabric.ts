@@ -676,6 +676,99 @@ export function toXPBDParams(pf: PhysicalFabric): PhysicalXPBDParams {
   };
 }
 
+// ─── Conversion: PhysicalFabric → MeshPhysicalMaterial params ────────────
+
+/**
+ * Render parameters for Three.js MeshPhysicalMaterial.
+ * Derived from physical fabric properties for CLO3D-quality rendering.
+ */
+export interface FabricRenderParams {
+  color: string;
+  roughness: number;
+  metalness: number;
+  sheen: number;
+  sheenRoughness: number;
+  sheenColor: string;
+  clearcoat: number;
+  clearcoatRoughness: number;
+  transmission: number;
+  thickness: number;       // for subsurface (transmission thickness)
+  ior: number;
+  opacity: number;
+  side: 'double';
+}
+
+/**
+ * Render presets per weave type — base visual appearance derived from textile properties.
+ */
+const WEAVE_RENDER_DEFAULTS: Record<WeaveType, Partial<FabricRenderParams>> = {
+  'plain': { roughness: 0.75, sheen: 0.15, sheenRoughness: 0.7, sheenColor: '#e8e4df' },
+  'twill': { roughness: 0.7, sheen: 0.2, sheenRoughness: 0.6, sheenColor: '#d0ccc5' },
+  'satin': { roughness: 0.25, sheen: 0.9, sheenRoughness: 0.2, sheenColor: '#fff8f0' },
+  'knit-jersey': { roughness: 0.8, sheen: 0.1, sheenRoughness: 0.8, sheenColor: '#e0dcd5' },
+  'knit-rib': { roughness: 0.82, sheen: 0.08, sheenRoughness: 0.85, sheenColor: '#ddd8d0' },
+  'knit-interlock': { roughness: 0.78, sheen: 0.12, sheenRoughness: 0.75, sheenColor: '#e0dcd5' },
+  'nonwoven': { roughness: 0.9, sheen: 0.0, sheenRoughness: 1.0, sheenColor: '#ffffff' },
+  'leather': { roughness: 0.45, sheen: 0.3, sheenRoughness: 0.4, sheenColor: '#8b7355', clearcoat: 0.3, clearcoatRoughness: 0.2 },
+  'mesh': { roughness: 0.6, sheen: 0.05, sheenRoughness: 0.5, sheenColor: '#ffffff', transmission: 0.3, opacity: 0.7 },
+  'pile': { roughness: 0.85, sheen: 0.7, sheenRoughness: 0.3, sheenColor: '#f0e8e0' },
+  'technical': { roughness: 0.5, sheen: 0.05, sheenRoughness: 0.6, sheenColor: '#c0c0c0', clearcoat: 0.5, clearcoatRoughness: 0.3 },
+};
+
+/**
+ * Convert PhysicalFabric to MeshPhysicalMaterial parameters.
+ *
+ * Maps physical textile properties to visual rendering:
+ * - surfaceRoughness → roughness
+ * - drapeCoefficient → sheen (fluid fabrics shimmer more)
+ * - thickness + weight → subsurface hints
+ * - weaveType → base visual preset
+ *
+ * @param pf Physical fabric definition
+ * @param baseColor Optional base color (default: neutral off-white)
+ */
+export function toMeshPhysicalParams(pf: PhysicalFabric, baseColor?: string): FabricRenderParams {
+  const defaults = WEAVE_RENDER_DEFAULTS[pf.weaveType] || WEAVE_RENDER_DEFAULTS['plain'];
+
+  // Surface roughness: combine physical roughness with weave preset
+  const roughness = Math.min(1, (pf.surfaceRoughness * 0.6 + (defaults.roughness ?? 0.7) * 0.4));
+
+  // Sheen: high-drape fabrics (silk, chiffon) have more surface sheen
+  // Also affected by weave type (satin = high sheen)
+  const drapeSheen = pf.drapeCoefficient > 0.7 ? 0.3 : 0;
+  const sheen = Math.min(1, (defaults.sheen ?? 0.1) + drapeSheen);
+  const sheenRoughness = defaults.sheenRoughness ?? 0.5;
+
+  // Transmission: very light + thin fabrics are slightly translucent
+  let transmission = defaults.transmission ?? 0;
+  if (pf.weight < 60 && pf.thickness < 0.3) {
+    transmission = Math.max(transmission, 0.15); // chiffon, organza
+  }
+
+  // Opacity for mesh/sheer fabrics
+  const opacity = defaults.opacity ?? (transmission > 0.1 ? 0.9 : 1.0);
+
+  // Clearcoat for leather/technical
+  const clearcoat = defaults.clearcoat ?? 0;
+  const clearcoatRoughness = defaults.clearcoatRoughness ?? 0;
+
+  return {
+    color: baseColor ?? '#e8e4df',
+    roughness,
+    metalness: 0,
+    sheen,
+    sheenRoughness,
+    sheenColor: defaults.sheenColor ?? '#e8e4df',
+    clearcoat,
+    clearcoatRoughness,
+    transmission,
+    thickness: pf.thickness,
+    ior: 1.5,
+    opacity,
+    side: 'double',
+  };
+}
+
 // ─── Search & Lookup ────────────────────────────────────────────────────
 
 /** Get all physical fabrics. */

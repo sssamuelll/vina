@@ -18,7 +18,7 @@ import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
 import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
-import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
+import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 
@@ -386,17 +386,36 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     return () => window.removeEventListener('openclo:export3d', handler);
   }, []);
 
+  // Derive render params from selected fabric
+  const renderParams = useMemo(() => {
+    const fabric = getPhysicalFabric(fabricId);
+    if (fabric) return toMeshPhysicalParams(fabric);
+    return {
+      roughness: 0.7, metalness: 0, sheen: 0.15, sheenRoughness: 0.7,
+      sheenColor: '#e8e4df', clearcoat: 0, clearcoatRoughness: 0,
+      transmission: 0, thickness: 0.5, ior: 1.5, opacity: 0.85,
+    };
+  }, [fabricId]);
+
   if (!staticGeometry) return null;
 
   return (
     <mesh ref={meshRef} geometry={staticGeometry}>
-      <meshStandardMaterial
+      <meshPhysicalMaterial
         vertexColors
         side={THREE.DoubleSide}
         transparent
-        opacity={0.85}
-        roughness={0.7}
-        metalness={0}
+        opacity={renderParams.opacity}
+        roughness={renderParams.roughness}
+        metalness={renderParams.metalness}
+        sheen={renderParams.sheen}
+        sheenRoughness={renderParams.sheenRoughness}
+        sheenColor={renderParams.sheenColor}
+        clearcoat={renderParams.clearcoat}
+        clearcoatRoughness={renderParams.clearcoatRoughness}
+        transmission={renderParams.transmission}
+        thickness={renderParams.thickness}
+        ior={renderParams.ior}
       />
     </mesh>
   );
