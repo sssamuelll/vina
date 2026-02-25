@@ -19,6 +19,8 @@ import { buildAvatarSDF } from '../../utils/cloth/avatarSDF';
 import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
+import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
+import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 
 const ClothMesh = lazy(() => import('./ClothMesh'));
 
@@ -202,71 +204,115 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     positionsRef.current = positions;
   }, []);
 
-  // Start/stop worker
+  // GPU solver client ref
+  const gpuClientRef = useRef<GpuSolverClient | null>(null);
+
+  // Apply placement transforms
+  const placedMeshes = useMemo(() => {
+    return pieceMeshes.map((pm, i) => {
+      const region = detectBodyRegion(pieces[i]?.name ?? '');
+      const placement = computePlacement(region, avatarMeasurements, i, pieces.length);
+      const euler = new THREE.Euler(placement.rotation[0], placement.rotation[1], placement.rotation[2]);
+      const rotMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
+      const pos = new THREE.Vector3(...placement.position);
+
+      const numVerts = pm.vertices.length / 3;
+      const transformed = new Array<number>(pm.vertices.length);
+      for (let vi = 0; vi < numVerts; vi++) {
+        const v = new THREE.Vector3(pm.vertices[vi * 3], pm.vertices[vi * 3 + 1], pm.vertices[vi * 3 + 2]);
+        v.applyMatrix4(rotMatrix);
+        v.add(pos);
+        transformed[vi * 3] = v.x;
+        transformed[vi * 3 + 1] = v.y;
+        transformed[vi * 3 + 2] = v.z;
+      }
+      return { ...pm, vertices: transformed };
+    });
+  }, [pieceMeshes, pieces, avatarMeasurements]);
+
+  // Start/stop simulation — WebGPU preferred, CPU Web Worker fallback
   useEffect(() => {
-    if (simulationState === 'running' && pieceMeshes.length > 0) {
-      const client = new ClothWorkerClient();
-      clientRef.current = client;
-      client.onFrame = onFrame;
-      client.onEdgeData = (ids, lengths) => {
-        edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
-      };
+    if (simulationState === 'running' && placedMeshes.length > 0) {
+      let cancelled = false;
 
-      // Apply placement transforms to vertices before sending to worker
-      // so particles start near the avatar body (required for SDF collision)
-      const placedMeshes = pieceMeshes.map((pm, i) => {
-        const region = detectBodyRegion(pieces[i]?.name ?? '');
-        const placement = computePlacement(region, avatarMeasurements, i, pieces.length);
-        const euler = new THREE.Euler(placement.rotation[0], placement.rotation[1], placement.rotation[2]);
-        const rotMatrix = new THREE.Matrix4().makeRotationFromEuler(euler);
-        const pos = new THREE.Vector3(...placement.position);
+      const startSim = async () => {
+        // ─── Try WebGPU ───────────────────────────────────────────────
+        if (isWebGPUAvailable()) {
+          try {
+            const gpuCtx = await initWebGPU();
+            if (gpuCtx && !cancelled) {
+              console.log('[GarmentSimulation] 🟢 Using WebGPU solver');
+              const gpuClient = new GpuSolverClient(gpuCtx.device);
+              gpuClientRef.current = gpuClient;
+              gpuClient.onFrame = onFrame;
 
-        const numVerts = pm.vertices.length / 3;
-        const transformed = new Array<number>(pm.vertices.length);
-        for (let vi = 0; vi < numVerts; vi++) {
-          const v = new THREE.Vector3(pm.vertices[vi * 3], pm.vertices[vi * 3 + 1], pm.vertices[vi * 3 + 2]);
-          v.applyMatrix4(rotMatrix);
-          v.add(pos);
-          transformed[vi * 3] = v.x;
-          transformed[vi * 3 + 1] = v.y;
-          transformed[vi * 3 + 2] = v.z;
+              await gpuClient.initMultiPiece(placedMeshes);
+
+              if (avatarModelUrl && !cancelled) {
+                try {
+                  const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
+                  gpuClient.setSDF(sdf);
+                } catch (e) {
+                  console.warn('[GarmentSimulation] Avatar SDF failed:', e);
+                }
+              }
+
+              if (!cancelled) gpuClient.start();
+              return;
+            }
+          } catch (e) {
+            console.warn('[GarmentSimulation] WebGPU failed, falling back to CPU:', e);
+          }
         }
-        return { ...pm, vertices: transformed };
-      });
 
-      client.initMultiPiece(placedMeshes, seamInitData).then(async () => {
+        // ─── Fallback: CPU Web Worker ─────────────────────────────────
+        if (cancelled) return;
+        console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
+        const client = new ClothWorkerClient();
+        clientRef.current = client;
+        client.onFrame = onFrame;
+        client.onEdgeData = (ids, lengths) => {
+          edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+        };
+
+        await client.initMultiPiece(placedMeshes, seamInitData);
         client.setFabric(fabricId);
         client.requestEdgeData();
 
-        // Generate and set avatar body SDF for collision
-        if (avatarModelUrl) {
+        if (avatarModelUrl && !cancelled) {
           try {
             const sdf = await buildAvatarSDF(avatarModelUrl, avatarHeight);
             client.setSDF(sdf);
           } catch (e) {
-            console.warn('[GarmentSimulation] Avatar SDF generation failed:', e);
+            console.warn('[GarmentSimulation] Avatar SDF failed:', e);
           }
         }
 
-        client.start();
-      }).catch(() => {});
+        if (!cancelled) client.start();
+      };
+
+      startSim().catch(e => console.error('[GarmentSimulation] Start failed:', e));
 
       return () => {
-        client.dispose();
+        cancelled = true;
+        clientRef.current?.dispose();
         clientRef.current = null;
+        gpuClientRef.current?.dispose();
+        gpuClientRef.current = null;
         positionsRef.current = null;
       };
     } else if (simulationState === 'idle') {
-      if (clientRef.current) {
-        clientRef.current.dispose();
-        clientRef.current = null;
-      }
+      clientRef.current?.dispose();
+      clientRef.current = null;
+      gpuClientRef.current?.dispose();
+      gpuClientRef.current = null;
       positionsRef.current = null;
     } else if (simulationState === 'paused') {
       clientRef.current?.stop();
+      gpuClientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, pieceMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
 
   // Per-frame geometry update
   useFrame(() => {
