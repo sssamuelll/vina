@@ -1,13 +1,13 @@
 /**
  * GarmentSimulation — R3F component that handles multi-piece cloth simulation with seams.
  *
- * When seams exist, merges all connected pieces into one shared solver.
- * When no seams exist, falls back to individual ClothMesh per piece.
+ * Always merges all pieces into one shared solver (with or without seams).
+ * All heavy work (meshing, SDF, simulation) runs in Web Workers.
  *
  * @module GarmentSimulation
  */
 
-import { Suspense, lazy, useRef, useEffect, useCallback, useMemo, useState } from 'react';
+import { Suspense, useRef, useEffect, useCallback, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
@@ -16,7 +16,7 @@ import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
-import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
+import { computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
@@ -24,8 +24,6 @@ import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setParticleCount } from '../../store/simulationSlice';
-
-const ClothMesh = lazy(() => import('./ClothMesh'));
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -563,36 +561,17 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 }
 
 /**
- * GarmentSimulation — decides whether to use merged or individual simulation.
+ * GarmentSimulation — always uses MergedSimulation for all pieces.
+ *
+ * Previously had a ClothMesh-per-piece fallback for no-seam patterns,
+ * but that path ran CDT meshing + SDF generation on the main thread,
+ * freezing the browser. MergedSimulation uses Web Workers for everything.
+ * When no seams exist, the solver simply has no seam constraints.
  */
 export default function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
-  const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
-  const hasSeams = seams.length > 0;
-
-  if (hasSeams) {
-    return (
-      <Suspense fallback={null}>
-        <MergedSimulation pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} onInspect={onInspect} />
-      </Suspense>
-    );
-  }
-
-  // No seams — fall back to individual ClothMesh per piece
-  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
-  const placements = placeGarmentPieces(pieces, measurements);
   return (
     <Suspense fallback={null}>
-      {pieces.map((piece, i) => (
-        <ClothMesh
-          key={piece.id}
-          piece={piece}
-          isSelected={selectedPieceIds.includes(piece.id)}
-          color={PIECE_COLORS[i % PIECE_COLORS.length]}
-          position={placements[i].position}
-          onFitMapStats={i === 0 ? onFitMapStats : undefined}
-          onInspect={onInspect}
-        />
-      ))}
+      <MergedSimulation pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} onInspect={onInspect} />
     </Suspense>
   );
 }
