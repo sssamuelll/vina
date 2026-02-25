@@ -42,6 +42,8 @@ interface SimulationSliceState {
   frameTimeMs: number;
   /** Particle count in active simulation */
   particleCount: number;
+  /** Whether body collision (SDF) is active */
+  bodyCollision: boolean;
 }
 
 const initialState: SimulationSliceState = {
@@ -62,6 +64,7 @@ const initialState: SimulationSliceState = {
   solverTier: 'none' as SolverTier,
   frameTimeMs: 0,
   particleCount: 0,
+  bodyCollision: false,
 };
 
 const simulationSlice = createSlice({
@@ -124,6 +127,10 @@ const simulationSlice = createSlice({
     setParticleCount(state, action: PayloadAction<number>) {
       state.particleCount = action.payload;
     },
+    /** Set body collision (SDF) status. */
+    setBodyCollision(state, action: PayloadAction<boolean>) {
+      state.bodyCollision = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -145,6 +152,7 @@ export const {
   setSolverTier,
   setFrameTime,
   setParticleCount,
+  setBodyCollision,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

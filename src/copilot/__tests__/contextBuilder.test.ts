@@ -105,6 +105,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       solverTier: 'none' as const,
       frameTimeMs: 0,
       particleCount: 0,
+      bodyCollision: false,
     },
     plugins: {
       installedPlugins: [],

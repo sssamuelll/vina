@@ -23,6 +23,7 @@ export function SimulationStatusOverlay() {
   const frameTimeMs = useSelector((s: RootState) => s.simulation.frameTimeMs);
   const particleCount = useSelector((s: RootState) => s.simulation.particleCount);
   const qualityLevel = useSelector((s: RootState) => s.simulation.qualityLevel);
+  const bodyCollision = useSelector((s: RootState) => s.simulation.bodyCollision);
 
   if (simulationState === 'idle') return null;
 
@@ -54,6 +55,11 @@ export function SimulationStatusOverlay() {
       <div style={{ opacity: 0.6 }}>
         Quality: {qualityLevel}{isMobile ? ' · Mobile' : ''}
       </div>
+      {solverTier !== 'none' && !bodyCollision && (
+        <div style={{ color: '#fb923c', fontSize: 10 }}>
+          ⚠️ No body collision
+        </div>
+      )}
     </div>
   );
 }

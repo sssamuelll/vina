@@ -23,7 +23,7 @@ import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetec
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setParticleCount } from '../../store/simulationSlice';
+import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision } from '../../store/simulationSlice';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -351,8 +351,9 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               // SDF loaded via worker after simulation starts (truly non-blocking)
               if (avatarModelUrl && !cancelled) {
                 loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                  if (sdf && !cancelled) gpuClient.setSDF(sdf);
-                }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+                  if (sdf && !cancelled) { gpuClient.setSDF(sdf); dispatch(setBodyCollision(true)); }
+                  else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
+                }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
               }
               return;
             }
@@ -379,8 +380,9 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               // SDF loaded via worker (truly non-blocking)
               if (avatarModelUrl && !cancelled) {
                 loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                  if (sdf && !cancelled) wasmClient.setSDF(sdf);
-                }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+                  if (sdf && !cancelled) { wasmClient.setSDF(sdf); dispatch(setBodyCollision(true)); }
+                  else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
+                }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
               }
               return;
             }
@@ -410,8 +412,9 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
             // SDF loaded via worker (truly non-blocking)
             if (avatarModelUrl && !cancelled) {
               loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                if (sdf && !cancelled) client.setSDF(sdf);
-              }).catch(e => console.warn('[GarmentSimulation] Avatar SDF failed:', e));
+                if (sdf && !cancelled) { client.setSDF(sdf); dispatch(setBodyCollision(true)); }
+                else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
+              }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
             }
             return;
           } catch (e) {
