@@ -1,11 +1,15 @@
 /**
- * Garment Placement — positions flat 2D pattern pieces near the corresponding
- * body region of the 3D avatar so cloth falls naturally during simulation.
+ * Garment Placement — positions flat 2D pattern pieces around the 3D avatar.
+ *
+ * CLO3D-style approach: each piece is placed as a flat plane tangent to the
+ * body surface at the appropriate region. Uses PieceCategory + PieceSide
+ * (from semantic classification) for robust, language-independent placement.
+ * Falls back to name-based regex for unclassified pieces.
  *
  * @module garmentPlacement
  */
 
-import type { PatternPiece } from '../../types/types';
+import type { PatternPiece, PieceCategory, PieceSide, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -20,6 +24,8 @@ export type BodyRegion =
   | 'collar'
   | 'waistband'
   | 'hood'
+  | 'cuff-left'
+  | 'cuff-right'
   | 'unknown';
 
 export interface PlacementResult {
@@ -27,55 +33,104 @@ export interface PlacementResult {
   rotation: [number, number, number]; // Euler angles in radians
 }
 
-// ── Region detection ─────────────────────────────────────────────────────────
+// ── Piece geometry helpers ───────────────────────────────────────────────────
 
-// Track sleeve alternation across calls within a single placeGarmentPieces batch
+/** Compute bounding box of outline in mm */
+function outlineBBox(outline: PathCommand[]): { width: number; height: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const cmd of outline) {
+    for (let i = 0; i < cmd.values.length - 1; i += 2) {
+      const x = cmd.values[i], y = cmd.values[i + 1];
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+  }
+  return {
+    width: maxX > minX ? maxX - minX : 0,
+    height: maxY > minY ? maxY - minY : 0,
+  };
+}
+
+// ── Region detection (category-first, name-fallback) ─────────────────────────
+
 let _sleeveToggle = false;
+let _cuffToggle = false;
 
-const FRONT_RE = /\b(front|delantero|delantera|frente)\b/i;
-const BACK_RE = /\b(back|espalda|trasero|trasera)\b/i;
-const SLEEVE_RE = /\b(sleeve|manga)\b/i;
-const LEFT_RE = /\b(left|izquierd[ao])\b/i;
-const RIGHT_RE = /\b(right|derech[ao])\b/i;
-const SKIRT_RE = /\b(skirt|falda)\b/i;
-const COLLAR_RE = /\b(collar|cuello)\b/i;
-const WAISTBAND_RE = /\b(waistband|cinturilla|pretina)\b/i;
-const HOOD_RE = /\b(hood|capucha)\b/i;
-const BODICE_RE = /\b(bodice|cuerpo|corpi[ñn]o)\b/i;
-const PANEL_RE = /\b(panel)\b/i;
+const FRONT_RE = /\b(front|delantero|delantera|frente|davanti|devant|vorder)/i;
+const BACK_RE = /\b(back|espalda|trasero|trasera|dietro|dos|r[üu]ck)/i;
+const SLEEVE_RE = /\b(sleeve|manga|manica|manche|[äa]rmel)/i;
+const LEFT_RE = /\b(left|izquierd[ao]|sinistr[ao]|gauche|link)/i;
+const RIGHT_RE = /\b(right|derech[ao]|destr[ao]|droit[e]?|recht)/i;
+const SKIRT_RE = /\b(skirt|falda|gonna|jupe|rock)/i;
+const COLLAR_RE = /\b(collar|cuello|colletto|col|kragen|neck.?bind)/i;
+const WAISTBAND_RE = /\b(waistband|cinturilla|pretina)/i;
+const HOOD_RE = /\b(hood|capucha|cappuccio)/i;
+const CUFF_RE = /\b(cuff|pu[ñn]o|polsino)/i;
 
-export function detectBodyRegion(pieceName: string): BodyRegion {
-  const n = pieceName;
-
-  // Collar / waistband / hood first (more specific)
-  if (COLLAR_RE.test(n)) return 'collar';
-  if (WAISTBAND_RE.test(n)) return 'waistband';
-  if (HOOD_RE.test(n)) return 'hood';
-
-  // Sleeve
-  if (SLEEVE_RE.test(n)) {
-    if (LEFT_RE.test(n)) return 'left-sleeve';
-    if (RIGHT_RE.test(n)) return 'right-sleeve';
-    // Alternate
+function detectFromName(name: string): BodyRegion {
+  if (COLLAR_RE.test(name)) return 'collar';
+  if (WAISTBAND_RE.test(name)) return 'waistband';
+  if (HOOD_RE.test(name)) return 'hood';
+  if (CUFF_RE.test(name)) {
+    if (LEFT_RE.test(name)) return 'cuff-left';
+    if (RIGHT_RE.test(name)) return 'cuff-right';
+    _cuffToggle = !_cuffToggle;
+    return _cuffToggle ? 'cuff-left' : 'cuff-right';
+  }
+  if (SLEEVE_RE.test(name)) {
+    if (LEFT_RE.test(name)) return 'left-sleeve';
+    if (RIGHT_RE.test(name)) return 'right-sleeve';
     _sleeveToggle = !_sleeveToggle;
     return _sleeveToggle ? 'left-sleeve' : 'right-sleeve';
   }
+  if (SKIRT_RE.test(name)) return BACK_RE.test(name) ? 'back-skirt' : 'front-skirt';
+  if (BACK_RE.test(name)) return 'back-torso';
+  if (FRONT_RE.test(name)) return 'front-torso';
+  return 'unknown';
+}
 
-  // Skirt
-  if (SKIRT_RE.test(n)) {
-    if (BACK_RE.test(n)) return 'back-skirt';
-    return 'front-skirt'; // default skirt → front
+/**
+ * Determine body region from piece metadata (category + side).
+ * Falls back to name-based regex for unclassified pieces.
+ */
+export function detectBodyRegion(piece: PatternPiece): BodyRegion {
+  const cat = piece.category;
+  const side = piece.side;
+
+  if (cat) {
+    switch (cat) {
+      case 'collar': return 'collar';
+      case 'hood': return 'hood';
+      case 'waistband': return 'waistband';
+      case 'cuff':
+        if (side === 'left') return 'cuff-left';
+        if (side === 'right') return 'cuff-right';
+        _cuffToggle = !_cuffToggle;
+        return _cuffToggle ? 'cuff-left' : 'cuff-right';
+      case 'sleeve':
+        if (side === 'left') return 'left-sleeve';
+        if (side === 'right') return 'right-sleeve';
+        _sleeveToggle = !_sleeveToggle;
+        return _sleeveToggle ? 'left-sleeve' : 'right-sleeve';
+      case 'skirt':
+      case 'trouser':
+        return side === 'back' ? 'back-skirt' : 'front-skirt';
+      case 'bodice':
+      case 'yoke':
+      case 'facing':
+      case 'lining':
+        return side === 'back' ? 'back-torso' : 'front-torso';
+      case 'pocket':
+        return side === 'back' ? 'back-torso' : 'front-torso';
+      default:
+        break;
+    }
   }
 
-  // Torso (bodice/panel or explicit front/back)
-  const isTorso = BODICE_RE.test(n) || PANEL_RE.test(n);
-  if (FRONT_RE.test(n)) return isTorso || true ? 'front-torso' : 'front-torso';
-  if (BACK_RE.test(n)) return 'back-torso';
-  if (isTorso) return 'front-torso'; // default bodice → front
-
-  // Standalone "Delantero" etc. already caught by FRONT_RE
-
-  return 'unknown';
+  // Fallback: name-based detection
+  return detectFromName(piece.name);
 }
 
 // ── Derived body dimensions (cm → meters) ────────────────────────────────────
@@ -85,90 +140,113 @@ interface BodyDimensions {
   waistHeight: number;
   shoulderHeight: number;
   neckHeight: number;
-  chestDepth: number;
-  hipDepth: number;
+  chestRadius: number;
+  hipRadius: number;
   shoulderWidth: number;
+  armLength: number;
 }
 
 function deriveDimensions(m: BodyMeasurements): BodyDimensions {
-  const h = m.height / 100; // cm → m
+  const h = m.height / 100;
+  const chestCirc = m.chest / 100;
+  const hipCirc = m.hips / 100;
   return {
     heightM: h,
     waistHeight: m.waistHeight ? m.waistHeight / 100 : h * 0.55,
     shoulderHeight: h * 0.82,
     neckHeight: h * 0.87,
-    chestDepth: (m.chest / 100) / (2 * Math.PI) * 0.7,
-    hipDepth: (m.hips / 100) / (2 * Math.PI) * 0.7,
+    chestRadius: chestCirc / (2 * Math.PI),
+    hipRadius: hipCirc / (2 * Math.PI),
     shoulderWidth: m.shoulderWidth ? m.shoulderWidth / 100 : (m.shoulder / 100),
+    armLength: m.armLength ? m.armLength / 100 : h * 0.33,
   };
 }
 
-// ── Placement computation ────────────────────────────────────────────────────
+// ── CLO3D-style placement ────────────────────────────────────────────────────
+//
+// Each piece is placed as a flat 2D plane tangent to the body surface.
+// Position = center of the piece relative to the avatar origin.
+// Rotation = orientation so the piece faces outward from the body.
+//
+// Key insight: pieces should be slightly offset from the body (GAP)
+// so simulation can drape them. Too close = interpenetration. Too far = slow drape.
 
-const OFFSET = 0.05; // 5 cm gap from body surface
+const GAP = 0.03; // 3cm from body surface
 
 export function computePlacement(
   region: BodyRegion,
   measurements: BodyMeasurements,
-  pieceIndex: number,
-  totalPieces: number,
+  pieceGeometry: { widthMm: number; heightMm: number },
 ): PlacementResult {
   const d = deriveDimensions(measurements);
-  const torsoHalf = (d.shoulderHeight - d.waistHeight) / 2;
+  const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
+
+  // Piece height in meters (for vertical centering)
+  const pH = pieceGeometry.heightMm / 1000;
 
   switch (region) {
     case 'front-torso':
       return {
-        position: [0, d.waistHeight + torsoHalf, -(d.chestDepth / 2 + OFFSET)],
+        position: [0, midTorso, -(d.chestRadius + GAP)],
         rotation: [0, 0, 0],
       };
     case 'back-torso':
       return {
-        position: [0, d.waistHeight + torsoHalf, d.chestDepth / 2 + OFFSET],
+        position: [0, midTorso, d.chestRadius + GAP],
         rotation: [0, Math.PI, 0],
       };
     case 'left-sleeve':
       return {
-        position: [-(d.shoulderWidth / 2 + OFFSET), d.shoulderHeight, 0],
-        rotation: [0, Math.PI / 2, 0],
+        position: [-(d.shoulderWidth / 2 + GAP), d.shoulderHeight, 0],
+        rotation: [0, Math.PI / 2, -Math.PI / 6], // slight downward angle
       };
     case 'right-sleeve':
       return {
-        position: [d.shoulderWidth / 2 + OFFSET, d.shoulderHeight, 0],
-        rotation: [0, -Math.PI / 2, 0],
+        position: [d.shoulderWidth / 2 + GAP, d.shoulderHeight, 0],
+        rotation: [0, -Math.PI / 2, Math.PI / 6],
       };
     case 'front-skirt':
       return {
-        position: [0, d.waistHeight, -(d.hipDepth / 2 + OFFSET)],
+        position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
         rotation: [0, 0, 0],
       };
     case 'back-skirt':
       return {
-        position: [0, d.waistHeight, d.hipDepth / 2 + OFFSET],
+        position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
         rotation: [0, Math.PI, 0],
       };
     case 'collar':
       return {
-        position: [0, d.neckHeight, 0],
-        rotation: [-Math.PI / 2, 0, 0],
+        position: [0, d.neckHeight + 0.02, 0],
+        rotation: [-Math.PI / 2, 0, 0], // horizontal, wrapping neck
       };
     case 'waistband':
       return {
-        position: [0, d.waistHeight, 0],
+        position: [0, d.waistHeight + 0.01, 0],
         rotation: [-Math.PI / 2, 0, 0],
       };
     case 'hood':
       return {
-        position: [0, d.neckHeight + 0.05, d.chestDepth / 2 + OFFSET],
-        rotation: [0, Math.PI, 0],
+        position: [0, d.neckHeight + 0.08, d.chestRadius / 2],
+        rotation: [-Math.PI / 4, 0, 0], // angled back over head
+      };
+    case 'cuff-left':
+      return {
+        position: [-(d.shoulderWidth / 2 + d.armLength * 0.9), d.shoulderHeight - d.armLength * 0.85, 0],
+        rotation: [0, Math.PI / 2, 0],
+      };
+    case 'cuff-right':
+      return {
+        position: [d.shoulderWidth / 2 + d.armLength * 0.9, d.shoulderHeight - d.armLength * 0.85, 0],
+        rotation: [0, -Math.PI / 2, 0],
       };
     case 'unknown':
     default: {
-      // Fallback: circle arrangement (same as old getPosition)
-      const radius = 0.6;
-      const angle = (pieceIndex / Math.max(totalPieces, 1)) * Math.PI * 2 - Math.PI / 2;
+      // Fallback: arrange in a circle around the torso
+      // Use a hash of the piece index to spread evenly
+      const radius = Math.max(d.chestRadius, d.hipRadius) + 0.15;
       return {
-        position: [Math.cos(angle) * radius, d.waistHeight + torsoHalf, Math.sin(angle) * radius],
+        position: [0, midTorso, -radius],
         rotation: [0, 0, 0],
       };
     }
@@ -177,15 +255,47 @@ export function computePlacement(
 
 // ── Batch placement ──────────────────────────────────────────────────────────
 
+/**
+ * Place all garment pieces around the avatar.
+ *
+ * Uses PieceCategory + PieceSide for classification (language-independent),
+ * falls back to name-based regex. Piece geometry (bounding box) is used
+ * to adjust vertical positioning (skirts hang from waist, sleeves from shoulder).
+ */
 export function placeGarmentPieces(
   pieces: PatternPiece[],
   measurements: BodyMeasurements,
 ): PlacementResult[] {
-  // Reset sleeve toggle for deterministic results
   _sleeveToggle = false;
+  _cuffToggle = false;
 
-  return pieces.map((piece, i) => {
-    const region = detectBodyRegion(piece.name);
-    return computePlacement(region, measurements, i, pieces.length);
+  // Track unknowns for circular fallback distribution
+  let unknownIndex = 0;
+  const unknownCount = pieces.filter(p => detectBodyRegion(p) === 'unknown').length;
+
+  return pieces.map((piece) => {
+    const region = detectBodyRegion(piece);
+    const geo = outlineBBox(piece.outline);
+
+    if (region === 'unknown') {
+      // Distribute unknowns in a circle
+      const d = deriveDimensions(measurements);
+      const radius = Math.max(d.chestRadius, d.hipRadius) + 0.15;
+      const angle = (unknownIndex / Math.max(unknownCount, 1)) * Math.PI * 2 - Math.PI / 2;
+      unknownIndex++;
+      return {
+        position: [
+          Math.cos(angle) * radius,
+          (d.shoulderHeight + d.waistHeight) / 2,
+          Math.sin(angle) * radius,
+        ] as [number, number, number],
+        rotation: [0, -angle - Math.PI / 2, 0] as [number, number, number],
+      };
+    }
+
+    return computePlacement(region, measurements, {
+      widthMm: geo.width,
+      heightMm: geo.height,
+    });
   });
 }

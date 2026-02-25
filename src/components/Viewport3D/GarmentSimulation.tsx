@@ -16,7 +16,7 @@ import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
-import { computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
+import { placeGarmentPieces, detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
@@ -285,10 +285,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
     // Compute placements
-    const placements = pieces.map((piece, i) => {
-      const region = detectBodyRegion(piece.name);
-      return computePlacement(region, avatarMeasurements, i, pieces.length);
-    });
+    const placements = placeGarmentPieces(pieces, avatarMeasurements);
 
     // Count totals
     let totalVerts = 0;
@@ -378,8 +375,10 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   // Apply placement transforms (pure math, no Three.js objects per vertex)
   const placedMeshes = useMemo(() => {
     return pieceMeshes.map((pm, i) => {
-      const region = detectBodyRegion(pieces[i]?.name ?? '');
-      const placement = computePlacement(region, avatarMeasurements, i, pieces.length);
+      const piece = pieces[i];
+      const region = piece ? detectBodyRegion(piece) : 'unknown' as const;
+      const geo = piece ? { widthMm: 200, heightMm: 300 } : { widthMm: 200, heightMm: 300 };
+      const placement = computePlacement(region, avatarMeasurements, geo);
       const [rx, ry, rz] = placement.rotation;
       const [px, py, pz] = placement.position;
       const cx = Math.cos(rx), sx = Math.sin(rx);
