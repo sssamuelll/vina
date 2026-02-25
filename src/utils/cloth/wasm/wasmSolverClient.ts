@@ -9,8 +9,7 @@
  */
 
 import type { SDFData } from '../sdfGenerator';
-import { extractStretchConstraints, extractBendConstraints, type SeamConstraintData } from '../gpu/gpuBuffers';
-import { buildAdjacency } from '../selfCollision';
+import { extractStretchConstraints, extractBendConstraints } from '../gpu/gpuBuffers';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -48,8 +47,6 @@ export class WasmSolverClient {
   private numParticles: number = 0;
   private animFrameId: number = 0;
   private running: boolean = false;
-  private triangles: Uint32Array = new Uint32Array(0);
-
   onFrame?: (positions: Float32Array) => void;
   onReady?: () => void;
   onError?: (error: string) => void;
@@ -98,7 +95,6 @@ export class WasmSolverClient {
       tOff += p.triIds.length;
     }
 
-    this.triangles = triangles;
     this.numParticles = totalVerts;
 
     // Create solver

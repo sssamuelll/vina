@@ -15,7 +15,7 @@ import { RootState } from '../../store';
 import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { SimulationInitClient, type MeshedPiece } from '../../utils/cloth/simulationInitClient';
+import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
 import { placeGarmentPieces, computePlacement, detectBodyRegion } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
@@ -78,7 +78,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     triIds: number[];
     outline: Array<{ type: string; values: number[] }>;
   }>>([]);
-  const [meshingStatus, setMeshingStatus] = useState<string | null>(null);
+  const [_meshingStatus, setMeshingStatus] = useState<string | null>(null);
   const initClientRef = useRef<SimulationInitClient | null>(null);
 
   useEffect(() => {
