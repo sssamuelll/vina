@@ -31,7 +31,7 @@ interface WasmXpbdSolver {
 // ─── Worker State ───────────────────────────────────────────────────────────
 
 let solver: WasmXpbdSolver | null = null;
-let wasmMemory: WebAssembly.Memory | null = null;
+let wasmExports: { memory: WebAssembly.Memory } | null = null;
 let numParticles = 0;
 let running = false;
 let animFrameId: ReturnType<typeof setTimeout> | null = null;
@@ -45,14 +45,15 @@ function simulationLoop(): void {
   solver.step(1 / 60);
   const elapsed = performance.now() - t0;
 
-  // Read positions
+  // Read positions from Wasm memory
   const n = numParticles;
+  const ptr = solver.positions_ptr();
   let positions: Float32Array;
 
-  if (wasmMemory) {
-    const ptr = solver.positions_ptr();
-    positions = new Float32Array(wasmMemory.buffer, ptr, n * 3).slice(); // copy — buffer may detach
+  if (wasmExports?.memory) {
+    positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
   } else {
+    // Should never happen after successful init, but safety fallback
     positions = new Float32Array(n * 3);
   }
 
@@ -74,7 +75,9 @@ self.onmessage = async (event: MessageEvent) => {
         // Load Wasm module inside the worker
         const baseUrl = msg.baseUrl ?? '/';
         const wasmModule = await import(/* @vite-ignore */ `${baseUrl}wasm/xpbd_wasm.js`) as unknown as WasmModule;
-        await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
+        const wasmInstance = await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
+        // wasm-bindgen default() returns instance.exports which has .memory
+        wasmExports = wasmInstance as unknown as { memory: WebAssembly.Memory };
 
         // Merge pieces
         const pieces: Array<{ vertices: number[]; triIds: number[] }> = msg.pieces;
