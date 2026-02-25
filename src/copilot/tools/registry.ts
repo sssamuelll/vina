@@ -30,6 +30,7 @@ import { tools as seamlyToolDefs } from './definitions/seamlyTools';
 import { tools as garmentPipelineToolDefs } from './definitions/garmentPipelineTool';
 import { tools as edgeToolDefs } from './definitions/edgeTools';
 import { tools as dartToolDefs } from './definitions/dartTools';
+import { tools as easeToolDefs } from './definitions/easeTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -289,6 +290,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   garmentPipelineToolDefs,
   edgeToolDefs,
   dartToolDefs,
+  easeToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
