@@ -1,9 +1,8 @@
 /**
  * AnchorPoints — CLO3D-style arrangement points on avatar body.
  *
- * Uniform blue filled circles (#4A90D9), billboard-facing, no labels,
- * no glow, no outlines. Points sit directly on body surface.
- * ~70 points at garment-construction landmarks.
+ * Uniform blue filled circles (#4A90D9), billboard-facing.
+ * Placement matches CLO3D reference exactly.
  */
 
 import { useMemo } from 'react';
@@ -13,18 +12,13 @@ import { deriveDimensions } from '../../utils/cloth/garmentPlacement';
 import type { BodyMeasurements } from '../../types/types';
 
 const POINT_COLOR = '#4A90D9';
-const POINT_RADIUS = 0.006; // ~6mm — visible but not intrusive
+const POINT_RADIUS = 0.008; // bigger than before — matches CLO3D
 
 interface AnchorPointsProps {
   measurements: BodyMeasurements;
   visible: boolean;
 }
 
-/**
- * Generate arrangement points that sit ON the body surface.
- * Uses cylinder/ellipse cross-sections at each height to place points
- * at the skin boundary rather than floating in space.
- */
 function computeAnchors(m: BodyMeasurements): [number, number, number][] {
   const d = deriveDimensions(m);
   const sw = d.shoulderWidth / 2;
@@ -36,153 +30,191 @@ function computeAnchors(m: BodyMeasurements): [number, number, number][] {
   const al = d.armLength;
   const h = d.heightM;
 
-  // Body radii — must be slightly oversized so dots sit ON surface visible, not inside mesh
-  const SO = 1.25; // 25% overshoot to clear avatar mesh
-  const neckR = cr * 0.4 * SO;
-  const shoulderR = cr * SO;
-  const chestR = cr * SO;
-  const waistR = cr * 0.88 * SO;
-  const hipR = hr * SO;
-  const thighR = hr * 0.38 * SO;
-  const kneeR = hr * 0.24 * SO;
-  const calfR = hr * 0.2 * SO;
-  const ankleR = hr * 0.15 * SO;
+  // Surface offset so dots sit ON mesh, not inside
+  const SO = 1.25;
 
   const pts: [number, number, number][] = [];
-
-  // Helper: ring of N points at height y, radius rX (side), rZ (front/back)
-  const ring = (y: number, rX: number, rZ: number, n: number, startAngle = 0) => {
-    for (let i = 0; i < n; i++) {
-      const a = startAngle + (i / n) * Math.PI * 2;
-      pts.push([Math.sin(a) * rX, y, Math.cos(a) * rZ]);
-    }
-  };
-
-  // Helper: single point
   const p = (x: number, y: number, z: number) => pts.push([x, y, z]);
 
-  // ── Crown ──
-  p(0, h, 0);
+  // ════════════════════════════════════════════════════════════════════════
+  // HEAD
+  // ════════════════════════════════════════════════════════════════════════
 
-  // ── Neck (4 points) ──
-  ring(nh, neckR, neckR, 4, Math.PI / 4);
+  const headR = cr * 0.32 * SO;
+  const headTop = h + 0.02;
 
-  // ── Neck base (6 points) ──
-  ring(nh - 0.03, neckR * 1.3, neckR * 1.3, 6);
+  // Top of head — 1 point
+  p(0, headTop, 0);
+  // Frontal cranium — 1 point (front of skull)
+  p(0, headTop - 0.02, headR * 0.8);
+  // Lateral cranium — 1 point (side of skull)
+  p(headR * 0.9, headTop - 0.03, 0);
+  // Slightly above ears — 1 per side
+  p(-headR * 1.1, nh + (headTop - nh) * 0.6, 0);
+  p(headR * 1.1, nh + (headTop - nh) * 0.6, 0);
+  // Nape of neck — 1 point
+  p(0, nh + 0.01, -headR * 1.2);
+  // Start of head (forehead level) — 1 point
+  p(0, nh + (headTop - nh) * 0.4, headR * 1.0);
 
-  // ── Shoulder line (8 points) ──
-  p(-sw, sh, 0);
-  p(sw, sh, 0);
-  p(-sw * 0.65, sh, shoulderR * 0.55);
-  p(sw * 0.65, sh, shoulderR * 0.55);
-  p(-sw * 0.65, sh, -shoulderR * 0.55);
-  p(sw * 0.65, sh, -shoulderR * 0.55);
-  p(-sw * 0.35, sh, shoulderR * 0.7);
-  p(sw * 0.35, sh, shoulderR * 0.7);
+  // ════════════════════════════════════════════════════════════════════════
+  // SHOULDERS — 1 point per shoulder
+  // ════════════════════════════════════════════════════════════════════════
 
-  // ── Upper chest / bust line (8 points) ──
-  const bustH = sh - 0.08;
-  ring(bustH, chestR, chestR, 8);
+  p(-sw * SO, sh, 0);
+  p(sw * SO, sh, 0);
 
-  // ── Mid chest (6 points) ──
-  ring(sh - 0.15, chestR * 0.95, chestR * 0.95, 6, Math.PI / 6);
+  // ════════════════════════════════════════════════════════════════════════
+  // TORSO — 5 rings
+  // Each ring: 3 front + 3 back + lateral points (varies)
+  // Upper rings are closer together
+  // ════════════════════════════════════════════════════════════════════════
 
-  // ── Waist (8 points) ──
-  ring(wh, waistR, waistR, 8);
+  const torsoTop = sh - 0.04;
+  const torsoBot = wh - 0.10;
+  const torsoH = torsoTop - torsoBot;
 
-  // ── Upper hip (6 points) ──
-  ring(wh - 0.06, waistR * 1.05, waistR * 1.05, 6, Math.PI / 6);
+  // Ring heights — upper rings closer together
+  const ringYs = [
+    torsoTop,                        // Ring 1 (upper chest) 
+    torsoTop - torsoH * 0.18,        // Ring 2 (bust)        — close to ring 1
+    torsoTop - torsoH * 0.40,        // Ring 3 (central/waist-ish)
+    torsoTop - torsoH * 0.65,        // Ring 4 (below central)
+    torsoTop - torsoH * 0.90,        // Ring 5 (low hip)
+  ];
 
-  // ── Hip line (8 points) ──
-  const hipH = wh - 0.12;
-  ring(hipH, hipR, hipR, 8);
+  // Torso radius at each ring height (interpolate chest→hip)
+  const torsoR = (y: number) => {
+    const t = Math.max(0, Math.min(1, (torsoTop - y) / torsoH));
+    return (cr + t * (hr - cr)) * SO;
+  };
 
-  // ── Crotch level (4 points) ──
-  const crotchH = wh - 0.22;
-  ring(crotchH, hipR * 0.7, hipR * 0.7, 4, Math.PI / 4);
+  for (let ri = 0; ri < 5; ri++) {
+    const y = ringYs[ri];
+    const r = torsoR(y);
+    const rSide = r * 0.95;
 
-  // ── Arms (both sides) — 4 rings of points along each arm ──
-  const armR = 0.04 * SO; // arm cross-section radius
+    // 3 front points: center + 2 flanking
+    p(0, y, r);                          // center front
+    p(-r * 0.45, y, r * 0.88);           // left front
+    p(r * 0.45, y, r * 0.88);            // right front
+
+    // 3 back points: center + 2 flanking
+    p(0, y, -r);                         // center back
+    p(-r * 0.45, y, -r * 0.88);          // left back
+    p(r * 0.45, y, -r * 0.88);           // right back
+
+    // Lateral points — varies by ring
+    if (ri === 2) {
+      // Central ring: 2 lateral per side
+      p(-rSide, y + 0.015, 0);
+      p(-rSide, y - 0.015, 0);
+      p(rSide, y + 0.015, 0);
+      p(rSide, y - 0.015, 0);
+    } else if (ri === 3) {
+      // Below central: 1 lateral per side
+      p(-rSide, y, 0);
+      p(rSide, y, 0);
+    } else {
+      // Other rings: 1 lateral per side
+      p(-rSide, y, 0);
+      p(rSide, y, 0);
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════════════
+  // ARMS — 4 rings × 4 points per ring, per arm
+  // ════════════════════════════════════════════════════════════════════════
+
+  const armR = 0.035 * SO;
+  const dropRate = 0.45;
+
   for (const side of [-1, 1]) {
-    const baseX = side * sw;
-    const dropRate = 0.45;
-    const armStops = [0.15, 0.35, 0.55, 0.75, 0.95]; // shoulder to wrist
-    for (const t of armStops) {
+    const baseX = side * sw * SO;
+    const ringTs = [0.20, 0.45, 0.70, 0.92]; // 4 stops along arm
+
+    for (const t of ringTs) {
       const dist = al * t;
       const cx = baseX + side * dist;
       const cy = sh - dist * dropRate;
-      // 4 points around the arm cross-section
-      p(cx, cy + armR, 0);
-      p(cx, cy - armR, 0);
-      p(cx, cy, armR);
-      p(cx, cy, -armR);
+      // 4 points around arm cross-section
+      p(cx, cy + armR, 0);               // top
+      p(cx, cy - armR, 0);               // bottom
+      p(cx, cy, armR);                    // front
+      p(cx, cy, -armR);                   // back
     }
   }
 
-  // ── Legs (both sides) ──
-  const legSpread = 0.075; // half-distance between legs
-  for (const side of [-legSpread, legSpread]) {
-    // Upper thigh (4 around)
-    const thighH = hipH - 0.08;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      pts.push([side + Math.sin(a) * thighR, thighH, Math.cos(a) * thighR]);
-    }
-    // Mid thigh
-    const midThighH = h * 0.38;
-    p(side + thighR, midThighH, 0);
-    p(side - thighR, midThighH, 0);
+  // ════════════════════════════════════════════════════════════════════════
+  // LEGS
+  // ════════════════════════════════════════════════════════════════════════
 
-    // Knee (4 around)
-    const kneeH = h * 0.28;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2;
-      pts.push([side + Math.sin(a) * kneeR, kneeH, Math.cos(a) * kneeR]);
-    }
+  const crotchH = wh - 0.24;
+  const legSpread = 0.08;
 
-    // Calf
-    const calfH = h * 0.2;
-    p(side + calfR, calfH, 0);
-    p(side - calfR, calfH, 0);
-    p(side, calfH, calfR);
-    p(side, calfH, -calfR);
+  // Crotch ring — just below genitals
+  // 3 front + 3 back + 1 lateral per side (lateral slightly higher)
+  for (const side of [-1, 1]) {
+    const lx = side * legSpread;
+    const lr = hr * 0.4 * SO;
 
-    // Ankle (2 points — front/back only)
-    const ankH = h * 0.06;
-    p(side, ankH, ankleR);
-    p(side, ankH, -ankleR);
+    // 3 front
+    p(lx, crotchH, lr);
+    p(lx - lr * 0.5, crotchH, lr * 0.85);
+    p(lx + lr * 0.5, crotchH, lr * 0.85);
 
-    // Foot
-    p(side, h * 0.015, ankleR * 1.5);
+    // 3 back
+    p(lx, crotchH, -lr);
+    p(lx - lr * 0.5, crotchH, -lr * 0.85);
+    p(lx + lr * 0.5, crotchH, -lr * 0.85);
+
+    // 1 lateral per side (slightly higher)
+    p(lx + side * lr, crotchH + 0.02, 0);
   }
 
-  // ── Back shoulder blade area ──
-  p(-sw * 0.4, sh - 0.06, -chestR * 0.95);
-  p(sw * 0.4, sh - 0.06, -chestR * 0.95);
-  p(-sw * 0.25, sh - 0.12, -chestR * 0.9);
-  p(sw * 0.25, sh - 0.12, -chestR * 0.9);
+  // 3 rings per leg × 4 points
+  const legRingHeights = [
+    h * 0.35,    // mid-thigh
+    h * 0.25,    // knee
+    h * 0.14,    // mid-calf
+  ];
+  const legRingRadii = [
+    hr * 0.32 * SO,   // thigh
+    hr * 0.22 * SO,   // knee
+    hr * 0.18 * SO,   // calf
+  ];
 
-  // ── Center front/back lines (additional density) ──
-  const cfSteps = 5;
-  for (let i = 0; i < cfSteps; i++) {
-    const t = i / (cfSteps - 1);
-    const y = sh - 0.04 - t * (sh - 0.04 - hipH);
-    const r = chestR + t * (hipR - chestR);
-    p(0, y, r);      // center front
-    p(0, y, -r);     // center back
+  for (const side of [-1, 1]) {
+    const lx = side * legSpread;
+    for (let ri = 0; ri < 3; ri++) {
+      const y = legRingHeights[ri];
+      const r = legRingRadii[ri];
+      p(lx, y, r);           // front
+      p(lx, y, -r);          // back
+      p(lx + r, y, 0);       // outer
+      p(lx - r, y, 0);       // inner
+    }
+  }
+
+  // Ankles — 1 point front + 1 back per leg
+  for (const side of [-1, 1]) {
+    const lx = side * legSpread;
+    const ankR = hr * 0.14 * SO;
+    p(lx, h * 0.05, ankR);
+    p(lx, h * 0.05, -ankR);
   }
 
   return pts;
 }
 
 // Shared geometry & material
-const circleGeo = new THREE.CircleGeometry(POINT_RADIUS, 12);
+const circleGeo = new THREE.CircleGeometry(POINT_RADIUS, 16);
 const circleMat = new THREE.MeshBasicMaterial({
   color: POINT_COLOR,
   side: THREE.DoubleSide,
   depthTest: false,
   transparent: true,
-  opacity: 0.9,
+  opacity: 0.92,
 });
 
 export default function AnchorPoints({ measurements, visible }: AnchorPointsProps) {
