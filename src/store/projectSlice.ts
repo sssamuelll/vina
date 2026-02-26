@@ -39,6 +39,8 @@ interface ProjectState {
   avatarMode: AvatarMode;
   avatarModelUrl: string | null;
   isDirty: boolean;
+  /** Per-piece 3D arrangement position overrides (piece ID → [x,y,z]) */
+  arrangementOverrides: Record<string, [number, number, number]>;
 }
 
 const initialState: ProjectState = {
@@ -51,6 +53,7 @@ const initialState: ProjectState = {
   avatarMode: 'model',
   avatarModelUrl: '/default-avatar.glb',
   isDirty: false,
+  arrangementOverrides: {},
 };
 
 const projectSlice = createSlice({
@@ -92,6 +95,17 @@ const projectSlice = createSlice({
       state.seams = state.seams.filter(
         s => s.pieceA.pieceId !== action.payload && s.pieceB.pieceId !== action.payload
       );
+      delete state.arrangementOverrides[action.payload];
+      state.isDirty = true;
+    },
+    /** Set a 3D arrangement position override for a piece. */
+    setArrangement3D(state, action: PayloadAction<{ pieceId: string; position: [number, number, number] }>) {
+      state.arrangementOverrides[action.payload.pieceId] = action.payload.position;
+      state.isDirty = true;
+    },
+    /** Clear all 3D arrangement overrides. */
+    clearArrangementOverrides(state) {
+      state.arrangementOverrides = {};
       state.isDirty = true;
     },
     movePiece(state, action: PayloadAction<{ id: string; x: number; y: number }>) {
@@ -264,7 +278,7 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, setProjectName,
-  addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV,
+  addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addSeam, removeSeam,
   addFabric, updateFabric,
