@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectPiece, clearSelection, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { selectPiece, togglePieceSelection, clearSelection, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
 import { extractNodes, NodeRef } from './useNodeEditor';
@@ -283,8 +283,12 @@ export function useEditorInteractions(
             return;
           }
           
-          // Regular piece selection
-          dispatch(selectPiece(pieceId));
+          // Shift+click = multi-select (CLO3D standard), regular click = single select
+          if (e.shiftKey) {
+            dispatch(togglePieceSelection(pieceId));
+          } else {
+            dispatch(selectPiece(pieceId));
+          }
           dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
         }
       } else {

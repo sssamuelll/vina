@@ -15,6 +15,9 @@ import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
+import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
+import { selectPiece } from '../../store/editorSlice';
+import { useDispatch } from 'react-redux';
 import './Viewport3D.css';
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
@@ -48,6 +51,7 @@ interface Viewport3DProps {
 }
 
 export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps) {
+  const dispatch = useDispatch();
   const { pieces, seams, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
@@ -60,22 +64,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   useEffect(() => {
     const controls = orbitRef.current;
     if (!controls) return;
-    if (cameraMode) {
-      controls.enabled = true;
-      controls.mouseButtons = {
-        LEFT: THREE.MOUSE.ROTATE,
-        MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.PAN,
-      };
-    } else {
-      // Edit/Pose mode: left-click free for tools, middle-click orbits
-      controls.enabled = true;
-      controls.mouseButtons = {
-        LEFT: -1 as unknown as THREE.MOUSE,
-        MIDDLE: THREE.MOUSE.ROTATE,
-        RIGHT: THREE.MOUSE.PAN,
-      };
-    }
+    // CLO3D-standard mouse mapping (all modes):
+    // LEFT = select (handled by tools, not OrbitControls)
+    // MIDDLE = pan
+    // RIGHT = orbit/rotate
+    // SCROLL = zoom (handled by OrbitControls enableZoom)
+    controls.enabled = true;
+    controls.mouseButtons = {
+      LEFT: cameraMode ? THREE.MOUSE.ROTATE : -1 as unknown as THREE.MOUSE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
   }, [cameraMode]);
 
   const setOrbitEnabled = useCallback((enabled: boolean) => {
@@ -92,6 +91,41 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<ContextMenu3DState>({
+    visible: false, x: 0, y: 0, target: 'background',
+  });
+  const rightDownRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Right-click context menu: distinguish drag (orbit) from click (menu)
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button === 2) {
+      rightDownRef.current = { x: e.clientX, y: e.clientY };
+    }
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const down = rightDownRef.current;
+    rightDownRef.current = null;
+    if (!down) return;
+    const dx = e.clientX - down.x;
+    const dy = e.clientY - down.y;
+    // If dragged more than 5px, it was an orbit gesture — don't show menu
+    if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+
+    setCtxMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      target: 'background',
+    });
+  }, []);
+
+  const handleResetCamera = useCallback(() => {
+    const controls = orbitRef.current;
+    if (!controls) return;
+    controls.reset();
+  }, []);
 
   // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
   // F10 — Snapshot 3D viewport (CLO3D: File > Snapshot > 3D Window)
@@ -167,7 +201,13 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   }, []);
 
   return (
-    <div className="viewport3d" ref={containerRef} style={{ position: 'relative' }}>
+    <div
+      className="viewport3d"
+      ref={containerRef}
+      style={{ position: 'relative' }}
+      onPointerDown={handlePointerDown}
+      onContextMenu={handleContextMenu}
+    >
       <SimulationStatusOverlay />
       <Canvas
         camera={{ position: [0, 0.8, 2.8], fov: 35 }}
@@ -260,6 +300,15 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           {activeTool3D === 'pose' ? '● POSE MODE' : '✏️ EDIT MODE'} — middle-click to orbit
         </div>
       )}
+
+      <ContextMenu3D
+        menu={ctxMenu}
+        onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
+        onResetCamera={handleResetCamera}
+        onToggleAvatar={() => setAvatarHidden(h => !h)}
+        onSnapshot={snapshot3D}
+        onSelectPiece={(id) => dispatch(selectPiece(id))}
+      />
     </div>
   );
 }
