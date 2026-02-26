@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import PieceMesh from './PieceMesh';
+import DraggablePiece from './DraggablePiece';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
@@ -17,8 +18,9 @@ import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
-import { selectPiece } from '../../store/editorSlice';
+import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
+import { setArrangement3D } from '../../store/projectSlice';
 import { useDispatch } from 'react-redux';
 import './Viewport3D.css';
 
@@ -54,10 +56,12 @@ interface Viewport3DProps {
 
 export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps) {
   const dispatch = useDispatch();
-  const { pieces, seams, avatarMode, avatarModelUrl, avatar } = useSelector((s: RootState) => s.project);
+  const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const useClothSim = simulationState !== 'idle';
+  const isArrangeMode = viewMode3D === 'arrange';
 
   const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
@@ -218,6 +222,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
         gl={{ antialias: true }}
+        onPointerMissed={() => dispatch(clearSelection())}
         onCreated={({ gl, scene, camera }) => {
           scene.background = new THREE.Color('#f0f0f0');
           // Store refs for snapshot (readPixels needs a fresh render)
@@ -249,12 +254,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           (() => {
             const placements = placeGarmentPieces(pieces, avatar.measurements);
             return pieces.map((piece, i) => (
-              <PieceMesh
+              <DraggablePiece
                 key={piece.id}
                 piece={piece}
                 isSelected={selectedPieceIds.includes(piece.id)}
                 color={PIECE_COLORS[i % PIECE_COLORS.length]}
                 position={placements[i].position}
+                arrangementOverride={arrangementOverrides[piece.id]}
+                canDrag={isArrangeMode}
+                onSelect={(id) => dispatch(selectPiece(id))}
+                onDragEnd={(id, pos) => dispatch(setArrangement3D({ pieceId: id, position: pos }))}
+                setOrbitEnabled={setOrbitEnabled}
               />
             ));
           })()
