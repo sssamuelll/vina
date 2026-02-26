@@ -212,4 +212,11 @@ export function useSeamTool(
 }
 
 /** Get edge endpoints for rendering seam connections */
-export { getEdgeEndpoints };
+/** Compute the length of an edge (straight-line distance between endpoints). */
+function getEdgeLength(commands: PathCommand[], edgeIndex: number): number {
+  const ep = getEdgeEndpoints(commands, edgeIndex);
+  if (!ep) return 0;
+  return Math.sqrt((ep.end.x - ep.start.x) ** 2 + (ep.end.y - ep.start.y) ** 2);
+}
+
+export { getEdgeEndpoints, getEdgeLength };

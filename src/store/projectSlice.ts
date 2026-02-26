@@ -243,6 +243,16 @@ const projectSlice = createSlice({
       state.seams = state.seams.filter(s => s.id !== action.payload);
       state.isDirty = true;
     },
+    /** Reverse sewing direction — swap pieceA and pieceB */
+    reverseSeam(state, action: PayloadAction<string>) {
+      const seam = state.seams.find(s => s.id === action.payload);
+      if (seam) {
+        const temp = seam.pieceA;
+        seam.pieceA = seam.pieceB;
+        seam.pieceB = temp;
+        state.isDirty = true;
+      }
+    },
 
     // ─── Fabrics ───
     addFabric(state, action: PayloadAction<Fabric>) {
@@ -280,7 +290,7 @@ export const {
   restoreState, loadProject, setProjectName,
   addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
-  addSeam, removeSeam,
+  addSeam, removeSeam, reverseSeam,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;

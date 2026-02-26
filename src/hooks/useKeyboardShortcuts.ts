@@ -20,7 +20,7 @@ import {
   redo,
 } from '../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
-import { removePiece } from '../store/projectSlice';
+import { removePiece, reverseSeam } from '../store/projectSlice';
 import {
   startSimulation,
   resetSimulation,
@@ -52,6 +52,7 @@ export function useKeyboardShortcuts() {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
+  const selectedSeamId = useSelector((s: RootState) => s.editor.selectedSeamId);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const avatar = useSelector((s: RootState) => s.project.avatar);
@@ -99,6 +100,13 @@ export function useKeyboardShortcuts() {
       if (ctrl && key === 'a' && !shift) {
         e.preventDefault();
         dispatch(selectAllPieces(pieces.map(p => p.id)));
+        return;
+      }
+
+      // Ctrl+B — Reverse sewing direction
+      if (ctrl && key === 'b' && !shift && selectedSeamId) {
+        e.preventDefault();
+        dispatch(reverseSeam(selectedSeamId));
         return;
       }
 
@@ -226,7 +234,7 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [dispatch, pieces, selectedPieceIds, simulationState, viewMode3D, avatar, projectState, viewMode, toolShortcuts]);
+  }, [dispatch, pieces, selectedPieceIds, selectedSeamId, simulationState, viewMode3D, avatar, projectState, viewMode, toolShortcuts]);
 
   // Build exportable shortcut map (for help overlay)
   useEffect(() => {
@@ -238,6 +246,7 @@ export function useKeyboardShortcuts() {
       { key: 'A', label: 'Transform Pattern (2D)', category: '2D Tools', action: () => {} },
       { key: 'B', label: 'Edit Sewing', category: 'Sewing', action: () => {} },
       { key: 'M', label: 'Segment Sewing', category: 'Sewing', action: () => {} },
+      { key: 'B', ctrl: true, label: 'Reverse Sewing', category: 'Sewing', action: () => {} },
       { key: 'A', ctrl: true, label: 'Select All', category: 'Selection', action: () => {} },
       { key: 'S', ctrl: true, label: 'Save', category: 'File', action: () => {} },
       { key: 'Z', ctrl: true, label: 'Undo', category: 'Edit', action: () => {} },
