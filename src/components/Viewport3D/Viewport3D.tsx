@@ -20,6 +20,7 @@ import SimModeToggle from './SimModeToggle';
 import AnchorPoints from './AnchorPoints';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
+import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
 import { useDispatch } from 'react-redux';
 import './Viewport3D.css';
@@ -59,6 +60,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const pieceFabrics = useSelector((s: RootState) => s.simulation.pieceFabrics);
+  const defaultFabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
@@ -259,7 +262,10 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         ) : (
           (() => {
             const placements = placeGarmentPieces(pieces, avatar.measurements);
-            return pieces.map((piece, i) => (
+            return pieces.map((piece, i) => {
+              const fabricId = pieceFabrics[piece.id] || defaultFabricId;
+              const fabric = FABRIC_LIBRARY[fabricId];
+              return (
               <DraggablePiece
                 key={piece.id}
                 piece={piece}
@@ -271,8 +277,10 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 onSelect={(id) => dispatch(selectPiece(id))}
                 onDragEnd={(id, pos) => dispatch(setArrangement3D({ pieceId: id, position: pos }))}
                 setOrbitEnabled={setOrbitEnabled}
+                fabricColor={fabric?.color}
+                fabricRoughness={fabric?.roughness}
               />
-            ));
+            ); });
           })()
         )}
 

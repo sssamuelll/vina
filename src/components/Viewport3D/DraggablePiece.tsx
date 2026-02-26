@@ -23,6 +23,8 @@ interface DraggablePieceProps {
   onSelect: (pieceId: string) => void;
   onDragEnd: (pieceId: string, position: [number, number, number]) => void;
   setOrbitEnabled: (enabled: boolean) => void;
+  fabricColor?: string;
+  fabricRoughness?: number;
 }
 
 export default function DraggablePiece({
@@ -35,6 +37,8 @@ export default function DraggablePiece({
   onSelect,
   onDragEnd,
   setOrbitEnabled,
+  fabricColor,
+  fabricRoughness,
 }: DraggablePieceProps) {
   const matrixRef = useRef(new THREE.Matrix4());
   const actualPos = arrangementOverride || position;
@@ -84,6 +88,8 @@ export default function DraggablePiece({
             isSelected={isSelected}
             color={color}
             position={[0, 0, 0]}
+            fabricColor={fabricColor}
+            fabricRoughness={fabricRoughness}
           />
         </group>
       </PivotControls>
@@ -97,6 +103,8 @@ export default function DraggablePiece({
         isSelected={isSelected}
         color={color}
         position={actualPos}
+        fabricColor={fabricColor}
+        fabricRoughness={fabricRoughness}
       />
     </group>
   );
