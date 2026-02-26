@@ -9,7 +9,7 @@
  * @module garmentPlacement
  */
 
-import type { PatternPiece, PieceCategory, PieceSide, PathCommand } from '../../types/types';
+import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 
 // ── Types ────────────────────────────────────────────────────────────────────

@@ -23,7 +23,6 @@ import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
 import { removePiece } from '../store/projectSlice';
 import {
   startSimulation,
-  pauseSimulation,
   resetSimulation,
   setViewMode3D,
   saveArrangementSnapshot,

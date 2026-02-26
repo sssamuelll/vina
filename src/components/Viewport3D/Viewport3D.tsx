@@ -4,7 +4,6 @@ import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import PieceMesh from './PieceMesh';
 import DraggablePiece from './DraggablePiece';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';

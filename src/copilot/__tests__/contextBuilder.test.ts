@@ -75,7 +75,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       },
       avatarMode: 'model',
       avatarModelUrl: null,
-      isDirty: false,
+      isDirty: false, arrangementOverrides: {},
     },
     editor: {
       viewMode: 'split',
@@ -105,7 +105,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       solverTier: 'none' as const,
       frameTimeMs: 0,
       particleCount: 0,
-      bodyCollision: false,
+      bodyCollision: false, viewMode3D: 'arrange' as const, arrangementSnapshot: null,
     },
     plugins: {
       installedPlugins: [],
@@ -250,7 +250,7 @@ describe('buildAgentContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false,
+        isDirty: false, arrangementOverrides: {},
       },
     });
     const context = buildAgentContext(state);
@@ -285,7 +285,7 @@ describe('serializeContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false,
+        isDirty: false, arrangementOverrides: {},
       },
     });
     const context = buildAgentContext(state);
