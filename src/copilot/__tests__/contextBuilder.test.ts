@@ -107,6 +107,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       particleCount: 0,
       bodyCollision: false, viewMode3D: 'arrange' as const, arrangementSnapshot: null,
     },
+    avatarTape: { tapes: [], pendingTape: null },
     plugins: {
       installedPlugins: [],
       enabledPlugins: [],

@@ -21,6 +21,8 @@ interface AvatarModelProps {
   autoScale?: boolean;
   /** Target height in meters (default: 1.80) */
   height?: number;
+  /** Pointer down handler for tape tools */
+  onPointerDown?: (e: any) => void;
 }
 
 const DEG2RAD = Math.PI / 180;
@@ -156,7 +158,7 @@ function discoverBoneAxes(boneMap: Map<string, THREE.Bone>, bindPoses: Map<strin
 }
 // ===== END AXIS DISCOVERY =====
 
-export default function AvatarModel({ url, autoScale = true, height = 1.80 }: AvatarModelProps) {
+export default function AvatarModel({ url, autoScale = true, height = 1.80, onPointerDown }: AvatarModelProps) {
   const groupRef = useRef<THREE.Group>(null);
   const format = detectFormat(url.split('/').pop() || url) as MeshFormat;
   const isVrm = format === 'vrm' || isVRMFile(url);
@@ -508,5 +510,5 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80 }: Av
     }
   });
 
-  return <group ref={groupRef} />;
+  return <group ref={groupRef} onPointerDown={onPointerDown} />;
 }

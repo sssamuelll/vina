@@ -18,6 +18,8 @@ import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
 import AnchorPoints from './AnchorPoints';
+import AvatarTapes from './AvatarTapes';
+import { useAvatarTape } from './useAvatarTape';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
@@ -65,6 +67,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
+  const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
 
   const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
@@ -248,11 +251,16 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
         {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
           <Suspense fallback={null}>
-            <AvatarModel url={avatarModelUrl} height={avatar.measurements.height / 100} />
+            <AvatarModel
+            url={avatarModelUrl}
+            height={avatar.measurements.height / 100}
+            onPointerDown={isTapeTool ? handleAvatarClick : undefined}
+          />
           </Suspense>
         )}
 
         {activeTool3D === 'pose' && <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />}
+        <AvatarTapes />
         <AnchorPoints measurements={avatar.measurements} visible={isArrangeMode && showAnchors && activeTool3D !== 'pose'} />
 
         {useClothSim ? (
