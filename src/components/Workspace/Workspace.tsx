@@ -18,6 +18,7 @@ import ActivityBar from '../ActivityBar/ActivityBar';
 import type { SidebarView } from '../ActivityBar/ActivityBar';
 import Sidebar from '../Sidebar/Sidebar';
 import CommandPalette from '../CommandPalette/CommandPalette';
+import ShortcutHelp from '../ShortcutHelp/ShortcutHelp';
 import type { Command } from '../CommandPalette/CommandPalette';
 import StatusBar from '../StatusBar/StatusBar';
 import BottomPanel from '../BottomPanel/BottomPanel';
@@ -411,6 +412,7 @@ export default function Workspace() {
       />
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
       <MarkerEditor />
+      <ShortcutHelp />
     </div>
   );
 }

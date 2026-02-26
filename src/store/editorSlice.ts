@@ -45,6 +45,11 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedInternalLine = null;
     },
+    selectAllPieces(state, action: PayloadAction<string[]>) {
+      state.selectedPieceIds = action.payload;
+      state.selectedSeamId = null;
+      state.selectedInternalLine = null;
+    },
     selectSeam(state, action: PayloadAction<string>) {
       state.selectedSeamId = action.payload;
       state.selectedPieceIds = [];
@@ -90,7 +95,7 @@ const editorSlice = createSlice({
 
 export const {
   setViewMode, setActiveTool,
-  selectPiece, togglePieceSelection, clearSelection, selectSeam, selectInternalLine,
+  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectSeam, selectInternalLine,
   setZoom2D, setPan2D,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize,
   setUnits,
