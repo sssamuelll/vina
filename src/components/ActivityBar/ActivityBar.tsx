@@ -1,4 +1,4 @@
-import { FileText, Ruler, Layers, LayoutGrid, Play, Folder, Plug, Settings, SlidersHorizontal } from 'lucide-react';
+import { FileText, Ruler, Layers, LayoutGrid, Play, Folder, Plug, Settings, SlidersHorizontal, History } from 'lucide-react';
 import './ActivityBar.css';
 
 export type SidebarView =
@@ -10,7 +10,8 @@ export type SidebarView =
   | 'plugins'
   | 'settings'
   | 'simulation'
-  | 'parametric';
+  | 'parametric'
+  | 'history';
 
 interface ActivityBarProps {
   activeView: SidebarView | null;
@@ -60,6 +61,12 @@ const items: ActivityItem[] = [
     label: 'Parametric',
     position: 'top',
     icon: <SlidersHorizontal size={20} />,
+  },
+  {
+    id: 'history',
+    label: 'History',
+    position: 'top',
+    icon: <History size={20} />,
   },
   {
     id: 'files',
