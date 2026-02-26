@@ -146,7 +146,7 @@ interface BodyDimensions {
   armLength: number;
 }
 
-function deriveDimensions(m: BodyMeasurements): BodyDimensions {
+export function deriveDimensions(m: BodyMeasurements): BodyDimensions {
   const h = m.height / 100;
   const chestCirc = m.chest / 100;
   const hipCirc = m.hips / 100;
