@@ -1,12 +1,24 @@
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { startSimulation, pauseSimulation, resetSimulation, setParticleDistance } from '../../store/simulationSlice';
+import {
+  startSimulation, pauseSimulation, resetSimulation,
+  setParticleDistance, setQualityLevel, setAutoQuality,
+} from '../../store/simulationSlice';
+import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 
-/**
- * Simulation control panel — start/pause/reset simulation,
- * select fabric presets, view simulation status.
- */
+const PRESET_COLORS: Record<QualityLevel, string> = {
+  preview: '#888',
+  standard: '#4a88cc',
+  production: '#cc4a4a',
+};
+
+const PRESET_ICONS: Record<QualityLevel, string> = {
+  preview: '⚡',
+  standard: '●',
+  production: '◆',
+};
+
 export default function SimulationView() {
   const dispatch = useDispatch();
   const simulation = useSelector((s: RootState) => s.simulation);
@@ -15,6 +27,13 @@ export default function SimulationView() {
   const isRunning = simulation.simulationState === 'running';
   const isPaused = simulation.simulationState === 'paused';
   const isIdle = simulation.simulationState === 'idle';
+  const activePreset = QUALITY_PRESETS[simulation.qualityLevel];
+
+  const handlePreset = (level: QualityLevel) => {
+    const preset = QUALITY_PRESETS[level];
+    dispatch(setQualityLevel(level));
+    dispatch(setParticleDistance(preset.particleDistance));
+  };
 
   return (
     <div className="simulation-view" style={{ padding: '12px' }}>
@@ -22,43 +41,80 @@ export default function SimulationView() {
       <div style={{ marginBottom: '16px' }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '8px 12px', borderRadius: '4px',
+          padding: '8px 12px', borderRadius: '6px',
           background: isRunning ? '#2d4a2d' : isPaused ? '#4a4a2d' : '#1e1e1e',
           border: `1px solid ${isRunning ? '#4a8a4a' : isPaused ? '#8a8a4a' : '#333'}`,
         }}>
-          <span style={{ fontSize: '12px' }}>
-            {isRunning ? '● SIMULATING' : isPaused ? '⏸ PAUSED' : '○ IDLE'}
+          <span style={{
+            width: 8, height: 8, borderRadius: '50%',
+            background: isRunning ? PRESET_COLORS[simulation.qualityLevel] : isPaused ? '#8a8a4a' : '#555',
+            boxShadow: isRunning ? `0 0 6px ${PRESET_COLORS[simulation.qualityLevel]}` : 'none',
+          }} />
+          <span style={{ fontSize: '12px', color: '#ccc' }}>
+            {isRunning ? `SIMULATING — ${activePreset.label}` : isPaused ? 'PAUSED' : 'IDLE'}
           </span>
         </div>
       </div>
 
       {/* Controls */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '16px' }}>
         <button
           onClick={() => isRunning ? dispatch(pauseSimulation()) : dispatch(startSimulation())}
           disabled={pieces.length === 0}
           style={{
-            padding: '8px 16px', border: 'none', borderRadius: '4px', cursor: 'pointer',
-            background: isRunning ? '#8a4a4a' : '#4a8a4a', color: '#fff',
-            opacity: pieces.length === 0 ? 0.5 : 1,
+            flex: 1, padding: '8px', border: 'none', borderRadius: '6px', cursor: 'pointer',
+            background: isRunning ? '#8a4a4a' : '#4a8a4a', color: '#fff', fontSize: '12px',
+            opacity: pieces.length === 0 ? 0.4 : 1,
           }}
         >
-          {isRunning ? '⏸ Pause' : '▶ Start Simulation'}
+          {isRunning ? '⏸ Pause' : '▶ Simulate'}
         </button>
         <button
           onClick={() => dispatch(resetSimulation())}
           disabled={isIdle}
           style={{
-            padding: '8px 16px', border: '1px solid #555', borderRadius: '4px', cursor: 'pointer',
-            background: 'transparent', color: '#ccc',
-            opacity: isIdle ? 0.5 : 1,
+            padding: '8px 12px', border: '1px solid #444', borderRadius: '6px', cursor: 'pointer',
+            background: 'transparent', color: '#aaa', fontSize: '12px',
+            opacity: isIdle ? 0.4 : 1,
           }}
         >
-          ↺ Reset
+          ↺
         </button>
       </div>
 
-      {/* Particle Distance */}
+      {/* Quality Presets */}
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
+          Quality Preset
+        </label>
+        <div style={{ display: 'flex', gap: '4px' }}>
+          {(Object.keys(QUALITY_PRESETS) as QualityLevel[]).map(level => {
+            const preset = QUALITY_PRESETS[level];
+            const isActive = simulation.qualityLevel === level;
+            return (
+              <button
+                key={level}
+                onClick={() => handlePreset(level)}
+                disabled={isRunning || isPaused}
+                style={{
+                  flex: 1, padding: '8px 6px', border: `1px solid ${isActive ? PRESET_COLORS[level] : '#333'}`,
+                  borderRadius: '6px', cursor: 'pointer', fontSize: '11px',
+                  background: isActive ? `${PRESET_COLORS[level]}22` : 'transparent',
+                  color: isActive ? PRESET_COLORS[level] : '#888',
+                  transition: 'all 0.15s',
+                  opacity: (isRunning || isPaused) ? 0.5 : 1,
+                }}
+              >
+                <div style={{ fontSize: '14px' }}>{PRESET_ICONS[level]}</div>
+                <div style={{ marginTop: '2px' }}>{preset.label}</div>
+                <div style={{ fontSize: '9px', opacity: 0.7 }}>{preset.particleDistance}mm</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Particle Distance (manual) */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
           Particle Distance
@@ -70,29 +126,38 @@ export default function SimulationView() {
             value={simulation.particleDistance}
             onChange={e => dispatch(setParticleDistance(Number(e.target.value)))}
             disabled={isRunning || isPaused}
-            style={{ flex: 1 }}
+            style={{ flex: 1, accentColor: PRESET_COLORS[simulation.qualityLevel] }}
           />
           <span style={{ fontSize: '12px', color: '#ccc', minWidth: '36px', textAlign: 'right' }}>
             {simulation.particleDistance}mm
           </span>
         </div>
-        <div style={{ fontSize: '10px', color: '#666', marginTop: '4px' }}>
-          {simulation.particleDistance <= 3 ? '⚠ Alta calidad — simulación lenta' :
-           simulation.particleDistance <= 5 ? 'Calidad estándar' :
-           simulation.particleDistance <= 10 ? 'Rápido — menos detalle' :
-           'Muy rápido — sin pliegues'}
-        </div>
       </div>
 
-      {/* Piece count */}
-      <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>
-        {pieces.length} piece{pieces.length !== 1 ? 's' : ''} in scene
+      {/* Auto Quality */}
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#aaa' }}>
+          <input
+            type="checkbox"
+            checked={simulation.autoQuality}
+            onChange={e => dispatch(setAutoQuality(e.target.checked))}
+            style={{ accentColor: '#4a88cc' }}
+          />
+          Auto-adjust quality (match framerate)
+        </label>
       </div>
 
-      {/* Fabric info */}
+      {/* Stats */}
+      <div style={{ fontSize: '11px', color: '#666', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '16px' }}>
+        <div>{pieces.length} piece{pieces.length !== 1 ? 's' : ''} • {simulation.particleCount > 0 ? `${simulation.particleCount.toLocaleString()} particles` : 'no mesh'}</div>
+        {simulation.frameTimeMs > 0 && <div>{simulation.frameTimeMs.toFixed(1)}ms/frame • {Math.round(1000 / simulation.frameTimeMs)} FPS</div>}
+        <div>Solver: {simulation.solverTier} {simulation.bodyCollision ? '• SDF ✓' : '• No body collision'}</div>
+      </div>
+
+      {/* Fabric Library */}
       <div>
         <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Available Fabrics
+          Fabrics
         </label>
         <div style={{ marginTop: '4px', fontSize: '12px', color: '#aaa' }}>
           {Object.entries(FABRIC_LIBRARY).map(([id, preset]) => (

@@ -16,6 +16,7 @@ import {
   clearArrangementSnapshot,
 } from '../../store/simulationSlice';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
+import { QUALITY_PRESETS } from '../../utils/cloth/gpu/qualityPresets';
 import { Move, Play, Square, RotateCcw } from 'lucide-react';
 
 export default function SimModeToggle() {
@@ -25,6 +26,8 @@ export default function SimModeToggle() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const hasSnapshot = useSelector((s: RootState) => s.simulation.arrangementSnapshot !== null);
+  const qualityLevel = useSelector((s: RootState) => s.simulation.qualityLevel);
+  const activePreset = QUALITY_PRESETS[qualityLevel];
 
   const isSimulating = viewMode3D === 'simulate';
 
@@ -94,7 +97,7 @@ export default function SimModeToggle() {
         Arrange
       </button>
 
-      {/* Simulate button */}
+      {/* Simulate button — color follows CLO3D convention: gray=off, blue=standard, red=production */}
       <button
         onClick={() => { if (!isSimulating) handleToggle(); }}
         style={{
@@ -105,20 +108,24 @@ export default function SimModeToggle() {
           border: 'none',
           borderRadius: 6,
           background: isSimulating
-            ? simulationState === 'running' ? '#2a5a3a' : '#3a3a2a'
+            ? simulationState === 'running'
+              ? qualityLevel === 'production' ? '#5a2a2a' : qualityLevel === 'standard' ? '#2a3a5a' : '#3a3a3a'
+              : '#3a3a2a'
             : 'transparent',
           color: isSimulating
-            ? simulationState === 'running' ? '#8c8' : '#cc8'
+            ? simulationState === 'running'
+              ? qualityLevel === 'production' ? '#f88' : qualityLevel === 'standard' ? '#88c' : '#aaa'
+              : '#cc8'
             : '#888',
           cursor: 'pointer',
           fontWeight: isSimulating ? 600 : 400,
           fontSize: 12,
           transition: 'all 0.15s',
         }}
-        title="Simulate Mode — run cloth physics (Space)"
+        title={`Simulate — ${activePreset.label} (${activePreset.particleDistance}mm) — Space`}
       >
         {isSimulating && simulationState === 'running' ? <Square size={13} /> : <Play size={13} />}
-        Simulate
+        {isSimulating && simulationState === 'running' ? activePreset.label : 'Simulate'}
       </button>
 
       {/* Reset button */}
