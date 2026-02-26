@@ -35,6 +35,7 @@ interface ContextMenu3DProps {
   onToggleAvatar?: () => void;
   onSnapshot?: () => void;
   onSelectPiece?: (pieceId: string) => void;
+  onResetArrangement?: () => void;
 }
 
 export default function ContextMenu3D({
@@ -44,6 +45,7 @@ export default function ContextMenu3D({
   onToggleAvatar,
   onSnapshot,
   onSelectPiece,
+  onResetArrangement,
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -114,6 +116,13 @@ export default function ContextMenu3D({
       icon: '👤',
       shortcut: 'Shift+A',
       action: () => act(() => onToggleAvatar?.()),
+      separator: true,
+    });
+    items.push({
+      label: 'Reset 3D Arrangement',
+      icon: '↩',
+      shortcut: 'Ctrl+F',
+      action: () => act(() => onResetArrangement?.()),
       separator: true,
     });
     items.push({
