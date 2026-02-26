@@ -29,6 +29,7 @@ import { cameraTool } from './definitions/camera';
 import { edit3dTool } from './definitions/edit3d';
 // pose tool removed — pose controls are inside AvatarPanel
 import { avatarTool } from './definitions/avatar';
+import { tapeMeasureCircTool, tapeMeasureLinearTool } from './definitions/avatarTape';
 import { scissorsTool } from './definitions/scissors';
 import { dartTool } from './definitions/dart';
 import { circleTool } from './definitions/circle';
@@ -95,6 +96,8 @@ const allTools = [
   
   // 3D Tools — Avatar (pose is inside AvatarPanel)
   avatarTool,
+  tapeMeasureCircTool,
+  tapeMeasureLinearTool,
   
   // 3D Tools — Simulation
   simulateTool,

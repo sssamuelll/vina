@@ -6,6 +6,7 @@ import pluginReducer from './pluginSlice';
 import layoutReducer from './layoutSlice';
 import markerReducer from './markerSlice';
 import avatarReducer from './avatarSlice';
+import avatarTapeReducer from './avatarTapeSlice';
 import toolReducer from './toolSlice';
 import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
@@ -22,6 +23,7 @@ export const store = configureStore({
     layout: layoutReducer,
     marker: markerReducer,
     avatar: avatarReducer,
+    avatarTape: avatarTapeReducer,
     tools: toolReducer,
     parametric: parametricReducer,
     construction: constructionReducer,
