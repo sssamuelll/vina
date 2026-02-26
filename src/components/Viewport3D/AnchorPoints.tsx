@@ -137,11 +137,22 @@ function computeAnchors(m: BodyMeasurements): [number, number, number][] {
       const dist = al * t;
       const cx = baseX + side * dist;
       const cy = sh - dist * dropRate;
-      // 4 points around arm cross-section
-      p(cx, cy + armR, 0);               // top
-      p(cx, cy - armR, 0);               // bottom
-      p(cx, cy, armR);                    // front
-      p(cx, cy, -armR);                   // back
+      // Arm direction vector (pointing outward + slightly down)
+      const dx = side;
+      const dy = -dropRate;
+      const dLen = Math.sqrt(dx * dx + dy * dy);
+      // Normal plane perpendicular to arm axis
+      // Up vector in arm's local frame (perpendicular to arm, in Y direction)
+      const upX = -dy / dLen;
+      const upY = dx / dLen;
+      // Forward vector (Z axis, perpendicular to both arm and up)
+      const fwdZ = 1;
+
+      // 4 points around arm cross-section, perpendicular to arm axis
+      p(cx + upX * armR, cy + upY * armR, 0);      // top (away from body)
+      p(cx - upX * armR, cy - upY * armR, 0);      // bottom (toward body)
+      p(cx, cy, armR * fwdZ);                        // front
+      p(cx, cy, -armR * fwdZ);                       // back
     }
   }
 
