@@ -1,26 +1,52 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
-import { PatternPiece, PathCommand } from '../../types/types';
+import { Html } from '@react-three/drei';
+import type { PatternPiece, PathCommand, PieceCategory } from '../../types/types';
 
 /**
  * Convert a pattern piece's outline (PathCommand[]) into a Three.js Shape
  * for rendering as a flat mesh in the 3D viewport.
- * 
+ *
  * Scale: 1 SVG unit = 1mm in pattern space → 0.001m in Three.js
  */
 const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
+
+// ─── Color-coding by body region (CLO3D-style) ─────────────────────────────
+
+const CATEGORY_COLORS: Record<PieceCategory | 'default', string> = {
+  bodice: '#4a7fbb',    // blue
+  sleeve: '#5a9e6f',    // green
+  collar: '#c9b84e',    // yellow
+  skirt: '#8e6aad',     // purple
+  trouser: '#7a8fb5',   // slate blue
+  waistband: '#b5886a', // warm brown
+  facing: '#7abbb5',    // teal
+  lining: '#b57a9e',    // rose
+  pocket: '#8a9e6f',    // olive
+  cuff: '#6a8aad',      // steel blue
+  hood: '#ad6a6a',      // brick
+  yoke: '#9e8a6f',      // tan
+  other: '#a0a0a0',     // gray
+  default: '#a0a0a0',
+};
+
+function getCategoryColor(category?: PieceCategory): string {
+  return CATEGORY_COLORS[category || 'default'];
+}
+
+// ─── Shape builder ──────────────────────────────────────────────────────────
 
 function commandsToShape(commands: PathCommand[]): THREE.Shape | null {
   if (commands.length === 0) return null;
 
   const shape = new THREE.Shape();
-  let cx = 0, cy = 0; // current point
+  let cx = 0, cy = 0;
 
   for (const cmd of commands) {
     const v = cmd.values;
     switch (cmd.type) {
       case 'M':
-        shape.moveTo(v[0] * SCALE, -v[1] * SCALE); // flip Y
+        shape.moveTo(v[0] * SCALE, -v[1] * SCALE);
         cx = v[0]; cy = v[1];
         break;
       case 'L':
@@ -59,20 +85,22 @@ function commandsToShape(commands: PathCommand[]): THREE.Shape | null {
   return shape;
 }
 
+// ─── Component ──────────────────────────────────────────────────────────────
+
 interface PieceMeshProps {
   piece: PatternPiece;
   isSelected: boolean;
   color: string;
   position: [number, number, number];
+  showLabel?: boolean;
 }
 
-export default function PieceMesh({ piece, isSelected, color, position }: PieceMeshProps) {
+export default function PieceMesh({ piece, isSelected, color: _color, position, showLabel = true }: PieceMeshProps) {
   const geometry = useMemo(() => {
     const shape = commandsToShape(piece.outline);
     if (!shape) return null;
     const geo = new THREE.ShapeGeometry(shape, 32);
     geo.computeBoundingBox();
-    // Center the geometry
     if (geo.boundingBox) {
       const center = new THREE.Vector3();
       geo.boundingBox.getCenter(center);
@@ -81,17 +109,21 @@ export default function PieceMesh({ piece, isSelected, color, position }: PieceM
     return geo;
   }, [piece.outline]);
 
+  // Color: selected = gold, otherwise category-based
+  const meshColor = isSelected ? '#ffd700' : getCategoryColor(piece.category);
+  const wireColor = isSelected ? '#ffd700' : '#4a9eff';
+
   if (!geometry) return null;
 
   return (
     <group position={position} rotation={[0, -(piece.rotation ?? 0) * Math.PI / 180, 0]}>
-      {/* Front face — pieces are drawn in XY, already vertical */}
+      {/* Main face */}
       <mesh geometry={geometry}>
         <meshStandardMaterial
-          color={isSelected ? '#ffd700' : color}
+          color={meshColor}
           side={THREE.DoubleSide}
           transparent
-          opacity={0.85}
+          opacity={isSelected ? 0.85 : 0.6}
           roughness={0.7}
           metalness={0}
         />
@@ -99,12 +131,32 @@ export default function PieceMesh({ piece, isSelected, color, position }: PieceM
       {/* Wireframe outline */}
       <mesh geometry={geometry}>
         <meshBasicMaterial
-          color={isSelected ? '#ffd700' : '#4a9eff'}
+          color={wireColor}
           wireframe
           transparent
           opacity={0.3}
         />
       </mesh>
+      {/* Floating piece name label */}
+      {showLabel && (
+        <Html
+          position={[0, 0.02, 0]}
+          center
+          distanceFactor={2}
+          style={{
+            pointerEvents: 'none',
+            userSelect: 'none',
+            fontSize: '10px',
+            fontFamily: "'Inter', sans-serif",
+            color: isSelected ? '#ffd700' : '#ddd',
+            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+            whiteSpace: 'nowrap',
+            fontWeight: isSelected ? 600 : 400,
+          }}
+        >
+          {piece.name}
+        </Html>
+      )}
     </group>
   );
 }
