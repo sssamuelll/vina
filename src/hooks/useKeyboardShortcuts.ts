@@ -21,7 +21,15 @@ import {
 } from '../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
 import { removePiece } from '../store/projectSlice';
-import { startSimulation, pauseSimulation, resetSimulation } from '../store/simulationSlice';
+import {
+  startSimulation,
+  pauseSimulation,
+  resetSimulation,
+  setViewMode3D,
+  saveArrangementSnapshot,
+  clearArrangementSnapshot,
+} from '../store/simulationSlice';
+import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
 import { saveToLocalStorage } from '../utils/projectIO';
 import { toolRegistry } from '../tools';
 
@@ -44,6 +52,8 @@ export function useKeyboardShortcuts() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
+  const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectState = useSelector((s: RootState) => s.project);
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
 
@@ -106,16 +116,34 @@ export function useKeyboardShortcuts() {
 
       // ─── Simulation shortcuts ─────────────────────────────────────────
 
-      // Space — Toggle simulation ON/OFF
+      // Space — Toggle Arrange ↔ Simulate mode
       if (key === ' ') {
         e.preventDefault();
-        if (simulationState === 'idle') {
+        if (viewMode3D === 'arrange') {
+          // Save arrangement snapshot, switch to simulate
+          const placements = placeGarmentPieces(pieces, avatar.measurements);
+          const snapshot: Record<string, [number, number, number]> = {};
+          pieces.forEach((p, i) => {
+            const pos = placements[i].position;
+            snapshot[p.id] = [pos[0], pos[1], pos[2]];
+          });
+          dispatch(saveArrangementSnapshot(snapshot));
+          dispatch(setViewMode3D('simulate'));
           dispatch(startSimulation());
-        } else if (simulationState === 'running') {
-          dispatch(pauseSimulation());
-        } else if (simulationState === 'paused') {
-          dispatch(startSimulation());
+        } else {
+          // Back to arrange
+          dispatch(resetSimulation());
+          dispatch(setViewMode3D('arrange'));
         }
+        return;
+      }
+
+      // Ctrl+F — Reset 3D Arrangement
+      if (ctrl && key === 'f' && !shift) {
+        e.preventDefault();
+        dispatch(resetSimulation());
+        dispatch(setViewMode3D('arrange'));
+        dispatch(clearArrangementSnapshot());
         return;
       }
 
@@ -178,7 +206,7 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [dispatch, pieces, selectedPieceIds, simulationState, projectState, viewMode, toolShortcuts]);
+  }, [dispatch, pieces, selectedPieceIds, simulationState, viewMode3D, avatar, projectState, viewMode, toolShortcuts]);
 
   // Build exportable shortcut map (for help overlay)
   useEffect(() => {
@@ -198,6 +226,7 @@ export function useKeyboardShortcuts() {
       { key: 'G', shift: true, label: 'Toggle Grainlines', category: 'View', action: () => {} },
       { key: 'A', shift: true, label: 'Toggle Avatar', category: 'View', action: () => {} },
       { key: 'F10', label: 'Snapshot 3D', category: 'View', action: () => {} },
+      { key: 'F', ctrl: true, label: 'Reset 3D Arrangement', category: 'View', action: () => {} },
       { key: 'Delete', label: 'Delete Selected', category: 'Edit', action: () => {} },
     ];
   }, []);

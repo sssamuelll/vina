@@ -16,7 +16,9 @@ import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
+import SimModeToggle from './SimModeToggle';
 import { selectPiece } from '../../store/editorSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
 import { useDispatch } from 'react-redux';
 import './Viewport3D.css';
 
@@ -208,6 +210,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       onPointerDown={handlePointerDown}
       onContextMenu={handleContextMenu}
     >
+      <SimModeToggle />
       <SimulationStatusOverlay />
       <Canvas
         camera={{ position: [0, 0.8, 2.8], fov: 35 }}
@@ -308,6 +311,11 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onToggleAvatar={() => setAvatarHidden(h => !h)}
         onSnapshot={snapshot3D}
         onSelectPiece={(id) => dispatch(selectPiece(id))}
+        onResetArrangement={() => {
+          dispatch(resetSimulation());
+          dispatch(setViewMode3D('arrange'));
+          dispatch(clearArrangementSnapshot());
+        }}
       />
     </div>
   );

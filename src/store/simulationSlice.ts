@@ -14,6 +14,16 @@ import type { QualityLevel } from '../utils/cloth/gpu/qualityPresets';
 /** Simulation lifecycle state. */
 export type SimulationState = 'idle' | 'running' | 'paused';
 
+/** 3D viewport mode: arrange (position pieces) or simulate (cloth physics). */
+export type ViewMode3D = 'arrange' | 'simulate';
+
+/** Snapshot of piece 3D positions for reset functionality. */
+export interface ArrangementSnapshot {
+  /** piece ID → [x, y, z] position */
+  positions: Record<string, [number, number, number]>;
+  timestamp: number;
+}
+
 /** Which solver tier is currently active. */
 export type SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape';
 
@@ -44,6 +54,10 @@ interface SimulationSliceState {
   particleCount: number;
   /** Whether body collision (SDF) is active */
   bodyCollision: boolean;
+  /** 3D viewport mode */
+  viewMode3D: ViewMode3D;
+  /** Pre-simulation arrangement snapshot for reset */
+  arrangementSnapshot: ArrangementSnapshot | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -65,6 +79,8 @@ const initialState: SimulationSliceState = {
   frameTimeMs: 0,
   particleCount: 0,
   bodyCollision: false,
+  viewMode3D: 'arrange' as ViewMode3D,
+  arrangementSnapshot: null,
 };
 
 const simulationSlice = createSlice({
@@ -131,6 +147,21 @@ const simulationSlice = createSlice({
     setBodyCollision(state, action: PayloadAction<boolean>) {
       state.bodyCollision = action.payload;
     },
+    /** Set 3D viewport mode (arrange/simulate). */
+    setViewMode3D(state, action: PayloadAction<ViewMode3D>) {
+      state.viewMode3D = action.payload;
+    },
+    /** Save current piece positions as arrangement snapshot. */
+    saveArrangementSnapshot(state, action: PayloadAction<Record<string, [number, number, number]>>) {
+      state.arrangementSnapshot = {
+        positions: action.payload,
+        timestamp: Date.now(),
+      };
+    },
+    /** Clear arrangement snapshot. */
+    clearArrangementSnapshot(state) {
+      state.arrangementSnapshot = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -153,6 +184,9 @@ export const {
   setFrameTime,
   setParticleCount,
   setBodyCollision,
+  setViewMode3D,
+  saveArrangementSnapshot,
+  clearArrangementSnapshot,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;
