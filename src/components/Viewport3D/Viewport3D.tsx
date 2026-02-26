@@ -252,8 +252,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           </Suspense>
         )}
 
-        <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
-        <AnchorPoints measurements={avatar.measurements} visible={isArrangeMode && showAnchors} />
+        {activeTool3D === 'pose' && <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />}
+        <AnchorPoints measurements={avatar.measurements} visible={isArrangeMode && showAnchors && activeTool3D !== 'pose'} />
 
         {useClothSim ? (
           <SimulationErrorBoundary>
