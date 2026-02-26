@@ -4,7 +4,7 @@ import {
   startSimulation, pauseSimulation, resetSimulation,
   setParticleDistance, setQualityLevel, setAutoQuality, setFabric, setDefaultFabric,
 } from '../../store/simulationSlice';
-import { toggleAnchorPoints } from '../../store/editorSlice';
+import { setActiveTool3D } from '../../store/toolSlice';
 import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 
@@ -25,7 +25,8 @@ export default function SimulationView() {
   const simulation = useSelector((s: RootState) => s.simulation);
   const pieces = useSelector((s: RootState) => s.project.pieces);
 
-  const showAnchorPoints = useSelector((s: RootState) => s.editor.showAnchorPoints);
+  const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
+  const arrangeActive = activeTool3D === 'arrangement';
   const isRunning = simulation.simulationState === 'running';
   const isPaused = simulation.simulationState === 'paused';
   const isIdle = simulation.simulationState === 'idle';
@@ -235,14 +236,14 @@ export default function SimulationView() {
           Viewport
         </div>
         <button
-          onClick={() => dispatch(toggleAnchorPoints())}
+          onClick={() => dispatch(setActiveTool3D(arrangeActive ? 'camera' : 'arrangement'))}
           title="Toggle arrangement anchor points (Shift+F)"
           style={{
             display: 'flex', alignItems: 'center', gap: '8px',
             width: '100%', padding: '7px 10px', borderRadius: '5px',
-            border: `1px solid ${showAnchorPoints ? '#4A90D9' : '#333'}`,
-            background: showAnchorPoints ? '#1a2a3a' : '#1a1a1a',
-            color: showAnchorPoints ? '#6aadee' : '#777',
+            border: `1px solid ${arrangeActive ? '#4A90D9' : '#333'}`,
+            background: arrangeActive ? '#1a2a3a' : '#1a1a1a',
+            color: arrangeActive ? '#6aadee' : '#777',
             cursor: 'pointer', fontSize: '12px', textAlign: 'left',
           }}
         >

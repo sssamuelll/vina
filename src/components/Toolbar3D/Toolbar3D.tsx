@@ -72,4 +72,4 @@ export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Tool
 }
 
 // Export for backward compatibility
-export type Tool3D = 'camera' | 'edit' | 'pose' | 'avatar';
+export type Tool3D = 'camera' | 'edit' | 'pose' | 'avatar' | 'arrangement';

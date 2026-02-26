@@ -20,8 +20,10 @@ import SimModeToggle from './SimModeToggle';
 import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import { useAvatarTape } from './useAvatarTape';
-import { selectPiece, clearSelection, toggleAnchorPoints } from '../../store/editorSlice';
+import { selectPiece, clearSelection } from '../../store/editorSlice';
+import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
+import { togglePoseEditor } from '../../store/avatarSlice';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
 import { useDispatch } from 'react-redux';
@@ -103,7 +105,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
-  const showAnchors = useSelector((s: RootState) => s.editor.showAnchorPoints);
+
+  const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
   const [ctxMenu, setCtxMenu] = useState<ContextMenu3DState>({
     visible: false, x: 0, y: 0, target: 'background',
   });
@@ -150,7 +153,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       }
       if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
         e.preventDefault();
-        dispatch(toggleAnchorPoints());
+        // Shift+F toggles arrangement tool on/off
+        dispatch(setActiveTool3D(activeTool3D === 'arrangement' ? 'camera' : 'arrangement'));
       }
       if (e.key === 'F10') {
         e.preventDefault();
@@ -160,6 +164,14 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, []);
+
+  // Mutual exclusivity: arrangement tool ↔ pose editor
+  useEffect(() => {
+    if (activeTool3D === 'arrangement' && poseEditorOpen) {
+      dispatch(togglePoseEditor()); // close pose when arrangement activates
+    }
+  }, [activeTool3D, poseEditorOpen, dispatch]);
+
 
   const snapshot3D = useCallback(() => {
     const container = containerRef.current;
@@ -259,9 +271,11 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           </Suspense>
         )}
 
-        {activeTool3D === 'pose' && <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />}
+        {/* JointGizmos: always mounted when avatar present; internally checks poseEditorOpen */}
+        <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
         <AvatarTapes />
-        <AnchorPoints measurements={avatar.measurements} visible={showAnchors && activeTool3D !== 'pose'} />
+        {/* AnchorPoints: only when 'arrangement' tool is active — mutually exclusive with pose */}
+        <AnchorPoints measurements={avatar.measurements} visible={activeTool3D === 'arrangement' && !poseEditorOpen} />
 
         {useClothSim ? (
           <SimulationErrorBoundary>
@@ -332,7 +346,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       </div>
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {activeTool3D === 'pose' ? '● POSE MODE' : '✏️ EDIT MODE'} — middle-click to orbit
+          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — middle-click to orbit
         </div>
       )}
 
