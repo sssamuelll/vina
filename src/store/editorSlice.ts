@@ -13,7 +13,7 @@ const initialState: EditorState = {
   showSeamAllowance: true,
   defaultSeamAllowanceWidth: 10,
   showGrainlines: true,
-  showAnchorPoints: true,
+  showAnchorPoints: false,
   snapToGrid: true,
   gridSize: 10,
   units: 'mm',
