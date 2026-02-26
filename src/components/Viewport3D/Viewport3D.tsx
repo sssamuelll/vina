@@ -20,7 +20,7 @@ import SimModeToggle from './SimModeToggle';
 import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import { useAvatarTape } from './useAvatarTape';
-import { selectPiece, clearSelection } from '../../store/editorSlice';
+import { selectPiece, clearSelection, toggleAnchorPoints } from '../../store/editorSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
@@ -103,7 +103,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
-  const [showAnchors, setShowAnchors] = useState(true);
+  const showAnchors = useSelector((s: RootState) => s.editor.showAnchorPoints);
   const [ctxMenu, setCtxMenu] = useState<ContextMenu3DState>({
     visible: false, x: 0, y: 0, target: 'background',
   });
@@ -150,7 +150,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       }
       if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
         e.preventDefault();
-        setShowAnchors(v => !v);
+        dispatch(toggleAnchorPoints());
       }
       if (e.key === 'F10') {
         e.preventDefault();
@@ -261,7 +261,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
         {activeTool3D === 'pose' && <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />}
         <AvatarTapes />
-        <AnchorPoints measurements={avatar.measurements} visible={isArrangeMode && showAnchors && activeTool3D !== 'pose'} />
+        <AnchorPoints measurements={avatar.measurements} visible={showAnchors && activeTool3D !== 'pose'} />
 
         {useClothSim ? (
           <SimulationErrorBoundary>

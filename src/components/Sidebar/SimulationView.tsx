@@ -4,6 +4,7 @@ import {
   startSimulation, pauseSimulation, resetSimulation,
   setParticleDistance, setQualityLevel, setAutoQuality, setFabric, setDefaultFabric,
 } from '../../store/simulationSlice';
+import { toggleAnchorPoints } from '../../store/editorSlice';
 import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 
@@ -24,6 +25,7 @@ export default function SimulationView() {
   const simulation = useSelector((s: RootState) => s.simulation);
   const pieces = useSelector((s: RootState) => s.project.pieces);
 
+  const showAnchorPoints = useSelector((s: RootState) => s.editor.showAnchorPoints);
   const isRunning = simulation.simulationState === 'running';
   const isPaused = simulation.simulationState === 'paused';
   const isIdle = simulation.simulationState === 'idle';
@@ -226,6 +228,29 @@ export default function SimulationView() {
           </div>
         </div>
       )}
+
+      {/* Viewport Overlays */}
+      <div style={{ marginTop: '16px', borderTop: '1px solid #2a2a2a', paddingTop: '12px' }}>
+        <div style={{ fontSize: '10px', color: '#666', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+          Viewport
+        </div>
+        <button
+          onClick={() => dispatch(toggleAnchorPoints())}
+          title="Toggle arrangement anchor points (Shift+F)"
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            width: '100%', padding: '7px 10px', borderRadius: '5px',
+            border: `1px solid ${showAnchorPoints ? '#4A90D9' : '#333'}`,
+            background: showAnchorPoints ? '#1a2a3a' : '#1a1a1a',
+            color: showAnchorPoints ? '#6aadee' : '#777',
+            cursor: 'pointer', fontSize: '12px', textAlign: 'left',
+          }}
+        >
+          <span style={{ fontSize: '14px' }}>⊕</span>
+          <span>Arrangement Points</span>
+          <span style={{ marginLeft: 'auto', fontSize: '10px', opacity: 0.6 }}>Shift+F</span>
+        </button>
+      </div>
     </div>
   );
 }

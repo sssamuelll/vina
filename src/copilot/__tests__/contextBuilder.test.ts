@@ -88,6 +88,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       showSeamAllowance: true,
       defaultSeamAllowanceWidth: 10,
       showGrainlines: true,
+      showAnchorPoints: true,
       snapToGrid: true,
       gridSize: 10,
       units: 'mm',

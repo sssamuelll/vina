@@ -13,6 +13,7 @@ const initialState: EditorState = {
   showSeamAllowance: true,
   defaultSeamAllowanceWidth: 10,
   showGrainlines: true,
+  showAnchorPoints: true,
   snapToGrid: true,
   gridSize: 10,
   units: 'mm',
@@ -75,6 +76,9 @@ const editorSlice = createSlice({
     toggleGrainlines(state) {
       state.showGrainlines = !state.showGrainlines;
     },
+    toggleAnchorPoints(state) {
+      state.showAnchorPoints = !state.showAnchorPoints;
+    },
     toggleSnapToGrid(state) {
       state.snapToGrid = !state.snapToGrid;
     },
@@ -97,7 +101,7 @@ export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectSeam, selectInternalLine,
   setZoom2D, setPan2D,
-  toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize,
+  toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   setUnits,
   undo, redo,
 } = editorSlice.actions;

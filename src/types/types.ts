@@ -302,6 +302,7 @@ export interface EditorState {
   showSeamAllowance: boolean;
   defaultSeamAllowanceWidth: number;  // mm fallback when piece has no SA set
   showGrainlines: boolean;
+  showAnchorPoints: boolean;
   snapToGrid: boolean;
   gridSize: number;       // mm
   units: UnitSystem;
