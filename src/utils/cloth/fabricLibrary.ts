@@ -25,6 +25,10 @@ export interface FabricMaterial {
   friction: number;
   /** Fabric thickness in millimeters */
   thickness: number;
+  /** Display color (hex) for 3D rendering */
+  color?: string;
+  /** PBR roughness 0-1 (0 = glossy/silk, 1 = matte/canvas) */
+  roughness?: number;
 }
 
 /**
@@ -70,6 +74,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.45,
     friction: 0.5,
     thickness: 0.3,
+    color: '#f5f0e8',
+    roughness: 0.75,
   },
   'denim': {
     name: 'Denim',
@@ -78,6 +84,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.80,
     friction: 0.7,
     thickness: 0.9,
+    color: '#3a5a8c',
+    roughness: 0.85,
   },
   'silk-charmeuse': {
     name: 'Silk Charmeuse',
@@ -86,6 +94,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.10,
     friction: 0.25,
     thickness: 0.15,
+    color: '#e8d8c8',
+    roughness: 0.15,
   },
   'wool-crepe': {
     name: 'Wool Crepe',
@@ -94,6 +104,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.50,
     friction: 0.55,
     thickness: 0.5,
+    color: '#4a4a4a',
+    roughness: 0.80,
   },
   'jersey-knit': {
     name: 'Jersey Knit',
@@ -102,6 +114,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.15,
     friction: 0.45,
     thickness: 0.6,
+    color: '#2a2a2a',
+    roughness: 0.60,
   },
   'organza': {
     name: 'Organza',
@@ -110,6 +124,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.55,
     friction: 0.20,
     thickness: 0.1,
+    color: '#f0e8f0',
+    roughness: 0.20,
   },
   'linen': {
     name: 'Linen',
@@ -118,6 +134,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.50,
     friction: 0.50,
     thickness: 0.4,
+    color: '#d8ccb8',
+    roughness: 0.80,
   },
   'neoprene': {
     name: 'Neoprene',
@@ -126,6 +144,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.85,
     friction: 0.75,
     thickness: 2.0,
+    color: '#1a1a1a',
+    roughness: 0.40,
   },
   'chiffon': {
     name: 'Chiffon',
@@ -134,6 +154,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.08,
     friction: 0.20,
     thickness: 0.1,
+    color: '#f8f0f0',
+    roughness: 0.10,
   },
   'canvas': {
     name: 'Canvas',
@@ -142,6 +164,8 @@ export const FABRIC_LIBRARY: Record<string, FabricMaterial> = {
     bendStiffness: 0.90,
     friction: 0.70,
     thickness: 1.2,
+    color: '#c8b898',
+    roughness: 0.95,
   },
 };
 

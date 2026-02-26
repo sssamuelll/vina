@@ -93,9 +93,12 @@ interface PieceMeshProps {
   color: string;
   position: [number, number, number];
   showLabel?: boolean;
+  /** Fabric material for visual rendering */
+  fabricColor?: string;
+  fabricRoughness?: number;
 }
 
-export default function PieceMesh({ piece, isSelected, color: _color, position, showLabel = true }: PieceMeshProps) {
+export default function PieceMesh({ piece, isSelected, color: _color, position, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
   const geometry = useMemo(() => {
     const shape = commandsToShape(piece.outline);
     if (!shape) return null;
@@ -109,8 +112,9 @@ export default function PieceMesh({ piece, isSelected, color: _color, position, 
     return geo;
   }, [piece.outline]);
 
-  // Color: selected = gold, otherwise category-based
-  const meshColor = isSelected ? '#ffd700' : getCategoryColor(piece.category);
+  // Color priority: selected=gold > fabric > category
+  const meshColor = isSelected ? '#ffd700' : (fabricColor || getCategoryColor(piece.category));
+  const roughness = fabricRoughness ?? 0.7;
   const wireColor = isSelected ? '#ffd700' : '#4a9eff';
 
   if (!geometry) return null;
@@ -124,7 +128,7 @@ export default function PieceMesh({ piece, isSelected, color: _color, position, 
           side={THREE.DoubleSide}
           transparent
           opacity={isSelected ? 0.85 : 0.6}
-          roughness={0.7}
+          roughness={roughness}
           metalness={0}
         />
       </mesh>

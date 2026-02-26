@@ -2,7 +2,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import {
   startSimulation, pauseSimulation, resetSimulation,
-  setParticleDistance, setQualityLevel, setAutoQuality,
+  setParticleDistance, setQualityLevel, setAutoQuality, setFabric, setDefaultFabric,
 } from '../../store/simulationSlice';
 import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
@@ -154,17 +154,78 @@ export default function SimulationView() {
         <div>Solver: {simulation.solverTier} {simulation.bodyCollision ? '• SDF ✓' : '• No body collision'}</div>
       </div>
 
-      {/* Fabric Library */}
-      <div>
-        <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          Fabrics
+      {/* Default Fabric */}
+      <div style={{ marginBottom: '16px' }}>
+        <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+          Default Fabric
         </label>
-        <div style={{ marginTop: '4px', fontSize: '12px', color: '#aaa' }}>
-          {Object.entries(FABRIC_LIBRARY).map(([id, preset]) => (
-            <div key={id} style={{ padding: '2px 0' }}>{preset.name}</div>
+        <select
+          value={simulation.defaultFabricId}
+          onChange={e => dispatch(setDefaultFabric(e.target.value))}
+          style={{
+            width: '100%', padding: '6px 8px', borderRadius: '4px',
+            border: '1px solid #444', background: '#1e1e1e', color: '#ccc',
+            fontSize: '12px',
+          }}
+        >
+          {Object.entries(FABRIC_LIBRARY).map(([id, fab]) => (
+            <option key={id} value={id}>{fab.name} — {fab.weight}gsm</option>
           ))}
-        </div>
+        </select>
+        {(() => {
+          const fab = FABRIC_LIBRARY[simulation.defaultFabricId];
+          return fab ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+              <div style={{
+                width: 16, height: 16, borderRadius: 3,
+                background: fab.color || '#888', border: '1px solid #555',
+              }} />
+              <span style={{ fontSize: '10px', color: '#888' }}>
+                Stretch: {Math.round(fab.stretchStiffness * 100)}% · Bend: {Math.round(fab.bendStiffness * 100)}% · {fab.thickness}mm
+              </span>
+            </div>
+          ) : null;
+        })()}
       </div>
+
+      {/* Per-Piece Fabric Assignment */}
+      {pieces.length > 0 && (
+        <div>
+          <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+            Piece Fabrics
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {pieces.map(p => {
+              const fabricId = simulation.pieceFabrics[p.id] || simulation.defaultFabricId;
+              const fab = FABRIC_LIBRARY[fabricId];
+              return (
+                <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{
+                    width: 10, height: 10, borderRadius: 2,
+                    background: fab?.color || '#888', border: '1px solid #555', flexShrink: 0,
+                  }} />
+                  <span style={{ fontSize: '11px', color: '#aaa', minWidth: '60px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {p.name}
+                  </span>
+                  <select
+                    value={fabricId}
+                    onChange={e => dispatch(setFabric({ pieceId: p.id, fabricId: e.target.value }))}
+                    style={{
+                      flex: 1, padding: '3px 4px', borderRadius: '3px',
+                      border: '1px solid #444', background: '#1e1e1e', color: '#ccc',
+                      fontSize: '11px',
+                    }}
+                  >
+                    {Object.entries(FABRIC_LIBRARY).map(([id, f]) => (
+                      <option key={id} value={id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
