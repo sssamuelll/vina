@@ -25,6 +25,8 @@ import {
   startSimulation,
   resetSimulation,
   setViewMode3D,
+  setQualityLevel,
+  setParticleDistance,
   saveArrangementSnapshot,
   clearArrangementSnapshot,
 } from '../store/simulationSlice';
@@ -114,6 +116,25 @@ export function useKeyboardShortcuts() {
       }
 
       // ─── Simulation shortcuts ─────────────────────────────────────────
+
+      // Shift+Space — Simulate Hi-Res (production quality)
+      if (key === ' ' && shift) {
+        e.preventDefault();
+        if (viewMode3D === 'arrange') {
+          dispatch(setQualityLevel('production'));
+          dispatch(setParticleDistance(3));
+          const placements = placeGarmentPieces(pieces, avatar.measurements);
+          const snapshot: Record<string, [number, number, number]> = {};
+          pieces.forEach((p, i) => {
+            const pos = placements[i].position;
+            snapshot[p.id] = [pos[0], pos[1], pos[2]];
+          });
+          dispatch(saveArrangementSnapshot(snapshot));
+          dispatch(setViewMode3D('simulate'));
+          dispatch(startSimulation());
+        }
+        return;
+      }
 
       // Space — Toggle Arrange ↔ Simulate mode
       if (key === ' ') {
@@ -211,6 +232,7 @@ export function useKeyboardShortcuts() {
   useEffect(() => {
     _shortcutMap = [
       { key: 'Space', label: 'Toggle Simulation', category: 'Simulation', action: () => {} },
+      { key: 'Space', shift: true, label: 'Simulate Hi-Res', category: 'Simulation', action: () => {} },
       { key: 'Q', label: 'Select/Move (3D)', category: '3D Tools', action: () => {} },
       { key: 'Escape', label: 'Deselect / Hide Gizmo', category: 'Selection', action: () => {} },
       { key: 'A', label: 'Transform Pattern (2D)', category: '2D Tools', action: () => {} },
