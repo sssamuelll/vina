@@ -17,6 +17,7 @@ import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
+import AnchorPoints from './AnchorPoints';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
 import { setArrangement3D } from '../../store/projectSlice';
@@ -96,6 +97,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
+  const [showAnchors, setShowAnchors] = useState(true);
   const [ctxMenu, setCtxMenu] = useState<ContextMenu3DState>({
     visible: false, x: 0, y: 0, target: 'background',
   });
@@ -139,6 +141,10 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
         setAvatarHidden(h => !h);
+      }
+      if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        setShowAnchors(v => !v);
       }
       if (e.key === 'F10') {
         e.preventDefault();
@@ -244,6 +250,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         )}
 
         <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
+        <AnchorPoints measurements={avatar.measurements} visible={isArrangeMode && showAnchors} />
 
         {useClothSim ? (
           <SimulationErrorBoundary>
