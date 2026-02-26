@@ -23,7 +23,7 @@ import { useAvatarTape } from './useAvatarTape';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
-import { togglePoseEditor } from '../../store/avatarSlice';
+
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
 import { useDispatch } from 'react-redux';
@@ -165,12 +165,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Mutual exclusivity: arrangement tool ↔ pose editor
-  useEffect(() => {
-    if (activeTool3D === 'arrangement' && poseEditorOpen) {
-      dispatch(togglePoseEditor()); // close pose when arrangement activates
-    }
-  }, [activeTool3D, poseEditorOpen, dispatch]);
+
 
 
   const snapshot3D = useCallback(() => {
