@@ -1,224 +1,141 @@
 /**
- * AnchorPoints — CLO3D-style arrangement points on avatar body.
+ * AnchorPoints — CLO3D-style arrangement points, bone-attached.
  *
- * Uniform blue filled circles (#4A90D9), billboard-facing.
- * Placement matches CLO3D reference exactly.
+ * Each point follows the avatar's skeleton in real-time via useFrame.
+ * Points are rendered as camera-facing circles (billboard via lookAt).
  */
 
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { Billboard } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
 import { deriveDimensions } from '../../utils/cloth/garmentPlacement';
 import type { BodyMeasurements } from '../../types/types';
 
 const POINT_COLOR = '#4A90D9';
-const POINT_RADIUS = 0.008; // bigger than before — matches CLO3D
+const POINT_RADIUS = 0.008;
+
+interface AnchorDef {
+  bone: string;
+  offset: [number, number, number];
+}
 
 interface AnchorPointsProps {
   measurements: BodyMeasurements;
   visible: boolean;
 }
 
-function computeAnchors(m: BodyMeasurements): [number, number, number][] {
+function computeBoneAnchors(m: BodyMeasurements): AnchorDef[] {
   const d = deriveDimensions(m);
-  const sw = d.shoulderWidth / 2;
   const cr = d.chestRadius;
   const hr = d.hipRadius;
-  const wh = d.waistHeight;
-  const sh = d.shoulderHeight;
-  const nh = d.neckHeight;
-  const al = d.armLength;
-  const h = d.heightM;
-
-  // Surface offset so dots sit ON mesh, not inside
   const SO = 1.25;
-
-  const pts: [number, number, number][] = [];
-  const p = (x: number, y: number, z: number) => pts.push([x, y, z]);
-
-  // ════════════════════════════════════════════════════════════════════════
-  // HEAD
-  // ════════════════════════════════════════════════════════════════════════
-
-  const headR = cr * 0.32 * SO;
-  const headTop = h + 0.02;
-
-  // Top of head — 1 point
-  p(0, headTop, 0);
-  // Frontal cranium — 1 point (front of skull)
-  p(0, headTop - 0.02, headR * 0.8);
-  // Lateral cranium — 1 point (side of skull)
-  p(headR * 0.9, headTop - 0.03, 0);
-  // Slightly above ears — 1 per side
-  p(-headR * 1.1, nh + (headTop - nh) * 0.6, 0);
-  p(headR * 1.1, nh + (headTop - nh) * 0.6, 0);
-  // Nape of neck — 1 point
-  p(0, nh + 0.01, -headR * 1.2);
-  // Start of head (forehead level) — 1 point
-  p(0, nh + (headTop - nh) * 0.4, headR * 1.0);
-
-  // ════════════════════════════════════════════════════════════════════════
-  // SHOULDERS — 1 point per shoulder
-  // ════════════════════════════════════════════════════════════════════════
-
-  p(-sw * SO, sh, 0);
-  p(sw * SO, sh, 0);
-
-  // ════════════════════════════════════════════════════════════════════════
-  // TORSO — 5 rings
-  // Each ring: 3 front + 3 back + lateral points (varies)
-  // Upper rings are closer together
-  // ════════════════════════════════════════════════════════════════════════
-
-  const torsoTop = sh - 0.04;
-  const torsoBot = wh - 0.10;
-  const torsoH = torsoTop - torsoBot;
-
-  // Ring heights — upper rings closer together
-  const ringYs = [
-    torsoTop,                        // Ring 1 (upper chest) 
-    torsoTop - torsoH * 0.18,        // Ring 2 (bust)        — close to ring 1
-    torsoTop - torsoH * 0.40,        // Ring 3 (central/waist-ish)
-    torsoTop - torsoH * 0.65,        // Ring 4 (below central)
-    torsoTop - torsoH * 0.90,        // Ring 5 (low hip)
-  ];
-
-  // Torso radius at each ring height (interpolate chest→hip)
-  const torsoR = (y: number) => {
-    const t = Math.max(0, Math.min(1, (torsoTop - y) / torsoH));
-    return (cr + t * (hr - cr)) * SO;
-  };
-
-  for (let ri = 0; ri < 5; ri++) {
-    const y = ringYs[ri];
-    const r = torsoR(y);
-    const rSide = r * 0.95;
-
-    // 3 front points: center + 2 flanking
-    p(0, y, r);                          // center front
-    p(-r * 0.45, y, r * 0.88);           // left front
-    p(r * 0.45, y, r * 0.88);            // right front
-
-    // 3 back points: center + 2 flanking
-    p(0, y, -r);                         // center back
-    p(-r * 0.45, y, -r * 0.88);          // left back
-    p(r * 0.45, y, -r * 0.88);           // right back
-
-    // Lateral points — varies by ring
-    if (ri === 2) {
-      // Central ring: 2 lateral per side
-      p(-rSide, y + 0.015, 0);
-      p(-rSide, y - 0.015, 0);
-      p(rSide, y + 0.015, 0);
-      p(rSide, y - 0.015, 0);
-    } else if (ri === 3) {
-      // Below central: 1 lateral per side
-      p(-rSide, y, 0);
-      p(rSide, y, 0);
-    } else {
-      // Other rings: 1 lateral per side
-      p(-rSide, y, 0);
-      p(rSide, y, 0);
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════
-  // ARMS — 4 rings × 4 points per ring, per arm
-  // ════════════════════════════════════════════════════════════════════════
-
   const armR = 0.035 * SO;
-  const dropRate = 0.45;
 
-  for (const side of [-1, 1]) {
-    const baseX = side * sw * SO;
-    const ringTs = [0.20, 0.45, 0.70, 0.92]; // 4 stops along arm
+  const anchors: AnchorDef[] = [];
+  const a = (bone: string, x: number, y: number, z: number) =>
+    anchors.push({ bone, offset: [x, y, z] });
 
-    for (const t of ringTs) {
-      const dist = al * t;
-      const cx = baseX + side * dist;
-      const cy = sh - dist * dropRate;
-      // Arm direction vector (pointing outward + slightly down)
-      const dx = side;
-      const dy = -dropRate;
-      const dLen = Math.sqrt(dx * dx + dy * dy);
-      // Normal plane perpendicular to arm axis
-      // Up vector in arm's local frame (perpendicular to arm, in Y direction)
-      const upX = -dy / dLen;
-      const upY = dx / dLen;
-      // Forward vector (Z axis, perpendicular to both arm and up)
-      const fwdZ = 1;
+  // ── HEAD ──
+  a('Head', 0, 0.12, 0);
+  a('Head', 0, 0.10, cr * 0.3);
+  a('Head', cr * 0.35, 0.10, 0);
+  a('Head', -cr * 0.38 * SO, 0.05, 0);
+  a('Head', cr * 0.38 * SO, 0.05, 0);
+  a('Head', 0, 0.05, cr * 0.35);
+  a('Neck', 0, 0.02, -cr * 0.35 * SO);
 
-      // 4 points around arm cross-section, perpendicular to arm axis
-      p(cx + upX * armR, cy + upY * armR, 0);      // top (away from body)
-      p(cx - upX * armR, cy - upY * armR, 0);      // bottom (toward body)
-      p(cx, cy, armR * fwdZ);                        // front
-      p(cx, cy, -armR * fwdZ);                       // back
+  // ── SHOULDERS ──
+  a('LeftShoulder', -0.06, 0, 0);
+  a('RightShoulder', 0.06, 0, 0);
+
+  // ── TORSO — 5 rings ──
+  const rFn = (t: number) => (cr + t * (hr - cr)) * SO;
+
+  // Ring 1 (upper chest) → Spine2
+  const r1 = rFn(0);
+  a('Spine2', 0, 0.04, r1);  a('Spine2', -r1*0.45, 0.04, r1*0.88);  a('Spine2', r1*0.45, 0.04, r1*0.88);
+  a('Spine2', 0, 0.04, -r1); a('Spine2', -r1*0.45, 0.04, -r1*0.88); a('Spine2', r1*0.45, 0.04, -r1*0.88);
+  a('Spine2', -r1*0.95, 0.04, 0); a('Spine2', r1*0.95, 0.04, 0);
+
+  // Ring 2 (bust) → Spine2 lower
+  const r2 = rFn(0.18);
+  a('Spine2', 0, -0.06, r2);  a('Spine2', -r2*0.45, -0.06, r2*0.88);  a('Spine2', r2*0.45, -0.06, r2*0.88);
+  a('Spine2', 0, -0.06, -r2); a('Spine2', -r2*0.45, -0.06, -r2*0.88); a('Spine2', r2*0.45, -0.06, -r2*0.88);
+  a('Spine2', -r2*0.95, -0.06, 0); a('Spine2', r2*0.95, -0.06, 0);
+
+  // Ring 3 (central) → Spine1 — 2 lateral per side
+  const r3 = rFn(0.4);
+  a('Spine1', 0, 0, r3);  a('Spine1', -r3*0.45, 0, r3*0.88);  a('Spine1', r3*0.45, 0, r3*0.88);
+  a('Spine1', 0, 0, -r3); a('Spine1', -r3*0.45, 0, -r3*0.88); a('Spine1', r3*0.45, 0, -r3*0.88);
+  a('Spine1', -r3*0.95, 0.015, 0); a('Spine1', -r3*0.95, -0.015, 0);
+  a('Spine1', r3*0.95, 0.015, 0);  a('Spine1', r3*0.95, -0.015, 0);
+
+  // Ring 4 (below central) → Spine — 1 lateral per side
+  const r4 = rFn(0.65);
+  a('Spine', 0, 0.02, r4);  a('Spine', -r4*0.45, 0.02, r4*0.88);  a('Spine', r4*0.45, 0.02, r4*0.88);
+  a('Spine', 0, 0.02, -r4); a('Spine', -r4*0.45, 0.02, -r4*0.88); a('Spine', r4*0.45, 0.02, -r4*0.88);
+  a('Spine', -r4*0.95, 0.02, 0); a('Spine', r4*0.95, 0.02, 0);
+
+  // Ring 5 (low hip) → Hips
+  const r5 = rFn(0.9);
+  a('Hips', 0, 0.02, r5);  a('Hips', -r5*0.45, 0.02, r5*0.88);  a('Hips', r5*0.45, 0.02, r5*0.88);
+  a('Hips', 0, 0.02, -r5); a('Hips', -r5*0.45, 0.02, -r5*0.88); a('Hips', r5*0.45, 0.02, -r5*0.88);
+  a('Hips', -r5*0.95, 0.02, 0); a('Hips', r5*0.95, 0.02, 0);
+
+  // ── ARMS — 4 rings × 4 points ──
+  for (const bones of [
+    ['LeftArm', 'LeftForeArm', 'LeftForeArm', 'LeftHand'],
+    ['RightArm', 'RightForeArm', 'RightForeArm', 'RightHand'],
+  ]) {
+    for (let bi = 0; bi < bones.length; bi++) {
+      const yOff = bi === 2 ? -0.1 : 0; // mid-forearm offset
+      a(bones[bi], 0, armR + yOff, 0);
+      a(bones[bi], 0, -armR + yOff, 0);
+      a(bones[bi], 0, yOff, armR);
+      a(bones[bi], 0, yOff, -armR);
     }
   }
 
-  // ════════════════════════════════════════════════════════════════════════
-  // LEGS
-  // ════════════════════════════════════════════════════════════════════════
-
-  const crotchH = wh - 0.24;
-  const legSpread = 0.08;
-
-  // Crotch ring — just below genitals
-  // 3 front + 3 back + 1 lateral per side (lateral slightly higher)
-  for (const side of [-1, 1]) {
-    const lx = side * legSpread;
-    const lr = hr * 0.4 * SO;
-
-    // 3 front
-    p(lx, crotchH, lr);
-    p(lx - lr * 0.5, crotchH, lr * 0.85);
-    p(lx + lr * 0.5, crotchH, lr * 0.85);
-
-    // 3 back
-    p(lx, crotchH, -lr);
-    p(lx - lr * 0.5, crotchH, -lr * 0.85);
-    p(lx + lr * 0.5, crotchH, -lr * 0.85);
-
-    // 1 lateral per side (slightly higher)
-    p(lx + side * lr, crotchH + 0.02, 0);
+  // ── CROTCH RING ──
+  const crotchR = hr * 0.4 * SO;
+  for (const side of ['LeftUpLeg', 'RightUpLeg'] as const) {
+    a(side, 0, 0.02, crotchR);
+    a(side, -crotchR*0.5, 0.02, crotchR*0.85);
+    a(side, crotchR*0.5, 0.02, crotchR*0.85);
+    a(side, 0, 0.02, -crotchR);
+    a(side, -crotchR*0.5, 0.02, -crotchR*0.85);
+    a(side, crotchR*0.5, 0.02, -crotchR*0.85);
+    const lSign = side.startsWith('Left') ? -1 : 1;
+    a(side, lSign * crotchR, 0.04, 0);
   }
 
-  // 3 rings per leg × 4 points
-  const legRingHeights = [
-    h * 0.35,    // mid-thigh
-    h * 0.25,    // knee
-    h * 0.14,    // mid-calf
+  // ── LEGS — 3 rings × 4 points ──
+  const legRings = [
+    { boneSuffix: 'UpLeg', r: hr * 0.32 * SO, yOff: -0.15 },
+    { boneSuffix: 'Leg', r: hr * 0.22 * SO, yOff: 0.0 },
+    { boneSuffix: 'Leg', r: hr * 0.18 * SO, yOff: -0.15 },
   ];
-  const legRingRadii = [
-    hr * 0.32 * SO,   // thigh
-    hr * 0.22 * SO,   // knee
-    hr * 0.18 * SO,   // calf
-  ];
-
-  for (const side of [-1, 1]) {
-    const lx = side * legSpread;
-    for (let ri = 0; ri < 3; ri++) {
-      const y = legRingHeights[ri];
-      const r = legRingRadii[ri];
-      p(lx, y, r);           // front
-      p(lx, y, -r);          // back
-      p(lx + r, y, 0);       // outer
-      p(lx - r, y, 0);       // inner
+  for (const prefix of ['Left', 'Right']) {
+    for (const ring of legRings) {
+      const bone = `${prefix}${ring.boneSuffix}`;
+      a(bone, 0, ring.yOff, ring.r);
+      a(bone, 0, ring.yOff, -ring.r);
+      a(bone, ring.r, ring.yOff, 0);
+      a(bone, -ring.r, ring.yOff, 0);
     }
   }
 
-  // Ankles — 1 point front + 1 back per leg
-  for (const side of [-1, 1]) {
-    const lx = side * legSpread;
-    const ankR = hr * 0.14 * SO;
-    p(lx, h * 0.05, ankR);
-    p(lx, h * 0.05, -ankR);
+  // ── ANKLES ──
+  const ankR = hr * 0.14 * SO;
+  for (const prefix of ['Left', 'Right']) {
+    a(`${prefix}Leg`, 0, -0.2, ankR);
+    a(`${prefix}Leg`, 0, -0.2, -ankR);
   }
 
-  return pts;
+  return anchors;
 }
 
-// Shared geometry & material
+// Shared resources
 const circleGeo = new THREE.CircleGeometry(POINT_RADIUS, 16);
 const circleMat = new THREE.MeshBasicMaterial({
   color: POINT_COLOR,
@@ -228,17 +145,70 @@ const circleMat = new THREE.MeshBasicMaterial({
   opacity: 0.92,
 });
 
+// Reusable temp objects
+const _worldPos = new THREE.Vector3();
+const _offset = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+
 export default function AnchorPoints({ measurements, visible }: AnchorPointsProps) {
-  const anchors = useMemo(() => computeAnchors(measurements), [measurements]);
+  const anchorDefs = useMemo(() => computeBoneAnchors(measurements), [measurements]);
+  const { scene, camera } = useThree();
+  const bonesRef = useRef<Map<string, THREE.Bone>>(new Map());
+  const groupRef = useRef<THREE.Group>(null);
+
+  // Each frame: find bones if needed, position all meshes at bone+offset, face camera
+  useFrame(() => {
+    const group = groupRef.current;
+    if (!group || !visible) return;
+
+    // Lazy-find bones (avatar loads async)
+    if (bonesRef.current.size === 0) {
+      const bones = new Map<string, THREE.Bone>();
+      scene.traverse((obj) => {
+        if ((obj as THREE.SkinnedMesh).isSkinnedMesh) {
+          const skeleton = (obj as THREE.SkinnedMesh).skeleton;
+          if (skeleton) {
+            for (const bone of skeleton.bones) {
+              if (!bones.has(bone.name)) bones.set(bone.name, bone);
+            }
+          }
+        }
+      });
+      if (bones.size > 0) bonesRef.current = bones;
+      else return; // avatar not loaded yet
+    }
+
+    const bones = bonesRef.current;
+
+    for (let i = 0; i < group.children.length && i < anchorDefs.length; i++) {
+      const mesh = group.children[i] as THREE.Mesh;
+      const def = anchorDefs[i];
+      const bone = bones.get(def.bone);
+
+      if (!bone) {
+        mesh.visible = false;
+        continue;
+      }
+
+      mesh.visible = true;
+      bone.getWorldPosition(_worldPos);
+      bone.getWorldQuaternion(_quat);
+      _offset.set(def.offset[0], def.offset[1], def.offset[2]);
+      _offset.applyQuaternion(_quat);
+      _worldPos.add(_offset);
+      mesh.position.copy(_worldPos);
+
+      // Billboard: face camera
+      mesh.lookAt(camera.position);
+    }
+  });
 
   if (!visible) return null;
 
   return (
-    <group>
-      {anchors.map((pos, i) => (
-        <Billboard key={i} position={pos} follow lockX={false} lockY={false} lockZ={false}>
-          <mesh geometry={circleGeo} material={circleMat} renderOrder={999} />
-        </Billboard>
+    <group ref={groupRef}>
+      {anchorDefs.map((_, i) => (
+        <mesh key={i} geometry={circleGeo} material={circleMat} renderOrder={999} />
       ))}
     </group>
   );
