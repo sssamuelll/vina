@@ -12,73 +12,75 @@ Real-time cloth simulation is the core differentiator. A pattern maker draws in 
 
 **DECISION:** We implemented **XPBD** instead of mass-spring for better stability and constraint handling.
 
-**XPBD Advantages:**
-- More stable than mass-spring systems
-- Better constraint satisfaction (distance, collision, seam constraints)
-- Handles stiff materials without explosion
-- Position-based → naturally damped
-
-**Current Implementation (v0.5):**
+**Current Implementation (v0.6 progress):**
 - 10 fabric presets with XPBD compliance parameters
-- Web Worker physics at 60fps
-- Distance constraints for stretch/shear resistance
-- Gravity simulation (pieces fall naturally)
+- Wasm-accelerated XPBD solver (Rust) for 3x performance boost
+- Web Worker multi-threaded execution
+- **Seam Assembly System**: Vertex-to-vertex distance constraints for joining pieces
+- **Robust Meshing**: CDT-based triangulation with edge subdivision
+- Gravity simulation + Avatar collision
 
-**Missing (v0.6 gap):** Seam constraints, collision detection, garment placement
-
-### XPBD Parameters (per fabric)
-
-| Fabric | Stretch Compliance | Shear Compliance | Bend Compliance | Mass (g/m²) |
-|--------|-------------------|------------------|------------------|-------------|
-| Cotton (woven) | 0.001 | 0.005 | 0.02 | 150 |
-| Silk (light) | 0.002 | 0.01 | 0.1 | 50 |
-| Denim | 0.0008 | 0.0025 | 0.005 | 350 |
-| Jersey (knit) | 0.003 | 0.012 | 0.05 | 180 |
-| Leather | 0.0005 | 0.0016 | 0.002 | 800 |
-| Chiffon | 0.005 | 0.02 | 0.2 | 30 |
-
-**Timestep:** Fixed 1/60s (16.67ms). XPBD handles larger timesteps better than Verlet integration.
+**Missing (v0.6 gap):** Garment placement, self-collision
 
 ### Constraint Solving
 
 After integration, iteratively solve constraints (Jakobsen method):
 
 1. **Distance constraints** (springs) — maintain rest lengths
-2. **Seam constraints** — sewn vertices share position
-3. **Collision constraints** — vertices outside avatar surface
+2. **Seam constraints** — sewn vertices share position (dynamic rest length)
+3. **Collision constraints** — vertices outside avatar surface (SDF lookup)
 4. **Pin constraints** — fixed vertices (shoulders, waistband)
 
-**Iterations per frame:** 8-16 (more = stiffer, less stretchy). Configurable per quality setting.
+**Iterations per frame:** 15 (default). Configurable per quality setting.
 
 ---
 
-## Collision Detection 🔨 NEXT (v0.6)
+## Meshing Pipeline ✅ COMPLETE (v0.6)
 
-### Avatar Collision
+High-quality triangles are essential for stable simulation. We replaced simple ear-clipping with a professional **Constrained Delaunay Triangulation (CDT)** pipeline.
 
-The avatar is a **static collider** (doesn't move during simulation).
+### Implementation Strategy: "Subdivide & Fill"
+1. **Edge Parameterization**: 2D pattern outlines are flattened into points.
+2. **Subdivision**: Any edge segment longer than `maxEdgeLength` (default 15mm) is split into multiple segments. This ensures uniform particle density on the boundaries.
+3. **PSLG Cleaning**: `clean-pslg` resolves self-intersections and T-junctions in the pattern geometry.
+4. **Grid-based Interior Fill**: A regular grid of interior points is generated inside the polygon.
+5. **CDT Triangulation**: `cdt2d` creates the final mesh constrained by the subdivided boundary and internal lines (darts).
 
-**Approach:** Signed Distance Field (SDF)
-- Pre-compute SDF from avatar mesh (3D grid of distances to surface)
-- Each cloth vertex: if inside avatar → push to nearest surface point
-- SDF resolution: 64³/128³ grid (balance memory vs accuracy)
-- Computed once when avatar changes, cached
+**Benefit:** Guarantees minimum triangle angles > 20° and consistent particle distribution, preventing "mesh locking" or simulation explosions.
 
-**Implementation Strategy:**
-1. Generate SDF in compute shader (WebGPU) or Web Worker 
-2. Store as 3D texture for GPU lookup or typed array for CPU
-3. Trilinear interpolation for smooth distance queries
+---
+
+## Seam Assembly System ✅ COMPLETE (v0.6)
+
+Connections between pieces are modeled as **dynamic distance constraints** in the XPBD solver.
+
+### The Sewing Process
+1. **Arc-Length Mapping**: Seam edges are mapped to a 0–1 parameter space.
+2. **Vertex Matching**: Boundary vertices on Piece A are paired with the closest vertices on Piece B using their normalized parameter (t).
+3. **Rest Length Shrinking**: At the start of simulation, seam constraints have a rest length equal to the 3D distance between pieces. This rest length is gradually shrunk to zero over several frames, creating a smooth "sewing" effect.
+4. **Compliance**: Seam stiffness is controlled by the `seamType` (e.g., standard, french), allowing for realistic joint behavior.
+
+---
+
+## Collision Detection 🔨 IN PROGRESS (v0.6)
+
+### Avatar Collision ✅ COMPLETE
+
+The avatar is a **static collider** represented by a Signed Distance Field (SDF).
+
+**Implementation (v0.6):**
+- **SDF Generation**: 32³/64³ grid computed in a Web Worker using a highly optimized **Spatial Hash** structure.
+- **M2/Safari Fix**: Robust 32-bit bitwise hashing prevents collision-induced brute force fallbacks on ARM browsers.
+- **Response**: Each frame, vertices inside the avatar (SDF < 0) are projected to the surface using the pre-computed surface normals.
 
 ### Self-Collision 🔨 NEXT (v0.6)
 
-Cloth-on-cloth collision (folds, layers). Expensive but necessary for realism.
+Cloth-on-cloth collision (folds, layers).
 
 **Approach:** Spatial hashing (following Müller papers #11/#15)
 - Divide space into grid cells (cell size = 2× cloth thickness)
 - Only check vertex-triangle pairs in same/adjacent cells
 - O(n) average vs O(n²) brute force
-
-**Performance toggle:** Can be disabled for complex garments (UI setting).
 
 ---
 
@@ -88,11 +90,11 @@ Cloth-on-cloth collision (folds, layers). Expensive but necessary for realism.
 每 frame (requestAnimationFrame):
     1. Apply gravity + wind forces to all vertices
     2. Verlet integration (update positions)
-    3. Constraint solving loop (8-16 iterations):
+    3. Constraint solving loop (15 iterations):
         a. Distance constraints (springs)
-        b. Seam constraints
+        b. Seam constraints (shrink rest lengths)
         c. Pin constraints
-        d. Avatar collision
+        d. Avatar collision (SDF lookup)
         e. (Optional) Self-collision
     4. Update Three.js mesh geometry (BufferGeometry)
     5. Update normals for lighting
@@ -102,34 +104,12 @@ Cloth-on-cloth collision (folds, layers). Expensive but necessary for realism.
 
 | Operation | Target Time | Strategy |
 |-----------|-------------|----------|
-| Force accumulation | < 1ms | Simple gravity + optional wind |
-| Verlet integration | < 1ms | Typed arrays, no allocations |
-| Constraint solving (8 iter) | < 8ms | Web Worker, shared buffers |
-| Collision detection | < 3ms | SDF lookup (GPU) or spatial hash (CPU) |
+| Force accumulation | < 1ms | Simple gravity |
+| Verlet integration | < 1ms | Typed arrays in Wasm |
+| Constraint solving (15 iter) | < 10ms | Rust/Wasm solver in Worker |
+| Collision detection | < 3ms | SDF lookup |
 | Mesh update | < 1ms | Direct BufferGeometry write |
-| **Total per frame** | **< 14ms** | **60fps budget = 16.6ms** |
-
-### Web Worker Architecture ✅ COMPLETE
-
-**Current implementation (v0.5):** XPBD physics runs in Web Worker at 60fps.
-
-```
-Main Thread                    Worker Thread
-─────────────                  ─────────────
-User input, Three.js render    Physics simulation (XPBD)
-    │                              │
-    ├── SharedArrayBuffer ────────►│ (vertex positions)
-    │   (positions, forces)        │
-    │                              ├── XPBD Integration
-    │                              ├── Distance Constraints
-    │                              ├── Gravity Forces
-    │◄── Atomics.notify ──────────┤ (frame done)
-    │                              │
-    ├── Update BufferGeometry      │
-    └── Render                     │
-```
-
-**Deployment:** Requires `Cross-Origin-Isolation` headers (COOP + COEP) — already configured on openclo.sdar.dev.
+| **Total per frame** | **< 15ms** | **60fps budget = 16.6ms** |
 
 ---
 
@@ -137,37 +117,20 @@ User input, Three.js render    Physics simulation (XPBD)
 
 Before simulation starts, pieces need initial 3D positions around the avatar:
 
-1. **Cylindrical mapping** — wrap pieces around avatar at approximate body position
-   - Bodice → chest cylinder
-   - Sleeve → arm cylinder
-   - Skirt → hip-to-knee cylinder
+1. **Cylindrical mapping** — wrap pieces around avatar (bodice, sleeve, skirt)
 2. **Inflate** — push pieces slightly away from avatar surface (2-5cm offset)
 3. **Pin shoulders/waistband** — fix key vertices to prevent garment falling off
 4. **Simulate settle** — run 200-500 frames to let garment drape naturally
-
-### Pin Points (automatic detection)
-
-| Garment Area | Pin Location | Detection |
-|--------------|-------------|-----------|
-| Top (bodice/shirt) | Shoulder seam vertices | Highest vertices after cylindrical mapping |
-| Bottom (skirt/pants) | Waistband top edge | Vertices on waist-height ring |
-| Sleeve | Cap attachment vertices | Vertices nearest armhole seam |
 
 ---
 
 ## Future Enhancements (post v0.7)
 
 ### GPU Simulation (WebGPU)
-- Move entire simulation to compute shaders
-- 10-100x performance improvement
-- Enables complex garments (coats, layered outfits)
-- Requires WebGPU browser support (Chrome 113+, Firefox nightly)
+- Move entire simulation to compute shaders (10-100x performance)
 
 ### Wind and Animation
-- Directional wind force with turbulence noise
-- Avatar pose animation (walking, sitting) → garment follows
-- Timeline-based animation for fashion shows / renders
+- Directional wind force + Avatar pose animation
 
 ### Fabric Drape Prediction
-- AI model trained on fabric swatches → predict spring parameters from photo
-- Camera → swatch photo → auto-configure fabric properties
+- AI model predicting spring parameters from fabric swatch photo

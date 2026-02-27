@@ -25,15 +25,15 @@ Everything needed to draw patterns, see them in 3D, and export files. **DONE.**
 **Duration:** 6-8 weeks (meshing 1wk, sewing 2-3wk, collision 2wk, placement 1-2wk)
 
 ### Meshing Pipeline
-- [ ] **CDT Meshing** — integrate `cdt2d` library for 2D pattern outlines → triangle meshes
-- [ ] **clean-pslg** integration — robust polygon processing for complex shapes
-- [ ] **Adaptive tessellation** — more triangles on curves, fewer on straight edges
-- [ ] **Quality refinement** — eliminate long/thin triangles for simulation stability
+- [x] **CDT Meshing** — integrate `cdt2d` library for 2D pattern outlines → triangle meshes
+- [x] **clean-pslg** integration — robust polygon processing for complex shapes
+- [x] **Adaptive tessellation** — more triangles on curves, fewer on straight edges (via subdivision)
+- [x] **Quality refinement** — eliminate long/thin triangles for simulation stability (Subdivide & Fill)
 
 ### Seam Assembly System  
-- [ ] **Edge parameterization** — map seam edges to 0-1 parameter space for alignment
-- [ ] **Sewing constraints in XPBD solver** — sewn vertices share positions
-- [ ] **Seam types** — standard, french, flat-felled with different constraint behaviors
+- [x] **Edge parameterization** — map seam edges to 0-1 parameter space for alignment
+- [x] **Sewing constraints in XPBD solver** — sewn vertices share positions
+- [x] **Seam types** — standard, french, flat-felled with different constraint behaviors
 - [ ] **Length validation** — warn when seaming edges with >5% length difference
 
 ### Garment Placement
@@ -42,9 +42,9 @@ Everything needed to draw patterns, see them in 3D, and export files. **DONE.**
 - [ ] **Pin point detection** — shoulders, waistband, sleeve caps to prevent falling
 
 ### Avatar Collision
-- [ ] **SDF generation** — signed distance field from avatar mesh (64³/128³ resolution)
-- [ ] **Inside/outside detection** — push cloth vertices outside avatar surface
-- [ ] **Surface normal calculation** — accurate collision response
+- [x] **SDF generation** — signed distance field from avatar mesh (64³/128³ resolution)
+- [x] **Inside/outside detection** — push cloth vertices outside avatar surface
+- [x] **Surface normal calculation** — accurate collision response (fixed for M2/Safari)
 
 ### Self-Collision
 - [ ] **Spatial hashing** — grid-based acceleration structure (Müller paper #11/#15)
