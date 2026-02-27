@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Tests for IndexedDB storage abstraction.
  * Mocks the `idb` module so openDB always rejects, forcing localStorage fallback.

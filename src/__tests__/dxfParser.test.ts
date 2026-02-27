@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import { parseDXF } from '../utils/dxf/parser';
 import { dxfToPatternPieces, entityToPath } from '../utils/dxf/converter';

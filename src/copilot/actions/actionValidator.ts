@@ -152,7 +152,7 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       }
       return ok();
 
-    case 'delete_piece':
+    case 'delete_piece': {
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
@@ -164,6 +164,7 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
         return warn([`Will delete ${connectedSeams.length} connected seam(s)`]);
       }
       return ok();
+    }
 
     case 'rename_piece':
       if (!pieceExists(state, action.pieceId)) {
@@ -218,15 +219,16 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
     case 'move_point':
       return validatePointIndex(state, action.pieceId, action.pointIndex);
 
-    case 'add_point':
+    case 'add_point': {
       const edgeResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
       if (!edgeResult.valid) return edgeResult;
       if (action.position < 0 || action.position > 1) {
         return fail('Position must be between 0 and 1');
       }
       return ok();
+    }
 
-    case 'delete_point':
+    case 'delete_point': {
       const pointResult = validatePointIndex(state, action.pieceId, action.pointIndex);
       if (!pointResult.valid) return pointResult;
       // Warn if piece would have too few points
@@ -236,6 +238,7 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
         return fail('Cannot delete point: piece must have at least 3 points');
       }
       return ok();
+    }
 
     case 'add_ease':
       if (!pieceExists(state, action.pieceId)) {
@@ -258,21 +261,23 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       }
       return ok();
 
-    case 'curve_edge':
+    case 'curve_edge': {
       const curveResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
       if (!curveResult.valid) return curveResult;
       if (action.curvature < -1 || action.curvature > 1) {
         return fail('Curvature must be between -1 and 1');
       }
       return ok();
+    }
 
-    case 'split_edge':
+    case 'split_edge': {
       const splitResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
       if (!splitResult.valid) return splitResult;
       if (action.at <= 0 || action.at >= 1) {
         return fail('Split position must be between 0 and 1 (exclusive)');
       }
       return ok();
+    }
 
     default:
       return fail(`Unknown geometry action`);
@@ -354,12 +359,13 @@ function validateMeasurementAction(action: MeasurementAction, state: RootState):
       }
       return ok();
 
-    case 'compare_edges':
+    case 'compare_edges': {
       const edge1Result = validateEdgeIndex(state, action.edge1.pieceId, action.edge1.edgeIndex);
       if (!edge1Result.valid) return edge1Result;
       const edge2Result = validateEdgeIndex(state, action.edge2.pieceId, action.edge2.edgeIndex);
       if (!edge2Result.valid) return edge2Result;
       return ok();
+    }
 
     case 'measure_distance':
       // No state validation needed for point-to-point distance
@@ -424,6 +430,7 @@ const VALID_MEASUREMENTS = new Set([
   'knee', 'calf', 'ankle', 'wrist', 'upperArm', 'forearm',
 ]);
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function validateAvatarAction(action: AvatarAction, _state: RootState): ValidationResult {
   switch (action.action) {
     case 'set_avatar_measurement':
@@ -504,6 +511,7 @@ function validateViewAction(action: ViewAction, state: RootState): ValidationRes
 // Project Validators
 // ============================================================================
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function validateProjectAction(action: ProjectAction, _state: RootState): ValidationResult {
   switch (action.action) {
     case 'save_project':
@@ -593,5 +601,5 @@ export function validateAction(action: CopilotAction, state: RootState): Validat
     return ok();
   }
 
-  return fail(`Unknown action type: ${(action as any).action}`);
+  return fail(`Unknown action type: ${(action as { action: string }).action}`);
 }

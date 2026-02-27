@@ -2,6 +2,7 @@ import { Undo2, Redo2, Plus, MessageSquare, Search } from 'lucide-react';
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
+import type { Tool2D } from '../../types/types';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo } from '../../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../../store/toolSlice';
 import { cycleCopilotPosition, setSplitRatio } from '../../store/layoutSlice';
@@ -9,7 +10,7 @@ import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
-import Toolbar3D from '../Toolbar3D/Toolbar3D';
+import Toolbar3D, { type Tool3D } from '../Toolbar3D/Toolbar3D';
 import ToolOptionsBar from '../Toolbar3D/ToolOptionsBar';
 import AvatarPanel from '../Viewport3D/AvatarPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
@@ -222,7 +223,7 @@ export default function Workspace() {
       shortcut: tool.shortcut?.toUpperCase(),
       action: () => {
         if (tool.context === '2d' || tool.context === 'both') {
-          dispatch(setActiveTool(tool.id as any)); // Backward compatibility
+          dispatch(setActiveTool(tool.id as Tool2D)); // Backward compatibility
           dispatch(setActiveTool2D(tool.id));
         }
         if (tool.context === '3d' || tool.context === 'both') {
@@ -377,7 +378,7 @@ export default function Workspace() {
                 <div className="viewport3d-with-toolbar">
                   <ToolOptionsBar />
                   <Viewport3DErrorBoundary>
-                    <Viewport3D activeTool3D={activeTool3D as any} />
+                    <Viewport3D activeTool3D={activeTool3D as Tool3D} />
                   </Viewport3DErrorBoundary>
                   <AvatarPanel open={avatarPanelOpen} onClose={() => setAvatarPanelOpen(false)} />
                   <div className={`toolbar3d-wrapper ${viewMode !== '2d' ? 'visible' : 'hidden'}`}>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLoader, useFrame } from "@react-three/fiber";
+import { useLoader, useFrame, ThreeEvent } from "@react-three/fiber";
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
@@ -22,7 +22,7 @@ interface AvatarModelProps {
   /** Target height in meters (default: 1.80) */
   height?: number;
   /** Pointer down handler for tape tools */
-  onPointerDown?: (e: any) => void;
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void;
 }
 
 const DEG2RAD = Math.PI / 180;
@@ -267,6 +267,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       const humanoid = vrmInstance.humanoid;
       if (humanoid) {
         for (const [vrmBoneName, mixamoBoneName] of Object.entries(VRM_TO_MIXAMO_BONE_MAP)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const boneNode = humanoid.getNormalizedBoneNode(vrmBoneName as any);
           if (boneNode && (boneNode as THREE.Bone).isBone) {
             const bone = boneNode as THREE.Bone;

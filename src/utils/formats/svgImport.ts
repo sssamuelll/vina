@@ -53,8 +53,8 @@ export function importSVG(svgString: string): SvgImportResult {
       } else {
         openPaths.push({ commands: scaled });
       }
-    } catch (e: any) {
-      warnings.push(`Failed to parse element: ${e.message}`);
+    } catch (e) {
+      warnings.push(`Failed to parse element: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
   }
 
@@ -390,7 +390,7 @@ export function parseSvgPathD(d: string): PathCommand[] {
       case 'S': {
         do {
           // Reflect last control point
-          let x1 = 2 * cx - lastCx2, y1 = 2 * cy - lastCy2;
+          const x1 = 2 * cx - lastCx2, y1 = 2 * cy - lastCy2;
           let x2 = nextNum(), y2 = nextNum(), x = nextNum(), y = nextNum();
           if (isRel) { x2 += cx; y2 += cy; x += cx; y += cy; }
           commands.push({ type: 'C', values: [x1, y1, x2, y2, x, y] });
@@ -417,7 +417,7 @@ export function parseSvgPathD(d: string): PathCommand[] {
       case 'T': {
         do {
           // Reflect last quadratic control point
-          let x1 = 2 * cx - lastCx2, y1 = 2 * cy - lastCy2;
+          const x1 = 2 * cx - lastCx2, y1 = 2 * cy - lastCy2;
           let x = nextNum(), y = nextNum();
           if (isRel) { x += cx; y += cy; }
           const cp1x = cx + (2 / 3) * (x1 - cx);
@@ -432,7 +432,7 @@ export function parseSvgPathD(d: string): PathCommand[] {
       }
       case 'A': {
         do {
-          let rx = nextNum(), ry = nextNum();
+          const rx = nextNum(), ry = nextNum();
           const angle = nextNum();
           const largeArc = nextNum();
           const sweep = nextNum();
@@ -495,7 +495,7 @@ function arcToCubics(
 
   // Step 2: compute (cx', cy')
   rx = Math.abs(rx); ry = Math.abs(ry);
-  let lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
   if (lambda > 1) { const s = Math.sqrt(lambda); rx *= s; ry *= s; }
 
   const num1 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;

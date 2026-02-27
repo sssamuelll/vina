@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Physical Fabric — edge cases, boundary conditions, and XPBD conversion accuracy.
  */

@@ -7,6 +7,7 @@
  * This bridges the gap between the 42 real Seamly2D patterns and
  * our construction engine + piece builder pipeline.
  */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { CPoint, CCurve, CPiece, PieceNode, CurveDefinition } from '../../types/construction';
 import { resolveConstruction, type ConstructionStep } from './constructionResolver';

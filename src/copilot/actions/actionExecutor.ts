@@ -11,7 +11,7 @@
  */
 
 import type { AppDispatch, RootState } from '../../store';
-import type { PatternPiece, Seam, PathCommand } from '../../types/types';
+import type { PatternPiece, Seam, PathCommand, ViewMode } from '../../types/types';
 import {
   addPiece,
   updatePiece,
@@ -673,7 +673,7 @@ export class CopilotActionExecutor {
         return { summary: `Zoomed to fit all` };
 
       case 'switch_view':
-        this.dispatch(setViewMode(action.view as any));
+        this.dispatch(setViewMode(action.view as ViewMode));
         return { summary: `Switched to ${action.view} view` };
 
       case 'set_view_mode':
@@ -717,7 +717,7 @@ export class CopilotActionExecutor {
         };
 
       default:
-        throw new Error(`Unknown action: ${(action as any).action}`);
+        throw new Error(`Unknown action: ${(action as { action: string }).action}`);
     }
   }
 

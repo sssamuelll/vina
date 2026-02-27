@@ -63,7 +63,7 @@ export function extractAvatarMesh(scene: THREE.Object3D): ExtractedMeshData | nu
     }
     
     // Get or generate index attribute
-    let indexAttribute = geometry.getIndex();
+    const indexAttribute = geometry.getIndex();
     let indices: number[];
     
     if (indexAttribute) {

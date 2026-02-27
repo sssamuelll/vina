@@ -19,7 +19,6 @@ export default function CopilotHeader({
   offline,
   isColumn,
   isFullscreen,
-  showSettings: _showSettings,
   onToggleFullscreen,
   onToggleSettings,
   onClearConversation,

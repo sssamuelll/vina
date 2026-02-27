@@ -6,6 +6,7 @@
  */
 
 import { useCallback } from 'react';
+import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
@@ -79,7 +80,7 @@ export function useAvatarTape(activeTool3D: string) {
 
   const isTapeTool = activeTool3D === 'tape-circumference' || activeTool3D === 'tape-linear';
 
-  const handleAvatarClick = useCallback((e: any) => {
+  const handleAvatarClick = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!isTapeTool) return;
     e.stopPropagation();
 

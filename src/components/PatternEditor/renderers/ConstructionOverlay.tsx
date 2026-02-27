@@ -67,7 +67,7 @@ export default function ConstructionOverlay({ zoom2D, pieces }: ConstructionOver
               transform={`translate(${patternPiece.position.x}, ${patternPiece.position.y})`}
             >
               {/* Curves */}
-              {renderCurves(blockCurves, ptMap, offsetX, offsetY, strokeWidth, zoom2D)}
+              {renderCurves(blockCurves, ptMap, offsetX, offsetY, strokeWidth)}
 
               {/* Points */}
               {blockPoints.filter(p => p.visible).map(point => (
@@ -103,7 +103,7 @@ export default function ConstructionOverlay({ zoom2D, pieces }: ConstructionOver
 
   return (
     <g className="construction-overlay">
-      {renderCurves(curves, ptMap, 0, 0, strokeWidth, zoom2D)}
+      {renderCurves(curves, ptMap, 0, 0, strokeWidth)}
 
       {points.filter(p => p.visible).map(point => (
         <g key={point.id}>
@@ -133,7 +133,7 @@ function renderCurves(
   curves: CCurve[],
   ptMap: Map<string, CPoint>,
   offsetX: number, offsetY: number,
-  strokeWidth: number, _zoom2D: number,
+  strokeWidth: number,
 ) {
   return curves.filter(c => c.visible).map(curve => {
     const def = curve.definition;

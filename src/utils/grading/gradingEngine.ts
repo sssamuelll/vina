@@ -25,7 +25,7 @@ export function gradePoints(
   points: GradedPoint[],
   options: GradingOptions,
 ): Point2D[] {
-  const { gradeTable, baseSize: _baseSize, targetSize, baseMeasurements } = options;
+  const { gradeTable, targetSize, baseMeasurements } = options;
   const targetSizeMeasurements = gradeTable.sizes[targetSize] ?? {};
 
   return points.map((pt) => {

@@ -29,7 +29,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
   });
 }
 
-function json(res: http.ServerResponse, data: any, status = 200) {
+function json(res: http.ServerResponse, data: unknown, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(data));
 }
@@ -110,8 +110,8 @@ export async function handleAPI(
     try {
       const response = await copilotBridge.handleMessage(msg);
       return json(res, response);
-    } catch (e: any) {
-      return json(res, { error: e.message }, 500);
+    } catch (e) {
+      return json(res, { error: e instanceof Error ? e.message : 'Unknown error' }, 500);
     }
   }
 

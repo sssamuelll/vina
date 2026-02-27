@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import { executeCommands } from '../copilot/commandExecutor';
 import { PatternPiece } from '../types/types';

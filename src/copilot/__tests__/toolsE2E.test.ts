@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * E2E Tool Tests — exercises the full pipeline:
  * Registry → Tool lookup → Execute with real Redux store → Verify state changes.

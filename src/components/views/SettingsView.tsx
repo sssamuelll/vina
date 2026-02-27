@@ -5,7 +5,7 @@ import { toggleSnapToGrid, setGridSize, setUnits } from '../../store/editorSlice
 import { UnitSystem } from '../../types/types';
 import './views.css';
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface
+ 
 export interface SettingsState {
   units: UnitSystem;
   gridEnabled: boolean;

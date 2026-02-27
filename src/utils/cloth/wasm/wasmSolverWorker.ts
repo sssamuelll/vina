@@ -103,6 +103,7 @@ self.onmessage = async (event: MessageEvent) => {
         }
 
         // Merge pieces using the standard utility (ensures consistent vertex mapping)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array }> = msg.pieces.map((p: any) => ({
           pieceId: p.pieceId,
           vertices: new Float32Array(p.vertices),

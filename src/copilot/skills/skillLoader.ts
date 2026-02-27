@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Skill Loader — loads, matches, and formats pattern skills for the agent prompt.
  *
@@ -34,7 +35,7 @@ export function getRelevantSkills(message: string): PatternSkill[] {
   const registry = getDefaultSkillRegistry();
   const normalized = message
     .toLowerCase()
-    .replace(/[.,;:!?¿¡"'()\[\]{}]/g, '');
+    .replace(/[.,;:!?¿¡"'()[\]{}]/g, '');
 
   const matchedSkills = new Map<string, { skill: PatternSkill; count: number }>();
 

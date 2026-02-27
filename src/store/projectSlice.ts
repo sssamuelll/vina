@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand } from '../types/types';
 import { NEW_PROJECT } from './actions';

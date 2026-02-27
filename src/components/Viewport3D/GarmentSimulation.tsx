@@ -234,7 +234,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     triIds: Int32Array;
     outline: Array<{ type: string; values: number[] }>;
   }>>([]);
-  const [_meshingStatus, setMeshingStatus] = useState<string | null>(null);
+  const [, setMeshingStatus] = useState<string | null>(null);
   const initClientRef = useRef<SimulationInitClient | null>(null);
 
   useEffect(() => {
@@ -289,10 +289,8 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
     // Count totals
     let totalVerts = 0;
-    let totalTris = 0;
     for (const p of pieceMeshes) {
       totalVerts += p.vertices.length / 3;
-      totalTris += p.triIds.length;
     }
 
     const positions = new Float32Array(totalVerts * 3);
@@ -615,10 +613,12 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   // Debug hook for E2E testing — exposes mesh to window for Playwright
   useEffect(() => {
     if (typeof window !== 'undefined' && meshRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
     }
     return () => {
       if (typeof window !== 'undefined') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         delete (window as any).__OPENCLO_CLOTH_MESH__;
       }
     };

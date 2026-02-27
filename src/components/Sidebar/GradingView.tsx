@@ -31,7 +31,8 @@ export default function GradingView() {
   const toggleSize = useCallback((size: StandardSize) => {
     setSelectedSizes(prev => {
       const next = new Set(prev);
-      next.has(size) ? next.delete(size) : next.add(size);
+      if (next.has(size)) next.delete(size);
+      else next.add(size);
       return next;
     });
   }, []);

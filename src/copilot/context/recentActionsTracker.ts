@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Recent Actions Tracker — maintains a rolling log of copilot actions
  * for conversation continuity and context.

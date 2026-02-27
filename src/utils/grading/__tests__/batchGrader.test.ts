@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import { batchGrade, generateOverlay, getSizeColor } from '../batchGrader';
 import type { SeamlyPattern } from '../../seamly2d/templateEngine';

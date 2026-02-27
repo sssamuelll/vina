@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * E2E test: Load ALL converted Seamly2D patterns through the full pipeline
  * adaptSeamlyPattern → buildPiece
@@ -29,7 +30,7 @@ describe('Seamly2D E2E Pipeline', () => {
   });
 
   it('pipeline summary', { timeout: 30000 }, () => {
-    let totalPieces = 0, builtOk = 0, buildFail = 0, adaptFail = 0;
+    let totalPieces = 0, builtOk = 0, _buildFail = 0, adaptFail = 0;
     const errors: Record<string, number> = {};
 
     for (const { name, data } of patternsWithPieces) {
@@ -50,7 +51,7 @@ describe('Seamly2D E2E Pipeline', () => {
               errors['Empty result'] = (errors['Empty result'] || 0) + 1;
             }
           } catch (e: any) {
-            buildFail++;
+            _buildFail++;
             const msg = (e.message || 'unknown').slice(0, 100);
             errors[msg] = (errors[msg] || 0) + 1;
             if (msg.includes('Math.cos')) console.error(`  MATH.COS in [${name}] piece "${piece.name}" nodes:${piece.nodes.length}`);
