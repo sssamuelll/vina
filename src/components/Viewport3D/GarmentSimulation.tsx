@@ -377,7 +377,21 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     return pieceMeshes.map((pm, i) => {
       const piece = pieces[i];
       const region = piece ? detectBodyRegion(piece) : 'unknown' as const;
-      const geo = piece ? { widthMm: 200, heightMm: 300 } : { widthMm: 200, heightMm: 300 };
+      
+      // Calculate real bounding box for placement
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const cmd of pm.outline) {
+        for (let j = 0; j < cmd.values.length - 1; j += 2) {
+          const x = cmd.values[j], y = cmd.values[j + 1];
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (y < minY) minY = y; if (y > maxY) maxY = y;
+        }
+      }
+      const geo = { 
+        widthMm: maxX > minX ? maxX - minX : 200, 
+        heightMm: maxY > minY ? maxY - minY : 300 
+      };
+
       const placement = computePlacement(region, avatarMeasurements, geo);
       const [rx, ry, rz] = placement.rotation;
       const [px, py, pz] = placement.position;
@@ -386,9 +400,11 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       const cz = Math.cos(rz), sz = Math.sin(rz);
 
       const numVerts = pm.vertices.length / 3;
-      const transformed = new Array<number>(pm.vertices.length);
+      // MUST be Float32Array for efficient transfer to Worker/Wasm
+      const transformed = new Float32Array(pm.vertices.length);
       for (let vi = 0; vi < numVerts; vi++) {
         const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
+        // Euler XYZ: Rz * Ry * Rx * v
         const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
         const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
         const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
