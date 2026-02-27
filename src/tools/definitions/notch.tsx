@@ -61,4 +61,34 @@ export const notchTool: ToolDefinition = {
       ],
     },
   ],
+  copilot: {
+    description:
+      'Add notch markings to pattern edges for alignment during sewing. Notches are small cuts or marks that help match seams accurately when assembling garment pieces. Different notch shapes and counts distinguish between similar seams.',
+    examples: [
+      'Add a notch to this edge',
+      'Place double notches on the back piece',
+      'Mark the shoulder seam with a V-notch',
+      'Add alignment notches at the waist',
+    ],
+    keywords: [
+      'notch',
+      'mark',
+      'alignment',
+      'matching',
+      'slit',
+      'cut',
+      'indicator',
+      'registration',
+      'sewing mark',
+    ],
+    requiresSelection: 'edge',
+    produces: 'point',
+    undoable: true,
+    dangerous: false,
+    parameterHints: {
+      notchShape: 'Shape of the notch: slit, T-notch, V-internal, V-external, U-notch, castle, or diamond',
+      notchSize: 'Size of the notch in millimeters',
+      notchCount: 'Number of notches: single, double, or triple for distinguishing seams',
+    },
+  },
 };

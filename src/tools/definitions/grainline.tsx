@@ -26,4 +26,29 @@ export const grainlineTool: ToolDefinition = {
   icon: GrainlineIcon,
   cursor: 'pointer',
   group: 'annotation',
+  copilot: {
+    description:
+      'Add grainline markings to pattern pieces. Grainlines indicate the direction of the fabric grain (warp threads) and are essential for proper fabric layout and cutting. They ensure consistent drape and stretch behavior across the garment.',
+    examples: [
+      'Add a grainline to this piece',
+      'Mark the grain direction on the bodice',
+      'Place a vertical grainline on the sleeve',
+      'Set the grainline parallel to center front',
+    ],
+    keywords: [
+      'grainline',
+      'grain',
+      'warp',
+      'weft',
+      'fabric direction',
+      'layout',
+      'cutting',
+      'arrow',
+      'alignment',
+    ],
+    requiresSelection: 'piece',
+    produces: 'none',
+    undoable: true,
+    dangerous: false,
+  },
 };

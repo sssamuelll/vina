@@ -47,4 +47,21 @@ export const transformTool: ToolDefinition = {
       value: true,
     },
   ],
+  copilot: {
+    description: 'Transform selected pattern pieces by scaling, rotating, or skewing. Scale mode resizes pieces proportionally (uniform) or independently per axis. Rotate mode spins pieces around their center. Skew mode applies angular distortion. Drag corner handles to transform interactively.',
+    examples: [
+      'Scale the bodice up by 10%',
+      'Rotate the sleeve 45 degrees',
+      'Make this piece smaller',
+      'Skew the pocket shape',
+    ],
+    keywords: ['transform', 'scale', 'resize', 'rotate', 'spin', 'skew', 'distort', 'enlarge', 'shrink', 'stretch'],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+    parameterHints: {
+      mode: 'Transform operation type: scale (resize), rotate (spin), or skew (angular distortion)',
+      uniform: 'When enabled, scaling maintains aspect ratio; when disabled, X and Y scale independently',
+    },
+  },
 };

@@ -49,4 +49,34 @@ export const mirrorTool: ToolDefinition = {
   onActivate: () => {
     console.log('Mirror/Symmetric tool - Coming soon!');
   },
+  copilot: {
+    description:
+      'Mirror or reflect pattern pieces across an axis. Creates symmetric copies of pattern pieces, useful for creating left/right versions of garment pieces or establishing symmetry lines for half-patterns.',
+    examples: [
+      'Mirror this pattern piece vertically',
+      'Reflect the bodice across the center line',
+      'Create a symmetric copy of the sleeve',
+      'Flip this piece horizontally and keep the original',
+    ],
+    keywords: [
+      'mirror',
+      'reflect',
+      'flip',
+      'symmetric',
+      'symmetry',
+      'copy',
+      'duplicate',
+      'reverse',
+      'left right',
+      'axis',
+    ],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+    dangerous: false,
+    parameterHints: {
+      axis: 'The axis to mirror across: vertical, horizontal, or custom angle',
+      keepOriginal: 'Whether to keep the original piece or only create the mirrored version',
+    },
+  },
 };

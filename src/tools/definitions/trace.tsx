@@ -39,4 +39,20 @@ export const traceTool: ToolDefinition = {
       step: 1,
     },
   ],
+  copilot: {
+    description: 'Trace along existing pattern edges to create new outlines or offset copies. Click to start tracing from a point, then follow the edge path. Specify an offset distance to create parallel lines inside or outside the original edge. Useful for creating facings, linings, or modified piece variations.',
+    examples: [
+      'Trace the neckline with 2cm offset',
+      'Create a facing by tracing this edge',
+      'Trace the outline of this piece',
+      'Make an offset copy of the armhole',
+    ],
+    keywords: ['trace', 'outline', 'offset', 'parallel', 'facing', 'lining', 'copy edge', 'follow'],
+    requiresSelection: 'none',
+    produces: 'piece',
+    undoable: true,
+    parameterHints: {
+      offset: 'Distance in mm to offset from original edge. Positive = outward, negative = inward',
+    },
+  },
 };

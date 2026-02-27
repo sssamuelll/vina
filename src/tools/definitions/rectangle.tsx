@@ -55,4 +55,34 @@ export const rectangleTool: ToolDefinition = {
       ],
     },
   ],
+  copilot: {
+    description:
+      'Draw rectangular pattern pieces or shapes. Creates four-sided shapes with perpendicular corners, useful for basic pattern blocks, pockets, facings, and other rectangular pattern elements.',
+    examples: [
+      'Draw a rectangle 100mm by 150mm',
+      'Create a square pocket piece',
+      'Make a rectangular facing with rounded corners',
+      'Add a 200x300mm pattern block',
+    ],
+    keywords: [
+      'rectangle',
+      'square',
+      'box',
+      'shape',
+      'block',
+      'pocket',
+      'facing',
+      'panel',
+      'four-sided',
+    ],
+    requiresSelection: 'none',
+    produces: 'piece',
+    undoable: true,
+    dangerous: false,
+    parameterHints: {
+      width: 'Width of the rectangle in millimeters',
+      height: 'Height of the rectangle in millimeters',
+      cornerStyle: 'Corner treatment: square, rounded, or chamfered (angled)',
+    },
+  },
 };

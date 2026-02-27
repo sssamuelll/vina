@@ -30,4 +30,17 @@ export const flattenTool: ToolDefinition = {
   icon: FlattenIcon,
   cursor: 'default',
   group: 'pattern',
+  copilot: {
+    description: 'Flattens a 3D draped garment piece back to a 2D pattern. Captures the deformed shape from simulation and converts it to a flat pattern piece. Useful for pattern adjustment after fitting on the avatar or extracting patterns from 3D designs.',
+    examples: [
+      'Flatten the draped piece to 2D',
+      'Convert 3D shape to pattern',
+      'Extract flat pattern from simulation',
+      'Flatten the garment piece',
+    ],
+    keywords: ['flatten', '2d', 'flat', 'unwrap', 'extract', 'pattern', 'unfold'],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+  },
 };

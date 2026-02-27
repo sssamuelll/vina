@@ -24,4 +24,17 @@ export const edit3dTool: ToolDefinition = {
   icon: Edit3DIcon,
   cursor: 'pointer',
   group: '3d-edit',
+  copilot: {
+    description: 'Enters 3D edit mode for manipulating cloth and pattern pieces in the 3D viewport. Allows selecting, moving, rotating, and adjusting garment pieces directly on the avatar. Changes made in 3D can be reflected back to the 2D pattern.',
+    examples: [
+      'Enter 3D edit mode',
+      'Edit the garment in 3D',
+      'Adjust the fit on the avatar',
+      'Move the pattern piece in 3D',
+    ],
+    keywords: ['edit', '3d', 'manipulate', 'adjust', 'move', 'transform', 'fit', 'drape'],
+    requiresSelection: 'none',
+    produces: 'view',
+    undoable: true,
+  },
 };

@@ -24,4 +24,17 @@ export const avatarTool: ToolDefinition = {
   icon: AvatarIcon,
   cursor: 'pointer',
   group: '3d-avatar',
+  copilot: {
+    description: 'Opens avatar settings to configure the 3D mannequin or body model used for garment simulation. Allows changing body measurements, proportions, and selecting different avatar presets.',
+    examples: [
+      'Open avatar settings',
+      'Change the mannequin',
+      'Adjust body measurements',
+      'Switch to a different body type',
+    ],
+    keywords: ['avatar', 'mannequin', 'body', 'model', 'measurements', 'figure', 'dummy', 'form'],
+    requiresSelection: 'none',
+    produces: 'view',
+    undoable: false,
+  },
 };

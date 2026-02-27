@@ -43,4 +43,21 @@ export const poseTool: ToolDefinition = {
       value: true,
     },
   ],
+  copilot: {
+    description: 'Adjust the 3D avatar pose by manipulating body joints. Click and drag on avatar limbs to rotate joints. Constraints prevent unnatural poses when enabled. Use to position the avatar for try-on visualization, fitting checks, or movement simulation. Affects how garments drape on the body.',
+    examples: [
+      'Raise the avatar arms',
+      'Pose the model with hands on hips',
+      'Bend the elbows',
+      'Put the avatar in a walking pose',
+    ],
+    keywords: ['pose', 'position', 'avatar', 'mannequin', 'body', 'joints', 'limbs', 'stance', 'posture'],
+    requiresSelection: 'none',
+    produces: 'simulation',
+    undoable: true,
+    parameterHints: {
+      sensitivity: 'How responsive joint rotation is to mouse movement (0.1 = precise, 2.0 = fast)',
+      constraints: 'When enabled, prevents joints from bending beyond natural human limits',
+    },
+  },
 };

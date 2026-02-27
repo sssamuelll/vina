@@ -33,4 +33,17 @@ export const editConstrainTool: ToolDefinition = {
   icon: EditConstrainIcon,
   cursor: 'default',
   group: 'select',
+  copilot: {
+    description: 'Edit pattern pieces while maintaining dimensional constraints and relationships. Preserves seam lengths, angles, and connected piece relationships during modifications. When you move one point, connected geometry adjusts automatically to maintain pattern integrity and fit.',
+    examples: [
+      'Adjust the waist while keeping seam lengths',
+      'Move the shoulder point with constraints',
+      'Edit the dart maintaining the angle',
+      'Resize while preserving proportions',
+    ],
+    keywords: ['constrain', 'constraint', 'parametric', 'locked', 'maintain', 'preserve', 'linked', 'proportional edit'],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+  },
 };

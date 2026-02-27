@@ -41,4 +41,20 @@ export const pinTool: ToolDefinition = {
   onActivate: () => {
     console.log('Pin tool - Coming soon!');
   },
+  copilot: {
+    description: 'Pins a point on the cloth to fix it in place during simulation. Pinned points will not move, allowing the rest of the fabric to drape naturally around them. Useful for holding garments on shoulders, waistband, or specific anchor points.',
+    examples: [
+      'Pin the shoulder point',
+      'Fix this point in place',
+      'Add a pin to hold the waistband',
+      'Anchor the neckline',
+    ],
+    keywords: ['pin', 'fix', 'anchor', 'hold', 'constrain', 'attach', 'lock', 'tack'],
+    requiresSelection: 'none',
+    produces: 'simulation',
+    undoable: true,
+    parameterHints: {
+      pinStrength: 'How strongly the pin holds the cloth. Weak allows slight movement, Strong is completely fixed.',
+    },
+  },
 };

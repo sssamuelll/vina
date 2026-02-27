@@ -50,4 +50,35 @@ export const measureTool: ToolDefinition = {
       value: false,
     },
   ],
+  copilot: {
+    description:
+      'Measure distances, lengths, and angles on pattern pieces. Provides precise measurements between points, along edges, or across pattern areas. Essential for verifying pattern accuracy and ensuring proper fit.',
+    examples: [
+      'Measure the length of this edge',
+      'What is the distance between these two points?',
+      'Show me the waist measurement',
+      'Measure the armhole circumference',
+    ],
+    keywords: [
+      'measure',
+      'distance',
+      'length',
+      'ruler',
+      'tape',
+      'dimension',
+      'size',
+      'angle',
+      'circumference',
+      'metric',
+    ],
+    requiresSelection: 'none',
+    produces: 'measurement',
+    undoable: false,
+    dangerous: false,
+    parameterHints: {
+      units: 'Display unit for measurements: millimeters, centimeters, or inches',
+      showAngle: 'Whether to display angle measurements in addition to distances',
+      cumulative: 'Add up multiple measurements to show total distance',
+    },
+  },
 };

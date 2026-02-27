@@ -27,4 +27,17 @@ export const handTool: ToolDefinition = {
   icon: HandIcon,
   cursor: 'grab',
   group: 'navigation',
+  copilot: {
+    description: 'Pan the 2D canvas view by clicking and dragging. Does not modify any pattern pieces. Hold spacebar with any tool to temporarily activate hand mode. Useful for navigating large patterns or repositioning the view without changing zoom level.',
+    examples: [
+      'Pan to the left side',
+      'Move the view to see the sleeves',
+      'Scroll the canvas over',
+      'Drag the view to the collar area',
+    ],
+    keywords: ['hand', 'pan', 'scroll', 'drag view', 'move canvas', 'navigate', 'grab'],
+    requiresSelection: 'none',
+    produces: 'view',
+    undoable: false,
+  },
 };

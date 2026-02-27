@@ -48,4 +48,33 @@ export const circleTool: ToolDefinition = {
   onActivate: () => {
     console.log('Circle/Curve tool - Coming soon!');
   },
+  copilot: {
+    description:
+      'Draw circular or elliptical pattern pieces and shapes. Creates round shapes including full circles, ellipses, and arcs. Useful for circular skirts, curved design elements, and rounded pattern components.',
+    examples: [
+      'Draw a circle with 50mm radius',
+      'Create an ellipse for the neckline',
+      'Add a circular skirt piece',
+      'Make an arc for the armhole curve',
+    ],
+    keywords: [
+      'circle',
+      'ellipse',
+      'oval',
+      'arc',
+      'round',
+      'curve',
+      'radius',
+      'diameter',
+      'circular',
+    ],
+    requiresSelection: 'none',
+    produces: 'piece',
+    undoable: true,
+    dangerous: false,
+    parameterHints: {
+      shapeType: 'Type of shape: circle, ellipse, or arc segment',
+      radius: 'Radius of the circle or base radius for ellipse in millimeters',
+    },
+  },
 };

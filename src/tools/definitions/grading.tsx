@@ -37,4 +37,17 @@ export const gradingTool: ToolDefinition = {
   icon: GradingIcon,
   cursor: 'default',
   group: 'annotation',
+  copilot: {
+    description: 'Opens the grading tool for creating multiple sizes from a base pattern. Defines grade rules that scale pattern pieces up or down to create a size range (e.g., XS to XL). Each grading point can have different X/Y offsets per size.',
+    examples: [
+      'Grade this pattern to size L',
+      'Create size range from S to XL',
+      'Add grading rules',
+      'Scale the pattern to different sizes',
+    ],
+    keywords: ['grading', 'size', 'scale', 'sizing', 'range', 'grade', 'rules', 'XS', 'S', 'M', 'L', 'XL'],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+  },
 };

@@ -29,4 +29,17 @@ export const editCurveTool: ToolDefinition = {
   icon: EditCurveIcon,
   cursor: 'crosshair',
   group: 'select',
+  copilot: {
+    description: 'Edit individual control points and curve handles on pattern piece edges. Click points to select them, drag to reposition. Adjust bezier handles to control curve smoothness and direction. Add new points by clicking on edges, delete points with backspace/delete key.',
+    examples: [
+      'Edit the curve points on the neckline',
+      'Adjust the armhole curve',
+      'Move the shoulder point higher',
+      'Smooth out the hip curve',
+    ],
+    keywords: ['edit', 'curve', 'points', 'nodes', 'bezier', 'handles', 'anchor', 'control points', 'reshape'],
+    requiresSelection: 'piece',
+    produces: 'point',
+    undoable: true,
+  },
 };

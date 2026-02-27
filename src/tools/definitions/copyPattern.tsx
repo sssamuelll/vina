@@ -27,4 +27,17 @@ export const copyPatternTool: ToolDefinition = {
   icon: CopyPatternIcon,
   cursor: 'default',
   group: 'pattern',
+  copilot: {
+    description: 'Copies the selected pattern piece to create a duplicate. The copy can be placed elsewhere and modified independently. Useful for creating symmetric pieces (left/right) or variations of an existing pattern.',
+    examples: [
+      'Copy this pattern piece',
+      'Duplicate the sleeve',
+      'Make a copy of the front bodice',
+      'Clone the selected piece',
+    ],
+    keywords: ['copy', 'duplicate', 'clone', 'replicate', 'pattern', 'piece'],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+  },
 };
