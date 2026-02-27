@@ -29,6 +29,7 @@ const initialState: ConstructionState = {
   variables: {},
   selectedEntity: null,
   showConstruction: true,
+  pieceIdentityMap: {},
 };
 
 // ─── ID generator ───────────────────────────────────────────────────────────
@@ -241,6 +242,30 @@ const constructionSlice = createSlice({
       state.pieces = [];
       state.variables = {};
       state.selectedEntity = null;
+      state.pieceIdentityMap = {};
+    },
+
+    // ─── Piece Identity Mapping (for reactive solver) ───
+    /**
+     * Map a construction piece ID to a pattern piece ID.
+     * This enables upsert behavior when rebuilding pieces.
+     */
+    mapPieceIdentity(state, action: PayloadAction<{ cPieceId: string; patternPieceId: string }>) {
+      state.pieceIdentityMap[action.payload.cPieceId] = action.payload.patternPieceId;
+    },
+
+    /**
+     * Remove a single piece identity mapping.
+     */
+    clearPieceIdentity(state, action: PayloadAction<string>) {
+      delete state.pieceIdentityMap[action.payload];
+    },
+
+    /**
+     * Clear all piece identity mappings.
+     */
+    clearAllIdentities(state) {
+      state.pieceIdentityMap = {};
     },
   },
   extraReducers: (builder) => {
@@ -268,6 +293,10 @@ export const {
   setShowConstruction,
   loadConstruction,
   clearConstruction,
+  // Piece identity mapping (for reactive solver)
+  mapPieceIdentity,
+  clearPieceIdentity,
+  clearAllIdentities,
 } = constructionSlice.actions;
 
 export default constructionSlice.reducer;

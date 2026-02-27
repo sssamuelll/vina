@@ -172,6 +172,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       variables: {},
       selectedEntity: null,
       showConstruction: true,
+      pieceIdentityMap: {},
     },
     blueprints: {
       blueprints: [],

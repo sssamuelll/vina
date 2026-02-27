@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand } from '../types/types';
 import { NEW_PROJECT } from './actions';
@@ -235,6 +235,54 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Reactive Solver (upsert for parametric updates) ───
+    /**
+     * Update only the outline and position of an existing piece.
+     * Preserves all other properties (seams, internals, selection, etc.)
+     * Used by the reactive solver middleware for parametric updates.
+     */
+    upsertPieceOutline(state, action: PayloadAction<{
+      pieceId: string;
+      outline: PathCommand[];
+      position: { x: number; y: number };
+    }>) {
+      const { pieceId, outline, position } = action.payload;
+      const piece = state.pieces.find(p => p.id === pieceId);
+
+      if (piece) {
+        // Update only geometry, preserve everything else
+        piece.outline = outline;
+        piece.position = position;
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      } else {
+        // Should not happen if identity map is correct
+        console.warn('[upsertPieceOutline] Piece not found:', pieceId);
+      }
+    },
+
+    /**
+     * Batch update multiple piece outlines (more efficient for many pieces).
+     */
+    upsertMultiplePieceOutlines(state, action: PayloadAction<Array<{
+      pieceId: string;
+      outline: PathCommand[];
+      position: { x: number; y: number };
+    }>>) {
+      const now = Date.now();
+      for (const { pieceId, outline, position } of action.payload) {
+        const piece = state.pieces.find(p => p.id === pieceId);
+        if (piece) {
+          piece.outline = outline;
+          piece.position = position;
+          piece.updatedAt = now;
+        }
+      }
+      if (action.payload.length > 0) {
+        state.isDirty = true;
+      }
+    },
+
     // ─── Seams ───
     addSeam(state, action: PayloadAction<Seam>) {
       state.seams.push(action.payload);
@@ -291,6 +339,8 @@ export const {
   restoreState, loadProject, setProjectName,
   addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
+  // Reactive solver (parametric updates)
+  upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, reverseSeam,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,

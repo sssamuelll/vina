@@ -22,24 +22,38 @@ export interface BuildPieceResult {
 
 /**
  * Build a PatternPiece from a construction piece definition.
+ *
+ * @param cPiece - Construction piece definition
+ * @param points - All resolved construction points
+ * @param curves - All construction curves
+ * @param ctx - Formula context with measurements and variables
+ * @param existingPieceId - Optional existing piece ID for upsert behavior (preserves seams)
  */
 export function buildPiece(
   cPiece: CPiece,
   points: CPoint[],
   curves: CCurve[],
   ctx: FormulaContext,
+  existingPieceId?: string,
 ): PatternPiece {
-  return buildPieceWithOffset(cPiece, points, curves, ctx).piece;
+  return buildPieceWithOffset(cPiece, points, curves, ctx, existingPieceId).piece;
 }
 
 /**
  * Build a PatternPiece and return the normalization offset for overlay alignment.
+ *
+ * @param cPiece - Construction piece definition
+ * @param points - All resolved construction points
+ * @param curves - All construction curves
+ * @param ctx - Formula context with measurements and variables
+ * @param existingPieceId - Optional existing piece ID for upsert behavior (preserves seams)
  */
 export function buildPieceWithOffset(
   cPiece: CPiece,
   points: CPoint[],
   curves: CCurve[],
   ctx: FormulaContext,
+  existingPieceId?: string,
 ): BuildPieceResult {
   const pointMap = new Map(points.map(p => [p.id, p]));
   const curveMap = new Map(curves.map(c => [c.id, c]));
@@ -125,9 +139,12 @@ export function buildPieceWithOffset(
     }
   }
 
+  const now = Date.now();
+
   return {
     piece: {
-      id: uid(),
+      // Use existing ID if provided (upsert behavior), otherwise generate new
+      id: existingPieceId || uid(),
       name: cPiece.name,
       outline,
       internals: [],
@@ -136,8 +153,9 @@ export function buildPieceWithOffset(
       mirrored: false,
       seamAllowance: cPiece.seamAllowance,
       constructionPieceId: cPiece.id,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      // Preserve createdAt for existing pieces, set new for new pieces
+      createdAt: existingPieceId ? now : now, // TODO: fetch original createdAt from store
+      updatedAt: now,
     },
     normOffset: { x: minX, y: minY },
   };
