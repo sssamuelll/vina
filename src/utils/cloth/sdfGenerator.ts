@@ -26,8 +26,7 @@ class IntSpatialHash {
     vertices: Float32Array,
     indices: Uint32Array,
     cellSize: number,
-    minX: number, minY: number, minZ: number,
-    sizeX: number, sizeY: number, sizeZ: number
+    minX: number, minY: number, minZ: number
   ) {
     this.cellInv = 1.0 / cellSize;
 
@@ -256,8 +255,7 @@ export function generateSDF(vertices: Float32Array, indices: Uint32Array, resolu
   const hashCellSize = cellSize * 4;
   const hash = new IntSpatialHash(
     vertices, indices, hashCellSize,
-    sdfMin[0], sdfMin[1], sdfMin[2],
-    maxSize, maxSize, maxSize
+    sdfMin[0], sdfMin[1], sdfMin[2]
   );
 
   // Pre-allocate query buffers
