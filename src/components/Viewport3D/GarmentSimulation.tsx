@@ -457,7 +457,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               wasmClientRef.current = wasmClient;
               wasmClient.onFrame = onFrame;
 
-              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
+              await withTimeout(wasmClient.initMultiPiece(placedMeshes, seamInitData), 12000, 'Wasm solver init');
 
               if (!cancelled) wasmClient.start();
 

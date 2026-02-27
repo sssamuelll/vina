@@ -78,6 +78,17 @@ describe('parameterizeEdge', () => {
     expect(result[0].t).toBeCloseTo(0);
     expect(result[2].t).toBeCloseTo(1);
   });
+
+  it('subdivides edges longer than maxEdgeLength', () => {
+    // Edge 0→1 is 10 units long. If maxEdgeLength is 4, it should split into 3 segments
+    // and produce 4 vertices. The T parameters will be uniform (0, 0.33, 0.66, 1.0).
+    const result = parameterizeEdge(squareOutline, 0, 1, 0, 12, 4);
+    expect(result.length).toBe(4);
+    expect(result[0].t).toBeCloseTo(0);
+    expect(result[1].t).toBeCloseTo(1/3); 
+    expect(result[2].t).toBeCloseTo(2/3);
+    expect(result[3].t).toBeCloseTo(1.0);
+  });
 });
 
 // ─── Vertex Matching ────────────────────────────────────────────────────────

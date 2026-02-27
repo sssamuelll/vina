@@ -5,6 +5,8 @@
  */
 
 import { extractStretchConstraints, extractBendConstraints } from '../gpu/gpuBuffers';
+import { mergeMeshes, buildSeamConstraints } from '../seamAssembly';
+import type { PathCommand } from '../../../types/types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -82,62 +84,51 @@ self.onmessage = async (event: MessageEvent) => {
         // Load Wasm module inside the worker
         const baseUrl = msg.baseUrl ?? '/';
         const wasmModule = await import(/* @vite-ignore */ `${baseUrl}wasm/xpbd_wasm.js`) as unknown as WasmModule;
-        const initResult = await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
+        await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
 
-        // wasm-bindgen default() returns instance.exports which has .memory
-        // But verify it actually has memory — fallback to module-level wasm if not
-        const exportsLike = initResult as WasmExportsLike | undefined;
-        if (exportsLike?.memory instanceof WebAssembly.Memory) {
-          wasmExports = exportsLike;
-          console.log('[WasmWorker] Got memory from init result');
-        } else if (wasmModule.wasm?.memory instanceof WebAssembly.Memory) {
-          wasmExports = wasmModule.wasm;
-          console.log('[WasmWorker] Got memory from module.wasm');
-        } else {
-          console.warn('[WasmWorker] Could not access WebAssembly.Memory — positions will be zero!',
-            'initResult type:', typeof initResult,
-            'initResult keys:', exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
-            'module keys:', Object.keys(wasmModule).slice(0, 10));
-        }
+        // wasm-bindgen 0.2.88+ might put exports on the module or the init result
+        wasmExports = (wasmModule as unknown as { wasm: { memory: WebAssembly.Memory } }).wasm;
 
-        // Merge pieces
-        const pieces: Array<{ vertices: number[]; triIds: number[] }> = msg.pieces;
-        let totalVerts = 0;
-        let totalTris = 0;
-        for (const p of pieces) {
-          totalVerts += p.vertices.length / 3;
-          totalTris += p.triIds.length;
-        }
+        // Merge pieces using the standard utility (ensures consistent vertex mapping)
+        const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array }> = msg.pieces.map((p: any) => ({
+          pieceId: p.pieceId,
+          vertices: new Float32Array(p.vertices),
+          triIds: new Int32Array(p.triIds),
+        }));
 
-        const positions = new Float32Array(totalVerts * 3);
+        const merged = mergeMeshes(pieceInput);
+        const totalVerts = merged.vertices.length / 3;
+        
         const invMass = new Float32Array(totalVerts);
-        const triangles = new Uint32Array(totalTris);
-        let vOff = 0;
-        let tOff = 0;
-
-        for (const p of pieces) {
-          const numV = p.vertices.length / 3;
-          for (let i = 0; i < p.vertices.length; i++) {
-            positions[vOff * 3 + i] = p.vertices[i];
-          }
-          for (let i = 0; i < numV; i++) {
-            invMass[vOff + i] = 1.0;
-          }
-          for (let i = 0; i < p.triIds.length; i++) {
-            triangles[tOff + i] = p.triIds[i] + vOff;
-          }
-          vOff += numV;
-          tOff += p.triIds.length;
-        }
+        for (let i = 0; i < totalVerts; i++) invMass[i] = 1.0;
 
         numParticles = totalVerts;
-        solver = new wasmModule.XpbdSolver(positions, invMass);
+        solver = new wasmModule.XpbdSolver(merged.vertices, invMass);
 
-        const stretch = extractStretchConstraints(positions, triangles);
+        // Standard constraints
+        const triangles = new Uint32Array(merged.triIds);
+        const stretch = extractStretchConstraints(merged.vertices, triangles);
         solver.set_stretch(stretch.ids, stretch.restLengths);
 
-        const bend = extractBendConstraints(positions, triangles);
+        const bend = extractBendConstraints(merged.vertices, triangles);
         solver.set_bend(bend.ids, bend.restAngles);
+
+        // Seam constraints
+        if (msg.seams && msg.seams.length > 0) {
+          const outlines = new Map<string, PathCommand[]>();
+          for (const p of msg.pieces) {
+            if (p.outline) outlines.set(p.pieceId, p.outline);
+          }
+
+          const seamConstraints = buildSeamConstraints(msg.seams, outlines, merged);
+          if (seamConstraints.count > 0) {
+            console.log('[WasmWorker] Adding seam constraints:', seamConstraints.count);
+            // Convert pairs to Uint32Array for Wasm
+            const ids = new Uint32Array(seamConstraints.ids);
+            // The Rust solver expects (ids, target_lengths)
+            solver.set_seams(ids, seamConstraints.restLengths);
+          }
+        }
 
         solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005);
 
