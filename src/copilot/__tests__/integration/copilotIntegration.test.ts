@@ -607,7 +607,8 @@ describe('Action Executor', () => {
   it('executor can execute multiple actions', async () => {
     const mockDispatch = () => {};
     const mockGetState = () => ({
-      project: { pieces: [] },
+      project: { pieces: [], seams: [] },
+      editor: { selectedPieceIds: [] },
     });
 
     const executor = actions.createActionExecutor(
@@ -615,14 +616,14 @@ describe('Action Executor', () => {
       mockGetState as never
     );
 
-    const results = await executor.executeAll([
-      { action: 'deselect_all' },
+    const results = await executor.executeBatch([
+      { action: 'clear_selection' },
       { action: 'start_simulation' },
     ]);
 
-    expect(results).toHaveLength(2);
-    expect(results[0].success).toBe(true);
-    expect(results[1].success).toBe(true);
+    expect(results.results).toHaveLength(2);
+    expect(results.succeeded).toBe(2);
+    expect(results.failed).toBe(0);
   });
 });
 

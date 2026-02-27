@@ -28,8 +28,16 @@ describe('NeuralDrapeClient', () => {
 
   it('initializes with merged piece data', async () => {
     await client.initMultiPiece([
-      { pieceId: 'front', vertices: [0, 0.5, 0, 0.1, 0.5, 0, 0.1, 0, 0], triIds: [0, 1, 2] },
-      { pieceId: 'back', vertices: [0.2, 0.5, 0, 0.3, 0.5, 0, 0.3, 0, 0], triIds: [0, 1, 2] },
+      { 
+        pieceId: 'front', 
+        vertices: new Float32Array([0, 0.5, 0, 0.1, 0.5, 0, 0.1, 0, 0]), 
+        triIds: new Int32Array([0, 1, 2]) 
+      },
+      { 
+        pieceId: 'back', 
+        vertices: new Float32Array([0.2, 0.5, 0, 0.3, 0.5, 0, 0.3, 0, 0]), 
+        triIds: new Int32Array([0, 1, 2]) 
+      },
     ]);
     // No error = success
   });
@@ -39,7 +47,11 @@ describe('NeuralDrapeClient', () => {
     client.onFrame = (pos) => frames.push(new Float32Array(pos));
 
     await client.initMultiPiece([
-      { pieceId: 'test', vertices: [0, 0.5, 0, 0.1, 0.3, 0, 0.05, 0.1, 0], triIds: [0, 1, 2] },
+      { 
+        pieceId: 'test', 
+        vertices: new Float32Array([0, 0.5, 0, 0.1, 0.3, 0, 0.05, 0.1, 0]), 
+        triIds: new Int32Array([0, 1, 2]) 
+      },
     ]);
 
     // Simulate a few frames manually by calling start and waiting
@@ -60,7 +72,7 @@ describe('NeuralDrapeClient', () => {
 
   it('start/stop lifecycle works', async () => {
     await client.initMultiPiece([
-      { pieceId: 'a', vertices: [0, 0, 0], triIds: [] },
+      { pieceId: 'a', vertices: new Float32Array([0, 0, 0]), triIds: new Int32Array(0) },
     ]);
 
     client.start();
@@ -72,7 +84,7 @@ describe('NeuralDrapeClient', () => {
 
   it('dispose cleans up', async () => {
     await client.initMultiPiece([
-      { pieceId: 'a', vertices: [0, 0, 0], triIds: [] },
+      { pieceId: 'a', vertices: new Float32Array([0, 0, 0]), triIds: new Int32Array(0) },
     ]);
     client.start();
     await client.dispose();
@@ -81,7 +93,7 @@ describe('NeuralDrapeClient', () => {
 
   it('setSDF is a no-op (API compatibility)', async () => {
     await client.initMultiPiece([
-      { pieceId: 'a', vertices: [0, 0, 0], triIds: [] },
+      { pieceId: 'a', vertices: new Float32Array([0, 0, 0]), triIds: new Int32Array(0) },
     ]);
     client.setSDF({ distances: new Float32Array(0), resolution: 0, min: [0, 0, 0], cellSize: 0 });
     // No crash = success

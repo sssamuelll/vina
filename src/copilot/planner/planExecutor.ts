@@ -226,7 +226,7 @@ export class PlanExecutor {
 
         if (!result.success) {
           step.status = 'failed';
-          step.errorMessage = result.error || result.message || 'Action failed';
+          step.errorMessage = result.error || result.summary || 'Action failed';
           step.durationMs = Date.now() - stepStartTime;
 
           const errorMsg = step.errorMessage || 'Unknown error';

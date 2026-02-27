@@ -16,31 +16,81 @@ import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
-import { detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
+import { placeGarmentPieces, detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
+import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
+import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
+import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
+import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
-import { setSolverTier, setParticleCount } from '../../store/simulationSlice';
+import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
+import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision } from '../../store/simulationSlice';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
-// ─── Types ──────────────────────────────────────────────────────────────────
+// ─── SDF Cache + Deduplication ────────────────────────────────────────────────
 
-interface SimPiece {
-  pieceId: string;
-  vertices: Float32Array;
-  triIds: Int32Array;
-  outline: Array<{ type: string; values: number[] }>;
-}
-
-// ─── SDF Cache ───────────────────────────────────────────────────────────────
-
+/** In-flight deduplication: same avatar+height returns same promise */
 const _sdfInflight = new Map<string, Promise<import('../../utils/cloth/sdfGenerator').SDFData | null>>();
 
 function sdfCacheKey(url: string, height: number): string {
   return `sdf|${url}|${height.toFixed(4)}`;
 }
 
+const SDF_IDB_STORE = 'sdf-cache';
+const SDF_IDB_VERSION = 1;
+
+async function openSdfIdb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('openclo-sdf', SDF_IDB_VERSION);
+    req.onupgradeneeded = () => { req.result.createObjectStore(SDF_IDB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function getSdfFromIdb(key: string): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
+  try {
+    const db = await openSdfIdb();
+    return new Promise((resolve) => {
+      const tx = db.transaction(SDF_IDB_STORE, 'readonly');
+      const req = tx.objectStore(SDF_IDB_STORE).get(key);
+      req.onsuccess = () => {
+        const val = req.result;
+        if (val && val.distances && val.resolution) {
+          // Reconstruct Float32Array from stored ArrayBuffer
+          resolve({
+            ...val,
+            distances: val.distances instanceof Float32Array ? val.distances : new Float32Array(val.distances),
+          });
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function putSdfToIdb(key: string, sdf: import('../../utils/cloth/sdfGenerator').SDFData): Promise<void> {
+  try {
+    const db = await openSdfIdb();
+    const tx = db.transaction(SDF_IDB_STORE, 'readwrite');
+    // Store distances as plain ArrayBuffer for IDB compatibility
+    tx.objectStore(SDF_IDB_STORE).put({
+      distances: sdf.distances.buffer.slice(0),
+      resolution: sdf.resolution,
+      min: sdf.min,
+      max: sdf.max,
+      cellSize: sdf.cellSize,
+    }, key);
+  } catch { /* best effort */ }
+}
+
 /**
  * Load avatar mesh and generate SDF off the main thread.
+ * Features: in-flight deduplication, IndexedDB persistence, worker-only generation.
  */
 async function loadSDFInWorker(
   avatarUrl: string,
@@ -48,11 +98,25 @@ async function loadSDFInWorker(
   initClient: SimulationInitClient | null,
 ): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
   const key = sdfCacheKey(avatarUrl, avatarHeight);
+
+  // 1. In-flight deduplication
   const inflight = _sdfInflight.get(key);
-  if (inflight) return inflight;
+  if (inflight) {
+    console.log('[SDF] Returning in-flight promise (deduplicated)');
+    return inflight;
+  }
 
   const promise = (async () => {
+    // 2. Check IndexedDB cache
+    const cached = await getSdfFromIdb(key);
+    if (cached) {
+      console.log('[SDF] Loaded from IndexedDB cache');
+      return cached;
+    }
+
+    // 3. Extract mesh data on main thread (fast — GLB parse + bone transforms)
     const { extractMeshData } = await import('../../utils/cloth/avatarSDF');
+    const THREE = await import('three');
     const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
     const { isVRMFile, loadVRM } = await import('../../utils/avatar/vrmLoader');
 
@@ -66,6 +130,7 @@ async function loadSDFInWorker(
       scene = gltf.scene as THREE.Group;
     }
 
+    // Scale + center (same as avatarSDF.ts)
     const box = new THREE.Box3().setFromObject(scene);
     const size = new THREE.Vector3();
     box.getSize(size);
@@ -84,14 +149,32 @@ async function loadSDFInWorker(
     const { vertices, indices } = extractMeshData(scene);
     if (vertices.length === 0 || indices.length === 0) return null;
 
+    // 4. Heavy SDF generation in worker — cascade: 32³ → 16³
     if (initClient) {
       try {
-        return await initClient.generateSDF(new Float32Array(vertices), new Uint32Array(indices), 32);
+        const sdf = await initClient.generateSDF(
+          new Float32Array(vertices), new Uint32Array(indices), 32);
+        if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 32³ in worker, cached to IDB'); }
+        return sdf;
       } catch {
-        return await initClient.generateSDF(new Float32Array(vertices), new Uint32Array(indices), 16).catch(() => null);
+        console.warn('[SDF] 32³ failed, trying 16³ fallback');
+        try {
+          const sdf = await initClient.generateSDF(
+            new Float32Array(vertices), new Uint32Array(indices), 16);
+          if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 16³ in worker, cached to IDB'); }
+          return sdf;
+        } catch {
+          console.warn('[SDF] 16³ also failed');
+          return null;
+        }
       }
     }
-    return null;
+
+    // 5. No worker available — generate directly (still off main React render)
+    const { generateSDF } = await import('../../utils/cloth/sdfGenerator');
+    const sdf = generateSDF(vertices, indices, 32);
+    if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 32³ directly, cached to IDB'); }
+    return sdf;
   })();
 
   _sdfInflight.set(key, promise);
@@ -99,6 +182,9 @@ async function loadSDFInWorker(
   return promise;
 }
 
+/**
+ * Convert Seam[] to SeamInitData[] for the worker.
+ */
 function seamsToInitData(seams: Seam[]): SeamInitData[] {
   return seams.map(s => ({
     id: s.id,
@@ -119,177 +205,493 @@ interface GarmentSimulationProps {
   onInspect?: (value: number | null) => void;
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-  return Promise.race([
-    p,
-    new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} timed out (${ms}ms)`)), ms)),
-  ]);
-}
-
 /**
  * Merged multi-piece simulation component.
+ * Renders all pieces as a single merged mesh with vertex colors.
  */
-function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
+function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
+  const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const positionsRef = useRef<Float32Array | null>(null);
+  const clientRef = useRef<ClothWorkerClient | null>(null);
+  const edgeDataRef = useRef<import('../../utils/cloth/fitMaps').SolverEdgeData | null>(null);
+  const pieceColorsRef = useRef<Float32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
+  const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
-  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
+  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
   const globalParticleDistance = useSelector((s: RootState) => s.simulation.particleDistance);
   const pieceParticleDistances = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
-  const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
 
-  const [pieceMeshes, setPieceMeshes] = useState<SimPiece[]>([]);
+  // Async meshing via Web Worker (never blocks main thread)
+  const [pieceMeshes, setPieceMeshes] = useState<Array<{
+    pieceId: string;
+    vertices: Float32Array;
+    triIds: Int32Array;
+    outline: Array<{ type: string; values: number[] }>;
+  }>>([]);
+  const [_meshingStatus, setMeshingStatus] = useState<string | null>(null);
   const initClientRef = useRef<SimulationInitClient | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const client = new SimulationInitClient();
     initClientRef.current = client;
+    client.onProgress = (p) => {
+      if (!cancelled) setMeshingStatus(`${p.stage} (${p.current}/${p.total})`);
+    };
 
     (async () => {
+      setMeshingStatus('Meshing pieces...');
       const meshed = await client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance);
       if (cancelled) return;
 
-      const result: SimPiece[] = meshed.map(m => ({
-        pieceId: m.pieceId,
-        vertices: new Float32Array(m.vertices),
-        triIds: new Int32Array(m.triIds),
-        outline: (pieces.find(p => p.id === m.pieceId)?.outline ?? []) as Array<{ type: string; values: number[] }>,
-      }));
+      const result = meshed.map(m => {
+        const piece = pieces.find(p => p.id === m.pieceId);
+        return {
+          ...m,
+          outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
+        };
+      });
 
       setPieceMeshes(result);
-      dispatch(setParticleCount(result.reduce((sum, p) => sum + p.vertices.length / 3, 0)));
-    })();
-
-    return () => { cancelled = true; client.dispose(); initClientRef.current = null; };
-  }, [pieces, globalParticleDistance, pieceParticleDistances, dispatch]);
-
-  const placedMeshes = useMemo(() => {
-    if (pieceMeshes.length === 0) return [];
-    return pieceMeshes.map((pm, i) => {
-      const piece = pieces[i];
-      const region = piece ? detectBodyRegion(piece) : 'unknown';
-      
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const cmd of pm.outline) {
-        for (let j = 0; j < cmd.values.length - 1; j += 2) {
-          const x = cmd.values[j], y = cmd.values[j + 1];
-          if (x < minX) minX = x; if (x > maxX) maxX = x;
-          if (y < minY) minY = y; if (y > maxY) maxY = y;
-        }
+      const totalParticles = result.reduce((sum, p) => sum + p.vertices.length / 3, 0);
+      dispatch(setParticleCount(totalParticles));
+      setMeshingStatus(null);
+    })().catch(err => {
+      if (!cancelled) {
+        console.error('[GarmentSimulation] Async meshing failed:', err);
+        setMeshingStatus(null);
       }
-      const geo = { widthMm: maxX > minX ? maxX - minX : 200, heightMm: maxY > minY ? maxY - minY : 300 };
-      const placement = computePlacement(region as any, avatarMeasurements, geo);
+    });
+
+    return () => {
+      cancelled = true;
+      client.dispose();
+      initClientRef.current = null;
+    };
+  }, [pieces, globalParticleDistance, pieceParticleDistances]);
+
+  // Compute placements for each piece
+  const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
+
+  // Build merged geometry for rendering (static initial state)
+  // Uses pure math Euler rotation — no per-vertex Three.js object allocation
+  const { staticGeometry } = useMemo(() => {
+    if (pieceMeshes.length === 0) return { staticGeometry: null };
+
+    // Compute placements
+    const placements = placeGarmentPieces(pieces, avatarMeasurements);
+
+    // Count totals
+    let totalVerts = 0;
+    let totalTris = 0;
+    for (const p of pieceMeshes) {
+      totalVerts += p.vertices.length / 3;
+      totalTris += p.triIds.length;
+    }
+
+    const positions = new Float32Array(totalVerts * 3);
+    const colors = new Float32Array(totalVerts * 3);
+    const indices: number[] = [];
+    let vOffset = 0;
+
+    for (let pi = 0; pi < pieceMeshes.length; pi++) {
+      const p = pieceMeshes[pi];
+      const numVerts = p.vertices.length / 3;
+      const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
+      const placement = placements[pi];
+
+      // Pure math Euler rotation (XYZ order) — no Three.js objects per vertex
       const [rx, ry, rz] = placement.rotation;
       const [px, py, pz] = placement.position;
       const cx = Math.cos(rx), sx = Math.sin(rx);
       const cy = Math.cos(ry), sy = Math.sin(ry);
       const cz = Math.cos(rz), sz = Math.sin(rz);
 
+      for (let vi = 0; vi < numVerts; vi++) {
+        const vx = p.vertices[vi * 3], vy = p.vertices[vi * 3 + 1], vz = p.vertices[vi * 3 + 2];
+        // Euler XYZ: Rz * Ry * Rx * v
+        const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
+        const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
+        const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
+        positions[(vOffset + vi) * 3] = x3 + px;
+        positions[(vOffset + vi) * 3 + 1] = y3 + py;
+        positions[(vOffset + vi) * 3 + 2] = z2 + pz;
+      }
+
+      // Set vertex colors
+      for (let i = 0; i < numVerts; i++) {
+        colors[(vOffset + i) * 3] = color.r;
+        colors[(vOffset + i) * 3 + 1] = color.g;
+        colors[(vOffset + i) * 3 + 2] = color.b;
+      }
+
+      // Copy indices with offset
+      for (let i = 0; i < p.triIds.length; i++) {
+        indices.push(p.triIds[i] + vOffset);
+      }
+
+      vOffset += numVerts;
+    }
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const colorAttr = new THREE.BufferAttribute(colors, 3);
+    geo.setAttribute('color', colorAttr);
+    geo.setIndex(indices);
+    geo.computeVertexNormals();
+
+    return { staticGeometry: geo };
+  }, [pieceMeshes, pieces, avatarMeasurements]);
+
+  const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
+
+  const lastFrameTimeRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const onFrame = useCallback((positions: Float32Array) => {
+    positionsRef.current = positions;
+    // Track frame time (report every 30 frames to avoid Redux spam)
+    const now = performance.now();
+    if (lastFrameTimeRef.current > 0) {
+      frameCountRef.current++;
+      if (frameCountRef.current % 30 === 0) {
+        const avgMs = (now - lastFrameTimeRef.current) / 30;
+        dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
+      }
+    }
+    lastFrameTimeRef.current = now;
+  }, [dispatch]);
+
+  // GPU solver client ref
+  const gpuClientRef = useRef<GpuSolverClient | null>(null);
+  const wasmClientRef = useRef<WasmSolverClient | null>(null);
+  const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
+
+  // Apply placement transforms (pure math, no Three.js objects per vertex)
+  const placedMeshes = useMemo(() => {
+    return pieceMeshes.map((pm, i) => {
+      const piece = pieces[i];
+      const region = piece ? detectBodyRegion(piece) : 'unknown' as const;
+      const geo = piece ? { widthMm: 200, heightMm: 300 } : { widthMm: 200, heightMm: 300 };
+      const placement = computePlacement(region, avatarMeasurements, geo);
+      const [rx, ry, rz] = placement.rotation;
+      const [px, py, pz] = placement.position;
+      const cx = Math.cos(rx), sx = Math.sin(rx);
+      const cy = Math.cos(ry), sy = Math.sin(ry);
+      const cz = Math.cos(rz), sz = Math.sin(rz);
+
+      const numVerts = pm.vertices.length / 3;
       const transformed = new Float32Array(pm.vertices.length);
-      for (let vi = 0; vi < pm.vertices.length / 3; vi++) {
+      for (let vi = 0; vi < numVerts; vi++) {
         const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
         const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
         const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
         const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-        transformed[vi * 3] = x3 + px; transformed[vi * 3 + 1] = y3 + py; transformed[vi * 3 + 2] = z2 + pz;
+        transformed[vi * 3] = x3 + px;
+        transformed[vi * 3 + 1] = y3 + py;
+        transformed[vi * 3 + 2] = z2 + pz;
       }
       return { ...pm, vertices: transformed };
     });
   }, [pieceMeshes, pieces, avatarMeasurements]);
 
-  const staticGeometry = useMemo(() => {
-    if (placedMeshes.length === 0) return null;
-    let totalV = 0;
-    for (const p of placedMeshes) { totalV += p.vertices.length / 3; }
-
-    const positions = new Float32Array(totalV * 3);
-    const colors = new Float32Array(totalV * 3);
-    const indices: number[] = [];
-    let vOff = 0;
-
-    for (let pi = 0; pi < placedMeshes.length; pi++) {
-      const p = placedMeshes[pi];
-      const nV = p.vertices.length / 3;
-      const col = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
-      positions.set(p.vertices, vOff * 3);
-      for (let i = 0; i < nV; i++) { colors[(vOff+i)*3] = col.r; colors[(vOff+i)*3+1] = col.g; colors[(vOff+i)*3+2] = col.b; }
-      for (let i = 0; i < p.triIds.length; i++) indices.push(p.triIds[i] + vOff);
-      vOff += nV;
-    }
-
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(indices);
-    geo.computeVertexNormals();
-    return geo;
-  }, [placedMeshes]);
-
-  const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
-  const onFrame = useCallback((positions: Float32Array) => { positionsRef.current = positions; }, []);
-
-  const clientRef = useRef<any>(null);
-
+  // Start/stop simulation — WebGPU preferred, CPU Web Worker fallback
   useEffect(() => {
     if (simulationState === 'running' && placedMeshes.length > 0) {
       let cancelled = false;
+
+      // Race a promise against a timeout
+      function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+        return Promise.race([
+          p,
+          new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} timed out (${ms}ms)`)), ms)),
+        ]);
+      }
+
       const startSim = async () => {
-        try {
-          const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 5000, 'Wasm check').catch(() => false);
-          if (wasmAvailable && !cancelled) {
-            dispatch(setSolverTier('wasm'));
-            const wasm = new WasmSolverClient();
-            clientRef.current = wasm;
-            wasm.onFrame = onFrame;
-            await withTimeout(wasm.initMultiPiece(placedMeshes, seamInitData), 12000, 'Wasm init');
-            if (!cancelled) wasm.start();
+        // ─── WebGPU (DISABLED) ─────────────────────────────────────────
+        // WebGPU shader compilation blocks the main thread (sync GPU calls).
+        // WGSL shaders are unvalidated on real GPU. Skipping until validated.
+        // TODO: Re-enable after shader validation + async compilation.
+        if (false as boolean && isWebGPUAvailable()) {
+          try {
+            const gpuCtx = await withTimeout(initWebGPU(), 5000, 'WebGPU init');
+            if (gpuCtx && !cancelled) {
+              console.log('[GarmentSimulation] 🟢 Using WebGPU solver');
+              dispatch(setSolverTier('webgpu'));
+              const gpuClient = new GpuSolverClient(gpuCtx.device);
+              gpuClientRef.current = gpuClient;
+              gpuClient.onFrame = onFrame;
+
+              await withTimeout(gpuClient.initMultiPiece(placedMeshes), 10000, 'GPU solver init');
+
+              if (!cancelled) gpuClient.start();
+
+              // SDF loaded via worker after simulation starts (truly non-blocking)
+              if (avatarModelUrl && !cancelled) {
+                loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+                  if (sdf && !cancelled) { gpuClient.setSDF(sdf); dispatch(setBodyCollision(true)); }
+                  else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
+                }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
+              }
+              return;
+            }
+          } catch (e) {
+            console.warn('[GarmentSimulation] WebGPU failed, falling back:', e);
+          }
+        }
+
+        // ─── Try Wasm XPBD (~3x faster than JS) ──────────────────────
+        if (!cancelled) {
+          try {
+            const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 5000, 'Wasm check').catch(() => false);
+            if (wasmAvailable && !cancelled) {
+              console.log('[GarmentSimulation] 🟠 Using Wasm XPBD solver');
+              dispatch(setSolverTier('wasm'));
+              const wasmClient = new WasmSolverClient();
+              wasmClientRef.current = wasmClient;
+              wasmClient.onFrame = onFrame;
+
+              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
+
+              if (!cancelled) wasmClient.start();
+
+              // SDF loaded via worker (truly non-blocking)
+              if (avatarModelUrl && !cancelled) {
+                console.log('[GarmentSimulation] Requesting Avatar SDF for Wasm solver...');
+                loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+                  if (sdf && !cancelled) {
+                    console.log('[GarmentSimulation] ✅ SDF loaded, enabling body collision');
+                    wasmClient.setSDF(sdf);
+                    dispatch(setBodyCollision(true));
+                  } else if (!sdf && !cancelled) {
+                    console.warn('[GarmentSimulation] ❌ SDF generation returned null');
+                    dispatch(setBodyCollision(false));
+                  }
+                }).catch(e => {
+                  console.error('[GarmentSimulation] ❌ Avatar SDF failed:', e);
+                  dispatch(setBodyCollision(false));
+                });
+              }
+              return;
+            } else if (!cancelled) {
+              console.warn('[GarmentSimulation] Wasm solver not available or timed out');
+            }
+          } catch (e) {
+            console.warn('[GarmentSimulation] Wasm failed, falling back to CPU:', e);
+          }
+        }
+
+        // ─── Tier 3: CPU Web Worker ──────────────────────────────────
+        if (!cancelled) {
+          try {
+            console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
+            dispatch(setSolverTier('cpu-worker'));
+            const client = new ClothWorkerClient();
+            clientRef.current = client;
+            client.onFrame = onFrame;
+            client.onEdgeData = (ids, lengths) => {
+              edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+            };
+
+            await withTimeout(client.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU worker init');
+            client.setFabric(fabricId);
+            client.requestEdgeData();
+
+            if (!cancelled) client.start();
+
+            // SDF loaded via worker (truly non-blocking)
             if (avatarModelUrl && !cancelled) {
               loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                if (sdf && !cancelled) wasm.setSDF(sdf);
-              });
+                if (sdf && !cancelled) { client.setSDF(sdf); dispatch(setBodyCollision(true)); }
+                else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
+              }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
             }
             return;
+          } catch (e) {
+            console.warn('[GarmentSimulation] CPU worker failed, falling back to Neural Drape:', e);
           }
-        } catch {}
-
-        if (!cancelled) {
-          dispatch(setSolverTier('cpu-worker'));
-          const cpu = new ClothWorkerClient();
-          clientRef.current = cpu;
-          cpu.onFrame = (pos) => onFrame(pos);
-          await withTimeout(cpu.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU init');
-          cpu.setFabric(fabricId);
-          if (!cancelled) cpu.start();
         }
-      };
-      startSim();
-      return () => { cancelled = true; clientRef.current?.dispose(); clientRef.current = null; };
-    }
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, dispatch]);
 
+        // ─── Tier 4: Neural Drape (analytical fallback) ─────────────
+        if (cancelled) return;
+        console.log('[GarmentSimulation] 🔵 Using Neural Drape (analytical preview)');
+        dispatch(setSolverTier('neural-drape'));
+        const neuralClient = new NeuralDrapeClient();
+        neuralClientRef.current = neuralClient;
+        neuralClient.onFrame = onFrame;
+
+        await neuralClient.initMultiPiece(placedMeshes);
+        if (!cancelled) neuralClient.start();
+      };
+
+      startSim().catch(e => console.error('[GarmentSimulation] Start failed:', e));
+
+      return () => {
+        cancelled = true;
+        clientRef.current?.dispose();
+        clientRef.current = null;
+        gpuClientRef.current?.dispose();
+        gpuClientRef.current = null;
+        wasmClientRef.current?.dispose();
+        wasmClientRef.current = null;
+        neuralClientRef.current?.dispose();
+        neuralClientRef.current = null;
+        positionsRef.current = null;
+      };
+    } else if (simulationState === 'idle') {
+      clientRef.current?.dispose();
+      clientRef.current = null;
+      gpuClientRef.current?.dispose();
+      gpuClientRef.current = null;
+      wasmClientRef.current?.dispose();
+      wasmClientRef.current = null;
+      neuralClientRef.current?.dispose();
+      neuralClientRef.current = null;
+      positionsRef.current = null;
+      dispatch(setSolverTier('none'));
+      dispatch(setFrameTime(0));
+    } else if (simulationState === 'paused') {
+      clientRef.current?.stop();
+      gpuClientRef.current?.stop();
+      wasmClientRef.current?.stop();
+      neuralClientRef.current?.stop();
+    }
+    return undefined;
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
+
+  // Per-frame geometry update
   useFrame(() => {
-    if (!meshRef.current || !staticGeometry || !positionsRef.current) return;
+    if (!meshRef.current || !staticGeometry) return;
+    const positions = positionsRef.current;
+    if (!positions) return;
+
     const posAttr = staticGeometry.getAttribute('position') as THREE.BufferAttribute;
-    if (posAttr.array.length === positionsRef.current.length) {
-      (posAttr.array as Float32Array).set(positionsRef.current);
+    if (posAttr && posAttr.array.length === positions.length) {
+      (posAttr.array as Float32Array).set(positions);
       posAttr.needsUpdate = true;
       staticGeometry.computeVertexNormals();
+      staticGeometry.computeBoundingSphere();
+    }
+
+    // Compute fit map overlay colors
+    const colorAttr = staticGeometry.getAttribute('color') as THREE.BufferAttribute;
+    if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr) {
+      // Save original piece colors on first fit-map frame
+      if (!pieceColorsRef.current) {
+        pieceColorsRef.current = new Float32Array(colorAttr.array as Float32Array);
+      }
+      const numP = positions.length / 3;
+      const fabric = PHYSICAL_FABRIC_LIBRARY.find((f: { id: string }) => f.id === fabricId);
+      const fitParams = fabric ? fabricToFitParams(fabric) : {
+        maxStretchRatio: 0.08, weight: 150, thickness: 0.4, avgStretch: 0.025,
+      };
+      const mapData = computeFitMapData(
+        fitMapMode, positions, numP, edgeDataRef.current, fitParams, null, fitMapConfig,
+      );
+      if (mapData) {
+        (colorAttr.array as Float32Array).set(mapData.colors);
+        colorAttr.needsUpdate = true;
+        onFitMapStats?.(mapData.stats);
+      }
+    } else if (fitMapMode === 'none' && pieceColorsRef.current && colorAttr) {
+      // Restore original piece colors
+      (colorAttr.array as Float32Array).set(pieceColorsRef.current);
+      colorAttr.needsUpdate = true;
+      pieceColorsRef.current = null;
+      onFitMapStats?.(null);
     }
   });
 
+  useEffect(() => {
+    geometryRef.current = staticGeometry;
+  }, [staticGeometry]);
+
+  // Debug hook for E2E testing — exposes mesh to window for Playwright
+  useEffect(() => {
+    if (typeof window !== 'undefined' && meshRef.current) {
+      (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).__OPENCLO_CLOTH_MESH__;
+      }
+    };
+  }, [staticGeometry]);
+
+  // Listen for 3D export events from copilot tools
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const { format, filename, scale, binary } = (e as CustomEvent).detail || {};
+      if (!meshRef.current) return;
+
+      const group = new THREE.Group();
+      group.add(meshRef.current.clone(true));
+
+      try {
+        if (format === 'obj') {
+          const { downloadOBJ } = await import('../../utils/export/objExporter');
+          downloadOBJ(group, { filename, scale: scale || 0.1 });
+        } else if (format === 'glb' || format === 'gltf') {
+          const { downloadGLTF } = await import('../../utils/export/gltfExporter');
+          await downloadGLTF(group, { filename, binary: binary ?? true });
+        }
+      } catch (err) {
+        console.error('[GarmentSimulation] 3D export failed:', err);
+      }
+    };
+    window.addEventListener('openclo:export3d', handler);
+    return () => window.removeEventListener('openclo:export3d', handler);
+  }, []);
+
+  // Derive render params from selected fabric
+  const renderParams = useMemo(() => {
+    const fabric = getPhysicalFabric(fabricId);
+    if (fabric) return toMeshPhysicalParams(fabric);
+    return {
+      roughness: 0.7, metalness: 0, sheen: 0.15, sheenRoughness: 0.7,
+      sheenColor: '#e8e4df', clearcoat: 0, clearcoatRoughness: 0,
+      transmission: 0, thickness: 0.5, ior: 1.5, opacity: 0.85,
+    };
+  }, [fabricId]);
+
   if (!staticGeometry) return null;
+
   return (
     <mesh ref={meshRef} geometry={staticGeometry}>
-      <meshPhysicalMaterial vertexColors side={THREE.DoubleSide} transparent opacity={0.85} roughness={0.7} />
+      <meshPhysicalMaterial
+        vertexColors
+        side={THREE.DoubleSide}
+        transparent
+        opacity={renderParams.opacity}
+        roughness={renderParams.roughness}
+        metalness={renderParams.metalness}
+        sheen={renderParams.sheen}
+        sheenRoughness={renderParams.sheenRoughness}
+        sheenColor={renderParams.sheenColor}
+        clearcoat={renderParams.clearcoat}
+        clearcoatRoughness={renderParams.clearcoatRoughness}
+        transmission={renderParams.transmission}
+        thickness={renderParams.thickness}
+        ior={renderParams.ior}
+      />
     </mesh>
   );
 }
 
+/**
+ * GarmentSimulation — always uses MergedSimulation for all pieces.
+ *
+ * Previously had a ClothMesh-per-piece fallback for no-seam patterns,
+ * but that path ran CDT meshing + SDF generation on the main thread,
+ * freezing the browser. MergedSimulation uses Web Workers for everything.
+ * When no seams exist, the solver simply has no seam constraints.
+ */
 export default function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
   return (
     <Suspense fallback={null}>

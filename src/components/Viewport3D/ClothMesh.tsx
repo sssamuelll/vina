@@ -112,7 +112,14 @@ function buildMeshFromPiece(
   particleDistance: number = 5
 ): { vertices: Float32Array; triIds: Int32Array } | null {
   try {
-    if (!meshPieceFn) return buildMeshFromOutlineFallback(piece.outline);
+    if (!meshPieceFn) {
+      const fallback = buildMeshFromOutlineFallback(piece.outline);
+      if (!fallback) return null;
+      return {
+        vertices: new Float32Array(fallback.vertices),
+        triIds: new Int32Array(fallback.triIds),
+      };
+    }
     
     const meshData = meshPieceFn(piece, {
       yHeight: 1.2,
@@ -132,7 +139,12 @@ function buildMeshFromPiece(
     console.warn('CDT meshing failed, falling back to Three.js Shape:', error);
     
     // Fallback to the old Three.js Shape method
-    return buildMeshFromOutlineFallback(piece.outline);
+    const fallback = buildMeshFromOutlineFallback(piece.outline);
+    if (!fallback) return null;
+    return {
+      vertices: new Float32Array(fallback.vertices),
+      triIds: new Int32Array(fallback.triIds),
+    };
   }
 }
 

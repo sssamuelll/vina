@@ -110,4 +110,19 @@ allTools.forEach(tool => {
 
 // Export the registry and types for use by other modules
 export { toolRegistry } from './registry';
-export type { ToolDefinition, ToolOption, ToolContext } from './types';
+export type { ToolDefinition, ToolOption, ToolContext, CopilotToolMetadata } from './types';
+
+// Export copilot schema utilities
+export {
+  generateToolSchemas,
+  toOpenAIFunctions,
+  toAnthropicTools,
+  generateToolsPromptSection,
+  findToolsByQuery,
+  toolToSchema,
+} from './copilotSchemas';
+export type {
+  CopilotToolSchema,
+  OpenAIFunctionSchema,
+  AnthropicToolSchema,
+} from './copilotSchemas';

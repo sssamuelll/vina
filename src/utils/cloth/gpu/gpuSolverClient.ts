@@ -17,8 +17,8 @@ import type { SDFData } from '../sdfGenerator';
 
 export interface PieceMeshData {
   pieceId: string;
-  vertices: number[];
-  triIds: number[];
+  vertices: Float32Array;
+  triIds: Int32Array;
 }
 
 export interface GpuSolverClientCallbacks {
@@ -69,10 +69,8 @@ export class GpuSolverClient {
     for (const p of pieces) {
       const numV = p.vertices.length / 3;
 
-      // Copy positions
-      for (let i = 0; i < p.vertices.length; i++) {
-        positions[vOff * 3 + i] = p.vertices[i];
-      }
+      // Copy positions efficiently
+      positions.set(p.vertices, vOff * 3);
 
       // All particles have equal mass (invMass = 1.0)
       for (let i = 0; i < numV; i++) {

@@ -1,0 +1,236 @@
+/**
+ * CopilotActionLog Styles
+ */
+
+.action-log-panel {
+  position: fixed;
+  top: 60px;
+  right: 16px;
+  width: 320px;
+  max-height: calc(100vh - 120px);
+  background: var(--bg-elevated, #1e1e1e);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-subtle, #333);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  animation: action-log-slide-in 0.2s ease-out;
+}
+
+@keyframes action-log-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.action-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--border-subtle, #333);
+}
+
+.action-log-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.action-log-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-log-clear,
+.action-log-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-log-clear:hover,
+.action-log-close:hover {
+  background: var(--bg-hover, #333);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.action-log-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.action-log-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.action-log-empty p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary, #a0a0a0);
+}
+
+.action-log-empty-hint {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  color: var(--text-muted, #666) !important;
+}
+
+.action-log-group {
+  margin-bottom: 8px;
+}
+
+.action-log-group-label {
+  padding: 8px 16px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #666);
+}
+
+.action-log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 16px;
+  transition: background 0.15s ease;
+}
+
+.action-log-entry:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.03));
+}
+
+.action-log-entry-undone {
+  opacity: 0.5;
+}
+
+.action-log-entry-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+}
+
+.action-log-icon-success {
+  color: #10b981;
+}
+
+.action-log-icon-error {
+  color: #ef4444;
+}
+
+.action-log-entry-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.action-log-entry-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.action-log-entry-type {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.action-log-entry-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}
+
+.action-log-entry-description {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #a0a0a0);
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-log-undone-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  background: rgba(139, 92, 246, 0.15);
+  border-radius: 4px;
+  font-size: 10px;
+  color: #a78bfa;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.action-log-entry-undo {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-subtle, #444);
+  border-radius: 6px;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s ease;
+}
+
+.action-log-entry:hover .action-log-entry-undo {
+  opacity: 1;
+}
+
+.action-log-entry-undo:hover {
+  background: var(--bg-hover, #333);
+  color: #8b5cf6;
+  border-color: #8b5cf6;
+}
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .action-log-panel {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 50vh;
+    border-radius: 12px 12px 0 0;
+  }
+}
