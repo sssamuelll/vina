@@ -95,7 +95,7 @@ export class SimulationInitClient {
    */
   async meshPiece(piece: PatternPiece, particleDistance: number): Promise<{ vertices: Float32Array; triIds: Int32Array }> {
     const options = {
-      yHeight: 1.2,
+      yHeight: 0,
       scale: SCALE,
       maxEdgeLength: particleDistance,
       minAngle: 25,

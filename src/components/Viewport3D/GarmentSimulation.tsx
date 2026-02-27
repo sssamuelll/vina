@@ -18,7 +18,7 @@ import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
 import { detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
-import { setSolverTier, setParticleCount } from '../../store/simulationSlice';
+import { setSolverTier, setParticleCount, setBodyCollision, setFrameTime } from '../../store/simulationSlice';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -57,13 +57,18 @@ async function loadSDFInWorker(
     const { isVRMFile, loadVRM } = await import('../../utils/avatar/vrmLoader');
 
     let scene: THREE.Group;
-    if (isVRMFile(avatarUrl)) {
-      const result = await loadVRM(avatarUrl);
-      scene = result.scene;
-    } else {
-      const loader = new GLTFLoader();
-      const gltf = await loader.loadAsync(avatarUrl);
-      scene = gltf.scene as THREE.Group;
+    try {
+      if (isVRMFile(avatarUrl)) {
+        const result = await loadVRM(avatarUrl);
+        scene = result.scene;
+      } else {
+        const loader = new GLTFLoader();
+        const gltf = await loader.loadAsync(avatarUrl);
+        scene = gltf.scene as THREE.Group;
+      }
+    } catch (e) {
+      console.error('[SDF] Failed to load avatar mesh:', e);
+      return null;
     }
 
     const box = new THREE.Box3().setFromObject(scene);
@@ -115,7 +120,7 @@ function seamsToInitData(seams: Seam[]): SeamInitData[] {
 interface GarmentSimulationProps {
   pieces: PatternPiece[];
   seams: Seam[];
-  onFitMapStats?: (stats: import('../../utils/cloth/fitMaps').FitMapStats | null) => void;
+  onFitMapStats?: (stats: any) => void;
   onInspect?: (value: number | null) => void;
 }
 
@@ -129,7 +134,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 /**
  * Merged multi-piece simulation component.
  */
-function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
+function MergedSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
   const positionsRef = useRef<Float32Array | null>(null);
@@ -168,6 +173,7 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
 
   const placedMeshes = useMemo(() => {
     if (pieceMeshes.length === 0) return [];
+    
     return pieceMeshes.map((pm, i) => {
       const piece = pieces[i];
       const region = piece ? detectBodyRegion(piece) : 'unknown';
@@ -180,7 +186,11 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
           if (y < minY) minY = y; if (y > maxY) maxY = y;
         }
       }
-      const geo = { widthMm: maxX > minX ? maxX - minX : 200, heightMm: maxY > minY ? maxY - minY : 300 };
+      
+      const width = (maxX > minX && isFinite(maxX - minX)) ? maxX - minX : 200;
+      const height = (maxY > minY && isFinite(maxY - minY)) ? maxY - minY : 300;
+      const geo = { widthMm: width, heightMm: height };
+
       const placement = computePlacement(region as any, avatarMeasurements, geo);
       const [rx, ry, rz] = placement.rotation;
       const [px, py, pz] = placement.position;
@@ -191,10 +201,13 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       const transformed = new Float32Array(pm.vertices.length);
       for (let vi = 0; vi < pm.vertices.length / 3; vi++) {
         const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
+        // Euler XYZ
         const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
         const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
         const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
-        transformed[vi * 3] = x3 + px; transformed[vi * 3 + 1] = y3 + py; transformed[vi * 3 + 2] = z2 + pz;
+        transformed[vi * 3] = x3 + px; 
+        transformed[vi * 3 + 1] = y3 + py; 
+        transformed[vi * 3 + 2] = z2 + pz;
       }
       return { ...pm, vertices: transformed };
     });
@@ -207,29 +220,49 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
 
     const positions = new Float32Array(totalV * 3);
     const colors = new Float32Array(totalV * 3);
-    const indices: number[] = [];
+    const indices = new Uint32Array(placedMeshes.reduce((sum, p) => sum + p.triIds.length, 0));
     let vOff = 0;
+    let iOff = 0;
 
     for (let pi = 0; pi < placedMeshes.length; pi++) {
       const p = placedMeshes[pi];
       const nV = p.vertices.length / 3;
       const col = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
       positions.set(p.vertices, vOff * 3);
-      for (let i = 0; i < nV; i++) { colors[(vOff+i)*3] = col.r; colors[(vOff+i)*3+1] = col.g; colors[(vOff+i)*3+2] = col.b; }
-      for (let i = 0; i < p.triIds.length; i++) indices.push(p.triIds[i] + vOff);
+      for (let i = 0; i < nV; i++) { 
+        colors[(vOff+i)*3] = col.r; colors[(vOff+i)*3+1] = col.g; colors[(vOff+i)*3+2] = col.b; 
+      }
+      for (let i = 0; i < p.triIds.length; i++) {
+        indices[iOff + i] = p.triIds[i] + vOff;
+      }
       vOff += nV;
+      iOff += p.triIds.length;
     }
 
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geo.setIndex(indices);
+    geo.setIndex(new THREE.BufferAttribute(indices, 1));
     geo.computeVertexNormals();
     return geo;
   }, [placedMeshes]);
 
   const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
-  const onFrame = useCallback((positions: Float32Array) => { positionsRef.current = positions; }, []);
+  
+  const lastFrameTimeRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const onFrame = useCallback((positions: Float32Array) => { 
+    positionsRef.current = positions; 
+    const now = performance.now();
+    if (lastFrameTimeRef.current > 0) {
+      frameCountRef.current++;
+      if (frameCountRef.current % 30 === 0) {
+        const avgMs = (now - lastFrameTimeRef.current) / 30;
+        dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
+      }
+    }
+    lastFrameTimeRef.current = now;
+  }, [dispatch]);
 
   const clientRef = useRef<any>(null);
 
@@ -248,8 +281,13 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
             if (!cancelled) wasm.start();
             if (avatarModelUrl && !cancelled) {
               loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                if (sdf && !cancelled) wasm.setSDF(sdf);
-              });
+                if (sdf && !cancelled) {
+                  wasm.setSDF(sdf);
+                  dispatch(setBodyCollision(true));
+                } else if (!cancelled) {
+                  dispatch(setBodyCollision(false));
+                }
+              }).catch(() => !cancelled && dispatch(setBodyCollision(false)));
             }
             return;
           }
@@ -263,10 +301,28 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
           await withTimeout(cpu.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU init');
           cpu.setFabric(fabricId);
           if (!cancelled) cpu.start();
+          if (avatarModelUrl && !cancelled) {
+            loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+              if (sdf && !cancelled) {
+                cpu.setSDF(sdf);
+                dispatch(setBodyCollision(true));
+              }
+            });
+          }
         }
       };
       startSim();
-      return () => { cancelled = true; clientRef.current?.dispose(); clientRef.current = null; };
+      return () => { 
+        cancelled = true; 
+        clientRef.current?.dispose(); 
+        clientRef.current = null;
+        dispatch(setBodyCollision(false));
+      };
+    } else if (simulationState === 'idle') {
+      clientRef.current?.dispose();
+      clientRef.current = null;
+      dispatch(setSolverTier('none'));
+      dispatch(setBodyCollision(false));
     }
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, dispatch]);
 
@@ -282,8 +338,23 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
 
   if (!staticGeometry) return null;
   return (
-    <mesh ref={meshRef} geometry={staticGeometry}>
-      <meshPhysicalMaterial vertexColors side={THREE.DoubleSide} transparent opacity={0.85} roughness={0.7} />
+    <mesh 
+      ref={meshRef} 
+      geometry={staticGeometry}
+      onClick={(e) => {
+        if (!onInspect || !positionsRef.current) return;
+        e.stopPropagation();
+        const point = e.point;
+        const pos = positionsRef.current;
+        let minDist = Infinity, nearest = 0;
+        for (let i = 0; i < pos.length / 3; i++) {
+          const d = (pos[3*i]-point.x)**2 + (pos[3*i+1]-point.y)**2 + (pos[3*i+2]-point.z)**2;
+          if (d < minDist) { minDist = d; nearest = i; }
+        }
+        // Logic for fit map values would go here if restored
+      }}
+    >
+      <meshStandardMaterial vertexColors side={THREE.DoubleSide} transparent opacity={0.85} roughness={0.7} />
     </mesh>
   );
 }
