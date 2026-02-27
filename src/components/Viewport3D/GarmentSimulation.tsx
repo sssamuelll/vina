@@ -134,7 +134,9 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 /**
  * Merged multi-piece simulation component.
  */
-function MergedSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
+function MergedSimulation({ pieces, seams, onFitMapStats: _onFitMapStats, onInspect }: GarmentSimulationProps) {
+  // TODO: Re-enable fit map stats when fit map feature is restored
+  void _onFitMapStats;
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
   const positionsRef = useRef<Float32Array | null>(null);
@@ -348,12 +350,13 @@ function MergedSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSi
         e.stopPropagation();
         const point = e.point;
         const pos = positionsRef.current;
-        let minDist = Infinity, nearest = 0;
+        let minDist = Infinity, nearestIdx = -1;
         for (let i = 0; i < pos.length / 3; i++) {
           const d = (pos[3*i]-point.x)**2 + (pos[3*i+1]-point.y)**2 + (pos[3*i+2]-point.z)**2;
-          if (d < minDist) { minDist = d; nearest = i; }
+          if (d < minDist) { minDist = d; nearestIdx = i; }
         }
-        // Logic for fit map values would go here if restored
+        // TODO: Add fit map value lookup using nearestIdx
+        onInspect(nearestIdx >= 0 ? nearestIdx : null);
       }}
     >
       <meshStandardMaterial vertexColors side={THREE.DoubleSide} transparent opacity={0.85} roughness={0.7} />
