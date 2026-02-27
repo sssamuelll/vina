@@ -84,10 +84,23 @@ self.onmessage = async (event: MessageEvent) => {
         // Load Wasm module inside the worker
         const baseUrl = msg.baseUrl ?? '/';
         const wasmModule = await import(/* @vite-ignore */ `${baseUrl}wasm/xpbd_wasm.js`) as unknown as WasmModule;
-        await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
+        const initResult = await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
 
-        // wasm-bindgen 0.2.88+ might put exports on the module or the init result
-        wasmExports = (wasmModule as unknown as { wasm: { memory: WebAssembly.Memory } }).wasm;
+        // wasm-bindgen default() returns instance.exports which has .memory
+        // But verify it actually has memory — fallback to module-level wasm if not
+        const exportsLike = initResult as WasmExportsLike | undefined;
+        if (exportsLike?.memory instanceof WebAssembly.Memory) {
+          wasmExports = exportsLike;
+          console.log('[WasmWorker] Got memory from init result');
+        } else if (wasmModule.wasm?.memory instanceof WebAssembly.Memory) {
+          wasmExports = wasmModule.wasm;
+          console.log('[WasmWorker] Got memory from module.wasm');
+        } else {
+          console.warn('[WasmWorker] Could not access WebAssembly.Memory — positions will be zero!',
+            'initResult type:', typeof initResult,
+            'initResult keys:', exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
+            'module keys:', Object.keys(wasmModule).slice(0, 10));
+        }
 
         // Merge pieces using the standard utility (ensures consistent vertex mapping)
         const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array }> = msg.pieces.map((p: any) => ({
