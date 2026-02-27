@@ -54,8 +54,8 @@ export interface NeuralDrapeConfig {
 
 export interface PieceMeshData {
   pieceId: string;
-  vertices: number[];
-  triIds: number[];
+  vertices: Float32Array;
+  triIds: Int32Array;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -113,10 +113,9 @@ export class NeuralDrapeClient {
     let offset = 0;
     for (const p of pieces) {
       const nv = p.vertices.length / 3;
-      for (let i = 0; i < p.vertices.length; i++) {
-        this.restPositions[offset * 3 + i] = p.vertices[i];
-        this.currentPositions[offset * 3 + i] = p.vertices[i];
-      }
+      this.restPositions.set(p.vertices, offset * 3);
+      this.currentPositions.set(p.vertices, offset * 3);
+      
       for (let i = 0; i < nv; i++) {
         this.invMass[offset + i] = 1.0;
       }

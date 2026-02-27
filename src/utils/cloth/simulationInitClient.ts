@@ -14,8 +14,8 @@ import type { SDFData } from './sdfGenerator';
 
 export interface MeshedPiece {
   pieceId: string;
-  vertices: number[];
-  triIds: number[];
+  vertices: Float32Array;
+  triIds: Int32Array;
 }
 
 export interface SimInitProgress {
@@ -171,8 +171,8 @@ export class SimulationInitClient {
         if (vertices.length > 0 && triIds.length > 0) {
           results.push({
             pieceId: piece.id,
-            vertices: Array.from(vertices),
-            triIds: Array.from(triIds),
+            vertices,
+            triIds,
           });
         }
       } catch (err) {

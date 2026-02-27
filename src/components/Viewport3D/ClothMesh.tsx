@@ -106,9 +106,20 @@ function sampleOutline(commands: PathCommand[], numSamplesPerEdge: number = 4): 
  * Build a high-quality triangulated mesh from pattern piece using CDT.
  * Uses Constrained Delaunay Triangulation for better physics stability.
  */
-function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null, particleDistance: number = 5): { vertices: number[]; triIds: number[] } | null {
+function buildMeshFromPiece(
+  piece: PatternPiece,
+  meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null,
+  particleDistance: number = 5
+): { vertices: Float32Array; triIds: Int32Array } | null {
   try {
-    if (!meshPieceFn) return buildMeshFromOutlineFallback(piece.outline);
+    if (!meshPieceFn) {
+      const fallback = buildMeshFromOutlineFallback(piece.outline);
+      if (!fallback) return null;
+      return {
+        vertices: new Float32Array(fallback.vertices),
+        triIds: new Int32Array(fallback.triIds),
+      };
+    }
     
     const meshData = meshPieceFn(piece, {
       yHeight: 1.2,
@@ -123,16 +134,17 @@ function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece,
       return null;
     }
 
-    // Convert to the format expected by the component
-    const vertices: number[] = Array.from(meshData.vertices);
-    const triIds: number[] = Array.from(meshData.triIds);
-
-    return { vertices, triIds };
+    return meshData;
   } catch (error) {
     console.warn('CDT meshing failed, falling back to Three.js Shape:', error);
     
     // Fallback to the old Three.js Shape method
-    return buildMeshFromOutlineFallback(piece.outline);
+    const fallback = buildMeshFromOutlineFallback(piece.outline);
+    if (!fallback) return null;
+    return {
+      vertices: new Float32Array(fallback.vertices),
+      triIds: new Int32Array(fallback.triIds),
+    };
   }
 }
 
@@ -260,7 +272,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
       // Apply position offset to vertices so particles start near the avatar body
       const placedData = { ...meshData };
       if (position[0] !== 0 || position[1] !== 0 || position[2] !== 0) {
-        const verts = [...meshData.vertices];
+        const verts = new Float32Array(meshData.vertices);
         const numVerts = verts.length / 3;
         for (let i = 0; i < numVerts; i++) {
           verts[i * 3] += position[0];
