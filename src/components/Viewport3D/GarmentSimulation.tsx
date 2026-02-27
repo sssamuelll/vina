@@ -612,6 +612,18 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     geometryRef.current = staticGeometry;
   }, [staticGeometry]);
 
+  // Debug hook for E2E testing — exposes mesh to window for Playwright
+  useEffect(() => {
+    if (typeof window !== 'undefined' && meshRef.current) {
+      (window as any).__OPENCLO_CLOTH_MESH__ = meshRef.current;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete (window as any).__OPENCLO_CLOTH_MESH__;
+      }
+    };
+  }, [staticGeometry]);
+
   // Listen for 3D export events from copilot tools
   useEffect(() => {
     const handler = async (e: Event) => {
