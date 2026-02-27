@@ -27,6 +27,7 @@ export const simulateTool: ToolDefinition = {
   icon: SimulateIcon,
   cursor: 'pointer',
   group: '3d-simulation',
+  hidden: true, // Managed via ActivityBar, not Toolbar3D
   options: [
     {
       id: 'particleDistance',
