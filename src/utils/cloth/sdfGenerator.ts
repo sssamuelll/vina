@@ -21,7 +21,6 @@ export interface SDFData {
 class IntSpatialHash {
   private readonly buckets: Map<number, Int32Array>;
   private readonly cellInv: number;
-  private readonly res: number;
 
   constructor(
     vertices: Float32Array,
@@ -31,8 +30,6 @@ class IntSpatialHash {
     sizeX: number, sizeY: number, sizeZ: number
   ) {
     this.cellInv = 1.0 / cellSize;
-    // Estimated resolution for keying — doesn't need to match SDF resolution
-    this.res = Math.ceil(Math.max(sizeX, sizeY, sizeZ) * this.cellInv) + 2;
 
     const counts = new Map<number, number>();
     const numTri = indices.length / 3;
