@@ -106,7 +106,11 @@ function sampleOutline(commands: PathCommand[], numSamplesPerEdge: number = 4): 
  * Build a high-quality triangulated mesh from pattern piece using CDT.
  * Uses Constrained Delaunay Triangulation for better physics stability.
  */
-function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null, particleDistance: number = 5): { vertices: number[]; triIds: number[] } | null {
+function buildMeshFromPiece(
+  piece: PatternPiece,
+  meshPieceFn: ((p: PatternPiece, opts: Record<string, number>) => { vertices: Float32Array; triIds: Int32Array }) | null,
+  particleDistance: number = 5
+): { vertices: Float32Array; triIds: Int32Array } | null {
   try {
     if (!meshPieceFn) return buildMeshFromOutlineFallback(piece.outline);
     
@@ -123,11 +127,7 @@ function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece,
       return null;
     }
 
-    // Convert to the format expected by the component
-    const vertices: number[] = Array.from(meshData.vertices);
-    const triIds: number[] = Array.from(meshData.triIds);
-
-    return { vertices, triIds };
+    return meshData;
   } catch (error) {
     console.warn('CDT meshing failed, falling back to Three.js Shape:', error);
     
@@ -142,7 +142,7 @@ function buildMeshFromPiece(piece: PatternPiece, meshPieceFn: ((p: PatternPiece,
  */
 function buildMeshFromOutlineFallback(
   outline: PathCommand[],
-): { vertices: number[]; triIds: number[] } | null {
+): { vertices: Float32Array; triIds: Int32Array } | null {
   const points = sampleOutline(outline);
   if (points.length < 3) return null;
 
@@ -171,15 +171,15 @@ function buildMeshFromOutlineFallback(
   }
 
   // Extract flat vertex array (place at y=1.2 above ground)
-  const vertices: number[] = [];
-  for (let i = 0; i < posAttr.count; i++) {
-    vertices.push(posAttr.getX(i), 1.2, posAttr.getY(i));
+  const numVerts = posAttr.count;
+  const vertices = new Float32Array(numVerts * 3);
+  for (let i = 0; i < numVerts; i++) {
+    vertices[i * 3] = posAttr.getX(i);
+    vertices[i * 3 + 1] = 1.2;
+    vertices[i * 3 + 2] = posAttr.getY(i);
   }
 
-  const triIds: number[] = [];
-  for (let i = 0; i < index.count; i++) {
-    triIds.push(index.getX(i));
-  }
+  const triIds = new Int32Array(index.array);
 
   geo.dispose();
   return { vertices, triIds };
@@ -260,7 +260,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
       // Apply position offset to vertices so particles start near the avatar body
       const placedData = { ...meshData };
       if (position[0] !== 0 || position[1] !== 0 || position[2] !== 0) {
-        const verts = [...meshData.vertices];
+        const verts = new Float32Array(meshData.vertices);
         const numVerts = verts.length / 3;
         for (let i = 0; i < numVerts; i++) {
           verts[i * 3] += position[0];
@@ -308,7 +308,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
       clientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, meshData, fabricId, onFrame]);
+  }, [simulationState, meshData, fabricId, onFrame, position, avatarModelUrl, avatarHeight]);
 
   // Update fabric on the running worker
   useEffect(() => {
@@ -372,7 +372,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
     const geo = new THREE.BufferGeometry();
     const posArray = new Float32Array(meshData.vertices);
     geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    geo.setIndex(Array.from(meshData.triIds));
+    geo.setIndex(new THREE.BufferAttribute(meshData.triIds, 1));
     geo.computeVertexNormals();
     geometryRef.current = geo;
     return geo;
