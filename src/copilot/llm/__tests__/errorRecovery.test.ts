@@ -18,7 +18,7 @@ import type { ParseError } from '../responseParser';
 describe('analyzeActionError', () => {
   describe('unknown actions', () => {
     it('should identify unknown action type', () => {
-      const action = { action: 'unknownaction' } as CopilotAction;
+      const action = { action: 'unknownaction' } as unknown as CopilotAction;
       const analysis = analyzeActionError(action);
 
       expect(analysis.errorType).toBe('unknown_action');
@@ -26,7 +26,7 @@ describe('analyzeActionError', () => {
     });
 
     it('should suggest similar actions', () => {
-      const action = { action: 'selectpiece' } as CopilotAction;
+      const action = { action: 'selectpiece' } as unknown as CopilotAction;
       const analysis = analyzeActionError(action);
 
       expect(analysis.similarActions).toBeDefined();
@@ -34,7 +34,7 @@ describe('analyzeActionError', () => {
     });
 
     it('should suggest common typo corrections', () => {
-      const action = { action: 'createpiece' } as CopilotAction;
+      const action = { action: 'createpiece' } as unknown as CopilotAction;
       const analysis = analyzeActionError(action);
 
       expect(analysis.suggestions.some(s => s.includes('create_piece'))).toBe(true);
@@ -43,7 +43,7 @@ describe('analyzeActionError', () => {
 
   describe('missing parameters', () => {
     it('should identify missing required parameters', () => {
-      const action = { action: 'select_piece' } as CopilotAction; // Missing pieceId
+      const action = { action: 'select_piece' } as unknown as CopilotAction; // Missing pieceId
       const analysis = analyzeActionError(action);
 
       expect(analysis.errorType).toBe('missing_params');
@@ -51,7 +51,7 @@ describe('analyzeActionError', () => {
     });
 
     it('should provide parameter hints', () => {
-      const action = { action: 'create_piece' } as CopilotAction; // Missing shape
+      const action = { action: 'create_piece' } as unknown as CopilotAction; // Missing shape
       const analysis = analyzeActionError(action);
 
       expect(analysis.suggestions.some(s => s.includes('shape'))).toBe(true);
@@ -60,7 +60,7 @@ describe('analyzeActionError', () => {
 
   describe('validation errors', () => {
     it('should report validation errors', () => {
-      const action = { action: 'select_piece', pieceId: 'p1' } as CopilotAction;
+      const action = { action: 'select_piece', pieceId: 'p1' } as unknown as CopilotAction;
       const validationErrors = [
         { field: 'pieceId', message: 'Piece not found', code: 'PIECE_NOT_FOUND' },
       ];
@@ -73,7 +73,7 @@ describe('analyzeActionError', () => {
 
   describe('recoverable flag', () => {
     it('should mark errors with suggestions as recoverable', () => {
-      const action = { action: 'selectpiece' } as CopilotAction;
+      const action = { action: 'selectpiece' } as unknown as CopilotAction;
       const analysis = analyzeActionError(action);
 
       expect(analysis.recoverable).toBe(true);
@@ -106,8 +106,8 @@ describe('analyzeParseErrors', () => {
 describe('generateRecoveryFeedback', () => {
   it('should generate summary with counts', () => {
     const actions = [
-      { action: 'unknownaction' } as CopilotAction,
-      { action: 'select_piece' } as CopilotAction, // Missing pieceId
+      { action: 'unknownaction' } as unknown as CopilotAction,
+      { action: 'select_piece' } as unknown as CopilotAction, // Missing pieceId
     ];
     const validationResults = new Map<CopilotAction, Array<{ field?: string; message: string; code: string }>>();
     validationResults.set(actions[1], [{ message: 'Missing pieceId', code: 'MISSING_PARAM' }]);
@@ -119,7 +119,7 @@ describe('generateRecoveryFeedback', () => {
   });
 
   it('should generate feedback text for LLM', () => {
-    const action = { action: 'unknownaction' } as CopilotAction;
+    const action = { action: 'unknownaction' } as unknown as CopilotAction;
     const actions = [action];
     // Need to add an entry to validationResults for the action to be analyzed
     const validationResults = new Map<CopilotAction, Array<{ field?: string; message: string; code: string }>>();
@@ -213,7 +213,7 @@ describe('buildRetryPrompt', () => {
 
 describe('attemptAutoCorrect', () => {
   it('should correct common typos', () => {
-    const action = { action: 'createpiece' } as CopilotAction;
+    const action = { action: 'createpiece' } as unknown as CopilotAction;
     const corrected = attemptAutoCorrect(action);
 
     expect(corrected).not.toBeNull();
@@ -221,14 +221,14 @@ describe('attemptAutoCorrect', () => {
   });
 
   it('should return null for uncorrectable actions', () => {
-    const action = { action: 'xyz123' } as CopilotAction;
+    const action = { action: 'xyz123' } as unknown as CopilotAction;
     const corrected = attemptAutoCorrect(action);
 
     expect(corrected).toBeNull();
   });
 
   it('should apply default values for valid actions', () => {
-    const action = { action: 'mirror_piece', pieceId: 'p1', axis: 'x' } as CopilotAction;
+    const action = { action: 'mirror_piece', pieceId: 'p1', axis: 'x' } as unknown as CopilotAction;
     const corrected = attemptAutoCorrect(action);
 
     // Should add createCopy: false if it has a default
@@ -241,8 +241,8 @@ describe('attemptAutoCorrect', () => {
 describe('filterValidActions', () => {
   it('should separate valid and invalid actions', () => {
     const actions = [
-      { action: 'clear_selection' } as CopilotAction,
-      { action: 'select_piece', pieceId: 'p1' } as CopilotAction, // p1 doesn't exist
+      { action: 'clear_selection' } as unknown as CopilotAction,
+      { action: 'select_piece', pieceId: 'p1' } as unknown as CopilotAction, // p1 doesn't exist
     ];
     const getState = () => ({
       project: {
@@ -261,7 +261,7 @@ describe('filterValidActions', () => {
 
   it('should validate against existing pieces', () => {
     const actions = [
-      { action: 'select_piece', pieceId: 'existing' } as CopilotAction,
+      { action: 'select_piece', pieceId: 'existing' } as unknown as CopilotAction,
     ];
     const getState = () => ({
       project: {

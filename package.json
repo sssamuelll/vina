@@ -15,7 +15,11 @@
     "build:all": "npm run build && npm run build:server",
     "start": "node dist-server/index.js",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare": "husky",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -45,10 +49,13 @@
     "@types/three": "^0.170.0",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "puppeteer": "^24.37.5",
     "tsx": "^4.21.0",
     "typescript": "~5.6.2",
@@ -57,5 +64,10 @@
     "vite-plugin-node-polyfills": "^0.25.0",
     "vitest": "^4.0.18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --max-warnings=0"
+    ]
+  }
 }

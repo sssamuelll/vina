@@ -7,7 +7,7 @@
  * @module actionSchemas
  */
 
-import { ACTION_CATEGORIES, DANGEROUS_ACTIONS, READ_ONLY_ACTIONS } from '../actions/actionTypes';
+import { ACTION_CATEGORIES } from '../actions/actionTypes';
 
 // ============================================================================
 // Schema Types

@@ -12,7 +12,8 @@
 
 import type { RootState } from '../../store';
 import { getPreferenceManager } from '../preferences/userPreferences';
-import { PLAN_TEMPLATES, type PlanTemplate } from '../planner/planGenerator';
+import { PLAN_TEMPLATES } from '../planner/planGenerator';
+import type { PlanTemplate } from '../planner/planTypes';
 
 // ============================================================================
 // Types
@@ -359,18 +360,18 @@ export function buildSuggestionContext(state: RootState): SuggestionContext {
 
   const pieces = state.project?.pieces ?? [];
   const seams = state.project?.seams ?? [];
-  const selectedIds = state.selection?.selectedIds ?? [];
+  const selectedIds = state.editor?.selectedPieceIds ?? [];
 
   return {
     selectedPieceIds: selectedIds,
     pieceCount: pieces.length,
     seamCount: seams.length,
-    isSimulating: state.simulation?.isSimulating ?? false,
-    currentTool: state.ui?.activeTool,
+    isSimulating: state.simulation?.simulationState === 'running',
+    currentTool: state.editor?.activeTool,
     recentActions,
     skillLevel: prefs.skillLevel,
     isEmpty: pieces.length === 0,
-    hasBody: state.simulation?.body != null,
+    hasBody: state.simulation?.bodyCollision ?? false,
   };
 }
 

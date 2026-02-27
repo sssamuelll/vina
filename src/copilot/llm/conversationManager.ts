@@ -14,13 +14,12 @@
 
 import type { RootState, AppDispatch } from '../../store';
 import type { LLMProvider, ProviderConfig, ChatMessage, StreamChunk } from '../providers/types';
-import type { CopilotAction } from '../actions/actionTypes';
-import type { ActionResult } from '../actions/actionExecutor';
+import type { CopilotAction, ActionResult } from '../actions/actionTypes';
 import { CopilotActionExecutor } from '../actions/actionExecutor';
 import { validateAction } from '../actions/actionValidator';
 import { generateCopilotContext, serializeCopilotContext, trackAction } from '../context';
 import { parseResponse, createStreamParserState, processStreamChunk, finalizeStreamParser, type ParsedResponse, type StreamParserState } from './responseParser';
-import { generateRecoveryFeedback, buildRetryPrompt, shouldRetry, filterValidActions, attemptAutoCorrect, type RetryOptions } from './errorRecovery';
+import { generateRecoveryFeedback, buildRetryPrompt, shouldRetry, attemptAutoCorrect, type RetryOptions } from './errorRecovery';
 import { generateActionsPromptSection, generateCompactActionsReference } from './actionSchemas';
 
 // ============================================================================
@@ -167,7 +166,6 @@ export class ConversationManager {
   private history: HistoryEntry[] = [];
   private config: ConversationConfig;
   private executor: CopilotActionExecutor;
-  private dispatch: AppDispatch;
   private getState: () => RootState;
 
   constructor(
@@ -176,7 +174,6 @@ export class ConversationManager {
     getState: () => RootState
   ) {
     this.config = config;
-    this.dispatch = dispatch;
     this.getState = getState;
     this.executor = new CopilotActionExecutor(dispatch, getState);
   }
@@ -252,7 +249,7 @@ export class ConversationManager {
       for (const { action, result } of allExecutedActions) {
         trackAction(
           action.action,
-          result.message || 'Completed',
+          result.summary || 'Completed',
           result.success,
           result.data
         );
@@ -357,7 +354,7 @@ export class ConversationManager {
       for (const { action, result } of allExecutedActions) {
         trackAction(
           action.action,
-          result.message || 'Completed',
+          result.summary || 'Completed',
           result.success,
           result.data
         );
@@ -448,15 +445,13 @@ export class ConversationManager {
     for (const action of actions) {
       // Validate first
       const state = this.getState();
-      const pieceIds = state.project.pieces.map(p => p.id);
-      const seamIds = state.project.seams.map(s => s.id);
-      const validation = validateAction(action, pieceIds, seamIds);
+      const validation = validateAction(action, state);
 
       if (!validation.valid) {
         // Try auto-correction
         const corrected = attemptAutoCorrect(action);
         if (corrected) {
-          const revalidation = validateAction(corrected, pieceIds, seamIds);
+          const revalidation = validateAction(corrected, state);
           if (revalidation.valid) {
             callbacks?.onActionStart?.(corrected);
             const result = await this.executor.execute(corrected);
@@ -468,7 +463,7 @@ export class ConversationManager {
 
         failed.push({
           action,
-          error: validation.errors.map(e => e.message).join('; '),
+          error: validation.errors.join('; '),
         });
         continue;
       }
@@ -483,7 +478,7 @@ export class ConversationManager {
       } else {
         failed.push({
           action,
-          error: result.error || result.message || 'Unknown error',
+          error: result.error || result.summary || 'Unknown error',
         });
       }
     }

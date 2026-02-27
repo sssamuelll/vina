@@ -12,13 +12,11 @@
  */
 
 import type { AppDispatch, RootState } from '../../store';
-import type { CopilotAction } from '../actions/actionTypes';
 import { CopilotActionExecutor } from '../actions/actionExecutor';
 import {
   type CopilotPlan,
   type PlanStep,
   type PlanEvent,
-  type PlanExecutionMode,
   areDependenciesMet,
   getNextPendingStep,
 } from './planTypes';
@@ -85,8 +83,6 @@ export interface PlanExecutionCallbacks {
  * Executes copilot plans with step-by-step control.
  */
 export class PlanExecutor {
-  private dispatch: AppDispatch;
-  private getState: () => RootState;
   private actionExecutor: CopilotActionExecutor;
   private options: PlanExecutionOptions;
   private callbacks: PlanExecutionCallbacks;
@@ -101,8 +97,6 @@ export class PlanExecutor {
     options: Partial<PlanExecutionOptions> = {},
     callbacks: PlanExecutionCallbacks = {}
   ) {
-    this.dispatch = dispatch;
-    this.getState = getState;
     this.actionExecutor = new CopilotActionExecutor(dispatch, getState);
     this.options = { ...DEFAULT_OPTIONS, ...options };
     this.callbacks = callbacks;
@@ -232,18 +226,19 @@ export class PlanExecutor {
 
         if (!result.success) {
           step.status = 'failed';
-          step.errorMessage = result.error || result.message || 'Action failed';
+          step.errorMessage = result.error || result.summary || 'Action failed';
           step.durationMs = Date.now() - stepStartTime;
 
+          const errorMsg = step.errorMessage || 'Unknown error';
           this.emitEvent({
             type: 'step_failed',
             planId: this.currentPlan!.id,
             stepId: step.id,
-            errorMessage: step.errorMessage,
+            errorMessage: errorMsg,
           });
 
-          this.callbacks.onStepComplete?.(step, { success: false, message: step.errorMessage });
-          return { success: false, message: step.errorMessage };
+          this.callbacks.onStepComplete?.(step, { success: false, message: errorMsg });
+          return { success: false, message: errorMsg };
         }
       }
 

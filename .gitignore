@@ -7,3 +7,6 @@ dist-server
 test-results/
 playwright-report/
 crates/*/target/
+
+# Coverage
+coverage/

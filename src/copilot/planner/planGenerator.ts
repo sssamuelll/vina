@@ -13,7 +13,6 @@ import {
   type PlanStep,
   type PlanTemplate,
   createPlan,
-  generateStepId,
 } from './planTypes';
 
 // ============================================================================
@@ -39,7 +38,7 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
         description: 'Create front bodice',
         details: 'Generate front bodice piece using measurements',
         actions: [
-          { action: 'create_piece', shape: 'from_blueprint', params: { blueprintId: 'aldrich-bodice-front' } } as CopilotAction,
+          { action: 'create_piece', shape: 'from_outline', params: { name: 'aldrich-bodice-front' } } as CopilotAction,
         ],
         dependsOn: [],
         optional: false,
@@ -50,7 +49,7 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
         description: 'Create back bodice',
         details: 'Generate back bodice piece using measurements',
         actions: [
-          { action: 'create_piece', shape: 'from_blueprint', params: { blueprintId: 'aldrich-bodice-back' } } as CopilotAction,
+          { action: 'create_piece', shape: 'from_outline', params: { name: 'aldrich-bodice-back' } } as CopilotAction,
         ],
         dependsOn: [],
         optional: false,
@@ -61,7 +60,7 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
         description: 'Create sleeve',
         details: 'Generate sleeve piece calculated from armhole',
         actions: [
-          { action: 'create_piece', shape: 'from_blueprint', params: { blueprintId: 'aldrich-sleeve' } } as CopilotAction,
+          { action: 'create_piece', shape: 'from_outline', params: { name: 'aldrich-sleeve' } } as CopilotAction,
         ],
         dependsOn: [],
         optional: false,
@@ -165,7 +164,7 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
         stepNumber: 1,
         description: 'Create front bodice block',
         actions: [
-          { action: 'create_piece', shape: 'from_blueprint', params: { blueprintId: 'aldrich-bodice-front' } } as CopilotAction,
+          { action: 'create_piece', shape: 'from_outline', params: { name: 'aldrich-bodice-front' } } as CopilotAction,
         ],
         dependsOn: [],
         optional: false,
@@ -175,7 +174,7 @@ export const PLAN_TEMPLATES: PlanTemplate[] = [
         stepNumber: 2,
         description: 'Create back bodice block',
         actions: [
-          { action: 'create_piece', shape: 'from_blueprint', params: { blueprintId: 'aldrich-bodice-back' } } as CopilotAction,
+          { action: 'create_piece', shape: 'from_outline', params: { name: 'aldrich-bodice-back' } } as CopilotAction,
         ],
         dependsOn: [],
         optional: false,
@@ -368,7 +367,7 @@ export function generateCustomPlan(
 function formatActionDescription(action: CopilotAction): string {
   const actionName = action.action
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+    .replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   switch (action.action) {
     case 'select_piece':

@@ -179,6 +179,15 @@ function mockState(overrides?: Partial<RootState>): RootState {
       activeBlockIndex: 0, activeStepIndex: 0,
       paused: false,
     },
+    copilotUI: {
+      highlights: [],
+      toasts: [],
+      actionLog: [],
+      maxLogEntries: 50,
+      pendingConfirmation: null,
+      ghostPreview: null,
+      actionLogVisible: false,
+    },
   };
 
   if (overrides) {

@@ -15,7 +15,6 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../../store';
 import {
   addHighlight,
-  removeHighlight,
   clearHighlights,
   cleanupExpiredHighlights,
   showToast,
@@ -26,8 +25,6 @@ import {
   hideGhostPreview,
   type CopilotHighlight,
   type CopilotToast,
-  type CopilotActionLogEntry,
-  type CopilotConfirmation,
   type CopilotGhostPreview,
 } from '../../store/copilotUISlice';
 import { isDangerousAction, type CopilotAction } from '../../copilot/actions/actionTypes';

@@ -4,6 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![Tests](https://img.shields.io/badge/tests-997%20unit%20%2B%20133%20E2E-brightgreen)](src/)
+[![codecov](https://codecov.io/gh/sssamuelll/openclo/graph/badge.svg)](https://codecov.io/gh/sssamuelll/openclo)
 
 **Open source 2D pattern editor + 3D cloth simulation + AI copilot — all in the browser.**
 

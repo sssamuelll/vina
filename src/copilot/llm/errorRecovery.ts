@@ -11,8 +11,19 @@
  */
 
 import type { CopilotAction } from '../actions/actionTypes';
-import type { ValidationError } from '../actions/actionValidator';
 import { validateAction } from '../actions/actionValidator';
+
+/** Validation error for action feedback */
+interface ValidationError {
+  field?: string;
+  message: string;
+  code: string;
+}
+
+/** Convert string errors to ValidationError objects */
+function toValidationErrors(errors: string[]): ValidationError[] {
+  return errors.map(e => ({ message: e, code: 'validation_error' }));
+}
 import { getAllActionSchemas, getActionSchema, type ActionSchema } from './actionSchemas';
 import type { ParseError } from './responseParser';
 
@@ -215,7 +226,7 @@ export function analyzeActionError(
       .filter(e => e.field)
       .map(e => ({
         name: e.field!,
-        value: (action as Record<string, unknown>)[e.field!],
+        value: (action as unknown as Record<string, unknown>)[e.field!],
         expected: e.message,
       }));
 
@@ -253,7 +264,7 @@ export function analyzeActionError(
  */
 export function analyzeParseErrors(errors: ParseError[]): ActionErrorAnalysis[] {
   return errors.map(error => ({
-    action: { action: 'unknown' } as CopilotAction,
+    action: { action: 'unknown' } as unknown as CopilotAction,
     errorType: error.type === 'json_syntax' ? 'invalid_params' : 'unknown_action',
     message: error.message,
     suggestions: error.type === 'json_syntax'
@@ -403,7 +414,8 @@ export function shouldRetry(
 export function buildRetryPrompt(
   originalMessage: string,
   feedback: RecoveryFeedback,
-  attemptNumber: number
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
+  _attemptNumber: number
 ): string {
   return `
 The previous response had errors. Please correct them:
@@ -453,7 +465,7 @@ export function attemptAutoCorrect(action: CopilotAction): CopilotAction | null 
     }
   }
 
-  return changed ? (corrected as CopilotAction) : null;
+  return changed ? (corrected as unknown as CopilotAction) : null;
 }
 
 /**
@@ -486,7 +498,7 @@ export function filterValidActions(
       valid.push(action);
     } else {
       invalid.push(action);
-      errors.set(action, validation.errors);
+      errors.set(action, toValidationErrors(validation.errors));
     }
   }
 
