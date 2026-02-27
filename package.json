@@ -15,7 +15,8 @@
     "build:all": "npm run build && npm run build:server",
     "start": "node dist-server/index.js",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepare": "husky"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -49,6 +50,8 @@
     "eslint-plugin-react-hooks": "^5.0.0",
     "eslint-plugin-react-refresh": "^0.4.16",
     "globals": "^15.14.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "puppeteer": "^24.37.5",
     "tsx": "^4.21.0",
     "typescript": "~5.6.2",
@@ -57,5 +60,10 @@
     "vite-plugin-node-polyfills": "^0.25.0",
     "vitest": "^4.0.18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --max-warnings=0"
+    ]
+  }
 }
