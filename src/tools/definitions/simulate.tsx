@@ -63,4 +63,23 @@ export const simulateTool: ToolDefinition = {
   onActivate: () => {
     console.log('Simulate tool - Coming soon!');
   },
+  copilot: {
+    description: 'Run XPBD cloth physics simulation to drape the garment realistically on the avatar. The simulation considers fabric properties, gravity, and collision with the body. Use this to see how the pattern will look when sewn and worn.',
+    examples: [
+      'Run the simulation',
+      'Simulate the garment',
+      'Show me how it drapes',
+      'Start cloth physics',
+      'Drape the pattern on the body',
+    ],
+    keywords: ['simulate', 'drape', 'physics', 'cloth', 'run', 'start', 'play', 'gravity'],
+    requiresSelection: 'none',
+    produces: 'simulation',
+    undoable: false,
+    parameterHints: {
+      particleDistance: 'Distance between simulation particles in mm. Lower = more detail but slower.',
+      iterations: 'Solver iterations per frame. Higher = stiffer/more accurate but slower.',
+      fabricPreset: 'Predefined fabric behavior: cotton (medium), silk (drapey), denim (stiff), knit (stretchy).',
+    },
+  },
 };

@@ -20,9 +20,23 @@ const SelectIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const selectTool: ToolDefinition = {
   id: 'select',
   name: 'Select/Move',
+  description: 'Select and move pattern pieces, points, or edges',
   context: '2d',
   shortcut: 'v',
   icon: SelectIcon,
   cursor: 'default',
   group: 'select',
+  copilot: {
+    description: 'Select pattern pieces, points, or edges for editing. Click to select single items, drag to marquee select multiple. Hold Shift to add to selection. Selected items can be moved by dragging.',
+    examples: [
+      'Select the front bodice',
+      'Select all sleeve pieces',
+      'Click on the shoulder point',
+      'Select the neckline edge',
+    ],
+    keywords: ['select', 'pick', 'choose', 'click', 'move', 'drag', 'highlight'],
+    requiresSelection: 'none',
+    produces: 'none',
+    undoable: true,
+  },
 };
