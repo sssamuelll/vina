@@ -28,8 +28,8 @@ export interface SeamInitData {
 
 /** Messages sent from main thread → worker */
 export type WorkerInMessage =
-  | { type: 'init'; meshData: { vertices: number[]; triIds: number[] }; config?: Partial<ClothSimConfig> }
-  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: number[]; triIds: number[]; outline: Array<{ type: string; values: number[] }> }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
+  | { type: 'init'; meshData: { vertices: Float32Array; triIds: Int32Array }; config?: Partial<ClothSimConfig> }
+  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }> }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
   | { type: 'setSeams'; seams: SeamInitData[] }
   | { type: 'start' }
   | { type: 'stop' }
@@ -119,6 +119,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
 
         // Merge all pieces into one particle system
         progress('Merging meshes...');
+        // Ensure inputs are typed arrays
         const pieceMeshes = msg.pieces.map(p => ({
           pieceId: p.pieceId,
           vertices: new Float32Array(p.vertices),
