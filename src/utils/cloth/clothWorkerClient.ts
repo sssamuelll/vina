@@ -51,7 +51,7 @@ export class ClothWorkerClient {
    * @returns Promise that resolves when worker is ready
    */
   async init(
-    meshData: { vertices: number[]; triIds: number[] },
+    meshData: { vertices: Float32Array; triIds: Int32Array },
     config?: Partial<ClothSimConfig>,
   ): Promise<void> {
     this.dispose();
@@ -86,7 +86,7 @@ export class ClothWorkerClient {
    * @returns Promise that resolves when worker is ready
    */
   async initMultiPiece(
-    pieces: Array<{ pieceId: string; vertices: number[]; triIds: number[]; outline: Array<{ type: string; values: number[] }> }>,
+    pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }> }>,
     seams: SeamInitData[],
     config?: Partial<ClothSimConfig>,
   ): Promise<void> {

@@ -230,8 +230,8 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   // Async meshing via Web Worker (never blocks main thread)
   const [pieceMeshes, setPieceMeshes] = useState<Array<{
     pieceId: string;
-    vertices: number[];
-    triIds: number[];
+    vertices: Float32Array;
+    triIds: Int32Array;
     outline: Array<{ type: string; values: number[] }>;
   }>>([]);
   const [_meshingStatus, setMeshingStatus] = useState<string | null>(null);

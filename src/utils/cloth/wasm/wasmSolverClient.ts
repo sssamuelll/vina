@@ -13,8 +13,8 @@ import type { SeamInitData } from '../clothWorker';
 
 export interface PieceMeshData {
   pieceId: string;
-  vertices: number[];
-  triIds: number[];
+  vertices: Float32Array;
+  triIds: Int32Array | number[];
   outline?: Array<{ type: string; values: number[] }>;
 }
 
