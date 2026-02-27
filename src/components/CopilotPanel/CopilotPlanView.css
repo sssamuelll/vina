@@ -1,0 +1,362 @@
+/**
+ * CopilotPlanView styles
+ */
+
+.copilot-plan-view {
+  background: var(--surface-secondary, #f8f9fa);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 8px 0;
+}
+
+/* Header */
+.copilot-plan-header {
+  margin-bottom: 12px;
+}
+
+.copilot-plan-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copilot-plan-title {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.copilot-plan-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+.copilot-plan-close:hover {
+  color: var(--text-primary, #1a1a1a);
+}
+
+.copilot-plan-summary {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #666);
+}
+
+/* Progress bar */
+.copilot-plan-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.copilot-plan-progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border-light, #e0e0e0);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.copilot-plan-progress-fill {
+  height: 100%;
+  background: var(--accent-primary, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.copilot-plan-progress-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #666);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* Stats */
+.copilot-plan-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-light, #e0e0e0);
+  border-bottom: 1px solid var(--border-light, #e0e0e0);
+}
+
+.copilot-plan-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.copilot-plan-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.copilot-plan-stat-label {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+}
+
+.copilot-plan-stat.failed .copilot-plan-stat-value {
+  color: var(--danger, #ef4444);
+}
+
+/* Controls */
+.copilot-plan-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.copilot-plan-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+}
+
+.copilot-plan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copilot-plan-btn.primary {
+  background: var(--accent-primary, #3b82f6);
+  color: white;
+}
+
+.copilot-plan-btn.primary:hover:not(:disabled) {
+  background: var(--accent-primary-hover, #2563eb);
+}
+
+.copilot-plan-btn.secondary {
+  background: var(--surface-tertiary, #e5e7eb);
+  color: var(--text-primary, #1a1a1a);
+}
+
+.copilot-plan-btn.secondary:hover:not(:disabled) {
+  background: var(--surface-hover, #d1d5db);
+}
+
+.copilot-plan-btn.danger {
+  background: var(--danger-light, #fee2e2);
+  color: var(--danger, #ef4444);
+}
+
+.copilot-plan-btn.danger:hover:not(:disabled) {
+  background: var(--danger, #ef4444);
+  color: white;
+}
+
+/* Status messages */
+.copilot-plan-message {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.copilot-plan-message.success {
+  background: var(--success-light, #dcfce7);
+  color: var(--success, #16a34a);
+}
+
+.copilot-plan-message.error {
+  background: var(--danger-light, #fee2e2);
+  color: var(--danger, #ef4444);
+}
+
+.copilot-plan-message.warning {
+  background: var(--warning-light, #fef3c7);
+  color: var(--warning, #d97706);
+}
+
+/* Steps list */
+.copilot-plan-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Single step */
+.copilot-plan-step {
+  background: var(--surface-primary, white);
+  border-radius: 6px;
+  border: 1px solid var(--border-light, #e0e0e0);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.copilot-plan-step:hover {
+  border-color: var(--border-hover, #c0c0c0);
+}
+
+.copilot-plan-step.active {
+  border-color: var(--accent-primary, #3b82f6);
+  box-shadow: 0 0 0 1px var(--accent-primary, #3b82f6);
+}
+
+.copilot-plan-step.running {
+  border-color: var(--accent-primary, #3b82f6);
+}
+
+.copilot-plan-step.completed {
+  background: var(--success-light, #dcfce7);
+  border-color: var(--success, #16a34a);
+}
+
+.copilot-plan-step.failed {
+  background: var(--danger-light, #fee2e2);
+  border-color: var(--danger, #ef4444);
+}
+
+.copilot-plan-step.skipped {
+  background: var(--surface-secondary, #f8f9fa);
+  opacity: 0.7;
+}
+
+/* Step header */
+.copilot-plan-step-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.copilot-plan-step-number {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary, #666);
+  min-width: 20px;
+}
+
+.copilot-plan-step-description {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.copilot-plan-step-optional {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: var(--surface-tertiary, #e5e7eb);
+  border-radius: 4px;
+  color: var(--text-secondary, #666);
+}
+
+.copilot-plan-step-skip {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: none;
+  border: 1px solid var(--border-light, #e0e0e0);
+  border-radius: 4px;
+  color: var(--text-secondary, #666);
+  cursor: pointer;
+}
+
+.copilot-plan-step-skip:hover {
+  background: var(--surface-tertiary, #e5e7eb);
+}
+
+/* Status icons */
+.copilot-plan-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 14px;
+}
+
+.copilot-plan-status-icon.pending {
+  color: var(--text-tertiary, #999);
+}
+
+.copilot-plan-status-icon.running {
+  color: var(--accent-primary, #3b82f6);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.copilot-plan-status-icon.completed {
+  color: var(--success, #16a34a);
+}
+
+.copilot-plan-status-icon.failed {
+  color: var(--danger, #ef4444);
+}
+
+.copilot-plan-status-icon.skipped {
+  color: var(--text-tertiary, #999);
+}
+
+.copilot-plan-status-icon.paused {
+  color: var(--warning, #d97706);
+}
+
+.copilot-plan-status-icon.cancelled {
+  color: var(--text-tertiary, #999);
+}
+
+/* Step details (expanded) */
+.copilot-plan-step-details {
+  padding: 0 12px 10px;
+  border-top: 1px solid var(--border-light, #e0e0e0);
+  margin-top: 0;
+}
+
+.copilot-plan-step-detail-text {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  margin: 8px 0 0;
+}
+
+.copilot-plan-step-result {
+  font-size: 12px;
+  color: var(--success, #16a34a);
+  margin: 8px 0 0;
+}
+
+.copilot-plan-step-error {
+  font-size: 12px;
+  color: var(--danger, #ef4444);
+  margin: 8px 0 0;
+}
+
+.copilot-plan-step-duration {
+  font-size: 11px;
+  color: var(--text-tertiary, #999);
+  margin: 8px 0 0;
+}
+
+/* Duration footer */
+.copilot-plan-duration {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  text-align: center;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-light, #e0e0e0);
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
