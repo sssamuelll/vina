@@ -27,6 +27,7 @@ import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
 import { useDispatch } from 'react-redux';
+import { toolRegistry } from '../../tools';
 import './Viewport3D.css';
 
 /** Error boundary so a WebGL crash doesn't take down the 2D editor */
@@ -73,6 +74,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
   const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+
+  // Get cursor from active tool definition
+  const toolCursor = toolRegistry.getTool(activeTool3D)?.cursor || 'default';
 
   // Sync OrbitControls with active tool
   useEffect(() => {
@@ -228,7 +232,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     <div
       className="viewport3d"
       ref={containerRef}
-      style={{ position: 'relative' }}
+      style={{ position: 'relative', cursor: toolCursor }}
       onPointerDown={handlePointerDown}
       onContextMenu={handleContextMenu}
     >
