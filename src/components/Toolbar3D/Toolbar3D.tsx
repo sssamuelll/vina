@@ -32,7 +32,6 @@ function setPrimarySubTool(parentId: string, subToolId: string) {
 export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Toolbar3DProps) {
   const dispatch = useDispatch();
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const [openFlyout, setOpenFlyout] = useState<string | null>(null);
   const [primarySubTools, setPrimarySubToolsState] = useState(getPrimarySubTools);
 
@@ -128,7 +127,6 @@ export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Tool
                   active={active}
                   hasSubTools={hasSubTools}
                   flyoutOpen={openFlyout === tool.id}
-                  simulationState={tool.id === 'simulate' ? simulationState : undefined}
                   onSelect={() => handleSelectTool(hasSubTools ? displayTool.id : tool.id)}
                   onOpenFlyout={() => handleOpenFlyout(tool.id)}
                   onSelectSubTool={(subId) => handleSelectSubTool(tool.id, subId)}
@@ -143,15 +141,12 @@ export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Tool
   );
 }
 
-type SimulationState = 'idle' | 'running' | 'paused';
-
 interface ToolButtonProps {
   tool: ToolDefinition;
   displayTool: ToolDefinition;
   active: boolean;
   hasSubTools: boolean;
   flyoutOpen: boolean;
-  simulationState?: SimulationState;
   onSelect: () => void;
   onOpenFlyout: () => void;
   onSelectSubTool: (subToolId: string) => void;
@@ -163,7 +158,6 @@ function ToolButton({
   active,
   hasSubTools,
   flyoutOpen,
-  simulationState,
   onSelect,
   onOpenFlyout,
   onSelectSubTool,
@@ -199,13 +193,10 @@ function ToolButton({
 
   const IconComponent = displayTool.icon;
 
-  // Simulation state CSS class: sim-idle (gray), sim-running (blue), sim-paused (red)
-  const simStateClass = simulationState ? `sim-${simulationState}` : '';
-
   return (
     <div className="tool3d-btn-wrapper">
       <button
-        className={`tool3d-btn ${active ? 'active' : ''} ${hasSubTools ? 'has-subtools' : ''} ${simStateClass}`}
+        className={`tool3d-btn ${active ? 'active' : ''} ${hasSubTools ? 'has-subtools' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}
