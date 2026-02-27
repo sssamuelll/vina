@@ -24,4 +24,17 @@ export const elasticTool: ToolDefinition = {
   icon: ElasticIcon,
   cursor: 'default',
   group: 'sewing',
+  copilot: {
+    description: 'Add elastic or gathering properties to pattern edges. Elastic edges contract to a shorter finished length, creating stretch or gathered effects. Select an edge and specify the gathered/stretched ratio. Used for waistbands, cuffs, necklines, and any area requiring elastic or shirring.',
+    examples: [
+      'Add elastic to the waistband',
+      'Create gathering on this sleeve edge',
+      'Make this edge gathered to 80%',
+      'Add shirring to the bodice back',
+    ],
+    keywords: ['elastic', 'gather', 'shirr', 'ruffle', 'stretch', 'contract', 'waistband', 'cuff', 'smocking'],
+    requiresSelection: 'edge',
+    produces: 'seam',
+    undoable: true,
+  },
 };

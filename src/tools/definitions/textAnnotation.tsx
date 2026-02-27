@@ -26,4 +26,17 @@ export const textAnnotationTool: ToolDefinition = {
   icon: TextAnnotationIcon,
   cursor: 'text',
   group: 'annotation',
+  copilot: {
+    description: 'Adds text labels and annotations to pattern pieces. Use for labeling piece names, adding sewing instructions, marking grain lines, or any other text notes. Text annotations are included when printing or exporting patterns.',
+    examples: [
+      'Add a label to this piece',
+      'Write "Front Bodice" on the pattern',
+      'Add sewing instructions',
+      'Label the grain line direction',
+    ],
+    keywords: ['text', 'label', 'annotation', 'note', 'write', 'name', 'instructions', 'mark'],
+    requiresSelection: 'piece',
+    produces: 'none',
+    undoable: true,
+  },
 };

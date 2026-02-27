@@ -31,4 +31,17 @@ export const movePatternTool: ToolDefinition = {
   icon: MovePatternIcon,
   cursor: 'move',
   group: 'select',
+  copilot: {
+    description: 'Moves pattern pieces around the 2D workspace. Click and drag to reposition pieces for better layout organization. Does not affect the pattern shape or measurements, only its position on the canvas.',
+    examples: [
+      'Move the pattern piece',
+      'Reposition the sleeve',
+      'Drag the bodice to the left',
+      'Rearrange the pattern pieces',
+    ],
+    keywords: ['move', 'drag', 'reposition', 'relocate', 'arrange', 'position', 'layout'],
+    requiresSelection: 'piece',
+    produces: 'none',
+    undoable: true,
+  },
 };

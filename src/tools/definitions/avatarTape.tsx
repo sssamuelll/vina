@@ -31,6 +31,19 @@ export const tapeMeasureCircTool: ToolDefinition = {
   group: '3d-avatar',
   shortcut: 'c',
   subTools: ['tape-linear'],
+  copilot: {
+    description: 'Measures circumference around the avatar body at a specified height or location. Used for taking body measurements like chest, waist, hip, neck, and arm circumferences. Click on the avatar to place a horizontal measuring tape that wraps around the body contour.',
+    examples: [
+      'Measure the waist circumference',
+      'Take a chest measurement',
+      'What is the hip circumference?',
+      'Measure around the neck',
+    ],
+    keywords: ['circumference', 'measure', 'tape', 'girth', 'around', 'chest', 'waist', 'hip', 'bust'],
+    requiresSelection: 'none',
+    produces: 'measurement',
+    undoable: true,
+  },
 };
 
 export const tapeMeasureLinearTool: ToolDefinition = {
@@ -43,4 +56,17 @@ export const tapeMeasureLinearTool: ToolDefinition = {
   group: '3d-avatar',
   shortcut: 'l',
   hidden: true, // Only appears in flyout from Circumference Tape
+  copilot: {
+    description: 'Measures straight-line distance between two points on the avatar body. Used for length measurements like shoulder width, arm length, torso length, and inseam. Click two points on the avatar to create a linear measurement.',
+    examples: [
+      'Measure shoulder to wrist length',
+      'What is the inseam measurement?',
+      'Measure the back length',
+      'Take a sleeve length measurement',
+    ],
+    keywords: ['linear', 'length', 'distance', 'straight', 'point-to-point', 'inseam', 'shoulder', 'arm'],
+    requiresSelection: 'none',
+    produces: 'measurement',
+    undoable: true,
+  },
 };

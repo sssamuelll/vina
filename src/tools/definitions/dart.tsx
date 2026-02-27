@@ -47,4 +47,33 @@ export const dartTool: ToolDefinition = {
       step: 5,
     },
   ],
+  copilot: {
+    description:
+      'Add darts to pattern pieces for shaping and fitting. Darts are triangular tucks sewn into fabric to provide three-dimensional shape, commonly used at bust, waist, and shoulder areas to create fitted garments.',
+    examples: [
+      'Add a dart to this bodice piece',
+      'Create a bust dart with 25mm width',
+      'Insert a waist dart 120mm deep',
+      'Place a dart on the selected edge',
+    ],
+    keywords: [
+      'dart',
+      'tuck',
+      'shaping',
+      'fitting',
+      'bust dart',
+      'waist dart',
+      'shoulder dart',
+      'contour',
+      'tailoring',
+    ],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+    dangerous: false,
+    parameterHints: {
+      dartWidth: 'Width of the dart opening at the edge in millimeters',
+      dartDepth: 'How deep the dart extends into the pattern piece in millimeters',
+    },
+  },
 };

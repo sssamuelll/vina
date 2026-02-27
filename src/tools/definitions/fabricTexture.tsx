@@ -31,4 +31,17 @@ export const fabricTextureTool: ToolDefinition = {
   icon: FabricTextureIcon,
   cursor: 'default',
   group: 'pattern',
+  copilot: {
+    description: 'Opens fabric and texture settings for pattern pieces. Allows assigning fabric materials with specific properties (weight, stretch, drape) and visual textures (color, pattern, print). Affects both simulation behavior and visual appearance.',
+    examples: [
+      'Change the fabric texture',
+      'Apply a denim material',
+      'Set the fabric to cotton',
+      'Add a floral print texture',
+    ],
+    keywords: ['fabric', 'texture', 'material', 'cloth', 'pattern', 'print', 'color', 'swatch'],
+    requiresSelection: 'piece',
+    produces: 'none',
+    undoable: true,
+  },
 };

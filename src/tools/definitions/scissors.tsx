@@ -45,4 +45,33 @@ export const scissorsTool: ToolDefinition = {
       value: true,
     },
   ],
+  copilot: {
+    description:
+      'Cut or split pattern pieces along a line. Divides a single pattern piece into two or more separate pieces, useful for creating style lines, adding seams, or separating pattern sections for different fabrics or construction methods.',
+    examples: [
+      'Cut this pattern piece in half',
+      'Split the bodice along this line',
+      'Divide the skirt panel here',
+      'Create a style line by cutting through this piece',
+    ],
+    keywords: [
+      'cut',
+      'scissors',
+      'split',
+      'divide',
+      'separate',
+      'slice',
+      'trim',
+      'style line',
+      'partition',
+    ],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+    dangerous: true,
+    parameterHints: {
+      cutType: 'Whether to cut along a straight line or a curved path',
+      keepBoth: 'Whether to keep both resulting pieces or discard one side',
+    },
+  },
 };

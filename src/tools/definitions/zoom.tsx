@@ -40,4 +40,20 @@ export const zoomTool: ToolDefinition = {
       ],
     },
   ],
+  copilot: {
+    description: 'Zoom the 2D view in or out to adjust magnification level. Click to zoom in at that location, or use Fit to Window to see all pattern pieces at once. Hold Alt/Option while clicking to zoom out. Scroll wheel also zooms when this tool is active.',
+    examples: [
+      'Zoom in on the collar',
+      'Zoom out to see all pieces',
+      'Fit the pattern to the window',
+      'Magnify this area',
+    ],
+    keywords: ['zoom', 'magnify', 'enlarge', 'fit', 'scale view', 'zoom in', 'zoom out', 'view size'],
+    requiresSelection: 'none',
+    produces: 'view',
+    undoable: false,
+    parameterHints: {
+      zoomMode: 'Zoom In increases magnification, Zoom Out decreases, Fit to Window shows entire pattern',
+    },
+  },
 };

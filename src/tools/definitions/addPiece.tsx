@@ -27,4 +27,17 @@ export const addPieceTool: ToolDefinition = {
   icon: AddPieceIcon,
   cursor: 'default',
   group: 'pattern',
+  copilot: {
+    description: 'Creates a new pattern piece from scratch. Opens a dialog or workflow to define a new garment component such as a bodice, sleeve, collar, or pocket. This is the starting point for building patterns.',
+    examples: [
+      'Add a new pattern piece',
+      'Create a sleeve piece',
+      'I need to make a new collar',
+      'Start a new bodice pattern',
+    ],
+    keywords: ['create', 'new', 'piece', 'add', 'pattern', 'block', 'component', 'start'],
+    requiresSelection: 'none',
+    produces: 'piece',
+    undoable: true,
+  },
 };

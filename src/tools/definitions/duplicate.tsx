@@ -27,4 +27,17 @@ export const duplicateTool: ToolDefinition = {
   icon: DuplicateIcon,
   cursor: 'default',
   group: 'pattern',
+  copilot: {
+    description: 'Duplicate selected pattern pieces to create exact copies. The duplicated pieces are offset slightly from the originals and automatically selected for immediate repositioning. Useful for creating symmetric garment pieces or making backup copies before modifications.',
+    examples: [
+      'Duplicate the front bodice piece',
+      'Make a copy of the sleeve',
+      'Clone the collar pattern',
+      'Create a duplicate of all selected pieces',
+    ],
+    keywords: ['duplicate', 'copy', 'clone', 'replicate', 'double', 'mirror copy'],
+    requiresSelection: 'piece',
+    produces: 'piece',
+    undoable: true,
+  },
 };
