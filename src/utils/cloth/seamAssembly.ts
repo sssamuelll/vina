@@ -122,15 +122,14 @@ export function computeArcLengthParams(points: Point2D[]): number[] {
 
 /**
  * Extract boundary vertices for a given edge segment of a pattern piece outline.
- *
- * The outline is flattened to 2D points, then the segment from `edgeStart` to
- * `edgeEnd` (inclusive) is extracted and parameterized by arc length.
+ * Subdivides edges according to maxEdgeLength to match the CDT mesher's output.
  *
  * @param outline - Pattern piece outline path commands
  * @param edgeStart - Start vertex index in the flattened outline
  * @param edgeEnd - End vertex index in the flattened outline
  * @param globalOffset - Offset to add to vertex indices for the merged mesh
  * @param curveResolution - Resolution for flattening curves
+ * @param maxEdgeLength - Maximum allowed edge length before subdivision
  * @returns Array of parameterized vertices along the edge
  */
 export function parameterizeEdge(
@@ -139,26 +138,86 @@ export function parameterizeEdge(
   edgeEnd: number,
   globalOffset: number = 0,
   curveResolution: number = 12,
+  maxEdgeLength: number = 15,
 ): ParameterizedVertex[] {
   const flatPoints = flattenPath(outline, curveResolution);
   if (flatPoints.length === 0) return [];
 
-  // Handle wrapping: if edgeEnd < edgeStart, wrap around
-  const indices: number[] = [];
-  if (edgeEnd >= edgeStart) {
-    for (let i = edgeStart; i <= edgeEnd; i++) indices.push(i);
-  } else {
-    for (let i = edgeStart; i < flatPoints.length; i++) indices.push(i);
-    for (let i = 0; i <= edgeEnd; i++) indices.push(i);
+  // 1. Calculate the global vertex index for each subdivided point in the WHOLE outline
+  // This is how the CDT mesher numbers them.
+  const allOutlineVertices: Array<{ x: number; y: number; originalIdx: number; isSubdivided: boolean }> = [];
+  const pointToGlobalIdx = new Map<number, number>();
+
+  for (let i = 0; i < flatPoints.length; i++) {
+    const p1 = flatPoints[i];
+    const p2 = flatPoints[(i + 1) % flatPoints.length];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const numSegments = dist <= maxEdgeLength ? 1 : Math.ceil(dist / maxEdgeLength);
+
+    pointToGlobalIdx.set(i, allOutlineVertices.length);
+    allOutlineVertices.push({ ...p1, originalIdx: i, isSubdivided: false });
+
+    for (let s = 1; s < numSegments; s++) {
+      const t = s / numSegments;
+      allOutlineVertices.push({ 
+        x: p1.x + dx * t, 
+        y: p1.y + dy * t, 
+        originalIdx: i, 
+        isSubdivided: true 
+      });
+    }
   }
 
-  const edgePoints = indices.map(i => flatPoints[i]);
-  const params = computeArcLengthParams(edgePoints);
+  // 2. Extract the range of global indices that correspond to the requested seam segment
+  const seamVertices: ParameterizedVertex[] = [];
+  let currentDist = 0;
+  const distances: number[] = [0];
 
-  return indices.map((vertIdx, i) => ({
-    index: vertIdx + globalOffset,
-    t: params[i],
-  }));
+  // Determine the sequence of original points in the segment
+  const segmentOriginalIndices: number[] = [];
+  if (edgeEnd >= edgeStart) {
+    for (let i = edgeStart; i <= edgeEnd; i++) segmentOriginalIndices.push(i);
+  } else {
+    for (let i = edgeStart; i < flatPoints.length; i++) segmentOriginalIndices.push(i);
+    for (let i = 0; i <= edgeEnd; i++) segmentOriginalIndices.push(i);
+  }
+
+  // Collect all vertices (original and subdivided) for these segments
+  for (let k = 0; k < segmentOriginalIndices.length; k++) {
+    const origIdx = segmentOriginalIndices[k];
+    const globalIdx = pointToGlobalIdx.get(origIdx)!;
+    
+    // Add the original point
+    seamVertices.push({ index: globalIdx + globalOffset, t: 0 });
+
+    // Add any subdivided points AFTER this point (if not at the very end of the seam)
+    if (k < segmentOriginalIndices.length - 1) {
+      let nextGlobalIdx = (globalIdx + 1) % allOutlineVertices.length;
+      while (allOutlineVertices[nextGlobalIdx].isSubdivided) {
+        seamVertices.push({ index: nextGlobalIdx + globalOffset, t: 0 });
+        nextGlobalIdx = (nextGlobalIdx + 1) % allOutlineVertices.length;
+      }
+    }
+  }
+
+  // 3. Calculate T parameters (arc length) for the extracted vertices
+  if (seamVertices.length > 1) {
+    for (let i = 1; i < seamVertices.length; i++) {
+      const p1 = allOutlineVertices[seamVertices[i - 1].index - globalOffset];
+      const p2 = allOutlineVertices[seamVertices[i].index - globalOffset];
+      const d = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
+      currentDist += d;
+      distances.push(currentDist);
+    }
+    const total = distances[distances.length - 1];
+    for (let i = 0; i < seamVertices.length; i++) {
+      seamVertices[i].t = total > 0 ? distances[i] / total : 0;
+    }
+  }
+
+  return seamVertices;
 }
 
 // ─── Vertex Pairing ─────────────────────────────────────────────────────────
@@ -289,8 +348,11 @@ export function buildSeamConstraints(
     const offsetB = mergedMesh.pieces.find(p => p.pieceId === seam.pieceB.pieceId);
     if (!offsetA || !offsetB) continue;
 
-    const edgeA = parameterizeEdge(outlineA, seam.pieceA.edgeStart, seam.pieceA.edgeEnd, offsetA.vertexOffset);
-    const edgeB = parameterizeEdge(outlineB, seam.pieceB.edgeStart, seam.pieceB.edgeEnd, offsetB.vertexOffset);
+    // Default maxEdgeLength is 15 in CDT, but we should ideally pass this from config
+    const maxEdgeLength = 15; 
+
+    const edgeA = parameterizeEdge(outlineA, seam.pieceA.edgeStart, seam.pieceA.edgeEnd, offsetA.vertexOffset, 12, maxEdgeLength);
+    const edgeB = parameterizeEdge(outlineB, seam.pieceB.edgeStart, seam.pieceB.edgeEnd, offsetB.vertexOffset, 12, maxEdgeLength);
 
     const pairs = matchVertices(edgeA, edgeB);
     const compliance = config.compliance[seam.type];

@@ -9,11 +9,13 @@
  */
 
 import type { SDFData } from '../sdfGenerator';
+import type { SeamInitData } from '../clothWorker';
 
 export interface PieceMeshData {
   pieceId: string;
   vertices: number[];
   triIds: number[];
+  outline?: Array<{ type: string; values: number[] }>;
 }
 
 export class WasmSolverClient {
@@ -26,9 +28,9 @@ export class WasmSolverClient {
   onError?: (error: string) => void;
 
   /**
-   * Initialize with merged multi-piece mesh data (runs entirely in worker).
+   * Initialize with merged multi-piece mesh data and seam connections.
    */
-  async initMultiPiece(pieces: PieceMeshData[]): Promise<void> {
+  async initMultiPiece(pieces: PieceMeshData[], seams: SeamInitData[] = []): Promise<void> {
     this.dispose();
 
     try {
@@ -57,10 +59,8 @@ export class WasmSolverClient {
       this.worker!.postMessage({
         type: 'init',
         baseUrl,
-        pieces: pieces.map(p => ({
-          vertices: p.vertices,
-          triIds: p.triIds,
-        })),
+        pieces,
+        seams,
       });
     });
   }
