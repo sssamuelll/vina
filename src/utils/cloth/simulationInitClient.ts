@@ -140,13 +140,13 @@ export class SimulationInitClient {
         [vertices.buffer, indices.buffer],
       );
 
-      // Timeout: 60s for SDF (32³ grid should complete in <15s)
+      // Timeout: 20s for SDF (32³ grid should complete in <15s)
       setTimeout(() => {
         if (this.pendingSDF) {
           this.pendingSDF = null;
           reject(new Error('SDF generation timeout'));
         }
-      }, 60000);
+      }, 20000);
     });
   }
 

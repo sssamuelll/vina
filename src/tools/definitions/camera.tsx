@@ -21,8 +21,9 @@ const CameraIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const cameraTool: ToolDefinition = {
   id: 'camera',
   name: 'Camera',
+  description: 'Orbit, pan and zoom the 3D viewport',
   context: '3d',
   icon: CameraIcon,
-  cursor: 'default',
+  cursor: 'grab',
   group: '3d-navigate',
 };
