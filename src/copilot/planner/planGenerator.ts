@@ -13,7 +13,6 @@ import {
   type PlanStep,
   type PlanTemplate,
   createPlan,
-  generateStepId,
 } from './planTypes';
 
 // ============================================================================
@@ -368,7 +367,7 @@ export function generateCustomPlan(
 function formatActionDescription(action: CopilotAction): string {
   const actionName = action.action
     .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase());
+    .replace(/\b\w/g, (c: string) => c.toUpperCase());
 
   switch (action.action) {
     case 'select_piece':

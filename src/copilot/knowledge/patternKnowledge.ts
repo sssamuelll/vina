@@ -369,7 +369,7 @@ export function queryKnowledge(query: KnowledgeQuery): string {
   }
 }
 
-function formatEaseKnowledge(garmentType?: string, area?: string): string {
+function formatEaseKnowledge(garmentType?: string, _area?: string): string {
   const lines: string[] = ['## Ease Standards\n'];
 
   if (garmentType && garmentType in EASE_STANDARDS.garment) {
@@ -388,7 +388,7 @@ function formatEaseKnowledge(garmentType?: string, area?: string): string {
   return lines.join('\n');
 }
 
-function formatSeamAllowanceKnowledge(context?: string): string {
+function formatSeamAllowanceKnowledge(_context?: string): string {
   const lines: string[] = ['## Seam Allowances\n'];
   lines.push('**Standard allowances:**');
   for (const [type, value] of Object.entries(SEAM_ALLOWANCES.standard)) {
@@ -423,7 +423,7 @@ function formatFabricKnowledge(fabricType?: string): string {
   return lines.join('\n');
 }
 
-function formatConstructionKnowledge(context?: string): string {
+function formatConstructionKnowledge(_context?: string): string {
   const lines: string[] = ['## Construction Techniques\n'];
   lines.push('**Seam types:**');
   for (const [type, info] of Object.entries(CONSTRUCTION_TECHNIQUES.seams)) {

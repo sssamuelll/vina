@@ -8,7 +8,7 @@
  * - Step details on hover/click
  */
 
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { CopilotPlan, PlanStep, PlanStatus } from '../../copilot/planner/planTypes';
 import { calculatePlanProgress, getPlanStats } from '../../copilot/planner/planTypes';
 import './CopilotPlanView.css';
