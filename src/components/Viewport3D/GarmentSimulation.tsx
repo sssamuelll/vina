@@ -155,8 +155,10 @@ function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
       if (cancelled) return;
 
       const result: SimPiece[] = meshed.map(m => ({
-        ...m,
-        outline: (pieces.find(p => p.id === m.pieceId)?.outline ?? []) as any,
+        pieceId: m.pieceId,
+        vertices: new Float32Array(m.vertices),
+        triIds: new Int32Array(m.triIds),
+        outline: (pieces.find(p => p.id === m.pieceId)?.outline ?? []) as Array<{ type: string; values: number[] }>,
       }));
 
       setPieceMeshes(result);
