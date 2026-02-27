@@ -1,0 +1,597 @@
+/**
+ * Action Validator — validates CopilotActions before execution.
+ *
+ * Each action type has specific validation rules that ensure
+ * the action can be executed successfully.
+ *
+ * @module actionValidator
+ */
+
+import type { RootState } from '../../store';
+import type {
+  CopilotAction,
+  SelectionAction,
+  PieceAction,
+  GeometryAction,
+  SeamAction,
+  MeasurementAction,
+  SimulationAction,
+  AvatarAction,
+  ViewAction,
+  ProjectAction,
+} from './actionTypes';
+
+// ============================================================================
+// Validation Result
+// ============================================================================
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+function ok(): ValidationResult {
+  return { valid: true, errors: [], warnings: [] };
+}
+
+function fail(...errors: string[]): ValidationResult {
+  return { valid: false, errors, warnings: [] };
+}
+
+function warn(warnings: string[]): ValidationResult {
+  return { valid: true, errors: [], warnings };
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+function pieceExists(state: RootState, pieceId: string): boolean {
+  return state.project.pieces.some(p => p.id === pieceId);
+}
+
+function seamExists(state: RootState, seamId: string): boolean {
+  return state.project.seams.some(s => s.id === seamId);
+}
+
+function getPiece(state: RootState, pieceId: string) {
+  return state.project.pieces.find(p => p.id === pieceId);
+}
+
+function validateEdgeIndex(state: RootState, pieceId: string, edgeIndex: number): ValidationResult {
+  const piece = getPiece(state, pieceId);
+  if (!piece) {
+    return fail(`Piece "${pieceId}" not found`);
+  }
+  // Edge count = number of outline commands (excluding Z/closepath)
+  const edgeCount = piece.outline.filter(c => c.type !== 'Z').length;
+  if (edgeIndex < 0 || edgeIndex >= edgeCount) {
+    return fail(`Edge index ${edgeIndex} out of range (piece has ${edgeCount} edges)`);
+  }
+  return ok();
+}
+
+function validatePointIndex(state: RootState, pieceId: string, pointIndex: number): ValidationResult {
+  const piece = getPiece(state, pieceId);
+  if (!piece) {
+    return fail(`Piece "${pieceId}" not found`);
+  }
+  // Point count = number of vertices in outline
+  const pointCount = piece.outline.filter(c => c.type !== 'Z').length;
+  if (pointIndex < 0 || pointIndex >= pointCount) {
+    return fail(`Point index ${pointIndex} out of range (piece has ${pointCount} points)`);
+  }
+  return ok();
+}
+
+// ============================================================================
+// Selection Validators
+// ============================================================================
+
+function validateSelectionAction(action: SelectionAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'select_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      return ok();
+
+    case 'select_pieces':
+      if (Array.isArray(action.query)) {
+        const missing = action.query.filter(id => !pieceExists(state, id));
+        if (missing.length > 0) {
+          return fail(`Pieces not found: ${missing.join(', ')}`);
+        }
+      }
+      // Natural language queries are validated at execution time
+      return ok();
+
+    case 'select_edge':
+      return validateEdgeIndex(state, action.pieceId, action.edgeIndex);
+
+    case 'select_point':
+      return validatePointIndex(state, action.pieceId, action.pointIndex);
+
+    case 'clear_selection':
+      return ok();
+
+    default:
+      return fail(`Unknown selection action`);
+  }
+}
+
+// ============================================================================
+// Piece Validators
+// ============================================================================
+
+function validatePieceAction(action: PieceAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'create_piece':
+      if (action.shape === 'rectangle') {
+        if (!action.params.width || !action.params.height) {
+          return fail('Rectangle requires width and height');
+        }
+        if (action.params.width <= 0 || action.params.height <= 0) {
+          return fail('Width and height must be positive');
+        }
+      } else if (action.shape === 'from_points') {
+        if (!action.params.points || action.params.points.length < 3) {
+          return fail('from_points requires at least 3 points');
+        }
+      } else if (action.shape === 'from_outline') {
+        if (!action.params.outline || action.params.outline.length < 2) {
+          return fail('from_outline requires a valid outline');
+        }
+      }
+      return ok();
+
+    case 'duplicate_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      return ok();
+
+    case 'delete_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      // Warn about connected seams
+      const connectedSeams = state.project.seams.filter(
+        s => s.pieceA.pieceId === action.pieceId || s.pieceB.pieceId === action.pieceId
+      );
+      if (connectedSeams.length > 0 && action.deleteConnectedSeams !== false) {
+        return warn([`Will delete ${connectedSeams.length} connected seam(s)`]);
+      }
+      return ok();
+
+    case 'rename_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      if (!action.name || action.name.trim().length === 0) {
+        return fail('Name cannot be empty');
+      }
+      return ok();
+
+    case 'mirror_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      if (action.axis !== 'x' && action.axis !== 'y') {
+        return fail('Axis must be "x" or "y"');
+      }
+      return ok();
+
+    case 'move_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      return ok();
+
+    case 'rotate_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      return ok();
+
+    case 'scale_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      if (action.factor <= 0) {
+        return fail('Scale factor must be positive');
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown piece action`);
+  }
+}
+
+// ============================================================================
+// Geometry Validators
+// ============================================================================
+
+function validateGeometryAction(action: GeometryAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'move_point':
+      return validatePointIndex(state, action.pieceId, action.pointIndex);
+
+    case 'add_point':
+      const edgeResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
+      if (!edgeResult.valid) return edgeResult;
+      if (action.position < 0 || action.position > 1) {
+        return fail('Position must be between 0 and 1');
+      }
+      return ok();
+
+    case 'delete_point':
+      const pointResult = validatePointIndex(state, action.pieceId, action.pointIndex);
+      if (!pointResult.valid) return pointResult;
+      // Warn if piece would have too few points
+      const piece = getPiece(state, action.pieceId);
+      const pointCount = piece?.outline.filter(c => c.type !== 'Z').length || 0;
+      if (pointCount <= 3) {
+        return fail('Cannot delete point: piece must have at least 3 points');
+      }
+      return ok();
+
+    case 'add_ease':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      if (action.edge !== 'all' && typeof action.edge === 'number') {
+        return validateEdgeIndex(state, action.pieceId, action.edge);
+      }
+      if (action.amount === 0) {
+        return warn(['Ease amount is 0, no change will occur']);
+      }
+      return ok();
+
+    case 'add_dart':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      if (action.depth <= 0) {
+        return fail('Dart depth must be positive');
+      }
+      return ok();
+
+    case 'curve_edge':
+      const curveResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
+      if (!curveResult.valid) return curveResult;
+      if (action.curvature < -1 || action.curvature > 1) {
+        return fail('Curvature must be between -1 and 1');
+      }
+      return ok();
+
+    case 'split_edge':
+      const splitResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
+      if (!splitResult.valid) return splitResult;
+      if (action.at <= 0 || action.at >= 1) {
+        return fail('Split position must be between 0 and 1 (exclusive)');
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown geometry action`);
+  }
+}
+
+// ============================================================================
+// Seam Validators
+// ============================================================================
+
+function validateSeamAction(action: SeamAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'create_seam': {
+      if (!pieceExists(state, action.pieceA)) {
+        return fail(`Piece A "${action.pieceA}" not found`);
+      }
+      if (!pieceExists(state, action.pieceB)) {
+        return fail(`Piece B "${action.pieceB}" not found`);
+      }
+      // Handle both single index and [start, end] range formats
+      const edgeAIdx = Array.isArray(action.edgeA) ? action.edgeA[0] : action.edgeA;
+      const edgeBIdx = Array.isArray(action.edgeB) ? action.edgeB[0] : action.edgeB;
+      const edgeAResult = validateEdgeIndex(state, action.pieceA, edgeAIdx);
+      if (!edgeAResult.valid) return edgeAResult;
+      const edgeBResult = validateEdgeIndex(state, action.pieceB, edgeBIdx);
+      if (!edgeBResult.valid) return edgeBResult;
+      // Check for existing seam (comparing against edgeStart/edgeEnd)
+      const existingSeam = state.project.seams.find(
+        s =>
+          (s.pieceA.pieceId === action.pieceA && s.pieceA.edgeStart === edgeAIdx) ||
+          (s.pieceB.pieceId === action.pieceA && s.pieceB.edgeStart === edgeAIdx) ||
+          (s.pieceA.pieceId === action.pieceB && s.pieceA.edgeStart === edgeBIdx) ||
+          (s.pieceB.pieceId === action.pieceB && s.pieceB.edgeStart === edgeBIdx)
+      );
+      if (existingSeam) {
+        return warn(['One or both edges already have seams']);
+      }
+      return ok();
+    }
+
+    case 'delete_seam':
+      if (!seamExists(state, action.seamId)) {
+        return fail(`Seam "${action.seamId}" not found`);
+      }
+      return ok();
+
+    case 'flip_seam_direction':
+      if (!seamExists(state, action.seamId)) {
+        return fail(`Seam "${action.seamId}" not found`);
+      }
+      return ok();
+
+    case 'auto_detect_seams':
+      if (action.pieceIds) {
+        const missing = action.pieceIds.filter(id => !pieceExists(state, id));
+        if (missing.length > 0) {
+          return fail(`Pieces not found: ${missing.join(', ')}`);
+        }
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown seam action`);
+  }
+}
+
+// ============================================================================
+// Measurement Validators
+// ============================================================================
+
+function validateMeasurementAction(action: MeasurementAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'measure_edge':
+      return validateEdgeIndex(state, action.pieceId, action.edgeIndex);
+
+    case 'measure_piece_area':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      return ok();
+
+    case 'compare_edges':
+      const edge1Result = validateEdgeIndex(state, action.edge1.pieceId, action.edge1.edgeIndex);
+      if (!edge1Result.valid) return edge1Result;
+      const edge2Result = validateEdgeIndex(state, action.edge2.pieceId, action.edge2.edgeIndex);
+      if (!edge2Result.valid) return edge2Result;
+      return ok();
+
+    case 'measure_distance':
+      // No state validation needed for point-to-point distance
+      return ok();
+
+    default:
+      return fail(`Unknown measurement action`);
+  }
+}
+
+// ============================================================================
+// Simulation Validators
+// ============================================================================
+
+function validateSimulationAction(action: SimulationAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'start_simulation':
+      if (state.project.pieces.length === 0) {
+        return fail('Cannot start simulation without any pieces');
+      }
+      if (state.simulation.simulationState === 'running') {
+        return warn(['Simulation is already running']);
+      }
+      return ok();
+
+    case 'stop_simulation':
+      if (state.simulation.simulationState === 'idle') {
+        return warn(['Simulation is not running']);
+      }
+      return ok();
+
+    case 'reset_simulation':
+      return ok();
+
+    case 'set_fabric':
+      if (action.pieceId !== 'all') {
+        if (!pieceExists(state, action.pieceId)) {
+          return fail(`Piece "${action.pieceId}" not found`);
+        }
+      }
+      // Note: fabricId validation would need a fabric registry lookup
+      return ok();
+
+    case 'show_fit_map':
+      if (action.enabled && state.simulation.simulationState !== 'running') {
+        return warn(['Fit map works best during simulation']);
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown simulation action`);
+  }
+}
+
+// ============================================================================
+// Avatar Validators
+// ============================================================================
+
+const VALID_MEASUREMENTS = new Set([
+  'height', 'chest', 'waist', 'hips', 'shoulder', 'armLength',
+  'inseam', 'neck', 'bust', 'underBust', 'highHip', 'thigh',
+  'knee', 'calf', 'ankle', 'wrist', 'upperArm', 'forearm',
+]);
+
+function validateAvatarAction(action: AvatarAction, _state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'set_avatar_measurement':
+      if (!VALID_MEASUREMENTS.has(action.measurement)) {
+        return warn([`Unknown measurement "${action.measurement}"`]);
+      }
+      if (action.value <= 0) {
+        return fail('Measurement value must be positive');
+      }
+      return ok();
+
+    case 'set_avatar_measurements':
+      for (const [key, value] of Object.entries(action.measurements)) {
+        if (!VALID_MEASUREMENTS.has(key)) {
+          // Don't fail, just warn about unknown measurements
+          return warn([`Unknown measurement "${key}"`]);
+        }
+        if (typeof value !== 'number' || value <= 0) {
+          return fail(`Measurement "${key}" must be a positive number`);
+        }
+      }
+      return ok();
+
+    case 'set_pose':
+      // Pose validation would need a pose registry lookup
+      return ok();
+
+    case 'set_avatar_type':
+      if (action.type !== 'dressform' && action.type !== 'model') {
+        return fail('Avatar type must be "dressform" or "model"');
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown avatar action`);
+  }
+}
+
+// ============================================================================
+// View Validators
+// ============================================================================
+
+function validateViewAction(action: ViewAction, state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'zoom_to_piece':
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      return ok();
+
+    case 'zoom_to_fit':
+      return ok();
+
+    case 'switch_view':
+      if (!['2d', '3d', 'split'].includes(action.view)) {
+        return fail('View must be "2d", "3d", or "split"');
+      }
+      return ok();
+
+    case 'set_view_mode':
+      if (!['edit', 'preview', 'simulation'].includes(action.mode)) {
+        return fail('Mode must be "edit", "preview", or "simulation"');
+      }
+      return ok();
+
+    case 'toggle_panel':
+      if (!['properties', 'layers', 'simulation', 'measurements'].includes(action.panel)) {
+        return fail(`Unknown panel "${action.panel}"`);
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown view action`);
+  }
+}
+
+// ============================================================================
+// Project Validators
+// ============================================================================
+
+function validateProjectAction(action: ProjectAction, _state: RootState): ValidationResult {
+  switch (action.action) {
+    case 'save_project':
+      return ok();
+
+    case 'export_dxf':
+    case 'export_pdf':
+      // pieceIds validation handled at execution
+      return ok();
+
+    case 'undo':
+      if (action.steps !== undefined && action.steps <= 0) {
+        return fail('Undo steps must be positive');
+      }
+      return ok();
+
+    case 'redo':
+      if (action.steps !== undefined && action.steps <= 0) {
+        return fail('Redo steps must be positive');
+      }
+      return ok();
+
+    default:
+      return fail(`Unknown project action`);
+  }
+}
+
+// ============================================================================
+// Main Validator
+// ============================================================================
+
+/**
+ * Validate a CopilotAction before execution.
+ *
+ * @param action - The action to validate
+ * @param state - Current Redux state
+ * @returns ValidationResult with valid flag and any errors/warnings
+ */
+export function validateAction(action: CopilotAction, state: RootState): ValidationResult {
+  // Selection actions
+  if (['select_piece', 'select_pieces', 'select_edge', 'select_point', 'clear_selection'].includes(action.action)) {
+    return validateSelectionAction(action as SelectionAction, state);
+  }
+
+  // Piece actions
+  if (['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece'].includes(action.action)) {
+    return validatePieceAction(action as PieceAction, state);
+  }
+
+  // Geometry actions
+  if (['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'split_edge'].includes(action.action)) {
+    return validateGeometryAction(action as GeometryAction, state);
+  }
+
+  // Seam actions
+  if (['create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams'].includes(action.action)) {
+    return validateSeamAction(action as SeamAction, state);
+  }
+
+  // Measurement actions
+  if (['measure_edge', 'measure_piece_area', 'compare_edges', 'measure_distance'].includes(action.action)) {
+    return validateMeasurementAction(action as MeasurementAction, state);
+  }
+
+  // Simulation actions
+  if (['start_simulation', 'stop_simulation', 'reset_simulation', 'set_fabric', 'show_fit_map'].includes(action.action)) {
+    return validateSimulationAction(action as SimulationAction, state);
+  }
+
+  // Avatar actions
+  if (['set_avatar_measurement', 'set_avatar_measurements', 'set_pose', 'set_avatar_type'].includes(action.action)) {
+    return validateAvatarAction(action as AvatarAction, state);
+  }
+
+  // View actions
+  if (['zoom_to_piece', 'zoom_to_fit', 'switch_view', 'set_view_mode', 'toggle_panel'].includes(action.action)) {
+    return validateViewAction(action as ViewAction, state);
+  }
+
+  // Project actions
+  if (['save_project', 'export_dxf', 'export_pdf', 'undo', 'redo'].includes(action.action)) {
+    return validateProjectAction(action as ProjectAction, state);
+  }
+
+  // Message action - always valid
+  if (action.action === 'message') {
+    return ok();
+  }
+
+  return fail(`Unknown action type: ${(action as any).action}`);
+}
