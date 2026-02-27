@@ -28,108 +28,110 @@ function computeBoneAnchors(m: BodyMeasurements): AnchorDef[] {
   const d = deriveDimensions(m);
   const cr = d.chestRadius;
   const hr = d.hipRadius;
-  const SO = 1.25;
-  const armR = 0.035 * SO;
+  const SO = 1.3; // Offset multiplier from surface
+  const armR = 0.04 * SO;
 
   const anchors: AnchorDef[] = [];
   const a = (bone: string, x: number, y: number, z: number) =>
     anchors.push({ bone, offset: [x, y, z] });
 
-  // ── HEAD ──
+  // ── HEAD & NECK ──
   a('Head', 0, 0.12, 0);
-  a('Head', 0, 0.10, cr * 0.3);
-  a('Head', cr * 0.35, 0.10, 0);
-  a('Head', -cr * 0.38 * SO, 0.05, 0);
-  a('Head', cr * 0.38 * SO, 0.05, 0);
-  a('Head', 0, 0.05, cr * 0.35);
-  a('Neck', 0, 0.02, -cr * 0.35 * SO);
+  a('Head', 0, 0.08, cr * 0.35);
+  a('Head', 0, 0.08, -cr * 0.35);
+  a('Head', cr * 0.4, 0.06, 0);
+  a('Head', -cr * 0.4, 0.06, 0);
+  a('Neck', 0, 0.04, cr * 0.3);
+  a('Neck', 0, 0.04, -cr * 0.3);
 
   // ── SHOULDERS ──
-  a('LeftShoulder', -0.06, 0, 0);
-  a('RightShoulder', 0.06, 0, 0);
+  a('LeftShoulder', -0.05, 0.02, 0);
+  a('RightShoulder', 0.05, 0.02, 0);
 
-  // ── TORSO — 5 rings ──
+  // ── TORSO — 5 Rings ──
   const rFn = (t: number) => (cr + t * (hr - cr)) * SO;
 
-  // Ring 1 (upper chest) → Spine2
+  // Ring 1: Upper Chest (Spine2 Top)
   const r1 = rFn(0);
-  a('Spine2', 0, 0.04, r1);  a('Spine2', -r1*0.45, 0.04, r1*0.88);  a('Spine2', r1*0.45, 0.04, r1*0.88);
-  a('Spine2', 0, 0.04, -r1); a('Spine2', -r1*0.45, 0.04, -r1*0.88); a('Spine2', r1*0.45, 0.04, -r1*0.88);
-  a('Spine2', -r1*0.95, 0.04, 0); a('Spine2', r1*0.95, 0.04, 0);
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    a('Spine2', Math.sin(ang) * r1, 0.08, Math.cos(ang) * r1);
+  }
 
-  // Ring 2 (bust) → Spine2 lower
-  const r2 = rFn(0.18);
-  a('Spine2', 0, -0.06, r2);  a('Spine2', -r2*0.45, -0.06, r2*0.88);  a('Spine2', r2*0.45, -0.06, r2*0.88);
-  a('Spine2', 0, -0.06, -r2); a('Spine2', -r2*0.45, -0.06, -r2*0.88); a('Spine2', r2*0.45, -0.06, -r2*0.88);
-  a('Spine2', -r2*0.95, -0.06, 0); a('Spine2', r2*0.95, -0.06, 0);
+  // Ring 2: Mid Chest (Spine2 Mid)
+  const r2 = rFn(0.2);
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    a('Spine2', Math.sin(ang) * r2, -0.02, Math.cos(ang) * r2);
+  }
 
-  // Ring 3 (central) → Spine1 — 2 lateral per side
-  const r3 = rFn(0.4);
-  a('Spine1', 0, 0, r3);  a('Spine1', -r3*0.45, 0, r3*0.88);  a('Spine1', r3*0.45, 0, r3*0.88);
-  a('Spine1', 0, 0, -r3); a('Spine1', -r3*0.45, 0, -r3*0.88); a('Spine1', r3*0.45, 0, -r3*0.88);
-  a('Spine1', -r3*0.95, 0.015, 0); a('Spine1', -r3*0.95, -0.015, 0);
-  a('Spine1', r3*0.95, 0.015, 0);  a('Spine1', r3*0.95, -0.015, 0);
+  // Ring 3: Waist (Spine1)
+  const r3 = rFn(0.45);
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    a('Spine1', Math.sin(ang) * r3, 0, Math.cos(ang) * r3);
+  }
 
-  // Ring 4 (below central) → Spine — 1 lateral per side
-  const r4 = rFn(0.65);
-  a('Spine', 0, 0.02, r4);  a('Spine', -r4*0.45, 0.02, r4*0.88);  a('Spine', r4*0.45, 0.02, r4*0.88);
-  a('Spine', 0, 0.02, -r4); a('Spine', -r4*0.45, 0.02, -r4*0.88); a('Spine', r4*0.45, 0.02, -r4*0.88);
-  a('Spine', -r4*0.95, 0.02, 0); a('Spine', r4*0.95, 0.02, 0);
+  // Ring 4: Upper Hip (Spine)
+  const r4 = rFn(0.7);
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    a('Spine', Math.sin(ang) * r4, 0, Math.cos(ang) * r4);
+  }
 
-  // Ring 5 (low hip) → Hips
-  const r5 = rFn(0.9);
-  a('Hips', 0, 0.02, r5);  a('Hips', -r5*0.45, 0.02, r5*0.88);  a('Hips', r5*0.45, 0.02, r5*0.88);
-  a('Hips', 0, 0.02, -r5); a('Hips', -r5*0.45, 0.02, -r5*0.88); a('Hips', r5*0.45, 0.02, -r5*0.88);
-  a('Hips', -r5*0.95, 0.02, 0); a('Hips', r5*0.95, 0.02, 0);
+  // Ring 5: Low Hip (Hips)
+  const r5 = rFn(0.95);
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2;
+    a('Hips', Math.sin(ang) * r5, 0, Math.cos(ang) * r5);
+  }
 
-  // ── ARMS — 4 rings × 4 points ──
-  for (const bones of [
-    ['LeftArm', 'LeftForeArm', 'LeftForeArm', 'LeftHand'],
-    ['RightArm', 'RightForeArm', 'RightForeArm', 'RightHand'],
-  ]) {
-    for (let bi = 0; bi < bones.length; bi++) {
-      const yOff = bi === 2 ? -0.1 : 0; // mid-forearm offset
-      a(bones[bi], 0, armR + yOff, 0);
-      a(bones[bi], 0, -armR + yOff, 0);
-      a(bones[bi], 0, yOff, armR);
-      a(bones[bi], 0, yOff, -armR);
+  // ── ARMS ──
+  // 4 rings along the arm: Upper, Mid-Upper, Mid-Forearm, Wrist
+  for (const side of ['Left', 'Right']) {
+    const s = side === 'Left' ? -1 : 1;
+    const armBones = [`${side}Arm`, `${side}Arm`, `${side}ForeArm`, `${side}Hand`];
+    const armYOffs = [0, -0.12, -0.1, 0];
+    
+    for (let bi = 0; bi < armBones.length; bi++) {
+      const bone = armBones[bi];
+      const y = armYOffs[bi];
+      a(bone, 0, y, armR);
+      a(bone, 0, y, -armR);
+      a(bone, s * armR, y, 0);
+      a(bone, -s * armR, y, 0);
     }
   }
 
-  // ── CROTCH RING ──
-  const crotchR = hr * 0.4 * SO;
-  for (const side of ['LeftUpLeg', 'RightUpLeg'] as const) {
-    a(side, 0, 0.02, crotchR);
-    a(side, -crotchR*0.5, 0.02, crotchR*0.85);
-    a(side, crotchR*0.5, 0.02, crotchR*0.85);
-    a(side, 0, 0.02, -crotchR);
-    a(side, -crotchR*0.5, 0.02, -crotchR*0.85);
-    a(side, crotchR*0.5, 0.02, -crotchR*0.85);
-    const lSign = side.startsWith('Left') ? -1 : 1;
-    a(side, lSign * crotchR, 0.04, 0);
-  }
-
-  // ── LEGS — 3 rings × 4 points ──
-  const legRings = [
-    { boneSuffix: 'UpLeg', r: hr * 0.32 * SO, yOff: -0.15 },
-    { boneSuffix: 'Leg', r: hr * 0.22 * SO, yOff: 0.0 },
-    { boneSuffix: 'Leg', r: hr * 0.18 * SO, yOff: -0.15 },
-  ];
-  for (const prefix of ['Left', 'Right']) {
-    for (const ring of legRings) {
-      const bone = `${prefix}${ring.boneSuffix}`;
-      a(bone, 0, ring.yOff, ring.r);
-      a(bone, 0, ring.yOff, -ring.r);
-      a(bone, ring.r, ring.yOff, 0);
-      a(bone, -ring.r, ring.yOff, 0);
+  // ── LEGS ──
+  // Each leg segment (Upper and Lower) gets 3 rings of 4 points
+  const upLegR = hr * 0.35 * SO;
+  const lowLegR = hr * 0.22 * SO;
+  
+  for (const side of ['Left', 'Right']) {
+    const s = side === 'Left' ? -1 : 1;
+    
+    // UpLeg (Thigh) - 3 rings
+    const upBone = `${side}UpLeg`;
+    for (const y of [-0.05, -0.2, -0.35]) {
+      a(upBone, 0, y, upLegR);
+      a(upBone, 0, y, -upLegR);
+      a(upBone, s * upLegR, y, 0);
+      a(upBone, -s * upLegR, y, 0);
     }
-  }
 
-  // ── ANKLES ──
-  const ankR = hr * 0.14 * SO;
-  for (const prefix of ['Left', 'Right']) {
-    a(`${prefix}Leg`, 0, -0.2, ankR);
-    a(`${prefix}Leg`, 0, -0.2, -ankR);
+    // Leg (Calf) - 3 rings
+    const lowBone = `${side}Leg`;
+    for (const y of [-0.05, -0.2, -0.35]) {
+      a(lowBone, 0, y, lowLegR);
+      a(lowBone, 0, y, -lowLegR);
+      a(lowBone, s * lowLegR, y, 0);
+      a(lowBone, -s * lowLegR, y, 0);
+    }
+
+    // Foot/Ankle
+    a(`${side}Foot`, 0, 0, lowLegR * 0.7);
+    a(`${side}Foot`, 0, 0, -lowLegR * 0.7);
   }
 
   return anchors;
