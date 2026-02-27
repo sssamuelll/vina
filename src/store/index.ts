@@ -11,6 +11,7 @@ import toolReducer from './toolSlice';
 import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
 import blueprintReducer, { loadBlueprints } from './blueprintSlice';
+import copilotUIReducer from './copilotUISlice';
 import { undoMiddleware } from './undoMiddleware';
 import { BUILTIN_BLUEPRINTS } from '../utils/construction/blueprints';
 
@@ -28,6 +29,7 @@ export const store = configureStore({
     parametric: parametricReducer,
     construction: constructionReducer,
     blueprints: blueprintReducer,
+    copilotUI: copilotUIReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
