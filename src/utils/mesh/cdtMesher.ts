@@ -13,8 +13,6 @@ import cleanPSLG from 'clean-pslg';
 import type { PatternPiece, Point2D, PathCommand } from '../../types/types';
 import type { ClothMeshData } from '../cloth/xpbdSolver';
 import { flattenPath } from '../seam/index';
-// refineMesh kept for potential future use but replaced by interior grid approach
-// import { refineMesh } from './refine';
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -59,10 +57,16 @@ const DEFAULT_CONFIG: Required<MeshConfig> = {
  *
  * @param piece - Pattern piece to mesh
  * @param config - Mesh generation configuration
+ * @param particleDistance - Optional override for maxEdgeLength (simulation resolution)
  * @returns ClothMeshData ready for cloth simulation
  */
-export function meshPiece(piece: PatternPiece, config: MeshConfig = {}): ClothMeshData {
+export function meshPiece(
+  piece: PatternPiece,
+  config: MeshConfig = {},
+  particleDistance?: number,
+): ClothMeshData {
   const cfg = { ...DEFAULT_CONFIG, ...config };
+  if (particleDistance) cfg.maxEdgeLength = particleDistance;
 
   try {
     // Flatten the outline to 2D points
@@ -102,144 +106,48 @@ export function meshPieceOutline(
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
   }
 
-  // Convert to PSLG format
-  const { points, edges } = convertToPSLG(cleanOutline, internalLines, config.curveResolution);
+  // 1. Convert to PSLG format with boundary subdivision
+  const { points, edges } = convertToPSLG(cleanOutline, internalLines, config.curveResolution, config.maxEdgeLength);
 
   if (points.length < 3 || edges.length === 0) {
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
   }
 
-  // Clean PSLG to fix self-intersections and T-junctions
-  // Note: cleanPSLG may return false but still process the data successfully
+  // 2. Clean PSLG to fix intersections (critical for complex patterns)
   cleanPSLG(points, edges);
 
-  // Run Constrained Delaunay Triangulation
+  // 3. Generate interior grid points for density
+  // We use the cleaned outline for point-in-polygon tests
+  const boundaryPoints = cleanOutline.map(p => [p.x, p.y]);
+  const interiorPoints = generateInteriorGrid(points, boundaryPoints, config.maxEdgeLength);
+  
+  const allPoints = [...points, ...interiorPoints];
+
+  // 4. Run CDT
   let triangles: number[][];
   try {
-    triangles = cdt2d(points, edges, {
+    triangles = cdt2d(allPoints, edges, {
       interior: true,
-      exterior: false, // Only interior triangles for cloth simulation
+      exterior: false,
     });
   } catch (error) {
-    console.warn('CDT failed:', error);
+    console.warn('[cdtMesher] CDT failed:', error);
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
   }
 
   if (triangles.length === 0) {
-    // Try with exterior triangles as fallback
+    // Fallback: try without interior constraint (still only interior triangles)
     try {
-      triangles = cdt2d(points, edges, {
-        interior: true,
-        exterior: true,
-      });
-    } catch (error) {
-      console.warn('CDT with exterior also failed:', error);
-      return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
-    }
-    
-    if (triangles.length === 0) {
-      return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
-    }
-  }
-
-  // Dense interior point insertion for particle-distance-based meshing.
-  // Instead of Ruppert-style refinement (too slow, often fails), generate a
-  // grid of interior points at maxEdgeLength spacing and re-triangulate.
-  const numBoundaryPoints = points.length;
-  const interiorPoints = generateInteriorGrid(points, edges, numBoundaryPoints, config.maxEdgeLength);
-
-  if (interiorPoints.length > 0) {
-    const densePoints = [...points, ...interiorPoints];
-    try {
-      const denseTriangles = cdt2d(densePoints, edges, {
-        interior: true,
-        exterior: false,
-      });
-      if (denseTriangles.length > 0) {
-        return convertToClothMeshData(densePoints, denseTriangles, config);
-      }
+      triangles = cdt2d(allPoints, edges, { interior: true, exterior: true });
     } catch {
-      // Fall through to basic CDT
+      return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
     }
   }
 
-  // Fallback to basic CDT mesh (boundary-only, coarse)
-  return convertToClothMeshData(points, triangles, config);
+  return convertToClothMeshData(allPoints, triangles, config);
 }
 
 // ─── Helper Functions ───────────────────────────────────────────────────────
-
-/**
- * Generate interior grid points inside a polygon at the given spacing.
- * Uses ray casting (point-in-polygon) to keep only points inside the boundary.
- */
-function generateInteriorGrid(
-  points: number[][],
-  _edges: number[][],
-  numBoundaryPoints: number,
-  spacing: number,
-): number[][] {
-  if (spacing <= 0 || numBoundaryPoints < 3) return [];
-
-  // Compute bounding box of boundary points
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (let i = 0; i < numBoundaryPoints; i++) {
-    const p = points[i];
-    if (p[0] < minX) minX = p[0];
-    if (p[0] > maxX) maxX = p[0];
-    if (p[1] < minY) minY = p[1];
-    if (p[1] > maxY) maxY = p[1];
-  }
-
-  // Build boundary polygon from edges (use only boundary edges = first numBoundaryPoints edges)
-  // The boundary is the first closed loop of edges
-  const boundaryPoly: number[][] = [];
-  for (let i = 0; i < numBoundaryPoints; i++) {
-    boundaryPoly.push(points[i]);
-  }
-
-  const interior: number[][] = [];
-  const halfSpacing = spacing * 0.5;
-
-  // Offset grid by half spacing so points don't land exactly on edges
-  for (let y = minY + halfSpacing; y < maxY; y += spacing) {
-    for (let x = minX + halfSpacing; x < maxX; x += spacing) {
-      if (pointInPolygon(x, y, boundaryPoly)) {
-        // Check minimum distance to boundary points to avoid near-duplicates
-        let tooClose = false;
-        for (let i = 0; i < points.length; i++) {
-          const dx = x - points[i][0];
-          const dy = y - points[i][1];
-          if (dx * dx + dy * dy < halfSpacing * halfSpacing) {
-            tooClose = true;
-            break;
-          }
-        }
-        if (!tooClose) {
-          interior.push([x, y]);
-        }
-      }
-    }
-  }
-
-  return interior;
-}
-
-/**
- * Ray casting point-in-polygon test.
- */
-function pointInPolygon(x: number, y: number, polygon: number[][]): boolean {
-  let inside = false;
-  const n = polygon.length;
-  for (let i = 0, j = n - 1; i < n; j = i++) {
-    const xi = polygon[i][0], yi = polygon[i][1];
-    const xj = polygon[j][0], yj = polygon[j][1];
-    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
 
 /**
  * Remove consecutive duplicate points from a polygon outline.
@@ -284,46 +192,64 @@ function removeDuplicatePoints(points: Point2D[], tolerance: number = 0.001): Po
 
 /**
  * Convert outline and internal lines to PSLG format (points + constrained edges).
+ * Subdivides any edges longer than maxEdgeLength to ensure simulation resolution.
  *
  * @param outlinePoints - Polygon outline points
  * @param internalLines - Internal lines to constrain
  * @param curveResolution - Resolution for flattening internal curves
+ * @param maxEdgeLength - Maximum allowed edge length before subdivision
  * @returns PSLG representation with points array and constraint edges
  */
 function convertToPSLG(
   outlinePoints: Point2D[],
   internalLines: { path: PathCommand[] }[],
   curveResolution: number,
+  maxEdgeLength: number,
 ): { points: number[][]; edges: number[][] } {
   const points: number[][] = [];
   const edges: number[][] = [];
 
-  // Add outline points
-  for (const pt of outlinePoints) {
-    points.push([pt.x, pt.y]);
+  function addSubdividedEdge(p1: Point2D, p2: Point2D) {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    let startIdx = points.length - 1;
+    if (startIdx < 0 || points[startIdx][0] !== p1.x || points[startIdx][1] !== p1.y) {
+      points.push([p1.x, p1.y]);
+      startIdx = points.length - 1;
+    }
+
+    if (dist <= maxEdgeLength) {
+      points.push([p2.x, p2.y]);
+      edges.push([startIdx, points.length - 1]);
+    } else {
+      const numSegments = Math.ceil(dist / maxEdgeLength);
+      let prevIdx = startIdx;
+      for (let i = 1; i <= numSegments; i++) {
+        const t = i / numSegments;
+        points.push([p1.x + dx * t, p1.y + dy * t]);
+        const currIdx = points.length - 1;
+        edges.push([prevIdx, currIdx]);
+        prevIdx = currIdx;
+      }
+    }
   }
 
-  // Add outline edges (closed loop)
+  // 1. Add outline with subdivision
   for (let i = 0; i < outlinePoints.length; i++) {
-    const next = (i + 1) % outlinePoints.length;
-    edges.push([i, next]);
+    const p1 = outlinePoints[i];
+    const p2 = outlinePoints[(i + 1) % outlinePoints.length];
+    addSubdividedEdge(p1, p2);
   }
 
-  // Add internal lines as constrained edges
+  // 2. Add internal lines with subdivision
   for (const line of internalLines) {
     const linePoints = flattenPath(line.path, curveResolution);
     if (linePoints.length < 2) continue;
-
-    const startIdx = points.length;
     
-    // Add internal line points
-    for (const pt of linePoints) {
-      points.push([pt.x, pt.y]);
-    }
-
-    // Add internal line edges
     for (let i = 0; i < linePoints.length - 1; i++) {
-      edges.push([startIdx + i, startIdx + i + 1]);
+      addSubdividedEdge(linePoints[i], linePoints[i + 1]);
     }
   }
 
@@ -369,5 +295,64 @@ function convertToClothMeshData(
     triIds[i * 3 + 2] = triangles[i][2];
   }
 
-  return { vertices, triIds };
-}
+    return { vertices, triIds };
+  }
+  
+  /**
+   * Generate interior grid points inside a polygon at the given spacing.
+   */
+  function generateInteriorGrid(
+    points: number[][],
+    boundaryPoly: number[][],
+    spacing: number,
+  ): number[][] {
+    if (spacing <= 0 || boundaryPoly.length < 3) return [];
+  
+    // Compute bounding box
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of boundaryPoly) {
+      if (p[0] < minX) minX = p[0];
+      if (p[0] > maxX) maxX = p[0];
+      if (p[1] < minY) minY = p[1];
+      if (p[1] > maxY) maxY = p[1];
+    }
+  
+    const interior: number[][] = [];
+    const halfSpacing = spacing * 0.5;
+  
+    // Offset grid to avoid landing exactly on edges
+    for (let y = minY + halfSpacing; y < maxY; y += spacing) {
+      for (let x = minX + halfSpacing; x < maxX; x += spacing) {
+        if (pointInPolygon(x, y, boundaryPoly)) {
+          // Keep distance from existing points
+          let tooClose = false;
+          for (const p of points) {
+            const dx = x - p[0], dy = y - p[1];
+            if (dx * dx + dy * dy < halfSpacing * halfSpacing) {
+              tooClose = true;
+              break;
+            }
+          }
+          if (!tooClose) interior.push([x, y]);
+        }
+      }
+    }
+  
+    return interior;
+  }
+  
+  /**
+   * Ray casting point-in-polygon test.
+   */
+  function pointInPolygon(x: number, y: number, polygon: number[][]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1];
+      const xj = polygon[j][0], yj = polygon[j][1];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }
+  

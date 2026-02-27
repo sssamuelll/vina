@@ -72,51 +72,43 @@ export function refineMesh(
     );
 
     if (badTriangles.length === 0) {
-      // No more bad triangles, refinement complete
       break;
     }
 
     // Sort by worst quality first (longest edge or smallest angle)
     badTriangles.sort((a, b) => {
-      // Prioritize by longest edge, then by smallest angle
       const edgeDiff = b.longestEdgeLength - a.longestEdgeLength;
       if (Math.abs(edgeDiff) > 0.1) return edgeDiff;
       return a.minAngle - b.minAngle;
     });
 
-    // Insert new points at edge midpoints (limit per pass to avoid explosion)
     const maxInsertionsPerPass = Math.min(badTriangles.length, 10);
     const newPoints: number[][] = [];
 
     for (let i = 0; i < maxInsertionsPerPass; i++) {
       const bad = badTriangles[i];
-      
-      // Check if midpoint is far enough from existing points
-      if (isPointTooClose(bad.edgeMidpoint, currentPoints, maxEdgeLength * 0.3)) {
-        continue;
+      if (!isPointTooClose(bad.edgeMidpoint, currentPoints, maxEdgeLength * 0.1)) {
+        newPoints.push(bad.edgeMidpoint);
       }
-
-      newPoints.push(bad.edgeMidpoint);
     }
 
     if (newPoints.length === 0) {
-      // No new points could be inserted, stop refinement
       break;
     }
 
-    // Add new points and rebuild triangulation
     currentPoints.push(...newPoints);
 
-    // Rebuild CDT with new points (preserve original constraint edges)
-    // The original edges still reference the same boundary point indices
     try {
-      currentTriangles = cdt2d(currentPoints, edges, {
+      const nextTriangles = cdt2d(currentPoints, edges, {
         interior: true,
         exterior: false,
       });
+      if (nextTriangles.length === 0) {
+        currentPoints = currentPoints.slice(0, -newPoints.length);
+        break;
+      }
+      currentTriangles = nextTriangles;
     } catch (error) {
-      // CDT failed, revert to previous state
-      console.warn('CDT refinement failed on pass', pass + 1, ':', error);
       currentPoints = currentPoints.slice(0, -newPoints.length);
       break;
     }

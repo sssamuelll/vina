@@ -313,7 +313,15 @@ describe('CDT Mesher', () => {
       }
 
       const quality = analyzeTriangleQuality(points, triangles);
-      expect(quality.minAngle).toBeGreaterThan(0); // Grid CDT prioritizes density over angle quality
+      expect(quality.minAngle).toBeGreaterThan(20); // Ruppert refinement should guarantee > 20°
+    });
+
+    test('particleDistance override works', () => {
+      const piece = createRectanglePiece(100, 100);
+      const result = meshPiece(piece, {}, 10); // 10mm particles
+      
+      const numVertices = result.vertices.length / 3;
+      expect(numVertices).toBeGreaterThan(50); // Small particles = many vertices
     });
   });
 
