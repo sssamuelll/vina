@@ -102,6 +102,10 @@ interface MiddlewareState {
   metrics: SolverMetrics;
   /** Jobs currently in flight */
   pendingJobs: Map<string, { generationId: number; cPieceId: string }>;
+  /** Whether solver is currently computing */
+  isComputing: boolean;
+  /** Listeners for computing state changes */
+  computingListeners: Set<(isComputing: boolean) => void>;
 }
 
 const state: MiddlewareState = {
@@ -120,7 +124,41 @@ const state: MiddlewareState = {
     lastResolveTimestamp: 0,
   },
   pendingJobs: new Map(),
+  isComputing: false,
+  computingListeners: new Set(),
 };
+
+// ─── Computing State Management ──────────────────────────────────────────────
+
+/**
+ * Set computing state and notify listeners.
+ */
+function setComputingState(computing: boolean): void {
+  if (state.isComputing !== computing) {
+    state.isComputing = computing;
+    state.computingListeners.forEach(listener => listener(computing));
+  }
+}
+
+/**
+ * Subscribe to computing state changes.
+ * @returns Unsubscribe function.
+ */
+export function subscribeToComputingState(listener: (isComputing: boolean) => void): () => void {
+  state.computingListeners.add(listener);
+  // Immediately notify of current state
+  listener(state.isComputing);
+  return () => {
+    state.computingListeners.delete(listener);
+  };
+}
+
+/**
+ * Get current computing state.
+ */
+export function getIsComputing(): boolean {
+  return state.isComputing;
+}
 
 // ─── Adaptive Debounce ───────────────────────────────────────────────────────
 
@@ -470,6 +508,11 @@ function handleWorkerResult(result: BuildPieceResult): void {
       }));
     }
   }
+
+  // Check if all jobs complete
+  if (state.pendingJobs.size === 0) {
+    setComputingState(false);
+  }
 }
 
 // ─── Middleware Factory ──────────────────────────────────────────────────────
@@ -525,9 +568,13 @@ export function createReactiveSolverMiddleware(): Middleware<{}, any> {
       const debounceMs = calculateDebounceMs();
       const currentGenerationId = state.generationId;
 
+      // Signal computing started (debounce pending)
+      setComputingState(true);
+
       state.debounceTimer = setTimeout(() => {
         // Double-check generation hasn't changed
         if (currentGenerationId !== state.generationId) {
+          setComputingState(false);
           return;
         }
 
@@ -538,6 +585,12 @@ export function createReactiveSolverMiddleware(): Middleware<{}, any> {
           currentGenerationId
         ).catch((error) => {
           console.error('[ReactiveSolver] Build error:', error);
+        }).finally(() => {
+          // For main thread builds, mark complete immediately
+          // Worker pool builds complete when all pending jobs finish
+          if (state.pendingJobs.size === 0) {
+            setComputingState(false);
+          }
         });
       }, debounceMs);
 

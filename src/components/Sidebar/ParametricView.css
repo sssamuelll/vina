@@ -39,6 +39,16 @@
   letter-spacing: 0.03em;
 }
 
+.parametric-computing {
+  color: var(--accent);
+  animation: parametric-pulse 1s ease-in-out infinite;
+}
+
+@keyframes parametric-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* ─── Size selector ─────────────────────────────────────────────────────── */
 
 .parametric-size-bar {
