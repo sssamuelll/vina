@@ -20,9 +20,15 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
   });
 
   test('garment falls due to gravity', async ({ page }) => {
-    // 1. Draw a simple rectangle piece using keyboard shortcut
-    await page.keyboard.press('r');
+    // 1. Click on 2D view to ensure focus, then draw a rectangle
     const svg = page.locator('svg.pattern-svg');
+    await svg.click(); // Focus the 2D canvas
+    await page.waitForTimeout(200);
+
+    // Activate rectangle tool
+    await page.keyboard.press('r');
+    await page.waitForTimeout(200);
+
     const box = await svg.boundingBox();
     if (!box) throw new Error('Pattern SVG not found');
 
@@ -30,16 +36,21 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
     const cy = box.y + box.height / 2;
     await page.mouse.move(cx - 80, cy - 80);
     await page.mouse.down();
-    await page.mouse.move(cx + 80, cy + 80, { steps: 5 });
+    await page.mouse.move(cx + 80, cy + 80, { steps: 10 });
     await page.mouse.up();
 
-    // Wait for piece to be created and meshed
-    await page.waitForTimeout(1500);
+    // Wait for piece to be created and verify
+    await page.waitForTimeout(1000);
 
-    // 2. Switch to 3D view and start simulation
-    // Look for the SimModeToggle "Simulate" button
-    const simulateBtn = page.locator('button:has-text("Simulate")').first();
-    await simulateBtn.click();
+    // Verify piece was created by checking the status bar
+    const piecesIndicator = page.locator('text=/Pieces:\\s*[1-9]/');
+    await expect(piecesIndicator).toBeVisible({ timeout: 5000 });
+
+    // 2. Open simulation panel and start simulation properly
+    await page.click('.activity-bar-item[title="Simulation"]');
+    const startBtn = page.locator('button:has-text("▶ Simulate")');
+    await expect(startBtn).toBeEnabled({ timeout: 5000 });
+    await startBtn.click();
 
     // Wait for simulation to initialize (Wasm loading + mesh setup)
     await page.waitForTimeout(3000);
@@ -118,22 +129,36 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
   test('simulation does not produce NaN or infinite positions', async ({ page }) => {
     // This is a regression test for the wasm memory access bug
 
-    // 1. Create a piece
-    await page.keyboard.press('r');
+    // 1. Create a piece - click to focus, then draw
     const svg = page.locator('svg.pattern-svg');
+    await svg.click();
+    await page.waitForTimeout(200);
+
+    await page.keyboard.press('r');
+    await page.waitForTimeout(200);
+
     const box = await svg.boundingBox();
     if (!box) throw new Error('Pattern SVG not found');
 
     await page.mouse.move(box.x + 100, box.y + 100);
     await page.mouse.down();
-    await page.mouse.move(box.x + 200, box.y + 200, { steps: 3 });
+    await page.mouse.move(box.x + 250, box.y + 250, { steps: 10 });
     await page.mouse.up();
     await page.waitForTimeout(1000);
 
-    // 2. Start simulation
-    const simulateBtn = page.locator('button:has-text("Simulate")').first();
-    await simulateBtn.click();
-    await page.waitForTimeout(5000);
+    // Verify piece was created
+    const piecesIndicator = page.locator('text=/Pieces:\\s*[1-9]/');
+    await expect(piecesIndicator).toBeVisible({ timeout: 5000 });
+
+    // 2. Start simulation via panel
+    await page.click('.activity-bar-item[title="Simulation"]');
+    const startBtn = page.locator('button:has-text("▶ Simulate")');
+    await expect(startBtn).toBeEnabled({ timeout: 5000 });
+    await startBtn.click();
+
+    // Wait for simulation to run
+    await expect(page.locator('.sim-status.running')).toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(4000);
 
     // 3. Check all positions are valid
     const positionCheck = await page.evaluate(() => {
