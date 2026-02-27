@@ -154,7 +154,7 @@ function buildMeshFromPiece(
  */
 function buildMeshFromOutlineFallback(
   outline: PathCommand[],
-): { vertices: number[]; triIds: number[] } | null {
+): { vertices: Float32Array; triIds: Int32Array } | null {
   const points = sampleOutline(outline);
   if (points.length < 3) return null;
 
@@ -183,15 +183,15 @@ function buildMeshFromOutlineFallback(
   }
 
   // Extract flat vertex array (place at y=1.2 above ground)
-  const vertices: number[] = [];
-  for (let i = 0; i < posAttr.count; i++) {
-    vertices.push(posAttr.getX(i), 1.2, posAttr.getY(i));
+  const numVerts = posAttr.count;
+  const vertices = new Float32Array(numVerts * 3);
+  for (let i = 0; i < numVerts; i++) {
+    vertices[i * 3] = posAttr.getX(i);
+    vertices[i * 3 + 1] = 1.2;
+    vertices[i * 3 + 2] = posAttr.getY(i);
   }
 
-  const triIds: number[] = [];
-  for (let i = 0; i < index.count; i++) {
-    triIds.push(index.getX(i));
-  }
+  const triIds = new Int32Array(index.array);
 
   geo.dispose();
   return { vertices, triIds };
@@ -320,7 +320,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
       clientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, meshData, fabricId, onFrame]);
+  }, [simulationState, meshData, fabricId, onFrame, position, avatarModelUrl, avatarHeight]);
 
   // Update fabric on the running worker
   useEffect(() => {
@@ -384,7 +384,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
     const geo = new THREE.BufferGeometry();
     const posArray = new Float32Array(meshData.vertices);
     geo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-    geo.setIndex(Array.from(meshData.triIds));
+    geo.setIndex(new THREE.BufferAttribute(meshData.triIds, 1));
     geo.computeVertexNormals();
     geometryRef.current = geo;
     return geo;

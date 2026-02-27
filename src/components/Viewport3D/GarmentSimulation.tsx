@@ -27,6 +27,15 @@ import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision } from 
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface SimPiece {
+  pieceId: string;
+  vertices: Float32Array;
+  triIds: Int32Array;
+  outline: Array<{ type: string; values: number[] }>;
+}
+
 // ─── SDF Cache + Deduplication ────────────────────────────────────────────────
 
 /** In-flight deduplication: same avatar+height returns same promise */
@@ -228,12 +237,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const pieceParticleDistances = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
 
   // Async meshing via Web Worker (never blocks main thread)
-  const [pieceMeshes, setPieceMeshes] = useState<Array<{
-    pieceId: string;
-    vertices: Float32Array;
-    triIds: Int32Array;
-    outline: Array<{ type: string; values: number[] }>;
-  }>>([]);
+  const [pieceMeshes, setPieceMeshes] = useState<SimPiece[]>([]);
   const [_meshingStatus, setMeshingStatus] = useState<string | null>(null);
   const initClientRef = useRef<SimulationInitClient | null>(null);
 
@@ -250,7 +254,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       const meshed = await client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance);
       if (cancelled) return;
 
-      const result = meshed.map(m => {
+      const result: SimPiece[] = meshed.map(m => {
         const piece = pieces.find(p => p.id === m.pieceId);
         return {
           ...m,
@@ -274,7 +278,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       client.dispose();
       initClientRef.current = null;
     };
-  }, [pieces, globalParticleDistance, pieceParticleDistances]);
+  }, [pieces, globalParticleDistance, pieceParticleDistances, dispatch]);
 
   // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
@@ -367,7 +371,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     lastFrameTimeRef.current = now;
   }, [dispatch]);
 
-  // GPU solver client ref
+  // Solver clients
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
   const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
@@ -400,11 +404,9 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       const cz = Math.cos(rz), sz = Math.sin(rz);
 
       const numVerts = pm.vertices.length / 3;
-      // MUST be Float32Array for efficient transfer to Worker/Wasm
       const transformed = new Float32Array(pm.vertices.length);
       for (let vi = 0; vi < numVerts; vi++) {
         const vx = pm.vertices[vi * 3], vy = pm.vertices[vi * 3 + 1], vz = pm.vertices[vi * 3 + 2];
-        // Euler XYZ: Rz * Ry * Rx * v
         const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
         const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
         const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
@@ -431,9 +433,6 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
       const startSim = async () => {
         // ─── WebGPU (DISABLED) ─────────────────────────────────────────
-        // WebGPU shader compilation blocks the main thread (sync GPU calls).
-        // WGSL shaders are unvalidated on real GPU. Skipping until validated.
-        // TODO: Re-enable after shader validation + async compilation.
         if (false as boolean && isWebGPUAvailable()) {
           try {
             const gpuCtx = await withTimeout(initWebGPU(), 5000, 'WebGPU init');
@@ -510,7 +509,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
             dispatch(setSolverTier('cpu-worker'));
             const client = new ClothWorkerClient();
             clientRef.current = client;
-            client.onFrame = onFrame;
+            client.onFrame = (pos) => onFrame(pos);
             client.onEdgeData = (ids, lengths) => {
               edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
             };
@@ -579,7 +578,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       neuralClientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, dispatch]);
 
   // Per-frame geometry update
   useFrame(() => {
@@ -690,11 +689,6 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
 /**
  * GarmentSimulation — always uses MergedSimulation for all pieces.
- *
- * Previously had a ClothMesh-per-piece fallback for no-seam patterns,
- * but that path ran CDT meshing + SDF generation on the main thread,
- * freezing the browser. MergedSimulation uses Web Workers for everything.
- * When no seams exist, the solver simply has no seam constraints.
  */
 export default function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
   return (
