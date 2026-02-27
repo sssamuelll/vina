@@ -26,4 +26,17 @@ export const cameraTool: ToolDefinition = {
   icon: CameraIcon,
   cursor: 'grab',
   group: '3d-navigate',
+  copilot: {
+    description: 'Control the 3D camera view. Left-click drag to orbit around the garment, right-click drag to pan, scroll to zoom. This is the default navigation mode in the 3D viewport.',
+    examples: [
+      'Switch to camera mode',
+      'Let me orbit around the garment',
+      'I want to look at the back',
+      'Zoom in on the collar',
+    ],
+    keywords: ['camera', 'view', 'orbit', 'rotate', 'pan', 'zoom', 'navigate', 'look'],
+    requiresSelection: 'none',
+    produces: 'view',
+    undoable: false,
+  },
 };

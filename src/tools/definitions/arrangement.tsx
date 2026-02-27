@@ -25,6 +25,7 @@ const ArrangementIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const arrangementTool: ToolDefinition = {
   id: 'arrangement',
   name: 'Arrangement Points',
+  description: 'Position pattern pieces on the avatar before simulation',
   context: '3d',
   shortcut: 'a',
   icon: ArrangementIcon,
@@ -46,5 +47,22 @@ export const arrangementTool: ToolDefinition = {
   ],
   onActivate: () => {
     console.log('Arrangement Points tool - Coming soon!');
+  },
+  copilot: {
+    description: 'Position flat pattern pieces around the avatar body before running cloth simulation. Drag arrangement anchor points on the avatar to specify where each piece should be placed. The simulation will then drape the pieces onto the body.',
+    examples: [
+      'Arrange the pieces on the body',
+      'Position the front bodice on the chest',
+      'Move the sleeve to the arm',
+      'Auto-arrange all pieces',
+    ],
+    keywords: ['arrange', 'position', 'place', 'layout', 'setup', 'anchor', 'drape'],
+    requiresSelection: 'none',
+    produces: 'none',
+    undoable: true,
+    parameterHints: {
+      snapToBody: 'Automatically snap pieces to the nearest body surface',
+      autoArrange: 'Let the system automatically position pieces based on seam connections',
+    },
   },
 };

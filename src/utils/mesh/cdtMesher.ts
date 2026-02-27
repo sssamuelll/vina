@@ -136,12 +136,20 @@ export function meshPieceOutline(
   }
 
   if (triangles.length === 0) {
-    // Fallback: try without interior constraint (still only interior triangles)
+    console.warn('[cdtMesher] CDT returned 0 interior triangles. Trying fallback with exterior:true...');
     try {
-      triangles = cdt2d(allPoints, edges, { interior: true, exterior: true });
-    } catch {
+      triangles = cdt2d(allPoints, edges, {
+        interior: true,
+        exterior: true,
+      });
+    } catch (error) {
+      console.error('[cdtMesher] All CDT attempts failed:', error);
       return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
     }
+  }
+
+  if (triangles.length === 0) {
+    console.error('[cdtMesher] Still 0 triangles after fallback. Points:', allPoints.length, 'Edges:', edges.length);
   }
 
   return convertToClothMeshData(allPoints, triangles, config);

@@ -1,5 +1,28 @@
 export type ToolContext = '2d' | '3d' | 'both';
 
+/**
+ * Copilot-specific metadata for AI-driven tool usage.
+ * This enables the Copilot to understand, suggest, and execute tools via natural language.
+ */
+export interface CopilotToolMetadata {
+  /** Detailed description for LLM (more verbose than UI description) */
+  description: string;
+  /** Natural language examples of how to invoke this tool */
+  examples: string[];
+  /** Synonyms and related terms for better NL matching */
+  keywords: string[];
+  /** Does this tool require something to be selected first? */
+  requiresSelection?: 'piece' | 'edge' | 'point' | 'seam' | 'none';
+  /** What does this tool produce or modify? */
+  produces?: 'piece' | 'seam' | 'point' | 'measurement' | 'simulation' | 'view' | 'none';
+  /** Can actions from this tool be undone? */
+  undoable?: boolean;
+  /** Is this a destructive action that needs confirmation? */
+  dangerous?: boolean;
+  /** Parameter descriptions for LLM (supplements ToolOption) */
+  parameterHints?: Record<string, string>;
+}
+
 export interface ToolDefinition {
   id: string;                    // unique: 'pen', 'select', 'pose', etc
   name: string;                  // display: 'Pen Tool'
@@ -14,6 +37,9 @@ export interface ToolDefinition {
   options?: ToolOption[];        // configurable options
   onActivate?: () => void;       // lifecycle
   onDeactivate?: () => void;     // cleanup
+
+  /** Copilot AI metadata — enables natural language tool invocation */
+  copilot?: CopilotToolMetadata;
 }
 
 export interface ToolOption {

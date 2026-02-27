@@ -20,6 +20,7 @@ const PenIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const penTool: ToolDefinition = {
   id: 'pen',
   name: 'Pen Tool',
+  description: 'Draw custom pattern shapes point by point',
   context: '2d',
   shortcut: 'p',
   icon: PenIcon,
@@ -50,4 +51,22 @@ export const penTool: ToolDefinition = {
       ],
     },
   ],
+  copilot: {
+    description: 'Draw custom pattern pieces by placing points. Click to place corner points, drag to create curved segments. Double-click or press Enter to close the shape and create a new pattern piece.',
+    examples: [
+      'Draw a collar shape',
+      'Create a pocket piece',
+      'Sketch a custom yoke',
+      'Draw a facing pattern',
+    ],
+    keywords: ['draw', 'sketch', 'create', 'pen', 'path', 'shape', 'freeform', 'custom'],
+    requiresSelection: 'none',
+    produces: 'piece',
+    undoable: true,
+    parameterHints: {
+      smoothing: 'Automatically smooth corners into curves',
+      snapGrid: 'Snap points to the grid for precise placement',
+      constrainAngles: 'Lock lines to 45° or 90° angles',
+    },
+  },
 };
