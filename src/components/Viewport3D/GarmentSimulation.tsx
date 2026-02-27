@@ -16,14 +16,9 @@ import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
-import { placeGarmentPieces, detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
-import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
-import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
-import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
+import { detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
-import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision } from '../../store/simulationSlice';
+import { setSolverTier, setParticleCount } from '../../store/simulationSlice';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -134,16 +129,12 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 /**
  * Merged multi-piece simulation component.
  */
-function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
+function MergedSimulation({ pieces, seams }: GarmentSimulationProps) {
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
   const positionsRef = useRef<Float32Array | null>(null);
-  const edgeDataRef = useRef<import('../../utils/cloth/fitMaps').SolverEdgeData | null>(null);
-  const pieceColorsRef = useRef<Float32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
-  const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
-  const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
@@ -209,10 +200,10 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     });
   }, [pieceMeshes, pieces, avatarMeasurements]);
 
-  const { staticGeometry } = useMemo(() => {
-    if (placedMeshes.length === 0) return { staticGeometry: null };
-    let totalV = 0, totalT = 0;
-    for (const p of placedMeshes) { totalV += p.vertices.length / 3; totalT += p.triIds.length; }
+  const staticGeometry = useMemo(() => {
+    if (placedMeshes.length === 0) return null;
+    let totalV = 0;
+    for (const p of placedMeshes) { totalV += p.vertices.length / 3; }
 
     const positions = new Float32Array(totalV * 3);
     const colors = new Float32Array(totalV * 3);
@@ -234,7 +225,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
     geo.setIndex(indices);
     geo.computeVertexNormals();
-    return { staticGeometry: geo };
+    return geo;
   }, [placedMeshes]);
 
   const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
