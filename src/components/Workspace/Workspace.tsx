@@ -10,6 +10,7 @@ import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import Toolbar3D from '../Toolbar3D/Toolbar3D';
+import ToolOptionsBar from '../Toolbar3D/ToolOptionsBar';
 import AvatarPanel from '../Viewport3D/AvatarPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
@@ -374,6 +375,7 @@ export default function Workspace() {
               >
                 <div className="viewport-label">3D VIEW</div>
                 <div className="viewport3d-with-toolbar">
+                  <ToolOptionsBar />
                   <Viewport3DErrorBoundary>
                     <Viewport3D activeTool3D={activeTool3D as any} />
                   </Viewport3DErrorBoundary>

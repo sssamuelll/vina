@@ -10,6 +10,7 @@ export interface ToolDefinition {
   cursor?: string;               // CSS cursor
   group?: string;                // for grouping in toolbar: 'draw', 'edit', 'view', '3d-edit'
   subTools?: string[];           // IDs of variant tools (flyout on long-press)
+  hidden?: boolean;              // if true, only appears in flyouts (not main toolbar)
   options?: ToolOption[];        // configurable options
   onActivate?: () => void;       // lifecycle
   onDeactivate?: () => void;     // cleanup

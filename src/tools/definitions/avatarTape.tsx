@@ -24,19 +24,23 @@ const LinearTapeIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const tapeMeasureCircTool: ToolDefinition = {
   id: 'tape-circumference',
   name: 'Circumference Tape',
+  description: 'Measure around body contours',
   context: '3d',
   icon: CircTapeIcon,
   cursor: 'crosshair',
   group: '3d-avatar',
   shortcut: 'c',
+  subTools: ['tape-linear'],
 };
 
 export const tapeMeasureLinearTool: ToolDefinition = {
   id: 'tape-linear',
   name: 'Linear Tape',
+  description: 'Measure point-to-point distance',
   context: '3d',
   icon: LinearTapeIcon,
   cursor: 'crosshair',
   group: '3d-avatar',
   shortcut: 'l',
+  hidden: true, // Only appears in flyout from Circumference Tape
 };
