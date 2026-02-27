@@ -92,7 +92,7 @@ export function evaluateFormula(
   }
 
   try {
-    // eslint-disable-next-line no-new-func
+     
     const fn = new Function(`"use strict"; return (${expr});`);
     const result = fn();
     if (typeof result !== 'number' || !isFinite(result)) {

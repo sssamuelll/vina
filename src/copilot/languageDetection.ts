@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Language Detection — simple heuristic-based detection of Spanish vs English.
  *
@@ -70,7 +71,7 @@ const ENGLISH_INDICATORS: ReadonlySet<string> = new Set([
 export function detectLanguage(message: string): AgentLanguage {
   const words = message
     .toLowerCase()
-    .replace(/[.,;:!?¿¡"'()\[\]{}]/g, '')
+    .replace(/[.,;:!?¿¡"'()[\]{}]/g, '')
     .split(/\s+/)
     .filter(w => w.length > 1);
 

@@ -108,7 +108,7 @@ export function refineMesh(
         break;
       }
       currentTriangles = nextTriangles;
-    } catch (error) {
+    } catch {
       currentPoints = currentPoints.slice(0, -newPoints.length);
       break;
     }

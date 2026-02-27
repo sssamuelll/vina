@@ -446,6 +446,7 @@ export function resolveConstruction(
   function buildSplinePathCurve(step: ConstructionStep, ctx: FormulaContext): PathCommand[] {
     const pathNodes = getPathNodes(step);
     if (!pathNodes || pathNodes.length < 2) return [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const kCurve = (step as any).kCurve ?? 1;
     const cmds: PathCommand[] = [];
     const sp = getPoint(pathNodes[0].point);

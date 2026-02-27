@@ -134,7 +134,7 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
     }
 
     return { value: result };
-  } catch (e: any) {
-    return { value: NaN, error: e.message || 'Evaluation error' };
+  } catch (e) {
+    return { value: NaN, error: e instanceof Error ? e.message : 'Evaluation error' };
   }
 }

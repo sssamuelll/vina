@@ -6,6 +6,7 @@ import { toolRegistry } from '../../tools';
 import type { ToolOption } from '../../tools';
 import './ToolOptions.css';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 interface OptionControlProps {
   option: ToolOption;
   currentValue: any;

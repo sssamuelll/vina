@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Piece Operations — tools for creating, modifying, and transforming pattern pieces.
  * Operaciones de Pieza — herramientas para crear, modificar y transformar piezas de patrón.

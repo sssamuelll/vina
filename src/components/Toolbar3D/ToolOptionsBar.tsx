@@ -18,6 +18,7 @@ export default function ToolOptionsBar() {
   const toolDef = toolRegistry.getTool(activeTool3D);
   const options = toolDef?.options;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleChange = useCallback((optionId: string, value: any) => {
     dispatch(setToolOption({ toolId: activeTool3D, optionId, value }));
   }, [dispatch, activeTool3D]);
@@ -40,6 +41,7 @@ export default function ToolOptionsBar() {
   );
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function OptionControl({ option, value, onChange }: {
   option: ToolOption;
   value: any;

@@ -83,7 +83,7 @@ export function clampSwingTwist(
     twist.z * constraint.twistAxis.z;
   const signedTwist = twistDot >= 0 ? twistAngle : -twistAngle;
 
-  let clampedTwist = twist.clone();
+  const clampedTwist = twist.clone();
   if (signedTwist < constraint.twistMin || signedTwist > constraint.twistMax) {
     const clamped = Math.max(constraint.twistMin, Math.min(constraint.twistMax, signedTwist));
     clampedTwist.setFromAxisAngle(constraint.twistAxis, clamped * DEG2RAD);
@@ -93,7 +93,7 @@ export function clampSwingTwist(
   // Get the swing axis and angle
   const swingAxis = new THREE.Vector3(swing.x, swing.y, swing.z);
   const swingAxisLen = swingAxis.length();
-  let clampedSwing = swing.clone();
+  const clampedSwing = swing.clone();
 
   if (swingAxisLen > 1e-6) {
     swingAxis.divideScalar(swingAxisLen); // normalize

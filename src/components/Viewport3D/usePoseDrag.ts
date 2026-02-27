@@ -84,7 +84,7 @@ export function usePoseDrag(
     }
   }, [dispatch, store]);
 
-  const onPointerUp = useCallback((_e: PointerEvent) => {
+  const onPointerUp = useCallback(() => {
     if (!isDraggingRef.current) return;
     isDraggingRef.current = false;
     activeJointRef.current = null;

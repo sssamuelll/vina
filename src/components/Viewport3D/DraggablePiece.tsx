@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useRef } from 'react';
+import type { ThreeEvent } from '@react-three/fiber';
 import { PivotControls } from '@react-three/drei';
 import * as THREE from 'three';
 import PieceMesh from './PieceMesh';
@@ -43,7 +44,7 @@ export default function DraggablePiece({
   const matrixRef = useRef(new THREE.Matrix4());
   const actualPos = arrangementOverride || position;
 
-  const handleClick = useCallback((e: any) => {
+  const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
     onSelect(piece.id);
   }, [piece.id, onSelect]);

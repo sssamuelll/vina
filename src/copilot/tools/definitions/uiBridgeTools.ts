@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * #82 — Tool-UI Bridge: Missing copilot equivalents for UI tools
  * duplicatePiece, addAnnotation, quickRectangle, selectTool, setViewMode

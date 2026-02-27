@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
+import type { Tool2D } from '../../types/types';
 import { setActiveTool } from '../../store/editorSlice';
 import { setActiveTool2D } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
@@ -192,7 +193,7 @@ export default function Toolbar2D() {
   }, []);
 
   const handleToolSelect = useCallback((toolId: string, groupIndex: number) => {
-    dispatch(setActiveTool(toolId as any));
+    dispatch(setActiveTool(toolId as Tool2D));
     dispatch(setActiveTool2D(toolId));
     setSelectedPerGroup(prev => ({ ...prev, [groupIndex]: toolId }));
   }, [dispatch]);

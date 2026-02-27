@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import { generateOBJ } from '../utils/export/exportOBJ';
 import type { PatternPiece } from '../types/types';

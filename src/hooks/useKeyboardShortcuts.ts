@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * useKeyboardShortcuts — CLO3D-compatible global keyboard shortcut system.
  *

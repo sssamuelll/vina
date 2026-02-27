@@ -1061,13 +1061,15 @@ export function meshPieceForSimulation(
 ): ClothMeshData {
   try {
     // Use CDT meshing for high-quality triangulation
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { meshPiece } = require('../mesh');
     return meshPiece(piece, config);
   } catch (error) {
     // Fallback to old ear-clipping method if CDT fails
     console.warn('CDT meshing failed, falling back to ear-clipping for piece', piece.id, ':', error);
-    
+
     // Use the existing flattenPath function
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { flattenPath } = require('../seam');
     const points = flattenPath(piece.outline);
     return triangulatePieceOutline(points, config?.yHeight, config?.scale);

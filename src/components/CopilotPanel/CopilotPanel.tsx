@@ -175,7 +175,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
                 return updated;
               });
             },
-            onToolCallStart: (name, _round) => {
+            onToolCallStart: (name) => {
               if (isMobile && navigator.vibrate) navigator.vibrate(15);
               setMessages(prev => {
                 const updated = [...prev];
@@ -187,7 +187,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
                 return updated;
               });
             },
-            onToolCallEnd: (name, success, _round) => {
+            onToolCallEnd: (name, success) => {
               setMessages(prev => {
                 const updated = [...prev];
                 const last = updated[updated.length - 1];

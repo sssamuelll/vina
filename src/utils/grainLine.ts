@@ -53,7 +53,7 @@ function computeAngle(line: InternalLine): number {
 
   // atan2 gives angle from positive x-axis
   // We want angle from vertical (y-axis), so rotate 90°
-  let angle = Math.atan2(Math.abs(dx), Math.abs(dy)) * 180 / Math.PI;
+  const angle = Math.atan2(Math.abs(dx), Math.abs(dy)) * 180 / Math.PI;
   return angle;
 }
 

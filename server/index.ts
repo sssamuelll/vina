@@ -90,8 +90,8 @@ wss.on('connection', (ws: WebSocket) => {
       const msg = JSON.parse(data.toString());
       const response = await copilotBridge.handleMessage(msg);
       ws.send(JSON.stringify(response));
-    } catch (e: any) {
-      ws.send(JSON.stringify({ error: e.message }));
+    } catch (e) {
+      ws.send(JSON.stringify({ error: e instanceof Error ? e.message : 'Unknown error' }));
     }
   });
 

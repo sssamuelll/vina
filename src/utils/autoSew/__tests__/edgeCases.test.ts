@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Auto-Sew edge case tests — tricky inputs, multilingual naming,
  * degenerate geometry, and full pipeline integration.

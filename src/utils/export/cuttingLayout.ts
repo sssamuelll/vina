@@ -6,7 +6,7 @@
  */
 
 import type { PatternPiece, Point2D } from '../../types/types';
-import type { Seam } from '../../types/types'; // eslint-disable-line @typescript-eslint/no-unused-vars
+import type { Seam } from '../../types/types';  
 import { flattenPath } from '../seam/index';
 import { preparePiece } from './pipeline';
 import { nestPieces, computeArea } from '../nesting/nestingEngine';
@@ -272,6 +272,7 @@ export function computeCuttingLayout(
 
 const A4_OVERLAP = 10; // mm
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function tileToA4(layout: LayoutResult, _config?: CuttingLayoutConfig): LayoutResult {
   const a4W = PAPER_SIZES.A4.width;
   const a4H = PAPER_SIZES.A4.height;

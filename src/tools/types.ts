@@ -46,9 +46,11 @@ export interface ToolOption {
   id: string;
   label: string;
   type: 'number' | 'select' | 'toggle' | 'color';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   value: any;
   min?: number;
   max?: number;
   step?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   choices?: { label: string; value: any }[];
 }

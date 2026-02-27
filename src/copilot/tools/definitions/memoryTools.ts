@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * #81 — Copilot Memory tools: rememberThis, recallContext, setPreference, addNote
  */

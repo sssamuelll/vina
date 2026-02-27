@@ -98,7 +98,7 @@ interface PieceMeshProps {
   fabricRoughness?: number;
 }
 
-export default function PieceMesh({ piece, isSelected, color: _color, position, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
+export default function PieceMesh({ piece, isSelected, position, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
   const geometry = useMemo(() => {
     const shape = commandsToShape(piece.outline);
     if (!shape) return null;

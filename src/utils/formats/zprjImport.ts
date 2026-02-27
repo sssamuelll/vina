@@ -35,6 +35,7 @@ function findByExt(files: Record<string, Uint8Array>, ext: string): Uint8Array |
   return key ? files[key] : undefined;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function safeJsonParse(data: Uint8Array): any {
   try {
     return JSON.parse(strFromU8(data));
@@ -55,7 +56,7 @@ export async function importZprj(file: File | ArrayBuffer): Promise<ZprjImportRe
   }
   const dxfText = strFromU8(dxfData);
   const doc = parseDXF(dxfText);
-  let pieces = dxfToPatternPieces(doc);
+  const pieces = dxfToPatternPieces(doc);
   const seams: Seam[] = [];
 
   // 2. Pattern info metadata

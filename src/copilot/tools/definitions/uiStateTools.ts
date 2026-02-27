@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * #80 — Copilot UI Awareness: State Query Tools
  * Read-only tools for the copilot to understand current editor/simulation context.

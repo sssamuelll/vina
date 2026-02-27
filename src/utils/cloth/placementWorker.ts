@@ -44,16 +44,16 @@ function applyEulerXYZ(
 ): [number, number, number] {
   // Rotate X
   const cx = Math.cos(rx), sx = Math.sin(rx);
-  let y1 = vy * cx - vz * sx;
-  let z1 = vy * sx + vz * cx;
+  const y1 = vy * cx - vz * sx;
+  const z1 = vy * sx + vz * cx;
   // Rotate Y
   const cy = Math.cos(ry), sy = Math.sin(ry);
-  let x2 = vx * cy + z1 * sy;
-  let z2 = -vx * sy + z1 * cy;
+  const x2 = vx * cy + z1 * sy;
+  const z2 = -vx * sy + z1 * cy;
   // Rotate Z
   const cz = Math.cos(rz), sz = Math.sin(rz);
-  let x3 = x2 * cz - y1 * sz;
-  let y3 = x2 * sz + y1 * cz;
+  const x3 = x2 * cz - y1 * sz;
+  const y3 = x2 * sz + y1 * cz;
   return [x3, y3, z2];
 }
 

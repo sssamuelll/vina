@@ -28,6 +28,11 @@ export interface BridgeConfig {
   name: string;
 }
 
+interface CopilotResponse {
+  message: string;
+  commands: Array<{ type: string; [key: string]: unknown }>;
+}
+
 const CONFIG_PATH = path.join(
   process.env.HOME || process.env.USERPROFILE || '.',
   '.openclo',
@@ -78,7 +83,7 @@ export class CopilotBridge {
       if (fs.existsSync(CONFIG_PATH)) {
         return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'));
       }
-    } catch {}
+    } catch { /* Use defaults if config file cannot be read */ }
     return { ...DEFAULT_CONFIG };
   }
 
@@ -97,7 +102,7 @@ export class CopilotBridge {
     this.saveConfig();
   }
 
-  async handleMessage(msg: { context: any; system?: string }): Promise<any> {
+  async handleMessage(msg: { context: Record<string, unknown>; system?: string }): Promise<CopilotResponse> {
     switch (this.config.agentType) {
       case 'http':
         return this.sendHTTP(msg);
@@ -112,7 +117,7 @@ export class CopilotBridge {
     }
   }
 
-  private async sendHTTP(msg: any): Promise<any> {
+  private async sendHTTP(msg: Record<string, unknown>): Promise<CopilotResponse> {
     if (!this.config.httpEndpoint) {
       throw new Error('No HTTP endpoint configured');
     }
@@ -139,7 +144,7 @@ export class CopilotBridge {
     return this.validateResponse(data);
   }
 
-  private async sendSubprocess(msg: any): Promise<any> {
+  private async sendSubprocess(msg: { context?: { message?: string } }): Promise<CopilotResponse> {
     // For CLI agents like claude/codex, we send the context as a prompt
     // and parse the JSON response from stdout
     const { spawn } = await import('node:child_process');
@@ -182,10 +187,13 @@ export class CopilotBridge {
     });
   }
 
-  private validateResponse(data: any): any {
-    if (typeof data?.message !== 'string') data.message = 'Done.';
-    if (!Array.isArray(data?.commands)) data.commands = [];
-    data.commands = data.commands.filter((c: any) => c && typeof c.type === 'string');
-    return data;
+  private validateResponse(data: Record<string, unknown>): CopilotResponse {
+    const message = typeof data?.message === 'string' ? data.message : 'Done.';
+    const rawCommands = Array.isArray(data?.commands) ? data.commands : [];
+    const commands = rawCommands.filter(
+      (c): c is { type: string; [key: string]: unknown } =>
+        c != null && typeof c === 'object' && typeof (c as Record<string, unknown>).type === 'string'
+    );
+    return { message, commands };
   }
 }
