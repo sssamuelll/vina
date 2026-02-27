@@ -16,24 +16,24 @@ export interface SDFData {
   cellSize: number;
 }
 
-// ── Spatial Hash (integer keys, flat arrays) ──────────────────────
+// ── Spatial Hash (optimized for performance and collision avoidance) ────────
 
 class IntSpatialHash {
   private readonly buckets: Map<number, Int32Array>;
   private readonly cellInv: number;
-  private readonly _resY: number;
+  private readonly res: number;
 
   constructor(
     vertices: Float32Array,
     indices: Uint32Array,
     cellSize: number,
     minX: number, minY: number, minZ: number,
-    _sizeX: number, sizeY: number, _sizeZ: number
+    sizeX: number, sizeY: number, sizeZ: number
   ) {
     this.cellInv = 1.0 / cellSize;
-    this._resY = Math.ceil(sizeY / cellSize) + 3;
+    // Estimated resolution for keying — doesn't need to match SDF resolution
+    this.res = Math.ceil(Math.max(sizeX, sizeY, sizeZ) * this.cellInv) + 2;
 
-    // First pass: count triangles per bucket
     const counts = new Map<number, number>();
     const numTri = indices.length / 3;
 
@@ -52,12 +52,11 @@ class IntSpatialHash {
       for (let cx = cxMin; cx <= cxMax; cx++)
         for (let cy = cyMin; cy <= cyMax; cy++)
           for (let cz = czMin; cz <= czMax; cz++) {
-            const key = cx * this._resY * 1000 + cy * 1000 + cz;
+            const key = this.getKey(cx, cy, cz);
             counts.set(key, (counts.get(key) || 0) + 1);
           }
     }
 
-    // Allocate Int32Arrays
     const offsets = new Map<number, number>();
     this.buckets = new Map();
     for (const [key, count] of counts) {
@@ -65,7 +64,6 @@ class IntSpatialHash {
       offsets.set(key, 0);
     }
 
-    // Second pass: fill buckets
     for (let t = 0; t < numTri; t++) {
       const i0 = indices[t * 3] * 3;
       const i1 = indices[t * 3 + 1] * 3;
@@ -81,19 +79,27 @@ class IntSpatialHash {
       for (let cx = cxMin; cx <= cxMax; cx++)
         for (let cy = cyMin; cy <= cyMax; cy++)
           for (let cz = czMin; cz <= czMax; cz++) {
-            const key = cx * this._resY * 1000 + cy * 1000 + cz;
+            const key = this.getKey(cx, cy, cz);
             const arr = this.buckets.get(key)!;
-            arr[offsets.get(key)!] = t;
-            offsets.set(key, offsets.get(key)! + 1);
+            const off = offsets.get(key)!;
+            arr[off] = t;
+            offsets.set(key, off + 1);
           }
     }
   }
 
   /**
-   * Get triangles near a point. Writes triangle indices into `out` array.
-   * Returns count of unique triangles found.
-   * Caller must provide `seen` Uint8Array of size >= numTriangles (reused across calls).
+   * Robust 3D integer hashing.
+   * Offsets negatives and uses primes to avoid collisions in a 1024^3 virtual grid.
    */
+  private getKey(cx: number, cy: number, cz: number): number {
+    // Offset by 512 to handle points slightly outside the padded box
+    const x = (cx + 512) & 1023;
+    const y = (cy + 512) & 1023;
+    const z = (cz + 512) & 1023;
+    return (x << 20) | (y << 10) | z;
+  }
+
   query(
     px: number, py: number, pz: number,
     minX: number, minY: number, minZ: number,
@@ -107,10 +113,10 @@ class IntSpatialHash {
     for (let dx = -1; dx <= 1; dx++)
       for (let dy = -1; dy <= 1; dy++)
         for (let dz = -1; dz <= 1; dz++) {
-          const key = (cx+dx) * this._resY * 1000 + (cy+dy) * 1000 + (cz+dz);
+          const key = this.getKey(cx + dx, cy + dy, cz + dz);
           const bucket = this.buckets.get(key);
           if (!bucket) continue;
-          for (let i = 0; i < bucket.length; i++) {
+          for (let i = 0, len = bucket.length; i < len; i++) {
             const triIdx = bucket[i];
             if (seen[triIdx] !== seenStamp) {
               seen[triIdx] = seenStamp;
@@ -298,6 +304,10 @@ export function generateSDF(vertices: Float32Array, indices: Uint32Array, resolu
           }
         } else {
           // Fallback: brute force (should rarely happen with good hash cell size)
+          // Log only once per generation to avoid flooding
+          if (zi === 0 && yi === 0 && xi === 0) {
+            console.warn('[sdfGenerator] Hash query returned 0 triangles, falling back to brute force (O(N)). Grid resolution:', resolution);
+          }
           for (let t = 0; t < numTri; t++) {
             const [dist, ndot] = ptTriDist(
               x, y, z,

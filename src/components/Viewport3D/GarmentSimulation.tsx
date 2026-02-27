@@ -449,7 +449,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
         // ─── Try Wasm XPBD (~3x faster than JS) ──────────────────────
         if (!cancelled) {
           try {
-            const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 3000, 'Wasm check').catch(() => false);
+            const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 5000, 'Wasm check').catch(() => false);
             if (wasmAvailable && !cancelled) {
               console.log('[GarmentSimulation] 🟠 Using Wasm XPBD solver');
               dispatch(setSolverTier('wasm'));
@@ -457,18 +457,30 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
               wasmClientRef.current = wasmClient;
               wasmClient.onFrame = onFrame;
 
-              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 10000, 'Wasm solver init');
+              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
 
               if (!cancelled) wasmClient.start();
 
               // SDF loaded via worker (truly non-blocking)
               if (avatarModelUrl && !cancelled) {
+                console.log('[GarmentSimulation] Requesting Avatar SDF for Wasm solver...');
                 loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                  if (sdf && !cancelled) { wasmClient.setSDF(sdf); dispatch(setBodyCollision(true)); }
-                  else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
-                }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
+                  if (sdf && !cancelled) {
+                    console.log('[GarmentSimulation] ✅ SDF loaded, enabling body collision');
+                    wasmClient.setSDF(sdf);
+                    dispatch(setBodyCollision(true));
+                  } else if (!sdf && !cancelled) {
+                    console.warn('[GarmentSimulation] ❌ SDF generation returned null');
+                    dispatch(setBodyCollision(false));
+                  }
+                }).catch(e => {
+                  console.error('[GarmentSimulation] ❌ Avatar SDF failed:', e);
+                  dispatch(setBodyCollision(false));
+                });
               }
               return;
+            } else if (!cancelled) {
+              console.warn('[GarmentSimulation] Wasm solver not available or timed out');
             }
           } catch (e) {
             console.warn('[GarmentSimulation] Wasm failed, falling back to CPU:', e);
