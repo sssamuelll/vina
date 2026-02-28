@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectFormulaDelta, createSkillOverride, detectMultipleDeltas, type OverrideCreationInput, type PieceFormulaComparison } from '../preferenceLearner';
+import { detectFormulaDelta, createSkillOverride, detectMultipleDeltas, PreferenceLearner, type OverrideCreationInput, type PieceFormulaComparison } from '../preferenceLearner';
 
 describe('Preference Learner - Formula Delta Detection', () => {
   it('should detect no delta when values match', () => {
@@ -204,5 +204,87 @@ describe('Preference Learner - Batch Detection', () => {
     const deltas = detectMultipleDeltas(comparison);
 
     expect(deltas).toHaveLength(0); // 3mm within 5mm tolerance
+  });
+});
+
+describe('PreferenceLearner - Aggregation', () => {
+  it('should aggregate overrides by skill and formula', () => {
+    const learner = new PreferenceLearner();
+
+    learner.recordOverride({
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalExpression: '(chest/4)+1',
+      delta: { formulaName: 'backWidth', expectedValue: 100, actualValue: 105, difference: 5, percentageDiff: 5 },
+    });
+
+    learner.recordOverride({
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalExpression: '(chest/4)+1',
+      delta: { formulaName: 'backWidth', expectedValue: 100, actualValue: 106, difference: 6, percentageDiff: 6 },
+    });
+
+    const overrides = learner.getOverrides();
+    expect(overrides).toHaveLength(1); // Same skill+formula, should be single entry
+    expect(overrides[0].overrideValue).toContain('6'); // Latest value
+  });
+
+  it('should track different formulas separately', () => {
+    const learner = new PreferenceLearner();
+
+    learner.recordOverride({
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalExpression: '(chest/4)+1',
+      delta: { formulaName: 'backWidth', expectedValue: 100, actualValue: 105, difference: 5, percentageDiff: 5 },
+    });
+
+    learner.recordOverride({
+      skillId: 'core:bodice',
+      formulaName: 'armholeDepth',
+      originalExpression: 'height*0.12',
+      delta: { formulaName: 'armholeDepth', expectedValue: 50, actualValue: 55, difference: 5, percentageDiff: 10 },
+    });
+
+    const overrides = learner.getOverrides();
+    expect(overrides).toHaveLength(2);
+  });
+
+  it('should get overrides for specific skill', () => {
+    const learner = new PreferenceLearner();
+
+    learner.recordOverride({
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalExpression: '(chest/4)+1',
+      delta: { formulaName: 'backWidth', expectedValue: 100, actualValue: 105, difference: 5, percentageDiff: 5 },
+    });
+
+    learner.recordOverride({
+      skillId: 'core:sleeve',
+      formulaName: 'length',
+      originalExpression: 'arm_length',
+      delta: { formulaName: 'length', expectedValue: 60, actualValue: 63, difference: 3, percentageDiff: 5 },
+    });
+
+    const bodiceOverrides = learner.getOverridesForSkill('core:bodice');
+    expect(bodiceOverrides).toHaveLength(1);
+    expect(bodiceOverrides[0].formulaName).toBe('backWidth');
+  });
+
+  it('should clear all overrides', () => {
+    const learner = new PreferenceLearner();
+
+    learner.recordOverride({
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalExpression: '(chest/4)+1',
+      delta: { formulaName: 'backWidth', expectedValue: 100, actualValue: 105, difference: 5, percentageDiff: 5 },
+    });
+
+    learner.clear();
+
+    expect(learner.getOverrides()).toHaveLength(0);
   });
 });

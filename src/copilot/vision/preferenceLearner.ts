@@ -199,3 +199,72 @@ export function detectMultipleDeltas(
 
   return deltas;
 }
+
+// ─── Preference Learner Class ───────────────────────────────────────────────
+
+/**
+ * Manages learned user preferences for formula overrides.
+ */
+export class PreferenceLearner {
+  /** Map of skillId:formulaName -> SkillOverride */
+  private overrides: Map<string, SkillOverride> = new Map();
+
+  /**
+   * Generate a key for the override map.
+   */
+  private getKey(skillId: string, formulaName: string): string {
+    return `${skillId}:${formulaName}`;
+  }
+
+  /**
+   * Record a new override, replacing any existing one for the same skill+formula.
+   */
+  recordOverride(input: OverrideCreationInput): SkillOverride {
+    const override = createSkillOverride(input);
+    const key = this.getKey(input.skillId, input.formulaName);
+    this.overrides.set(key, override);
+    return override;
+  }
+
+  /**
+   * Get all recorded overrides.
+   */
+  getOverrides(): SkillOverride[] {
+    return Array.from(this.overrides.values());
+  }
+
+  /**
+   * Get overrides for a specific skill.
+   */
+  getOverridesForSkill(skillId: string): SkillOverride[] {
+    return this.getOverrides().filter(o => o.skillId === skillId);
+  }
+
+  /**
+   * Check if an override exists for a skill+formula.
+   */
+  hasOverride(skillId: string, formulaName: string): boolean {
+    return this.overrides.has(this.getKey(skillId, formulaName));
+  }
+
+  /**
+   * Get a specific override.
+   */
+  getOverride(skillId: string, formulaName: string): SkillOverride | undefined {
+    return this.overrides.get(this.getKey(skillId, formulaName));
+  }
+
+  /**
+   * Clear all overrides.
+   */
+  clear(): void {
+    this.overrides.clear();
+  }
+
+  /**
+   * Get the number of recorded overrides.
+   */
+  get size(): number {
+    return this.overrides.size;
+  }
+}
