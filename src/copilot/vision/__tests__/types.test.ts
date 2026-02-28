@@ -3,6 +3,8 @@ import type {
   SegmentType,
   SemanticLandmark,
   GeometricFingerprint,
+  SpatialRelationship,
+  SpatialConflict,
 } from '../types';
 
 describe('Vision Types - Perception Layer', () => {
@@ -32,5 +34,32 @@ describe('Vision Types - Perception Layer', () => {
     };
     expect(fingerprint.segmentTypes).toHaveLength(4);
     expect(fingerprint.curvatureDensity).toBeLessThan(1);
+  });
+});
+
+describe('Vision Types - Spatial Relationships', () => {
+  it('should define SpatialRelationship correctly', () => {
+    const relation: SpatialRelationship = {
+      pieceAId: 'p-1',
+      pieceBId: 'p-2',
+      type: 'adjacent',
+      distance3D: 5.2,
+      edgeAIndex: 2,
+      edgeBIndex: 0,
+      hasSewingConnection: true,
+    };
+    expect(relation.type).toBe('adjacent');
+    expect(relation.hasSewingConnection).toBe(true);
+  });
+
+  it('should define SpatialConflict correctly', () => {
+    const conflict: SpatialConflict = {
+      type: 'collision',
+      severity: 'high',
+      affectedPieceIds: ['p-1', 'p-2'],
+      description: 'Left sleeve intersects avatar arm by 12mm',
+    };
+    expect(conflict.severity).toBe('high');
+    expect(conflict.affectedPieceIds).toContain('p-1');
   });
 });

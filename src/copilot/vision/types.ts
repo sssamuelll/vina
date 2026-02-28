@@ -63,3 +63,58 @@ export interface GeometricFingerprint {
   /** Detected anatomical landmarks */
   landmarks: SemanticLandmark[];
 }
+
+// ─── Perception Layer: Spatial Analysis ─────────────────────────────────────
+
+/**
+ * Types of spatial relationships between pieces.
+ */
+export type SpatialRelationType =
+  | 'adjacent'      // Close in 3D, potentially sewable
+  | 'overlapping'   // Pieces intersect in 3D
+  | 'distant'       // Too far to interact
+  | 'sewn';         // Connected by a seam
+
+/**
+ * A spatial relationship between two pieces in 3D space.
+ */
+export interface SpatialRelationship {
+  /** First piece ID */
+  pieceAId: string;
+  /** Second piece ID */
+  pieceBId: string;
+  /** Relationship type */
+  type: SpatialRelationType;
+  /** Minimum distance between boundaries in mm */
+  distance3D: number;
+  /** Index of closest edge on piece A */
+  edgeAIndex?: number;
+  /** Index of closest edge on piece B */
+  edgeBIndex?: number;
+  /** Whether these pieces have a sewing connection */
+  hasSewingConnection: boolean;
+}
+
+/**
+ * Severity levels for spatial conflicts.
+ */
+export type ConflictSeverity = 'low' | 'high';
+
+/**
+ * Types of spatial conflicts.
+ */
+export type ConflictType = 'gap' | 'overlap' | 'collision' | 'instability';
+
+/**
+ * A detected spatial conflict requiring attention.
+ */
+export interface SpatialConflict {
+  /** Type of conflict */
+  type: ConflictType;
+  /** How serious the conflict is */
+  severity: ConflictSeverity;
+  /** IDs of affected pieces */
+  affectedPieceIds: string[];
+  /** Human-readable description */
+  description: string;
+}
