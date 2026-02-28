@@ -14,6 +14,86 @@ import type { DesignLog, DesignLogEntry, SkillOverride } from './types';
 /** Token threshold for flushing log to storage */
 export const TOKEN_FLUSH_THRESHOLD = 4000;
 
+/**
+ * Format a timestamp as a human-readable date string.
+ * @param ts - Unix timestamp in milliseconds
+ * @returns Formatted date string (YYYY-MM-DD HH:MM:SS)
+ */
+export function formatTimestamp(ts: number): string {
+  const date = new Date(ts);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+}
+
+/**
+ * Serialize a DesignLog to markdown format.
+ *
+ * Format:
+ * ```markdown
+ * # Design Log - {projectId}
+ *
+ * > Last updated: {timestamp}
+ *
+ * ## Decisions
+ *
+ * ### {timestamp} - {type}
+ * **{summary}**
+ * - Pieces: {pieceIds}
+ *
+ * ## Formula Overrides
+ *
+ * ### {skillId} - {formulaName}
+ * - Original: `{originalValue}`
+ * - Override: `{overrideValue}`
+ * - Reason: {reason}
+ * ```
+ *
+ * @param log - The design log to serialize
+ * @returns Markdown string representation
+ */
+export function designLogToMarkdown(log: DesignLog): string {
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`# Design Log - ${log.projectId}`);
+  lines.push('');
+  lines.push(`> Last updated: ${formatTimestamp(Date.now())}`);
+  lines.push('');
+
+  // Decisions section
+  lines.push('## Decisions');
+  lines.push('');
+
+  for (const entry of log.entries) {
+    const dateStr = formatTimestamp(entry.timestamp).split(' ')[0]; // Just the date part
+    lines.push(`### ${dateStr} - ${entry.type}`);
+    lines.push(`**${entry.summary}**`);
+    if (entry.relatedPieceIds.length > 0) {
+      lines.push(`- Pieces: ${entry.relatedPieceIds.join(', ')}`);
+    }
+    lines.push('');
+  }
+
+  // Formula Overrides section
+  lines.push('## Formula Overrides');
+  lines.push('');
+
+  for (const override of log.overrides) {
+    lines.push(`### ${override.skillId} - ${override.formulaName}`);
+    lines.push(`- Original: \`${override.originalValue}\``);
+    lines.push(`- Override: \`${override.overrideValue}\``);
+    lines.push(`- Reason: ${override.reason}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
 /** LocalStorage key for persisting design logs */
 export const DESIGN_LOG_STORAGE_KEY = 'openclo:designLog';
 
@@ -87,5 +167,13 @@ export class DesignLogManager {
     return [...this.log.entries]
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, count);
+  }
+
+  /**
+   * Serialize the design log to markdown format.
+   * @returns Markdown string representation of the log
+   */
+  toMarkdown(): string {
+    return designLogToMarkdown(this.log);
   }
 }
