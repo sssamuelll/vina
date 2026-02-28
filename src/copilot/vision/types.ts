@@ -222,3 +222,51 @@ export interface IntentPrediction {
   /** Suggested alternative if unsafe */
   suggestedFix?: string;
 }
+
+// ─── Perception Layer: Template Matching ────────────────────────────────────
+
+/**
+ * A match against a known garment archetype.
+ */
+export interface ArchetypeMatch {
+  /** ID of the matched archetype (e.g., 'bodice_front') */
+  archetypeId: string;
+  /** Human-readable archetype name */
+  archetypeName: string;
+  /** Similarity score (0-1) */
+  similarity: number;
+  /** Which landmarks matched */
+  matchedLandmarks: LandmarkLabel[];
+}
+
+/**
+ * Complete semantic analysis of a pattern piece.
+ */
+export interface PieceSemantics {
+  /** Piece ID */
+  pieceId: string;
+  /** Geometric fingerprint */
+  fingerprint: GeometricFingerprint;
+  /** Best archetype match (if any) */
+  bestMatch?: ArchetypeMatch;
+  /** Nearest avatar bone (for proximity anchor) */
+  avatarProximity?: string;
+}
+
+// ─── Context Integration ────────────────────────────────────────────────────
+
+/**
+ * Complete cerebral context for a single LLM request.
+ */
+export interface CerebralContext {
+  /** Semantic analysis of all pieces */
+  pieceSemantics: PieceSemantics[];
+  /** Spatial relationships between pieces */
+  spatialRelationships: SpatialRelationship[];
+  /** Active spatial conflicts */
+  conflicts: SpatialConflict[];
+  /** Recent design decisions */
+  recentDecisions: DesignLogEntry[];
+  /** Active formula overrides */
+  activeOverrides: SkillOverride[];
+}

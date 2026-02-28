@@ -10,6 +10,8 @@ import type {
   DesignLog,
   AuditResult,
   IntentPrediction,
+  ArchetypeMatch,
+  PieceSemantics,
 } from '../types';
 
 describe('Vision Types - Perception Layer', () => {
@@ -134,5 +136,56 @@ describe('Vision Types - Action Layer', () => {
     expect(prediction.isSafe).toBe(false);
     expect(prediction.auditResults).toHaveLength(2);
     expect(prediction.suggestedFix).toBeDefined();
+  });
+});
+
+describe('Vision Types - Template Matching', () => {
+  it('should define ArchetypeMatch correctly', () => {
+    const match: ArchetypeMatch = {
+      archetypeId: 'bodice_front',
+      archetypeName: 'Standard Front Bodice',
+      similarity: 0.85,
+      matchedLandmarks: ['neckline', 'armhole', 'side_seam'],
+    };
+    expect(match.similarity).toBeGreaterThan(0.8);
+    expect(match.matchedLandmarks).toContain('armhole');
+  });
+
+  it('should define PieceSemantics correctly', () => {
+    const semantics: PieceSemantics = {
+      pieceId: 'p-123',
+      fingerprint: {
+        pieceId: 'p-123',
+        segmentTypes: ['straight', 'concave'],
+        ratios: {},
+        curvatureDensity: 0.3,
+        landmarks: [],
+      },
+      bestMatch: {
+        archetypeId: 'bodice_front',
+        archetypeName: 'Front Bodice',
+        similarity: 0.9,
+        matchedLandmarks: [],
+      },
+      avatarProximity: 'Spine2',
+    };
+    expect(semantics.bestMatch?.similarity).toBe(0.9);
+    expect(semantics.avatarProximity).toBe('Spine2');
+  });
+});
+
+import type { CerebralContext } from '../types';
+
+describe('Vision Types - Context Integration', () => {
+  it('should define CerebralContext correctly', () => {
+    const context: CerebralContext = {
+      pieceSemantics: [],
+      spatialRelationships: [],
+      conflicts: [],
+      recentDecisions: [],
+      activeOverrides: [],
+    };
+    expect(context.pieceSemantics).toHaveLength(0);
+    expect(context.conflicts).toHaveLength(0);
   });
 });
