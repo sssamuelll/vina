@@ -32,6 +32,15 @@ export interface BoundingBox3D {
   maxZ: number;
 }
 
+/**
+ * Result of minimum distance calculation between two vertex sets.
+ */
+export interface MinDistanceResult {
+  distance: number;
+  indexA: number;
+  indexB: number;
+}
+
 // ─── Distance Functions ─────────────────────────────────────────────────────
 
 /**
@@ -110,4 +119,57 @@ export function boundingBoxesOverlap(
   const overlapZ = box1.minZ <= box2.maxZ && box1.maxZ >= box2.minZ;
 
   return overlapX && overlapY && overlapZ;
+}
+
+// ─── Vertex Distance Functions ───────────────────────────────────────────────
+
+/**
+ * Find the minimum distance between two sets of vertices.
+ *
+ * Performs a brute-force comparison of all vertex pairs to find the
+ * closest pair. Returns the distance and indices of the closest vertices.
+ *
+ * @param verticesA - First vertex array (x, y, z triplets)
+ * @param verticesB - Second vertex array (x, y, z triplets)
+ * @returns Minimum distance and indices of the closest vertex pair
+ */
+export function findMinimumDistance(
+  verticesA: Float32Array,
+  verticesB: Float32Array,
+): MinDistanceResult {
+  if (verticesA.length === 0 || verticesB.length === 0) {
+    return { distance: Infinity, indexA: -1, indexB: -1 };
+  }
+
+  let minDist = Infinity;
+  let minIndexA = -1;
+  let minIndexB = -1;
+
+  const numA = verticesA.length / 3;
+  const numB = verticesB.length / 3;
+
+  for (let i = 0; i < numA; i++) {
+    const ax = verticesA[i * 3];
+    const ay = verticesA[i * 3 + 1];
+    const az = verticesA[i * 3 + 2];
+
+    for (let j = 0; j < numB; j++) {
+      const bx = verticesB[j * 3];
+      const by = verticesB[j * 3 + 1];
+      const bz = verticesB[j * 3 + 2];
+
+      const dx = bx - ax;
+      const dy = by - ay;
+      const dz = bz - az;
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      if (distSq < minDist * minDist) {
+        minDist = Math.sqrt(distSq);
+        minIndexA = i;
+        minIndexB = j;
+      }
+    }
+  }
+
+  return { distance: minDist, indexA: minIndexA, indexB: minIndexB };
 }
