@@ -8,7 +8,7 @@
  */
 
 import type { PathCommand, Point2D } from '../../types/types';
-import type { SegmentType } from './types';
+import type { SegmentType, SemanticLandmark, LandmarkLabel } from './types';
 
 /**
  * Curvature threshold for classifying nearly-straight curves.
@@ -36,6 +36,8 @@ export interface SegmentInfo {
   start: Point2D;
   /** End point of the segment */
   end: Point2D;
+  /** Index of the path command that generated this segment (optional for backward compatibility) */
+  commandIndex?: number;
 }
 
 /**
@@ -439,4 +441,124 @@ export function extractSegments(outline: PathCommand[]): SegmentInfo[] {
   }
 
   return segments;
+}
+
+// ─── Landmark Detection ─────────────────────────────────────────────────────
+
+/**
+ * Calculate bounding box of segments.
+ */
+function getBoundingBox(segments: SegmentInfo[]): { minX: number; maxX: number; minY: number; maxY: number } {
+  if (segments.length === 0) {
+    return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+  }
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  for (const seg of segments) {
+    minX = Math.min(minX, seg.start.x, seg.end.x);
+    maxX = Math.max(maxX, seg.start.x, seg.end.x);
+    minY = Math.min(minY, seg.start.y, seg.end.y);
+    maxY = Math.max(maxY, seg.start.y, seg.end.y);
+  }
+
+  return { minX, maxX, minY, maxY };
+}
+
+/**
+ * Determine relative position of a segment within the piece.
+ */
+function getSegmentPosition(seg: SegmentInfo, bbox: { minX: number; maxX: number; minY: number; maxY: number }): {
+  horizontal: 'left' | 'center' | 'right';
+  vertical: 'top' | 'middle' | 'bottom';
+} {
+  const midX = (seg.start.x + seg.end.x) / 2;
+  const midY = (seg.start.y + seg.end.y) / 2;
+  const width = bbox.maxX - bbox.minX;
+  const height = bbox.maxY - bbox.minY;
+
+  const relX = width > 0 ? (midX - bbox.minX) / width : 0.5;
+  const relY = height > 0 ? (midY - bbox.minY) / height : 0.5;
+
+  return {
+    horizontal: relX < 0.33 ? 'left' : relX > 0.67 ? 'right' : 'center',
+    vertical: relY < 0.33 ? 'top' : relY > 0.67 ? 'bottom' : 'middle',
+  };
+}
+
+/**
+ * Detect anatomical landmarks from segment characteristics.
+ */
+export function detectLandmarks(segments: SegmentInfo[]): SemanticLandmark[] {
+  const landmarks: SemanticLandmark[] = [];
+  if (segments.length === 0) return landmarks;
+
+  const bbox = getBoundingBox(segments);
+  const totalLength = segments.reduce((sum, s) => sum + s.length, 0);
+
+  for (const seg of segments) {
+    const pos = getSegmentPosition(seg, bbox);
+    const relativeLength = seg.length / totalLength;
+    let label: LandmarkLabel = 'unknown';
+    let confidence = 0;
+
+    // Neckline: concave curve at top-center
+    if (seg.type === 'concave' && pos.vertical === 'top' && pos.horizontal !== 'right') {
+      label = 'neckline';
+      confidence = 0.8;
+      if (relativeLength < 0.15) confidence += 0.1; // Necklines are typically short
+    }
+
+    // Armhole: concave curve at top-right or middle-right
+    else if (seg.type === 'concave' && pos.horizontal === 'right' && pos.vertical !== 'bottom') {
+      label = 'armhole';
+      confidence = 0.75;
+      if (relativeLength > 0.05 && relativeLength < 0.2) confidence += 0.1;
+    }
+
+    // Shoulder: straight segment at top between neckline and armhole
+    else if (seg.type === 'straight' && pos.vertical === 'top' && pos.horizontal === 'right') {
+      label = 'shoulder';
+      confidence = 0.7;
+      if (relativeLength < 0.1) confidence += 0.1;
+    }
+
+    // Side seam: straight segment on the right side, vertical
+    else if (seg.type === 'straight' && pos.horizontal === 'right' && pos.vertical === 'middle') {
+      const isVertical = Math.abs(seg.end.x - seg.start.x) < Math.abs(seg.end.y - seg.start.y);
+      if (isVertical) {
+        label = 'side_seam';
+        confidence = 0.7;
+      }
+    }
+
+    // Hemline: straight segment at bottom
+    else if (seg.type === 'straight' && pos.vertical === 'bottom') {
+      const isHorizontal = Math.abs(seg.end.x - seg.start.x) > Math.abs(seg.end.y - seg.start.y);
+      if (isHorizontal) {
+        label = 'hemline';
+        confidence = 0.8;
+      }
+    }
+
+    // Center front/back: straight vertical segment on left
+    else if (seg.type === 'straight' && pos.horizontal === 'left') {
+      const isVertical = Math.abs(seg.end.x - seg.start.x) < Math.abs(seg.end.y - seg.start.y);
+      if (isVertical) {
+        label = 'center_front';
+        confidence = 0.6;
+      }
+    }
+
+    if (label !== 'unknown' && confidence > 0.5) {
+      landmarks.push({
+        edgeIndex: seg.commandIndex ?? 0,
+        label,
+        confidence,
+        curvatureType: seg.type,
+      });
+    }
+  }
+
+  return landmarks;
 }

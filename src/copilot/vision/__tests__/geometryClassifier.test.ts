@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifySegment, extractSegments, calculateRatios, calculateCurvatureDensity, type SegmentInfo } from '../geometryClassifier';
+import { classifySegment, extractSegments, calculateRatios, calculateCurvatureDensity, detectLandmarks, type SegmentInfo } from '../geometryClassifier';
 import type { PathCommand } from '../../../types/types';
 
 describe('Geometry Classifier - Segment Analysis', () => {
@@ -183,5 +183,44 @@ describe('Geometry Classifier - Ratio Analysis', () => {
     const density = calculateCurvatureDensity(segments);
     // 100 curved out of 300 total = 0.333
     expect(density).toBeCloseTo(100 / 300, 1);
+  });
+});
+
+describe('Geometry Classifier - Landmark Detection', () => {
+  it('should detect neckline from concave curve at top', () => {
+    // Simulated bodice front shape: neckline is concave at top-center
+    const segments: SegmentInfo[] = [
+      { type: 'straight', length: 30, start: { x: 0, y: 100 }, end: { x: 0, y: 70 }, commandIndex: 1 },  // center front
+      { type: 'concave', length: 20, start: { x: 0, y: 70 }, end: { x: 20, y: 60 }, commandIndex: 2 },   // neckline
+      { type: 'straight', length: 15, start: { x: 20, y: 60 }, end: { x: 35, y: 55 }, commandIndex: 3 }, // shoulder
+      { type: 'concave', length: 25, start: { x: 35, y: 55 }, end: { x: 40, y: 80 }, commandIndex: 4 },  // armhole
+      { type: 'straight', length: 50, start: { x: 40, y: 80 }, end: { x: 35, y: 130 }, commandIndex: 5 },// side seam
+      { type: 'straight', length: 35, start: { x: 35, y: 130 }, end: { x: 0, y: 130 }, commandIndex: 6 }, // hemline
+    ];
+
+    const landmarks = detectLandmarks(segments);
+
+    // Should detect neckline
+    const neckline = landmarks.find(l => l.label === 'neckline');
+    expect(neckline).toBeDefined();
+    expect(neckline?.edgeIndex).toBe(2); // The concave curve at top
+    expect(neckline?.confidence).toBeGreaterThan(0.5);
+  });
+
+  it('should detect armhole from concave curve on side', () => {
+    const segments: SegmentInfo[] = [
+      { type: 'straight', length: 30, start: { x: 0, y: 100 }, end: { x: 0, y: 70 }, commandIndex: 1 },
+      { type: 'concave', length: 20, start: { x: 0, y: 70 }, end: { x: 20, y: 60 }, commandIndex: 2 },
+      { type: 'straight', length: 15, start: { x: 20, y: 60 }, end: { x: 35, y: 55 }, commandIndex: 3 },
+      { type: 'concave', length: 25, start: { x: 35, y: 55 }, end: { x: 40, y: 80 }, commandIndex: 4 },
+      { type: 'straight', length: 50, start: { x: 40, y: 80 }, end: { x: 35, y: 130 }, commandIndex: 5 },
+      { type: 'straight', length: 35, start: { x: 35, y: 130 }, end: { x: 0, y: 130 }, commandIndex: 6 },
+    ];
+
+    const landmarks = detectLandmarks(segments);
+
+    const armhole = landmarks.find(l => l.label === 'armhole');
+    expect(armhole).toBeDefined();
+    expect(armhole?.edgeIndex).toBe(4); // The concave curve on side
   });
 });
