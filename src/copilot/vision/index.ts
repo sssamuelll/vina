@@ -66,3 +66,10 @@ export type {
   SpatialDescriptionInput,
   SpatialDescriptionResult,
 } from './spatialDescriber';
+
+// Design Log
+export {
+  DesignLogManager,
+  TOKEN_FLUSH_THRESHOLD,
+  DESIGN_LOG_STORAGE_KEY,
+} from './designLog';
