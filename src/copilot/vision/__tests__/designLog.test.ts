@@ -448,6 +448,45 @@ describe('Decision Extraction', () => {
     });
   });
 
+  describe('Integration', () => {
+    it('should support full workflow: add, extract, serialize, flush', async () => {
+      const manager = new DesignLogManager('integration-test');
+
+      // Extract and add decisions from message
+      const entries = extractDecisionsFromMessage(
+        'Adjusted the shoulder seam to 15mm for better fit.',
+        ['modifyDimension'],
+        ['front', 'back']
+      );
+      for (const entry of entries) {
+        manager.addEntry(entry);
+      }
+
+      // Add an override
+      manager.addOverride({
+        id: 'override-1',
+        skillId: 'core:bodice',
+        formulaName: 'shoulder_width',
+        originalValue: 'chest / 4',
+        overrideValue: 'chest / 4 + 1',
+        reason: 'Broader shoulders preferred',
+        createdAt: Date.now(),
+      });
+
+      // Serialize to markdown
+      const markdown = manager.toMarkdown();
+      expect(markdown).toContain('shoulder seam');
+      expect(markdown).toContain('shoulder_width');
+
+      // Check flush threshold
+      expect(manager.shouldFlush(5000)).toBe(true);
+
+      // Flush
+      await manager.flush();
+      expect(manager.getLog().entries.length).toBeLessThanOrEqual(10);
+    });
+  });
+
   describe('extractDecisionsFromMessage', () => {
     it('extracts decisions from tool call messages with decision keywords', () => {
       const message = 'I modified the sleeve length to 60cm for the front piece.';

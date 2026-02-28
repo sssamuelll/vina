@@ -70,6 +70,14 @@ export type {
 // Design Log
 export {
   DesignLogManager,
+  designLogToMarkdown,
+  extractDecisionsFromMessage,
+  formatTimestamp,
+  generateEntryId,
+  extractSummary,
   TOKEN_FLUSH_THRESHOLD,
   DESIGN_LOG_STORAGE_KEY,
+  DECISION_KEYWORDS,
+  CONSTRAINT_KEYWORDS,
+  WARNING_KEYWORDS,
 } from './designLog';
