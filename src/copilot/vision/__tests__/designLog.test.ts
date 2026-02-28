@@ -5,6 +5,12 @@ import {
   DESIGN_LOG_STORAGE_KEY,
   formatTimestamp,
   designLogToMarkdown,
+  DECISION_KEYWORDS,
+  CONSTRAINT_KEYWORDS,
+  WARNING_KEYWORDS,
+  generateEntryId,
+  extractSummary,
+  extractDecisionsFromMessage,
 } from '../designLog';
 import type { DesignLog, DesignLogEntry, SkillOverride } from '../types';
 
@@ -348,5 +354,209 @@ describe('designLogToMarkdown', () => {
     // Should still have section headers but no content
     expect(markdown).toContain('## Decisions');
     expect(markdown).toContain('## Formula Overrides');
+  });
+});
+
+describe('Decision Extraction', () => {
+  describe('Keywords', () => {
+    it('exports DECISION_KEYWORDS array', () => {
+      expect(DECISION_KEYWORDS).toEqual([
+        'modified',
+        'changed',
+        'adjusted',
+        'increased',
+        'decreased',
+        'added',
+        'removed',
+        'set',
+        'updated',
+        'created',
+        'applied',
+      ]);
+    });
+
+    it('exports CONSTRAINT_KEYWORDS array', () => {
+      expect(CONSTRAINT_KEYWORDS).toEqual([
+        'must',
+        'should',
+        'require',
+        'constraint',
+        'rule',
+        'standard',
+        'always',
+        'never',
+        'minimum',
+        'maximum',
+      ]);
+    });
+
+    it('exports WARNING_KEYWORDS array', () => {
+      expect(WARNING_KEYWORDS).toEqual([
+        'warning',
+        'caution',
+        'issue',
+        'problem',
+        'risk',
+        'may cause',
+        'potential',
+      ]);
+    });
+  });
+
+  describe('generateEntryId', () => {
+    it('generates unique IDs', () => {
+      const id1 = generateEntryId();
+      const id2 = generateEntryId();
+      const id3 = generateEntryId();
+
+      expect(id1).not.toBe(id2);
+      expect(id2).not.toBe(id3);
+      expect(id1).not.toBe(id3);
+    });
+
+    it('returns string IDs', () => {
+      const id = generateEntryId();
+      expect(typeof id).toBe('string');
+      expect(id.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('extractSummary', () => {
+    it('extracts first sentence from message', () => {
+      const message = 'Increased the armhole ease by 5mm. This provides more comfort.';
+      const summary = extractSummary(message);
+      expect(summary).toBe('Increased the armhole ease by 5mm.');
+    });
+
+    it('truncates to max 100 characters', () => {
+      const longMessage =
+        'This is an extremely long sentence that goes on and on and continues for quite a while without stopping because someone decided to write without punctuation and it just keeps going forever.';
+      const summary = extractSummary(longMessage);
+      expect(summary.length).toBeLessThanOrEqual(100);
+      expect(summary.endsWith('...')).toBe(true);
+    });
+
+    it('handles message with no period', () => {
+      const message = 'No period in this message';
+      const summary = extractSummary(message);
+      expect(summary).toBe('No period in this message');
+    });
+
+    it('handles empty message', () => {
+      const summary = extractSummary('');
+      expect(summary).toBe('');
+    });
+  });
+
+  describe('extractDecisionsFromMessage', () => {
+    it('extracts decisions from tool call messages with decision keywords', () => {
+      const message = 'I modified the sleeve length to 60cm for the front piece.';
+      const tools = ['adjustSeamAllowance'];
+      const pieceIds = ['piece-front'];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('decision');
+      expect(entries[0].summary).toContain('modified');
+      expect(entries[0].relatedPieceIds).toEqual(['piece-front']);
+    });
+
+    it('extracts decisions when tools are present (even without keywords)', () => {
+      const message = 'The operation completed successfully on the bodice.';
+      const tools = ['movePiece', 'rotatePiece'];
+      const pieceIds = ['piece-bodice'];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('decision');
+    });
+
+    it('extracts constraints from constraint-related messages', () => {
+      const message =
+        'The shoulder width must not exceed 40cm. This is a requirement for the design.';
+      const tools: string[] = [];
+      const pieceIds = ['piece-front', 'piece-back'];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('constraint');
+      expect(entries[0].relatedPieceIds).toEqual(['piece-front', 'piece-back']);
+    });
+
+    it('extracts warnings from warning-related messages', () => {
+      const message =
+        'Warning: the current seam allowance may cause issues during assembly.';
+      const tools: string[] = [];
+      const pieceIds = ['piece-sleeve'];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('warning');
+      expect(entries[0].relatedPieceIds).toEqual(['piece-sleeve']);
+    });
+
+    it('prioritizes warnings over constraints and decisions', () => {
+      const message =
+        'Warning: you must be careful. I have adjusted the value but there is a risk.';
+      const tools = ['adjustValue'];
+      const pieceIds = ['piece-1'];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('warning');
+    });
+
+    it('prioritizes constraints over decisions', () => {
+      const message =
+        'I have modified the piece. The minimum value should always be respected.';
+      const tools: string[] = [];
+      const pieceIds = ['piece-1'];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('constraint');
+    });
+
+    it('returns empty array for generic messages with no keywords', () => {
+      const message = 'Hello, how can I help you today?';
+      const tools: string[] = [];
+      const pieceIds: string[] = [];
+
+      const entries = extractDecisionsFromMessage(message, tools, pieceIds);
+
+      expect(entries).toEqual([]);
+    });
+
+    it('returns empty array for empty message', () => {
+      const entries = extractDecisionsFromMessage('', [], []);
+      expect(entries).toEqual([]);
+    });
+
+    it('handles case-insensitive keyword matching', () => {
+      const message = 'WARNING: Please check the measurements.';
+      const entries = extractDecisionsFromMessage(message, [], ['piece-1']);
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe('warning');
+    });
+
+    it('generates valid entry IDs and timestamps', () => {
+      const message = 'I adjusted the hemline by 2cm.';
+      const beforeTime = Date.now();
+      const entries = extractDecisionsFromMessage(message, [], ['piece-skirt']);
+      const afterTime = Date.now();
+
+      expect(entries).toHaveLength(1);
+      expect(entries[0].id).toBeTruthy();
+      expect(typeof entries[0].id).toBe('string');
+      expect(entries[0].timestamp).toBeGreaterThanOrEqual(beforeTime);
+      expect(entries[0].timestamp).toBeLessThanOrEqual(afterTime);
+    });
   });
 });

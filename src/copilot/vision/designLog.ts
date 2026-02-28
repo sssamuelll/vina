@@ -9,10 +9,156 @@
  * @module copilot/vision/designLog
  */
 
-import type { DesignLog, DesignLogEntry, SkillOverride } from './types';
+import type { DesignLog, DesignLogEntry, DesignLogEntryType, SkillOverride } from './types';
 
 /** Token threshold for flushing log to storage */
 export const TOKEN_FLUSH_THRESHOLD = 4000;
+
+/** Keywords indicating a design decision was made */
+export const DECISION_KEYWORDS = [
+  'modified',
+  'changed',
+  'adjusted',
+  'increased',
+  'decreased',
+  'added',
+  'removed',
+  'set',
+  'updated',
+  'created',
+  'applied',
+] as const;
+
+/** Keywords indicating a constraint or rule */
+export const CONSTRAINT_KEYWORDS = [
+  'must',
+  'should',
+  'require',
+  'constraint',
+  'rule',
+  'standard',
+  'always',
+  'never',
+  'minimum',
+  'maximum',
+] as const;
+
+/** Keywords indicating a warning or caution */
+export const WARNING_KEYWORDS = [
+  'warning',
+  'caution',
+  'issue',
+  'problem',
+  'risk',
+  'may cause',
+  'potential',
+] as const;
+
+/** Counter for generating unique entry IDs */
+let entryIdCounter = 0;
+
+/**
+ * Generate a unique entry ID.
+ * Combines timestamp with a counter to ensure uniqueness.
+ * @returns A unique string ID
+ */
+export function generateEntryId(): string {
+  entryIdCounter += 1;
+  return `entry-${Date.now()}-${entryIdCounter}`;
+}
+
+/**
+ * Extract a summary from a message.
+ * Takes the first sentence, truncated to max 100 characters.
+ * @param message - The full message text
+ * @returns The extracted summary
+ */
+export function extractSummary(message: string): string {
+  if (!message) {
+    return '';
+  }
+
+  // Find the first sentence (ends with . or ! or ?)
+  const sentenceEnd = message.search(/[.!?]/);
+  let summary: string;
+
+  if (sentenceEnd >= 0) {
+    summary = message.slice(0, sentenceEnd + 1);
+  } else {
+    summary = message;
+  }
+
+  // Truncate to max 100 characters
+  if (summary.length > 100) {
+    summary = summary.slice(0, 97) + '...';
+  }
+
+  return summary;
+}
+
+/**
+ * Check if a message contains any keywords from a list (case-insensitive).
+ * @param message - The message to search
+ * @param keywords - Array of keywords to look for
+ * @returns true if any keyword is found
+ */
+function containsKeyword(message: string, keywords: readonly string[]): boolean {
+  const lowerMessage = message.toLowerCase();
+  return keywords.some(keyword => lowerMessage.includes(keyword.toLowerCase()));
+}
+
+/**
+ * Extract design log entries from a message based on content analysis.
+ *
+ * Priority order:
+ * 1. Warnings (highest priority)
+ * 2. Constraints
+ * 3. Decisions (tool use OR decision keywords)
+ *
+ * @param message - The message content to analyze
+ * @param tools - Array of tool names used in this message
+ * @param pieceIds - Array of piece IDs related to this message
+ * @returns Array of extracted DesignLogEntry objects
+ */
+export function extractDecisionsFromMessage(
+  message: string,
+  tools: string[],
+  pieceIds: string[]
+): DesignLogEntry[] {
+  if (!message) {
+    return [];
+  }
+
+  let type: DesignLogEntryType | null = null;
+
+  // Check warnings first (highest priority)
+  if (containsKeyword(message, WARNING_KEYWORDS)) {
+    type = 'warning';
+  }
+  // Then constraints
+  else if (containsKeyword(message, CONSTRAINT_KEYWORDS)) {
+    type = 'constraint';
+  }
+  // Then decisions (tool use OR decision keywords)
+  else if (tools.length > 0 || containsKeyword(message, DECISION_KEYWORDS)) {
+    type = 'decision';
+  }
+
+  // Return empty if no match
+  if (!type) {
+    return [];
+  }
+
+  const entry: DesignLogEntry = {
+    id: generateEntryId(),
+    timestamp: Date.now(),
+    type,
+    summary: extractSummary(message),
+    relatedPieceIds: pieceIds,
+  };
+
+  return [entry];
+}
 
 /**
  * Format a timestamp as a human-readable date string.
