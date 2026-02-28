@@ -5,9 +5,12 @@
  * - 3D distance calculation between points
  * - Bounding box computation from vertex arrays
  * - Bounding box overlap detection
+ * - Relationship analysis between pieces
  *
  * @module copilot/vision/spatialDescriber
  */
+
+import type { SpatialRelationship, SpatialRelationType } from './types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -215,4 +218,68 @@ export function extractPieceInfo(
   const worldBounds = computeBoundingBox3D(worldVertices);
 
   return { pieceId, position, worldBounds, worldVertices };
+}
+
+// ─── Relationship Analysis ──────────────────────────────────────────────────
+
+/** Threshold below which pieces are considered overlapping (mm) */
+const OVERLAP_THRESHOLD = 1;
+
+/** Threshold below which pieces are considered adjacent (mm) */
+const ADJACENT_THRESHOLD = 10;
+
+/**
+ * Analyze the spatial relationship between two pieces.
+ *
+ * Classifies the relationship based on minimum vertex distance:
+ * - 'sewn': Pieces have a sewing connection (takes precedence)
+ * - 'overlapping': Distance < 1mm
+ * - 'adjacent': Distance < 10mm
+ * - 'distant': Distance >= 10mm
+ *
+ * @param infoA - Spatial information for the first piece
+ * @param infoB - Spatial information for the second piece
+ * @param hasSewingConnection - Whether the pieces are connected by a seam
+ * @returns Spatial relationship between the two pieces
+ */
+export function analyzePieceRelationship(
+  infoA: PieceSpatialInfo,
+  infoB: PieceSpatialInfo,
+  hasSewingConnection: boolean,
+): SpatialRelationship {
+  const { distance, indexA, indexB } = findMinimumDistance(
+    infoA.worldVertices,
+    infoB.worldVertices,
+  );
+
+  if (hasSewingConnection) {
+    return {
+      pieceAId: infoA.pieceId,
+      pieceBId: infoB.pieceId,
+      type: 'sewn',
+      distance3D: distance,
+      edgeAIndex: indexA,
+      edgeBIndex: indexB,
+      hasSewingConnection: true,
+    };
+  }
+
+  let type: SpatialRelationType;
+  if (distance < OVERLAP_THRESHOLD) {
+    type = 'overlapping';
+  } else if (distance < ADJACENT_THRESHOLD) {
+    type = 'adjacent';
+  } else {
+    type = 'distant';
+  }
+
+  return {
+    pieceAId: infoA.pieceId,
+    pieceBId: infoB.pieceId,
+    type,
+    distance3D: distance,
+    edgeAIndex: indexA,
+    edgeBIndex: indexB,
+    hasSewingConnection: false,
+  };
 }

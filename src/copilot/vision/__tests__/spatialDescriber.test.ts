@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { distance3D, computeBoundingBox3D, boundingBoxesOverlap, findMinimumDistance, extractPieceInfo } from '../spatialDescriber';
+import { distance3D, computeBoundingBox3D, boundingBoxesOverlap, findMinimumDistance, extractPieceInfo, analyzePieceRelationship, type PieceSpatialInfo } from '../spatialDescriber';
 
 describe('Spatial Describer - Distance Functions', () => {
   it('should calculate 3D distance between two points', () => {
@@ -101,5 +101,88 @@ describe('Spatial Describer - Piece Info', () => {
     expect(info.worldVertices[3]).toBe(15);
     expect(info.worldVertices[4]).toBe(15);
     expect(info.worldVertices[5]).toBe(15);
+  });
+});
+
+describe('Spatial Describer - Relationship Analysis', () => {
+  it('should classify adjacent pieces', () => {
+    const infoA: PieceSpatialInfo = {
+      pieceId: 'piece-a',
+      position: [0, 0, 0],
+      worldBounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0]),
+    };
+    const infoB: PieceSpatialInfo = {
+      pieceId: 'piece-b',
+      position: [12, 0, 0],
+      worldBounds: { minX: 12, maxX: 22, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([12, 0, 0, 22, 0, 0, 22, 10, 0, 12, 10, 0]),
+    };
+
+    const relationship = analyzePieceRelationship(infoA, infoB, false);
+
+    expect(relationship.type).toBe('adjacent');
+    expect(relationship.distance3D).toBeCloseTo(2);
+    expect(relationship.hasSewingConnection).toBe(false);
+  });
+
+  it('should classify overlapping pieces', () => {
+    const infoA: PieceSpatialInfo = {
+      pieceId: 'piece-a',
+      position: [0, 0, 0],
+      worldBounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([5, 5, 0]),
+    };
+    const infoB: PieceSpatialInfo = {
+      pieceId: 'piece-b',
+      position: [0, 0, 0],
+      worldBounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([5, 5, 0]),
+    };
+
+    const relationship = analyzePieceRelationship(infoA, infoB, false);
+
+    expect(relationship.type).toBe('overlapping');
+    expect(relationship.distance3D).toBeCloseTo(0);
+  });
+
+  it('should classify distant pieces', () => {
+    const infoA: PieceSpatialInfo = {
+      pieceId: 'piece-a',
+      position: [0, 0, 0],
+      worldBounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([0, 0, 0]),
+    };
+    const infoB: PieceSpatialInfo = {
+      pieceId: 'piece-b',
+      position: [100, 0, 0],
+      worldBounds: { minX: 100, maxX: 110, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([100, 0, 0]),
+    };
+
+    const relationship = analyzePieceRelationship(infoA, infoB, false);
+
+    expect(relationship.type).toBe('distant');
+    expect(relationship.distance3D).toBeCloseTo(100);
+  });
+
+  it('should classify sewn pieces', () => {
+    const infoA: PieceSpatialInfo = {
+      pieceId: 'piece-a',
+      position: [0, 0, 0],
+      worldBounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([0, 0, 0]),
+    };
+    const infoB: PieceSpatialInfo = {
+      pieceId: 'piece-b',
+      position: [0, 0, 0],
+      worldBounds: { minX: 0, maxX: 10, minY: 0, maxY: 10, minZ: 0, maxZ: 0 },
+      worldVertices: new Float32Array([0, 0, 0]),
+    };
+
+    const relationship = analyzePieceRelationship(infoA, infoB, true);
+
+    expect(relationship.type).toBe('sewn');
+    expect(relationship.hasSewingConnection).toBe(true);
   });
 });
