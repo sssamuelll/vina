@@ -355,3 +355,71 @@ export function buildCerebralContext(input: CerebralContextInput): CerebralConte
     activeOverrides: overrides,
   };
 }
+
+/**
+ * Serialize cerebral context for LLM system prompt.
+ */
+export function serializeCerebralContext(context: CerebralContext): string {
+  const sections: string[] = [];
+
+  // Piece analysis section
+  if (context.pieceSemantics.length > 0) {
+    sections.push('## Piece Analysis');
+    for (const ps of context.pieceSemantics) {
+      const fp = ps.fingerprint;
+      const segTypes = fp.segmentTypes.join(', ');
+      const density = (fp.curvatureDensity * 100).toFixed(0);
+      sections.push(`- **${ps.pieceId}**: ${segTypes} | ${density}% curved`);
+      if (fp.landmarks.length > 0) {
+        const landmarks = fp.landmarks.map(l => l.label).join(', ');
+        sections.push(`  - Landmarks: ${landmarks}`);
+      }
+    }
+    sections.push('');
+  }
+
+  // Spatial relationships section
+  if (context.spatialRelationships.length > 0) {
+    sections.push('## Spatial Relationships');
+    for (const rel of context.spatialRelationships) {
+      const sewn = rel.hasSewingConnection ? ' [sewn]' : '';
+      sections.push(`- ${rel.pieceAId} ↔ ${rel.pieceBId}: ${rel.type} (${rel.distance3D.toFixed(1)}mm)${sewn}`);
+    }
+    sections.push('');
+  }
+
+  // Conflicts section
+  if (context.conflicts.length > 0) {
+    sections.push('## ⚠️ Conflicts');
+    for (const c of context.conflicts) {
+      sections.push(`- [${c.severity.toUpperCase()}] ${c.type}: ${c.description}`);
+    }
+    sections.push('');
+  }
+
+  // Recent decisions section
+  if (context.recentDecisions.length > 0) {
+    sections.push('## Recent Decisions');
+    for (const d of context.recentDecisions) {
+      const icon = d.type === 'warning' ? '⚠️' : d.type === 'constraint' ? '🔒' : '📝';
+      sections.push(`- ${icon} ${d.summary}`);
+    }
+    sections.push('');
+  }
+
+  // Overrides section
+  if (context.activeOverrides.length > 0) {
+    sections.push('## User Formula Overrides');
+    for (const o of context.activeOverrides) {
+      sections.push(`- **${o.formulaName}** (${o.skillId}): \`${o.overrideValue}\``);
+      sections.push(`  - Reason: ${o.reason}`);
+    }
+    sections.push('');
+  }
+
+  if (sections.length === 0) {
+    return '## Context\nNo pieces or design history yet.';
+  }
+
+  return sections.join('\n');
+}

@@ -417,7 +417,8 @@ describe('Context Builder - Spatial Relationships', () => {
   });
 });
 
-import { getRecentDecisions, buildCerebralContext, type CerebralContextInput } from '../contextBuilder';
+import { getRecentDecisions, buildCerebralContext, serializeCerebralContext, type CerebralContextInput } from '../contextBuilder';
+import type { CerebralContext } from '../vision/types';
 import type { DesignLogEntry, SkillOverride } from '../vision/types';
 
 describe('Context Builder - Design Log Integration', () => {
@@ -535,5 +536,100 @@ describe('Context Builder - Cerebral Context', () => {
 
     expect(context.activeOverrides).toHaveLength(1);
     expect(context.activeOverrides[0].skillId).toBe('core:bodice');
+  });
+});
+
+describe('Context Builder - Serialization', () => {
+  const context: CerebralContext = {
+    pieceSemantics: [
+      {
+        pieceId: 'front',
+        fingerprint: {
+          pieceId: 'front',
+          segmentTypes: ['straight', 'straight', 'straight', 'straight'],
+          ratios: { 'width/height': 0.67 },
+          curvatureDensity: 0,
+          landmarks: [],
+        },
+      },
+    ],
+    spatialRelationships: [
+      {
+        pieceAId: 'front',
+        pieceBId: 'back',
+        type: 'adjacent',
+        distance3D: 5,
+        hasSewingConnection: false,
+      },
+    ],
+    conflicts: [],
+    recentDecisions: [
+      {
+        id: 'e1',
+        timestamp: Date.now(),
+        type: 'decision',
+        summary: 'Use French seams',
+        relatedPieceIds: ['front'],
+      },
+    ],
+    activeOverrides: [],
+  };
+
+  it('should serialize to markdown format', () => {
+    const serialized = serializeCerebralContext(context);
+
+    expect(serialized).toContain('## Piece Analysis');
+    expect(serialized).toContain('front');
+  });
+
+  it('should include spatial relationships', () => {
+    const serialized = serializeCerebralContext(context);
+
+    expect(serialized).toContain('Spatial');
+    expect(serialized).toContain('adjacent');
+  });
+
+  it('should include recent decisions', () => {
+    const serialized = serializeCerebralContext(context);
+
+    expect(serialized).toContain('Decision');
+    expect(serialized).toContain('French seams');
+  });
+
+  it('should handle empty context', () => {
+    const empty: CerebralContext = {
+      pieceSemantics: [],
+      spatialRelationships: [],
+      conflicts: [],
+      recentDecisions: [],
+      activeOverrides: [],
+    };
+
+    const serialized = serializeCerebralContext(empty);
+
+    expect(serialized).toBeDefined();
+    expect(serialized.length).toBeGreaterThan(0);
+  });
+
+  it('should include overrides when present', () => {
+    const withOverrides: CerebralContext = {
+      ...context,
+      activeOverrides: [
+        {
+          id: 'o1',
+          skillId: 'core:bodice',
+          formulaName: 'backWidth',
+          originalValue: 'x',
+          overrideValue: 'x + 5',
+          reason: 'Wider back',
+          createdAt: Date.now(),
+        },
+      ],
+    };
+
+    const serialized = serializeCerebralContext(withOverrides);
+
+    expect(serialized).toContain('Override');
+    expect(serialized).toContain('backWidth');
   });
 });
