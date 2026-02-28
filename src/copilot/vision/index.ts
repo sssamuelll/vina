@@ -44,3 +44,25 @@ export {
 } from './geometryClassifier';
 
 export type { SegmentInfo } from './geometryClassifier';
+
+// Spatial Describer
+export {
+  distance3D,
+  computeBoundingBox3D,
+  boundingBoxesOverlap,
+  findMinimumDistance,
+  extractPieceInfo,
+  analyzePieceRelationship,
+  describeSpatialRelationships,
+} from './spatialDescriber';
+
+export type {
+  Point3D,
+  BoundingBox3D,
+  MinDistanceResult,
+  PieceSpatialInfo,
+  SpatialPiece,
+  SpatialSeam,
+  SpatialDescriptionInput,
+  SpatialDescriptionResult,
+} from './spatialDescriber';

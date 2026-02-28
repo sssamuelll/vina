@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { distance3D, computeBoundingBox3D, boundingBoxesOverlap, findMinimumDistance, extractPieceInfo, analyzePieceRelationship, type PieceSpatialInfo } from '../spatialDescriber';
+import { distance3D, computeBoundingBox3D, boundingBoxesOverlap, findMinimumDistance, extractPieceInfo, analyzePieceRelationship, describeSpatialRelationships, type PieceSpatialInfo, type SpatialDescriptionInput } from '../spatialDescriber';
 
 describe('Spatial Describer - Distance Functions', () => {
   it('should calculate 3D distance between two points', () => {
@@ -184,5 +184,73 @@ describe('Spatial Describer - Relationship Analysis', () => {
 
     expect(relationship.type).toBe('sewn');
     expect(relationship.hasSewingConnection).toBe(true);
+  });
+});
+
+describe('Spatial Describer - Main Function', () => {
+  it('should describe relationships between multiple pieces', () => {
+    const input: SpatialDescriptionInput = {
+      pieces: [
+        { id: 'front', vertices: new Float32Array([0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0]) },
+        { id: 'back', vertices: new Float32Array([0, 0, 0, 10, 0, 0, 10, 10, 0, 0, 10, 0]) },
+      ],
+      positions: {
+        'front': [0, 0, 0],
+        'back': [0, 0, 5],
+      },
+      seams: [],
+    };
+
+    const result = describeSpatialRelationships(input);
+
+    expect(result.relationships).toHaveLength(1);
+    expect(result.relationships[0].pieceAId).toBe('front');
+    expect(result.relationships[0].pieceBId).toBe('back');
+    expect(result.relationships[0].distance3D).toBeCloseTo(5);
+    expect(result.relationships[0].type).toBe('adjacent');
+  });
+
+  it('should detect collision conflicts', () => {
+    const input: SpatialDescriptionInput = {
+      pieces: [
+        { id: 'piece-a', vertices: new Float32Array([5, 5, 0]) },
+        { id: 'piece-b', vertices: new Float32Array([5, 5, 0]) },
+      ],
+      positions: {
+        'piece-a': [0, 0, 0],
+        'piece-b': [0, 0, 0],
+      },
+      seams: [],
+    };
+
+    const result = describeSpatialRelationships(input);
+
+    expect(result.conflicts).toHaveLength(1);
+    expect(result.conflicts[0].type).toBe('collision');
+    expect(result.conflicts[0].severity).toBe('high');
+    expect(result.conflicts[0].affectedPieceIds).toContain('piece-a');
+    expect(result.conflicts[0].affectedPieceIds).toContain('piece-b');
+  });
+
+  it('should respect sewing connections from seams', () => {
+    const input: SpatialDescriptionInput = {
+      pieces: [
+        { id: 'front', vertices: new Float32Array([0, 0, 0]) },
+        { id: 'back', vertices: new Float32Array([0, 0, 0]) },
+      ],
+      positions: {
+        'front': [0, 0, 0],
+        'back': [0, 0, 0],
+      },
+      seams: [
+        { pieceAId: 'front', pieceBId: 'back' },
+      ],
+    };
+
+    const result = describeSpatialRelationships(input);
+
+    expect(result.relationships[0].type).toBe('sewn');
+    expect(result.relationships[0].hasSewingConnection).toBe(true);
+    expect(result.conflicts).toHaveLength(0);
   });
 });

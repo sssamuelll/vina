@@ -10,7 +10,7 @@
  * @module copilot/vision/spatialDescriber
  */
 
-import type { SpatialRelationship, SpatialRelationType } from './types';
+import type { SpatialRelationship, SpatialRelationType, SpatialConflict } from './types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -282,4 +282,105 @@ export function analyzePieceRelationship(
     edgeBIndex: indexB,
     hasSewingConnection: false,
   };
+}
+
+// ─── Main Spatial Description ────────────────────────────────────────────────
+
+/**
+ * A piece with its geometry for spatial analysis.
+ */
+export interface SpatialPiece {
+  /** Unique identifier for the piece */
+  id: string;
+  /** Vertex array in local space (x, y, z triplets) */
+  vertices: Float32Array;
+}
+
+/**
+ * A seam connection between two pieces.
+ */
+export interface SpatialSeam {
+  /** First piece ID */
+  pieceAId: string;
+  /** Second piece ID */
+  pieceBId: string;
+}
+
+/**
+ * Input for spatial relationship analysis.
+ */
+export interface SpatialDescriptionInput {
+  /** Pieces to analyze */
+  pieces: SpatialPiece[];
+  /** World positions for each piece by ID */
+  positions: Record<string, [number, number, number]>;
+  /** Seam connections between pieces */
+  seams: SpatialSeam[];
+}
+
+/**
+ * Result of spatial relationship analysis.
+ */
+export interface SpatialDescriptionResult {
+  /** All pairwise relationships between pieces */
+  relationships: SpatialRelationship[];
+  /** Detected spatial conflicts */
+  conflicts: SpatialConflict[];
+}
+
+/**
+ * Analyze spatial relationships between all pieces and detect conflicts.
+ *
+ * This is the main entry point for spatial analysis. It:
+ * - Extracts world-space information for all pieces
+ * - Analyzes all pairwise relationships
+ * - Detects collision conflicts (overlapping without sewing)
+ * - Respects sewing connections from seams
+ *
+ * @param input - Pieces, positions, and seam data
+ * @returns Relationships and conflicts
+ */
+export function describeSpatialRelationships(
+  input: SpatialDescriptionInput,
+): SpatialDescriptionResult {
+  const { pieces, positions, seams } = input;
+  const relationships: SpatialRelationship[] = [];
+  const conflicts: SpatialConflict[] = [];
+
+  // Build seam lookup for O(1) checking
+  const seamPairs = new Set<string>();
+  for (const seam of seams) {
+    seamPairs.add(`${seam.pieceAId}:${seam.pieceBId}`);
+    seamPairs.add(`${seam.pieceBId}:${seam.pieceAId}`);
+  }
+
+  // Extract spatial info for all pieces
+  const pieceInfos: PieceSpatialInfo[] = pieces.map(piece => {
+    const pos = positions[piece.id] || [0, 0, 0];
+    return extractPieceInfo(piece.id, piece.vertices, pos);
+  });
+
+  // Analyze all piece pairs
+  for (let i = 0; i < pieceInfos.length; i++) {
+    for (let j = i + 1; j < pieceInfos.length; j++) {
+      const infoA = pieceInfos[i];
+      const infoB = pieceInfos[j];
+
+      const hasSewing = seamPairs.has(`${infoA.pieceId}:${infoB.pieceId}`);
+      const relationship = analyzePieceRelationship(infoA, infoB, hasSewing);
+      relationships.push(relationship);
+
+      // Detect conflicts (overlapping without sewing)
+      if (relationship.type === 'overlapping' && !hasSewing) {
+        conflicts.push({
+          type: 'collision',
+          severity: 'high',
+          affectedPieceIds: [infoA.pieceId, infoB.pieceId],
+          description: `Pieces ${infoA.pieceId} and ${infoB.pieceId} overlap by ${relationship.distance3D.toFixed(1)}mm`,
+        });
+      }
+    }
+  }
+
+  return { relationships, conflicts };
 }
