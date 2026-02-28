@@ -8,6 +8,8 @@ import type {
   DesignLogEntry,
   SkillOverride,
   DesignLog,
+  AuditResult,
+  IntentPrediction,
 } from '../types';
 
 describe('Vision Types - Perception Layer', () => {
@@ -103,5 +105,34 @@ describe('Vision Types - Memory Layer', () => {
       lastFlushAt: Date.now(),
     };
     expect(log.projectId).toBe('proj-123');
+  });
+});
+
+describe('Vision Types - Action Layer', () => {
+  it('should define AuditResult correctly', () => {
+    const result: AuditResult = {
+      rule: 'self_intersection',
+      passed: false,
+      message: 'Proposed change would create self-intersecting outline',
+    };
+    expect(result.passed).toBe(false);
+    expect(result.rule).toBe('self_intersection');
+  });
+
+  it('should define IntentPrediction correctly', () => {
+    const prediction: IntentPrediction = {
+      toolName: 'modifyDimension',
+      originalPieceId: 'p-front',
+      predictedChanges: { width: 42, height: 58 },
+      isSafe: false,
+      auditResults: [
+        { rule: 'area_integrity', passed: true },
+        { rule: 'self_intersection', passed: false, message: 'Self-intersection detected' },
+      ],
+      suggestedFix: 'Try a smaller increment (10mm instead of 50mm)',
+    };
+    expect(prediction.isSafe).toBe(false);
+    expect(prediction.auditResults).toHaveLength(2);
+    expect(prediction.suggestedFix).toBeDefined();
   });
 });

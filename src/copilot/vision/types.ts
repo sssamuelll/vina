@@ -181,3 +181,44 @@ export interface DesignLog {
   /** Last time the log was flushed to storage */
   lastFlushAt: number;
 }
+
+// ─── Action Layer: Intent Prediction ────────────────────────────────────────
+
+/**
+ * Types of geometric audit rules.
+ */
+export type AuditRuleType =
+  | 'area_integrity'      // Area > 0
+  | 'self_intersection'   // No self-crossing
+  | 'seam_compatibility'  // Sewn edges still match
+  | 'constraint_violation'; // Violates a design log constraint
+
+/**
+ * Result of a single audit rule check.
+ */
+export interface AuditResult {
+  /** Which rule was checked */
+  rule: AuditRuleType;
+  /** Whether the check passed */
+  passed: boolean;
+  /** Error message if failed */
+  message?: string;
+}
+
+/**
+ * Pre-flight prediction of a tool call's effect.
+ */
+export interface IntentPrediction {
+  /** Name of the tool being called */
+  toolName: string;
+  /** ID of the piece being modified */
+  originalPieceId: string;
+  /** Predicted changes to piece properties */
+  predictedChanges: Record<string, unknown>;
+  /** Whether the change is safe to apply */
+  isSafe: boolean;
+  /** Results of all audit rule checks */
+  auditResults: AuditResult[];
+  /** Suggested alternative if unsafe */
+  suggestedFix?: string;
+}
