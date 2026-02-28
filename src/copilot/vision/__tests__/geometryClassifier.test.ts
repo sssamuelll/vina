@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifySegment, extractSegments } from '../geometryClassifier';
+import { classifySegment, extractSegments, calculateRatios, calculateCurvatureDensity, type SegmentInfo } from '../geometryClassifier';
 import type { PathCommand } from '../../../types/types';
 
 describe('Geometry Classifier - Segment Analysis', () => {
@@ -152,5 +152,36 @@ describe('Geometry Classifier - Edge Cases', () => {
       expect(result.length).toBe(0);
       expect(result.end).toEqual(prevPoint);
     });
+  });
+});
+
+describe('Geometry Classifier - Ratio Analysis', () => {
+  it('should calculate segment length ratios', () => {
+    const segments: SegmentInfo[] = [
+      { type: 'straight', length: 100, start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+      { type: 'concave', length: 50, start: { x: 100, y: 0 }, end: { x: 100, y: 50 } },
+      { type: 'straight', length: 100, start: { x: 100, y: 50 }, end: { x: 0, y: 50 } },
+      { type: 'straight', length: 50, start: { x: 0, y: 50 }, end: { x: 0, y: 0 } },
+    ];
+
+    const ratios = calculateRatios(segments);
+
+    // Longest to total perimeter
+    expect(ratios.longestToPerimeter).toBeCloseTo(100 / 300);
+    // First to second segment
+    expect(ratios.seg0ToSeg1).toBeCloseTo(100 / 50);
+  });
+
+  it('should calculate curvature density', () => {
+    const segments: SegmentInfo[] = [
+      { type: 'straight', length: 100, start: { x: 0, y: 0 }, end: { x: 100, y: 0 } },
+      { type: 'convex', length: 50, start: { x: 100, y: 0 }, end: { x: 100, y: 50 } },
+      { type: 'straight', length: 100, start: { x: 100, y: 50 }, end: { x: 0, y: 50 } },
+      { type: 'concave', length: 50, start: { x: 0, y: 50 }, end: { x: 0, y: 0 } },
+    ];
+
+    const density = calculateCurvatureDensity(segments);
+    // 100 curved out of 300 total = 0.333
+    expect(density).toBeCloseTo(100 / 300, 1);
   });
 });

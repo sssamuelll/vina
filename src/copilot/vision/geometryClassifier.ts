@@ -347,6 +347,50 @@ export function classifySegment(
   }
 }
 
+// ─── Ratio Analysis ─────────────────────────────────────────────────────────
+
+/**
+ * Calculate length ratios between segments.
+ */
+export function calculateRatios(segments: SegmentInfo[]): Record<string, number> {
+  const ratios: Record<string, number> = {};
+  if (segments.length === 0) return ratios;
+
+  const totalLength = segments.reduce((sum, s) => sum + s.length, 0);
+  const longestSegment = Math.max(...segments.map(s => s.length));
+
+  ratios.longestToPerimeter = longestSegment / totalLength;
+  ratios.totalPerimeter = totalLength;
+
+  // Calculate adjacent segment ratios
+  for (let i = 0; i < segments.length - 1; i++) {
+    const ratio = segments[i].length / segments[i + 1].length;
+    ratios[`seg${i}ToSeg${i + 1}`] = ratio;
+  }
+
+  // Group by type and calculate type ratios
+  const straightLength = segments.filter(s => s.type === 'straight').reduce((sum, s) => sum + s.length, 0);
+  const curvedLength = totalLength - straightLength;
+
+  ratios.straightToCurved = curvedLength > 0 ? straightLength / curvedLength : Infinity;
+
+  return ratios;
+}
+
+/**
+ * Calculate the fraction of the outline that is curved (0-1).
+ */
+export function calculateCurvatureDensity(segments: SegmentInfo[]): number {
+  if (segments.length === 0) return 0;
+
+  const totalLength = segments.reduce((sum, s) => sum + s.length, 0);
+  const curvedLength = segments
+    .filter(s => s.type !== 'straight')
+    .reduce((sum, s) => sum + s.length, 0);
+
+  return totalLength > 0 ? curvedLength / totalLength : 0;
+}
+
 /**
  * Extract and classify all segments from a pattern outline.
  *
