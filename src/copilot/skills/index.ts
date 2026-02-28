@@ -37,3 +37,10 @@ export {
   uninstallSkill,
   isSkillInstalled,
 } from './marketplace';
+
+// Seamly2D converter
+export { parseSeamlyXML } from './seamlyParser';
+export type { SeamlyPattern, SeamlyConstructionStep, SeamlyPiece } from './seamlyParser';
+export { generateInstruction, getToolCalls } from './instructionGenerator';
+export { convertSeamlyToSkill, generateTriggers, inferTags } from './seamlyToSkill';
+export type { ImportValidation, ConversionResult } from './seamlyToSkill';
