@@ -416,3 +416,59 @@ describe('Context Builder - Spatial Relationships', () => {
     expect(relationships.conflicts).toHaveLength(0);
   });
 });
+
+import { getRecentDecisions } from '../contextBuilder';
+import type { DesignLogEntry } from '../vision/types';
+
+describe('Context Builder - Design Log Integration', () => {
+  const entries: DesignLogEntry[] = [
+    {
+      id: 'entry-1',
+      timestamp: Date.now() - 1000,
+      type: 'decision',
+      summary: 'Set bodice ease to 3cm',
+      relatedPieceIds: ['front-bodice'],
+    },
+    {
+      id: 'entry-2',
+      timestamp: Date.now() - 500,
+      type: 'constraint',
+      summary: 'Armhole must match sleeve cap',
+      relatedPieceIds: ['front-bodice', 'sleeve'],
+    },
+    {
+      id: 'entry-3',
+      timestamp: Date.now(),
+      type: 'warning',
+      summary: 'Grain line missing on back piece',
+      relatedPieceIds: ['back-bodice'],
+    },
+  ];
+
+  it('should return recent decisions', () => {
+    const recent = getRecentDecisions(entries, 5);
+
+    expect(recent).toHaveLength(3);
+    expect(recent[0].id).toBe('entry-3'); // Most recent first
+  });
+
+  it('should limit to specified count', () => {
+    const recent = getRecentDecisions(entries, 2);
+
+    expect(recent).toHaveLength(2);
+  });
+
+  it('should prioritize warnings and constraints', () => {
+    const recent = getRecentDecisions(entries, 2);
+
+    // Should include warning and constraint over plain decision
+    const types = recent.map(e => e.type);
+    expect(types).toContain('warning');
+  });
+
+  it('should return empty array for no entries', () => {
+    const recent = getRecentDecisions([], 5);
+
+    expect(recent).toHaveLength(0);
+  });
+});

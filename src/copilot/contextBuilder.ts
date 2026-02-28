@@ -11,6 +11,7 @@
 import type { RootState } from '../store';
 import type { PatternPiece, PathCommand, Seam } from '../types/types';
 import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './vision';
+import type { DesignLogEntry } from './vision/types';
 import { generateFingerprint, describeSpatialRelationships } from './vision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -286,4 +287,31 @@ export function buildSpatialRelationships(
     relationships: result.relationships,
     conflicts: result.conflicts,
   };
+}
+
+/** Priority weights for entry types (higher = more important) */
+const ENTRY_TYPE_PRIORITY: Record<string, number> = {
+  warning: 3,
+  constraint: 2,
+  decision: 1,
+  note: 0,
+};
+
+/**
+ * Get recent design decisions, prioritizing warnings and constraints.
+ */
+export function getRecentDecisions(
+  entries: DesignLogEntry[],
+  limit: number,
+): DesignLogEntry[] {
+  if (entries.length === 0) return [];
+
+  // Sort by priority (desc) then timestamp (desc)
+  const sorted = [...entries].sort((a, b) => {
+    const priorityDiff = (ENTRY_TYPE_PRIORITY[b.type] ?? 0) - (ENTRY_TYPE_PRIORITY[a.type] ?? 0);
+    if (priorityDiff !== 0) return priorityDiff;
+    return b.timestamp - a.timestamp;
+  });
+
+  return sorted.slice(0, limit);
 }
