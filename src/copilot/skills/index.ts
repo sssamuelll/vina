@@ -44,3 +44,7 @@ export type { SeamlyPattern, SeamlyConstructionStep, SeamlyPiece } from './seaml
 export { generateInstruction, getToolCalls } from './instructionGenerator';
 export { convertSeamlyToSkill, generateTriggers, inferTags } from './seamlyToSkill';
 export type { ImportValidation, ConversionResult } from './seamlyToSkill';
+
+// SkillBuilder (authoring tool)
+export { SkillBuilder } from './SkillBuilder';
+export type { SkillBuilderPreview, SkillBuilderValidation } from './SkillBuilder';
