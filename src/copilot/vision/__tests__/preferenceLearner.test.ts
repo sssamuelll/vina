@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { detectFormulaDelta, createSkillOverride, detectMultipleDeltas, PreferenceLearner, type OverrideCreationInput, type PieceFormulaComparison } from '../preferenceLearner';
+import { detectFormulaDelta, createSkillOverride, detectMultipleDeltas, PreferenceLearner, formatOverridesForPrompt, type OverrideCreationInput, type PieceFormulaComparison } from '../preferenceLearner';
+import type { SkillOverride } from '../types';
 
 describe('Preference Learner - Formula Delta Detection', () => {
   it('should detect no delta when values match', () => {
@@ -286,5 +287,94 @@ describe('PreferenceLearner - Aggregation', () => {
     learner.clear();
 
     expect(learner.getOverrides()).toHaveLength(0);
+  });
+});
+
+describe('PreferenceLearner - Context Integration', () => {
+  it('should format overrides for LLM prompt', () => {
+    const overrides: SkillOverride[] = [
+      {
+        id: 'o1',
+        skillId: 'core:bodice',
+        formulaName: 'backWidth',
+        originalValue: '(chest/4)+1',
+        overrideValue: '(chest/4)+1 + 5',
+        reason: 'User prefers wider back',
+        createdAt: Date.now(),
+      },
+    ];
+
+    const formatted = formatOverridesForPrompt(overrides);
+
+    expect(formatted).toContain('core:bodice');
+    expect(formatted).toContain('backWidth');
+    expect(formatted).toContain('(chest/4)+1 + 5');
+    expect(formatted).toContain('User prefers wider back');
+  });
+
+  it('should return empty string for no overrides', () => {
+    const formatted = formatOverridesForPrompt([]);
+    expect(formatted).toBe('');
+  });
+
+  it('should format multiple overrides', () => {
+    const overrides: SkillOverride[] = [
+      {
+        id: 'o1',
+        skillId: 'core:bodice',
+        formulaName: 'backWidth',
+        originalValue: 'x',
+        overrideValue: 'x + 5',
+        reason: 'Reason 1',
+        createdAt: Date.now(),
+      },
+      {
+        id: 'o2',
+        skillId: 'core:sleeve',
+        formulaName: 'length',
+        originalValue: 'y',
+        overrideValue: 'y + 3',
+        reason: 'Reason 2',
+        createdAt: Date.now(),
+      },
+    ];
+
+    const formatted = formatOverridesForPrompt(overrides);
+
+    expect(formatted).toContain('core:bodice');
+    expect(formatted).toContain('core:sleeve');
+    expect(formatted.split('\n').length).toBeGreaterThan(2);
+  });
+});
+
+describe('PreferenceLearner - Full Integration', () => {
+  it('should support full workflow: detect, record, format', () => {
+    const learner = new PreferenceLearner();
+
+    // Detect deltas
+    const comparison: PieceFormulaComparison = {
+      pieceId: 'front',
+      skillId: 'core:bodice',
+      formulas: [
+        { name: 'backWidth', expression: '(chest/4)+1', expectedValue: 100, actualValue: 107 },
+      ],
+    };
+
+    const deltas = detectMultipleDeltas(comparison);
+    expect(deltas).toHaveLength(1);
+
+    // Record override
+    learner.recordOverride({
+      skillId: comparison.skillId,
+      formulaName: deltas[0].formulaName,
+      originalExpression: deltas[0].expression,
+      delta: deltas[0],
+      reason: 'User preference',
+    });
+
+    // Format for prompt
+    const formatted = formatOverridesForPrompt(learner.getOverrides());
+    expect(formatted).toContain('backWidth');
+    expect(formatted).toContain('+ 7');
   });
 });

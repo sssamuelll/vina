@@ -268,3 +268,31 @@ export class PreferenceLearner {
     return this.overrides.size;
   }
 }
+
+// ─── Context Integration ────────────────────────────────────────────────────
+
+/**
+ * Format overrides for inclusion in LLM system prompt.
+ */
+export function formatOverridesForPrompt(overrides: SkillOverride[]): string {
+  if (overrides.length === 0) {
+    return '';
+  }
+
+  const lines: string[] = [
+    '## User Formula Preferences',
+    '',
+    'The user has the following formula overrides that should be applied:',
+    '',
+  ];
+
+  for (const override of overrides) {
+    lines.push(`### ${override.skillId} - ${override.formulaName}`);
+    lines.push(`- Original: \`${override.originalValue}\``);
+    lines.push(`- Preferred: \`${override.overrideValue}\``);
+    lines.push(`- Reason: ${override.reason}`);
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}

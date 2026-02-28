@@ -81,3 +81,23 @@ export {
   CONSTRAINT_KEYWORDS,
   WARNING_KEYWORDS,
 } from './designLog';
+
+// Preference Learner
+export {
+  PreferenceLearner,
+  detectFormulaDelta,
+  detectMultipleDeltas,
+  createSkillOverride,
+  generateOverrideId,
+  formatOverridesForPrompt,
+  DEFAULT_TOLERANCE_MM,
+} from './preferenceLearner';
+
+export type {
+  FormulaComparisonInput,
+  FormulaDelta,
+  OverrideCreationInput,
+  FormulaWithValues,
+  PieceFormulaComparison,
+  FormulaDeltaWithExpression,
+} from './preferenceLearner';
