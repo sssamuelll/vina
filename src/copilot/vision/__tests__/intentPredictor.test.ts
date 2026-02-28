@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { checkAreaIntegrity, checkSelfIntersection, checkSeamCompatibility, simulateChange } from '../intentPredictor';
+import {
+  checkAreaIntegrity,
+  checkSelfIntersection,
+  checkSeamCompatibility,
+  simulateChange,
+  formatAuditResultsForLLM,
+  predictIntent,
+} from '../intentPredictor';
 import type { PathCommand, PatternPiece } from '../../../types/types';
 
 describe('Intent Predictor - Area Integrity', () => {
@@ -242,5 +249,99 @@ describe('Intent Predictor - Sandbox Simulation', () => {
     });
 
     expect(JSON.stringify(basePiece.outline)).toBe(originalOutline);
+  });
+});
+
+describe('Intent Predictor - LLM Feedback', () => {
+  it('should format passing results concisely', () => {
+    const results: import('../types').AuditResult[] = [
+      { rule: 'area_integrity', passed: true },
+      { rule: 'self_intersection', passed: true },
+    ];
+
+    const formatted = formatAuditResultsForLLM(results);
+
+    expect(formatted).toContain('All checks passed');
+  });
+
+  it('should format failing results with details', () => {
+    const results: import('../types').AuditResult[] = [
+      { rule: 'area_integrity', passed: false, message: 'Polygon has zero area' },
+      { rule: 'self_intersection', passed: true },
+    ];
+
+    const formatted = formatAuditResultsForLLM(results);
+
+    expect(formatted).toContain('FAILED');
+    expect(formatted).toContain('area_integrity');
+    expect(formatted).toContain('zero area');
+  });
+
+  it('should include suggested fixes', () => {
+    const results: import('../types').AuditResult[] = [
+      { rule: 'seam_compatibility', passed: false, message: 'Length mismatch' },
+    ];
+    const fixes = ['Consider easing by 5mm'];
+
+    const formatted = formatAuditResultsForLLM(results, fixes);
+
+    expect(formatted).toContain('Suggested fixes');
+    expect(formatted).toContain('easing');
+  });
+});
+
+describe('Intent Predictor - Full Prediction', () => {
+  const piece: PatternPiece = {
+    id: 'test-piece',
+    name: 'Test',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [],
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  it('should return full IntentPrediction for valid change', () => {
+    const prediction = predictIntent({
+      toolName: 'resizePiece',
+      piece,
+      proposedOutline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [120, 0] },
+        { type: 'L', values: [120, 100] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+    });
+
+    expect(prediction.toolName).toBe('resizePiece');
+    expect(prediction.originalPieceId).toBe('test-piece');
+    expect(prediction.isSafe).toBe(true);
+    expect(prediction.auditResults.length).toBeGreaterThan(0);
+  });
+
+  it('should include suggestedFix for unsafe change', () => {
+    const prediction = predictIntent({
+      toolName: 'collapsePiece',
+      piece,
+      proposedOutline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [0, 0] },
+        { type: 'L', values: [0, 0] },
+        { type: 'Z', values: [] },
+      ],
+    });
+
+    expect(prediction.isSafe).toBe(false);
+    expect(prediction.suggestedFix).toBeDefined();
   });
 });

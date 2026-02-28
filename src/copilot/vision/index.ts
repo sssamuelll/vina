@@ -101,3 +101,28 @@ export type {
   PieceFormulaComparison,
   FormulaDeltaWithExpression,
 } from './preferenceLearner';
+
+// Intent Predictor
+export {
+  checkAreaIntegrity,
+  checkSelfIntersection,
+  checkSeamCompatibility,
+  simulateChange,
+  formatAuditResultsForLLM,
+  predictIntent,
+  DEFAULT_MIN_AREA_MM2,
+  DEFAULT_SEAM_TOLERANCE_MM,
+  MAX_EASING_PERCENT,
+} from './intentPredictor';
+
+export type {
+  AreaAuditResult,
+  AreaCheckInput,
+  SelfIntersectionAuditResult,
+  SelfIntersectionCheckInput,
+  SeamCompatibilityAuditResult,
+  SeamCompatibilityInput,
+  SimulationInput,
+  SimulationResult,
+  IntentInput,
+} from './intentPredictor';

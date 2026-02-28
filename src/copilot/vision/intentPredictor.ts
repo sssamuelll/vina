@@ -10,7 +10,7 @@
  */
 
 import type { PathCommand, PatternPiece } from '../../types/types';
-import type { AuditResult } from './types';
+import type { AuditResult, IntentPrediction } from './types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -412,5 +412,88 @@ export function simulateChange(input: SimulationInput): SimulationResult {
     auditResults,
     simulatedPiece,
     suggestedFixes,
+  };
+}
+
+// ─── LLM Feedback Formatting ─────────────────────────────────────────────────
+
+/**
+ * Format audit results for inclusion in LLM context.
+ */
+export function formatAuditResultsForLLM(
+  results: AuditResult[],
+  suggestedFixes?: string[],
+): string {
+  const allPassed = results.every(r => r.passed);
+
+  if (allPassed) {
+    return '✓ All checks passed. The proposed change is safe to apply.';
+  }
+
+  const lines: string[] = ['## Pre-flight Audit Results', ''];
+
+  for (const result of results) {
+    const status = result.passed ? '✓ PASSED' : '✗ FAILED';
+    lines.push(`- **${result.rule}**: ${status}`);
+    if (!result.passed && result.message) {
+      lines.push(`  - ${result.message}`);
+    }
+  }
+
+  if (suggestedFixes && suggestedFixes.length > 0) {
+    lines.push('');
+    lines.push('### Suggested fixes:');
+    for (const fix of suggestedFixes) {
+      lines.push(`- ${fix}`);
+    }
+  }
+
+  return lines.join('\n');
+}
+
+// ─── Full Intent Prediction ──────────────────────────────────────────────────
+
+/**
+ * Input for full intent prediction.
+ */
+export interface IntentInput {
+  /** Name of the tool being called */
+  toolName: string;
+  /** The piece being modified */
+  piece: PatternPiece;
+  /** Proposed new outline */
+  proposedOutline: PathCommand[];
+  /** Optional seam edges to check compatibility */
+  seamEdgeLengths?: {
+    pieceAEdgeLength: number;
+    pieceBEdgeLength: number;
+  };
+}
+
+/**
+ * Predict the outcome of a proposed tool call.
+ * Returns a full IntentPrediction with safety assessment.
+ */
+export function predictIntent(input: IntentInput): IntentPrediction {
+  const { toolName, piece, proposedOutline, seamEdgeLengths } = input;
+
+  const simulation = simulateChange({
+    piece,
+    proposedOutline,
+    seamEdgeLengths,
+  });
+
+  return {
+    toolName,
+    originalPieceId: piece.id,
+    predictedChanges: {
+      outlineChanged: true,
+      newArea: (simulation.auditResults.find(r => r.rule === 'area_integrity') as AreaAuditResult)?.area,
+    },
+    isSafe: simulation.isSafe,
+    auditResults: simulation.auditResults,
+    suggestedFix: simulation.suggestedFixes.length > 0
+      ? simulation.suggestedFixes.join('; ')
+      : undefined,
   };
 }
