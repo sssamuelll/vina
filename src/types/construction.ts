@@ -124,4 +124,10 @@ export interface ConstructionState {
   selectedEntity: { type: 'point' | 'line' | 'curve' | 'piece'; id: string } | null;
   /** Whether construction overlay is visible */
   showConstruction: boolean;
+  /**
+   * Maps CPiece.id → PatternPiece.id for persistent identity.
+   * This enables upsert behavior when rebuilding pieces, preserving seams and selection.
+   * @see docs/plans/2026-02-27-reactive-solver-middleware-design.md
+   */
+  pieceIdentityMap: Record<string, string>;
 }

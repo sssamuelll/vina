@@ -1,0 +1,95 @@
+/* ─── Solver Metrics Dashboard (Dev Only) ──────────────────────────────────
+ * Floating panel for monitoring solver performance.
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+.solver-metrics {
+  position: fixed;
+  bottom: 8px;
+  right: 8px;
+  z-index: 9999;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  font-size: 10px;
+}
+
+.solver-metrics-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.solver-metrics-toggle:hover {
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+}
+
+.solver-metrics-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #555;
+}
+
+.solver-metrics-dot--active {
+  background: #4a9eff;
+  animation: solver-dot-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes solver-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.solver-metrics--expanded .solver-metrics-toggle {
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+}
+
+.solver-metrics-body {
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  padding: 8px;
+  min-width: 180px;
+}
+
+.solver-metrics-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.solver-metrics-row span:last-child {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 500;
+}
+
+.solver-metrics-section {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.solver-metrics-section--error {
+  color: #ff6b6b;
+}
+
+.solver-metrics-error {
+  padding: 2px 0;
+  color: #ff8a8a;
+  font-size: 9px;
+  word-break: break-all;
+}

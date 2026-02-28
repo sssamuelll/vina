@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 /**
  * Skill Loader — loads, matches, and formats pattern skills for the agent prompt.
  *
@@ -18,7 +17,11 @@ import { getDefaultSkillRegistry } from './skillRegistry';
  * @returns The skill definition, or undefined if not found
  */
 export function loadSkill(name: string): PatternSkill | undefined {
-  return getDefaultSkillRegistry().get(name);
+  const registry = getDefaultSkillRegistry();
+  // Find skill by checking the nested skill.name property
+  const all = registry.getAll();
+  const found = all.find(rs => rs.skill.name === name);
+  return found?.skill;
 }
 
 /**
@@ -39,11 +42,14 @@ export function getRelevantSkills(message: string): PatternSkill[] {
 
   const matchedSkills = new Map<string, { skill: PatternSkill; count: number }>();
 
-  // Check each trigger against the message
-  for (const trigger of registry.listTriggers()) {
-    if (normalized.includes(trigger)) {
-      const skill = registry.findByTrigger(trigger);
-      if (skill) {
+  // Check triggers from all enabled skills
+  const enabledSkills = registry.getEnabled();
+
+  for (const registered of enabledSkills) {
+    for (const trigger of registered.skill.triggers) {
+      const triggerNorm = trigger.toLowerCase();
+      if (normalized.includes(triggerNorm)) {
+        const skill = registered.skill;
         const existing = matchedSkills.get(skill.name);
         if (existing) {
           existing.count++;

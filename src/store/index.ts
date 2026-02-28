@@ -13,6 +13,7 @@ import constructionReducer from './constructionSlice';
 import blueprintReducer, { loadBlueprints } from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
 import { undoMiddleware } from './undoMiddleware';
+import { createReactiveSolverMiddleware } from './reactiveSolverMiddleware';
 import { BUILTIN_BLUEPRINTS } from '../utils/construction/blueprints';
 
 export const store = configureStore({
@@ -37,7 +38,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar'],
         ignoredActions: ['project/loadProject', 'project/restoreState'],
       },
-    }).concat(undoMiddleware),
+    }).concat(undoMiddleware, createReactiveSolverMiddleware()),
 });
 
 // Load builtin recipes synchronously — must be available before first copilot turn

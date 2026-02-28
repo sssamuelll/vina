@@ -601,14 +601,18 @@ describe('Action Executor', () => {
     });
 
     expect(result.success).toBe(false);
-    expect(result.error).toContain('not implemented');
+    expect(result.error).toContain('Unknown action type');
   });
 
   it('executor can execute multiple actions', async () => {
     const mockDispatch = () => {};
     const mockGetState = () => ({
-      project: { pieces: [], seams: [] },
+      project: {
+        pieces: [{ id: 'test-piece', name: 'Test', outline: [], internals: [] }],
+        seams: [],
+      },
       editor: { selectedPieceIds: [] },
+      simulation: { simulationState: 'idle' },
     });
 
     const executor = actions.createActionExecutor(

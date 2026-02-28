@@ -14,6 +14,8 @@ import { useSelector } from 'react-redux';
 import { ChevronDown, SlidersHorizontal, RotateCcw, X } from 'lucide-react';
 import type { RootState } from '../../store';
 import { useParametricEngine, type ParametricVariable, type SliderCategory } from '../../hooks/useParametricEngine';
+import { usePredictiveWarmup } from '../../hooks/usePredictiveWarmup';
+import { useSolverStatus } from '../../hooks/useSolverStatus';
 import './ParametricView.css';
 
 // ─── Category metadata ──────────────────────────────────────────────────────
@@ -37,6 +39,7 @@ interface SliderProps {
 function ParametricSlider({ variable, onChange, onReset }: SliderProps) {
   const [isEditing, setIsEditing] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { onFocus: onWarmupFocus, onMouseEnter, onMouseLeave } = usePredictiveWarmup();
 
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(variable.key, parseFloat(e.target.value));
@@ -111,6 +114,9 @@ function ParametricSlider({ variable, onChange, onReset }: SliderProps) {
           step={variable.step}
           value={variable.currentValue}
           onChange={handleSliderChange}
+          onFocus={onWarmupFocus}
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
           style={trackStyle}
         />
       </div>
@@ -128,6 +134,7 @@ export default function ParametricView() {
   const fabrics = useSelector((s: RootState) => s.project.fabrics);
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const { isActive, patternName, currentSize, availableSizes, variables, groups, handleSliderChange, handleReset, handleResetVariable, handleChangeSize } = useParametricEngine();
+  const { isComputing } = useSolverStatus();
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const toggleGroup = useCallback((category: string) => {
@@ -176,6 +183,7 @@ export default function ParametricView() {
         </span>
         <span className="parametric-template-meta">
           {variables.length} params{overriddenCount > 0 ? ` · ${overriddenCount} modified` : ''}
+          {isComputing && <span className="parametric-computing"> · Computing...</span>}
         </span>
       </div>
 
