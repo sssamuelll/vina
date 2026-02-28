@@ -417,8 +417,8 @@ describe('Context Builder - Spatial Relationships', () => {
   });
 });
 
-import { getRecentDecisions } from '../contextBuilder';
-import type { DesignLogEntry } from '../vision/types';
+import { getRecentDecisions, buildCerebralContext, type CerebralContextInput } from '../contextBuilder';
+import type { DesignLogEntry, SkillOverride } from '../vision/types';
 
 describe('Context Builder - Design Log Integration', () => {
   const entries: DesignLogEntry[] = [
@@ -470,5 +470,70 @@ describe('Context Builder - Design Log Integration', () => {
     const recent = getRecentDecisions([], 5);
 
     expect(recent).toHaveLength(0);
+  });
+});
+
+describe('Context Builder - Cerebral Context', () => {
+  const input: CerebralContextInput = {
+    pieces: [
+      {
+        id: 'front',
+        name: 'Front',
+        outline: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [100, 0] },
+          { type: 'L', values: [100, 100] },
+          { type: 'L', values: [0, 100] },
+          { type: 'Z', values: [] },
+        ],
+        internals: [],
+        position: { x: 0, y: 0 },
+        rotation: 0,
+        mirrored: false,
+        seamAllowance: 10,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ],
+    seams: [],
+    designLogEntries: [],
+    overrides: [],
+  };
+
+  it('should build complete cerebral context', () => {
+    const context = buildCerebralContext(input);
+
+    expect(context.pieceSemantics).toBeDefined();
+    expect(context.spatialRelationships).toBeDefined();
+    expect(context.conflicts).toBeDefined();
+    expect(context.recentDecisions).toBeDefined();
+    expect(context.activeOverrides).toBeDefined();
+  });
+
+  it('should include semantics for each piece', () => {
+    const context = buildCerebralContext(input);
+
+    expect(context.pieceSemantics).toHaveLength(1);
+    expect(context.pieceSemantics[0].pieceId).toBe('front');
+  });
+
+  it('should include provided overrides', () => {
+    const override: SkillOverride = {
+      id: 'o1',
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalValue: 'x',
+      overrideValue: 'x + 5',
+      reason: 'User preference',
+      createdAt: Date.now(),
+    };
+
+    const context = buildCerebralContext({
+      ...input,
+      overrides: [override],
+    });
+
+    expect(context.activeOverrides).toHaveLength(1);
+    expect(context.activeOverrides[0].skillId).toBe('core:bodice');
   });
 });

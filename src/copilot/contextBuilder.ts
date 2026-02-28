@@ -11,7 +11,7 @@
 import type { RootState } from '../store';
 import type { PatternPiece, PathCommand, Seam } from '../types/types';
 import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './vision';
-import type { DesignLogEntry } from './vision/types';
+import type { CerebralContext, DesignLogEntry, SkillOverride } from './vision/types';
 import { generateFingerprint, describeSpatialRelationships } from './vision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -314,4 +314,44 @@ export function getRecentDecisions(
   });
 
   return sorted.slice(0, limit);
+}
+
+/**
+ * Input for building cerebral context.
+ */
+export interface CerebralContextInput {
+  /** Pattern pieces */
+  pieces: PatternPiece[];
+  /** Seams connecting pieces */
+  seams: Seam[];
+  /** Design log entries */
+  designLogEntries: DesignLogEntry[];
+  /** Active formula overrides */
+  overrides: SkillOverride[];
+  /** Maximum recent decisions to include (default: 10) */
+  maxDecisions?: number;
+}
+
+/**
+ * Build the complete cerebral context for LLM consumption.
+ */
+export function buildCerebralContext(input: CerebralContextInput): CerebralContext {
+  const { pieces, seams, designLogEntries, overrides, maxDecisions = 10 } = input;
+
+  // Build piece semantics
+  const pieceSemantics = pieces.map(buildPieceSemantics);
+
+  // Build spatial relationships
+  const spatial = buildSpatialRelationships(pieces, seams);
+
+  // Get recent decisions
+  const recentDecisions = getRecentDecisions(designLogEntries, maxDecisions);
+
+  return {
+    pieceSemantics,
+    spatialRelationships: spatial.relationships,
+    conflicts: spatial.conflicts,
+    recentDecisions,
+    activeOverrides: overrides,
+  };
 }
