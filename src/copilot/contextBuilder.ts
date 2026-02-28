@@ -357,6 +357,46 @@ export function buildCerebralContext(input: CerebralContextInput): CerebralConte
 }
 
 /**
+ * Enhanced agent context with cerebral intelligence.
+ */
+export interface EnhancedAgentContext extends AgentContext {
+  /** Structured cerebral context */
+  cerebral: CerebralContext;
+  /** Serialized cerebral context for LLM prompt */
+  cerebralSerialized: string;
+}
+
+/**
+ * Build enhanced agent context with cerebral intelligence.
+ */
+export function buildEnhancedAgentContext(
+  state: RootState,
+  activeSkills: string[] = [],
+  designLogEntries: DesignLogEntry[] = [],
+  overrides: SkillOverride[] = [],
+): EnhancedAgentContext {
+  // Build base agent context
+  const baseContext = buildAgentContext(state, activeSkills);
+
+  // Build cerebral context
+  const cerebral = buildCerebralContext({
+    pieces: state.project.pieces,
+    seams: state.project.seams,
+    designLogEntries,
+    overrides,
+  });
+
+  // Serialize for LLM
+  const cerebralSerialized = serializeCerebralContext(cerebral);
+
+  return {
+    ...baseContext,
+    cerebral,
+    cerebralSerialized,
+  };
+}
+
+/**
  * Serialize cerebral context for LLM system prompt.
  */
 export function serializeCerebralContext(context: CerebralContext): string {

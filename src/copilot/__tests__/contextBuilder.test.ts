@@ -633,3 +633,55 @@ describe('Context Builder - Serialization', () => {
     expect(serialized).toContain('backWidth');
   });
 });
+
+import { buildEnhancedAgentContext } from '../contextBuilder';
+
+describe('Context Builder - Enhanced Agent Context', () => {
+  // Minimal mock state
+  const mockState = {
+    project: {
+      name: 'Test Project',
+      pieces: [],
+      seams: [],
+      fabrics: [],
+      avatar: { measurements: {} },
+    },
+    editor: {
+      selectedPieceIds: [],
+      selectedSeamId: null,
+      activeTool: 'select',
+      viewMode: '2d',
+      units: 'mm',
+      showSeamAllowance: true,
+    },
+    simulation: {
+      simulationState: 'idle',
+      pieceFabrics: {},
+    },
+  } as unknown as RootState;
+
+  it('should include cerebral context in enhanced agent context', () => {
+    const context = buildEnhancedAgentContext(
+      mockState,
+      [],
+      [],
+      [],
+    );
+
+    expect(context.cerebral).toBeDefined();
+    expect(context.cerebralSerialized).toBeDefined();
+  });
+
+  it('should include base agent context fields', () => {
+    const context = buildEnhancedAgentContext(
+      mockState,
+      [],
+      [],
+      [],
+    );
+
+    expect(context.project).toBeDefined();
+    expect(context.editor).toBeDefined();
+    expect(context.simulation).toBeDefined();
+  });
+});
