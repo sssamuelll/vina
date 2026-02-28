@@ -133,3 +133,69 @@ export function createSkillOverride(input: OverrideCreationInput): SkillOverride
     createdAt: Date.now(),
   };
 }
+
+// ─── Batch Detection ────────────────────────────────────────────────────────
+
+/**
+ * A formula with expected and actual values for comparison.
+ */
+export interface FormulaWithValues {
+  /** Formula name */
+  name: string;
+  /** Original formula expression */
+  expression: string;
+  /** Expected value from formula calculation */
+  expectedValue: number;
+  /** Actual value from piece geometry */
+  actualValue: number;
+}
+
+/**
+ * Input for comparing multiple formulas on a piece.
+ */
+export interface PieceFormulaComparison {
+  /** Piece ID */
+  pieceId: string;
+  /** Skill ID that generated this piece */
+  skillId: string;
+  /** List of formulas to compare */
+  formulas: FormulaWithValues[];
+  /** Optional tolerance (default: 2mm) */
+  tolerance?: number;
+}
+
+/**
+ * Extended delta with formula expression.
+ */
+export interface FormulaDeltaWithExpression extends FormulaDelta {
+  /** Original formula expression */
+  expression: string;
+}
+
+/**
+ * Detect deltas across multiple formulas for a piece.
+ */
+export function detectMultipleDeltas(
+  comparison: PieceFormulaComparison,
+): FormulaDeltaWithExpression[] {
+  const { formulas, tolerance } = comparison;
+  const deltas: FormulaDeltaWithExpression[] = [];
+
+  for (const formula of formulas) {
+    const delta = detectFormulaDelta({
+      formulaName: formula.name,
+      expectedValue: formula.expectedValue,
+      actualValue: formula.actualValue,
+      tolerance,
+    });
+
+    if (delta) {
+      deltas.push({
+        ...delta,
+        expression: formula.expression,
+      });
+    }
+  }
+
+  return deltas;
+}

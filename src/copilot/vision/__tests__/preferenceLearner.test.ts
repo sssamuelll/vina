@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectFormulaDelta, createSkillOverride, type OverrideCreationInput } from '../preferenceLearner';
+import { detectFormulaDelta, createSkillOverride, detectMultipleDeltas, type OverrideCreationInput, type PieceFormulaComparison } from '../preferenceLearner';
 
 describe('Preference Learner - Formula Delta Detection', () => {
   it('should detect no delta when values match', () => {
@@ -154,5 +154,55 @@ describe('Preference Learner - SkillOverride Creation', () => {
 
     expect(override.reason).toContain('adjusted by');
     expect(override.reason).toContain('3');
+  });
+});
+
+describe('Preference Learner - Batch Detection', () => {
+  it('should detect deltas across multiple formulas', () => {
+    const comparison: PieceFormulaComparison = {
+      pieceId: 'front-bodice',
+      skillId: 'core:bodice',
+      formulas: [
+        { name: 'backWidth', expression: '(chest/4)+1', expectedValue: 100, actualValue: 100 },
+        { name: 'frontWidth', expression: '(chest/4)+2', expectedValue: 101, actualValue: 108 },
+        { name: 'armholeDepth', expression: 'height*0.12', expectedValue: 50, actualValue: 45 },
+      ],
+    };
+
+    const deltas = detectMultipleDeltas(comparison);
+
+    expect(deltas).toHaveLength(2); // backWidth within tolerance
+    expect(deltas[0].formulaName).toBe('frontWidth');
+    expect(deltas[1].formulaName).toBe('armholeDepth');
+  });
+
+  it('should return empty array when all within tolerance', () => {
+    const comparison: PieceFormulaComparison = {
+      pieceId: 'sleeve',
+      skillId: 'core:sleeve',
+      formulas: [
+        { name: 'length', expression: 'arm_length', expectedValue: 60, actualValue: 61 },
+        { name: 'width', expression: 'arm_circ', expectedValue: 30, actualValue: 30.5 },
+      ],
+    };
+
+    const deltas = detectMultipleDeltas(comparison);
+
+    expect(deltas).toHaveLength(0);
+  });
+
+  it('should use custom tolerance', () => {
+    const comparison: PieceFormulaComparison = {
+      pieceId: 'test',
+      skillId: 'core:test',
+      formulas: [
+        { name: 'test', expression: 'x', expectedValue: 100, actualValue: 103 },
+      ],
+      tolerance: 5, // Higher tolerance
+    };
+
+    const deltas = detectMultipleDeltas(comparison);
+
+    expect(deltas).toHaveLength(0); // 3mm within 5mm tolerance
   });
 });
