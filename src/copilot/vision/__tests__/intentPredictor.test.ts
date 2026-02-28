@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkAreaIntegrity } from '../intentPredictor';
+import { checkAreaIntegrity, checkSelfIntersection } from '../intentPredictor';
 import type { PathCommand } from '../../../types/types';
 
 describe('Intent Predictor - Area Integrity', () => {
@@ -55,5 +55,51 @@ describe('Intent Predictor - Area Integrity', () => {
 
     expect(result.passed).toBe(false);
     expect(result.message).toContain('empty');
+  });
+});
+
+describe('Intent Predictor - Self Intersection', () => {
+  const nonIntersecting: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [100, 0] },
+    { type: 'L', values: [100, 100] },
+    { type: 'L', values: [0, 100] },
+    { type: 'Z', values: [] },
+  ];
+
+  const selfIntersecting: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [100, 100] },
+    { type: 'L', values: [100, 0] },
+    { type: 'L', values: [0, 100] }, // Crosses the first line
+    { type: 'Z', values: [] },
+  ];
+
+  it('should pass for non-intersecting polygon', () => {
+    const result = checkSelfIntersection({ outline: nonIntersecting });
+
+    expect(result.passed).toBe(true);
+    expect(result.rule).toBe('self_intersection');
+  });
+
+  it('should fail for self-intersecting polygon', () => {
+    const result = checkSelfIntersection({ outline: selfIntersecting });
+
+    expect(result.passed).toBe(false);
+    expect(result.rule).toBe('self_intersection');
+    expect(result.message).toContain('self-intersect');
+  });
+
+  it('should pass for simple triangle', () => {
+    const triangle: PathCommand[] = [
+      { type: 'M', values: [50, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+
+    const result = checkSelfIntersection({ outline: triangle });
+
+    expect(result.passed).toBe(true);
   });
 });
