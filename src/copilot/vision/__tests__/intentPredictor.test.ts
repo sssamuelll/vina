@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkAreaIntegrity, checkSelfIntersection } from '../intentPredictor';
+import { checkAreaIntegrity, checkSelfIntersection, checkSeamCompatibility } from '../intentPredictor';
 import type { PathCommand } from '../../../types/types';
 
 describe('Intent Predictor - Area Integrity', () => {
@@ -101,5 +101,60 @@ describe('Intent Predictor - Self Intersection', () => {
     const result = checkSelfIntersection({ outline: triangle });
 
     expect(result.passed).toBe(true);
+  });
+});
+
+describe('Intent Predictor - Seam Compatibility', () => {
+  it('should pass when edge lengths match within tolerance', () => {
+    const result = checkSeamCompatibility({
+      pieceAEdgeLength: 100,
+      pieceBEdgeLength: 100,
+      tolerance: 2,
+    });
+
+    expect(result.passed).toBe(true);
+    expect(result.rule).toBe('seam_compatibility');
+  });
+
+  it('should pass when edge lengths are within tolerance', () => {
+    const result = checkSeamCompatibility({
+      pieceAEdgeLength: 100,
+      pieceBEdgeLength: 101.5,
+      tolerance: 2,
+    });
+
+    expect(result.passed).toBe(true);
+  });
+
+  it('should fail when edge lengths differ beyond tolerance', () => {
+    const result = checkSeamCompatibility({
+      pieceAEdgeLength: 100,
+      pieceBEdgeLength: 110,
+      tolerance: 2,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.message).toContain('mismatch');
+    expect(result.lengthDifference).toBe(10);
+  });
+
+  it('should use default tolerance of 5mm', () => {
+    const result = checkSeamCompatibility({
+      pieceAEdgeLength: 100,
+      pieceBEdgeLength: 104,
+    });
+
+    expect(result.passed).toBe(true); // Within default 5mm tolerance
+  });
+
+  it('should suggest easing when slightly off', () => {
+    const result = checkSeamCompatibility({
+      pieceAEdgeLength: 100,
+      pieceBEdgeLength: 107,
+      tolerance: 5,
+    });
+
+    expect(result.passed).toBe(false);
+    expect(result.suggestedFix).toContain('ease');
   });
 });

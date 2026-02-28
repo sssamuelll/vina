@@ -17,6 +17,12 @@ import type { AuditResult } from './types';
 /** Default minimum area threshold in mm² */
 export const DEFAULT_MIN_AREA_MM2 = 1;
 
+/** Default seam length tolerance in mm */
+export const DEFAULT_SEAM_TOLERANCE_MM = 5;
+
+/** Maximum easing percentage before suggesting alternative */
+export const MAX_EASING_PERCENT = 10;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /**
@@ -251,5 +257,70 @@ export function checkSelfIntersection(input: SelfIntersectionCheckInput): SelfIn
     rule: 'self_intersection',
     passed: true,
     intersectionCount: 0,
+  };
+}
+
+// ─── Seam Compatibility Check ────────────────────────────────────────────────
+
+/**
+ * Extended audit result for seam compatibility.
+ */
+export interface SeamCompatibilityAuditResult extends AuditResult {
+  rule: 'seam_compatibility';
+  /** Difference in edge lengths (mm) */
+  lengthDifference?: number;
+  /** Percentage difference */
+  percentageDiff?: number;
+  /** Suggested fix if incompatible */
+  suggestedFix?: string;
+}
+
+/**
+ * Input for seam compatibility check.
+ */
+export interface SeamCompatibilityInput {
+  /** Length of edge on piece A (mm) */
+  pieceAEdgeLength: number;
+  /** Length of edge on piece B (mm) */
+  pieceBEdgeLength: number;
+  /** Tolerance in mm (default: 5mm) */
+  tolerance?: number;
+}
+
+/**
+ * Check that two seam edges are compatible in length.
+ */
+export function checkSeamCompatibility(input: SeamCompatibilityInput): SeamCompatibilityAuditResult {
+  const { pieceAEdgeLength, pieceBEdgeLength, tolerance = DEFAULT_SEAM_TOLERANCE_MM } = input;
+
+  const lengthDifference = Math.abs(pieceAEdgeLength - pieceBEdgeLength);
+  const averageLength = (pieceAEdgeLength + pieceBEdgeLength) / 2;
+  const percentageDiff = averageLength > 0 ? (lengthDifference / averageLength) * 100 : 0;
+
+  if (lengthDifference <= tolerance) {
+    return {
+      rule: 'seam_compatibility',
+      passed: true,
+      lengthDifference,
+      percentageDiff,
+    };
+  }
+
+  // Generate suggested fix
+  let suggestedFix: string;
+  if (percentageDiff <= MAX_EASING_PERCENT) {
+    const longer = pieceAEdgeLength > pieceBEdgeLength ? 'A' : 'B';
+    suggestedFix = `Consider ease on piece ${longer} by ${lengthDifference.toFixed(1)}mm (${percentageDiff.toFixed(1)}%)`;
+  } else {
+    suggestedFix = `Edge lengths differ by ${percentageDiff.toFixed(1)}%. Consider adjusting pattern or using a different seam strategy.`;
+  }
+
+  return {
+    rule: 'seam_compatibility',
+    passed: false,
+    message: `Seam edge length mismatch: ${pieceAEdgeLength.toFixed(1)}mm vs ${pieceBEdgeLength.toFixed(1)}mm (diff: ${lengthDifference.toFixed(1)}mm)`,
+    lengthDifference,
+    percentageDiff,
+    suggestedFix,
   };
 }
