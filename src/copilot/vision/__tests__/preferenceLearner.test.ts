@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectFormulaDelta } from '../preferenceLearner';
+import { detectFormulaDelta, createSkillOverride, type OverrideCreationInput } from '../preferenceLearner';
 
 describe('Preference Learner - Formula Delta Detection', () => {
   it('should detect no delta when values match', () => {
@@ -87,5 +87,72 @@ describe('Preference Learner - Formula Delta Detection', () => {
     expect(delta?.difference).toBe(5);
     // percentageDiff is 0 when expectedValue is 0 to avoid Infinity/NaN
     expect(delta?.percentageDiff).toBe(0);
+  });
+});
+
+describe('Preference Learner - SkillOverride Creation', () => {
+  it('should create a SkillOverride from delta', () => {
+    const input: OverrideCreationInput = {
+      skillId: 'core:bodice',
+      formulaName: 'backWidth',
+      originalExpression: '(chest / 4) + 1',
+      delta: {
+        formulaName: 'backWidth',
+        expectedValue: 100,
+        actualValue: 105,
+        difference: 5,
+        percentageDiff: 5,
+      },
+      reason: 'User prefers wider back',
+    };
+
+    const override = createSkillOverride(input);
+
+    expect(override.skillId).toBe('core:bodice');
+    expect(override.formulaName).toBe('backWidth');
+    expect(override.originalValue).toBe('(chest / 4) + 1');
+    expect(override.overrideValue).toBe('(chest / 4) + 1 + 5'); // Adds difference
+    expect(override.reason).toBe('User prefers wider back');
+    expect(override.id).toContain('override-');
+    expect(override.createdAt).toBeGreaterThan(0);
+  });
+
+  it('should handle negative delta in override expression', () => {
+    const input: OverrideCreationInput = {
+      skillId: 'core:bodice',
+      formulaName: 'armholeDepth',
+      originalExpression: '(height * 0.12) + 5',
+      delta: {
+        formulaName: 'armholeDepth',
+        expectedValue: 50,
+        actualValue: 45,
+        difference: -5,
+        percentageDiff: -10,
+      },
+    };
+
+    const override = createSkillOverride(input);
+
+    expect(override.overrideValue).toBe('(height * 0.12) + 5 - 5');
+  });
+
+  it('should generate default reason if not provided', () => {
+    const input: OverrideCreationInput = {
+      skillId: 'core:sleeve',
+      formulaName: 'sleeveLength',
+      originalExpression: 'arm_length - 2',
+      delta: {
+        formulaName: 'sleeveLength',
+        expectedValue: 60,
+        actualValue: 63,
+        difference: 3,
+        percentageDiff: 5,
+      },
+    };
+
+    const override = createSkillOverride(input);
+
+    expect(override.reason).toContain('adjusted by');
+    expect(override.reason).toContain('3');
   });
 });

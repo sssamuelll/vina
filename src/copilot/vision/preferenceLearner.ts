@@ -9,6 +9,8 @@
  * @module copilot/vision/preferenceLearner
  */
 
+import type { SkillOverride } from './types';
+
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /** Default tolerance for formula deviation detection (in mm) */
@@ -75,5 +77,59 @@ export function detectFormulaDelta(input: FormulaComparisonInput): FormulaDelta 
     actualValue,
     difference,
     percentageDiff,
+  };
+}
+
+// ─── Override Creation ──────────────────────────────────────────────────────
+
+/**
+ * Input for creating a SkillOverride.
+ */
+export interface OverrideCreationInput {
+  /** Skill ID (e.g., 'core:bodice') */
+  skillId: string;
+  /** Formula name */
+  formulaName: string;
+  /** Original formula expression */
+  originalExpression: string;
+  /** Detected delta */
+  delta: FormulaDelta;
+  /** Optional reason for the override */
+  reason?: string;
+}
+
+/** Counter for generating unique override IDs */
+let overrideIdCounter = 0;
+
+/**
+ * Generate a unique override ID.
+ */
+export function generateOverrideId(): string {
+  overrideIdCounter++;
+  return `override-${Date.now()}-${overrideIdCounter}`;
+}
+
+/**
+ * Create a SkillOverride from a detected delta.
+ */
+export function createSkillOverride(input: OverrideCreationInput): SkillOverride {
+  const { skillId, formulaName, originalExpression, delta, reason } = input;
+
+  // Create adjusted expression
+  const sign = delta.difference >= 0 ? '+' : '-';
+  const absValue = Math.abs(delta.difference);
+  const overrideValue = `${originalExpression} ${sign} ${absValue}`;
+
+  // Generate reason if not provided
+  const defaultReason = `Formula ${formulaName} adjusted by ${delta.difference > 0 ? '+' : ''}${delta.difference}mm (${delta.percentageDiff.toFixed(1)}%)`;
+
+  return {
+    id: generateOverrideId(),
+    skillId,
+    formulaName,
+    originalValue: originalExpression,
+    overrideValue,
+    reason: reason || defaultReason,
+    createdAt: Date.now(),
   };
 }
