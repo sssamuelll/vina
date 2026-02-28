@@ -104,6 +104,9 @@ export const DESIGN_LOG_STORAGE_KEY = 'openclo:designLog';
  * to provide context continuity across sessions.
  */
 export class DesignLogManager {
+  /** Maximum number of entries to keep after flush */
+  static readonly MAX_ENTRIES_AFTER_FLUSH = 10;
+
   private log: DesignLog;
 
   /**
@@ -175,5 +178,36 @@ export class DesignLogManager {
    */
   toMarkdown(): string {
     return designLogToMarkdown(this.log);
+  }
+
+  /**
+   * Check if the log should be flushed based on current session tokens.
+   * @param currentSessionTokens - Current token count in the session
+   * @returns true if tokens are at or above TOKEN_FLUSH_THRESHOLD
+   */
+  shouldFlush(currentSessionTokens: number): boolean {
+    return currentSessionTokens >= TOKEN_FLUSH_THRESHOLD;
+  }
+
+  /**
+   * Flush the design log by compacting entries.
+   *
+   * Sorts entries by timestamp descending and keeps only the most recent
+   * MAX_ENTRIES_AFTER_FLUSH entries. Updates lastFlushAt timestamp.
+   */
+  async flush(): Promise<void> {
+    // Sort entries by timestamp descending (newest first)
+    const sortedEntries = [...this.log.entries].sort(
+      (a, b) => b.timestamp - a.timestamp
+    );
+
+    // Keep only the most recent entries
+    this.log.entries = sortedEntries.slice(
+      0,
+      DesignLogManager.MAX_ENTRIES_AFTER_FLUSH
+    );
+
+    // Update lastFlushAt timestamp
+    this.log.lastFlushAt = Date.now();
   }
 }

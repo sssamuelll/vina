@@ -141,6 +141,88 @@ describe('DesignLogManager', () => {
     expect(typeof DESIGN_LOG_STORAGE_KEY).toBe('string');
   });
 
+  describe('Memory Flush Protocol', () => {
+    it('shouldFlush returns false below threshold (3000 tokens)', () => {
+      const manager = new DesignLogManager('project-123');
+      expect(manager.shouldFlush(3000)).toBe(false);
+      expect(manager.shouldFlush(0)).toBe(false);
+      expect(manager.shouldFlush(3999)).toBe(false);
+    });
+
+    it('shouldFlush returns true at/above threshold (4000+ tokens)', () => {
+      const manager = new DesignLogManager('project-123');
+      expect(manager.shouldFlush(4000)).toBe(true);
+      expect(manager.shouldFlush(5000)).toBe(true);
+      expect(manager.shouldFlush(10000)).toBe(true);
+    });
+
+    it('flush updates lastFlushAt timestamp', async () => {
+      const manager = new DesignLogManager('project-123');
+      const log = manager.getLog();
+      expect(log.lastFlushAt).toBe(0);
+
+      const beforeFlush = Date.now();
+      await manager.flush();
+      const afterFlush = Date.now();
+
+      const updatedLog = manager.getLog();
+      expect(updatedLog.lastFlushAt).toBeGreaterThanOrEqual(beforeFlush);
+      expect(updatedLog.lastFlushAt).toBeLessThanOrEqual(afterFlush);
+    });
+
+    it('flush compacts entries keeping only recent (default 10)', async () => {
+      const manager = new DesignLogManager('project-123');
+
+      // Add 15 entries with increasing timestamps
+      for (let i = 0; i < 15; i++) {
+        manager.addEntry({
+          id: `entry-${i}`,
+          timestamp: 1000 + i * 100, // 1000, 1100, 1200, ..., 2400
+          type: 'decision',
+          summary: `Decision ${i}`,
+          relatedPieceIds: [],
+        });
+      }
+
+      expect(manager.getLog().entries).toHaveLength(15);
+
+      await manager.flush();
+
+      const log = manager.getLog();
+      expect(log.entries).toHaveLength(10);
+
+      // Should keep the 10 most recent entries (highest timestamps)
+      // These are entries 5-14 (timestamps 1500-2400)
+      expect(log.entries[0].id).toBe('entry-14'); // Most recent first
+      expect(log.entries[9].id).toBe('entry-5'); // Least recent of kept entries
+    });
+
+    it('flush preserves entries if fewer than MAX_ENTRIES_AFTER_FLUSH', async () => {
+      const manager = new DesignLogManager('project-123');
+
+      // Add only 5 entries
+      for (let i = 0; i < 5; i++) {
+        manager.addEntry({
+          id: `entry-${i}`,
+          timestamp: 1000 + i * 100,
+          type: 'decision',
+          summary: `Decision ${i}`,
+          relatedPieceIds: [],
+        });
+      }
+
+      expect(manager.getLog().entries).toHaveLength(5);
+
+      await manager.flush();
+
+      const log = manager.getLog();
+      expect(log.entries).toHaveLength(5);
+      // Should be sorted by timestamp desc
+      expect(log.entries[0].id).toBe('entry-4');
+      expect(log.entries[4].id).toBe('entry-0');
+    });
+  });
+
   describe('toMarkdown', () => {
     it('should serialize empty log to markdown with header and project ID', () => {
       const manager = new DesignLogManager('my-project-456');
