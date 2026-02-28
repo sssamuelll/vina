@@ -27,6 +27,7 @@ const viewTitles: Record<SidebarView, string> = {
   nesting: 'Nesting',
   files: 'File Browser',
   plugins: 'Plugins',
+  skills: 'Skills',
   settings: 'Settings',
   simulation: 'Simulation',
   parametric: 'Parametric',
