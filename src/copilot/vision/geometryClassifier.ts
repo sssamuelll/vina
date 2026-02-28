@@ -11,6 +11,20 @@ import type { PathCommand, Point2D } from '../../types/types';
 import type { SegmentType } from './types';
 
 /**
+ * Curvature threshold for classifying nearly-straight curves.
+ * A curve is considered "straight" if its control points deviate from the
+ * baseline by less than this fraction of the squared segment length.
+ * Value of 0.01 means control points within 1% of the squared length
+ * are treated as negligible curvature.
+ */
+const CURVATURE_THRESHOLD_RATIO = 0.01;
+
+/**
+ * Minimum number of sample points for Bezier length approximation.
+ */
+const MIN_BEZIER_SAMPLES = 1;
+
+/**
  * Information about a classified segment.
  */
 export interface SegmentInfo {
@@ -36,6 +50,13 @@ function lineLength(p1: Point2D, p2: Point2D): number {
 /**
  * Approximate the length of a cubic Bezier curve by sampling.
  * Uses 10 sample points for reasonable accuracy.
+ *
+ * @param p0 - Start point
+ * @param p1 - First control point
+ * @param p2 - Second control point
+ * @param p3 - End point
+ * @param samples - Number of sample points (must be >= 1, defaults to 10)
+ * @returns Approximate length of the curve
  */
 function bezierLength(
   p0: Point2D,
@@ -44,11 +65,14 @@ function bezierLength(
   p3: Point2D,
   samples = 10
 ): number {
+  // Validate samples parameter
+  const validSamples = Math.max(MIN_BEZIER_SAMPLES, Math.floor(samples));
+
   let length = 0;
   let prevPoint = p0;
 
-  for (let i = 1; i <= samples; i++) {
-    const t = i / samples;
+  for (let i = 1; i <= validSamples; i++) {
+    const t = i / validSamples;
     const t2 = t * t;
     const t3 = t2 * t;
     const mt = 1 - t;
@@ -69,6 +93,12 @@ function bezierLength(
 
 /**
  * Approximate the length of a quadratic Bezier curve by sampling.
+ *
+ * @param p0 - Start point
+ * @param p1 - Control point
+ * @param p2 - End point
+ * @param samples - Number of sample points (must be >= 1, defaults to 10)
+ * @returns Approximate length of the curve
  */
 function quadraticBezierLength(
   p0: Point2D,
@@ -76,11 +106,14 @@ function quadraticBezierLength(
   p2: Point2D,
   samples = 10
 ): number {
+  // Validate samples parameter
+  const validSamples = Math.max(MIN_BEZIER_SAMPLES, Math.floor(samples));
+
   let length = 0;
   let prevPoint = p0;
 
-  for (let i = 1; i <= samples; i++) {
-    const t = i / samples;
+  for (let i = 1; i <= validSamples; i++) {
+    const t = i / validSamples;
     const mt = 1 - t;
 
     const point: Point2D = {
@@ -114,6 +147,12 @@ function classifyBezierCurvature(
   const dx = p3.x - p0.x;
   const dy = p3.y - p0.y;
 
+  // Degenerate case: start and end points coincide (zero-length segment)
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) {
+    return 'straight';
+  }
+
   // Cross products of (start→end) × (start→control point)
   const cross1 = dx * (cp1.y - p0.y) - dy * (cp1.x - p0.x);
   const cross2 = dx * (cp2.y - p0.y) - dy * (cp2.x - p0.x);
@@ -122,8 +161,7 @@ function classifyBezierCurvature(
   const avgCross = (cross1 + cross2) / 2;
 
   // Threshold to avoid classifying nearly-straight curves
-  const lengthSq = dx * dx + dy * dy;
-  const threshold = lengthSq * 0.01; // 1% of squared length
+  const threshold = lengthSq * CURVATURE_THRESHOLD_RATIO;
 
   if (Math.abs(avgCross) < threshold) {
     return 'straight';
@@ -146,18 +184,38 @@ function classifyQuadraticCurvature(
   const dx = p2.x - p0.x;
   const dy = p2.y - p0.y;
 
+  // Degenerate case: start and end points coincide (zero-length segment)
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) {
+    return 'straight';
+  }
+
   // Cross product of (start→end) × (start→control point)
   const cross = dx * (cp.y - p0.y) - dy * (cp.x - p0.x);
 
   // Threshold to avoid classifying nearly-straight curves
-  const lengthSq = dx * dx + dy * dy;
-  const threshold = lengthSq * 0.01;
+  const threshold = lengthSq * CURVATURE_THRESHOLD_RATIO;
 
   if (Math.abs(cross) < threshold) {
     return 'straight';
   }
 
   return cross < 0 ? 'convex' : 'concave';
+}
+
+/**
+ * Safely get a value from segment.values array with bounds checking.
+ * Returns 0 if index is out of bounds.
+ */
+function safeGetValue(values: number[], index: number): number {
+  return index >= 0 && index < values.length ? values[index] : 0;
+}
+
+/**
+ * Check if segment.values has the required number of values for a command type.
+ */
+function hasRequiredValues(values: number[], required: number): boolean {
+  return values.length >= required;
 }
 
 /**
@@ -175,8 +233,11 @@ export function classifySegment(
 
   switch (segment.type) {
     case 'L': {
-      // Line to (x, y)
-      const end: Point2D = { x: segment.values[0], y: segment.values[1] };
+      // Line to (x, y) - requires 2 values
+      if (!hasRequiredValues(segment.values, 2)) {
+        return { type: 'straight', length: 0, start, end: start };
+      }
+      const end: Point2D = { x: safeGetValue(segment.values, 0), y: safeGetValue(segment.values, 1) };
       return {
         type: 'straight',
         length: lineLength(start, end),
@@ -186,8 +247,11 @@ export function classifySegment(
     }
 
     case 'H': {
-      // Horizontal line to x
-      const end: Point2D = { x: segment.values[0], y: start.y };
+      // Horizontal line to x - requires 1 value
+      if (!hasRequiredValues(segment.values, 1)) {
+        return { type: 'straight', length: 0, start, end: start };
+      }
+      const end: Point2D = { x: safeGetValue(segment.values, 0), y: start.y };
       return {
         type: 'straight',
         length: Math.abs(end.x - start.x),
@@ -197,8 +261,11 @@ export function classifySegment(
     }
 
     case 'V': {
-      // Vertical line to y
-      const end: Point2D = { x: start.x, y: segment.values[0] };
+      // Vertical line to y - requires 1 value
+      if (!hasRequiredValues(segment.values, 1)) {
+        return { type: 'straight', length: 0, start, end: start };
+      }
+      const end: Point2D = { x: start.x, y: safeGetValue(segment.values, 0) };
       return {
         type: 'straight',
         length: Math.abs(end.y - start.y),
@@ -208,10 +275,13 @@ export function classifySegment(
     }
 
     case 'C': {
-      // Cubic Bezier: C cp1x cp1y cp2x cp2y x y
-      const cp1: Point2D = { x: segment.values[0], y: segment.values[1] };
-      const cp2: Point2D = { x: segment.values[2], y: segment.values[3] };
-      const end: Point2D = { x: segment.values[4], y: segment.values[5] };
+      // Cubic Bezier: C cp1x cp1y cp2x cp2y x y - requires 6 values
+      if (!hasRequiredValues(segment.values, 6)) {
+        return { type: 'straight', length: 0, start, end: start };
+      }
+      const cp1: Point2D = { x: safeGetValue(segment.values, 0), y: safeGetValue(segment.values, 1) };
+      const cp2: Point2D = { x: safeGetValue(segment.values, 2), y: safeGetValue(segment.values, 3) };
+      const end: Point2D = { x: safeGetValue(segment.values, 4), y: safeGetValue(segment.values, 5) };
 
       return {
         type: classifyBezierCurvature(start, cp1, cp2, end),
@@ -222,9 +292,12 @@ export function classifySegment(
     }
 
     case 'Q': {
-      // Quadratic Bezier: Q cpx cpy x y
-      const cp: Point2D = { x: segment.values[0], y: segment.values[1] };
-      const end: Point2D = { x: segment.values[2], y: segment.values[3] };
+      // Quadratic Bezier: Q cpx cpy x y - requires 4 values
+      if (!hasRequiredValues(segment.values, 4)) {
+        return { type: 'straight', length: 0, start, end: start };
+      }
+      const cp: Point2D = { x: safeGetValue(segment.values, 0), y: safeGetValue(segment.values, 1) };
+      const end: Point2D = { x: safeGetValue(segment.values, 2), y: safeGetValue(segment.values, 3) };
 
       return {
         type: classifyQuadraticCurvature(start, cp, end),
@@ -235,8 +308,11 @@ export function classifySegment(
     }
 
     case 'M': {
-      // Move to - not a segment, but handle gracefully
-      const end: Point2D = { x: segment.values[0], y: segment.values[1] };
+      // Move to - requires 2 values
+      if (!hasRequiredValues(segment.values, 2)) {
+        return { type: 'straight', length: 0, start, end: start };
+      }
+      const end: Point2D = { x: safeGetValue(segment.values, 0), y: safeGetValue(segment.values, 1) };
       return {
         type: 'straight',
         length: 0,
@@ -290,8 +366,11 @@ export function extractSegments(outline: PathCommand[]): SegmentInfo[] {
 
   for (const cmd of outline) {
     if (cmd.type === 'M') {
-      pathStart = { x: cmd.values[0], y: cmd.values[1] };
-      currentPoint = { ...pathStart };
+      // M command requires 2 values, use defaults if missing
+      if (hasRequiredValues(cmd.values, 2)) {
+        pathStart = { x: safeGetValue(cmd.values, 0), y: safeGetValue(cmd.values, 1) };
+        currentPoint = { ...pathStart };
+      }
       continue;
     }
 

@@ -42,3 +42,115 @@ describe('Geometry Classifier - Segment Analysis', () => {
     expect(segments[1].type).toBe('straight');
   });
 });
+
+describe('Geometry Classifier - Edge Cases', () => {
+  describe('Empty outlines', () => {
+    it('should return empty array for empty outline', () => {
+      const segments = extractSegments([]);
+      expect(segments).toHaveLength(0);
+    });
+
+    it('should return empty array for outline with only M command', () => {
+      const outline: PathCommand[] = [{ type: 'M', values: [0, 0] }];
+      const segments = extractSegments(outline);
+      expect(segments).toHaveLength(0);
+    });
+
+    it('should return empty array for outline with only M and Z commands at same point', () => {
+      const outline: PathCommand[] = [
+        { type: 'M', values: [10, 10] },
+        { type: 'Z', values: [] },
+      ];
+      const segments = extractSegments(outline);
+      expect(segments).toHaveLength(0); // Z at same point creates no segment
+    });
+  });
+
+  describe('Degenerate curves (zero-length segments)', () => {
+    it('should handle zero-length line segment', () => {
+      const segment: PathCommand = { type: 'L', values: [0, 0] };
+      const prevPoint = { x: 0, y: 0 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+    });
+
+    it('should handle zero-length cubic bezier (all points coincident)', () => {
+      const segment: PathCommand = { type: 'C', values: [5, 5, 5, 5, 5, 5] };
+      const prevPoint = { x: 5, y: 5 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight'); // Degenerate curve = straight
+      expect(result.length).toBeCloseTo(0); // Use toBeCloseTo for floating point
+    });
+
+    it('should handle zero-length quadratic bezier (all points coincident)', () => {
+      const segment: PathCommand = { type: 'Q', values: [10, 10, 10, 10] };
+      const prevPoint = { x: 10, y: 10 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBeCloseTo(0); // Use toBeCloseTo for floating point
+    });
+
+    it('should handle zero-length horizontal line', () => {
+      const segment: PathCommand = { type: 'H', values: [50] };
+      const prevPoint = { x: 50, y: 25 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+    });
+
+    it('should handle zero-length vertical line', () => {
+      const segment: PathCommand = { type: 'V', values: [25] };
+      const prevPoint = { x: 50, y: 25 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+    });
+  });
+
+  describe('Array bounds checking', () => {
+    it('should handle L command with insufficient values', () => {
+      const segment: PathCommand = { type: 'L', values: [100] }; // Missing y
+      const prevPoint = { x: 0, y: 0 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+      expect(result.end).toEqual(prevPoint);
+    });
+
+    it('should handle C command with insufficient values', () => {
+      const segment: PathCommand = { type: 'C', values: [25, -20, 75] }; // Missing 3 values
+      const prevPoint = { x: 0, y: 0 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+    });
+
+    it('should handle Q command with insufficient values', () => {
+      const segment: PathCommand = { type: 'Q', values: [25, 20] }; // Missing end point
+      const prevPoint = { x: 0, y: 0 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+    });
+
+    it('should handle M command with insufficient values in extractSegments', () => {
+      const outline: PathCommand[] = [
+        { type: 'M', values: [] }, // Missing coordinates
+        { type: 'L', values: [100, 0] },
+      ];
+      const segments = extractSegments(outline);
+      // Should still process L command with default start point (0,0)
+      expect(segments).toHaveLength(1);
+    });
+
+    it('should handle empty values array', () => {
+      const segment: PathCommand = { type: 'L', values: [] };
+      const prevPoint = { x: 10, y: 20 };
+      const result = classifySegment(segment, prevPoint);
+      expect(result.type).toBe('straight');
+      expect(result.length).toBe(0);
+      expect(result.end).toEqual(prevPoint);
+    });
+  });
+});
