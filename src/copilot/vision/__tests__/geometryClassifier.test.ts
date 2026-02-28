@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifySegment, extractSegments, calculateRatios, calculateCurvatureDensity, detectLandmarks, type SegmentInfo } from '../geometryClassifier';
+import { classifySegment, extractSegments, calculateRatios, calculateCurvatureDensity, detectLandmarks, generateFingerprint, type SegmentInfo } from '../geometryClassifier';
 import type { PathCommand } from '../../../types/types';
 
 describe('Geometry Classifier - Segment Analysis', () => {
@@ -222,5 +222,50 @@ describe('Geometry Classifier - Landmark Detection', () => {
     const armhole = landmarks.find(l => l.label === 'armhole');
     expect(armhole).toBeDefined();
     expect(armhole?.edgeIndex).toBe(4); // The concave curve on side
+  });
+});
+
+describe('Geometry Classifier - Fingerprint Generation', () => {
+  it('should generate complete fingerprint from outline', () => {
+    // Simple rectangle
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 50] },
+      { type: 'L', values: [0, 50] },
+      { type: 'Z', values: [] },
+    ];
+
+    const fingerprint = generateFingerprint('piece-1', outline);
+
+    expect(fingerprint.pieceId).toBe('piece-1');
+    expect(fingerprint.segmentTypes).toHaveLength(4);
+    expect(fingerprint.segmentTypes.every(t => t === 'straight')).toBe(true);
+    expect(fingerprint.curvatureDensity).toBe(0);
+    expect(fingerprint.ratios.totalPerimeter).toBeCloseTo(300);
+  });
+
+  it('should detect landmarks in bodice-like shape', () => {
+    // Simplified bodice front shape
+    // Note: Control points positioned to create mathematically concave curves
+    // (control points below/right of the baseline = positive cross product = concave)
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 100] },
+      { type: 'L', values: [0, 70] },                                    // center front
+      { type: 'C', values: [5, 75, 15, 65, 20, 55] },                   // neckline (concave - control points below baseline)
+      { type: 'L', values: [35, 50] },                                   // shoulder
+      { type: 'C', values: [40, 60, 45, 70, 50, 80] },                  // armhole (concave - control points left of baseline)
+      { type: 'L', values: [50, 130] },                                  // side seam
+      { type: 'L', values: [0, 130] },                                   // hemline
+      { type: 'Z', values: [] },
+    ];
+
+    const fingerprint = generateFingerprint('bodice-front', outline);
+
+    expect(fingerprint.landmarks.length).toBeGreaterThan(0);
+    expect(fingerprint.curvatureDensity).toBeGreaterThan(0);
+
+    const labels = fingerprint.landmarks.map(l => l.label);
+    expect(labels).toContain('neckline');
   });
 });

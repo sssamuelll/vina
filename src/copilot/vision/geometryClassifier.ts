@@ -8,7 +8,7 @@
  */
 
 import type { PathCommand, Point2D } from '../../types/types';
-import type { SegmentType, SemanticLandmark, LandmarkLabel } from './types';
+import type { SegmentType, SemanticLandmark, LandmarkLabel, GeometricFingerprint } from './types';
 
 /**
  * Curvature threshold for classifying nearly-straight curves.
@@ -410,7 +410,8 @@ export function extractSegments(outline: PathCommand[]): SegmentInfo[] {
   let pathStart: Point2D = { x: 0, y: 0 };
   let currentPoint: Point2D = { x: 0, y: 0 };
 
-  for (const cmd of outline) {
+  for (let i = 0; i < outline.length; i++) {
+    const cmd = outline[i];
     if (cmd.type === 'M') {
       // M command requires 2 values, use defaults if missing
       if (hasRequiredValues(cmd.values, 2)) {
@@ -428,6 +429,7 @@ export function extractSegments(outline: PathCommand[]): SegmentInfo[] {
           length: lineLength(currentPoint, pathStart),
           start: { ...currentPoint },
           end: { ...pathStart },
+          commandIndex: i,
         });
       }
       currentPoint = { ...pathStart };
@@ -436,6 +438,7 @@ export function extractSegments(outline: PathCommand[]): SegmentInfo[] {
 
     // Classify the segment
     const segmentInfo = classifySegment(cmd, currentPoint);
+    segmentInfo.commandIndex = i;
     segments.push(segmentInfo);
     currentPoint = { ...segmentInfo.end };
   }
@@ -561,4 +564,25 @@ export function detectLandmarks(segments: SegmentInfo[]): SemanticLandmark[] {
   }
 
   return landmarks;
+}
+
+// ─── Fingerprint Generation ─────────────────────────────────────────────────
+
+/**
+ * Generate a complete geometric fingerprint for a pattern piece.
+ */
+export function generateFingerprint(pieceId: string, outline: PathCommand[]): GeometricFingerprint {
+  const segments = extractSegments(outline);
+  const segmentTypes = segments.map(s => s.type);
+  const ratios = calculateRatios(segments);
+  const curvatureDensity = calculateCurvatureDensity(segments);
+  const landmarks = detectLandmarks(segments);
+
+  return {
+    pieceId,
+    segmentTypes,
+    ratios,
+    curvatureDensity,
+    landmarks,
+  };
 }

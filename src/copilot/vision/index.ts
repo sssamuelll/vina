@@ -32,3 +32,15 @@ export type {
   // Context
   CerebralContext,
 } from './types';
+
+// Geometry Classifier
+export {
+  classifySegment,
+  extractSegments,
+  calculateRatios,
+  calculateCurvatureDensity,
+  detectLandmarks,
+  generateFingerprint,
+} from './geometryClassifier';
+
+export type { SegmentInfo } from './geometryClassifier';
