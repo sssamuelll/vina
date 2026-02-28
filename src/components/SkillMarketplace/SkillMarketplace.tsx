@@ -2,12 +2,14 @@
  * SkillMarketplace — main view for browsing and managing skills.
  */
 import { useState, useEffect, useCallback } from 'react';
+import { Upload } from 'lucide-react';
 import { SkillRegistry } from '../../copilot/skills/skillRegistry';
 import { fetchAvailableSkills, getSkillRegistryUrl } from '../../copilot/skills/marketplace';
 import type { CommunitySkill } from '../../copilot/skills/communityFormat';
 import type { RegisteredSkill } from '../../copilot/skills/registryTypes';
 import SkillCard from './SkillCard';
 import SkillCardInstalled from './SkillCardInstalled';
+import ImportSeamlyModal from './ImportSeamlyModal';
 import './SkillMarketplace.css';
 
 type Tab = 'browse' | 'installed';
@@ -15,6 +17,7 @@ type Tab = 'browse' | 'installed';
 export default function SkillMarketplace() {
   const [activeTab, setActiveTab] = useState<Tab>('installed');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Browse state
   const [availableSkills, setAvailableSkills] = useState<CommunitySkill[]>([]);
@@ -192,27 +195,43 @@ export default function SkillMarketplace() {
         )}
 
         {activeTab === 'installed' && (
-          filteredInstalled.length === 0 ? (
-            <div className="skill-marketplace__empty">
-              <p>No skills installed</p>
-              <p className="skill-marketplace__empty-hint">
-                Browse the marketplace to find skills
-              </p>
+          <>
+            <div className="skill-marketplace__actions">
+              <button
+                className="skill-marketplace__import-btn"
+                onClick={() => setShowImportModal(true)}
+              >
+                <Upload size={14} />
+                Import .sm2d
+              </button>
             </div>
-          ) : (
-            <div className="skill-marketplace__list">
-              {filteredInstalled.map(skill => (
-                <SkillCardInstalled
-                  key={skill.nsid}
-                  skill={skill}
-                  onToggle={enabled => handleToggle(skill.nsid, enabled)}
-                  onRemove={() => handleRemove(skill.nsid)}
-                />
-              ))}
-            </div>
-          )
+            {filteredInstalled.length === 0 ? (
+              <div className="skill-marketplace__empty">
+                <p>No skills installed</p>
+                <p className="skill-marketplace__empty-hint">
+                  Browse the marketplace to find skills
+                </p>
+              </div>
+            ) : (
+              <div className="skill-marketplace__list">
+                {filteredInstalled.map(skill => (
+                  <SkillCardInstalled
+                    key={skill.nsid}
+                    skill={skill}
+                    onToggle={enabled => handleToggle(skill.nsid, enabled)}
+                    onRemove={() => handleRemove(skill.nsid)}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
+
+      <ImportSeamlyModal
+        isOpen={showImportModal}
+        onClose={() => setShowImportModal(false)}
+      />
     </div>
   );
 }

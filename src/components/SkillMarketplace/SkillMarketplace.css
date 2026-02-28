@@ -316,3 +316,26 @@
 .skill-card__remove:hover {
   color: var(--error-fg, #f48771);
 }
+
+/* Import action */
+.skill-marketplace__actions {
+  margin-bottom: 12px;
+}
+
+.skill-marketplace__import-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: var(--button-secondary-bg, #333);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 4px;
+  color: var(--text-primary, #ccc);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.skill-marketplace__import-btn:hover {
+  background: var(--button-secondary-hover-bg, #3c3c3c);
+}
