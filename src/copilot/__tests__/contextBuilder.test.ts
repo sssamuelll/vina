@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildAgentContext, serializeContext } from '../contextBuilder';
+import { buildAgentContext, serializeContext, buildPieceSemantics } from '../contextBuilder';
 import type { RootState } from '../../store';
+import type { PatternPiece } from '../../types/types';
 
 function mockState(overrides?: Partial<RootState>): RootState {
   const base: RootState = {
@@ -304,5 +305,50 @@ describe('serializeContext', () => {
     const serialized = serializeContext(context);
 
     expect(serialized).toContain('No pieces yet');
+  });
+});
+
+describe('Context Builder - Piece Semantics', () => {
+  const testPiece: PatternPiece = {
+    id: 'front-bodice',
+    name: 'Front Bodice',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 150] },
+      { type: 'L', values: [0, 150] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [],
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  it('should build piece semantics with fingerprint', () => {
+    const semantics = buildPieceSemantics(testPiece);
+
+    expect(semantics.pieceId).toBe('front-bodice');
+    expect(semantics.fingerprint).toBeDefined();
+    expect(semantics.fingerprint.pieceId).toBe('front-bodice');
+    expect(semantics.fingerprint.segmentTypes).toBeDefined();
+  });
+
+  it('should include landmarks in fingerprint', () => {
+    const semantics = buildPieceSemantics(testPiece);
+
+    expect(semantics.fingerprint.landmarks).toBeDefined();
+    expect(Array.isArray(semantics.fingerprint.landmarks)).toBe(true);
+  });
+
+  it('should compute curvature density', () => {
+    const semantics = buildPieceSemantics(testPiece);
+
+    expect(typeof semantics.fingerprint.curvatureDensity).toBe('number');
+    expect(semantics.fingerprint.curvatureDensity).toBeGreaterThanOrEqual(0);
+    expect(semantics.fingerprint.curvatureDensity).toBeLessThanOrEqual(1);
   });
 });

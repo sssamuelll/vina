@@ -10,6 +10,8 @@
 
 import type { RootState } from '../store';
 import type { PatternPiece, PathCommand } from '../types/types';
+import type { PieceSemantics } from './vision';
+import { generateFingerprint } from './vision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -204,4 +206,17 @@ export function serializeContext(context: AgentContext): string {
   }
 
   return parts.join('\n');
+}
+
+/**
+ * Build semantic analysis for a single piece.
+ */
+export function buildPieceSemantics(piece: PatternPiece): PieceSemantics {
+  const fingerprint = generateFingerprint(piece.id, piece.outline);
+
+  return {
+    pieceId: piece.id,
+    fingerprint,
+    // bestMatch and avatarProximity are optional, computed separately
+  };
 }
