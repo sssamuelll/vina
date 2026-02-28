@@ -1,0 +1,70 @@
+[
+  {
+    "schemaVersion": "1.0.0",
+    "metadata": {
+      "id": "community:jeans",
+      "name": "JeansSkill",
+      "version": "1.0.0",
+      "author": "openclo-community",
+      "description": "5-pocket classic jeans construction with yoke and fly front",
+      "tags": ["pants", "denim", "casual"],
+      "license": "MIT"
+    },
+    "skill": {
+      "name": "jeans",
+      "triggers": ["jeans", "denim pants", "5-pocket", "pantalon vaquero"],
+      "description": "Draft classic 5-pocket jeans with fly front and yoke back",
+      "methods": [
+        {
+          "name": "Classic 5-Pocket",
+          "origin": "US",
+          "description": "Traditional Levi's-style construction",
+          "formulas": {}
+        }
+      ],
+      "formulas": {},
+      "easeTable": {
+        "denim": { "hip": 5, "thigh": 4 }
+      },
+      "constructionSteps": [
+        { "order": 1, "instruction": "Draft front panel with pocket placement", "toolCalls": [] },
+        { "order": 2, "instruction": "Draft back panel with yoke seam", "toolCalls": [] },
+        { "order": 3, "instruction": "Add fly front extension", "toolCalls": [] }
+      ]
+    }
+  },
+  {
+    "schemaVersion": "1.0.0",
+    "metadata": {
+      "id": "community:corset",
+      "name": "CorsetSkill",
+      "version": "1.2.0",
+      "author": "historical-patterns",
+      "description": "Victorian-era overbust corset with steel boning channels",
+      "tags": ["historical", "corset", "structured"],
+      "license": "CC-BY-SA-4.0"
+    },
+    "skill": {
+      "name": "corset",
+      "triggers": ["corset", "corse", "victorian corset", "overbust"],
+      "description": "Draft Victorian overbust corset with boning channels",
+      "methods": [
+        {
+          "name": "Victorian Overbust",
+          "origin": "UK",
+          "description": "Period-accurate 1880s construction",
+          "formulas": {}
+        }
+      ],
+      "formulas": {},
+      "easeTable": {
+        "coutil": { "bust": -2, "waist": -4 }
+      },
+      "constructionSteps": [
+        { "order": 1, "instruction": "Draft center front panel", "toolCalls": [] },
+        { "order": 2, "instruction": "Draft side panels with boning channels", "toolCalls": [] },
+        { "order": 3, "instruction": "Draft center back with lacing allowance", "toolCalls": [] }
+      ]
+    }
+  }
+]

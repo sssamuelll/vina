@@ -1,4 +1,4 @@
-import { FileText, Ruler, Layers, LayoutGrid, Play, Folder, Plug, Settings, SlidersHorizontal, History } from 'lucide-react';
+import { FileText, Ruler, Layers, LayoutGrid, Play, Folder, Plug, Settings, SlidersHorizontal, History, Sparkles } from 'lucide-react';
 import './ActivityBar.css';
 
 export type SidebarView =
@@ -8,6 +8,7 @@ export type SidebarView =
   | 'nesting'
   | 'files'
   | 'plugins'
+  | 'skills'
   | 'settings'
   | 'simulation'
   | 'parametric'
@@ -73,6 +74,12 @@ const items: ActivityItem[] = [
     label: 'Files',
     position: 'top',
     icon: <Folder size={20} />,
+  },
+  {
+    id: 'skills',
+    label: 'Skills Marketplace',
+    position: 'bottom',
+    icon: <Sparkles size={20} />,
   },
   {
     id: 'plugins',

@@ -9,6 +9,7 @@ import {
   SettingsView,
 } from '../views';
 import PluginManager from '../PluginManager/PluginManager';
+import SkillMarketplace from '../SkillMarketplace/SkillMarketplace';
 import SimulationView from './SimulationView';
 import ParametricView from './ParametricView';
 import HistoryView from '../views/HistoryView';
@@ -27,6 +28,7 @@ const viewTitles: Record<SidebarView, string> = {
   nesting: 'Nesting',
   files: 'File Browser',
   plugins: 'Plugins',
+  skills: 'Skills',
   settings: 'Settings',
   simulation: 'Simulation',
   parametric: 'Parametric',
@@ -53,6 +55,7 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             {activeView === 'nesting' && <NestingView />}
             {activeView === 'files' && <FileExplorerView />}
             {activeView === 'plugins' && <PluginManager />}
+            {activeView === 'skills' && <SkillMarketplace />}
             {activeView === 'settings' && <SettingsView />}
             {activeView === 'simulation' && <SimulationView />}
             {activeView === 'parametric' && <ParametricView />}

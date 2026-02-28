@@ -1,0 +1,318 @@
+/* src/components/SkillMarketplace/SkillMarketplace.css */
+
+/* Main container */
+.skill-marketplace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Tabs */
+.skill-marketplace__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #333);
+  padding: 0 12px;
+}
+
+.skill-marketplace__tab {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.skill-marketplace__tab:hover {
+  color: var(--text-primary, #ccc);
+}
+
+.skill-marketplace__tab--active {
+  color: var(--text-primary, #ccc);
+  border-bottom-color: var(--accent-color, #0e639c);
+}
+
+.skill-marketplace__tab-count {
+  margin-left: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  background: var(--badge-bg, #333);
+  border-radius: 10px;
+}
+
+/* Content area */
+.skill-marketplace__content {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* Search */
+.skill-marketplace__search {
+  margin-bottom: 12px;
+}
+
+.skill-marketplace__search-input {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #333);
+  border-radius: 4px;
+  background: var(--input-bg, #1e1e1e);
+  color: var(--text-primary, #ccc);
+}
+
+.skill-marketplace__search-input::placeholder {
+  color: var(--text-secondary, #666);
+}
+
+/* List */
+.skill-marketplace__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Empty state */
+.skill-marketplace__empty {
+  text-align: center;
+  padding: 24px 12px;
+  color: var(--text-secondary, #888);
+  font-size: 13px;
+}
+
+.skill-marketplace__empty-hint {
+  font-size: 11px;
+  margin-top: 8px;
+  color: var(--text-secondary, #666);
+}
+
+/* Error state */
+.skill-marketplace__error {
+  padding: 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--error-fg, #f48771);
+  background: var(--error-bg, rgba(244, 135, 113, 0.1));
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skill-marketplace__retry-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--error-fg, #f48771);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--error-fg, #f48771);
+  cursor: pointer;
+}
+
+/* Loading */
+.skill-marketplace__loading {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-marketplace__skeleton {
+  height: 80px;
+  background: var(--card-bg, #252526);
+  border-radius: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0.3; }
+}
+
+/* Skill Card */
+.skill-card {
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--card-bg, #252526);
+}
+
+.skill-card--enabled {
+  border-color: var(--accent-color, #0e639c);
+}
+
+.skill-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.skill-card__info {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.skill-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #ccc);
+}
+
+.skill-card__version {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.skill-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-card__install-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  border: none;
+  border-radius: 3px;
+  background: var(--button-bg, #0e639c);
+  color: var(--button-fg, #fff);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.skill-card__install-btn:hover:not(:disabled) {
+  background: var(--button-hover-bg, #1177bb);
+}
+
+.skill-card__install-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.skill-card__spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.skill-card__installed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--success-fg, #89d185);
+}
+
+.skill-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.skill-card__author {
+  font-size: 11px;
+  color: var(--text-secondary, #888);
+}
+
+.skill-card__nsid {
+  font-size: 10px;
+  color: var(--text-secondary, #666);
+  font-family: monospace;
+}
+
+.skill-card__source {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--badge-bg, #333);
+  color: var(--text-secondary, #aaa);
+  border-radius: 10px;
+}
+
+.skill-card__tags {
+  display: flex;
+  gap: 4px;
+}
+
+.skill-card__tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: var(--badge-bg, #333);
+  color: var(--text-secondary, #aaa);
+  border-radius: 10px;
+}
+
+.skill-card__description {
+  font-size: 12px;
+  color: var(--text-primary, #ccc);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* Toggle switch (same as PluginManager) */
+.skill-card__toggle {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+}
+
+.skill-card__toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.skill-card__toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--toggle-off, #555);
+  border-radius: 16px;
+  transition: 0.2s;
+}
+
+.skill-card__toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 12px;
+  width: 12px;
+  left: 2px;
+  bottom: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.2s;
+}
+
+.skill-card__toggle input:checked + .skill-card__toggle-slider {
+  background: var(--accent-color, #0e639c);
+}
+
+.skill-card__toggle input:checked + .skill-card__toggle-slider::before {
+  transform: translateX(12px);
+}
+
+.skill-card__remove {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+}
+
+.skill-card__remove:hover {
+  color: var(--error-fg, #f48771);
+}
