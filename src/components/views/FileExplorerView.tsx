@@ -5,6 +5,7 @@ import { addPiece, loadProject, addSeam, updateAvatar, updateMeasurements, setPr
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
+import ExportSkillModal from '../ExportSkillModal/ExportSkillModal';
 import { importZprj } from '../../utils/formats/zprjImport';
 import { downloadZprj } from '../../utils/formats/zprjExport';
 import { importSVG } from '../../utils/formats/svgImport';
@@ -51,6 +52,10 @@ export default function FileExplorerView() {
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectName = useSelector((s: RootState) => s.project.name);
   const projectId = useSelector((s: RootState) => s.project.id);
+  const construction = useSelector((s: RootState) => s.construction);
+
+  // Check if construction has data for skill export
+  const hasConstruction = construction?.points?.length > 0;
 
   const dxfInputRef = useRef<HTMLInputElement>(null);
   const zprjInputRef = useRef<HTMLInputElement>(null);
@@ -59,6 +64,7 @@ export default function FileExplorerView() {
   const projectInputRef = useRef<HTMLInputElement>(null);
 
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
+  const [showExportSkillModal, setShowExportSkillModal] = useState(false);
 
   // ─── Cutting Layout State ───
   const [clPaperSize, setClPaperSize] = useState<PaperSize>('A0');
@@ -397,6 +403,15 @@ export default function FileExplorerView() {
             >
               📦 Export Gerber AccuMark
             </button>
+            <hr style={{ border: 'none', borderTop: '1px solid #333', margin: '8px 0' }} />
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={() => setShowExportSkillModal(true)}
+              disabled={!hasConstruction}
+              title={hasConstruction ? 'Export as reusable skill' : 'Create a parametric pattern first'}
+            >
+              🧠 Export as Skill
+            </button>
           </div>
         </Section>
 
@@ -491,6 +506,12 @@ export default function FileExplorerView() {
           </Section>
         )}
       </div>
+
+      {/* Export Skill Modal */}
+      <ExportSkillModal
+        isOpen={showExportSkillModal}
+        onClose={() => setShowExportSkillModal(false)}
+      />
     </div>
   );
 }
