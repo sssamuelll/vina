@@ -9,9 +9,9 @@
  */
 
 import type { RootState } from '../store';
-import type { PatternPiece, PathCommand } from '../types/types';
-import type { PieceSemantics } from './vision';
-import { generateFingerprint } from './vision';
+import type { PatternPiece, PathCommand, Seam } from '../types/types';
+import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './vision';
+import { generateFingerprint, describeSpatialRelationships } from './vision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -218,5 +218,72 @@ export function buildPieceSemantics(piece: PatternPiece): PieceSemantics {
     pieceId: piece.id,
     fingerprint,
     // bestMatch and avatarProximity are optional, computed separately
+  };
+}
+
+/**
+ * Result of spatial analysis.
+ */
+export interface SpatialAnalysisResult {
+  relationships: SpatialRelationship[];
+  conflicts: SpatialConflict[];
+}
+
+/**
+ * Convert a 2D outline to a 3D vertex array (z=0).
+ */
+function outlineToVertices(outline: PathCommand[], position: { x: number; y: number }): Float32Array {
+  const points: number[] = [];
+
+  for (const cmd of outline) {
+    // Extract x,y pairs from command values
+    for (let i = 0; i < cmd.values.length - 1; i += 2) {
+      const x = cmd.values[i] + position.x;
+      const y = cmd.values[i + 1] + position.y;
+      points.push(x, y, 0); // z = 0 for 2D layout
+    }
+  }
+
+  return new Float32Array(points);
+}
+
+/**
+ * Build spatial relationships between all pieces.
+ */
+export function buildSpatialRelationships(
+  pieces: PatternPiece[],
+  seams: Seam[],
+): SpatialAnalysisResult {
+  if (pieces.length < 2) {
+    return { relationships: [], conflicts: [] };
+  }
+
+  // Convert pieces to spatial input format
+  const spatialPieces = pieces.map(p => ({
+    id: p.id,
+    vertices: outlineToVertices(p.outline, p.position),
+  }));
+
+  // Build positions map (already incorporated into vertices, so use zero offsets)
+  const positions: Record<string, [number, number, number]> = {};
+  for (const p of pieces) {
+    positions[p.id] = [0, 0, 0];
+  }
+
+  // Convert seams to spatial input format
+  const spatialSeams = seams.map(s => ({
+    pieceAId: s.pieceA.pieceId,
+    pieceBId: s.pieceB.pieceId,
+  }));
+
+  const result = describeSpatialRelationships({
+    pieces: spatialPieces,
+    positions,
+    seams: spatialSeams,
+  });
+
+  return {
+    relationships: result.relationships,
+    conflicts: result.conflicts,
   };
 }

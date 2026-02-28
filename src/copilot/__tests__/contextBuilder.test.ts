@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { buildAgentContext, serializeContext, buildPieceSemantics } from '../contextBuilder';
+import { buildAgentContext, serializeContext, buildPieceSemantics, buildSpatialRelationships } from '../contextBuilder';
 import type { RootState } from '../../store';
-import type { PatternPiece } from '../../types/types';
+import type { PatternPiece, Seam } from '../../types/types';
 
 function mockState(overrides?: Partial<RootState>): RootState {
   const base: RootState = {
@@ -350,5 +350,69 @@ describe('Context Builder - Piece Semantics', () => {
     expect(typeof semantics.fingerprint.curvatureDensity).toBe('number');
     expect(semantics.fingerprint.curvatureDensity).toBeGreaterThanOrEqual(0);
     expect(semantics.fingerprint.curvatureDensity).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('Context Builder - Spatial Relationships', () => {
+  const pieces: PatternPiece[] = [
+    {
+      id: 'front',
+      name: 'Front',
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [100, 100] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+      internals: [],
+      position: { x: 0, y: 0 },
+      rotation: 0,
+      mirrored: false,
+      seamAllowance: 10,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+    {
+      id: 'back',
+      name: 'Back',
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [100, 100] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+      internals: [],
+      position: { x: 150, y: 0 },
+      rotation: 0,
+      mirrored: false,
+      seamAllowance: 10,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  ];
+
+  const seams: Seam[] = [];
+
+  it('should build spatial relationships between pieces', () => {
+    const relationships = buildSpatialRelationships(pieces, seams);
+
+    expect(relationships.relationships).toBeDefined();
+    expect(Array.isArray(relationships.relationships)).toBe(true);
+  });
+
+  it('should detect conflicts', () => {
+    const relationships = buildSpatialRelationships(pieces, seams);
+
+    expect(relationships.conflicts).toBeDefined();
+    expect(Array.isArray(relationships.conflicts)).toBe(true);
+  });
+
+  it('should return empty arrays for single piece', () => {
+    const relationships = buildSpatialRelationships([pieces[0]], []);
+
+    expect(relationships.relationships).toHaveLength(0);
+    expect(relationships.conflicts).toHaveLength(0);
   });
 });
