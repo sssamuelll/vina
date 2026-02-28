@@ -5,6 +5,9 @@ import type {
   GeometricFingerprint,
   SpatialRelationship,
   SpatialConflict,
+  DesignLogEntry,
+  SkillOverride,
+  DesignLog,
 } from '../types';
 
 describe('Vision Types - Perception Layer', () => {
@@ -61,5 +64,44 @@ describe('Vision Types - Spatial Relationships', () => {
     };
     expect(conflict.severity).toBe('high');
     expect(conflict.affectedPieceIds).toContain('p-1');
+  });
+});
+
+describe('Vision Types - Memory Layer', () => {
+  it('should define DesignLogEntry correctly', () => {
+    const entry: DesignLogEntry = {
+      id: 'log-001',
+      timestamp: Date.now(),
+      type: 'decision',
+      summary: 'Increased armhole depth by 2cm for mobility',
+      relatedPieceIds: ['p-front', 'p-back'],
+      metadata: { reasoning: 'User requested athletic fit' },
+    };
+    expect(entry.type).toBe('decision');
+    expect(entry.relatedPieceIds).toContain('p-front');
+  });
+
+  it('should define SkillOverride correctly', () => {
+    const override: SkillOverride = {
+      id: 'override-001',
+      skillId: 'core:bodice',
+      formulaName: 'armhole_depth',
+      originalValue: 'bust_arc / 5 + 2',
+      overrideValue: 'bust_arc / 5 + 4',
+      reason: 'User prefers deeper armholes',
+      createdAt: Date.now(),
+    };
+    expect(override.formulaName).toBe('armhole_depth');
+    expect(override.overrideValue).toContain('+ 4');
+  });
+
+  it('should define DesignLog correctly', () => {
+    const log: DesignLog = {
+      projectId: 'proj-123',
+      entries: [],
+      overrides: [],
+      lastFlushAt: Date.now(),
+    };
+    expect(log.projectId).toBe('proj-123');
   });
 });

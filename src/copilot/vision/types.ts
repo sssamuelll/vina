@@ -118,3 +118,66 @@ export interface SpatialConflict {
   /** Human-readable description */
   description: string;
 }
+
+// ─── Memory Layer: Design Log ───────────────────────────────────────────────
+
+/**
+ * Types of design log entries.
+ */
+export type DesignLogEntryType =
+  | 'decision'    // A design choice made
+  | 'constraint'  // A rule that must be preserved
+  | 'note'        // A general observation
+  | 'warning';    // A potential issue flagged
+
+/**
+ * A single entry in the durable design log.
+ */
+export interface DesignLogEntry {
+  /** Unique entry ID */
+  id: string;
+  /** When this entry was created */
+  timestamp: number;
+  /** Entry type */
+  type: DesignLogEntryType;
+  /** Human-readable summary */
+  summary: string;
+  /** IDs of pieces this entry relates to */
+  relatedPieceIds: string[];
+  /** Additional structured data */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * A user-defined override for a skill formula.
+ */
+export interface SkillOverride {
+  /** Unique override ID */
+  id: string;
+  /** Skill this override applies to (e.g., 'core:bodice') */
+  skillId: string;
+  /** Name of the formula being overridden */
+  formulaName: string;
+  /** Original formula expression */
+  originalValue: string;
+  /** User's preferred expression */
+  overrideValue: string;
+  /** Why the override was created */
+  reason: string;
+  /** When the override was created */
+  createdAt: number;
+}
+
+/**
+ * The complete design log for a project.
+ */
+export interface DesignLog {
+  /** Project this log belongs to */
+  projectId: string;
+  /** Log entries */
+  entries: DesignLogEntry[];
+  /** User formula overrides */
+  overrides: SkillOverride[];
+  /** Last time the log was flushed to storage */
+  lastFlushAt: number;
+}
