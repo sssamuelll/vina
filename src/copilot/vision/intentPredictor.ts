@@ -9,7 +9,7 @@
  * @module copilot/vision/intentPredictor
  */
 
-import type { PathCommand } from '../../types/types';
+import type { PathCommand, PatternPiece } from '../../types/types';
 import type { AuditResult } from './types';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -322,5 +322,95 @@ export function checkSeamCompatibility(input: SeamCompatibilityInput): SeamCompa
     lengthDifference,
     percentageDiff,
     suggestedFix,
+  };
+}
+
+// ─── Sandbox Simulation ──────────────────────────────────────────────────────
+
+/**
+ * Input for simulation.
+ */
+export interface SimulationInput {
+  /** The piece being modified */
+  piece: PatternPiece;
+  /** Proposed new outline */
+  proposedOutline: PathCommand[];
+  /** Optional seam edges to check compatibility */
+  seamEdgeLengths?: {
+    pieceAEdgeLength: number;
+    pieceBEdgeLength: number;
+  };
+}
+
+/**
+ * Result of a simulation run.
+ */
+export interface SimulationResult {
+  /** Whether all audits passed */
+  isSafe: boolean;
+  /** Results of individual audits */
+  auditResults: AuditResult[];
+  /** The simulated piece (deep clone with changes applied) */
+  simulatedPiece: PatternPiece;
+  /** Suggested fixes for any failures */
+  suggestedFixes: string[];
+}
+
+/**
+ * Deep clone a piece to avoid mutation.
+ */
+function clonePiece(piece: PatternPiece): PatternPiece {
+  return JSON.parse(JSON.stringify(piece));
+}
+
+/**
+ * Run pre-flight simulation of a proposed change.
+ * Applies change to a clone and runs all audit checks.
+ */
+export function simulateChange(input: SimulationInput): SimulationResult {
+  const { piece, proposedOutline, seamEdgeLengths } = input;
+
+  // Create deep clone to avoid state mutation
+  const simulatedPiece = clonePiece(piece);
+  simulatedPiece.outline = proposedOutline;
+  simulatedPiece.updatedAt = Date.now();
+
+  const auditResults: AuditResult[] = [];
+  const suggestedFixes: string[] = [];
+
+  // Run area integrity check
+  const areaResult = checkAreaIntegrity({ outline: proposedOutline });
+  auditResults.push(areaResult);
+  if (!areaResult.passed && areaResult.message) {
+    suggestedFixes.push(`Area issue: ${areaResult.message}`);
+  }
+
+  // Run self-intersection check
+  const intersectionResult = checkSelfIntersection({ outline: proposedOutline });
+  auditResults.push(intersectionResult);
+  if (!intersectionResult.passed && intersectionResult.message) {
+    suggestedFixes.push(`Self-intersection issue: ${intersectionResult.message}`);
+  }
+
+  // Run seam compatibility check if edges provided
+  if (seamEdgeLengths) {
+    const seamResult = checkSeamCompatibility(seamEdgeLengths);
+    auditResults.push(seamResult);
+    if (!seamResult.passed) {
+      if (seamResult.suggestedFix) {
+        suggestedFixes.push(seamResult.suggestedFix);
+      } else if (seamResult.message) {
+        suggestedFixes.push(`Seam issue: ${seamResult.message}`);
+      }
+    }
+  }
+
+  const isSafe = auditResults.every(r => r.passed);
+
+  return {
+    isSafe,
+    auditResults,
+    simulatedPiece,
+    suggestedFixes,
   };
 }

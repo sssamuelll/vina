@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { checkAreaIntegrity, checkSelfIntersection, checkSeamCompatibility } from '../intentPredictor';
-import type { PathCommand } from '../../../types/types';
+import { checkAreaIntegrity, checkSelfIntersection, checkSeamCompatibility, simulateChange } from '../intentPredictor';
+import type { PathCommand, PatternPiece } from '../../../types/types';
 
 describe('Intent Predictor - Area Integrity', () => {
   const validSquare: PathCommand[] = [
@@ -156,5 +156,91 @@ describe('Intent Predictor - Seam Compatibility', () => {
 
     expect(result.passed).toBe(false);
     expect(result.suggestedFix).toContain('ease');
+  });
+});
+
+describe('Intent Predictor - Sandbox Simulation', () => {
+  const basePiece: PatternPiece = {
+    id: 'piece-1',
+    name: 'Front Bodice',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [],
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  it('should pass all audits for valid change', () => {
+    const result = simulateChange({
+      piece: basePiece,
+      proposedOutline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [110, 0] },
+        { type: 'L', values: [110, 100] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+    });
+
+    expect(result.isSafe).toBe(true);
+    expect(result.auditResults.every(r => r.passed)).toBe(true);
+  });
+
+  it('should fail for degenerate change', () => {
+    const result = simulateChange({
+      piece: basePiece,
+      proposedOutline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [100, 0] }, // Collapses to zero area
+        { type: 'L', values: [0, 0] },
+        { type: 'Z', values: [] },
+      ],
+    });
+
+    expect(result.isSafe).toBe(false);
+    expect(result.auditResults.some(r => r.rule === 'area_integrity' && !r.passed)).toBe(true);
+  });
+
+  it('should fail for self-intersecting change', () => {
+    const result = simulateChange({
+      piece: basePiece,
+      proposedOutline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [100, 100] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [0, 100] },
+        { type: 'Z', values: [] },
+      ],
+    });
+
+    expect(result.isSafe).toBe(false);
+    expect(result.auditResults.some(r => r.rule === 'self_intersection' && !r.passed)).toBe(true);
+  });
+
+  it('should not mutate original piece', () => {
+    const originalOutline = JSON.stringify(basePiece.outline);
+
+    simulateChange({
+      piece: basePiece,
+      proposedOutline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [200, 0] },
+        { type: 'L', values: [200, 200] },
+        { type: 'L', values: [0, 200] },
+        { type: 'Z', values: [] },
+      ],
+    });
+
+    expect(JSON.stringify(basePiece.outline)).toBe(originalOutline);
   });
 });
