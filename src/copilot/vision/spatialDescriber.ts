@@ -41,6 +41,16 @@ export interface MinDistanceResult {
   indexB: number;
 }
 
+/**
+ * Spatial information for a single piece in world space.
+ */
+export interface PieceSpatialInfo {
+  pieceId: string;
+  position: [number, number, number];
+  worldBounds: BoundingBox3D;
+  worldVertices: Float32Array;
+}
+
 // ─── Distance Functions ─────────────────────────────────────────────────────
 
 /**
@@ -172,4 +182,37 @@ export function findMinimumDistance(
   }
 
   return { distance: minDist, indexA: minIndexA, indexB: minIndexB };
+}
+
+// ─── Piece Spatial Info ──────────────────────────────────────────────────────
+
+/**
+ * Extract spatial information for a piece, transforming local vertices to world space.
+ *
+ * Takes local-space vertices and a world position, then computes:
+ * - World-space vertices (local + position offset)
+ * - World-space bounding box
+ *
+ * @param pieceId - Unique identifier for the piece
+ * @param localVertices - Vertex array in local/object space (x, y, z triplets)
+ * @param position - World position offset [x, y, z]
+ * @returns Spatial information with world-space coordinates
+ */
+export function extractPieceInfo(
+  pieceId: string,
+  localVertices: Float32Array,
+  position: [number, number, number],
+): PieceSpatialInfo {
+  const [px, py, pz] = position;
+
+  const worldVertices = new Float32Array(localVertices.length);
+  for (let i = 0; i < localVertices.length; i += 3) {
+    worldVertices[i] = localVertices[i] + px;
+    worldVertices[i + 1] = localVertices[i + 1] + py;
+    worldVertices[i + 2] = localVertices[i + 2] + pz;
+  }
+
+  const worldBounds = computeBoundingBox3D(worldVertices);
+
+  return { pieceId, position, worldBounds, worldVertices };
 }

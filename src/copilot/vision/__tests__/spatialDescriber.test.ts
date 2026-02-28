@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { distance3D, computeBoundingBox3D, boundingBoxesOverlap, findMinimumDistance } from '../spatialDescriber';
+import { distance3D, computeBoundingBox3D, boundingBoxesOverlap, findMinimumDistance, extractPieceInfo } from '../spatialDescriber';
 
 describe('Spatial Describer - Distance Functions', () => {
   it('should calculate 3D distance between two points', () => {
@@ -68,5 +68,38 @@ describe('Spatial Describer - Vertex Distance', () => {
 
     const result = findMinimumDistance(empty, vertices);
     expect(result.distance).toBe(Infinity);
+  });
+});
+
+describe('Spatial Describer - Piece Info', () => {
+  it('should extract spatial info from piece data', () => {
+    const pieceId = 'piece-1';
+    const vertices = new Float32Array([0, 0, 0, 100, 0, 0, 100, 50, 10, 0, 50, 10]);
+    const position: [number, number, number] = [10, 20, 30];
+
+    const info = extractPieceInfo(pieceId, vertices, position);
+
+    expect(info.pieceId).toBe('piece-1');
+    expect(info.position).toEqual([10, 20, 30]);
+    expect(info.worldBounds.minX).toBe(10);
+    expect(info.worldBounds.maxX).toBe(110);
+    expect(info.worldBounds.minY).toBe(20);
+    expect(info.worldBounds.maxY).toBe(70);
+    expect(info.worldBounds.minZ).toBe(30);
+    expect(info.worldBounds.maxZ).toBe(40);
+  });
+
+  it('should store world-space vertices', () => {
+    const vertices = new Float32Array([0, 0, 0, 10, 10, 10]);
+    const position: [number, number, number] = [5, 5, 5];
+
+    const info = extractPieceInfo('p1', vertices, position);
+
+    expect(info.worldVertices[0]).toBe(5);
+    expect(info.worldVertices[1]).toBe(5);
+    expect(info.worldVertices[2]).toBe(5);
+    expect(info.worldVertices[3]).toBe(15);
+    expect(info.worldVertices[4]).toBe(15);
+    expect(info.worldVertices[5]).toBe(15);
   });
 });
