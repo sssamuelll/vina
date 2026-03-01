@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -24,7 +24,6 @@ export const duplicateTool: ToolDefinition = {
   id: 'duplicate',
   name: 'Duplicate',
   context: '2d',
-  shortcut: 'd',
   icon: DuplicateIcon,
   cursor: 'default',
   group: 'pattern',

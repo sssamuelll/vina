@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -24,7 +24,6 @@ export const copyPatternTool: ToolDefinition = {
   id: 'copyPattern',
   name: 'Copy Pattern',
   context: '2d',
-  shortcut: 'c',
   icon: CopyPatternIcon,
   cursor: 'default',
   group: 'pattern',

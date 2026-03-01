@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -21,7 +21,6 @@ export const lineTool: ToolDefinition = {
   id: 'line',
   name: 'Line Tool',
   context: '2d',
-  shortcut: 'l',
   icon: LineIcon,
   cursor: 'crosshair',
   group: 'draw',

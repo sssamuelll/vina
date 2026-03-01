@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -24,7 +24,6 @@ export const mirrorTool: ToolDefinition = {
   id: 'mirror',
   name: 'Mirror/Symmetric',
   context: '2d',
-  shortcut: 'i',
   icon: MirrorIcon,
   cursor: 'crosshair',
   group: 'pattern',

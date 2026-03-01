@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -22,7 +22,6 @@ export const measureTool: ToolDefinition = {
   id: 'measure',
   name: 'Measure',
   context: '2d',
-  shortcut: 'm',
   icon: MeasureIcon,
   cursor: 'crosshair',
   group: 'annotation',

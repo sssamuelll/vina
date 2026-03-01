@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -23,7 +23,6 @@ export const grainlineTool: ToolDefinition = {
   id: 'grainline',
   name: 'Grainline',
   context: '2d',
-  shortcut: 'g',
   icon: GrainlineIcon,
   cursor: 'pointer',
   group: 'annotation',
