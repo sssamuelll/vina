@@ -16,7 +16,7 @@ import { PatternPiece, Seam } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
-import { placeGarmentPieces, detectBodyRegion, computePlacement } from '../../utils/cloth/garmentPlacement';
+import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
@@ -376,12 +376,17 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
 
   // Apply placement transforms (pure math, no Three.js objects per vertex)
+  // Uses placeGarmentPieces for consistency with staticGeometry rendering
   const placedMeshes = useMemo(() => {
+    if (pieceMeshes.length === 0) return [];
+
+    // Use placeGarmentPieces to correctly distribute pieces around avatar
+    // This handles 'unknown' pieces by spreading them in a circle rather than
+    // placing them all at the same position (which causes explosion on sim start)
+    const placements = placeGarmentPieces(pieces, avatarMeasurements);
+
     return pieceMeshes.map((pm, i) => {
-      const piece = pieces[i];
-      const region = piece ? detectBodyRegion(piece) : 'unknown' as const;
-      const geo = piece ? { widthMm: 200, heightMm: 300 } : { widthMm: 200, heightMm: 300 };
-      const placement = computePlacement(region, avatarMeasurements, geo);
+      const placement = placements[i] || { position: [0, 1.0, -0.2], rotation: [0, 0, 0] };
       const [rx, ry, rz] = placement.rotation;
       const [px, py, pz] = placement.position;
       const cx = Math.cos(rx), sx = Math.sin(rx);
