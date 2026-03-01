@@ -356,11 +356,23 @@ describe('XPBDClothSolver - Air Drag', () => {
     const mesh = makeSquareMesh();
     const solver = new XPBDClothSolver(mesh, {
       dragCoefficient: 0.0,
-      damping: 1.0,
-      gravity: [0, 0, 0],
+      damping: 1.0, // No regular damping
+      gravity: [0, 0, 0], // No gravity
+      selfCollision: false, // Disable self-collision
+      groundY: -100, // Move ground far away to avoid interference
     });
 
-    // Verify config set correctly
-    expect(solver.config.dragCoefficient).toBe(0.0);
+    // Give all particles downward velocity
+    for (let i = 0; i < solver.numParticles; i++) {
+      solver.vel[i * 3 + 1] = -5.0;
+    }
+
+    const initialKE = solver.computeKineticEnergy();
+    solver.step();
+    const finalKE = solver.computeKineticEnergy();
+
+    // With zero drag coefficient, kinetic energy should be unchanged
+    // (or very close - constraints may affect it slightly)
+    expect(finalKE).toBeCloseTo(initialKE, 1);
   });
 });
