@@ -514,7 +514,7 @@ export class XPBDClothSolver {
   }
 
   /**
-   * Pre-solve: integrate gravity, save previous positions, enforce ground plane.
+   * Pre-solve: integrate gravity, apply air drag, save previous positions, enforce ground plane.
    */
   private preSolve(sdt: number): void {
     const grav = new Float32Array(this.config.gravity);
@@ -527,12 +527,111 @@ export class XPBDClothSolver {
 
       // Apply damping
       vecScale(this.vel, i, this.config.damping);
+    }
+
+    // Apply air drag after gravity integration but before position update
+    this.applyAirDrag(sdt);
+
+    for (let i = 0; i < this.numParticles; i++) {
+      if (this.invMass[i] === 0.0) continue;
 
       // Save previous position
       vecCopy(this.prevPos, i, this.pos, i);
 
       // Integrate position
       vecAdd(this.pos, i, this.vel, i, sdt);
+    }
+  }
+
+  /**
+   * Apply aerodynamic drag force per triangle.
+   * Formula: F = ½ρv²CdA(n·v̂)
+   *
+   * @param sdt - Substep delta time
+   */
+  private applyAirDrag(sdt: number): void {
+    const dragCoeff = this.config.dragCoefficient;
+    if (dragCoeff <= 0) return;
+
+    const airDensity = 1.225; // kg/m³ at sea level
+    const numTris = this.triIds.length / 3;
+
+    // Temporary vectors for calculation
+    const e0 = new Float32Array(3);
+    const e1 = new Float32Array(3);
+    const normal = new Float32Array(3);
+    const triVel = new Float32Array(3);
+
+    for (let t = 0; t < numTris; t++) {
+      const i0 = this.triIds[t * 3];
+      const i1 = this.triIds[t * 3 + 1];
+      const i2 = this.triIds[t * 3 + 2];
+
+      // Skip if all vertices are pinned
+      if (this.invMass[i0] === 0 && this.invMass[i1] === 0 && this.invMass[i2] === 0) {
+        continue;
+      }
+
+      // Calculate triangle velocity (average of vertices)
+      const v0 = i0 * 3, v1 = i1 * 3, v2 = i2 * 3;
+      triVel[0] = (this.vel[v0] + this.vel[v1] + this.vel[v2]) / 3;
+      triVel[1] = (this.vel[v0 + 1] + this.vel[v1 + 1] + this.vel[v2 + 1]) / 3;
+      triVel[2] = (this.vel[v0 + 2] + this.vel[v1 + 2] + this.vel[v2 + 2]) / 3;
+
+      const speed = Math.sqrt(triVel[0] * triVel[0] + triVel[1] * triVel[1] + triVel[2] * triVel[2]);
+      if (speed < 0.001) continue;
+
+      // Calculate triangle normal and area
+      const p0 = i0 * 3, p1 = i1 * 3, p2 = i2 * 3;
+      e0[0] = this.pos[p1] - this.pos[p0];
+      e0[1] = this.pos[p1 + 1] - this.pos[p0 + 1];
+      e0[2] = this.pos[p1 + 2] - this.pos[p0 + 2];
+
+      e1[0] = this.pos[p2] - this.pos[p0];
+      e1[1] = this.pos[p2 + 1] - this.pos[p0 + 1];
+      e1[2] = this.pos[p2 + 2] - this.pos[p0 + 2];
+
+      // normal = cross(e0, e1)
+      normal[0] = e0[1] * e1[2] - e0[2] * e1[1];
+      normal[1] = e0[2] * e1[0] - e0[0] * e1[2];
+      normal[2] = e0[0] * e1[1] - e0[1] * e1[0];
+
+      const normalLen = Math.sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]);
+      if (normalLen < 1e-10) continue;
+
+      const area = normalLen * 0.5;
+
+      // Normalize normal
+      normal[0] /= normalLen;
+      normal[1] /= normalLen;
+      normal[2] /= normalLen;
+
+      // Velocity direction
+      const velDir = [triVel[0] / speed, triVel[1] / speed, triVel[2] / speed];
+
+      // Facing factor: how much triangle faces into velocity
+      const facingFactor = Math.abs(normal[0] * velDir[0] + normal[1] * velDir[1] + normal[2] * velDir[2]);
+
+      // F = ½ρv²CdA * facingFactor
+      const dragMagnitude = 0.5 * airDensity * speed * speed * dragCoeff * area * facingFactor;
+
+      // Drag force opposes velocity
+      const dragForce = [
+        -velDir[0] * dragMagnitude,
+        -velDir[1] * dragMagnitude,
+        -velDir[2] * dragMagnitude,
+      ];
+
+      // Distribute force to vertices
+      const forcePerVertex = 1 / 3;
+      for (const idx of [i0, i1, i2]) {
+        if (this.invMass[idx] === 0) continue;
+        const vi = idx * 3;
+        const scale = forcePerVertex * this.invMass[idx] * sdt;
+        this.vel[vi] += dragForce[0] * scale;
+        this.vel[vi + 1] += dragForce[1] * scale;
+        this.vel[vi + 2] += dragForce[2] * scale;
+      }
     }
   }
 

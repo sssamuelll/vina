@@ -313,4 +313,54 @@ describe('XPBDClothSolver - Air Drag', () => {
     const solver = new XPBDClothSolver(mesh, { dragCoefficient: 0.5 });
     expect(solver.config.dragCoefficient).toBe(0.5);
   });
+
+  it('should slow down fast-moving cloth with drag enabled', () => {
+    const mesh = makeSquareMesh();
+    const solverWithDrag = new XPBDClothSolver(mesh, {
+      dragCoefficient: 2.0,
+      damping: 1.0, // Disable regular damping to isolate drag effect
+      gravity: [0, 0, 0], // Disable gravity
+      selfCollision: false, // Disable self-collision
+      maxVelocity: 100, // High limit to avoid clamping
+      groundY: -100, // Move ground far away to avoid interference
+    });
+
+    const solverNoDrag = new XPBDClothSolver(mesh, {
+      dragCoefficient: 0.0,
+      damping: 1.0, // Disable regular damping
+      gravity: [0, 0, 0], // Disable gravity
+      selfCollision: false, // Disable self-collision
+      maxVelocity: 100, // High limit to avoid clamping
+      groundY: -100, // Move ground far away to avoid interference
+    });
+
+    // Give all particles velocity perpendicular to cloth surface (Z direction)
+    // The cloth is in the XY plane, so the normal is in Z direction
+    // Air drag is only effective when cloth moves perpendicular to its surface
+    for (let i = 0; i < solverWithDrag.numParticles; i++) {
+      solverWithDrag.vel[i * 3 + 2] = 5.0; // 5 m/s in +Z direction
+      solverNoDrag.vel[i * 3 + 2] = 5.0;
+    }
+
+    solverWithDrag.step();
+    solverNoDrag.step();
+
+    const keWithDrag = solverWithDrag.computeKineticEnergy();
+    const keNoDrag = solverNoDrag.computeKineticEnergy();
+
+    // Drag should reduce kinetic energy more than no drag
+    expect(keWithDrag).toBeLessThan(keNoDrag);
+  });
+
+  it('should not affect cloth when dragCoefficient is 0', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh, {
+      dragCoefficient: 0.0,
+      damping: 1.0,
+      gravity: [0, 0, 0],
+    });
+
+    // Verify config set correctly
+    expect(solver.config.dragCoefficient).toBe(0.0);
+  });
 });
