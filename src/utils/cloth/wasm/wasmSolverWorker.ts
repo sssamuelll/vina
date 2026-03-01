@@ -175,6 +175,39 @@ self.onmessage = async (event: MessageEvent) => {
         }
         break;
 
+      case 'applyInitialCollision':
+        // Run settling steps to push particles outside body BEFORE physics starts.
+        // Uses small timestep with no gravity to resolve collisions without explosion.
+        if (solver) {
+          console.log('[WasmWorker] Running initial collision settling...');
+          // Temporarily configure solver with zero gravity for settling
+          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005);
+
+          // Run several small steps to let SDF collision push particles out
+          for (let i = 0; i < 20; i++) {
+            solver.step(1 / 120); // Small timestep
+          }
+
+          // Restore normal gravity
+          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005);
+
+          // Send settled positions to client
+          const n = numParticles;
+          const ptr = solver.positions_ptr();
+          let positions: Float32Array;
+          if (wasmExports?.memory) {
+            positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
+          } else {
+            positions = new Float32Array(n * 3);
+          }
+          (self as unknown as Worker).postMessage(
+            { type: 'frame', positions },
+            [positions.buffer],
+          );
+          console.log('[WasmWorker] Initial collision settling complete');
+        }
+        break;
+
       case 'setPins':
         if (solver && msg.indices && msg.positions) {
           const indices = new Uint32Array(msg.indices);

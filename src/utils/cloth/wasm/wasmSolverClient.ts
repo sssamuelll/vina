@@ -70,6 +70,14 @@ export class WasmSolverClient {
   }
 
   /**
+   * Apply initial collision pass to push all particles outside the body.
+   * Call this AFTER setSDF() and BEFORE start() to prevent explosion.
+   */
+  applyInitialCollision(): void {
+    this.worker?.postMessage({ type: 'applyInitialCollision' });
+  }
+
+  /**
    * Set pinned vertices with target positions.
    * @param pins Array of { vertexIndex, position: [x, y, z] }
    */

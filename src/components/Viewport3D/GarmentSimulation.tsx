@@ -467,25 +467,33 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
 
               await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
 
-              if (!cancelled) wasmClient.start();
-
-              // SDF loaded via worker (truly non-blocking)
+              // Load SDF BEFORE starting simulation to prevent explosion
+              // Particles inside body will be pushed out before physics kicks in
               if (avatarModelUrl && !cancelled) {
-                console.log('[GarmentSimulation] Requesting Avatar SDF for Wasm solver...');
-                loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
+                console.log('[GarmentSimulation] Loading Avatar SDF before simulation start...');
+                try {
+                  const sdf = await withTimeout(
+                    loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current),
+                    8000,
+                    'SDF generation'
+                  );
                   if (sdf && !cancelled) {
-                    console.log('[GarmentSimulation] ✅ SDF loaded, enabling body collision');
+                    console.log('[GarmentSimulation] ✅ SDF loaded, applying initial collision pass');
                     wasmClient.setSDF(sdf);
+                    // Apply initial collision to push particles outside body before physics
+                    wasmClient.applyInitialCollision?.();
                     dispatch(setBodyCollision(true));
-                  } else if (!sdf && !cancelled) {
+                  } else if (!cancelled) {
                     console.warn('[GarmentSimulation] ❌ SDF generation returned null');
                     dispatch(setBodyCollision(false));
                   }
-                }).catch(e => {
-                  console.error('[GarmentSimulation] ❌ Avatar SDF failed:', e);
+                } catch (e) {
+                  console.warn('[GarmentSimulation] SDF load timed out, starting without body collision:', e);
                   dispatch(setBodyCollision(false));
-                });
+                }
               }
+
+              if (!cancelled) wasmClient.start();
               return;
             } else if (!cancelled) {
               console.warn('[GarmentSimulation] Wasm solver not available or timed out');
@@ -511,15 +519,29 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
             client.setFabric(fabricId);
             client.requestEdgeData();
 
-            if (!cancelled) client.start();
-
-            // SDF loaded via worker (truly non-blocking)
+            // Load SDF BEFORE starting simulation to prevent explosion
             if (avatarModelUrl && !cancelled) {
-              loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                if (sdf && !cancelled) { client.setSDF(sdf); dispatch(setBodyCollision(true)); }
-                else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
-              }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
+              console.log('[GarmentSimulation] Loading Avatar SDF before simulation start (CPU)...');
+              try {
+                const sdf = await withTimeout(
+                  loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current),
+                  8000,
+                  'SDF generation'
+                );
+                if (sdf && !cancelled) {
+                  console.log('[GarmentSimulation] ✅ SDF loaded for CPU solver');
+                  client.setSDF(sdf);
+                  dispatch(setBodyCollision(true));
+                } else if (!cancelled) {
+                  dispatch(setBodyCollision(false));
+                }
+              } catch (e) {
+                console.warn('[GarmentSimulation] SDF load timed out (CPU), starting without body collision:', e);
+                dispatch(setBodyCollision(false));
+              }
             }
+
+            if (!cancelled) client.start();
             return;
           } catch (e) {
             console.warn('[GarmentSimulation] CPU worker failed, falling back to Neural Drape:', e);
