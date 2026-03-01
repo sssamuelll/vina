@@ -359,23 +359,14 @@ impl XpbdSolver {
         }
     }
 
-    /// Ground plane collision with friction - must be called AFTER all other constraints
+    /// Ground plane collision - clamps particles to ground plane
+    /// Friction is handled separately in post_solve at velocity level
     fn solve_ground_collision(&mut self) {
-        let friction = 0.5_f32; // Ground friction coefficient
-
         for i in 0..self.num_particles {
             if self.inv_mass[i] == 0.0 { continue; }
             let idx = i * 3;
 
             if self.positions[idx + 1] < self.ground_y {
-                // Calculate horizontal displacement from previous position
-                let dx = self.positions[idx] - self.prev_positions[idx];
-                let dz = self.positions[idx + 2] - self.prev_positions[idx + 2];
-
-                // Apply friction: reduce horizontal movement
-                self.positions[idx] = self.prev_positions[idx] + dx * (1.0 - friction);
-                self.positions[idx + 2] = self.prev_positions[idx + 2] + dz * (1.0 - friction);
-
                 // Clamp to ground plane
                 self.positions[idx + 1] = self.ground_y;
             }
@@ -440,12 +431,62 @@ impl XpbdSolver {
 
     fn post_solve(&mut self, sdt: f32) {
         let inv_sdt = 1.0 / sdt;
+
+        // Coulomb friction coefficients
+        let static_friction = 0.6_f32;  // μ_s - higher, prevents motion from starting
+        let kinetic_friction = 0.4_f32; // μ_k - lower, applies when already moving
+        let static_threshold = 0.01_f32; // velocity threshold for static friction
+        let ground_tolerance = 0.001_f32; // distance from ground to apply friction
+
         for i in 0..self.num_particles {
             if self.inv_mass[i] == 0.0 { continue; }
             let idx = i * 3;
-            self.velocities[idx] = (self.positions[idx] - self.prev_positions[idx]) * inv_sdt;
-            self.velocities[idx + 1] = (self.positions[idx + 1] - self.prev_positions[idx + 1]) * inv_sdt;
-            self.velocities[idx + 2] = (self.positions[idx + 2] - self.prev_positions[idx + 2]) * inv_sdt;
+
+            // Compute velocity from position change (Verlet integration)
+            let vx = (self.positions[idx] - self.prev_positions[idx]) * inv_sdt;
+            let vy = (self.positions[idx + 1] - self.prev_positions[idx + 1]) * inv_sdt;
+            let vz = (self.positions[idx + 2] - self.prev_positions[idx + 2]) * inv_sdt;
+
+            // Check if particle is on or near ground
+            if self.positions[idx + 1] <= self.ground_y + ground_tolerance {
+                // Calculate tangent (horizontal) velocity
+                let tangent_speed = (vx * vx + vz * vz).sqrt();
+
+                // Normal force = mass * gravity (pointing up against gravity)
+                // For unit mass with gravity -9.81, normal force ≈ 9.81
+                let gravity_mag = self.gravity[1].abs();
+
+                if tangent_speed < static_threshold {
+                    // Static friction: stop horizontal motion completely
+                    self.velocities[idx] = 0.0;
+                    self.velocities[idx + 2] = 0.0;
+                } else {
+                    // Kinetic friction: decelerate tangent velocity
+                    // F_friction = μ_k * F_normal = μ_k * m * g
+                    // a_friction = F_friction / m = μ_k * g
+                    // Δv = a_friction * dt
+                    let friction_decel = kinetic_friction * gravity_mag * sdt;
+                    let new_tangent_speed = (tangent_speed - friction_decel).max(0.0);
+
+                    if new_tangent_speed > 0.0 {
+                        let scale = new_tangent_speed / tangent_speed;
+                        self.velocities[idx] = vx * scale;
+                        self.velocities[idx + 2] = vz * scale;
+                    } else {
+                        // Friction stopped the particle
+                        self.velocities[idx] = 0.0;
+                        self.velocities[idx + 2] = 0.0;
+                    }
+                }
+
+                // Vertical velocity: prevent bouncing below ground, allow upward motion
+                self.velocities[idx + 1] = if vy < 0.0 { 0.0 } else { vy };
+            } else {
+                // Not on ground - normal velocity update
+                self.velocities[idx] = vx;
+                self.velocities[idx + 1] = vy;
+                self.velocities[idx + 2] = vz;
+            }
         }
     }
 }

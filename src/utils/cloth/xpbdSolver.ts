@@ -561,33 +561,19 @@ export class XPBDClothSolver {
   }
 
   /**
-   * Resolve ground plane collisions with friction.
+   * Resolve ground plane collisions.
    * Called after all other constraints to ensure particles stay above ground.
-   * Uses position-based friction for realistic cloth behavior.
+   * Friction is handled separately in postSolve at velocity level.
    */
   private solveGroundCollision(): void {
-    const friction = this.config.groundFriction;
     const groundY = this.config.groundY;
 
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
 
-      const xi = 3 * i;
-      const yi = xi + 1;
-      const zi = xi + 2;
+      const yi = 3 * i + 1;
 
       if (this.pos[yi] < groundY) {
-        // Particle is below ground - apply collision response
-
-        // Calculate horizontal displacement from previous position
-        const dx = this.pos[xi] - this.prevPos[xi];
-        const dz = this.pos[zi] - this.prevPos[zi];
-
-        // Apply friction: reduce horizontal movement
-        // friction = 1.0 means no sliding, 0.0 means frictionless
-        this.pos[xi] = this.prevPos[xi] + dx * (1.0 - friction);
-        this.pos[zi] = this.prevPos[zi] + dz * (1.0 - friction);
-
         // Clamp to ground plane
         this.pos[yi] = groundY;
       }
@@ -759,13 +745,68 @@ export class XPBDClothSolver {
   }
 
   /**
-   * Post-solve: derive velocities from position change.
+   * Post-solve: derive velocities from position change and apply friction.
+   * Implements Coulomb friction model at velocity level for ground contact.
    */
   private postSolve(sdt: number): void {
     const maxSpeed = this.config.maxVelocity ?? 5.0;
+    const invSdt = 1.0 / sdt;
+
+    // Coulomb friction coefficients
+    const kineticFriction = 0.4; // μ_k - applies when already moving
+    const staticThreshold = 0.01; // velocity threshold for static friction
+    const groundTolerance = 0.001; // distance from ground to apply friction
+    const groundY = this.config.groundY;
+    const gravityMag = Math.abs(this.config.gravity[1]);
+
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
-      vecSetDiff(this.vel, i, this.pos, i, this.prevPos, i, 1.0 / sdt);
+
+      const xi = 3 * i;
+      const yi = xi + 1;
+      const zi = xi + 2;
+
+      // Compute velocity from position change (Verlet integration)
+      const vx = (this.pos[xi] - this.prevPos[xi]) * invSdt;
+      const vy = (this.pos[yi] - this.prevPos[yi]) * invSdt;
+      const vz = (this.pos[zi] - this.prevPos[zi]) * invSdt;
+
+      // Check if particle is on or near ground
+      if (this.pos[yi] <= groundY + groundTolerance) {
+        // Calculate tangent (horizontal) velocity
+        const tangentSpeed = Math.sqrt(vx * vx + vz * vz);
+
+        if (tangentSpeed < staticThreshold) {
+          // Static friction: stop horizontal motion completely
+          this.vel[xi] = 0.0;
+          this.vel[zi] = 0.0;
+        } else {
+          // Kinetic friction: decelerate tangent velocity
+          // F_friction = μ_k * F_normal = μ_k * m * g
+          // a_friction = F_friction / m = μ_k * g
+          // Δv = a_friction * dt
+          const frictionDecel = kineticFriction * gravityMag * sdt;
+          const newTangentSpeed = Math.max(0, tangentSpeed - frictionDecel);
+
+          if (newTangentSpeed > 0) {
+            const scale = newTangentSpeed / tangentSpeed;
+            this.vel[xi] = vx * scale;
+            this.vel[zi] = vz * scale;
+          } else {
+            // Friction stopped the particle
+            this.vel[xi] = 0.0;
+            this.vel[zi] = 0.0;
+          }
+        }
+
+        // Vertical velocity: prevent bouncing below ground, allow upward motion
+        this.vel[yi] = vy < 0 ? 0 : vy;
+      } else {
+        // Not on ground - normal velocity update
+        this.vel[xi] = vx;
+        this.vel[yi] = vy;
+        this.vel[zi] = vz;
+      }
 
       // Clamp velocity to prevent explosions
       const speed = Math.sqrt(vecLengthSquared(this.vel, i));
