@@ -76,6 +76,8 @@ export interface MergedMesh {
   triIds: Int32Array;
   /** Per-piece offset tracking */
   pieces: PieceOffset[];
+  /** Combined UV coordinates [u0,v0, u1,v1, ...] (optional) */
+  uvs?: Float32Array;
 }
 
 // ─── Default Config ─────────────────────────────────────────────────────────
@@ -274,21 +276,25 @@ export function matchVertices(
  * All vertex positions are concatenated into one Float32Array, triangle indices
  * are offset accordingly, and per-piece offset info is tracked for later use.
  *
- * @param pieces - Array of { pieceId, vertices (flat xyz), triIds }
+ * @param pieces - Array of { pieceId, vertices (flat xyz), triIds, uvs? (flat uv) }
  * @returns Merged mesh with offset tracking
  */
 export function mergeMeshes(
-  pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array }>,
+  pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array }>,
 ): MergedMesh {
   const totalVerts = pieces.reduce((s, p) => s + p.vertices.length, 0);
   const totalTris = pieces.reduce((s, p) => s + p.triIds.length, 0);
+  const hasUVs = pieces.every(p => p.uvs && p.uvs.length > 0);
+  const totalUVs = hasUVs ? pieces.reduce((s, p) => s + (p.uvs?.length ?? 0), 0) : 0;
 
   const vertices = new Float32Array(totalVerts);
   const triIds = new Int32Array(totalTris);
+  const uvs = hasUVs ? new Float32Array(totalUVs) : undefined;
   const offsets: PieceOffset[] = [];
 
-  let vOff = 0; // float offset
-  let tOff = 0; // int offset
+  let vOff = 0; // float offset for vertices
+  let tOff = 0; // int offset for triangles
+  let uvOff = 0; // float offset for UVs
 
   for (const p of pieces) {
     const vertexOffset = vOff / 3;
@@ -299,6 +305,12 @@ export function mergeMeshes(
     vertices.set(p.vertices, vOff);
     for (let i = 0; i < p.triIds.length; i++) {
       triIds[tOff + i] = p.triIds[i] + vertexOffset;
+    }
+
+    // Merge UVs if available
+    if (uvs && p.uvs) {
+      uvs.set(p.uvs, uvOff);
+      uvOff += p.uvs.length;
     }
 
     offsets.push({
@@ -313,7 +325,7 @@ export function mergeMeshes(
     tOff += p.triIds.length;
   }
 
-  return { vertices, triIds, pieces: offsets };
+  return { vertices, triIds, pieces: offsets, uvs };
 }
 
 // ─── Seam Constraint Generation ─────────────────────────────────────────────

@@ -24,6 +24,7 @@ interface WasmExportsLike {
 
 interface WasmXpbdSolver {
   set_stretch(ids: Uint32Array, rest: Float32Array): void;
+  set_stretch_with_types(ids: Uint32Array, rest_lengths: Float32Array, edge_types: Uint8Array): void;
   set_bend(ids: Uint32Array, rest: Float32Array): void;
   set_seams(ids: Uint32Array, target: Float32Array): void;
   set_triangles(tri_ids: Uint32Array): void;
@@ -34,7 +35,9 @@ interface WasmXpbdSolver {
   configure(substeps: number, damping: number, gravityY: number,
             stretchCompliance: number, bendCompliance: number,
             selfCollision: boolean, thickness: number, collisionMargin: number,
-            groundY: number, dragCoefficient: number): void;
+            groundY: number, dragCoefficient: number,
+            stretchComplianceWarp: number, stretchComplianceWeft: number,
+            stretchComplianceShear: number): void;
   step(dt: number): void;
   positions_ptr(): number;
   num_particles(): number;
@@ -108,10 +111,11 @@ self.onmessage = async (event: MessageEvent) => {
 
         // Merge pieces using the standard utility (ensures consistent vertex mapping)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array }> = msg.pieces.map((p: any) => ({
+        const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array }> = msg.pieces.map((p: any) => ({
           pieceId: p.pieceId,
           vertices: new Float32Array(p.vertices),
           triIds: new Int32Array(p.triIds),
+          uvs: p.uvs ? new Float32Array(p.uvs) : undefined,
         }));
 
         const merged = mergeMeshes(pieceInput);
@@ -125,8 +129,8 @@ self.onmessage = async (event: MessageEvent) => {
 
         // Standard constraints
         const triangles = new Uint32Array(merged.triIds);
-        const stretch = extractStretchConstraints(merged.vertices, triangles);
-        solver.set_stretch(stretch.ids, stretch.restLengths);
+        const stretch = extractStretchConstraints(merged.vertices, triangles, merged.uvs);
+        solver.set_stretch_with_types(stretch.ids, stretch.restLengths, stretch.edgeTypes);
 
         const bend = extractBendConstraints(merged.vertices, triangles);
         solver.set_bend(bend.ids, bend.restAngles);
@@ -163,6 +167,9 @@ self.onmessage = async (event: MessageEvent) => {
           config.collisionMargin ?? 0.005,
           config.groundY ?? 0.0,
           config.dragCoefficient ?? 1.0,
+          config.stretchComplianceWarp ?? 0.0,
+          config.stretchComplianceWeft ?? 0.0,
+          config.stretchComplianceShear ?? 0.001,
         );
         console.log('[WasmWorker] Solver configured with dragCoefficient =', config.dragCoefficient ?? 1.0);
 
@@ -199,7 +206,7 @@ self.onmessage = async (event: MessageEvent) => {
         if (solver) {
           console.log('[WasmWorker] Running initial collision settling...');
           // Temporarily configure solver with zero gravity for settling
-          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0, 0.0);
+          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0, 0.0, 0.0, 0.0, 0.001);
 
           // Run several small steps to let SDF collision push particles out
           for (let i = 0; i < 20; i++) {
@@ -207,7 +214,7 @@ self.onmessage = async (event: MessageEvent) => {
           }
 
           // Restore normal gravity
-          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0, 1.0);
+          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0, 1.0, 0.0, 0.0, 0.001);
 
           // Send settled positions to client
           const n = numParticles;

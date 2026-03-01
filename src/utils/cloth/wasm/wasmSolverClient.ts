@@ -16,6 +16,8 @@ export interface PieceMeshData {
   vertices: Float32Array;
   triIds: Int32Array | number[];
   outline?: Array<{ type: string; values: number[] }>;
+  /** UV coordinates [u0,v0, u1,v1, ...] for anisotropic stretch */
+  uvs?: Float32Array;
 }
 
 export interface WasmSolverConfig {
@@ -29,6 +31,12 @@ export interface WasmSolverConfig {
   collisionMargin?: number;
   groundY?: number;
   dragCoefficient?: number;
+  /** Stretch compliance for WARP (vertical) edges */
+  stretchComplianceWarp?: number;
+  /** Stretch compliance for WEFT (horizontal) edges */
+  stretchComplianceWeft?: number;
+  /** Stretch compliance for SHEAR (diagonal) edges */
+  stretchComplianceShear?: number;
 }
 
 export class WasmSolverClient {
