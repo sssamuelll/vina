@@ -75,6 +75,10 @@ export function evaluateFormula(
     expr = expr.replace(re, String(context.variables[name]));
   }
 
+  // Handle European locale: semicolons as function argument separators
+  // Replace ; with , inside parentheses (function calls)
+  expr = expr.replace(/;/g, ',');
+
   // Replace Seamly2D-specific math functions (aliases)
   expr = expr.replace(/\brint\b/g, '__ROUND__');
   expr = expr.replace(/\bsign\b/g, '__SIGN__');
@@ -91,8 +95,16 @@ export function evaluateFormula(
     throw new Error(`Unsafe formula expression: ${expr} (original: ${formula})`);
   }
 
+  // CRITICAL: Prevent assignment operators that could corrupt global Math object
+  // Check for single = that isn't part of == or >= or <= or !=
+  if (/(?<![=!<>])=(?!=)/.test(expr)) {
+    throw new Error(`Assignment not allowed in formula: ${formula}`);
+  }
+
   try {
-     
+    // The assignment check above prevents formulas like "cos=270" from corrupting Math.
+    // Pass the real Math object since spreading doesn't copy methods properly.
+    // This formula evaluator is intentionally limited to math expressions only.
     const fn = new Function(`"use strict"; return (${expr});`);
     const result = fn();
     if (typeof result !== 'number' || !isFinite(result)) {
