@@ -321,6 +321,78 @@ describe('XPBDClothSolver - Anisotropic Stretch', () => {
     expect(solver.config.stretchComplianceWeft).toBe(0.0);
     expect(solver.config.stretchComplianceShear).toBe(0.001);
   });
+
+  it('shear direction should stretch more than warp/weft with same force', () => {
+    // Create a mesh with UV coordinates for proper edge classification
+    // Simple square: 4 vertices with UVs
+    const positions = new Float32Array([
+      0, 0, 0,   // v0: bottom-left
+      1, 0, 0,   // v1: bottom-right
+      1, 1, 0,   // v2: top-right
+      0, 1, 0,   // v3: top-left
+    ]);
+    const triIds = new Int32Array([0, 1, 2, 0, 2, 3]); // Two triangles
+    const uvs = new Float32Array([
+      0, 0,  // v0 UV
+      1, 0,  // v1 UV
+      1, 1,  // v2 UV
+      0, 1,  // v3 UV
+    ]);
+
+    const mesh: ClothMeshData = { vertices: positions, triIds, uvs };
+
+    // Config: stiff in warp/weft, stretchy in shear
+    const solver = new XPBDClothSolver(mesh, {
+      stretchComplianceWarp: 0.0,    // Very stiff
+      stretchComplianceWeft: 0.0,    // Very stiff
+      stretchComplianceShear: 0.1,   // Much more compliant
+      gravity: [0, -9.81, 0],
+      damping: 0.99,
+      numSubsteps: 15,
+    });
+
+    // Pin top-left corner
+    solver.pinParticle(3);
+
+    // Simulate several frames
+    for (let i = 0; i < 30; i++) {
+      solver.step();
+    }
+
+    // Get final positions
+    const pos = solver.pos;
+
+    // The diagonal edge (0-2 or 1-3) should have stretched more than
+    // horizontal edge (0-1) or vertical edge (0-3 or 1-2)
+
+    // Compute current edge lengths
+    const horizontalLen = Math.sqrt(
+      (pos[3] - pos[0]) ** 2 + (pos[4] - pos[1]) ** 2 + (pos[5] - pos[2]) ** 2
+    ); // v0-v1 horizontal
+
+    const verticalLen = Math.sqrt(
+      (pos[9] - pos[0]) ** 2 + (pos[10] - pos[1]) ** 2 + (pos[11] - pos[2]) ** 2
+    ); // v0-v3 vertical
+
+    const diagonalLen = Math.sqrt(
+      (pos[6] - pos[0]) ** 2 + (pos[7] - pos[1]) ** 2 + (pos[8] - pos[2]) ** 2
+    ); // v0-v2 diagonal
+
+    // Original lengths
+    const origHorizontal = 1.0;
+    const origVertical = 1.0;
+    const origDiagonal = Math.sqrt(2);
+
+    // Compute strain (stretch ratio)
+    const strainHorizontal = (horizontalLen - origHorizontal) / origHorizontal;
+    const strainVertical = (verticalLen - origVertical) / origVertical;
+    const strainDiagonal = (diagonalLen - origDiagonal) / origDiagonal;
+
+    // Diagonal (shear) should have more strain than warp/weft
+    // since it has higher compliance
+    expect(Math.abs(strainDiagonal)).toBeGreaterThan(Math.abs(strainHorizontal) * 0.5);
+    expect(Math.abs(strainDiagonal)).toBeGreaterThan(Math.abs(strainVertical) * 0.5);
+  });
 });
 
 // ─── Air Drag ───────────────────────────────────────────────────────────
