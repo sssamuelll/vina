@@ -224,31 +224,32 @@ export function computePlacement(
       };
     case 'collar':
       return {
-        // Collar stays flat/horizontal around neck
-        position: [0, d.neckHeight + 0.02, 0],
-        rotation: [0, 0, 0], // stay flat in XZ plane
+        // Collar in front of neck, standing vertical like front-torso
+        position: [0, d.neckHeight, -(d.chestRadius * 0.5 + GAP)],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward
       };
     case 'waistband':
       return {
-        position: [0, d.waistHeight + 0.01, 0],
-        rotation: [0, 0, 0], // stay flat in XZ plane
+        // Waistband in front of waist, standing vertical
+        position: [0, d.waistHeight, -(d.hipRadius * 0.5 + GAP)],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward
       };
     case 'hood':
       return {
-        // Behind head, tilted back
-        position: [0, d.neckHeight + 0.08, d.chestRadius / 2],
-        rotation: [-Math.PI / 4, 0, 0], // partial stand, tilted back
+        // Behind head, standing vertical facing backward
+        position: [0, d.neckHeight + 0.05, d.chestRadius + GAP],
+        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward
       };
     case 'cuff-left':
       return {
-        // At wrist, stays flat like collar
-        position: [-(d.shoulderWidth / 2 + d.armLength * 0.85), d.shoulderHeight - d.armLength * 0.8, 0],
-        rotation: [0, 0, 0], // flat around wrist
+        // At wrist, standing vertical facing outward
+        position: [-(d.shoulderWidth / 2 + d.armLength * 0.9), d.shoulderHeight - d.armLength * 0.85, 0],
+        rotation: [-Math.PI / 2, Math.PI / 2, 0], // stand up, face left
       };
     case 'cuff-right':
       return {
-        position: [d.shoulderWidth / 2 + d.armLength * 0.85, d.shoulderHeight - d.armLength * 0.8, 0],
-        rotation: [0, 0, 0], // flat around wrist
+        position: [d.shoulderWidth / 2 + d.armLength * 0.9, d.shoulderHeight - d.armLength * 0.85, 0],
+        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // stand up, face right
       };
     case 'unknown':
     default: {
