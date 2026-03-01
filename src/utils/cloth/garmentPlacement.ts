@@ -201,12 +201,13 @@ export function computePlacement(
       };
     case 'left-sleeve':
       return {
-        position: [-(d.shoulderWidth / 2 + GAP + 0.08), d.shoulderHeight - 0.02, 0],
+        // Position further out from shoulder to avoid arm penetration
+        position: [-(d.shoulderWidth / 2 + 0.15), d.shoulderHeight - 0.05, 0],
         rotation: [0, -Math.PI / 2, -Math.PI / 8], // face -X (left), slight downward tilt
       };
     case 'right-sleeve':
       return {
-        position: [d.shoulderWidth / 2 + GAP + 0.08, d.shoulderHeight - 0.02, 0],
+        position: [d.shoulderWidth / 2 + 0.15, d.shoulderHeight - 0.05, 0],
         rotation: [0, Math.PI / 2, Math.PI / 8], // face +X (right), slight downward tilt
       };
     case 'front-skirt':
@@ -221,28 +222,32 @@ export function computePlacement(
       };
     case 'collar':
       return {
-        position: [0, d.neckHeight + 0.02, 0],
-        rotation: [-Math.PI / 2, 0, 0], // lay flat horizontally around neck
+        // Position in front of neck, vertical like other front pieces
+        position: [0, d.neckHeight, -(d.chestRadius * 0.6 + GAP)],
+        rotation: [0, Math.PI, 0], // face front (same as front-torso)
       };
     case 'waistband':
       return {
-        position: [0, d.waistHeight + 0.01, 0],
-        rotation: [-Math.PI / 2, 0, 0], // lay flat horizontally around waist
+        // Position in front of waist, vertical
+        position: [0, d.waistHeight + 0.02, -(d.hipRadius * 0.8 + GAP)],
+        rotation: [0, Math.PI, 0], // face front
       };
     case 'hood':
       return {
-        position: [0, d.neckHeight + 0.15, d.chestRadius / 2],
-        rotation: [Math.PI / 6, 0, 0], // tilt backward over head
+        // Position behind head, vertical, facing backward
+        position: [0, d.neckHeight + 0.1, d.chestRadius * 0.8],
+        rotation: [0, 0, 0], // face back (default orientation)
       };
     case 'cuff-left':
       return {
-        position: [-(d.shoulderWidth / 2 + d.armLength * 0.85), d.shoulderHeight - d.armLength * 0.8, 0],
-        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // horizontal ring, facing left
+        // Position at wrist level, vertical, facing outward
+        position: [-(d.shoulderWidth / 2 + d.armLength * 0.9 + 0.05), d.shoulderHeight - d.armLength * 0.85, 0],
+        rotation: [0, -Math.PI / 2, 0], // face left
       };
     case 'cuff-right':
       return {
-        position: [d.shoulderWidth / 2 + d.armLength * 0.85, d.shoulderHeight - d.armLength * 0.8, 0],
-        rotation: [-Math.PI / 2, Math.PI / 2, 0], // horizontal ring, facing right
+        position: [d.shoulderWidth / 2 + d.armLength * 0.9 + 0.05, d.shoulderHeight - d.armLength * 0.85, 0],
+        rotation: [0, Math.PI / 2, 0], // face right
       };
     case 'unknown':
     default: {
