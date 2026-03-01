@@ -15,6 +15,12 @@ export class XpbdSolver {
         wasm.__wbg_xpbdsolver_free(ptr, 0);
     }
     /**
+     * Clear all pins, restoring original masses.
+     */
+    clear_pins() {
+        wasm.xpbdsolver_clear_pins(this.__wbg_ptr);
+    }
+    /**
      * Configure solver parameters.
      * @param {number} substeps
      * @param {number} damping
@@ -24,9 +30,10 @@ export class XpbdSolver {
      * @param {boolean} self_collision
      * @param {number} thickness
      * @param {number} collision_margin
+     * @param {number} ground_y
      */
-    configure(substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin) {
-        wasm.xpbdsolver_configure(this.__wbg_ptr, substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin);
+    configure(substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin, ground_y) {
+        wasm.xpbdsolver_configure(this.__wbg_ptr, substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin, ground_y);
     }
     /**
      * Create a new solver with particle positions and inverse masses.
@@ -82,6 +89,20 @@ export class XpbdSolver {
         const ptr1 = passArrayF32ToWasm0(rest_angles, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         wasm.xpbdsolver_set_bend(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+    }
+    /**
+     * Set pinned vertices with target positions.
+     * indices: flat array of vertex indices to pin
+     * positions: flat array [x,y,z, x,y,z, ...] of target positions
+     * @param {Uint32Array} indices
+     * @param {Float32Array} positions
+     */
+    set_pins(indices, positions) {
+        const ptr0 = passArray32ToWasm0(indices, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(positions, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.xpbdsolver_set_pins(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
      * Upload SDF volume for body collision.

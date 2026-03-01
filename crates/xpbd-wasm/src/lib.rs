@@ -98,7 +98,7 @@ impl XpbdSolver {
             substeps: 15,
             stretch_compliance: 0.0,
             bend_compliance: 0.01,
-            ground_y: -2.0,
+            ground_y: 0.0,
             collision_margin: 0.005,
         }
     }
@@ -180,7 +180,8 @@ impl XpbdSolver {
     /// Configure solver parameters.
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
                      stretch_compliance: f32, bend_compliance: f32,
-                     self_collision: bool, thickness: f32, collision_margin: f32) {
+                     self_collision: bool, thickness: f32, collision_margin: f32,
+                     ground_y: f32) {
         self.substeps = substeps;
         self.damping = damping;
         self.gravity[1] = gravity_y;
@@ -189,6 +190,7 @@ impl XpbdSolver {
         self.self_collision = self_collision;
         self.thickness = thickness;
         self.collision_margin = collision_margin;
+        self.ground_y = ground_y;
     }
 
     /// Step the simulation forward one frame.

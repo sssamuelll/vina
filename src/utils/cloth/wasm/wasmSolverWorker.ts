@@ -32,7 +32,8 @@ interface WasmXpbdSolver {
   clear_pins(): void;
   configure(substeps: number, damping: number, gravityY: number,
             stretchCompliance: number, bendCompliance: number,
-            selfCollision: boolean, thickness: number, collisionMargin: number): void;
+            selfCollision: boolean, thickness: number, collisionMargin: number,
+            groundY: number): void;
   step(dt: number): void;
   positions_ptr(): number;
   num_particles(): number;
@@ -146,7 +147,7 @@ self.onmessage = async (event: MessageEvent) => {
           }
         }
 
-        solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005);
+        solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0);
 
         (self as unknown as Worker).postMessage({ type: 'ready', numParticles: totalVerts });
         break;
@@ -181,7 +182,7 @@ self.onmessage = async (event: MessageEvent) => {
         if (solver) {
           console.log('[WasmWorker] Running initial collision settling...');
           // Temporarily configure solver with zero gravity for settling
-          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005);
+          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0);
 
           // Run several small steps to let SDF collision push particles out
           for (let i = 0; i < 20; i++) {
@@ -189,7 +190,7 @@ self.onmessage = async (event: MessageEvent) => {
           }
 
           // Restore normal gravity
-          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005);
+          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0);
 
           // Send settled positions to client
           const n = numParticles;
