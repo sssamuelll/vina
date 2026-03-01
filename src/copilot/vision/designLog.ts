@@ -240,14 +240,25 @@ export function designLogToMarkdown(log: DesignLog): string {
   return lines.join('\n');
 }
 
-/** LocalStorage key for persisting design logs */
+/** LocalStorage key prefix for persisting design logs */
 export const DESIGN_LOG_STORAGE_KEY = 'openclo:designLog';
+
+/**
+ * Get the storage key for a specific project.
+ * @param projectId - The project ID
+ * @returns The full storage key
+ */
+function getStorageKey(projectId: string): string {
+  return `${DESIGN_LOG_STORAGE_KEY}:${projectId}`;
+}
 
 /**
  * Manages the design log for a project.
  *
  * Tracks design decisions, constraints, and user formula overrides
  * to provide context continuity across sessions.
+ *
+ * Supports persistence via localStorage with automatic save/load.
  */
 export class DesignLogManager {
   /** Maximum number of entries to keep after flush */
@@ -269,6 +280,71 @@ export class DesignLogManager {
   }
 
   /**
+   * Load a design log from localStorage.
+   * Returns a new manager with loaded data, or empty if not found.
+   * @param projectId - The project ID to load
+   * @returns DesignLogManager with loaded data
+   */
+  static load(projectId: string): DesignLogManager {
+    const manager = new DesignLogManager(projectId);
+
+    if (typeof localStorage === 'undefined') {
+      return manager;
+    }
+
+    try {
+      const stored = localStorage.getItem(getStorageKey(projectId));
+      if (stored) {
+        const parsed = JSON.parse(stored) as DesignLog;
+        // Validate basic structure
+        if (parsed.projectId && Array.isArray(parsed.entries) && Array.isArray(parsed.overrides)) {
+          manager.log = parsed;
+        }
+      }
+    } catch {
+      // If parse fails, return empty manager
+      console.warn(`[DesignLogManager] Failed to load log for project ${projectId}`);
+    }
+
+    return manager;
+  }
+
+  /**
+   * Save the current design log to localStorage.
+   * @returns true if save succeeded, false otherwise
+   */
+  save(): boolean {
+    if (typeof localStorage === 'undefined') {
+      return false;
+    }
+
+    try {
+      const serialized = JSON.stringify(this.log);
+      localStorage.setItem(getStorageKey(this.log.projectId), serialized);
+      return true;
+    } catch (e) {
+      console.warn(`[DesignLogManager] Failed to save log:`, e);
+      return false;
+    }
+  }
+
+  /**
+   * Clear the design log from localStorage.
+   * @param projectId - The project ID to clear
+   */
+  static clear(projectId: string): void {
+    if (typeof localStorage === 'undefined') {
+      return;
+    }
+
+    try {
+      localStorage.removeItem(getStorageKey(projectId));
+    } catch {
+      // Ignore errors
+    }
+  }
+
+  /**
    * Get the complete design log.
    * @returns The current design log state
    */
@@ -278,14 +354,17 @@ export class DesignLogManager {
 
   /**
    * Add a new entry to the design log.
+   * Auto-saves to localStorage after adding.
    * @param entry - The entry to add
    */
   addEntry(entry: DesignLogEntry): void {
     this.log.entries.push(entry);
+    this.save();
   }
 
   /**
    * Add or update a skill override.
+   * Auto-saves to localStorage after adding.
    *
    * If an override for the same skill/formula combination already exists,
    * it will be replaced with the new override.
@@ -305,6 +384,7 @@ export class DesignLogManager {
       // Add new override
       this.log.overrides.push(override);
     }
+    this.save();
   }
 
   /**
@@ -340,6 +420,7 @@ export class DesignLogManager {
    *
    * Sorts entries by timestamp descending and keeps only the most recent
    * MAX_ENTRIES_AFTER_FLUSH entries. Updates lastFlushAt timestamp.
+   * Auto-saves to localStorage after flushing.
    */
   async flush(): Promise<void> {
     // Sort entries by timestamp descending (newest first)
@@ -355,5 +436,32 @@ export class DesignLogManager {
 
     // Update lastFlushAt timestamp
     this.log.lastFlushAt = Date.now();
+
+    // Persist to storage
+    this.save();
+  }
+
+  /**
+   * Get all entries (for serialization or debugging).
+   * @returns Array of all entries
+   */
+  getEntries(): DesignLogEntry[] {
+    return this.log.entries;
+  }
+
+  /**
+   * Get all overrides.
+   * @returns Array of all overrides
+   */
+  getOverrides(): SkillOverride[] {
+    return this.log.overrides;
+  }
+
+  /**
+   * Get the project ID.
+   * @returns The project ID
+   */
+  getProjectId(): string {
+    return this.log.projectId;
   }
 }

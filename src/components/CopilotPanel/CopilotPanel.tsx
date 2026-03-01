@@ -18,6 +18,7 @@ import {
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
 import { runAgentLoop, type AgentLoopResult } from '../../copilot/agentLoop';
+import { DesignLogManager } from '../../copilot/vision/designLog';
 import { isTeachingModeEnabled } from '../../copilot/teachingContext';
 import { CostManager } from '../../copilot/costManager';
 import { RecoveryStrategy, getErrorMessage, classifyError, isOfflineMode } from '../../copilot/errorRecovery';
@@ -83,7 +84,6 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const dispatch = useDispatch<AppDispatch>();
   const project = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
-  const rootState = useSelector((s: RootState) => s);
 
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -103,6 +103,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const costManagerRef = useRef(new CostManager(project.id));
   const recoveryRef = useRef(new RecoveryStrategy());
   const memoryRef = useRef(new ProjectMemory(project.id));
+  const designLogRef = useRef(DesignLogManager.load(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
 
@@ -128,6 +129,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   useEffect(() => {
     memoryRef.current = new ProjectMemory(project.id);
     costManagerRef.current = new CostManager(project.id);
+    designLogRef.current = DesignLogManager.load(project.id);
   }, [project.id]);
 
   const isProviderMode = providerConfig !== null && (
@@ -161,6 +163,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       setMessages(prev => [...prev, assistantMsg]);
 
       const getState = () => store.getState();
+      const designLog = designLogRef.current;
       const result: AgentLoopResult = await recoveryRef.current.withRecovery(() =>
         runAgentLoop(
           text, provider, providerConfig, registry, dispatch, getState, memoryRef.current, PATRONAJE_SOUL,
@@ -217,6 +220,11 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
               });
             },
           },
+          // Pass design log context for cross-session memory (#143/#146)
+          {
+            designLogEntries: designLog.getEntries(),
+            overrides: designLog.getOverrides(),
+          },
         )
       );
 
@@ -252,7 +260,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     } finally {
       setIsLoading(false);
     }
-  }, [providerConfig, rootState, dispatch, isMobile]);
+  }, [providerConfig, dispatch, isMobile]);
 
   const handleLegacySend = useCallback(async (text: string) => {
     if (!text.trim() || isLoading) return;

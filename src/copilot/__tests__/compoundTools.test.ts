@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // Updated after #79-#82 copilot epic completion
-      expect(registry.size).toBe(105);
+      // Updated after #79-#82 copilot epic completion + #143/#146 design log tools
+      expect(registry.size).toBe(108);
     });
   });
 });
