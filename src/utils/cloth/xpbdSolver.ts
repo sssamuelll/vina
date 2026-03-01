@@ -296,6 +296,9 @@ export class XPBDClothSolver {
   /** Per-constraint compliance for anisotropic stretch */
   private stretchCompliances!: Float32Array;
 
+  /** Per-constraint compliance for anisotropic bending */
+  private bendCompliances!: Float32Array;
+
   /** Optional UV coordinates for edge classification */
   private uvs: Float32Array | undefined;
 
@@ -485,6 +488,34 @@ export class XPBDClothSolver {
       const id0 = this.bendingIds[4 * i + 2];
       const id1 = this.bendingIds[4 * i + 3];
       this.bendingLengths[i] = Math.sqrt(vecDistSquared(this.pos, id0, this.pos, id1));
+    }
+
+    // Classify bend edges and assign per-constraint compliance for anisotropic bending
+    this.bendCompliances = new Float32Array(this.bendingLengths.length);
+
+    for (let i = 0; i < this.bendingLengths.length; i++) {
+      // Get the shared edge vertices (a, b are first two indices of quad)
+      const a = this.bendingIds[i * 4];
+      const b = this.bendingIds[i * 4 + 1];
+
+      // Classify edge by UV direction
+      let edgeType = EdgeType.WEFT; // Default
+      if (uvs && uvs.length >= (Math.max(a, b) + 1) * 2) {
+        const uvA: [number, number] = [uvs[a * 2], uvs[a * 2 + 1]];
+        const uvB: [number, number] = [uvs[b * 2], uvs[b * 2 + 1]];
+        edgeType = classifyEdgeType(uvA, uvB);
+        // For bending, SHEAR defaults to WEFT
+        if (edgeType === EdgeType.SHEAR) {
+          edgeType = EdgeType.WEFT;
+        }
+      }
+
+      // Assign compliance based on edge type
+      if (edgeType === EdgeType.WARP) {
+        this.bendCompliances[i] = this.config.bendComplianceWarp;
+      } else {
+        this.bendCompliances[i] = this.config.bendComplianceWeft;
+      }
     }
   }
 
@@ -696,7 +727,7 @@ export class XPBDClothSolver {
    */
   private solve(sdt: number): void {
     this.solveStretching(sdt);
-    this.solveBending(this.config.bendingCompliance, sdt);
+    this.solveBending(sdt);
     if (this.seamConstraints) {
       solveSeamConstraints(this.pos, this.invMass, this.seamConstraints, sdt);
     }
@@ -773,14 +804,15 @@ export class XPBDClothSolver {
 
   /**
    * Solve XPBD bending constraints between triangle pairs.
+   * Uses per-constraint compliance for anisotropic bending behavior.
    *
-   * @param compliance - Bending compliance (higher = more flexible)
    * @param sdt - Substep time
    */
-  private solveBending(compliance: number, sdt: number): void {
-    const alpha = compliance / (sdt * sdt);
-
+  private solveBending(sdt: number): void {
     for (let i = 0; i < this.bendingLengths.length; i++) {
+      const compliance = this.bendCompliances[i];
+      const alpha = compliance / (sdt * sdt);
+
       const id0 = this.bendingIds[4 * i + 2]; // opposite vertex 0
       const id1 = this.bendingIds[4 * i + 3]; // opposite vertex 1
 
