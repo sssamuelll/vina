@@ -9,6 +9,12 @@
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
+export enum EdgeType {
+  WARP = 0,   // Vertical (along V axis in UV)
+  WEFT = 1,   // Horizontal (along U axis in UV)
+  SHEAR = 2,  // Diagonal (45°)
+}
+
 export interface ClothMeshData {
   /** Flat array of vertex positions [x,y,z, x,y,z, ...] */
   positions: Float32Array;
@@ -23,6 +29,8 @@ export interface StretchConstraints {
   ids: Uint32Array;
   /** Rest lengths per constraint */
   restLengths: Float32Array;
+  /** EdgeType per constraint (WARP, WEFT, or SHEAR) */
+  edgeTypes: Uint8Array;
 }
 
 export interface BendConstraints {
@@ -115,16 +123,37 @@ function createZeroBuffer(
 // ─── Constraint Extraction ──────────────────────────────────────────────────
 
 /**
+ * Classify edge direction based on UV coordinates.
+ * @param uvA - UV coords of first vertex [u, v]
+ * @param uvB - UV coords of second vertex [u, v]
+ * @returns EdgeType (WARP, WEFT, or SHEAR)
+ */
+export function classifyEdgeType(uvA: [number, number], uvB: [number, number]): EdgeType {
+  const du = uvB[0] - uvA[0];
+  const dv = uvB[1] - uvA[1];
+  const angle = Math.atan2(Math.abs(dv), Math.abs(du)) * (180 / Math.PI);
+
+  // Weft: mostly horizontal (angle < 22.5° or > 157.5°)
+  if (angle < 22.5 || angle > 157.5) return EdgeType.WEFT;
+  // Warp: mostly vertical (67.5° < angle < 112.5°)
+  if (angle > 67.5 && angle < 112.5) return EdgeType.WARP;
+  // Shear: diagonal
+  return EdgeType.SHEAR;
+}
+
+/**
  * Extract stretch (distance) constraints from triangle mesh.
  * Each unique edge becomes a constraint.
  */
 export function extractStretchConstraints(
   positions: Float32Array,
   triangles: Uint32Array,
+  uvs?: Float32Array,  // optional UV coords [u,v, u,v, ...]
 ): StretchConstraints {
   const edgeSet = new Set<string>();
   const ids: number[] = [];
   const restLengths: number[] = [];
+  const edgeTypes: number[] = [];
 
   for (let t = 0; t < triangles.length; t += 3) {
     const triVerts = [triangles[t], triangles[t + 1], triangles[t + 2]];
@@ -142,12 +171,22 @@ export function extractStretchConstraints(
 
       ids.push(a, b);
       restLengths.push(len);
+
+      // Classify edge type based on UV direction
+      if (uvs && uvs.length >= (Math.max(a, b) + 1) * 2) {
+        const uvA: [number, number] = [uvs[a * 2], uvs[a * 2 + 1]];
+        const uvB: [number, number] = [uvs[b * 2], uvs[b * 2 + 1]];
+        edgeTypes.push(classifyEdgeType(uvA, uvB));
+      } else {
+        edgeTypes.push(EdgeType.SHEAR); // Default when no UVs
+      }
     }
   }
 
   return {
     ids: new Uint32Array(ids),
     restLengths: new Float32Array(restLengths),
+    edgeTypes: new Uint8Array(edgeTypes),
   };
 }
 

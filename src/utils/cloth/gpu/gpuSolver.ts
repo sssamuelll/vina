@@ -399,7 +399,7 @@ export class GpuClothSolver {
     if (this.buffers) {
       const params = this.buildSimParams(
         { positions: new Float32Array(0), triangles: new Uint32Array(0), invMass: new Float32Array(0) },
-        { ids: new Uint32Array(0), restLengths: new Float32Array(0) },
+        { ids: new Uint32Array(0), restLengths: new Float32Array(0), edgeTypes: new Uint8Array(0) },
         { ids: new Uint32Array(0), restAngles: new Float32Array(0) },
         null,
       );
