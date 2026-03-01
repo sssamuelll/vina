@@ -148,6 +148,7 @@ self.onmessage = async (event: MessageEvent) => {
         }
 
         solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0);
+        console.log('[WasmWorker] Solver configured with groundY = 0.0');
 
         (self as unknown as Worker).postMessage({ type: 'ready', numParticles: totalVerts });
         break;
