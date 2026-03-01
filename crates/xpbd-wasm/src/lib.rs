@@ -359,12 +359,24 @@ impl XpbdSolver {
         }
     }
 
-    /// Ground plane collision - must be called AFTER all other constraints
+    /// Ground plane collision with friction - must be called AFTER all other constraints
     fn solve_ground_collision(&mut self) {
+        let friction = 0.5_f32; // Ground friction coefficient
+
         for i in 0..self.num_particles {
             if self.inv_mass[i] == 0.0 { continue; }
             let idx = i * 3;
+
             if self.positions[idx + 1] < self.ground_y {
+                // Calculate horizontal displacement from previous position
+                let dx = self.positions[idx] - self.prev_positions[idx];
+                let dz = self.positions[idx + 2] - self.prev_positions[idx + 2];
+
+                // Apply friction: reduce horizontal movement
+                self.positions[idx] = self.prev_positions[idx] + dx * (1.0 - friction);
+                self.positions[idx + 2] = self.prev_positions[idx + 2] + dz * (1.0 - friction);
+
+                // Clamp to ground plane
                 self.positions[idx + 1] = self.ground_y;
             }
         }

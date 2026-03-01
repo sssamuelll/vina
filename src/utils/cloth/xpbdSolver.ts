@@ -561,15 +561,35 @@ export class XPBDClothSolver {
   }
 
   /**
-   * Resolve ground plane collisions.
+   * Resolve ground plane collisions with friction.
    * Called after all other constraints to ensure particles stay above ground.
+   * Uses position-based friction for realistic cloth behavior.
    */
   private solveGroundCollision(): void {
+    const friction = this.config.groundFriction;
+    const groundY = this.config.groundY;
+
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
-      const yi = 3 * i + 1;
-      if (this.pos[yi] < this.config.groundY) {
-        this.pos[yi] = this.config.groundY;
+
+      const xi = 3 * i;
+      const yi = xi + 1;
+      const zi = xi + 2;
+
+      if (this.pos[yi] < groundY) {
+        // Particle is below ground - apply collision response
+
+        // Calculate horizontal displacement from previous position
+        const dx = this.pos[xi] - this.prevPos[xi];
+        const dz = this.pos[zi] - this.prevPos[zi];
+
+        // Apply friction: reduce horizontal movement
+        // friction = 1.0 means no sliding, 0.0 means frictionless
+        this.pos[xi] = this.prevPos[xi] + dx * (1.0 - friction);
+        this.pos[zi] = this.prevPos[zi] + dz * (1.0 - friction);
+
+        // Clamp to ground plane
+        this.pos[yi] = groundY;
       }
     }
   }
