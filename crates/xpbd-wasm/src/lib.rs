@@ -57,6 +57,12 @@ pub struct XpbdSolver {
     collision_margin: f32,
     drag_coefficient: f32,
     tri_ids: Vec<u32>,
+
+    // Anisotropic stretch compliance
+    stretch_compliance_warp: f32,
+    stretch_compliance_weft: f32,
+    stretch_compliance_shear: f32,
+    stretch_compliances: Vec<f32>,  // Per-constraint compliance
 }
 
 #[wasm_bindgen]
@@ -104,6 +110,10 @@ impl XpbdSolver {
             collision_margin: 0.005,
             drag_coefficient: 1.0,
             tri_ids: Vec::new(),
+            stretch_compliance_warp: 0.0,
+            stretch_compliance_weft: 0.0,
+            stretch_compliance_shear: 0.001,
+            stretch_compliances: Vec::new(),
         }
     }
 
@@ -111,6 +121,22 @@ impl XpbdSolver {
     pub fn set_stretch(&mut self, ids: &[u32], rest_lengths: &[f32]) {
         self.stretch_ids = ids.to_vec();
         self.stretch_rest = rest_lengths.to_vec();
+    }
+
+    /// Set stretch constraints with edge type classification.
+    /// edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR
+    pub fn set_stretch_with_types(&mut self, ids: &[u32], rest_lengths: &[f32], edge_types: &[u8]) {
+        self.stretch_ids = ids.to_vec();
+        self.stretch_rest = rest_lengths.to_vec();
+
+        // Compute per-constraint compliance based on edge types
+        self.stretch_compliances = edge_types.iter().map(|&et| {
+            match et {
+                0 => self.stretch_compliance_warp,   // WARP
+                1 => self.stretch_compliance_weft,   // WEFT
+                _ => self.stretch_compliance_shear,  // SHEAR or default
+            }
+        }).collect();
     }
 
     /// Set bend constraints.
@@ -190,7 +216,9 @@ impl XpbdSolver {
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
                      stretch_compliance: f32, bend_compliance: f32,
                      self_collision: bool, thickness: f32, collision_margin: f32,
-                     ground_y: f32, drag_coefficient: f32) {
+                     ground_y: f32, drag_coefficient: f32,
+                     stretch_compliance_warp: f32, stretch_compliance_weft: f32,
+                     stretch_compliance_shear: f32) {
         self.substeps = substeps;
         self.damping = damping;
         self.gravity[1] = gravity_y;
@@ -201,6 +229,9 @@ impl XpbdSolver {
         self.collision_margin = collision_margin;
         self.ground_y = ground_y;
         self.drag_coefficient = drag_coefficient;
+        self.stretch_compliance_warp = stretch_compliance_warp;
+        self.stretch_compliance_weft = stretch_compliance_weft;
+        self.stretch_compliance_shear = stretch_compliance_shear;
     }
 
     /// Step the simulation forward one frame.
@@ -278,9 +309,16 @@ impl XpbdSolver {
 
     fn solve_stretch(&mut self, sdt: f32) {
         let num_constraints = self.stretch_ids.len() / 2;
-        let alpha = self.stretch_compliance / (sdt * sdt);
 
         for c in 0..num_constraints {
+            // Use per-constraint compliance if available, else global
+            let compliance = if c < self.stretch_compliances.len() {
+                self.stretch_compliances[c]
+            } else {
+                self.stretch_compliance
+            };
+            let alpha = compliance / (sdt * sdt);
+
             let a = self.stretch_ids[c * 2] as usize;
             let b = self.stretch_ids[c * 2 + 1] as usize;
             let wa = self.inv_mass[a];
