@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -25,6 +25,7 @@ export const freeSewingTool: ToolDefinition = {
   id: 'freesewing',
   name: 'Free Sewing',
   context: '2d',
+  shortcut: 'm',
   icon: FreeSewingIcon,
   cursor: 'crosshair',
   group: 'sewing',
