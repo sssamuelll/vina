@@ -42,7 +42,7 @@ const DEFAULT_CONFIG: GpuSolverConfig = {
   stretchCompliance: 0.0,
   bendCompliance: 0.01,
   seamStiffness: 0.0,
-  groundY: -2.0,
+  groundY: 0.0,
   collisionMargin: 0.005,
   clothThickness: 0.002,
   selfCollision: false,
