@@ -36,3 +36,42 @@
   background: rgba(255, 255, 255, 0.25);
   flex-shrink: 0;
 }
+
+/* ─── Simulation Status Indicators ─── */
+
+.status-item-with-dot {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  white-space: nowrap;
+  line-height: var(--statusbar-height);
+}
+
+.status-item-with-dot:hover {
+  background: rgba(255, 255, 255, 0.12);
+  cursor: default;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.status-dot.healthy {
+  background: #3794ff;
+}
+
+.status-dot.warning {
+  background: #cca700;
+}
+
+.status-dot.critical {
+  background: #f14c4c;
+}
+
+.status-dot.inactive {
+  background: #6b6b6b;
+}
