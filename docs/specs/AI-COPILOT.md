@@ -1,134 +1,62 @@
-# OpenClo — AI Copilot Spec
+# OpenClo.ai — AI Copilot Spec (v0.5)
 
 ## Overview
 
-The AI copilot is OpenClo's unfair advantage over legacy software. CLO3D has 15 years of features — we have AI that makes half those features unnecessary.
+The AI Copilot is the primary interface for professional fashion engineering in OpenClo.ai. It is built as a **Situated Agent** that understands garment anatomy, technical constraints, and user preferences in real-time.
 
-**Key principle:** The copilot doesn't replace the pattern maker — it removes tedium and accelerates iteration.
+**Core Philosophy**: The agent is a **Co-Designer** that operates on a Semantic Graph, not just a text-to-CAD translator.
 
-## Capabilities
+## Capabilities ✅ COMPLETE (v0.5)
 
-### Tier 1: Pattern Generation (implemented v0.4)
-- "Crea un cuerpo base talla 40" → parametric bodice template
-- "Manga raglan, largo 60cm" → sleeve piece with correct cap shape
-- "Falda acampanada, cintura 72" → A-line skirt pieces
+### Pattern Synthesis
+- **Intelligent Generation**: "Create a base bodice size 40 based on Müller's method." The agent uses its **Tailoring Soul** (Gilewska/Aldrich/Müller) to synthesize production-ready pieces.
+- **Parametric Templates**: 5 primary skills (Bodice, Sleeve, Skirt, Collar, Grading) with 35+ formulas and 52 construction steps.
 
-### Tier 2: Pattern Modification (next)
-- "Hazlo 2cm más largo" → extend selected piece
-- "Añade una pinza en el busto" → insert dart at correct position
-- "Reduce la sisa 5mm" → modify armhole curve
-- "Ensancha las caderas" → adjust hip measurement, regenerate
+### Pattern Modification
+- **Semantic Edits**: "Widen the shoulder by 1.5cm," "Move the bust dart down 20mm." The agent identifies the correct **SemanticEdge** or **Dart** and applies geometric transformations while maintaining piece integrity.
+- **Constraint-Aware Transforms**: 9 primary transformations (scale, offset, rotate, dart-move, etc.) that respect sewing compatibility.
 
-### Tier 3: Intelligent Assistance (planned)
-- "¿Esta manga encaja con la sisa?" → measure edge lengths, warn if mismatch
-- "Optimiza el corte para tela de 150cm" → marker layout suggestion
-- "Revisa los márgenes de costura" → audit seam allowances across all pieces
-- Import a photo → suggest pattern pieces that approximate the garment
+### Situated Intelligence
+- **Semantic Recognition**: The agent identifies pieces and edges by anatomical function (e.g., knowing an edge is an *Armhole* allows it to warn about sleeve compatibility).
+- **Proactive Analysis**: 5 automatic audits (Seam Allowance consistency, Dart alignment, Self-intersection, Area integrity, Seam compatibility).
+- **Teaching Mode**: Explains the technical "WHY" behind pattern-making decisions to educate the user.
 
-### Tier 4: AI-Native Features (future)
-- Photo → pattern: upload garment photo, AI generates approximate pattern pieces
-- Body scan → avatar: camera input → 3D body model
-- Fit prediction: given body measurements + pattern, predict fit issues before simulation
-- Style transfer: "Make this bodice more like Balenciaga" → modify proportions
+### Adaptive Learning & Memory
+- **Durable Design Memory**: The agent remembers fit standards, fabric preferences, and style history across sessions.
+- **Preference Learner**: Observes manual edits to detect formula deltas and creates permanent **Skill Overrides** for the user's specific aesthetic.
 
 ## Architecture
 
-### Agent-Agnostic Protocol
+OpenClo.ai uses a **Multi-Turn Agentic Loop** with multi-provider support.
 
-The copilot doesn't know or care which LLM is behind it. It communicates through a protocol layer:
+### The Orchestration Loop
+1. **Context Building**: The `EnhancedContextBuilder` serializes the current **Semantic Graph**, **Spatial Relationships**, and **Design Log** into the system prompt.
+2. **Reasoning**: The LLM (Claude, GPT, or Ollama) reasons about the request and selects from **42+ Tools**.
+3. **Execution**: The `ToolExecutor` applies changes to the Redux store.
+4. **Validation**: The `ProactiveAnalysis` engine audits the result.
+5. **Durable Logging**: Decisions are written back to the **Design Log** for cross-session persistence.
 
-```
-User message
-    ↓
-Chat Panel (React component)
-    ↓
-Protocol Layer (buildCopilotContext)
-    ├── Current pieces (names, measurements, outlines)
-    ├── Selected piece details
-    ├── Active tool
-    ├── Recent actions (undo history)
-    └── Available commands
-    ↓
-LLM Provider (Claude, GPT, local model, etc.)
-    ↓
-Response with commands (JSON)
-    ↓
-Command Executor
-    ├── createPiece → Redux dispatch
-    ├── modifyPiece → Redux dispatch
-    ├── deletePiece → Redux dispatch
-    ├── selectTool → Redux dispatch
-    ├── addDart → geometric calculation → dispatch
-    ├── measureEdge → calculation → display result
-    └── explain → text response only
-    ↓
-State updates → UI re-renders
-```
-
-### Command Schema
-
-```typescript
-interface CopilotCommand {
-  action: 'createPiece' | 'modifyPiece' | 'deletePiece' |
-          'addDart' | 'addNotch' | 'addSeam' |
-          'selectTool' | 'setMeasurement' |
-          'measureEdge' | 'auditSeams' | 'explain';
-  params: Record<string, any>;
-}
-```
-
-### Context Window Management
-
-Pattern data can be large. Context strategy:
-1. **Always include:** piece names, count, active selection, measurements summary
-2. **On demand:** full outline paths (only for selected piece or when modification requested)
-3. **Never include:** raw mesh data, simulation state, texture data
-
-Estimated context per project:
-- 5 pieces, names + measurements: ~500 tokens
-- 5 pieces, full outlines: ~3000 tokens
-- 20 pieces, full outlines: ~12000 tokens
-
-### Provider Configuration
-
-```typescript
-interface CopilotConfig {
-  provider: 'anthropic' | 'openai' | 'local' | 'custom';
-  apiKey?: string;
-  model?: string;
-  endpoint?: string;  // for custom/local providers
-  systemPrompt?: string;  // override default
-}
-```
-
-No agent configured → chat panel shows setup prompt only, no input bar.
+### Multi-Provider Architecture
+The agent is provider-agnostic, supporting:
+- **Anthropic Claude 3.5 Sonnet** (Primary recommendation for professional reasoning).
+- **OpenAI GPT-4o**.
+- **Ollama (llama3.1)**: For 100% private, local-first, and cost-free execution.
 
 ## UX Principles
 
-1. **Chat, not commands** — natural language, not CLI syntax
-2. **Show, don't just tell** — when AI creates a piece, it appears immediately in the editor
-3. **Undo-friendly** — every AI action is a single undo step
-4. **Bilingual** — understands Spanish and English pattern terminology
-5. **Suggestions** — after each action, suggest logical next steps as quick-action buttons
-6. **No hallucination tolerance** — if unsure about a measurement, ask rather than guess
+1. **Natural Language, Technical Precision**: Speak like a tailor, execute like a CAD engineer.
+2. **Visual Feedback**: Every AI action is immediately reflected in the 2D Editor and 3D Viewport.
+3. **Transparency**: Token tracking, budget warnings, and tool-use logging are visible in the ActivityBar.
+4. **Deterministic Audits**: The agent simulates changes in a **Sandbox** before applying them to ensure no unsewable geometry is created.
 
-## Fashion Terminology Mapping
+## Fashion Terminology & Soul
 
-The copilot must understand pattern-making terms in multiple languages:
+The Copilot's "Soul" is defined by industrial pattern-making standards. It maps natural language across English and Spanish to precise technical entities:
 
-| English | Spanish | French | Technical |
-|---------|---------|--------|-----------|
-| Bodice | Cuerpo / Corpiño | Corsage | front_bodice / back_bodice |
-| Dart | Pinza | Pince | dart |
-| Armhole | Sisa | Emmanchure | armhole_curve |
-| Seam allowance | Margen de costura | Marge de couture | seam_allowance_mm |
-| Grainline | Hilo de la tela | Droit fil | grainline |
-| Notch | Piquete | Cran | notch |
-| Ease | Holgura / Desahogo | Aisance | ease_mm |
-| Yoke | Canesú | Empiècement | yoke |
-| Placket | Tapeta | Patte de boutonnage | placket |
-| Gusset | Nesga | Soufflet | gusset |
-| Welt | Vivo | Passepoil | welt |
-| Facing | Vista / Enfrentado | Parementure | facing |
-| Lining | Forro | Doublure | lining |
-| Interfacing | Entretela | Entoilage | interfacing |
+| Concept | Semantic Target | Technical Constraint |
+|---------|-----------------|----------------------|
+| Corpiño | `BODICE_FRONT/BACK`| Anatomical landmarks (Neck, Bust, Side) |
+| Pinza | `DART` | Vertex/Leg geometry + Intake |
+| Sisa | `ARMHOLE_CURVE` | Bezier curvature + Ease |
+| Piquete | `NOTCH` | ASTM layer mapping (4/84/85) |
+| Hilo | `GRAINLINE` | Fabric vector orientation |

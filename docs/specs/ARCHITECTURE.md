@@ -1,68 +1,70 @@
-# OpenClo — Architecture Overview
+# OpenClo.ai — Architecture Overview
 
-## What Is OpenClo?
+## What is OpenClo.ai?
 
-Browser-based open source alternative to CLO3D. 2D pattern editor + 3D garment visualization + AI copilot.
+OpenClo.ai is a **Cognitive Design Engine** for professional fashion engineering. It transcends traditional CAD by combining a **Semantic Garment Engine**, a **Situated AI Copilot**, and **Deterministic XPBD Physics** into a unified browser-native ecosystem.
 
-**Target users:** Pattern makers (patronistas), fashion designers, students, indie creators.
-**Primary use case:** María at Adidas — patterns from scratch, adjustments on base, fitting on avatar. Output: DXF/PDF for real cutting.
+**Primary Goal:** To digitize fashion intelligence, moving beyond static 2D drawing into intent-based garment synthesis and 3D validation.
 
-## Stack
+## Technical Stack
 
-| Layer | Tech |
-|-------|------|
-| UI Framework | React 18 + TypeScript + Vite |
-| State | Redux Toolkit |
-| 2D Editor | SVG (custom canvas, PathCommand system) |
-| 3D Viewport | Three.js via React Three Fiber v8 + drei v9 |
-| Server | Node.js + Express (serves UI + project files + copilot bridge) |
-| Tests | Vitest (82 unit) + Puppeteer (16 E2E suites) |
-| Deploy | GitHub Actions → rsync → openclo.sdar.dev |
+| Layer | Technology |
+|-------|------------|
+| **UI Framework** | React 18 + TypeScript + Vite |
+| **State Management** | Redux Toolkit |
+| **Semantic Engine** | Graph-based Node/Edge Model (Custom) |
+| **2D Viewport** | SVG (Semantic Overlay + PathCommand System) |
+| **3D Viewport** | Three.js via React Three Fiber v8 |
+| **Physics Engine** | Extended Position Based Dynamics (XPBD) in **Rust (WASM)** |
+| **AI Copilot** | Agentic Loop (Provider-Agnostic) with Persistent Memory |
+| **Server** | Node.js + Express (Project storage + Copilot Bridge) |
 
-## Core Data Model
+## Core Data Model: The Semantic Graph
 
-```
+Unlike legacy systems that store patterns as isolated loops of coordinates, OpenClo.ai represents a garment as a **Semantic Directed Graph**.
+
+```typescript
 OpenCloProject
-├── pieces: PatternPiece[]     — 2D pattern outlines (Bezier paths)
-│   ├── outline: PathCommand[] — M/L/C/Q/Z commands
-│   ├── internals: InternalLine[] — darts, grainline, notch, fold, pleat
-│   ├── seamAllowance: number  — mm
-│   └── position/rotation/mirrored
-├── seams: Seam[]              — connections between piece edges
-├── fabrics: Fabric[]          — physical properties (weight, stretch, stiffness)
-└── avatar: Avatar             — GLTF/GLB model + body measurements
+├── pieces: ProfessionalPatternPiece[]
+│   ├── nodes: SemanticNode[]         // Landmarks (e.g., NeckPoint, BustPoint)
+│   ├── edges: SemanticEdge[]         // Curves with meaning (e.g., Armhole, Hem)
+│   ├── constraints: Constraint[]     // Geometric rules (e.g., EqualLength, Parallel)
+│   └── fabric: FabricProfile         // Physical properties (Weight, Stretch, Shear)
+├── topology: SeamGraph               // Connections between semantic edges
+└── context: GlobalDesignContext      // Durable memory, style history, and intent log
 ```
 
-Units: **millimeters** (1 SVG unit = 1mm)
+### Piece Anatomy
+- **SemanticNode**: Every vertex is anchored to an anatomical landmark or a functional geometric control point.
+- **SemanticEdge**: Lines are tagged with functional metadata (e.g., `Seam`, `Fold`, `DartEdge`), allowing the AI to understand the *role* of each curve.
+- **Geometric Constraints**: A declarative layer ensuring that modifications (by the human or AI) maintain technical feasibility (e.g., a sleeve cap length must match the armhole length).
 
 ## Module Map
 
 ```
 src/
-├── components/
-│   ├── PatternEditor/     — 2D SVG editor (GridLayer, PieceRenderer, SeamRenderer, ToolOverlay, HintText)
-│   ├── Viewport3D/        — Three.js 3D viewport
-│   ├── Workspace/         — Split-view layout, draggable divider
-│   ├── Chat/              — AI copilot panel (agent-agnostic protocol)
-│   ├── PropertiesPanel/   — Piece/avatar properties sidebar
-│   └── Toolbar/           — Tool selection, view mode, actions
-├── store/                 — Redux slices (project, editor, undo middleware)
-├── utils/
-│   ├── exportDXF.ts       — DXF R12 export (LWPOLYLINE, layers)
-│   ├── exportPDF.ts       — PDF export (A0/A1 cut layout)
-│   ├── patternTemplates.ts — Parametric generators (bodice, sleeve, skirt, pants, collar)
-│   ├── commandExecutor.ts  — AI command → Redux action bridge
-│   └── protocol.ts         — Copilot context builder
-├── server/                — Node.js backend
-├── types/types.ts         — All TypeScript interfaces
-└── styles/shared.css      — Design system utilities
+├── copilot/           # Situated AI Agency
+│   ├── brain/         # Cognitive logic, Intent Prediction, Adaptive Learning
+│   ├── context/       # Semantic context builders and Durable Memory
+│   └── tools/         # 42+ tools for graph manipulation and synthesis
+├── engine/            # The Semantic Core
+│   ├── solver/        # Constraint resolution and geometric validation
+│   ├── semantics/     # Anatomical landmark mapping and graph logic
+│   └── ingestion/     # Silent Ingestion Layer (Legacy format translation)
+├── components/        # UI Layers
+│   ├── Viewport2D/    # Interactive SVG view with semantic ghosting
+│   ├── Viewport3D/    # R3F-based viewport with XPBD simulation
+│   └── Workspace/     # Synchronized 2D/3D state management
+├── utils/             # Industrial utilities
+│   ├── physics/       # Rust/WASM XPBD implementation
+│   └── export/        # Professional DXF/PDF/OBJ generation
+└── store/             # Reactive project state
 ```
 
-## Key Decisions
+## Key Architectural Decisions
 
-- **SVG for 2D, Three.js for 3D** — SVG gives precision + accessibility; Three.js handles cloth sim
-- **PathCommand system** — same as SVG path `d` attribute, maps directly to DXF/PDF export
-- **Agent-agnostic copilot** — no hardcoded AI provider; protocol layer bridges any LLM
-- **Mobile = chat only** — no attempt to cram a CAD editor into a phone; <768px shows copilot
-- **No external chart/crop/UI libraries** — everything built from scratch to keep bundle minimal
-- **Templates as bootstraps** — parametric generators create starting pieces; user/AI refines from there
+1.  **Semantic-First Representation**: Geometry is a projection of the semantic graph. This allows the AI to "think" in terms of tailoring rules rather than coordinate manipulation.
+2.  **Deterministic Physics (Rust/WASM)**: By moving the XPBD solver to Rust, we achieve sub-millisecond physics updates in the browser, enabling "Instant Drape" feedback during drafting.
+3.  **Silent Ingestion Layer**: Compatibility with formats like Seamly2D or DXF is handled as a background "Hydration Service." Legacy data is imported and automatically upgraded to our semantic model using AI-driven heuristics.
+4.  **Durable Agent Memory**: The Copilot's "Brain" is decoupled from the project. It persists across sessions, learning the user's aesthetic and technical standards (e.g., "always use 1cm seam allowance for jersey").
+5.  **Agent-Agnostic Protocol**: The communication between the UI and the AI uses a strict JSON-RPC protocol, allowing OpenClo.ai to work with any LLM (Claude, GPT-4, or local Llama3 via Ollama).

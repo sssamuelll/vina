@@ -184,74 +184,73 @@ export function computePlacement(
   // Piece height in meters (for vertical centering)
   const pH = pieceGeometry.heightMm / 1000;
 
-  // CDT mesher outputs pieces flat in XZ plane (Y=0).
-  // Pattern X → 3D X (width), Pattern Y → 3D Z (length/height).
-  // To stand pieces up: rotate -π/2 around X so Z → Y.
-  // Pieces that wrap horizontally (collar, waistband) stay flat.
+  // ShapeGeometry (PieceMesh) creates pieces in XY plane (Z=0), facing +Z.
+  // Pattern X → 3D X, Pattern Y → 3D -Y (negated).
+  // Pieces are already vertical. Rotations orient them around avatar.
 
   switch (region) {
     case 'front-torso':
       return {
         position: [0, midTorso, -(d.chestRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (-Z)
+        rotation: [0, Math.PI, 0], // flip to face -Z (toward camera/front)
       };
     case 'back-torso':
       return {
         position: [0, midTorso, d.chestRadius + GAP],
-        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward (+Z)
+        rotation: [0, 0, 0], // already faces +Z (away from camera/back)
       };
     case 'left-sleeve':
       return {
-        position: [-(d.shoulderWidth / 2 + GAP + 0.05), d.shoulderHeight - 0.05, 0],
-        rotation: [-Math.PI / 2, Math.PI / 2, -Math.PI / 8], // stand up, point left, slight angle
+        position: [-(d.shoulderWidth / 2 + GAP + 0.08), d.shoulderHeight - 0.02, 0],
+        rotation: [0, -Math.PI / 2, -Math.PI / 8], // face -X (left), slight downward tilt
       };
     case 'right-sleeve':
       return {
-        position: [d.shoulderWidth / 2 + GAP + 0.05, d.shoulderHeight - 0.05, 0],
-        rotation: [-Math.PI / 2, -Math.PI / 2, Math.PI / 8], // stand up, point right, slight angle
+        position: [d.shoulderWidth / 2 + GAP + 0.08, d.shoulderHeight - 0.02, 0],
+        rotation: [0, Math.PI / 2, Math.PI / 8], // face +X (right), slight downward tilt
       };
     case 'front-skirt':
       return {
         position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward
+        rotation: [0, Math.PI, 0], // flip to face front
       };
     case 'back-skirt':
       return {
         position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
-        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward
+        rotation: [0, 0, 0], // faces back
       };
     case 'collar':
       return {
         position: [0, d.neckHeight + 0.02, 0],
-        rotation: [0, 0, 0], // stay flat/horizontal, wrapping neck
+        rotation: [-Math.PI / 2, 0, 0], // lay flat horizontally around neck
       };
     case 'waistband':
       return {
         position: [0, d.waistHeight + 0.01, 0],
-        rotation: [0, 0, 0], // stay flat/horizontal, wrapping waist
+        rotation: [-Math.PI / 2, 0, 0], // lay flat horizontally around waist
       };
     case 'hood':
       return {
-        position: [0, d.neckHeight + 0.12, d.chestRadius / 2 + 0.05],
-        rotation: [-Math.PI / 3, 0, 0], // tilt back over head
+        position: [0, d.neckHeight + 0.15, d.chestRadius / 2],
+        rotation: [Math.PI / 6, 0, 0], // tilt backward over head
       };
     case 'cuff-left':
       return {
         position: [-(d.shoulderWidth / 2 + d.armLength * 0.85), d.shoulderHeight - d.armLength * 0.8, 0],
-        rotation: [0, Math.PI / 2, 0], // horizontal ring around wrist
+        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // horizontal ring, facing left
       };
     case 'cuff-right':
       return {
         position: [d.shoulderWidth / 2 + d.armLength * 0.85, d.shoulderHeight - d.armLength * 0.8, 0],
-        rotation: [0, -Math.PI / 2, 0], // horizontal ring around wrist
+        rotation: [-Math.PI / 2, Math.PI / 2, 0], // horizontal ring, facing right
       };
     case 'unknown':
     default: {
-      // Fallback: arrange in a circle around the torso, standing up
+      // Fallback: arrange in a circle around the torso
       const radius = Math.max(d.chestRadius, d.hipRadius) + 0.15;
       return {
         position: [0, midTorso, -radius],
-        rotation: [-Math.PI / 2, 0, 0], // stand up
+        rotation: [0, Math.PI, 0], // face front
       };
     }
   }

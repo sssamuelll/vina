@@ -92,13 +92,15 @@ interface PieceMeshProps {
   isSelected: boolean;
   color: string;
   position: [number, number, number];
+  /** Placement rotation from garmentPlacement (Euler XYZ radians) */
+  placementRotation?: [number, number, number];
   showLabel?: boolean;
   /** Fabric material for visual rendering */
   fabricColor?: string;
   fabricRoughness?: number;
 }
 
-export default function PieceMesh({ piece, isSelected, position, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
+export default function PieceMesh({ piece, isSelected, position, placementRotation, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
   const geometry = useMemo(() => {
     const shape = commandsToShape(piece.outline);
     if (!shape) return null;
@@ -112,6 +114,21 @@ export default function PieceMesh({ piece, isSelected, position, showLabel = tru
     return geo;
   }, [piece.outline]);
 
+  // Compute final rotation:
+  // - ShapeGeometry creates in XY plane (Z=0), piece is vertical, facing +Z
+  // - Placement rotations are now designed for XY plane geometry
+  const finalRotation = useMemo((): [number, number, number] => {
+    if (placementRotation) {
+      return [
+        placementRotation[0],
+        placementRotation[1] - (piece.rotation ?? 0) * Math.PI / 180,
+        placementRotation[2],
+      ];
+    }
+    // Fallback: just piece rotation around Y
+    return [0, -(piece.rotation ?? 0) * Math.PI / 180, 0];
+  }, [placementRotation, piece.rotation]);
+
   // Color priority: selected=gold > fabric > category
   const meshColor = isSelected ? '#ffd700' : (fabricColor || getCategoryColor(piece.category));
   const roughness = fabricRoughness ?? 0.7;
@@ -120,7 +137,7 @@ export default function PieceMesh({ piece, isSelected, position, showLabel = tru
   if (!geometry) return null;
 
   return (
-    <group position={position} rotation={[0, -(piece.rotation ?? 0) * Math.PI / 180, 0]}>
+    <group position={position} rotation={finalRotation}>
       {/* Main face */}
       <mesh geometry={geometry}>
         <meshStandardMaterial

@@ -307,6 +307,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 isSelected={selectedPieceIds.includes(piece.id)}
                 color={PIECE_COLORS[i % PIECE_COLORS.length]}
                 position={placements[i].position}
+                rotation={placements[i].rotation}
                 arrangementOverride={arrangementOverrides[piece.id]}
                 canDrag={isArrangeMode}
                 onSelect={(id) => dispatch(selectPiece(id))}

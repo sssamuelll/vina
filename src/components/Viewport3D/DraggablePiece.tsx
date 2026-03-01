@@ -19,6 +19,7 @@ interface DraggablePieceProps {
   isSelected: boolean;
   color: string;
   position: [number, number, number];
+  rotation?: [number, number, number];
   arrangementOverride?: [number, number, number];
   canDrag: boolean;
   onSelect: (pieceId: string) => void;
@@ -33,6 +34,7 @@ export default function DraggablePiece({
   isSelected,
   color,
   position,
+  rotation,
   arrangementOverride,
   canDrag,
   onSelect,
@@ -66,7 +68,7 @@ export default function DraggablePiece({
       actualPos[1] + pos.y,
       actualPos[2] + pos.z,
     ]);
-  }, [piece.id, actualPos, onDragEnd]);
+  }, [piece.id, actualPos, onDragEnd, setOrbitEnabled]);
 
   const showGizmo = canDrag && isSelected;
 
@@ -89,6 +91,7 @@ export default function DraggablePiece({
             isSelected={isSelected}
             color={color}
             position={[0, 0, 0]}
+            placementRotation={rotation}
             fabricColor={fabricColor}
             fabricRoughness={fabricRoughness}
           />
@@ -104,6 +107,7 @@ export default function DraggablePiece({
         isSelected={isSelected}
         color={color}
         position={actualPos}
+        placementRotation={rotation}
         fabricColor={fabricColor}
         fabricRoughness={fabricRoughness}
       />
