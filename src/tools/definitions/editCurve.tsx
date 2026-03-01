@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -26,7 +26,7 @@ export const editCurveTool: ToolDefinition = {
   id: 'editCurve',
   name: 'Edit Curve Points',
   context: '2d',
-  shortcut: 'a',
+  shortcut: 'v',
   icon: EditCurveIcon,
   cursor: 'crosshair',
   group: 'select',

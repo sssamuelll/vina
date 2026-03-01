@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -25,7 +25,7 @@ export const transformTool: ToolDefinition = {
   id: 'transform',
   name: 'Transform',
   context: '2d',
-  shortcut: 't',
+  shortcut: 'a',
   icon: TransformIcon,
   cursor: 'default',
   group: 'select',

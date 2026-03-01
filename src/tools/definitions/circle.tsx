@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -21,6 +21,7 @@ export const circleTool: ToolDefinition = {
   id: 'circle',
   name: 'Circle/Curve Tool',
   context: '2d',
+  shortcut: 'e',
   icon: CircleIcon,
   cursor: 'crosshair',
   group: 'draw',

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -23,7 +23,7 @@ export const seamTool: ToolDefinition = {
   name: 'Seam',
   description: 'Connect pattern pieces with sewing seams',
   context: '2d',
-  shortcut: 's',
+  shortcut: 'b',
   icon: SeamIcon,
   cursor: 'pointer',
   group: 'sewing',

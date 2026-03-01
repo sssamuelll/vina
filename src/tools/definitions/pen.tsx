@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -23,7 +23,7 @@ export const penTool: ToolDefinition = {
   name: 'Pen Tool',
   description: 'Draw custom pattern shapes point by point',
   context: '2d',
-  shortcut: 'p',
+  shortcut: 'h',
   icon: PenIcon,
   cursor: 'crosshair',
   group: 'draw',

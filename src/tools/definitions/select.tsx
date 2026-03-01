@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -23,7 +23,7 @@ export const selectTool: ToolDefinition = {
   name: 'Select/Move',
   description: 'Select and move pattern pieces, points, or edges',
   context: '2d',
-  shortcut: 'v',
+  shortcut: 'z',
   icon: SelectIcon,
   cursor: 'default',
   group: 'select',
