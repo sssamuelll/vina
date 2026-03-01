@@ -23,7 +23,7 @@ pub struct XpbdSolver {
 
     // Bend constraints (optional)
     bend_ids: Vec<u32>,         // [a,b,c,d, ...]
-    bend_rest: Vec<f32>,        // rest dihedral angle
+    bend_rest: Vec<f32>,        // rest distance (distance-based bending)
 
     // Seam constraints
     seam_ids: Vec<u32>,         // [a,b, a,b, ...]
@@ -63,6 +63,11 @@ pub struct XpbdSolver {
     stretch_compliance_weft: f32,
     stretch_compliance_shear: f32,
     stretch_compliances: Vec<f32>,  // Per-constraint compliance
+
+    // Anisotropic bend compliance
+    bend_compliance_warp: f32,
+    bend_compliance_weft: f32,
+    bend_compliances: Vec<f32>,  // Per-constraint compliance
 }
 
 #[wasm_bindgen]
@@ -114,6 +119,9 @@ impl XpbdSolver {
             stretch_compliance_weft: 0.0,
             stretch_compliance_shear: 0.001,
             stretch_compliances: Vec::new(),
+            bend_compliance_warp: 1.0,
+            bend_compliance_weft: 1.0,
+            bend_compliances: Vec::new(),
         }
     }
 
@@ -143,6 +151,21 @@ impl XpbdSolver {
     pub fn set_bend(&mut self, ids: &[u32], rest_angles: &[f32]) {
         self.bend_ids = ids.to_vec();
         self.bend_rest = rest_angles.to_vec();
+    }
+
+    /// Set bend constraints with edge type classification.
+    /// edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR (SHEAR defaults to WEFT for bending)
+    pub fn set_bend_with_types(&mut self, ids: &[u32], rest_angles: &[f32], edge_types: &[u8]) {
+        self.bend_ids = ids.to_vec();
+        self.bend_rest = rest_angles.to_vec();
+
+        // Compute per-constraint compliance based on edge types
+        self.bend_compliances = edge_types.iter().map(|&et| {
+            match et {
+                0 => self.bend_compliance_warp,   // WARP
+                _ => self.bend_compliance_weft,   // WEFT or SHEAR (default to weft)
+            }
+        }).collect();
     }
 
     /// Set seam constraints.
@@ -218,7 +241,8 @@ impl XpbdSolver {
                      self_collision: bool, thickness: f32, collision_margin: f32,
                      ground_y: f32, drag_coefficient: f32,
                      stretch_compliance_warp: f32, stretch_compliance_weft: f32,
-                     stretch_compliance_shear: f32) {
+                     stretch_compliance_shear: f32,
+                     bend_compliance_warp: f32, bend_compliance_weft: f32) {
         self.substeps = substeps;
         self.damping = damping;
         self.gravity[1] = gravity_y;
@@ -232,6 +256,8 @@ impl XpbdSolver {
         self.stretch_compliance_warp = stretch_compliance_warp;
         self.stretch_compliance_weft = stretch_compliance_weft;
         self.stretch_compliance_shear = stretch_compliance_shear;
+        self.bend_compliance_warp = bend_compliance_warp;
+        self.bend_compliance_weft = bend_compliance_weft;
     }
 
     /// Step the simulation forward one frame.
@@ -242,6 +268,7 @@ impl XpbdSolver {
             self.enforce_pins();
             self.pre_solve(sdt);
             self.solve_stretch(sdt);
+            self.solve_bend(sdt);
             self.solve_seams(sdt);
             if self.has_sdf {
                 self.solve_sdf_collision();
@@ -348,6 +375,62 @@ impl XpbdSolver {
             self.positions[bi] += nx * s * wb;
             self.positions[bi + 1] += ny * s * wb;
             self.positions[bi + 2] += nz * s * wb;
+        }
+    }
+
+    fn solve_bend(&mut self, sdt: f32) {
+        // Bend constraints use 4 particles [a, b, c, d] where a-b is the shared edge
+        // and c, d are the opposite vertices. We use distance-based bending (rest distance between c and d).
+        let num_constraints = self.bend_ids.len() / 4;
+
+        for c in 0..num_constraints {
+            // Use per-constraint compliance if available, else global
+            let compliance = if c < self.bend_compliances.len() {
+                self.bend_compliances[c]
+            } else {
+                self.bend_compliance
+            };
+            let alpha = compliance / (sdt * sdt);
+
+            // Get the opposite vertices (indices 2 and 3) for distance-based bending
+            // Layout: [a, b, c, d] where a-b is shared edge, c and d are opposite vertices
+            let p0 = self.bend_ids[c * 4 + 2] as usize;  // opposite vertex c
+            let p1 = self.bend_ids[c * 4 + 3] as usize;  // opposite vertex d
+
+            // Inverse masses
+            let w0 = self.inv_mass[p0];
+            let w1 = self.inv_mass[p1];
+            let w_sum = w0 + w1;
+            if w_sum == 0.0 { continue; }
+
+            // Position indices
+            let i0 = p0 * 3;
+            let i1 = p1 * 3;
+
+            // Vector from p0 to p1
+            let dx = self.positions[i1] - self.positions[i0];
+            let dy = self.positions[i1 + 1] - self.positions[i0 + 1];
+            let dz = self.positions[i1 + 2] - self.positions[i0 + 2];
+            let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+            if dist < 1e-12 { continue; }
+
+            // Rest distance stored in bend_rest
+            let rest = self.bend_rest[c];
+            let c_val = dist - rest;
+            let s = -c_val / (w_sum + alpha);
+
+            // Normalized direction
+            let nx = dx / dist;
+            let ny = dy / dist;
+            let nz = dz / dist;
+
+            // Apply position corrections
+            self.positions[i0] -= nx * s * w0;
+            self.positions[i0 + 1] -= ny * s * w0;
+            self.positions[i0 + 2] -= nz * s * w0;
+            self.positions[i1] += nx * s * w1;
+            self.positions[i1 + 1] += ny * s * w1;
+            self.positions[i1 + 2] += nz * s * w1;
         }
     }
 
