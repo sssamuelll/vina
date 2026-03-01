@@ -8,15 +8,32 @@ export default function StatusBar() {
   const simulation = useSelector((s: RootState) => s.simulation);
 
   const toolLabels: Record<string, string> = {
-    select: 'Select (V)',
-    pen: 'Pen (P)',
-    line: 'Line (L)',
-    rectangle: 'Rectangle (R)',
-    seam: 'Seam (S)',
-    notch: 'Notch (N)',
-    grainline: 'Grainline (G)',
-    measure: 'Measure (M)',
-    hand: 'Hand (H)',
+    // CLO3D 2D Tools
+    select: 'Edit Pattern (Z)',
+    transform: 'Transform (A)',
+    editCurve: 'Edit Curve (V)',
+    editConstrain: 'Edit Curvature (C)',
+    pen: 'Polygon (H)',
+    rectangle: 'Rectangle (S)',
+    circle: 'Ellipse (E)',
+    scissors: 'Split (X)',
+    internalShape: 'Internal Shape (G)',
+    trace: 'Trace (I)',
+    dart: 'Dart (D)',
+    // Sewing
+    seam: 'Edit Sewing (B)',
+    freeSewing: 'Free Sewing (M)',
+    // Displaced (Shift+Key)
+    measure: 'Measure (Shift+M)',
+    notch: 'Notch (Shift+N)',
+    grainline: 'Grainline (Shift+G)',
+    line: 'Line (Shift+L)',
+    // 3D
+    camera: 'Camera (Q)',
+    pin: 'Pin (W)',
+    // Navigation (no shortcut)
+    hand: 'Hand',
+    zoom: 'Zoom',
   };
 
   // Solver tier display labels
