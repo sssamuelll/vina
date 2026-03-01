@@ -14,6 +14,7 @@ import { type SDFData, sampleSDF, sdfGradient } from './sdfGenerator';
 import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
 import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfCollision';
 import { type LRAConstraint, buildLRAConstraints, solveLRA } from './longRangeAttachments';
+import { EdgeType, classifyEdgeType } from './gpu/gpuBuffers';
 
 // ─── Vector Math on Float32Array ────────────────────────────────────────────
 
@@ -173,6 +174,8 @@ export interface ClothMeshData {
   vertices: Float32Array;
   /** Triangle indices [i0,i1,i2, i3,i4,i5, ...] */
   triIds: Int32Array;
+  /** Optional UV coordinates [u0,v0, u1,v1, ...] for anisotropic stretch */
+  uvs?: Float32Array;
 }
 
 /**
@@ -286,6 +289,12 @@ export class XPBDClothSolver {
   /** Rest lengths for bending constraints */
   private bendingLengths: Float32Array;
 
+  /** Per-constraint compliance for anisotropic stretch */
+  private stretchCompliances!: Float32Array;
+
+  /** Optional UV coordinates for edge classification */
+  private uvs: Float32Array | undefined;
+
   /** Triangle index buffer */
   readonly triIds: Int32Array;
 
@@ -352,6 +361,7 @@ export class XPBDClothSolver {
     this.vel = new Float32Array(3 * this.numParticles);
     this.invMass = new Float32Array(this.numParticles);
     this.triIds = new Int32Array(meshData.triIds);
+    this.uvs = meshData.uvs;
 
     // Build constraints from mesh topology
     const neighbors = findTriNeighbors(this.triIds);
@@ -431,6 +441,37 @@ export class XPBDClothSolver {
       const id0 = this.stretchingIds[2 * i];
       const id1 = this.stretchingIds[2 * i + 1];
       this.stretchingLengths[i] = Math.sqrt(vecDistSquared(this.pos, id0, this.pos, id1));
+    }
+
+    // Classify edges and assign per-constraint compliance for anisotropic stretch
+    this.stretchCompliances = new Float32Array(this.stretchingLengths.length);
+    const uvs = this.uvs;
+
+    for (let i = 0; i < this.stretchingLengths.length; i++) {
+      const id0 = this.stretchingIds[2 * i];
+      const id1 = this.stretchingIds[2 * i + 1];
+
+      // Get UV coords if available, otherwise default to SHEAR
+      let edgeType = EdgeType.SHEAR;
+      if (uvs && uvs.length >= (Math.max(id0, id1) + 1) * 2) {
+        const uvA: [number, number] = [uvs[id0 * 2], uvs[id0 * 2 + 1]];
+        const uvB: [number, number] = [uvs[id1 * 2], uvs[id1 * 2 + 1]];
+        edgeType = classifyEdgeType(uvA, uvB);
+      }
+
+      // Assign compliance based on edge type
+      switch (edgeType) {
+        case EdgeType.WARP:
+          this.stretchCompliances[i] = this.config.stretchComplianceWarp;
+          break;
+        case EdgeType.WEFT:
+          this.stretchCompliances[i] = this.config.stretchComplianceWeft;
+          break;
+        case EdgeType.SHEAR:
+        default:
+          this.stretchCompliances[i] = this.config.stretchComplianceShear;
+          break;
+      }
     }
 
     // Compute rest lengths for bending
@@ -648,7 +689,7 @@ export class XPBDClothSolver {
    * Solve all constraints (stretching + bending).
    */
   private solve(sdt: number): void {
-    this.solveStretching(this.config.stretchingCompliance, sdt);
+    this.solveStretching(sdt);
     this.solveBending(this.config.bendingCompliance, sdt);
     if (this.seamConstraints) {
       solveSeamConstraints(this.pos, this.invMass, this.seamConstraints, sdt);
@@ -693,14 +734,15 @@ export class XPBDClothSolver {
 
   /**
    * Solve XPBD distance constraints for stretching resistance.
+   * Uses per-constraint compliance for anisotropic stretch behavior.
    *
-   * @param compliance - Constraint compliance (0 = stiff)
    * @param sdt - Substep time
    */
-  private solveStretching(compliance: number, sdt: number): void {
-    const alpha = compliance / (sdt * sdt);
-
+  private solveStretching(sdt: number): void {
     for (let i = 0; i < this.stretchingLengths.length; i++) {
+      const compliance = this.stretchCompliances[i];
+      const alpha = compliance / (sdt * sdt);
+
       const id0 = this.stretchingIds[2 * i];
       const id1 = this.stretchingIds[2 * i + 1];
 
