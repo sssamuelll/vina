@@ -26,6 +26,7 @@ interface WasmXpbdSolver {
   set_stretch(ids: Uint32Array, rest: Float32Array): void;
   set_bend(ids: Uint32Array, rest: Float32Array): void;
   set_seams(ids: Uint32Array, target: Float32Array): void;
+  set_triangles(tri_ids: Uint32Array): void;
   set_sdf(data: Float32Array, resolution: number, minX: number, minY: number, minZ: number, cellSize: number): void;
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
   set_pins(indices: Uint32Array, positions: Float32Array): void;
@@ -33,7 +34,7 @@ interface WasmXpbdSolver {
   configure(substeps: number, damping: number, gravityY: number,
             stretchCompliance: number, bendCompliance: number,
             selfCollision: boolean, thickness: number, collisionMargin: number,
-            groundY: number): void;
+            groundY: number, dragCoefficient: number): void;
   step(dt: number): void;
   positions_ptr(): number;
   num_particles(): number;
@@ -130,6 +131,9 @@ self.onmessage = async (event: MessageEvent) => {
         const bend = extractBendConstraints(merged.vertices, triangles);
         solver.set_bend(bend.ids, bend.restAngles);
 
+        // Pass triangle indices for air drag calculation
+        solver.set_triangles(triangles);
+
         // Seam constraints
         if (msg.seams && msg.seams.length > 0) {
           const outlines = new Map<string, PathCommand[]>();
@@ -147,8 +151,20 @@ self.onmessage = async (event: MessageEvent) => {
           }
         }
 
-        solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0);
-        console.log('[WasmWorker] Solver configured with groundY = 0.0');
+        const config = msg.config ?? {};
+        solver.configure(
+          config.substeps ?? 15,
+          config.damping ?? 0.99,
+          config.gravityY ?? -9.81,
+          config.stretchCompliance ?? 0.0,
+          config.bendCompliance ?? 0.01,
+          config.selfCollision ?? false,
+          config.thickness ?? 0.002,
+          config.collisionMargin ?? 0.005,
+          config.groundY ?? 0.0,
+          config.dragCoefficient ?? 1.0,
+        );
+        console.log('[WasmWorker] Solver configured with dragCoefficient =', config.dragCoefficient ?? 1.0);
 
         (self as unknown as Worker).postMessage({ type: 'ready', numParticles: totalVerts });
         break;
@@ -183,7 +199,7 @@ self.onmessage = async (event: MessageEvent) => {
         if (solver) {
           console.log('[WasmWorker] Running initial collision settling...');
           // Temporarily configure solver with zero gravity for settling
-          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0);
+          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0, 0.0);
 
           // Run several small steps to let SDF collision push particles out
           for (let i = 0; i < 20; i++) {
@@ -191,7 +207,7 @@ self.onmessage = async (event: MessageEvent) => {
           }
 
           // Restore normal gravity
-          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0);
+          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0, 1.0);
 
           // Send settled positions to client
           const n = numParticles;

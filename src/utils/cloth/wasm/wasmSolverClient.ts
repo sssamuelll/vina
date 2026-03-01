@@ -18,6 +18,19 @@ export interface PieceMeshData {
   outline?: Array<{ type: string; values: number[] }>;
 }
 
+export interface WasmSolverConfig {
+  substeps?: number;
+  damping?: number;
+  gravityY?: number;
+  stretchCompliance?: number;
+  bendCompliance?: number;
+  selfCollision?: boolean;
+  thickness?: number;
+  collisionMargin?: number;
+  groundY?: number;
+  dragCoefficient?: number;
+}
+
 export class WasmSolverClient {
   private worker: Worker | null = null;
   private readyResolve: (() => void) | null = null;
@@ -29,8 +42,15 @@ export class WasmSolverClient {
 
   /**
    * Initialize with merged multi-piece mesh data and seam connections.
+   * @param pieces Array of piece mesh data
+   * @param seams Array of seam connection data
+   * @param config Optional solver configuration (includes dragCoefficient)
    */
-  async initMultiPiece(pieces: PieceMeshData[], seams: SeamInitData[] = []): Promise<void> {
+  async initMultiPiece(
+    pieces: PieceMeshData[],
+    seams: SeamInitData[] = [],
+    config?: WasmSolverConfig,
+  ): Promise<void> {
     this.dispose();
 
     try {
@@ -61,6 +81,7 @@ export class WasmSolverClient {
         baseUrl,
         pieces,
         seams,
+        config,
       });
     });
   }

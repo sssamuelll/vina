@@ -55,6 +55,8 @@ pub struct XpbdSolver {
     bend_compliance: f32,
     ground_y: f32,
     collision_margin: f32,
+    drag_coefficient: f32,
+    tri_ids: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -100,6 +102,8 @@ impl XpbdSolver {
             bend_compliance: 0.01,
             ground_y: 0.0,
             collision_margin: 0.005,
+            drag_coefficient: 1.0,
+            tri_ids: Vec::new(),
         }
     }
 
@@ -119,6 +123,11 @@ impl XpbdSolver {
     pub fn set_seams(&mut self, ids: &[u32], target_dist: &[f32]) {
         self.seam_ids = ids.to_vec();
         self.seam_target = target_dist.to_vec();
+    }
+
+    /// Set triangle indices for air drag calculation.
+    pub fn set_triangles(&mut self, tri_ids: &[u32]) {
+        self.tri_ids = tri_ids.to_vec();
     }
 
     /// Upload SDF volume for body collision.
@@ -181,7 +190,7 @@ impl XpbdSolver {
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
                      stretch_compliance: f32, bend_compliance: f32,
                      self_collision: bool, thickness: f32, collision_margin: f32,
-                     ground_y: f32) {
+                     ground_y: f32, drag_coefficient: f32) {
         self.substeps = substeps;
         self.damping = damping;
         self.gravity[1] = gravity_y;
@@ -191,6 +200,7 @@ impl XpbdSolver {
         self.thickness = thickness;
         self.collision_margin = collision_margin;
         self.ground_y = ground_y;
+        self.drag_coefficient = drag_coefficient;
     }
 
     /// Step the simulation forward one frame.
@@ -261,6 +271,9 @@ impl XpbdSolver {
             self.positions[idx + 1] += self.velocities[idx + 1] * sdt;
             self.positions[idx + 2] += self.velocities[idx + 2] * sdt;
         }
+
+        // Apply air drag after gravity integration
+        self.apply_air_drag(sdt);
     }
 
     fn solve_stretch(&mut self, sdt: f32) {
@@ -427,6 +440,92 @@ impl XpbdSolver {
             return (0.0, 1.0, 0.0);
         }
         (dx / len, dy / len, dz / len)
+    }
+
+    /// Apply aerodynamic drag force per triangle.
+    fn apply_air_drag(&mut self, sdt: f32) {
+        if self.drag_coefficient <= 0.0 || self.tri_ids.is_empty() {
+            return;
+        }
+
+        let air_density = 1.225_f32;
+        let num_tris = self.tri_ids.len() / 3;
+
+        for t in 0..num_tris {
+            let i0 = self.tri_ids[t * 3] as usize;
+            let i1 = self.tri_ids[t * 3 + 1] as usize;
+            let i2 = self.tri_ids[t * 3 + 2] as usize;
+
+            // Skip if all pinned
+            if self.inv_mass[i0] == 0.0 && self.inv_mass[i1] == 0.0 && self.inv_mass[i2] == 0.0 {
+                continue;
+            }
+
+            let (v0, v1, v2) = (i0 * 3, i1 * 3, i2 * 3);
+            let (p0, p1, p2) = (i0 * 3, i1 * 3, i2 * 3);
+
+            // Triangle velocity (average)
+            let tri_vel = [
+                (self.velocities[v0] + self.velocities[v1] + self.velocities[v2]) / 3.0,
+                (self.velocities[v0 + 1] + self.velocities[v1 + 1] + self.velocities[v2 + 1]) / 3.0,
+                (self.velocities[v0 + 2] + self.velocities[v1 + 2] + self.velocities[v2 + 2]) / 3.0,
+            ];
+
+            let speed = (tri_vel[0] * tri_vel[0] + tri_vel[1] * tri_vel[1] + tri_vel[2] * tri_vel[2]).sqrt();
+            if speed < 0.001 {
+                continue;
+            }
+
+            // Edge vectors
+            let e0 = [
+                self.positions[p1] - self.positions[p0],
+                self.positions[p1 + 1] - self.positions[p0 + 1],
+                self.positions[p1 + 2] - self.positions[p0 + 2],
+            ];
+            let e1 = [
+                self.positions[p2] - self.positions[p0],
+                self.positions[p2 + 1] - self.positions[p0 + 1],
+                self.positions[p2 + 2] - self.positions[p0 + 2],
+            ];
+
+            // Normal = cross(e0, e1)
+            let normal = [
+                e0[1] * e1[2] - e0[2] * e1[1],
+                e0[2] * e1[0] - e0[0] * e1[2],
+                e0[0] * e1[1] - e0[1] * e1[0],
+            ];
+
+            let normal_len = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+            if normal_len < 1e-10 {
+                continue;
+            }
+
+            let area = normal_len * 0.5;
+            let normal_normalized = [normal[0] / normal_len, normal[1] / normal_len, normal[2] / normal_len];
+            let vel_dir = [tri_vel[0] / speed, tri_vel[1] / speed, tri_vel[2] / speed];
+
+            // Facing factor
+            let facing = (normal_normalized[0] * vel_dir[0] + normal_normalized[1] * vel_dir[1] + normal_normalized[2] * vel_dir[2]).abs();
+
+            // Drag magnitude: F = 1/2 * rho * v^2 * Cd * A * facing
+            let drag_mag = 0.5 * air_density * speed * speed * self.drag_coefficient * area * facing;
+
+            // Drag force opposes velocity
+            let drag_force = [-vel_dir[0] * drag_mag, -vel_dir[1] * drag_mag, -vel_dir[2] * drag_mag];
+
+            // Distribute to vertices
+            let force_per_vertex = 1.0 / 3.0;
+            for &idx in &[i0, i1, i2] {
+                if self.inv_mass[idx] == 0.0 {
+                    continue;
+                }
+                let vi = idx * 3;
+                let scale = force_per_vertex * self.inv_mass[idx] * sdt;
+                self.velocities[vi] += drag_force[0] * scale;
+                self.velocities[vi + 1] += drag_force[1] * scale;
+                self.velocities[vi + 2] += drag_force[2] * scale;
+            }
+        }
     }
 
     fn post_solve(&mut self, sdt: f32) {
