@@ -225,7 +225,7 @@
 }
 
 .import-modal__warnings {
-  color: var(--warning-fg, #cca700);
+  color: var(--warning-fg, var(--color-warning));
 }
 
 .import-modal__success {

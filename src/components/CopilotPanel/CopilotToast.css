@@ -46,23 +46,23 @@
 }
 
 .copilot-toast-icon-success {
-  color: #10b981;
+  color: var(--color-success);
 }
 
 .copilot-toast-icon-error {
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .copilot-toast-icon-warning {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .copilot-toast-icon-info {
-  color: #3b82f6;
+  color: var(--color-info);
 }
 
 .copilot-toast-icon-undo {
-  color: #8b5cf6;
+  color: var(--color-copilot);
 }
 
 .copilot-toast-message {
@@ -112,23 +112,23 @@
 
 /* Type-specific borders */
 .copilot-toast-success {
-  border-left: 3px solid #10b981;
+  border-left: 3px solid var(--color-success);
 }
 
 .copilot-toast-error {
-  border-left: 3px solid #ef4444;
+  border-left: 3px solid var(--color-error);
 }
 
 .copilot-toast-warning {
-  border-left: 3px solid #f59e0b;
+  border-left: 3px solid var(--color-warning);
 }
 
 .copilot-toast-info {
-  border-left: 3px solid #3b82f6;
+  border-left: 3px solid var(--color-info);
 }
 
 .copilot-toast-undo {
-  border-left: 3px solid #8b5cf6;
+  border-left: 3px solid var(--color-copilot);
 }
 
 /* Mobile adjustments */

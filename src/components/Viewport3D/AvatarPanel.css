@@ -282,7 +282,7 @@
 .ap-joint-info {
   padding: 6px 0;
   font-size: 11px;
-  color: #44ff44;
+  color: var(--color-success);
   font-weight: 600;
 }
 

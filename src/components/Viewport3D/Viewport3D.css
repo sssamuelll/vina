@@ -25,5 +25,5 @@
 }
 
 .sim-status.running {
-  color: #6bff6b;
+  color: var(--grainline-color);
 }

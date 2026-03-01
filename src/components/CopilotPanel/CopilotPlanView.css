@@ -66,7 +66,7 @@
 
 .copilot-plan-progress-fill {
   height: 100%;
-  background: var(--accent-primary, #3b82f6);
+  background: var(--accent-primary, var(--color-info));
   border-radius: 3px;
   transition: width 0.3s ease;
 }
@@ -107,7 +107,7 @@
 }
 
 .copilot-plan-stat.failed .copilot-plan-stat-value {
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--color-error));
 }
 
 /* Controls */
@@ -133,7 +133,7 @@
 }
 
 .copilot-plan-btn.primary {
-  background: var(--accent-primary, #3b82f6);
+  background: var(--accent-primary, var(--color-info));
   color: white;
 }
 
@@ -152,11 +152,11 @@
 
 .copilot-plan-btn.danger {
   background: var(--danger-light, #fee2e2);
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--color-error));
 }
 
 .copilot-plan-btn.danger:hover:not(:disabled) {
-  background: var(--danger, #ef4444);
+  background: var(--danger, var(--color-error));
   color: white;
 }
 
@@ -175,7 +175,7 @@
 
 .copilot-plan-message.error {
   background: var(--danger-light, #fee2e2);
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--color-error));
 }
 
 .copilot-plan-message.warning {
@@ -205,12 +205,12 @@
 }
 
 .copilot-plan-step.active {
-  border-color: var(--accent-primary, #3b82f6);
-  box-shadow: 0 0 0 1px var(--accent-primary, #3b82f6);
+  border-color: var(--accent-primary, var(--color-info));
+  box-shadow: 0 0 0 1px var(--accent-primary, var(--color-info));
 }
 
 .copilot-plan-step.running {
-  border-color: var(--accent-primary, #3b82f6);
+  border-color: var(--accent-primary, var(--color-info));
 }
 
 .copilot-plan-step.completed {
@@ -220,7 +220,7 @@
 
 .copilot-plan-step.failed {
   background: var(--danger-light, #fee2e2);
-  border-color: var(--danger, #ef4444);
+  border-color: var(--danger, var(--color-error));
 }
 
 .copilot-plan-step.skipped {
@@ -286,7 +286,7 @@
 }
 
 .copilot-plan-status-icon.running {
-  color: var(--accent-primary, #3b82f6);
+  color: var(--accent-primary, var(--color-info));
   animation: pulse 1s ease-in-out infinite;
 }
 
@@ -295,7 +295,7 @@
 }
 
 .copilot-plan-status-icon.failed {
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--color-error));
 }
 
 .copilot-plan-status-icon.skipped {
@@ -331,7 +331,7 @@
 
 .copilot-plan-step-error {
   font-size: 12px;
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--color-error));
   margin: 8px 0 0;
 }
 

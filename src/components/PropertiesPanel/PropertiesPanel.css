@@ -347,7 +347,7 @@ select.panel-input {
 }
 
 .seam-delete:hover {
-  color: #e74c3c;
+  color: var(--color-error);
   background: rgba(231, 76, 60, 0.15);
 }
 

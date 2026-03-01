@@ -19,6 +19,15 @@
   --grainline-color: #6bff6b;
   --selected: #ffd700;
 
+  /* ─── Semantic Colors ─── */
+  --color-error: #ef4444;
+  --color-error-dark: #dc2626;
+  --color-warning: #cca700;
+  --color-success: #10b981;
+  --color-info: #3794ff;
+  --color-copilot: #8b5cf6;
+  --color-copilot-light: #a78bfa;
+
   --border: #3a3a3a;
   --border-light: #4a4a4a;
 

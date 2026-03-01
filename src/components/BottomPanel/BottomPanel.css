@@ -166,13 +166,13 @@
 }
 
 .problem-warning .problem-message {
-  color: #cca700;
+  color: var(--color-warning);
 }
 
 .problem-error .problem-message {
-  color: #f14c4c;
+  color: var(--color-error);
 }
 
 .problem-info .problem-message {
-  color: #3794ff;
+  color: var(--color-info);
 }

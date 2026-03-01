@@ -86,7 +86,7 @@
   flex-shrink: 0;
   width: 24px;
   height: 24px;
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .copilot-confirm-title {
@@ -122,7 +122,7 @@
   background: rgba(239, 68, 68, 0.1);
   border-radius: 6px;
   font-size: 13px;
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .copilot-confirm-actions {
@@ -152,7 +152,7 @@
 }
 
 .copilot-confirm-btn-primary {
-  background: var(--accent-primary, #3b82f6);
+  background: var(--accent-primary, var(--color-info));
   border: 1px solid transparent;
   color: white;
 }
@@ -162,17 +162,17 @@
 }
 
 .copilot-confirm-btn-destructive {
-  background: #ef4444;
+  background: var(--color-error);
   border: 1px solid transparent;
   color: white;
 }
 
 .copilot-confirm-btn-destructive:hover {
-  background: #dc2626;
+  background: var(--color-error-dark);
 }
 
 /* Focus states */
 .copilot-confirm-btn:focus-visible {
-  outline: 2px solid var(--accent-primary, #3b82f6);
+  outline: 2px solid var(--accent-primary, var(--color-info));
   outline-offset: 2px;
 }

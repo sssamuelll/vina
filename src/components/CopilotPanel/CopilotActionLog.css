@@ -139,11 +139,11 @@
 }
 
 .action-log-icon-success {
-  color: #10b981;
+  color: var(--color-success);
 }
 
 .action-log-icon-error {
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .action-log-entry-content {
@@ -190,7 +190,7 @@
   background: rgba(139, 92, 246, 0.15);
   border-radius: 4px;
   font-size: 10px;
-  color: #a78bfa;
+  color: var(--color-copilot-light);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
@@ -218,8 +218,8 @@
 
 .action-log-entry-undo:hover {
   background: var(--bg-hover, #333);
-  color: #8b5cf6;
-  border-color: #8b5cf6;
+  color: var(--color-copilot);
+  border-color: var(--color-copilot);
 }
 
 /* Mobile adjustments */

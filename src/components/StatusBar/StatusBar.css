@@ -61,15 +61,15 @@
 }
 
 .status-dot.healthy {
-  background: #3794ff;
+  background: var(--color-info);
 }
 
 .status-dot.warning {
-  background: #cca700;
+  background: var(--color-warning);
 }
 
 .status-dot.critical {
-  background: #f14c4c;
+  background: var(--color-error);
 }
 
 .status-dot.inactive {

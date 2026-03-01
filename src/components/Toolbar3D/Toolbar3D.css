@@ -178,7 +178,7 @@
 }
 
 .tool3d-btn.sim-running .tool3d-icon {
-  color: #3b82f6;
+  color: var(--color-info);
 }
 
 .tool3d-btn.sim-running::after {
@@ -186,7 +186,7 @@
   position: absolute;
   inset: 0;
   border-radius: 6px;
-  box-shadow: inset 0 0 0 1.5px #3b82f6;
+  box-shadow: inset 0 0 0 1.5px var(--color-info);
   animation: simPulse 1.5s ease-in-out infinite;
 }
 
@@ -200,7 +200,7 @@
 }
 
 .tool3d-btn.sim-paused .tool3d-icon {
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .tool3d-btn.sim-paused::after {
@@ -208,5 +208,5 @@
   position: absolute;
   inset: 0;
   border-radius: 6px;
-  box-shadow: inset 0 0 0 1.5px #ef4444;
+  box-shadow: inset 0 0 0 1.5px var(--color-error);
 }

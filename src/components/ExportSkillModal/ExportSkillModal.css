@@ -189,7 +189,7 @@
 
 .export-modal__warning {
   margin: 8px 0 0;
-  color: var(--warning-fg, #cca700);
+  color: var(--warning-fg, var(--color-warning));
 }
 
 .export-modal__checkbox {
