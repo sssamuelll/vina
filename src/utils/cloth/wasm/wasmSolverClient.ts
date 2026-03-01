@@ -69,6 +69,42 @@ export class WasmSolverClient {
     this.worker?.postMessage({ type: 'setSDF', sdf });
   }
 
+  /**
+   * Set pinned vertices with target positions.
+   * @param pins Array of { vertexIndex, position: [x, y, z] }
+   */
+  setPins(pins: Array<{ vertexIndex: number; position: [number, number, number] }>): void {
+    if (!this.worker || pins.length === 0) {
+      if (this.worker && pins.length === 0) {
+        this.worker.postMessage({ type: 'clearPins' });
+      }
+      return;
+    }
+
+    const indices = new Uint32Array(pins.length);
+    const positions = new Float32Array(pins.length * 3);
+
+    for (let i = 0; i < pins.length; i++) {
+      indices[i] = pins[i].vertexIndex;
+      positions[i * 3] = pins[i].position[0];
+      positions[i * 3 + 1] = pins[i].position[1];
+      positions[i * 3 + 2] = pins[i].position[2];
+    }
+
+    this.worker.postMessage({
+      type: 'setPins',
+      indices: Array.from(indices),
+      positions: Array.from(positions),
+    });
+  }
+
+  /**
+   * Clear all pinned vertices.
+   */
+  clearPins(): void {
+    this.worker?.postMessage({ type: 'clearPins' });
+  }
+
   start(): void {
     this.worker?.postMessage({ type: 'start' });
   }

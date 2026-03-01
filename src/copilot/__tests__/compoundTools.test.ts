@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // Updated after #79-#82 copilot epic completion + #143/#146 design log + #148 preference learning
-      expect(registry.size).toBe(111);
+      // Updated after #79-#82 copilot epic completion + #142 3D interaction tools
+      expect(registry.size).toBe(117);
     });
   });
 });

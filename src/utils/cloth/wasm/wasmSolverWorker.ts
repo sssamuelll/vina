@@ -28,6 +28,8 @@ interface WasmXpbdSolver {
   set_seams(ids: Uint32Array, target: Float32Array): void;
   set_sdf(data: Float32Array, resolution: number, minX: number, minY: number, minZ: number, cellSize: number): void;
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
+  set_pins(indices: Uint32Array, positions: Float32Array): void;
+  clear_pins(): void;
   configure(substeps: number, damping: number, gravityY: number,
             stretchCompliance: number, bendCompliance: number,
             selfCollision: boolean, thickness: number, collisionMargin: number): void;
@@ -170,6 +172,20 @@ self.onmessage = async (event: MessageEvent) => {
             msg.sdf.distances, msg.sdf.resolution,
             msg.sdf.min[0], msg.sdf.min[1], msg.sdf.min[2], msg.sdf.cellSize,
           );
+        }
+        break;
+
+      case 'setPins':
+        if (solver && msg.indices && msg.positions) {
+          const indices = new Uint32Array(msg.indices);
+          const positions = new Float32Array(msg.positions);
+          solver.set_pins(indices, positions);
+        }
+        break;
+
+      case 'clearPins':
+        if (solver) {
+          solver.clear_pins();
         }
         break;
 

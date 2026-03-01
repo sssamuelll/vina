@@ -22,7 +22,7 @@ import AvatarTapes from './AvatarTapes';
 import { useAvatarTape } from './useAvatarTape';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { resetSimulation, setViewMode3D, clearArrangementSnapshot } from '../../store/simulationSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
@@ -149,6 +149,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
   // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
   // F10 — Snapshot 3D viewport (CLO3D: File > Snapshot > 3D Window)
+  // W — Toggle Pin Tool (#134)
+  // Ctrl+W — Clear all pins (#134)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
@@ -164,10 +166,22 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         e.preventDefault();
         snapshot3D();
       }
+      // W — Toggle Pin Tool (without modifiers)
+      if ((e.key === 'W' || e.key === 'w') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        dispatch(setActiveTool3D(activeTool3D === 'pin' ? 'camera' : 'pin'));
+      }
+      // Ctrl+W — Clear all pins
+      if ((e.key === 'W' || e.key === 'w') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        dispatch(clearAllPins());
+        console.log('[Pin Tool] Cleared all pins');
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool3D, dispatch]);
 
 
 

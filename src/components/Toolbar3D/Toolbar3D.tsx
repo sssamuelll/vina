@@ -255,4 +255,4 @@ function SubToolFlyout({ parentTool, onSelect }: SubToolFlyoutProps) {
 }
 
 // Export for backward compatibility
-export type Tool3D = 'camera' | 'edit' | 'pose' | 'avatar' | 'arrangement';
+export type Tool3D = 'camera' | 'edit' | 'pose' | 'avatar' | 'arrangement' | 'pin';

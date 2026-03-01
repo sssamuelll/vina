@@ -23,7 +23,9 @@ import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetec
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision } from '../../store/simulationSlice';
+import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin } from '../../store/simulationSlice';
+import PinRenderer from './PinRenderer';
+import { ThreeEvent } from '@react-three/fiber';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -226,6 +228,9 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
   const globalParticleDistance = useSelector((s: RootState) => s.simulation.particleDistance);
   const pieceParticleDistances = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
+  const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
+  const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
+  const pinnedVertices = useSelector((s: RootState) => s.simulation.pinnedVertices);
 
   // Async meshing via Web Worker (never blocks main thread)
   const [pieceMeshes, setPieceMeshes] = useState<Array<{
@@ -274,7 +279,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       client.dispose();
       initClientRef.current = null;
     };
-  }, [pieces, globalParticleDistance, pieceParticleDistances]);
+  }, [pieces, globalParticleDistance, pieceParticleDistances, dispatch]);
 
   // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
@@ -561,7 +566,23 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       neuralClientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, dispatch]);
+
+  // Sync pinned vertices to Wasm solver
+  useEffect(() => {
+    const wasmClient = wasmClientRef.current;
+    if (!wasmClient) return;
+
+    const pins = Object.values(pinnedVertices);
+    if (pins.length === 0) {
+      wasmClient.clearPins();
+    } else {
+      wasmClient.setPins(pins.map(p => ({
+        vertexIndex: p.vertexIndex,
+        position: p.targetPosition,
+      })));
+    }
+  }, [pinnedVertices]);
 
   // Per-frame geometry update
   useFrame(() => {
@@ -660,27 +681,77 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
     };
   }, [fabricId]);
 
+  // Pin tool: click handler to find nearest vertex and add pin
+  const handleMeshClick = useCallback((e: ThreeEvent<MouseEvent>) => {
+    if (activeTool3D !== 'pin') return;
+
+    e.stopPropagation();
+    const positions = positionsRef.current;
+    if (!positions) return;
+
+    // Find the nearest vertex to the click point
+    const clickPoint = e.point;
+    const numParticles = positions.length / 3;
+
+    let minDistSq = Infinity;
+    let nearestIdx = 0;
+
+    for (let i = 0; i < numParticles; i++) {
+      const dx = positions[i * 3] - clickPoint.x;
+      const dy = positions[i * 3 + 1] - clickPoint.y;
+      const dz = positions[i * 3 + 2] - clickPoint.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      if (distSq < minDistSq) {
+        minDistSq = distSq;
+        nearestIdx = i;
+      }
+    }
+
+    // Add pin at the nearest vertex
+    const pinPosition: [number, number, number] = [
+      positions[nearestIdx * 3],
+      positions[nearestIdx * 3 + 1],
+      positions[nearestIdx * 3 + 2],
+    ];
+
+    dispatch(addPin({
+      vertexIndex: nearestIdx,
+      position: pinPosition,
+      strength: pinStrength,
+    }));
+
+    console.log(`[Pin Tool] Added pin at vertex ${nearestIdx}, position:`, pinPosition);
+  }, [activeTool3D, dispatch, pinStrength]);
+
   if (!staticGeometry) return null;
 
   return (
-    <mesh ref={meshRef} geometry={staticGeometry}>
-      <meshPhysicalMaterial
-        vertexColors
-        side={THREE.DoubleSide}
-        transparent
-        opacity={renderParams.opacity}
-        roughness={renderParams.roughness}
-        metalness={renderParams.metalness}
-        sheen={renderParams.sheen}
-        sheenRoughness={renderParams.sheenRoughness}
-        sheenColor={renderParams.sheenColor}
-        clearcoat={renderParams.clearcoat}
-        clearcoatRoughness={renderParams.clearcoatRoughness}
-        transmission={renderParams.transmission}
-        thickness={renderParams.thickness}
-        ior={renderParams.ior}
-      />
-    </mesh>
+    <>
+      <mesh
+        ref={meshRef}
+        geometry={staticGeometry}
+        onClick={handleMeshClick}
+      >
+        <meshPhysicalMaterial
+          vertexColors
+          side={THREE.DoubleSide}
+          transparent
+          opacity={renderParams.opacity}
+          roughness={renderParams.roughness}
+          metalness={renderParams.metalness}
+          sheen={renderParams.sheen}
+          sheenRoughness={renderParams.sheenRoughness}
+          sheenColor={renderParams.sheenColor}
+          clearcoat={renderParams.clearcoat}
+          clearcoatRoughness={renderParams.clearcoatRoughness}
+          transmission={renderParams.transmission}
+          thickness={renderParams.thickness}
+          ior={renderParams.ior}
+        />
+      </mesh>
+      <PinRenderer livePositions={positionsRef.current || undefined} />
+    </>
   );
 }
 

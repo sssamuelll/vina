@@ -27,6 +27,21 @@ export interface ArrangementSnapshot {
 /** Which solver tier is currently active. */
 export type SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape';
 
+/** Pin strength determines how firmly the vertex is held. */
+export type PinStrength = 'weak' | 'medium' | 'strong';
+
+/** A pinned vertex in the cloth simulation. */
+export interface PinData {
+  /** Unique pin ID */
+  id: string;
+  /** Vertex index in the simulation mesh */
+  vertexIndex: number;
+  /** Target position [x, y, z] in world coordinates */
+  targetPosition: [number, number, number];
+  /** How firmly the pin holds the vertex */
+  strength: PinStrength;
+}
+
 interface SimulationSliceState {
   /** Current simulation state */
   simulationState: SimulationState;
@@ -58,6 +73,10 @@ interface SimulationSliceState {
   viewMode3D: ViewMode3D;
   /** Pre-simulation arrangement snapshot for reset */
   arrangementSnapshot: ArrangementSnapshot | null;
+  /** Pinned vertices for cloth simulation */
+  pinnedVertices: Record<string, PinData>;
+  /** Currently selected pin ID (for editing/dragging) */
+  selectedPinId: string | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -81,6 +100,8 @@ const initialState: SimulationSliceState = {
   bodyCollision: false,
   viewMode3D: 'arrange' as ViewMode3D,
   arrangementSnapshot: null,
+  pinnedVertices: {},
+  selectedPinId: null,
 };
 
 const simulationSlice = createSlice({
@@ -162,6 +183,65 @@ const simulationSlice = createSlice({
     clearArrangementSnapshot(state) {
       state.arrangementSnapshot = null;
     },
+
+    // ─── Pin Management ─────────────────────────────────────────────────────
+
+    /** Add a pin at a vertex position. */
+    addPin(state, action: PayloadAction<{
+      vertexIndex: number;
+      position: [number, number, number];
+      strength?: PinStrength;
+    }>) {
+      const id = `pin_${Date.now()}_${action.payload.vertexIndex}`;
+      state.pinnedVertices[id] = {
+        id,
+        vertexIndex: action.payload.vertexIndex,
+        targetPosition: action.payload.position,
+        strength: action.payload.strength || 'strong',
+      };
+      state.selectedPinId = id;
+    },
+
+    /** Remove a specific pin by ID. */
+    removePin(state, action: PayloadAction<string>) {
+      delete state.pinnedVertices[action.payload];
+      if (state.selectedPinId === action.payload) {
+        state.selectedPinId = null;
+      }
+    },
+
+    /** Update a pin's target position (for dragging). */
+    updatePinPosition(state, action: PayloadAction<{
+      pinId: string;
+      position: [number, number, number];
+    }>) {
+      const pin = state.pinnedVertices[action.payload.pinId];
+      if (pin) {
+        pin.targetPosition = action.payload.position;
+      }
+    },
+
+    /** Clear all pins (Ctrl+W). */
+    clearAllPins(state) {
+      state.pinnedVertices = {};
+      state.selectedPinId = null;
+    },
+
+    /** Select a pin for editing. */
+    selectPin(state, action: PayloadAction<string | null>) {
+      state.selectedPinId = action.payload;
+    },
+
+    /** Update pin strength. */
+    setPinStrength(state, action: PayloadAction<{
+      pinId: string;
+      strength: PinStrength;
+    }>) {
+      const pin = state.pinnedVertices[action.payload.pinId];
+      if (pin) {
+        pin.strength = action.payload.strength;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -187,6 +267,13 @@ export const {
   setViewMode3D,
   saveArrangementSnapshot,
   clearArrangementSnapshot,
+  // Pin actions
+  addPin,
+  removePin,
+  updatePinPosition,
+  clearAllPins,
+  selectPin,
+  setPinStrength,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

@@ -42,6 +42,11 @@ pub struct XpbdSolver {
     adjacency_offsets: Vec<u32>,
     adjacency_neighbors: Vec<u32>,
 
+    // Pinned vertices
+    pin_indices: Vec<u32>,
+    pin_positions: Vec<f32>,      // [x,y,z, x,y,z, ...] target positions
+    original_inv_mass: Vec<f32>,  // Store original masses for unpinning
+
     // Config
     gravity: [f32; 3],
     damping: f32,
@@ -62,6 +67,7 @@ impl XpbdSolver {
         let prev_positions = positions.clone();
         let velocities = vec![0.0; num_particles * 3];
         let inv_mass = inv_mass.to_vec();
+        let original_inv_mass = inv_mass.clone();
 
         XpbdSolver {
             num_particles,
@@ -84,6 +90,9 @@ impl XpbdSolver {
             thickness: 0.002,
             adjacency_offsets: Vec::new(),
             adjacency_neighbors: Vec::new(),
+            pin_indices: Vec::new(),
+            pin_positions: Vec::new(),
+            original_inv_mass,
             gravity: [0.0, -9.81, 0.0],
             damping: 0.99,
             substeps: 15,
@@ -127,6 +136,47 @@ impl XpbdSolver {
         self.adjacency_neighbors = neighbors.to_vec();
     }
 
+    /// Set pinned vertices with target positions.
+    /// indices: flat array of vertex indices to pin
+    /// positions: flat array [x,y,z, x,y,z, ...] of target positions
+    pub fn set_pins(&mut self, indices: &[u32], positions: &[f32]) {
+        // First, restore all previously pinned vertices to original mass
+        for &idx in &self.pin_indices {
+            let i = idx as usize;
+            if i < self.num_particles {
+                self.inv_mass[i] = self.original_inv_mass[i];
+            }
+        }
+
+        // Store new pins
+        self.pin_indices = indices.to_vec();
+        self.pin_positions = positions.to_vec();
+
+        // Set inv_mass = 0 for newly pinned vertices and set their positions
+        for (p, &idx) in self.pin_indices.iter().enumerate() {
+            let i = idx as usize;
+            if i < self.num_particles && p * 3 + 2 < self.pin_positions.len() {
+                self.inv_mass[i] = 0.0;
+                let pos_idx = i * 3;
+                self.positions[pos_idx] = self.pin_positions[p * 3];
+                self.positions[pos_idx + 1] = self.pin_positions[p * 3 + 1];
+                self.positions[pos_idx + 2] = self.pin_positions[p * 3 + 2];
+            }
+        }
+    }
+
+    /// Clear all pins, restoring original masses.
+    pub fn clear_pins(&mut self) {
+        for &idx in &self.pin_indices {
+            let i = idx as usize;
+            if i < self.num_particles {
+                self.inv_mass[i] = self.original_inv_mass[i];
+            }
+        }
+        self.pin_indices.clear();
+        self.pin_positions.clear();
+    }
+
     /// Configure solver parameters.
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
                      stretch_compliance: f32, bend_compliance: f32,
@@ -146,13 +196,28 @@ impl XpbdSolver {
         let sdt = dt / self.substeps as f32;
 
         for _ in 0..self.substeps {
+            self.enforce_pins();
             self.pre_solve(sdt);
             self.solve_stretch(sdt);
             self.solve_seams(sdt);
             if self.has_sdf {
                 self.solve_sdf_collision();
             }
+            self.enforce_pins(); // Also enforce after constraints
             self.post_solve(sdt);
+        }
+    }
+
+    /// Enforce pinned vertex positions.
+    fn enforce_pins(&mut self) {
+        for (p, &idx) in self.pin_indices.iter().enumerate() {
+            let i = idx as usize;
+            if i < self.num_particles && p * 3 + 2 < self.pin_positions.len() {
+                let pos_idx = i * 3;
+                self.positions[pos_idx] = self.pin_positions[p * 3];
+                self.positions[pos_idx + 1] = self.pin_positions[p * 3 + 1];
+                self.positions[pos_idx + 2] = self.pin_positions[p * 3 + 2];
+            }
         }
     }
 
