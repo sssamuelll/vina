@@ -205,6 +205,7 @@ impl XpbdSolver {
             if self.has_sdf {
                 self.solve_sdf_collision();
             }
+            self.solve_ground_collision(); // Ground collision AFTER all constraints
             self.enforce_pins(); // Also enforce after constraints
             self.post_solve(sdt);
         }
@@ -259,11 +260,6 @@ impl XpbdSolver {
             self.positions[idx] += self.velocities[idx] * sdt;
             self.positions[idx + 1] += self.velocities[idx + 1] * sdt;
             self.positions[idx + 2] += self.velocities[idx + 2] * sdt;
-
-            // Ground collision
-            if self.positions[idx + 1] < self.ground_y {
-                self.positions[idx + 1] = self.ground_y;
-            }
         }
     }
 
@@ -359,6 +355,17 @@ impl XpbdSolver {
                 self.positions[idx] += gx * correction;
                 self.positions[idx + 1] += gy * correction;
                 self.positions[idx + 2] += gz * correction;
+            }
+        }
+    }
+
+    /// Ground plane collision - must be called AFTER all other constraints
+    fn solve_ground_collision(&mut self) {
+        for i in 0..self.num_particles {
+            if self.inv_mass[i] == 0.0 { continue; }
+            let idx = i * 3;
+            if self.positions[idx + 1] < self.ground_y {
+                self.positions[idx + 1] = self.ground_y;
             }
         }
     }

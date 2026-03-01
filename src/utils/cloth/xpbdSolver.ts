@@ -530,14 +530,6 @@ export class XPBDClothSolver {
 
       // Integrate position
       vecAdd(this.pos, i, this.vel, i, sdt);
-
-      // Ground plane collision
-      const yi = 3 * i + 1;
-      if (this.pos[yi] < this.config.groundY) {
-        // Restore previous position for friction
-        vecCopy(this.pos, i, this.prevPos, i);
-        this.pos[yi] = this.config.groundY;
-      }
     }
   }
 
@@ -562,6 +554,23 @@ export class XPBDClothSolver {
     // LRA as hard limit after all soft constraints
     if (this.config.enableLRA && this.lraConstraints) {
       solveLRA(this.pos, this.invMass, this.lraConstraints);
+    }
+
+    // Ground plane collision - MUST be after all other constraints
+    this.solveGroundCollision();
+  }
+
+  /**
+   * Resolve ground plane collisions.
+   * Called after all other constraints to ensure particles stay above ground.
+   */
+  private solveGroundCollision(): void {
+    for (let i = 0; i < this.numParticles; i++) {
+      if (this.invMass[i] === 0.0) continue;
+      const yi = 3 * i + 1;
+      if (this.pos[yi] < this.config.groundY) {
+        this.pos[yi] = this.config.groundY;
+      }
     }
   }
 
