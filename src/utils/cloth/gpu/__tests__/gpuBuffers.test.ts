@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EdgeType, classifyEdgeType, extractStretchConstraints } from '../gpuBuffers';
+import { EdgeType, classifyEdgeType, extractStretchConstraints, extractBendConstraints } from '../gpuBuffers';
 
 describe('EdgeType classification', () => {
   describe('classifyEdgeType', () => {
@@ -64,6 +64,78 @@ describe('EdgeType classification', () => {
       const hasShear = Array.from(result.edgeTypes).includes(EdgeType.SHEAR);
 
       expect(hasWarp || hasWeft || hasShear).toBe(true);
+    });
+  });
+
+  describe('extractBendConstraints', () => {
+    it('should return edgeTypes array', () => {
+      // Two triangles sharing an edge
+      const positions = new Float32Array([
+        0,0,0,  1,0,0,  0.5,1,0,  0.5,-1,0
+      ]);
+      const triangles = new Uint32Array([0,1,2, 0,3,1]); // Shared edge 0-1
+
+      const result = extractBendConstraints(positions, triangles);
+
+      expect(result.edgeTypes).toBeInstanceOf(Uint8Array);
+      expect(result.edgeTypes.length).toBe(result.restAngles.length);
+    });
+
+    it('should classify bend edge based on UVs', () => {
+      const positions = new Float32Array([
+        0,0,0,  1,0,0,  0.5,1,0,  0.5,-1,0
+      ]);
+      const triangles = new Uint32Array([0,1,2, 0,3,1]);
+      const uvs = new Float32Array([
+        0,0,  1,0,  0.5,1,  0.5,-1  // Horizontal edge 0-1
+      ]);
+
+      const result = extractBendConstraints(positions, triangles, uvs);
+
+      // Edge 0-1 is horizontal in UV -> WEFT
+      expect(result.edgeTypes[0]).toBe(EdgeType.WEFT);
+    });
+
+    it('should classify vertical edge as WARP', () => {
+      const positions = new Float32Array([
+        0,0,0,  0,1,0,  1,0.5,0,  -1,0.5,0
+      ]);
+      const triangles = new Uint32Array([0,1,2, 0,3,1]); // Shared edge 0-1
+      const uvs = new Float32Array([
+        0.5,0,  0.5,1,  1,0.5,  0,0.5  // Vertical edge 0-1
+      ]);
+
+      const result = extractBendConstraints(positions, triangles, uvs);
+
+      // Edge 0-1 is vertical in UV -> WARP
+      expect(result.edgeTypes[0]).toBe(EdgeType.WARP);
+    });
+
+    it('should default diagonal (SHEAR) edges to WEFT', () => {
+      const positions = new Float32Array([
+        0,0,0,  1,1,0,  1,0,0,  0,1,0
+      ]);
+      const triangles = new Uint32Array([0,1,2, 0,3,1]); // Shared edge 0-1
+      const uvs = new Float32Array([
+        0,0,  1,1,  1,0,  0,1  // Diagonal edge 0-1 (45 degrees)
+      ]);
+
+      const result = extractBendConstraints(positions, triangles, uvs);
+
+      // Edge 0-1 is diagonal in UV -> SHEAR, but defaults to WEFT
+      expect(result.edgeTypes[0]).toBe(EdgeType.WEFT);
+    });
+
+    it('should default to WEFT when no UVs provided', () => {
+      const positions = new Float32Array([
+        0,0,0,  1,0,0,  0.5,1,0,  0.5,-1,0
+      ]);
+      const triangles = new Uint32Array([0,1,2, 0,3,1]);
+
+      const result = extractBendConstraints(positions, triangles);
+
+      // Without UVs, edges are classified as SHEAR, which defaults to WEFT
+      expect(result.edgeTypes[0]).toBe(EdgeType.WEFT);
     });
   });
 });

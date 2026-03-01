@@ -38,6 +38,8 @@ export interface BendConstraints {
   ids: Uint32Array;
   /** Rest dihedral angles */
   restAngles: Float32Array;
+  /** EdgeType per constraint (WARP or WEFT) */
+  edgeTypes: Uint8Array;
 }
 
 export interface SeamConstraintData {
@@ -198,6 +200,7 @@ export function extractStretchConstraints(
 export function extractBendConstraints(
   positions: Float32Array,
   triangles: Uint32Array,
+  uvs?: Float32Array,
 ): BendConstraints {
   // Build edge → triangle adjacency
   const edgeToTri = new Map<string, number[]>();
@@ -217,6 +220,7 @@ export function extractBendConstraints(
 
   const ids: number[] = [];
   const restAngles: number[] = [];
+  const edgeTypes: number[] = [];
 
   for (const [key, tris] of edgeToTri) {
     if (tris.length !== 2) continue;
@@ -236,11 +240,25 @@ export function extractBendConstraints(
     const angle = computeDihedralAngle(positions, a, b, c, d);
     ids.push(a, b, c, d);
     restAngles.push(angle);
+
+    // Classify the shared edge (a-b) by UV direction
+    let edgeType = EdgeType.SHEAR;
+    if (uvs && uvs.length >= (Math.max(a, b) + 1) * 2) {
+      const uvA: [number, number] = [uvs[a * 2], uvs[a * 2 + 1]];
+      const uvB: [number, number] = [uvs[b * 2], uvs[b * 2 + 1]];
+      edgeType = classifyEdgeType(uvA, uvB);
+    }
+    // For bending, SHEAR edges default to WEFT (or could use average)
+    if (edgeType === EdgeType.SHEAR) {
+      edgeType = EdgeType.WEFT;
+    }
+    edgeTypes.push(edgeType);
   }
 
   return {
     ids: new Uint32Array(ids),
     restAngles: new Float32Array(restAngles),
+    edgeTypes: new Uint8Array(edgeTypes),
   };
 }
 
