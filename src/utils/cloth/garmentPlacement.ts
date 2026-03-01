@@ -184,70 +184,74 @@ export function computePlacement(
   // Piece height in meters (for vertical centering)
   const pH = pieceGeometry.heightMm / 1000;
 
+  // CDT mesher outputs pieces flat in XZ plane (Y=0).
+  // Pattern X → 3D X (width), Pattern Y → 3D Z (length/height).
+  // To stand pieces up: rotate -π/2 around X so Z → Y.
+  // Pieces that wrap horizontally (collar, waistband) stay flat.
+
   switch (region) {
     case 'front-torso':
       return {
         position: [0, midTorso, -(d.chestRadius + GAP)],
-        rotation: [0, 0, 0],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (-Z)
       };
     case 'back-torso':
       return {
         position: [0, midTorso, d.chestRadius + GAP],
-        rotation: [0, Math.PI, 0],
+        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward (+Z)
       };
     case 'left-sleeve':
       return {
-        position: [-(d.shoulderWidth / 2 + GAP), d.shoulderHeight, 0],
-        rotation: [0, Math.PI / 2, -Math.PI / 6], // slight downward angle
+        position: [-(d.shoulderWidth / 2 + GAP + 0.05), d.shoulderHeight - 0.05, 0],
+        rotation: [-Math.PI / 2, Math.PI / 2, -Math.PI / 8], // stand up, point left, slight angle
       };
     case 'right-sleeve':
       return {
-        position: [d.shoulderWidth / 2 + GAP, d.shoulderHeight, 0],
-        rotation: [0, -Math.PI / 2, Math.PI / 6],
+        position: [d.shoulderWidth / 2 + GAP + 0.05, d.shoulderHeight - 0.05, 0],
+        rotation: [-Math.PI / 2, -Math.PI / 2, Math.PI / 8], // stand up, point right, slight angle
       };
     case 'front-skirt':
       return {
         position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
-        rotation: [0, 0, 0],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward
       };
     case 'back-skirt':
       return {
         position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
-        rotation: [0, Math.PI, 0],
+        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward
       };
     case 'collar':
       return {
         position: [0, d.neckHeight + 0.02, 0],
-        rotation: [-Math.PI / 2, 0, 0], // horizontal, wrapping neck
+        rotation: [0, 0, 0], // stay flat/horizontal, wrapping neck
       };
     case 'waistband':
       return {
         position: [0, d.waistHeight + 0.01, 0],
-        rotation: [-Math.PI / 2, 0, 0],
+        rotation: [0, 0, 0], // stay flat/horizontal, wrapping waist
       };
     case 'hood':
       return {
-        position: [0, d.neckHeight + 0.08, d.chestRadius / 2],
-        rotation: [-Math.PI / 4, 0, 0], // angled back over head
+        position: [0, d.neckHeight + 0.12, d.chestRadius / 2 + 0.05],
+        rotation: [-Math.PI / 3, 0, 0], // tilt back over head
       };
     case 'cuff-left':
       return {
-        position: [-(d.shoulderWidth / 2 + d.armLength * 0.9), d.shoulderHeight - d.armLength * 0.85, 0],
-        rotation: [0, Math.PI / 2, 0],
+        position: [-(d.shoulderWidth / 2 + d.armLength * 0.85), d.shoulderHeight - d.armLength * 0.8, 0],
+        rotation: [0, Math.PI / 2, 0], // horizontal ring around wrist
       };
     case 'cuff-right':
       return {
-        position: [d.shoulderWidth / 2 + d.armLength * 0.9, d.shoulderHeight - d.armLength * 0.85, 0],
-        rotation: [0, -Math.PI / 2, 0],
+        position: [d.shoulderWidth / 2 + d.armLength * 0.85, d.shoulderHeight - d.armLength * 0.8, 0],
+        rotation: [0, -Math.PI / 2, 0], // horizontal ring around wrist
       };
     case 'unknown':
     default: {
-      // Fallback: arrange in a circle around the torso
-      // Use a hash of the piece index to spread evenly
+      // Fallback: arrange in a circle around the torso, standing up
       const radius = Math.max(d.chestRadius, d.hipRadius) + 0.15;
       return {
         position: [0, midTorso, -radius],
-        rotation: [0, 0, 0],
+        rotation: [-Math.PI / 2, 0, 0], // stand up
       };
     }
   }
