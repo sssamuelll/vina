@@ -299,6 +299,30 @@ describe('XPBDClothSolver - Snapshot', () => {
   });
 });
 
+// ─── Anisotropic Stretch ────────────────────────────────────────────────
+
+describe('XPBDClothSolver - Anisotropic Stretch', () => {
+  it('should have anisotropic stretch config properties', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh, {
+      stretchComplianceWarp: 0.0,
+      stretchComplianceWeft: 0.001,
+      stretchComplianceShear: 0.01,
+    });
+    expect(solver.config.stretchComplianceWarp).toBe(0.0);
+    expect(solver.config.stretchComplianceWeft).toBe(0.001);
+    expect(solver.config.stretchComplianceShear).toBe(0.01);
+  });
+
+  it('should use default anisotropic values', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh);
+    expect(solver.config.stretchComplianceWarp).toBe(0.0);
+    expect(solver.config.stretchComplianceWeft).toBe(0.0);
+    expect(solver.config.stretchComplianceShear).toBe(0.001);
+  });
+});
+
 // ─── Air Drag ───────────────────────────────────────────────────────────
 
 describe('XPBDClothSolver - Air Drag', () => {

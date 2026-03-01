@@ -135,6 +135,12 @@ export interface ClothSimConfig {
   enableLRA: boolean;
   /** Air drag coefficient (0 = no drag, 1.0 = normal, 2.0 = heavy drag) */
   dragCoefficient: number;
+  /** Stretch compliance in warp direction (vertical, 0° in UV) */
+  stretchComplianceWarp: number;
+  /** Stretch compliance in weft direction (horizontal, 90° in UV) */
+  stretchComplianceWeft: number;
+  /** Stretch compliance in shear direction (diagonal, 45° in UV) */
+  stretchComplianceShear: number;
 }
 
 /**
@@ -333,6 +339,9 @@ export class XPBDClothSolver {
       maxVelocity: 5.0,
       enableLRA: true,
       dragCoefficient: 1.0,
+      stretchComplianceWarp: 0.0,
+      stretchComplianceWeft: 0.0,
+      stretchComplianceShear: 0.001,
       ...config,
     };
 
