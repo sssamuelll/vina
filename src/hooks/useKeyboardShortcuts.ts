@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * useKeyboardShortcuts — CLO3D-compatible global keyboard shortcut system.
  *
@@ -16,7 +16,6 @@ import {
   clearSelection,
   selectAllPieces,
   toggleSeamAllowance,
-  toggleGrainlines,
   undo,
   redo,
 } from '../store/editorSlice';
@@ -184,13 +183,35 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Shift+G — Toggle grainlines
+      // Shift+G — Grainline tool (displaced from G)
       if (shift && key === 'g' && !ctrl) {
-        dispatch(toggleGrainlines());
+        dispatch(setActiveTool('grainline' as any));
+        dispatch(setActiveTool2D('grainline'));
         return;
       }
 
-      // ─── Tool shortcuts (no modifiers) ────────────────────────────────
+      // Shift+M — Measure tool (displaced from M)
+      if (shift && key === 'm' && !ctrl) {
+        dispatch(setActiveTool('measure' as any));
+        dispatch(setActiveTool2D('measure'));
+        return;
+      }
+
+      // Shift+N — Notch tool (displaced from N)
+      if (shift && key === 'n' && !ctrl) {
+        dispatch(setActiveTool('notch' as any));
+        dispatch(setActiveTool2D('notch'));
+        return;
+      }
+
+      // Shift+L — Line tool (displaced from L)
+      if (shift && key === 'l' && !ctrl) {
+        dispatch(setActiveTool('line' as any));
+        dispatch(setActiveTool2D('line'));
+        return;
+      }
+
+      // ─── CLO3D 2D Tool shortcuts (no modifiers) ────────────────────────
       if (ctrl || shift || e.altKey) return;
 
       // Q — Select/Move (3D camera tool)
@@ -199,24 +220,101 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // A — Transform Pattern (2D select tool)
+      // A — Transform Pattern
       if (key === 'a') {
+        dispatch(setActiveTool('transform' as any));
+        dispatch(setActiveTool2D('transform'));
+        return;
+      }
+
+      // Z — Edit Pattern (Select)
+      if (key === 'z') {
         dispatch(setActiveTool('select' as any));
         dispatch(setActiveTool2D('select'));
         return;
       }
 
-      // B — Edit Sewing
-      if (key === 'b') {
-        dispatch(setActiveTool('sew' as any));
-        dispatch(setActiveTool2D('sew'));
+      // V — Edit Curve Point
+      if (key === 'v') {
+        dispatch(setActiveTool('editCurve' as any));
+        dispatch(setActiveTool2D('editCurve'));
         return;
       }
 
-      // M — Segment Sewing / Free Sewing
+      // C — Edit Curvature
+      if (key === 'c') {
+        dispatch(setActiveTool('editConstrain' as any));
+        dispatch(setActiveTool2D('editConstrain'));
+        return;
+      }
+
+      // H — Polygon (Pen)
+      if (key === 'h') {
+        dispatch(setActiveTool('pen' as any));
+        dispatch(setActiveTool2D('pen'));
+        return;
+      }
+
+      // S — Rectangle
+      if (key === 's') {
+        dispatch(setActiveTool('rectangle' as any));
+        dispatch(setActiveTool2D('rectangle'));
+        return;
+      }
+
+      // E — Ellipse (Circle)
+      if (key === 'e') {
+        dispatch(setActiveTool('circle' as any));
+        dispatch(setActiveTool2D('circle'));
+        return;
+      }
+
+      // G — Internal Shape
+      if (key === 'g') {
+        dispatch(setActiveTool('internalShape' as any));
+        dispatch(setActiveTool2D('internalShape'));
+        return;
+      }
+
+      // I — Trace
+      if (key === 'i') {
+        dispatch(setActiveTool('trace' as any));
+        dispatch(setActiveTool2D('trace'));
+        return;
+      }
+
+      // B — Edit Sewing (Seam)
+      if (key === 'b') {
+        dispatch(setActiveTool('seam' as any));
+        dispatch(setActiveTool2D('seam'));
+        return;
+      }
+
+      // M — Free Sewing
       if (key === 'm') {
-        dispatch(setActiveTool('sew' as any));
-        dispatch(setActiveTool2D('sew'));
+        dispatch(setActiveTool('freeSewing' as any));
+        dispatch(setActiveTool2D('freeSewing'));
+        return;
+      }
+
+      // D — Dart
+      if (key === 'd') {
+        dispatch(setActiveTool('dart' as any));
+        dispatch(setActiveTool2D('dart'));
+        return;
+      }
+
+      // X — Scissors
+      if (key === 'x') {
+        dispatch(setActiveTool('scissors' as any));
+        dispatch(setActiveTool2D('scissors'));
+        return;
+      }
+
+      // W — Pin
+      if (key === 'w') {
+        dispatch(setActiveTool('pin' as any));
+        dispatch(setActiveTool2D('pin'));
         return;
       }
 
@@ -240,25 +338,48 @@ export function useKeyboardShortcuts() {
   // Build exportable shortcut map (for help overlay)
   useEffect(() => {
     _shortcutMap = [
+      // Simulation
       { key: 'Space', label: 'Toggle Simulation', category: 'Simulation', action: () => {} },
       { key: 'Space', shift: true, label: 'Simulate Hi-Res', category: 'Simulation', action: () => {} },
+      // 3D Tools
       { key: 'Q', label: 'Select/Move (3D)', category: '3D Tools', action: () => {} },
-      { key: 'Escape', label: 'Deselect / Hide Gizmo', category: 'Selection', action: () => {} },
-      { key: 'A', label: 'Transform Pattern (2D)', category: '2D Tools', action: () => {} },
-      { key: 'B', label: 'Edit Sewing', category: 'Sewing', action: () => {} },
-      { key: 'M', label: 'Segment Sewing', category: 'Sewing', action: () => {} },
+      // 2D Tools (CLO3D mapping)
+      { key: 'A', label: 'Transform Pattern', category: '2D Tools', action: () => {} },
+      { key: 'Z', label: 'Edit Pattern (Select)', category: '2D Tools', action: () => {} },
+      { key: 'V', label: 'Edit Curve Point', category: '2D Tools', action: () => {} },
+      { key: 'C', label: 'Edit Curvature', category: '2D Tools', action: () => {} },
+      { key: 'H', label: 'Polygon (Pen)', category: '2D Tools', action: () => {} },
+      { key: 'S', label: 'Rectangle', category: '2D Tools', action: () => {} },
+      { key: 'E', label: 'Ellipse (Circle)', category: '2D Tools', action: () => {} },
+      { key: 'G', label: 'Internal Shape', category: '2D Tools', action: () => {} },
+      { key: 'I', label: 'Trace', category: '2D Tools', action: () => {} },
+      { key: 'D', label: 'Dart', category: '2D Tools', action: () => {} },
+      { key: 'X', label: 'Scissors', category: '2D Tools', action: () => {} },
+      { key: 'W', label: 'Pin', category: '2D Tools', action: () => {} },
+      // Sewing
+      { key: 'B', label: 'Edit Sewing (Seam)', category: 'Sewing', action: () => {} },
+      { key: 'M', label: 'Free Sewing', category: 'Sewing', action: () => {} },
       { key: 'B', ctrl: true, label: 'Reverse Sewing', category: 'Sewing', action: () => {} },
+      // Displaced tools (Shift+Key)
+      { key: 'G', shift: true, label: 'Grainline Tool', category: '2D Tools', action: () => {} },
+      { key: 'M', shift: true, label: 'Measure Tool', category: '2D Tools', action: () => {} },
+      { key: 'N', shift: true, label: 'Notch Tool', category: '2D Tools', action: () => {} },
+      { key: 'L', shift: true, label: 'Line Tool', category: '2D Tools', action: () => {} },
+      // Selection
+      { key: 'Escape', label: 'Deselect / Hide Gizmo', category: 'Selection', action: () => {} },
       { key: 'A', ctrl: true, label: 'Select All', category: 'Selection', action: () => {} },
+      // File
       { key: 'S', ctrl: true, label: 'Save', category: 'File', action: () => {} },
+      // Edit
       { key: 'Z', ctrl: true, label: 'Undo', category: 'Edit', action: () => {} },
       { key: 'Z', ctrl: true, shift: true, label: 'Redo', category: 'Edit', action: () => {} },
       { key: 'Y', ctrl: true, label: 'Redo', category: 'Edit', action: () => {} },
+      { key: 'Delete', label: 'Delete Selected', category: 'Edit', action: () => {} },
+      // View
       { key: 'S', shift: true, label: 'Toggle Seam Allowance', category: 'View', action: () => {} },
-      { key: 'G', shift: true, label: 'Toggle Grainlines', category: 'View', action: () => {} },
       { key: 'A', shift: true, label: 'Toggle Avatar', category: 'View', action: () => {} },
       { key: 'F10', label: 'Snapshot 3D', category: 'View', action: () => {} },
       { key: 'F', ctrl: true, label: 'Reset 3D Arrangement', category: 'View', action: () => {} },
-      { key: 'Delete', label: 'Delete Selected', category: 'Edit', action: () => {} },
     ];
   }, []);
 }
