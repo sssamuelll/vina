@@ -142,6 +142,10 @@ export interface ClothSimConfig {
   stretchComplianceWeft: number;
   /** Stretch compliance in shear direction (diagonal, 45° in UV) */
   stretchComplianceShear: number;
+  /** Bending compliance in warp direction (vertical in UV) */
+  bendComplianceWarp: number;
+  /** Bending compliance in weft direction (horizontal in UV) */
+  bendComplianceWeft: number;
 }
 
 /**
@@ -351,6 +355,8 @@ export class XPBDClothSolver {
       stretchComplianceWarp: 0.0,
       stretchComplianceWeft: 0.0,
       stretchComplianceShear: 0.001,
+      bendComplianceWarp: 1.0,
+      bendComplianceWeft: 1.0,
       ...config,
     };
 
