@@ -298,3 +298,19 @@ describe('XPBDClothSolver - Snapshot', () => {
     expect(solver.pos[0]).not.toBe(999);
   });
 });
+
+// ─── Air Drag ───────────────────────────────────────────────────────────
+
+describe('XPBDClothSolver - Air Drag', () => {
+  it('should have dragCoefficient in default config', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh);
+    expect(solver.config.dragCoefficient).toBe(1.0);
+  });
+
+  it('should accept custom dragCoefficient', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh, { dragCoefficient: 0.5 });
+    expect(solver.config.dragCoefficient).toBe(0.5);
+  });
+});

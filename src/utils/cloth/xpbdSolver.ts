@@ -133,6 +133,8 @@ export interface ClothSimConfig {
   maxVelocity: number;
   /** Enable Long Range Attachments (default true) */
   enableLRA: boolean;
+  /** Air drag coefficient (0 = no drag, 1.0 = normal, 2.0 = heavy drag) */
+  dragCoefficient: number;
 }
 
 /**
@@ -330,6 +332,7 @@ export class XPBDClothSolver {
       maxSubsteps: 30,
       maxVelocity: 5.0,
       enableLRA: true,
+      dragCoefficient: 1.0,
       ...config,
     };
 
