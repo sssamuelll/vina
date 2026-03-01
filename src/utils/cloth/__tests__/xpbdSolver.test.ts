@@ -375,4 +375,58 @@ describe('XPBDClothSolver - Air Drag', () => {
     // (or very close - constraints may affect it slightly)
     expect(finalKE).toBeCloseTo(initialKE, 1);
   });
+
+  it('cloth should settle faster with higher drag coefficient', () => {
+    // Create separate mesh instances for each solver to avoid shared state
+    // Use a cloth positioned in XY plane so perpendicular motion (Z) shows drag effect
+    const meshLow = generateRectClothMesh(0.5, 0.5, 5, 5, [0, 0, 0]);
+    const meshHigh = generateRectClothMesh(0.5, 0.5, 5, 5, [0, 0, 0]);
+
+    // Low drag - disable regular damping to isolate air drag effect
+    const solverLow = new XPBDClothSolver(meshLow, {
+      dragCoefficient: 0.1,
+      damping: 1.0,     // No velocity damping
+      gravity: [0, 0, 0], // No gravity - we'll use initial velocity
+      groundY: -100,    // Move ground far away
+      selfCollision: false,
+      maxVelocity: 100,
+    });
+    solverLow.pinParticle(0);
+    solverLow.pinParticle(4);
+
+    // High drag
+    const solverHigh = new XPBDClothSolver(meshHigh, {
+      dragCoefficient: 2.0,
+      damping: 1.0,
+      gravity: [0, 0, 0],
+      groundY: -100,
+      selfCollision: false,
+      maxVelocity: 100,
+    });
+    solverHigh.pinParticle(0);
+    solverHigh.pinParticle(4);
+
+    // Give all non-pinned particles initial velocity perpendicular to cloth
+    // The cloth is in XY plane, so Z velocity is perpendicular
+    for (let i = 0; i < solverLow.numParticles; i++) {
+      if (solverLow.invMass[i] > 0) {
+        solverLow.vel[i * 3 + 2] = 5.0; // Z velocity
+      }
+      if (solverHigh.invMass[i] > 0) {
+        solverHigh.vel[i * 3 + 2] = 5.0;
+      }
+    }
+
+    // Simulate and measure kinetic energy decay
+    for (let i = 0; i < 30; i++) {
+      solverLow.step();
+      solverHigh.step();
+    }
+
+    const keLow = solverLow.computeKineticEnergy();
+    const keHigh = solverHigh.computeKineticEnergy();
+
+    // Higher drag should result in lower kinetic energy (more settled)
+    expect(keHigh).toBeLessThan(keLow);
+  });
 });
