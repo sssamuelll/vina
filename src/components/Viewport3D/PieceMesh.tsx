@@ -105,18 +105,23 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
     const shape = commandsToShape(piece.outline);
     if (!shape) return null;
     const geo = new THREE.ShapeGeometry(shape, 32);
+
+    // Rotate geometry to XZ plane to match CDT mesher output
+    // CDT mesher: X = pattern X, Y = 0, Z = pattern Y
+    // ShapeGeometry default: X = pattern X, Y = pattern -Y, Z = 0
+    // Rotate +90° around X to convert: Y → Z, Z → -Y
+    geo.rotateX(Math.PI / 2);
+
     geo.computeBoundingBox();
     if (geo.boundingBox) {
       const center = new THREE.Vector3();
       geo.boundingBox.getCenter(center);
-      geo.translate(-center.x, -center.y, 0);
+      geo.translate(-center.x, -center.y, -center.z);
     }
     return geo;
   }, [piece.outline]);
 
-  // Compute final rotation:
-  // - ShapeGeometry creates in XY plane (Z=0), piece is vertical, facing +Z
-  // - Placement rotations are now designed for XY plane geometry
+  // Rotation now uses same system as CDT mesher (XZ plane geometry)
   const finalRotation = useMemo((): [number, number, number] => {
     if (placementRotation) {
       return [
