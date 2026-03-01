@@ -15,7 +15,8 @@ import type { ToolRegistry } from './tools/registry';
 import type { LLMProvider, ProviderConfig, ChatMessage, ProviderToolDef, StreamChunk } from './providers/types';
 import type { LLMToolCall } from './toolExecutor';
 import { executeToolCalls } from './toolExecutor';
-import { buildAgentContext, serializeContext } from './contextBuilder';
+import { buildEnhancedAgentContext, serializeContext } from './contextBuilder';
+import type { DesignLogEntry, SkillOverride } from './vision/types';
 import { detectLanguage, type AgentLanguage } from './languageDetection';
 import { getTeachingSnippet, formatTeachingSnippet, isTeachingModeEnabled } from './teachingContext';
 import { runProactiveAnalysis, formatWarnings } from './proactiveAnalysis';
@@ -72,13 +73,16 @@ export interface AgentLoopCallbacks {
 }
 
 /**
- * Build the system prompt with current project context, active skills, and memory.
+ * Build the system prompt with current project context, active skills, memory,
+ * and cerebral intelligence (semantic analysis, spatial relationships, design decisions).
  *
  * @param state - Current Redux state
  * @param memory - Project memory
  * @param soul - PATRONAJE_SOUL personality string
  * @param skillContext - Formatted skill context string (if any skills matched)
  * @param activeSkillNames - Names of matched skills for context tracking
+ * @param designLogEntries - Recent design log entries
+ * @param overrides - Active formula overrides
  * @returns Complete system prompt
  */
 function buildSystemPrompt(
@@ -87,9 +91,16 @@ function buildSystemPrompt(
   soul: string,
   skillContext: string = '',
   activeSkillNames: string[] = [],
+  designLogEntries: DesignLogEntry[] = [],
+  overrides: SkillOverride[] = [],
 ): string {
-  const context = buildAgentContext(state, activeSkillNames);
-  const contextStr = serializeContext(context);
+  const enhancedContext = buildEnhancedAgentContext(
+    state,
+    activeSkillNames,
+    designLogEntries,
+    overrides,
+  );
+  const contextStr = serializeContext(enhancedContext);
   const memoryContext = memory.toContextString();
 
   let prompt = soul;
@@ -97,10 +108,26 @@ function buildSystemPrompt(
     prompt += `\n\n${skillContext}`;
   }
   prompt += `\n\n## Current Project State\n${contextStr}`;
+
+  // Add cerebral intelligence context (semantic analysis, spatial relationships, etc.)
+  if (enhancedContext.cerebralSerialized && enhancedContext.cerebralSerialized !== '## Context\nNo pieces or design history yet.') {
+    prompt += `\n\n## Semantic Analysis\n${enhancedContext.cerebralSerialized}`;
+  }
+
   if (memoryContext) {
     prompt += `\n\n## Memory\n${memoryContext}`;
   }
   return prompt;
+}
+
+/**
+ * Options for running the agent loop.
+ */
+export interface AgentLoopOptions {
+  /** Design log entries from the current project */
+  designLogEntries?: DesignLogEntry[];
+  /** Active formula overrides from preference learning */
+  overrides?: SkillOverride[];
 }
 
 /**
@@ -125,6 +152,7 @@ function buildSystemPrompt(
  * @param memory - Project memory instance
  * @param soul - PATRONAJE_SOUL personality string
  * @param callbacks - Optional streaming callbacks
+ * @param options - Optional design log and override context
  * @returns Complete agent loop result
  */
 export async function runAgentLoop(
@@ -137,20 +165,23 @@ export async function runAgentLoop(
   memory: ProjectMemory,
   soul: string,
   callbacks?: AgentLoopCallbacks,
+  options?: AgentLoopOptions,
 ): Promise<AgentLoopResult> {
   const language = detectLanguage(userMessage);
   const rounds: ToolRound[] = [];
   const teachingContent: string[] = [];
   let totalToolCalls = 0;
+  const designLogEntries = options?.designLogEntries ?? [];
+  const overrides = options?.overrides ?? [];
 
   // Match relevant skills from user message
   const matchedSkills = getRelevantSkills(userMessage);
   const skillContext = buildSkillContext(matchedSkills);
   const activeSkillNames = matchedSkills.map(s => s.name);
 
-  // Build initial messages
+  // Build initial messages with cerebral context
   const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(getState(), memory, soul, skillContext, activeSkillNames) },
+    { role: 'system', content: buildSystemPrompt(getState(), memory, soul, skillContext, activeSkillNames, designLogEntries, overrides) },
   ];
 
   // Add conversation history from memory
@@ -270,6 +301,14 @@ export async function runAgentLoop(
         role: 'tool',
         content: resultContent,
         tool_call_id: r.toolCallId,
+      });
+    }
+
+    // Add audit warnings as a user message if any geometry issues were detected
+    if (batchResult.auditWarnings) {
+      messages.push({
+        role: 'user',
+        content: `[SYSTEM AUDIT]\n${batchResult.auditWarnings}\n\nPlease review these geometry issues and consider corrective action.`,
       });
     }
   }
