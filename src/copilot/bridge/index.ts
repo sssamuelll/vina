@@ -13,3 +13,5 @@ export { ResultStore } from './ResultStore';
 export { SummaryGenerator } from './SummaryGenerator';
 export { Planner, PlannerError } from './Planner';
 export type { ToolSchema } from './Planner';
+export { Executor } from './Executor';
+export type { ToolRegistry, ToolFunction, Evaluator, ExecutionResult } from './Executor';
