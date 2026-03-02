@@ -7,12 +7,14 @@ const BRIDGE_MODE_KEY = 'openclo-use-bridge';
 
 /**
  * Check if bridge mode is enabled (uses new ExecutionBridge instead of agentLoop).
+ * Bridge mode is now enabled by default for better execution control and reduced verbosity.
  */
 export function isBridgeModeEnabled(): boolean {
   try {
-    return localStorage.getItem(BRIDGE_MODE_KEY) === 'true';
+    // Bridge mode is ON by default - only disable if explicitly set to 'false'
+    return localStorage.getItem(BRIDGE_MODE_KEY) !== 'false';
   } catch {
-    return false;
+    return true; // Default to bridge mode
   }
 }
 
