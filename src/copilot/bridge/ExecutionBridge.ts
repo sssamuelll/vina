@@ -20,6 +20,7 @@ import type {
   ReasonerInput,
   ExpandableSummary,
   ExecuteStep,
+  EvaluateStep,
 } from './types';
 import { DEFAULT_BRIDGE_CONFIG, isExecuteStep } from './types';
 import { Planner } from './Planner';
@@ -321,7 +322,7 @@ export class ExecutionBridge {
       return this.executeExecuteStep(step);
     }
 
-    // Evaluate step - call evaluator
+    // Type guard narrows step to EvaluateStep
     return this.executeEvaluateStep(step);
   }
 
@@ -360,11 +361,11 @@ export class ExecutionBridge {
   /**
    * Execute an evaluate step (LLM call).
    */
-  private async executeEvaluateStep(step: Step): Promise<StepResult> {
+  private async executeEvaluateStep(step: EvaluateStep): Promise<StepResult> {
     // For evaluate steps, we use the evaluator
     // Note: In a full implementation, we'd resolve input references
     try {
-      const result = await this.evaluator(null, (step as { decide: string }).decide);
+      const result = await this.evaluator(null, step.decide);
       return {
         stepId: step.id,
         success: result.success,

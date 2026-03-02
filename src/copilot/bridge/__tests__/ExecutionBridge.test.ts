@@ -237,4 +237,88 @@ describe('ExecutionBridge', () => {
     // Initial try + 2 retries = 3 calls
     expect(mockTools.measureEdge).toHaveBeenCalledTimes(3);
   });
+
+  it('uses alternative step when reasoner suggests one', async () => {
+    mockPlannerLLM.mockResolvedValue(JSON.stringify({
+      intent: 'test',
+      steps: [
+        { type: 'execute', id: 's1', tool: 'measureEdge', params: { edge: 'neckline' }, label: 'Measure' },
+      ],
+    }));
+
+    let callCount = 0;
+    (mockTools.measureEdge as ReturnType<typeof vi.fn>).mockImplementation(async (params) => {
+      callCount++;
+      if (params.edge === 'neckline') {
+        return { success: false, error: 'Edge not found' };
+      }
+      // Alternative edge succeeds
+      return { success: true, data: { length: 200 } };
+    });
+
+    mockReasonerLLM.mockResolvedValue({
+      action: 'alternative',
+      newStep: { type: 'execute', id: 's1-alt', tool: 'measureEdge', params: { edge: 'front-neckline' }, label: 'Measure alt' },
+    });
+
+    const bridge = new ExecutionBridge({
+      plannerLLM: mockPlannerLLM,
+      evaluator: mockEvaluator,
+      reasonerLLM: mockReasonerLLM,
+      tools: mockTools,
+    });
+
+    const result = await bridge.run('Test');
+
+    expect(result.success).toBe(true);
+    expect(callCount).toBe(2);
+    expect(mockTools.measureEdge).toHaveBeenLastCalledWith({ edge: 'front-neckline' });
+  });
+
+  it('executes evaluate step using evaluator', async () => {
+    mockPlannerLLM.mockResolvedValue(JSON.stringify({
+      intent: 'evaluate_condition',
+      steps: [
+        { type: 'evaluate', id: 's1', input: '$context', decide: 'Is the measurement valid?', label: 'Check validity' },
+      ],
+    }));
+
+    mockEvaluator.mockResolvedValue({
+      success: true,
+      data: { decision: 'yes', confidence: 0.95 },
+    });
+
+    const bridge = new ExecutionBridge({
+      plannerLLM: mockPlannerLLM,
+      evaluator: mockEvaluator,
+      reasonerLLM: mockReasonerLLM,
+      tools: mockTools,
+    });
+
+    const result = await bridge.run('Check if measurement is valid');
+
+    expect(result.success).toBe(true);
+    expect(mockEvaluator).toHaveBeenCalledWith(null, 'Is the measurement valid?');
+    expect(result.results[0].data).toEqual({ decision: 'yes', confidence: 0.95 });
+  });
+
+  it('handles plan parsing failure from invalid JSON', async () => {
+    mockPlannerLLM.mockResolvedValue('This is not valid JSON at all');
+
+    const events: BridgeEvent[] = [];
+    const bridge = new ExecutionBridge({
+      plannerLLM: mockPlannerLLM,
+      evaluator: mockEvaluator,
+      reasonerLLM: mockReasonerLLM,
+      tools: mockTools,
+    });
+    bridge.on((event) => events.push(event));
+
+    const result = await bridge.run('Test');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeDefined();
+    expect(result.results).toEqual([]);
+    expect(events.some(e => e.type === 'plan:error')).toBe(true);
+  });
 });
