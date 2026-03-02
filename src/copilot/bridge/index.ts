@@ -1,0 +1,15 @@
+// src/copilot/bridge/index.ts
+/**
+ * Bridge Module — Copilot Execution Bridge
+ *
+ * @module bridge
+ */
+
+// Types
+export * from './types';
+
+// Modules
+export { ResultStore } from './ResultStore';
+export { SummaryGenerator } from './SummaryGenerator';
+export { Planner, PlannerError } from './Planner';
+export type { ToolSchema } from './Planner';
