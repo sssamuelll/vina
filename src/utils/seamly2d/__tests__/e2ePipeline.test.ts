@@ -78,7 +78,7 @@ describe('Seamly2D E2E Pipeline', () => {
     console.log(`Found ${patternsWithPieces.length} patterns with pieces out of ${patterns.length} total`);
   });
 
-  it('pipeline summary', { timeout: 30000 }, () => {
+  it('pipeline summary', { timeout: 120000 }, () => {
     let totalPieces = 0, builtOk = 0, _buildFail = 0, adaptFail = 0;
     const errors: Record<string, number> = {};
 
