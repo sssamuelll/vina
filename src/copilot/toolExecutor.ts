@@ -18,8 +18,8 @@
 import type { AppDispatch, RootState } from '../store';
 import type { PatternPiece } from '../types/types';
 import { ToolRegistry, ToolResult } from './tools/registry';
-import { checkAreaIntegrity, checkSelfIntersection, formatAuditResultsForLLM } from './vision';
-import type { AuditResult } from './vision/types';
+import { checkAreaIntegrity, checkSelfIntersection, formatAuditResultsForLLM } from './perception';
+import type { AuditResult } from './perception/types';
 
 /**
  * A tool call from the LLM response.

@@ -7,7 +7,7 @@
  * - Bounding box overlap detection
  * - Relationship analysis between pieces
  *
- * @module copilot/vision/spatialDescriber
+ * @module copilot/perception/spatialDescriber
  */
 
 import type { SpatialRelationship, SpatialRelationType, SpatialConflict } from './types';

@@ -10,9 +10,9 @@
 
 import type { RootState } from '../store';
 import type { PatternPiece, PathCommand, Seam } from '../types/types';
-import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './vision';
-import type { CerebralContext, DesignLogEntry, SkillOverride } from './vision/types';
-import { generateFingerprint, describeSpatialRelationships } from './vision';
+import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './perception';
+import type { CerebralContext, DesignLogEntry, SkillOverride } from './perception/types';
+import { generateFingerprint, describeSpatialRelationships } from './perception';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

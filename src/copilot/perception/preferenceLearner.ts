@@ -6,7 +6,7 @@
  * - Create SkillOverride objects for learned preferences
  * - Merge preferences into LLM context
  *
- * @module copilot/vision/preferenceLearner
+ * @module copilot/perception/preferenceLearner
  */
 
 import type { SkillOverride } from './types';

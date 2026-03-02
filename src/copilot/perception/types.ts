@@ -6,7 +6,7 @@
  * - Memory: DesignLogEntry, SkillOverride
  * - Action: IntentPrediction, AuditResult
  *
- * @module copilot/vision/types
+ * @module copilot/perception/types
  */
 
 // ─── Perception Layer: Segment Analysis ─────────────────────────────────────

@@ -12,8 +12,8 @@
  */
 
 import type { ToolDefinition } from '../registry';
-import { detectLandmarks, extractSegments } from '../../vision/geometryClassifier';
-import type { LandmarkLabel } from '../../vision/types';
+import { detectLandmarks, extractSegments } from '../../perception/geometryClassifier';
+import type { LandmarkLabel } from '../../perception/types';
 import {
   startSimulation,
   pauseSimulation,

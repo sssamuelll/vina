@@ -419,8 +419,8 @@ describe('Context Builder - Spatial Relationships', () => {
 });
 
 import { getRecentDecisions, buildCerebralContext, serializeCerebralContext, type CerebralContextInput } from '../contextBuilder';
-import type { CerebralContext } from '../vision/types';
-import type { DesignLogEntry, SkillOverride } from '../vision/types';
+import type { CerebralContext } from '../perception/types';
+import type { DesignLogEntry, SkillOverride } from '../perception/types';
 
 describe('Context Builder - Design Log Integration', () => {
   const entries: DesignLogEntry[] = [

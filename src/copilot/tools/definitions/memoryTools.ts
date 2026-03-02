@@ -7,9 +7,9 @@
 
 import type { ToolDefinition } from '../registry';
 import { loadLongTermMemory, addLongTermDecision, setLongTermPreference, addLongTermNote, clearLongTermMemory, longTermMemoryToContext } from '../../memory';
-import { DesignLogManager, generateEntryId } from '../../vision/designLog';
-import { detectFormulaDelta, generateOverrideId } from '../../vision/preferenceLearner';
-import type { DesignLogEntryType, SkillOverride } from '../../vision/types';
+import { DesignLogManager, generateEntryId } from '../../perception/designLog';
+import { detectFormulaDelta, generateOverrideId } from '../../perception/preferenceLearner';
+import type { DesignLogEntryType, SkillOverride } from '../../perception/types';
 
 function getProjectId(getState: () => any): string {
   return getState().project?.id || 'default';

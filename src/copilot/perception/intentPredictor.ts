@@ -6,7 +6,7 @@
  * - Check area integrity, self-intersection, seam compatibility
  * - Return structured results for LLM self-correction
  *
- * @module copilot/vision/intentPredictor
+ * @module copilot/perception/intentPredictor
  */
 
 import type { PathCommand, PatternPiece } from '../../types/types';

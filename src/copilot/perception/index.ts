@@ -1,7 +1,7 @@
 /**
  * Vision Module — Copilot intelligence layer.
  *
- * @module copilot/vision
+ * @module copilot/perception
  */
 
 // Types

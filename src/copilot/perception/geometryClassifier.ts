@@ -4,7 +4,7 @@
  * Provides functions to classify path segments by curvature type
  * and extract segment information from pattern outlines.
  *
- * @module copilot/vision/geometryClassifier
+ * @module copilot/perception/geometryClassifier
  */
 
 import type { PathCommand, Point2D } from '../../types/types';

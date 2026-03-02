@@ -6,7 +6,7 @@
  * - Constraints that must be preserved
  * - User-defined formula overrides
  *
- * @module copilot/vision/designLog
+ * @module copilot/perception/designLog
  */
 
 import type { DesignLog, DesignLogEntry, DesignLogEntryType, SkillOverride } from './types';
