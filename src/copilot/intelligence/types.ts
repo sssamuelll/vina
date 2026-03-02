@@ -7,6 +7,8 @@
  * @module copilot/intelligence/types
  */
 
+import type { BodyMeasurements } from '../../types/types';
+
 // ─── Piece Classification ────────────────────────────────────────────────────
 
 export type PieceType =
@@ -75,7 +77,7 @@ export interface Resolution {
 // ─── Measurement Context ─────────────────────────────────────────────────────
 
 export interface MeasurementContext {
-  bodyMeasurements: Record<string, number>;
+  bodyMeasurements: BodyMeasurements;
   edgeLengths: Record<string, Record<string, number>>;
 }
 

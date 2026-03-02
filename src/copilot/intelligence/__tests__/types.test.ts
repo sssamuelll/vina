@@ -101,8 +101,14 @@ describe('Intelligence Types', () => {
     it('should contain body and edge measurements', () => {
       const context: MeasurementContext = {
         bodyMeasurements: {
-          bustCircumference: 920,
-          neckCircumference: 380,
+          height: 170,
+          chest: 92,
+          waist: 76,
+          hips: 98,
+          shoulder: 42,
+          armLength: 60,
+          inseam: 80,
+          neckCirc: 38,
         },
         edgeLengths: {
           'front-1': {
@@ -111,7 +117,7 @@ describe('Intelligence Types', () => {
           },
         },
       };
-      expect(context.bodyMeasurements.bustCircumference).toBe(920);
+      expect(context.bodyMeasurements.chest).toBe(92);
       expect(context.edgeLengths['front-1'].neckline).toBe(125);
     });
   });

@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { IntelligentContext } from '../IntelligentContext';
-import type { PatternPiece } from '../../../types/types';
+import type { PatternPiece, BodyMeasurements } from '../../../types/types';
 
 // Minimal state interface matching IntelligentContext constructor
 interface MockState {
   project: {
     pieces: Partial<PatternPiece>[];
     avatar: {
-      measurements: Record<string, number>;
+      measurements: BodyMeasurements;
     };
   };
 }
@@ -40,10 +40,14 @@ describe('IntelligentContext', () => {
       ],
       avatar: {
         measurements: {
-          neckCirc: 38,
+          height: 170,
           chest: 92,
           waist: 76,
+          hips: 98,
           shoulder: 42,
+          armLength: 60,
+          inseam: 80,
+          neckCirc: 38,
         },
       },
     },
@@ -51,7 +55,7 @@ describe('IntelligentContext', () => {
 
   // Cast to the expected type for IntelligentContext
   const createIntelligence = () =>
-    new IntelligentContext(mockState as { project: { pieces: PatternPiece[]; avatar: { measurements: Record<string, number> } } });
+    new IntelligentContext(mockState as { project: { pieces: PatternPiece[]; avatar: { measurements: BodyMeasurements } } });
 
   describe('process', () => {
     it('processes "reduce el escote 2cm" to enriched context', () => {

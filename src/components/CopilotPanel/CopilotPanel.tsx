@@ -32,6 +32,7 @@ import CopilotHeader from './CopilotHeader';
 import CopilotMessages, { DisplayMessage } from './CopilotMessages';
 import CopilotInput from './CopilotInput';
 import './CopilotPanel.css';
+import { IntelligentContext } from '../../copilot/intelligence';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 
@@ -135,13 +136,22 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       // Build system prompt with JSON instructions and tools
       const plannerPrompt = planner.buildSystemPrompt(toolSchemas);
 
-      // Add project context
+      // NEW: Use IntelligentContext for enriched resolution
+      const intelligence = new IntelligentContext(store.getState());
+      const enrichedContext = intelligence.process(userRequest);
+      const enrichedStr = intelligence.getSerialized(enrichedContext);
+
+      // Add base project context for reference
       const agentContext = buildAgentContext(store.getState(), []);
       const contextStr = serializeContext(agentContext);
 
+      // Combine: Planner instructions + Enriched context + Project state
       const systemPrompt = `${plannerPrompt}
 
-## Current Project State
+## Resolved Context (use these values)
+${enrichedStr}
+
+## Project State (reference only)
 ${contextStr}`;
 
       const provider = getProvider(providerConfig);

@@ -7,10 +7,14 @@ describe('MeasurementCalculator', () => {
 
   const mockContext: MeasurementContext = {
     bodyMeasurements: {
-      neckCirc: 38,
+      height: 170,
       chest: 92,
       waist: 76,
+      hips: 98,
       shoulder: 42,
+      armLength: 60,
+      inseam: 80,
+      neckCirc: 38,
     },
     edgeLengths: {
       'front': {

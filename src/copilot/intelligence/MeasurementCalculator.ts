@@ -12,6 +12,7 @@ import type {
   CalculatedValue,
   PieceType,
 } from './types';
+import type { BodyMeasurements } from '../../types/types';
 import { getRelatedMeasurement } from './GarmentKnowledge';
 
 /**
@@ -55,11 +56,16 @@ export class MeasurementCalculator {
 
     const relatedMeasurementName = getRelatedMeasurement(edge.resolved, pieceType);
     let relatedMeasurement: CalculatedValue['relatedMeasurement'];
-    if (relatedMeasurementName && context.bodyMeasurements[relatedMeasurementName] !== undefined) {
-      relatedMeasurement = {
-        name: relatedMeasurementName,
-        value: context.bodyMeasurements[relatedMeasurementName],
-      };
+    if (relatedMeasurementName) {
+      // Cast to access by dynamic key - the knowledge base guarantees valid keys
+      const measurements = context.bodyMeasurements as unknown as Record<string, number | undefined>;
+      const measurementValue = measurements[relatedMeasurementName];
+      if (measurementValue !== undefined) {
+        relatedMeasurement = {
+          name: relatedMeasurementName,
+          value: measurementValue,
+        };
+      }
     }
 
     return {
@@ -91,7 +97,7 @@ export class MeasurementCalculator {
    */
   static buildContext(
     pieces: Array<{ id: string; edges?: Array<{ name: string; length?: number }> }>,
-    bodyMeasurements: Record<string, number>,
+    bodyMeasurements: BodyMeasurements,
   ): MeasurementContext {
     const edgeLengths: Record<string, Record<string, number>> = {};
 

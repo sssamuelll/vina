@@ -45,7 +45,16 @@ describe('ContextEnricher', () => {
   };
 
   const mockMeasurements: MeasurementContext = {
-    bodyMeasurements: { neckCirc: 38, chest: 92 },
+    bodyMeasurements: {
+      height: 170,
+      chest: 92,
+      waist: 76,
+      hips: 98,
+      shoulder: 42,
+      armLength: 60,
+      inseam: 80,
+      neckCirc: 38,
+    },
     edgeLengths: {
       'front': { 'neckline': 125, 'shoulder': 150 },
       'back': { 'neckline': 120, 'shoulder': 150 },

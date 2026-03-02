@@ -87,8 +87,13 @@ export class ContextEnricher {
         if (!classification) continue;
 
         const measurementName = getRelatedMeasurement(edge.resolved, classification.type);
-        if (measurementName && measurements.bodyMeasurements[measurementName] !== undefined) {
-          relatedMeasurements[measurementName] = measurements.bodyMeasurements[measurementName];
+        if (measurementName) {
+          // Cast to access by dynamic key - the knowledge base guarantees valid keys
+          const bodyMeasurements = measurements.bodyMeasurements as unknown as Record<string, number | undefined>;
+          const value = bodyMeasurements[measurementName];
+          if (value !== undefined) {
+            relatedMeasurements[measurementName] = value;
+          }
         }
       }
     }

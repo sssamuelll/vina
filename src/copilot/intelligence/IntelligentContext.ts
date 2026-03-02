@@ -7,7 +7,7 @@
  * @module copilot/intelligence/IntelligentContext
  */
 
-import type { PatternPiece } from '../../types/types';
+import type { PatternPiece, BodyMeasurements } from '../../types/types';
 import type { PieceClassification, EnrichedContext, PieceType } from './types';
 import { SemanticResolver } from './SemanticResolver';
 import { ContextEnricher } from './ContextEnricher';
@@ -17,7 +17,7 @@ interface MinimalState {
   project: {
     pieces: PatternPiece[];
     avatar: {
-      measurements: Record<string, number>;
+      measurements: BodyMeasurements;
     };
   };
 }
@@ -27,13 +27,13 @@ interface MinimalState {
  */
 export class IntelligentContext {
   private pieces: PatternPiece[];
-  private bodyMeasurements: Record<string, number>;
+  private bodyMeasurements: BodyMeasurements;
   private resolver = new SemanticResolver();
   private enricher = new ContextEnricher();
 
   constructor(state: MinimalState) {
     this.pieces = state.project.pieces;
-    this.bodyMeasurements = state.project.avatar?.measurements ?? {};
+    this.bodyMeasurements = state.project.avatar?.measurements ?? {} as BodyMeasurements;
   }
 
   /**
