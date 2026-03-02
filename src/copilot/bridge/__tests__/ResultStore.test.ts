@@ -76,6 +76,7 @@ describe('ResultStore', () => {
 
     store.rollbackAll();
     expect(order).toEqual(['s3', 's2', 's1']);
+    expect(store.size).toBe(0);
   });
 
   it('clear removes all results', () => {

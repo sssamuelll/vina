@@ -120,6 +120,7 @@ export class ResultStore {
         result.rollback();
       }
     }
+    this.clear();
   }
 
   /**
