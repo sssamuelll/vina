@@ -18,6 +18,8 @@ import {
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
 import { runAgentLoop, type AgentLoopResult } from '../../copilot/agentLoop';
+import { Planner } from '../../copilot/bridge/Planner';
+import { buildAgentContext, serializeContext } from '../../copilot/contextBuilder';
 import { DesignLogManager } from '../../copilot/vision/designLog';
 import { isTeachingModeEnabled } from '../../copilot/teachingContext';
 import { isBridgeModeEnabled } from '../../copilot/features';
@@ -116,12 +118,38 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   // Bridge mode hook (called unconditionally per React rules)
   // Uses ExecutionBridge for step-by-step execution when enabled via feature flag
   const bridgeHook = useBridge({
-    plannerLLM: async (prompt) => {
-      // Use current provider for planning
+    plannerLLM: async (userRequest) => {
       if (!providerConfig) return '';
+
+      // Build proper system prompt with tools and context
+      const registry = getDefaultRegistry();
+      const planner = new Planner();
+
+      // Convert registry tools to Planner schema format
+      const toolSchemas = registry.list().map(t => ({
+        name: t.name,
+        description: t.description,
+        parameters: t.parameters,
+      }));
+
+      // Build system prompt with JSON instructions and tools
+      const plannerPrompt = planner.buildSystemPrompt(toolSchemas);
+
+      // Add project context
+      const agentContext = buildAgentContext(store.getState(), []);
+      const contextStr = serializeContext(agentContext);
+
+      const systemPrompt = `${plannerPrompt}
+
+## Current Project State
+${contextStr}`;
+
       const provider = getProvider(providerConfig);
       const response = await provider.send(
-        [{ role: 'user', content: prompt }],
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userRequest }
+        ],
         [],
         providerConfig
       );

@@ -7,13 +7,13 @@ const BRIDGE_MODE_KEY = 'openclo-use-bridge';
 
 /**
  * Check if bridge mode is enabled (uses new ExecutionBridge instead of agentLoop).
- * NOTE: Bridge OFF by default - Planner needs context integration before enabling.
+ * Bridge mode is ON by default for step-by-step execution with reduced verbosity.
  */
 export function isBridgeModeEnabled(): boolean {
   try {
-    return localStorage.getItem(BRIDGE_MODE_KEY) === 'true';
+    return localStorage.getItem(BRIDGE_MODE_KEY) !== 'false';
   } catch {
-    return false;
+    return true;
   }
 }
 
