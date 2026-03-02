@@ -23,6 +23,7 @@ import {
   PROVIDER_OPTIONS,
   MODEL_OPTIONS,
 } from './providers/types';
+import { SecureStorage } from './providers/secureStorage';
 import {
   detectOllama,
   listOllamaModels,
@@ -45,6 +46,7 @@ const LANGUAGE_STORAGE_KEY = 'openclo-language-pref';
  *
  * @returns Saved preference or 'auto'
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function loadLanguagePreference(): LanguagePreference {
   try {
     const saved = localStorage.getItem(LANGUAGE_STORAGE_KEY);
@@ -58,6 +60,7 @@ export function loadLanguagePreference(): LanguagePreference {
  *
  * @param pref - Language preference to save
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function saveLanguagePreference(pref: LanguagePreference): void {
   try {
     localStorage.setItem(LANGUAGE_STORAGE_KEY, pref);
@@ -139,8 +142,12 @@ export default function AgentSettings({
     setProvider(p);
     const opt = PROVIDER_OPTIONS.find(o => o.value === p);
     if (opt) setModel(opt.defaultModel);
-    if (p !== 'ollama') setApiKey(existingConfig?.provider === p ? (existingConfig?.apiKey ?? '') : '');
-  }, [existingConfig]);
+    // Load API key from SecureStorage for the selected provider
+    if (p !== 'ollama') {
+      const storedKey = SecureStorage.get(`${p}-apikey`) ?? '';
+      setApiKey(storedKey);
+    }
+  }, []);
 
   const handleSave = useCallback(() => {
     // Save teaching mode

@@ -5,6 +5,7 @@
  */
 
 import type { ToolParametersSchema } from '../action/tools/registry';
+import { SecureStorage } from './secureStorage';
 
 /**
  * A message in the conversation history.
@@ -144,22 +145,49 @@ export const MODEL_OPTIONS: Record<string, string[]> = {
 const PROVIDER_STORAGE_KEY = 'openclo-provider-config';
 
 /**
- * Load provider config from localStorage.
+ * Provider config stored in localStorage (no secrets).
+ */
+export interface StoredProviderConfig {
+  provider: string;
+  model?: string;
+  baseUrl?: string;
+  // apiKey is stored separately in SecureStorage
+}
+
+/**
+ * Load provider config from localStorage + apiKey from SecureStorage.
  * @returns ProviderConfig or null if not set
  */
 export function loadProviderConfig(): ProviderConfig | null {
   try {
     const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    if (!saved) return null;
+    const config: StoredProviderConfig = JSON.parse(saved);
+    // Retrieve apiKey from SecureStorage
+    const apiKey = SecureStorage.get(`${config.provider}-apikey`) ?? '';
+    return {
+      provider: config.provider as ProviderConfig['provider'],
+      model: config.model ?? '',
+      baseUrl: config.baseUrl,
+      apiKey,
+    };
   } catch { /* ignore */ }
   return null;
 }
 
 /**
- * Save provider config to localStorage.
+ * Save provider config to localStorage (no secrets) + apiKey to SecureStorage.
  * @param config - Provider configuration to save
  */
 export function saveProviderConfig(config: ProviderConfig): void {
-  import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'provider-config', config); }).catch(() => {});
-  try { localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+  // Store apiKey securely in SecureStorage
+  SecureStorage.set(`${config.provider}-apikey`, config.apiKey);
+  // Store non-secret config in localStorage
+  const storedConfig: StoredProviderConfig = {
+    provider: config.provider,
+    model: config.model,
+    baseUrl: config.baseUrl,
+  };
+  import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'provider-config', storedConfig); }).catch(() => {});
+  try { localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(storedConfig)); } catch { /* ignore */ }
 }
