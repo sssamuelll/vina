@@ -16,7 +16,7 @@ import {
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
 import { Planner } from '../../copilot/bridge/Planner';
-import { buildAgentContext, serializeContext } from '../../copilot/contextBuilder';
+import { buildAgentContext, serializeContext } from '../../copilot/perception/contextBuilder';
 import { useBridge } from '../../copilot/hooks/useBridge';
 import { ProgressMessage } from './ProgressMessage';
 import { CostManager } from '../../copilot/costManager';

@@ -7,7 +7,7 @@
  * @module teachingContext
  */
 
-import type { AgentLanguage } from './languageDetection';
+import type { AgentLanguage } from './perception/languageDetection';
 
 /**
  * A teaching snippet attached to a tool execution result.

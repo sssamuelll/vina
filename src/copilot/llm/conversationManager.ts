@@ -17,7 +17,8 @@ import type { LLMProvider, ProviderConfig, ChatMessage, StreamChunk } from '../p
 import type { CopilotAction, ActionResult } from '../actions/actionTypes';
 import { CopilotActionExecutor } from '../actions/actionExecutor';
 import { validateAction } from '../actions/actionValidator';
-import { generateCopilotContext, serializeCopilotContext, trackAction } from '../context';
+import { generateCopilotContext, serializeCopilotContext } from '../perception/copilotContext';
+import { trackAction } from '../perception/recentActionsTracker';
 import { parseResponse, createStreamParserState, processStreamChunk, finalizeStreamParser, type ParsedResponse, type StreamParserState } from './responseParser';
 import { generateRecoveryFeedback, buildRetryPrompt, shouldRetry, attemptAutoCorrect, type RetryOptions } from './errorRecovery';
 import { generateActionsPromptSection, generateCompactActionsReference } from './actionSchemas';

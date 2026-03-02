@@ -7,8 +7,8 @@
  * @module defaults
  */
 
-import type { AgentLanguage } from './languageDetection';
-import { getLocalizedPieceName } from './languageDetection';
+import type { AgentLanguage } from './perception/languageDetection';
+import { getLocalizedPieceName } from './perception/languageDetection';
 
 // ─── Seam Allowance Defaults ────────────────────────────────────────────────
 

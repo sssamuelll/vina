@@ -1,6 +1,6 @@
 import { Mic } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { type AgentLanguage } from '../../copilot/languageDetection';
+import { type AgentLanguage } from '../../copilot/perception/languageDetection';
 import { loadLanguagePreference } from '../../copilot/AgentSettings';
 
 /** Quick action chips for mobile */

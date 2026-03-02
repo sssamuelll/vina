@@ -126,3 +126,71 @@ export type {
   SimulationResult,
   IntentInput,
 } from './intentPredictor';
+
+// Context Builder
+export {
+  buildAgentContext,
+  serializeContext,
+  buildPieceSemantics,
+  buildSpatialRelationships,
+  getRecentDecisions,
+  buildCerebralContext,
+  serializeCerebralContext,
+  buildEnhancedAgentContext,
+} from './contextBuilder';
+
+export type {
+  PieceSummary,
+  SeamSummary,
+  FabricSummary,
+  AgentContext,
+  CerebralContextInput,
+  EnhancedAgentContext,
+  SpatialAnalysisResult,
+} from './contextBuilder';
+
+// Language Detection
+export {
+  detectLanguage,
+  getLocalizedPieceName,
+  getLabel,
+} from './languageDetection';
+
+export type { AgentLanguage } from './languageDetection';
+
+// Copilot Context (from context/)
+export {
+  generateCopilotContext,
+  serializeCopilotContext,
+  generateContextDelta,
+} from './copilotContext';
+
+export type {
+  CopilotPieceInfo,
+  CopilotSeamInfo,
+  CopilotSelection,
+  CopilotViewState,
+  CopilotSimulationState,
+  CopilotAvatarState,
+  CopilotContext,
+} from './copilotContext';
+
+// Recent Actions Tracker
+export {
+  trackAction,
+  getRecentActions,
+  getRecentSuccessfulActions,
+  getRecentActionsByType,
+  getActionsSince,
+  clearActions,
+  setMaxActions,
+  getRevision,
+  subscribe,
+  summarizeRecentActions,
+  withActionTracking,
+} from './recentActionsTracker';
+
+export type {
+  TrackedAction,
+  RecentActionsState,
+} from './recentActionsTracker';

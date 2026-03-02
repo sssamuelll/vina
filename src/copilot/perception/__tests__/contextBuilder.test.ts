@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { buildAgentContext, serializeContext, buildPieceSemantics, buildSpatialRelationships } from '../contextBuilder';
-import type { RootState } from '../../store';
-import type { PatternPiece, Seam } from '../../types/types';
+import type { RootState } from '../../../store';
+import type { PatternPiece, Seam } from '../../../types/types';
 
 function mockState(overrides?: Partial<RootState>): RootState {
   const base: RootState = {
@@ -419,8 +419,8 @@ describe('Context Builder - Spatial Relationships', () => {
 });
 
 import { getRecentDecisions, buildCerebralContext, serializeCerebralContext, type CerebralContextInput } from '../contextBuilder';
-import type { CerebralContext } from '../perception/types';
-import type { DesignLogEntry, SkillOverride } from '../perception/types';
+import type { CerebralContext } from '../types';
+import type { DesignLogEntry, SkillOverride } from '../types';
 
 describe('Context Builder - Design Log Integration', () => {
   const entries: DesignLogEntry[] = [

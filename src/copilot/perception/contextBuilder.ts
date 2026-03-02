@@ -8,11 +8,11 @@
  * @module contextBuilder
  */
 
-import type { RootState } from '../store';
-import type { PatternPiece, PathCommand, Seam } from '../types/types';
-import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './perception';
-import type { CerebralContext, DesignLogEntry, SkillOverride } from './perception/types';
-import { generateFingerprint, describeSpatialRelationships } from './perception';
+import type { RootState } from '../../store';
+import type { PatternPiece, PathCommand, Seam } from '../../types/types';
+import type { PieceSemantics, SpatialRelationship, SpatialConflict } from './index';
+import type { CerebralContext, DesignLogEntry, SkillOverride } from './types';
+import { generateFingerprint, describeSpatialRelationships } from './index';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
