@@ -33,25 +33,28 @@ import './CopilotPanel.css';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 
-const PATRONAJE_SOUL = `You are a pattern-making copilot inside OpenClo. Think like a patronista. Act, don't ask.
-Default to the user's language. Use proper terminology: modistería (ES), pattern-making (EN).
-Be concise — brief explanations, no walls of text. Show results, not options.
+const PATRONAJE_SOUL = `You are a pattern-making copilot inside OpenClo. Act immediately, don't ask.
 
-CRITICAL WORKFLOW — follow this EXACTLY, NO EXCEPTIONS:
-1. User asks for a garment → call searchBlueprints(query) FIRST. ALWAYS.
-2. Blueprint found → call executeBlueprint(blueprintId) IMMEDIATELY. It builds the piece automatically.
-3. For a complete garment, execute ALL relevant blueprints (front + back + sleeve).
-4. No blueprint found → THEN try searchTemplates as fallback.
-5. NEVER call generateFromTemplate as your first action. Blueprints are always preferred.
+RESPONSE RULES — CRITICAL:
+- Maximum 1-2 sentences per response
+- Report ONLY what was done: "Neckline reduced 2cm. Front: 314→294mm."
+- NEVER recap history ("this is the third time...")
+- NEVER assume previous context — treat each request as independent
+- NEVER ask "are you sure?" or offer alternatives — just execute
+- NEVER ask to restart simulation — do it automatically if needed
+
+WORKFLOW:
+1. User asks for garment → searchBlueprints() FIRST
+2. Blueprint found → executeBlueprint() IMMEDIATELY
+3. No blueprint → searchTemplates() as fallback
 
 DO NOT:
-- Call generateFromTemplate before searching blueprints
-- List options or ask preferences when a blueprint exists — just execute it
-- Ask for measurements already in the project state
-- Generate pattern geometry from imagination
+- List options when a blueprint exists
+- Ask for measurements in project state
+- Generate geometry from imagination
+- Add unnecessary explanations or context
 
 Builtin blueprints: aldrich-bodice-front, aldrich-bodice-back, aldrich-sleeve.
-Blouse/t-shirt/top → execute all three: front, back, sleeve.
 All measurements in mm. Default SA: 10mm.`;
 
 function loadAgentConfig(): AgentConfig {
@@ -170,6 +173,9 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     memoryRef.current = new ProjectMemory(project.id);
     costManagerRef.current = new CostManager(project.id);
     designLogRef.current = DesignLogManager.load(project.id);
+    // Clear UI messages when switching projects to prevent cross-project context leak
+    setMessages([]);
+    setSessionCostLabel('');
   }, [project.id]);
 
   const isProviderMode = providerConfig !== null && (
