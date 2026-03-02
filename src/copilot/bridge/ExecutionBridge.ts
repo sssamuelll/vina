@@ -63,6 +63,8 @@ export interface BridgeResult {
   summary?: ExpandableSummary;
   /** Error message if failed */
   error?: string;
+  /** Whether rollback is available for this execution */
+  canRollback?: boolean;
 }
 
 // ─── ExecutionBridge Class ──────────────────────────────────────────────────
@@ -135,11 +137,16 @@ export class ExecutionBridge {
       // Emit execution:complete
       this.emit({ type: 'execution:complete', success, summary });
 
+      // Determine if rollback is available
+      const hasRollbackFunctions = results.some((r) => r.rollback !== undefined);
+      const canRollback = this.config.enableRollback && hasRollbackFunctions;
+
       return {
         success,
         results,
         summary,
         error,
+        canRollback,
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
@@ -151,6 +158,7 @@ export class ExecutionBridge {
         success: false,
         results: [],
         error: errorMessage,
+        canRollback: false,
       };
     }
   }
