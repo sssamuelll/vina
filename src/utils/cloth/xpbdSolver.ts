@@ -609,14 +609,18 @@ export class XPBDClothSolver {
   private preSolve(sdt: number): void {
     const grav = new Float32Array(this.config.gravity);
 
+    // Compute internal damping factor: maps internalDamping (0.0 to 1.0) to factor (1.0 to 0.9)
+    const internalDampingFactor = 1.0 - this.config.internalDamping * 0.1;
+
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
 
       // Apply gravity
       vecAdd(this.vel, i, grav, 0, sdt);
 
-      // Apply damping
-      vecScale(this.vel, i, this.config.damping);
+      // Apply damping (global + internal)
+      const totalDamping = this.config.damping * internalDampingFactor;
+      vecScale(this.vel, i, totalDamping);
     }
 
     // Apply air drag after gravity integration but before position update

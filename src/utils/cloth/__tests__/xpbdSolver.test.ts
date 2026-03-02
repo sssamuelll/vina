@@ -492,6 +492,7 @@ describe('XPBDClothSolver - Air Drag', () => {
     const solver = new XPBDClothSolver(mesh, {
       dragCoefficient: 0.0,
       damping: 1.0, // No regular damping
+      internalDamping: 0.0, // No internal damping
       gravity: [0, 0, 0], // No gravity
       selfCollision: false, // Disable self-collision
       groundY: -100, // Move ground far away to avoid interference
