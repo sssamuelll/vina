@@ -15,3 +15,5 @@ export { Planner, PlannerError } from './Planner';
 export type { ToolSchema } from './Planner';
 export { Executor } from './Executor';
 export type { ToolRegistry, ToolFunction, Evaluator, ExecutionResult } from './Executor';
+export { Reasoner } from './Reasoner';
+export type { ReasonerLLM } from './Reasoner';
