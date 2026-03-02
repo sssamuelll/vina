@@ -8,7 +8,9 @@
  * @module ToolRegistry
  */
 
+import { z } from 'zod';
 import type { AppDispatch, RootState } from '../../../store';
+import { validateToolParams } from './validation';
 import { tools as pieceToolDefs } from './definitions/pieceTools';
 import { tools as internalToolDefs } from './definitions/internalTools';
 import { tools as seamToolDefs } from './definitions/seamTools';
@@ -87,6 +89,8 @@ export interface ToolDefinition {
   description: string;
   /** JSON Schema for parameters in OpenAI function calling format */
   parameters: ToolParametersSchema;
+  /** Optional Zod schema for runtime validation */
+  schema?: z.ZodSchema;
   /** Execute the tool with validated params */
   execute: (
     params: Record<string, unknown>,
@@ -121,6 +125,19 @@ export interface OpenAITool {
  */
 export class ToolRegistry {
   private tools: Map<string, ToolDefinition> = new Map();
+  private dispatch: AppDispatch | null = null;
+  private getState: (() => RootState) | null = null;
+
+  /**
+   * Set the Redux dispatch and getState functions.
+   * Must be called before using execute().
+   * @param dispatch - Redux dispatch function
+   * @param getState - Function that returns the current Redux state
+   */
+  setContext(dispatch: AppDispatch, getState: () => RootState): void {
+    this.dispatch = dispatch;
+    this.getState = getState;
+  }
 
   /**
    * Register a tool definition.
@@ -244,6 +261,39 @@ export class ToolRegistry {
     }
 
     return { valid: errors.length === 0, errors };
+  }
+
+  /**
+   * Execute a tool by name with the given parameters.
+   *
+   * If the tool has a Zod schema, parameters are validated before execution.
+   * Requires setContext() to have been called first.
+   *
+   * @param name - Name of the tool to execute
+   * @param params - Parameters to pass to the tool
+   * @returns ToolResult with success status and data or error
+   */
+  async execute(name: string, params: unknown): Promise<ToolResult> {
+    const tool = this.get(name);
+    if (!tool) {
+      return { success: false, error: `Unknown tool: ${name}` };
+    }
+
+    if (!this.dispatch || !this.getState) {
+      return { success: false, error: 'Registry context not set. Call setContext() first.' };
+    }
+
+    // Validate with Zod if schema exists
+    let validatedParams = params as Record<string, unknown>;
+    if (tool.schema) {
+      const validated = validateToolParams(tool.schema, params);
+      if (!validated.success) {
+        return { success: false, error: validated.error };
+      }
+      validatedParams = validated.data as Record<string, unknown>;
+    }
+
+    return tool.execute(validatedParams, this.dispatch, this.getState);
   }
 
   /**

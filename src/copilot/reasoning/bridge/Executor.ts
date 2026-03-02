@@ -22,16 +22,19 @@ import type {
 } from './types';
 import { isExecuteStep } from './types';
 import { ResultStore } from './ResultStore';
+import { ToolRegistry as UnifiedToolRegistry } from '../../action/tools/registry';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /**
  * A tool function that executes with parameters and returns a result.
+ * @deprecated Use UnifiedToolRegistry from '../../action/tools/registry' instead
  */
 export type ToolFunction = (params: Record<string, unknown>) => Promise<{ success: boolean; data?: unknown; error?: string }>;
 
 /**
  * Registry of available tools by name.
+ * @deprecated Use UnifiedToolRegistry from '../../action/tools/registry' instead
  */
 export type ToolRegistry = Record<string, ToolFunction>;
 
@@ -60,18 +63,23 @@ export interface ExecutionResult {
  * Executes plans step-by-step, resolving variable references and emitting events.
  */
 export class Executor {
-  private tools: ToolRegistry;
+  private tools: ToolRegistry | null = null;
+  private unifiedRegistry: UnifiedToolRegistry | null = null;
   private evaluator: Evaluator;
   private resultStore: ResultStore;
   private eventHandlers: BridgeEventHandler[] = [];
 
   /**
    * Create an Executor.
-   * @param tools - Registry of available tools
+   * @param tools - Registry of available tools (legacy Record or unified ToolRegistry)
    * @param evaluator - Function to call for evaluate steps
    */
-  constructor(tools: ToolRegistry, evaluator: Evaluator) {
-    this.tools = tools;
+  constructor(tools: ToolRegistry | UnifiedToolRegistry, evaluator: Evaluator) {
+    if (tools instanceof UnifiedToolRegistry) {
+      this.unifiedRegistry = tools;
+    } else {
+      this.tools = tools;
+    }
     this.evaluator = evaluator;
     this.resultStore = new ResultStore();
   }
@@ -172,7 +180,22 @@ export class Executor {
    * Execute an execute step (tool call).
    */
   private async executeExecuteStep(step: ExecuteStep): Promise<StepResult> {
-    const tool = this.tools[step.tool];
+    // Resolve variable references in params
+    const resolvedParams = this.resolveParams(step.params);
+
+    // Use unified registry if available
+    if (this.unifiedRegistry) {
+      const result = await this.unifiedRegistry.execute(step.tool, resolvedParams);
+      return {
+        stepId: step.id,
+        success: result.success,
+        data: result.data,
+        error: result.error,
+      };
+    }
+
+    // Fallback to legacy registry
+    const tool = this.tools?.[step.tool];
 
     if (!tool) {
       return {
@@ -181,9 +204,6 @@ export class Executor {
         error: `Unknown tool: ${step.tool}`,
       };
     }
-
-    // Resolve variable references in params
-    const resolvedParams = this.resolveParams(step.params);
 
     // Call the tool
     const result = await tool(resolvedParams);
