@@ -4,10 +4,13 @@
  * Takes semantic resolution and produces a lean but complete context
  * that the Planner can use without needing to infer values.
  *
+ * Uses detectSemanticEdges for geometry-based edge detection when
+ * piece.edges is not populated.
+ *
  * @module copilot/intelligence/ContextEnricher
  */
 
-import type { PatternPiece } from '../../types/types';
+import type { PatternPiece, SemanticEdge } from '../../types/types';
 import type {
   Resolution,
   PieceClassification,
@@ -18,6 +21,17 @@ import type {
 } from './types';
 import { MeasurementCalculator } from './MeasurementCalculator';
 import { getRelatedMeasurement } from './GarmentKnowledge';
+import { detectSemanticEdges } from '../../utils/semanticEdges';
+
+/**
+ * Get edges for a piece, using geometry-based detection if not populated.
+ */
+function getEdges(piece: PatternPiece): SemanticEdge[] {
+  if (piece.edges && piece.edges.length > 0) {
+    return piece.edges;
+  }
+  return detectSemanticEdges(piece);
+}
 
 /**
  * Enriches semantic resolution into Planner-ready context.
@@ -52,7 +66,9 @@ export class ContextEnricher {
         const classification = classMap.get(pieceId);
         if (!piece || !classification) continue;
 
-        const edgeData = piece.edges?.find(e => e.name === edge.resolved);
+        // Use geometry-based edge detection if piece.edges not populated
+        const edges = getEdges(piece);
+        const edgeData = edges.find(e => e.name === edge.resolved);
         targets.push({
           pieceId,
           pieceName: piece.name,
@@ -77,7 +93,9 @@ export class ContextEnricher {
 
     const availableEdgesPerPiece: Record<string, string[]> = {};
     for (const piece of pieces) {
-      availableEdgesPerPiece[piece.id] = piece.edges?.map(e => e.name) ?? [];
+      // Use geometry-based edge detection if piece.edges not populated
+      const edges = getEdges(piece);
+      availableEdgesPerPiece[piece.id] = edges.map(e => e.name);
     }
 
     const relatedMeasurements: Record<string, number> = {};

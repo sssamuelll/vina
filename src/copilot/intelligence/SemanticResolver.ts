@@ -4,10 +4,13 @@
  * Uses fuzzy matching against the GarmentKnowledge base and validates
  * resolved entities against actual piece edges for 100% accuracy.
  *
+ * Uses detectSemanticEdges for geometry-based edge detection when
+ * piece.edges is not populated.
+ *
  * @module copilot/intelligence/SemanticResolver
  */
 
-import type { PatternPiece } from '../../types/types';
+import type { PatternPiece, SemanticEdge } from '../../types/types';
 import type {
   PieceClassification,
   Resolution,
@@ -19,6 +22,17 @@ import type {
   OperationType,
 } from './types';
 import { findEdgeByUserTerm } from './GarmentKnowledge';
+import { detectSemanticEdges } from '../../utils/semanticEdges';
+
+/**
+ * Get edges for a piece, using geometry-based detection if not populated.
+ */
+function getEdges(piece: PatternPiece): SemanticEdge[] {
+  if (piece.edges && piece.edges.length > 0) {
+    return piece.edges;
+  }
+  return detectSemanticEdges(piece);
+}
 
 /**
  * Resolves user terms to technical pattern terminology with validation.
@@ -109,6 +123,15 @@ export class SemanticResolver {
       classMap.set(c.pieceId, c);
     }
 
+    // Cache detected edges per piece (geometry-based detection is expensive)
+    const edgesCache = new Map<string, SemanticEdge[]>();
+    const getPieceEdges = (piece: PatternPiece): SemanticEdge[] => {
+      if (!edgesCache.has(piece.id)) {
+        edgesCache.set(piece.id, getEdges(piece));
+      }
+      return edgesCache.get(piece.id)!;
+    };
+
     for (const term of words) {
       for (const piece of pieces) {
         const classification = classMap.get(piece.id);
@@ -117,7 +140,9 @@ export class SemanticResolver {
         const resolvedName = findEdgeByUserTerm(term, classification.type);
         if (!resolvedName) continue;
 
-        const hasEdge = piece.edges?.some(e =>
+        // Use geometry-based edge detection if piece.edges not populated
+        const pieceEdges = getPieceEdges(piece);
+        const hasEdge = pieceEdges.some(e =>
           e.name.toLowerCase() === resolvedName.toLowerCase()
         );
         if (!hasEdge) continue;
@@ -140,7 +165,9 @@ export class SemanticResolver {
     if (edges.length === 0) {
       for (const term of words) {
         for (const piece of pieces) {
-          const matchingEdge = piece.edges?.find(e =>
+          // Use geometry-based edge detection if piece.edges not populated
+          const pieceEdges = getPieceEdges(piece);
+          const matchingEdge = pieceEdges.find(e =>
             e.name.toLowerCase().includes(term.toLowerCase())
           );
           if (matchingEdge) {

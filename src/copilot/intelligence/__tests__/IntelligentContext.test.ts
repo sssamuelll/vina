@@ -97,4 +97,58 @@ describe('IntelligentContext', () => {
       expect(serialized).toContain('IMPORTANT');
     });
   });
+
+  describe('geometry-based edge detection', () => {
+    it('detects edges from geometry when piece.edges is empty', () => {
+      // Piece with outline geometry but no pre-populated edges
+      // This bodice-front-like shape should detect neckline, armhole, hemline, etc.
+      const stateWithGeometry: MockState = {
+        project: {
+          pieces: [
+            {
+              id: 'front-bodice',
+              name: 'Front Bodice',  // Name hints at bodice-front
+              outline: [
+                { type: 'M', values: [0, 0] },           // Start at top-left
+                { type: 'C', values: [50, -20, 100, -20, 150, 0] },  // Neckline curve (concave at top)
+                { type: 'L', values: [200, 50] },       // Shoulder (top-right)
+                { type: 'C', values: [220, 100, 220, 150, 200, 200] }, // Armhole curve
+                { type: 'L', values: [200, 400] },      // Side seam (right side)
+                { type: 'L', values: [0, 400] },        // Hemline (bottom)
+                { type: 'Z', values: [] },              // Close path
+              ],
+              edges: undefined,  // Explicitly no edges - will use geometry detection
+              position: { x: 0, y: 0 },
+              rotation: 0,
+              mirrored: false,
+              seamAllowance: 10,
+              internals: [],
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            } as PatternPiece,
+          ],
+          avatar: {
+            measurements: {
+              height: 170,
+              chest: 92,
+              waist: 76,
+              hips: 98,
+              shoulder: 42,
+              armLength: 60,
+              inseam: 80,
+            },
+          },
+        },
+      };
+
+      const intelligence = new IntelligentContext(
+        stateWithGeometry as { project: { pieces: PatternPiece[]; avatar: { measurements: BodyMeasurements } } }
+      );
+      const result = intelligence.process('reduce el escote 2cm');
+
+      // Should detect edges from geometry and resolve 'escote' to an edge
+      expect(result.availableEdgesPerPiece['front-bodice']).toBeDefined();
+      expect(result.availableEdgesPerPiece['front-bodice'].length).toBeGreaterThan(0);
+    });
+  });
 });
