@@ -40,9 +40,15 @@ export class MeasurementCalculator {
     const currentLength = pieceEdges[edge.resolved];
     if (currentLength === undefined) return null;
 
-    const direction = originalRequest
-      ? this.detectDirection(originalRequest)
-      : 'reduce';
+    // Determine direction from parsed value operation, or detect from request
+    let direction: 'increase' | 'reduce' = 'reduce';
+    if (value.operation === 'increase') {
+      direction = 'increase';
+    } else if (value.operation === 'reduce') {
+      direction = 'reduce';
+    } else if (originalRequest) {
+      direction = this.detectDirection(originalRequest);
+    }
 
     const delta = direction === 'increase' ? value.value : -value.value;
     const targetValue = currentLength + delta;
@@ -71,11 +77,11 @@ export class MeasurementCalculator {
   private detectDirection(request: string): 'increase' | 'reduce' {
     const r = request.toLowerCase();
 
-    if (/aumenta|incrementa|agranda|expande|alarga/i.test(r)) return 'increase';
-    if (/increase|expand|widen|lengthen|enlarge|grow/i.test(r)) return 'increase';
+    if (/aumenta|incrementa|agranda|expande|alarga/.test(r)) return 'increase';
+    if (/increase|expand|widen|lengthen|enlarge|grow/.test(r)) return 'increase';
 
-    if (/reduce|reducir|disminuir|acortar|encog/i.test(r)) return 'reduce';
-    if (/shrink|decrease|narrow|shorten/i.test(r)) return 'reduce';
+    if (/reduce|reducir|disminuir|acortar|encog/.test(r)) return 'reduce';
+    if (/shrink|decrease|narrow|shorten/.test(r)) return 'reduce';
 
     return 'reduce';
   }
