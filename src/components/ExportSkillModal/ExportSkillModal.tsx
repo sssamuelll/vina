@@ -5,8 +5,8 @@ import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { X, Download, Check, AlertTriangle } from 'lucide-react';
 import type { RootState } from '../../store';
-import { SkillBuilder } from '../../copilot/skills/SkillBuilder';
-import { SkillRegistry } from '../../copilot/skills/skillRegistry';
+import { SkillBuilder } from '../../copilot/action/skills/SkillBuilder';
+import { SkillRegistry } from '../../copilot/action/skills/skillRegistry';
 import './ExportSkillModal.css';
 
 interface ExportSkillModalProps {

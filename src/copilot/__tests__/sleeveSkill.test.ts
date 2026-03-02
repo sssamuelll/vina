@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sleeveSkill } from '../skills/definitions/sleeveSkill';
+import { sleeveSkill } from '../action/skills/definitions/sleeveSkill';
 
 describe('sleeveSkill', () => {
   describe('structure', () => {

@@ -6,8 +6,8 @@
  */
 import { useState, useCallback, useRef } from 'react';
 import { X, Upload, AlertTriangle, Check } from 'lucide-react';
-import { convertSeamlyToSkill, type ConversionResult } from '../../copilot/skills/seamlyToSkill';
-import { SkillRegistry } from '../../copilot/skills/skillRegistry';
+import { convertSeamlyToSkill, type ConversionResult } from '../../copilot/action/skills/seamlyToSkill';
+import { SkillRegistry } from '../../copilot/action/skills/skillRegistry';
 import './ImportSeamlyModal.css';
 
 interface ImportSeamlyModalProps {

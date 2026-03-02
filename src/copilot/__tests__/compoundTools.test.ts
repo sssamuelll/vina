@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ToolRegistry, getDefaultRegistry, resetDefaultRegistry } from '../tools/registry';
+import { ToolRegistry, getDefaultRegistry, resetDefaultRegistry } from '../action/tools/registry';
 
 describe('Compound Tools', () => {
   let registry: ToolRegistry;

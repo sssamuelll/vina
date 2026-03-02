@@ -4,7 +4,7 @@
  * @module providerTypes
  */
 
-import type { ToolParametersSchema } from '../tools/registry';
+import type { ToolParametersSchema } from '../action/tools/registry';
 
 /**
  * A message in the conversation history.

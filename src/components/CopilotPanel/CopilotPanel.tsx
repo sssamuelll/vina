@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState, store } from '../../store';
 import { AgentConfig } from '../../copilot/protocol';
-import { getDefaultRegistry } from '../../copilot/tools/registry';
+import { getDefaultRegistry } from '../../copilot/action/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
 import { deepseekProvider } from '../../copilot/providers/deepseek';

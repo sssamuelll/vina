@@ -8,7 +8,7 @@
  * @module plugins/pluginRegistry
  */
 
-import type { ToolDefinition, ToolResult } from '../tools/registry';
+import type { ToolDefinition, ToolResult } from '../action/tools/registry';
 import type {
   OpenCloPlugin,
   PluginFabric,

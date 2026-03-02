@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { skirtSkill } from '../skills/definitions/skirtSkill';
+import { skirtSkill } from '../action/skills/definitions/skirtSkill';
 
 describe('skirtSkill', () => {
   describe('structure', () => {

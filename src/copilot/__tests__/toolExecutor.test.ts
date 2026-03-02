@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { executeToolCalls, formatExecutionSummary, LLMToolCall } from '../toolExecutor';
-import { ToolRegistry, ToolDefinition, ToolResult } from '../tools/registry';
+import { ToolRegistry, ToolDefinition, ToolResult } from '../action/tools/registry';
 import type { AppDispatch, RootState } from '../../store';
 
 function createTestTool(name: string, result: ToolResult): ToolDefinition {

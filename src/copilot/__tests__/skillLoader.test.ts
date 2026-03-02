@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { loadSkill, getRelevantSkills, buildSkillContext } from '../skills/skillLoader';
-import { resetSkillRegistry, getDefaultSkillRegistry } from '../skills/skillRegistry';
+import { loadSkill, getRelevantSkills, buildSkillContext } from '../action/skills/skillLoader';
+import { resetSkillRegistry, getDefaultSkillRegistry } from '../action/skills/skillRegistry';
 
 describe('skillLoader', () => {
   beforeEach(async () => {

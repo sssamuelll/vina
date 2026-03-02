@@ -15,7 +15,7 @@ import markerReducer from '../../store/markerSlice';
 import avatarReducer from '../../store/avatarSlice';
 import toolReducer from '../../store/toolSlice';
 import parametricReducer from '../../store/parametricSlice';
-import { getDefaultRegistry, resetDefaultRegistry, type ToolDefinition } from '../tools/registry';
+import { getDefaultRegistry, resetDefaultRegistry, type ToolDefinition } from '../action/tools/registry';
 import type { RootState, AppDispatch } from '../../store';
 
 // ─── Test Store Factory ─────────────────────────────────────────────────────

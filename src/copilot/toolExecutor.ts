@@ -17,7 +17,7 @@
 
 import type { AppDispatch, RootState } from '../store';
 import type { PatternPiece } from '../types/types';
-import { ToolRegistry, ToolResult } from './tools/registry';
+import { ToolRegistry, ToolResult } from './action/tools/registry';
 import { checkAreaIntegrity, checkSelfIntersection, formatAuditResultsForLLM } from './perception';
 import type { AuditResult } from './perception/types';
 

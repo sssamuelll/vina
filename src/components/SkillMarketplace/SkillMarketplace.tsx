@@ -3,10 +3,10 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Upload } from 'lucide-react';
-import { SkillRegistry } from '../../copilot/skills/skillRegistry';
-import { fetchAvailableSkills, getSkillRegistryUrl } from '../../copilot/skills/marketplace';
-import type { CommunitySkill } from '../../copilot/skills/communityFormat';
-import type { RegisteredSkill } from '../../copilot/skills/registryTypes';
+import { SkillRegistry } from '../../copilot/action/skills/skillRegistry';
+import { fetchAvailableSkills, getSkillRegistryUrl } from '../../copilot/action/skills/marketplace';
+import type { CommunitySkill } from '../../copilot/action/skills/communityFormat';
+import type { RegisteredSkill } from '../../copilot/action/skills/registryTypes';
 import SkillCard from './SkillCard';
 import SkillCardInstalled from './SkillCardInstalled';
 import ImportSeamlyModal from './ImportSeamlyModal';

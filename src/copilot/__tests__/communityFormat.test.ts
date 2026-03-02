@@ -6,9 +6,9 @@ import {
   communitySkillToJSON,
   communitySkillFromJSON,
   COMMUNITY_SKILL_SCHEMA_VERSION,
-} from '../skills/communityFormat';
-import type { CommunitySkill, CommunitySkillMetadata } from '../skills/communityFormat';
-import type { PatternSkill } from '../skills/types';
+} from '../action/skills/communityFormat';
+import type { CommunitySkill, CommunitySkillMetadata } from '../action/skills/communityFormat';
+import type { PatternSkill } from '../action/skills/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

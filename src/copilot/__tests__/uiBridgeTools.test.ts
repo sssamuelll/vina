@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getDefaultRegistry, resetDefaultRegistry } from '../tools/registry';
+import { getDefaultRegistry, resetDefaultRegistry } from '../action/tools/registry';
 
 describe('UI Bridge Tools (#82)', () => {
   const basePiece = {

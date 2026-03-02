@@ -16,9 +16,9 @@ import {
   loadInstalledCommunitySkills,
   getInstalledSkillsAsPatternSkills,
   resetMarketplace,
-} from '../skills/marketplace';
-import type { CommunitySkill } from '../skills/communityFormat';
-import { COMMUNITY_SKILL_SCHEMA_VERSION } from '../skills/communityFormat';
+} from '../action/skills/marketplace';
+import type { CommunitySkill } from '../action/skills/communityFormat';
+import { COMMUNITY_SKILL_SCHEMA_VERSION } from '../action/skills/communityFormat';
 
 // ─── Mock localStorage ──────────────────────────────────────────────────────
 const store: Record<string, string> = {};

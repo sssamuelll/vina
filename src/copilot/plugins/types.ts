@@ -8,8 +8,8 @@
  * @module plugins/types
  */
 
-import type { PatternSkill } from '../skills/types';
-import type { ToolParametersSchema, ToolResult } from '../tools/registry';
+import type { PatternSkill } from '../action/skills/types';
+import type { ToolParametersSchema, ToolResult } from '../action/tools/registry';
 import type { FabricMaterial } from '../../utils/cloth/fabricLibrary';
 
 // ─── Permissions ────────────────────────────────────────────────────────────

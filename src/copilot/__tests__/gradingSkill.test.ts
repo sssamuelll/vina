@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { gradingSkill } from '../skills/definitions/gradingSkill';
+import { gradingSkill } from '../action/skills/definitions/gradingSkill';
 
 describe('gradingSkill', () => {
   describe('structure', () => {

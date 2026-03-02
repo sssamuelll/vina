@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ToolRegistry, ToolDefinition, ToolResult } from '../tools/registry';
+import { ToolRegistry, ToolDefinition, ToolResult } from '../action/tools/registry';
 
 // Helper: create a simple tool definition
 function createMockTool(name: string, required?: string[]): ToolDefinition {

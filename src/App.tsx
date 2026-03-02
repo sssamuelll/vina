@@ -3,7 +3,7 @@ import { Provider } from 'react-redux';
 import { store } from './store';
 import Workspace from './components/Workspace/Workspace';
 import SolverMetrics from './components/Debug/SolverMetrics';
-import { SkillRegistry } from './copilot/skills/skillRegistry';
+import { SkillRegistry } from './copilot/action/skills/skillRegistry';
 import './App.css';
 
 function App() {

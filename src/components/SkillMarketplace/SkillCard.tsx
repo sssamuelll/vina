@@ -2,7 +2,7 @@
  * SkillCard — displays a single skill in the Browse tab.
  */
 import { Download, Check, Loader2 } from 'lucide-react';
-import type { CommunitySkillMetadata } from '../../copilot/skills/communityFormat';
+import type { CommunitySkillMetadata } from '../../copilot/action/skills/communityFormat';
 
 interface SkillCardProps {
   metadata: CommunitySkillMetadata;

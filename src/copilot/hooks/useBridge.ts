@@ -17,7 +17,7 @@ import {
   type ReasonerLLM,
   DEFAULT_BRIDGE_CONFIG,
 } from '../reasoning/bridge';
-import { getDefaultRegistry } from '../tools/registry';
+import { getDefaultRegistry } from '../action/tools/registry';
 
 export interface UseBridgeOptions {
   /** LLM function for planning */

@@ -2,8 +2,8 @@
  * SkillCardInstalled — displays an installed skill with enable/disable toggle.
  */
 import { Trash2 } from 'lucide-react';
-import type { RegisteredSkill } from '../../copilot/skills/registryTypes';
-import { isCoreSkill } from '../../copilot/skills/coreSkills';
+import type { RegisteredSkill } from '../../copilot/action/skills/registryTypes';
+import { isCoreSkill } from '../../copilot/action/skills/coreSkills';
 
 interface SkillCardInstalledProps {
   skill: RegisteredSkill;

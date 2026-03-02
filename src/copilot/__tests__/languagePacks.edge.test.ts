@@ -15,9 +15,9 @@ import {
   getLanguagePack,
   listAvailableLanguages,
   resetLanguagePacks,
-} from '../skills/languagePacks';
-import type { LanguagePack } from '../skills/languagePacks';
-import type { PatternSkill } from '../skills/types';
+} from '../action/skills/languagePacks';
+import type { LanguagePack } from '../action/skills/languagePacks';
+import type { PatternSkill } from '../action/skills/types';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 

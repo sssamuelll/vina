@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bodiceSkill } from '../skills/definitions/bodiceSkill';
+import { bodiceSkill } from '../action/skills/definitions/bodiceSkill';
 
 describe('bodiceSkill', () => {
   describe('structure', () => {
