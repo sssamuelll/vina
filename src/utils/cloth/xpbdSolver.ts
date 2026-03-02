@@ -146,6 +146,8 @@ export interface ClothSimConfig {
   bendComplianceWarp: number;
   /** Bending compliance in weft direction (horizontal in UV) */
   bendComplianceWeft: number;
+  /** Internal damping (0.0 = fluid/oscillates, 1.0 = heavy/settles quickly). Default: 0.3 */
+  internalDamping: number;
 }
 
 /**
@@ -360,6 +362,7 @@ export class XPBDClothSolver {
       stretchComplianceShear: 0.001,
       bendComplianceWarp: 1.0,
       bendComplianceWeft: 1.0,
+      internalDamping: 0.3,
       ...config,
     };
 

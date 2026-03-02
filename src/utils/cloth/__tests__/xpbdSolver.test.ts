@@ -418,6 +418,24 @@ describe('XPBDClothSolver - Anisotropic Bending', () => {
 
 // ─── Air Drag ───────────────────────────────────────────────────────────
 
+// ─── Internal Damping ────────────────────────────────────────────────────
+
+describe('XPBDClothSolver - Internal Damping', () => {
+  it('should have internalDamping in config with default value', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh);
+    expect(solver.config.internalDamping).toBe(0.3);
+  });
+
+  it('should accept custom internalDamping value', () => {
+    const mesh = makeSquareMesh();
+    const solver = new XPBDClothSolver(mesh, { internalDamping: 0.8 });
+    expect(solver.config.internalDamping).toBe(0.8);
+  });
+});
+
+// ─── Air Drag ───────────────────────────────────────────────────────────
+
 describe('XPBDClothSolver - Air Drag', () => {
   it('should have dragCoefficient in default config', () => {
     const mesh = makeSquareMesh();
