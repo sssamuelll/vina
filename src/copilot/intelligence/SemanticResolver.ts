@@ -27,11 +27,11 @@ export class SemanticResolver {
   /**
    * Resolve a user request to technical entities.
    */
-  async resolve(
+  resolve(
     request: string,
     pieces: PatternPiece[],
     classifications: PieceClassification[],
-  ): Promise<Resolution> {
+  ): Resolution {
     const intent = this.detectIntent(request);
     const values = this.parseValues(request);
     const edges = this.resolveEdges(request, pieces, classifications);
@@ -79,7 +79,7 @@ export class SemanticResolver {
     const patterns = [
       { regex: /(\d+(?:\.\d+)?)\s*cm/gi, unit: 'cm' as const, multiplier: 10 },
       { regex: /(\d+(?:\.\d+)?)\s*mm/gi, unit: 'mm' as const, multiplier: 1 },
-      { regex: /(\d+(?:\.\d+)?)\s*(?:inch|in|")/gi, unit: 'cm' as const, multiplier: 25.4 },
+      { regex: /(\d+(?:\.\d+)?)\s*(?:inch|in|")/gi, unit: 'mm' as const, multiplier: 25.4 },
     ];
 
     for (const { regex, unit, multiplier } of patterns) {
@@ -144,12 +144,18 @@ export class SemanticResolver {
             e.name.toLowerCase().includes(term.toLowerCase())
           );
           if (matchingEdge) {
-            edges.push({
-              userTerm: term,
-              resolved: matchingEdge.name,
-              pieceIds: [piece.id],
-              confidence: 0.7,
-            });
+            // Check for duplicates before adding
+            const existing = edges.find(
+              e => e.resolved === matchingEdge.name && e.pieceIds.includes(piece.id)
+            );
+            if (!existing) {
+              edges.push({
+                userTerm: term,
+                resolved: matchingEdge.name,
+                pieceIds: [piece.id],
+                confidence: 0.7,
+              });
+            }
           }
         }
       }

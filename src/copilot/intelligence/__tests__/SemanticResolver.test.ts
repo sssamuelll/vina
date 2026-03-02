@@ -36,8 +36,8 @@ describe('SemanticResolver', () => {
   ];
 
   describe('resolve', () => {
-    it('resolves "reduce el escote 2cm" with certain confidence', async () => {
-      const result = await resolver.resolve(
+    it('resolves "reduce el escote 2cm" with certain confidence', () => {
+      const result = resolver.resolve(
         'reduce el escote 2cm',
         mockPieces as PatternPiece[],
         mockClassifications,
@@ -52,8 +52,8 @@ describe('SemanticResolver', () => {
       expect(result.entities.values[0].value).toBe(20);
     });
 
-    it('resolves "aumenta el hombro 5mm"', async () => {
-      const result = await resolver.resolve(
+    it('resolves "aumenta el hombro 5mm"', () => {
+      const result = resolver.resolve(
         'aumenta el hombro 5mm',
         mockPieces as PatternPiece[],
         mockClassifications,
@@ -64,8 +64,8 @@ describe('SemanticResolver', () => {
       expect(result.entities.values[0].value).toBe(5);
     });
 
-    it('resolves English terms: "reduce neckline by 1 inch"', async () => {
-      const result = await resolver.resolve(
+    it('resolves English terms: "reduce neckline by 1 inch"', () => {
+      const result = resolver.resolve(
         'reduce neckline by 1 inch',
         mockPieces as PatternPiece[],
         mockClassifications,
@@ -75,8 +75,8 @@ describe('SemanticResolver', () => {
       expect(result.entities.values[0].value).toBeCloseTo(25.4, 1);
     });
 
-    it('returns ambiguous when edge not found', async () => {
-      const result = await resolver.resolve(
+    it('returns ambiguous when edge not found', () => {
+      const result = resolver.resolve(
         'reduce el xyz 2cm',
         mockPieces as PatternPiece[],
         mockClassifications,
@@ -86,14 +86,14 @@ describe('SemanticResolver', () => {
       expect(result.entities.edges).toHaveLength(0);
     });
 
-    it('validates resolved edge exists on piece', async () => {
+    it('validates resolved edge exists on piece', () => {
       const piecesWithoutNeckline: Partial<PatternPiece>[] = [{
         id: 'front',
         name: 'Front Bodice',
         edges: [{ id: 'e1', name: 'shoulder', segmentRange: [0, 1], edgeType: 'seam', length: 150 }],
       }];
 
-      const result = await resolver.resolve(
+      const result = resolver.resolve(
         'reduce el escote 2cm',
         piecesWithoutNeckline as PatternPiece[],
         [{ pieceId: 'front', type: 'bodice-front', confidence: 0.95 }],
