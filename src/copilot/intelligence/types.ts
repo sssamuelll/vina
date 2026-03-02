@@ -26,6 +26,7 @@ export type PieceSide = 'front' | 'back' | 'left' | 'right';
 export interface PieceClassification {
   pieceId: string;
   type: PieceType;
+  /** Confidence score from 0 (none) to 1 (certain) */
   confidence: number;
   side?: PieceSide;
 }
@@ -40,6 +41,7 @@ export interface ResolvedEdge {
   userTerm: string;
   resolved: string;
   pieceIds: string[];
+  /** Confidence score from 0 (none) to 1 (certain) */
   confidence: number;
 }
 
@@ -47,6 +49,7 @@ export interface ResolvedPiece {
   userTerm: string;
   pieceId: string;
   type: PieceType;
+  /** Confidence score from 0 (none) to 1 (certain) */
   confidence: number;
 }
 
