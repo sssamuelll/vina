@@ -39,7 +39,8 @@ interface WasmXpbdSolver {
             groundY: number, dragCoefficient: number,
             stretchComplianceWarp: number, stretchComplianceWeft: number,
             stretchComplianceShear: number,
-            bendComplianceWarp: number, bendComplianceWeft: number): void;
+            bendComplianceWarp: number, bendComplianceWeft: number,
+            internal_damping: number): void;
   step(dt: number): void;
   positions_ptr(): number;
   num_particles(): number;
@@ -174,6 +175,7 @@ self.onmessage = async (event: MessageEvent) => {
           config.stretchComplianceShear ?? 0.001,
           config.bendComplianceWarp ?? 1.0,
           config.bendComplianceWeft ?? 1.0,
+          config.internalDamping ?? 0.3,
         );
         console.log('[WasmWorker] Solver configured with dragCoefficient =', config.dragCoefficient ?? 1.0);
 
@@ -210,7 +212,7 @@ self.onmessage = async (event: MessageEvent) => {
         if (solver) {
           console.log('[WasmWorker] Running initial collision settling...');
           // Temporarily configure solver with zero gravity for settling
-          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0, 0.0, 0.0, 0.0, 0.001, 1.0, 1.0);
+          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0, 0.0, 0.0, 0.0, 0.001, 1.0, 1.0, 0.3);
 
           // Run several small steps to let SDF collision push particles out
           for (let i = 0; i < 20; i++) {
@@ -218,7 +220,7 @@ self.onmessage = async (event: MessageEvent) => {
           }
 
           // Restore normal gravity
-          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0, 1.0, 0.0, 0.0, 0.001, 1.0, 1.0);
+          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0, 1.0, 0.0, 0.0, 0.001, 1.0, 1.0, 0.3);
 
           // Send settled positions to client
           const n = numParticles;
