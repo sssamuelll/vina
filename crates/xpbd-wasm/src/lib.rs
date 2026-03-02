@@ -68,6 +68,9 @@ pub struct XpbdSolver {
     bend_compliance_warp: f32,
     bend_compliance_weft: f32,
     bend_compliances: Vec<f32>,  // Per-constraint compliance
+
+    // Internal damping
+    internal_damping: f32,
 }
 
 #[wasm_bindgen]
@@ -122,6 +125,7 @@ impl XpbdSolver {
             bend_compliance_warp: 1.0,
             bend_compliance_weft: 1.0,
             bend_compliances: Vec::new(),
+            internal_damping: 0.3,
         }
     }
 
@@ -242,7 +246,8 @@ impl XpbdSolver {
                      ground_y: f32, drag_coefficient: f32,
                      stretch_compliance_warp: f32, stretch_compliance_weft: f32,
                      stretch_compliance_shear: f32,
-                     bend_compliance_warp: f32, bend_compliance_weft: f32) {
+                     bend_compliance_warp: f32, bend_compliance_weft: f32,
+                     internal_damping: f32) {
         self.substeps = substeps;
         self.damping = damping;
         self.gravity[1] = gravity_y;
@@ -258,6 +263,7 @@ impl XpbdSolver {
         self.stretch_compliance_shear = stretch_compliance_shear;
         self.bend_compliance_warp = bend_compliance_warp;
         self.bend_compliance_weft = bend_compliance_weft;
+        self.internal_damping = internal_damping;
     }
 
     /// Step the simulation forward one frame.
@@ -305,6 +311,10 @@ impl XpbdSolver {
     // ─── Internal solver passes ─────────────────────────────────────────
 
     fn pre_solve(&mut self, sdt: f32) {
+        // Compute total damping with internal damping factor
+        let internal_damping_factor = 1.0 - self.internal_damping * 0.1;
+        let total_damping = self.damping * internal_damping_factor;
+
         for i in 0..self.num_particles {
             if self.inv_mass[i] == 0.0 { continue; }
             let idx = i * 3;
@@ -319,10 +329,10 @@ impl XpbdSolver {
             self.velocities[idx + 1] += self.gravity[1] * sdt;
             self.velocities[idx + 2] += self.gravity[2] * sdt;
 
-            // Damping
-            self.velocities[idx] *= self.damping;
-            self.velocities[idx + 1] *= self.damping;
-            self.velocities[idx + 2] *= self.damping;
+            // Damping (using total_damping which includes internal damping)
+            self.velocities[idx] *= total_damping;
+            self.velocities[idx + 1] *= total_damping;
+            self.velocities[idx + 2] *= total_damping;
 
             // Integrate
             self.positions[idx] += self.velocities[idx] * sdt;
