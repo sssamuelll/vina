@@ -31,9 +31,16 @@ export class XpbdSolver {
      * @param {number} thickness
      * @param {number} collision_margin
      * @param {number} ground_y
+     * @param {number} drag_coefficient
+     * @param {number} stretch_compliance_warp
+     * @param {number} stretch_compliance_weft
+     * @param {number} stretch_compliance_shear
+     * @param {number} bend_compliance_warp
+     * @param {number} bend_compliance_weft
+     * @param {number} internal_damping
      */
-    configure(substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin, ground_y) {
-        wasm.xpbdsolver_configure(this.__wbg_ptr, substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin, ground_y);
+    configure(substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin, ground_y, drag_coefficient, stretch_compliance_warp, stretch_compliance_weft, stretch_compliance_shear, bend_compliance_warp, bend_compliance_weft, internal_damping) {
+        wasm.xpbdsolver_configure(this.__wbg_ptr, substeps, damping, gravity_y, stretch_compliance, bend_compliance, self_collision, thickness, collision_margin, ground_y, drag_coefficient, stretch_compliance_warp, stretch_compliance_weft, stretch_compliance_shear, bend_compliance_warp, bend_compliance_weft, internal_damping);
     }
     /**
      * Create a new solver with particle positions and inverse masses.
@@ -91,6 +98,22 @@ export class XpbdSolver {
         wasm.xpbdsolver_set_bend(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
+     * Set bend constraints with edge type classification.
+     * edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR (SHEAR defaults to WEFT for bending)
+     * @param {Uint32Array} ids
+     * @param {Float32Array} rest_angles
+     * @param {Uint8Array} edge_types
+     */
+    set_bend_with_types(ids, rest_angles, edge_types) {
+        const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(rest_angles, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray8ToWasm0(edge_types, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        wasm.xpbdsolver_set_bend_with_types(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
+    }
+    /**
      * Set pinned vertices with target positions.
      * indices: flat array of vertex indices to pin
      * positions: flat array [x,y,z, x,y,z, ...] of target positions
@@ -141,6 +164,31 @@ export class XpbdSolver {
         const ptr1 = passArrayF32ToWasm0(rest_lengths, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         wasm.xpbdsolver_set_stretch(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+    }
+    /**
+     * Set stretch constraints with edge type classification.
+     * edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR
+     * @param {Uint32Array} ids
+     * @param {Float32Array} rest_lengths
+     * @param {Uint8Array} edge_types
+     */
+    set_stretch_with_types(ids, rest_lengths, edge_types) {
+        const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(rest_lengths, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passArray8ToWasm0(edge_types, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        wasm.xpbdsolver_set_stretch_with_types(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
+    }
+    /**
+     * Set triangle indices for air drag calculation.
+     * @param {Uint32Array} tri_ids
+     */
+    set_triangles(tri_ids) {
+        const ptr0 = passArray32ToWasm0(tri_ids, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        wasm.xpbdsolver_set_triangles(this.__wbg_ptr, ptr0, len0);
     }
     /**
      * Step the simulation forward one frame.
@@ -210,6 +258,13 @@ function getUint8ArrayMemory0() {
 function passArray32ToWasm0(arg, malloc) {
     const ptr = malloc(arg.length * 4, 4) >>> 0;
     getUint32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
+
+function passArray8ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 1, 1) >>> 0;
+    getUint8ArrayMemory0().set(arg, ptr / 1);
     WASM_VECTOR_LEN = arg.length;
     return ptr;
 }
