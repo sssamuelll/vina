@@ -8,7 +8,7 @@
  * with preferences, notes, and cross-session recall via copilot tools.
  */
 
-import { storageGet, storageSet } from '../utils/storage';
+import { storageGet, storageSet } from '../../utils/storage';
 
 // ─── Message types ───────────────────────────────────────────────────────────
 
