@@ -1,5 +1,9 @@
 // src/copilot/bridge/__tests__/types.test.ts
 import { describe, it, expect } from 'vitest';
+import {
+  isExecuteStep,
+  isEvaluateStep,
+} from '../types';
 import type {
   ExecutionPlan,
   ExecuteStep,
@@ -137,5 +141,19 @@ describe('Bridge Types', () => {
     };
     expect(state.status).toBe('running');
     expect(state.steps[0].status).toBe('done');
+  });
+});
+
+describe('Type Guards', () => {
+  it('isExecuteStep returns true for ExecuteStep', () => {
+    const step: Step = { type: 'execute', id: '1', tool: 't', params: {}, label: 'L' };
+    expect(isExecuteStep(step)).toBe(true);
+    expect(isEvaluateStep(step)).toBe(false);
+  });
+
+  it('isEvaluateStep returns true for EvaluateStep', () => {
+    const step: Step = { type: 'evaluate', id: '1', input: '$x', decide: 'ok?', label: 'L' };
+    expect(isEvaluateStep(step)).toBe(true);
+    expect(isExecuteStep(step)).toBe(false);
   });
 });
