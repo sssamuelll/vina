@@ -269,7 +269,9 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     setInput('');
     setIsLoading(true);
     try {
-      const copilotMessages: CopilotMessage[] = messages.map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp }));
+      const copilotMessages: CopilotMessage[] = messages
+        .filter(m => m.role === 'user' || m.role === 'assistant')
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content, timestamp: m.timestamp }));
       const context = buildCopilotContext(project, editor, text, copilotMessages);
       const response = await sendToAgent(agentConfig, context);
       const { executed, errors } = executeCommands(response.commands, dispatch, project.pieces);
