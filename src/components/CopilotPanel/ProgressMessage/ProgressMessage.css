@@ -1,0 +1,291 @@
+/**
+ * ProgressMessage Styles
+ * Inline progress display for copilot execution
+ */
+
+/* ─── Container ─── */
+.progress-message {
+  background: var(--bg-secondary, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 8px 0;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+
+/* Status variants */
+.progress-message.progress-running {
+  border-left: 3px solid var(--accent-primary, var(--color-info, #3b82f6));
+}
+
+.progress-message.progress-done {
+  border-left: 3px solid var(--success, #16a34a);
+  background: var(--success-light, rgba(22, 163, 74, 0.08));
+}
+
+.progress-message.progress-failed {
+  border-left: 3px solid var(--danger, var(--color-error, #dc2626));
+  background: var(--danger-light, rgba(220, 38, 38, 0.08));
+}
+
+.progress-message.progress-asking {
+  border-left: 3px solid var(--warning, #d97706);
+  background: var(--warning-light, rgba(217, 119, 6, 0.08));
+}
+
+/* ─── Header ─── */
+.progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+}
+
+.progress-done .progress-icon {
+  color: var(--success, #16a34a);
+}
+
+.progress-failed .progress-icon {
+  color: var(--danger, var(--color-error, #dc2626));
+}
+
+.progress-asking .progress-icon {
+  color: var(--warning, #d97706);
+}
+
+.progress-running .progress-icon {
+  color: var(--accent-primary, var(--color-info, #3b82f6));
+}
+
+.progress-intent {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text-primary, #e0e0e0);
+  line-height: 1.4;
+}
+
+/* ─── Controls (done state) ─── */
+.progress-controls {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.progress-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--border-subtle, #444);
+  border-radius: 4px;
+  color: var(--text-muted, #666);
+  cursor: pointer;
+  font-size: 11px;
+  transition: all 0.15s ease;
+}
+
+.progress-btn:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--border, #555);
+}
+
+/* ─── Steps List ─── */
+.progress-steps {
+  margin-top: 10px;
+  padding-left: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  position: relative;
+}
+
+/* Tree line connector */
+.progress-step::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-subtle, #444);
+}
+
+.progress-step:last-child::before {
+  bottom: 50%;
+}
+
+.progress-step:first-child::before {
+  top: 50%;
+}
+
+/* Step indicator */
+.progress-step-indicator {
+  position: relative;
+  z-index: 1;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  background: var(--bg-secondary, #1e1e1e);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.progress-step-done .progress-step-indicator {
+  color: var(--success, #16a34a);
+}
+
+.progress-step-running .progress-step-indicator {
+  color: var(--accent-primary, var(--color-info, #3b82f6));
+  animation: step-pulse 1s ease-in-out infinite;
+}
+
+.progress-step-failed .progress-step-indicator {
+  color: var(--danger, var(--color-error, #dc2626));
+}
+
+.progress-step-pending .progress-step-indicator {
+  color: var(--text-muted, #666);
+}
+
+@keyframes step-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+/* Step label */
+.progress-step-label {
+  flex: 1;
+  color: var(--text-secondary, #a0a0a0);
+  line-height: 1.4;
+  font-size: 11px;
+}
+
+.progress-step-done .progress-step-label {
+  color: var(--text-primary, #e0e0e0);
+}
+
+.progress-step-running .progress-step-label {
+  color: var(--text-primary, #e0e0e0);
+  font-weight: 500;
+}
+
+/* ─── Question UI ─── */
+.progress-question {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle, #444);
+}
+
+.progress-question-text {
+  margin: 0 0 10px;
+  color: var(--text-primary, #e0e0e0);
+  font-weight: 500;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.progress-question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.progress-option-btn {
+  padding: 6px 12px;
+  background: var(--bg-primary, #111);
+  border: 1px solid var(--border, #444);
+  border-radius: 6px;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.progress-option-btn:hover {
+  background: var(--accent-dim, rgba(139, 92, 246, 0.1));
+  border-color: var(--accent, var(--color-copilot, #8b5cf6));
+  color: var(--accent, var(--color-copilot, #8b5cf6));
+}
+
+.progress-option-btn:active {
+  transform: scale(0.97);
+}
+
+/* Cancel button special styling */
+.progress-option-btn:last-child {
+  color: var(--text-muted, #666);
+}
+
+/* ─── Expanded Details ─── */
+.progress-details {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle, #444);
+}
+
+.progress-detail-item {
+  padding: 3px 0;
+  color: var(--text-secondary, #a0a0a0);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* ─── Error Message ─── */
+.progress-error {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: var(--danger-light, rgba(220, 38, 38, 0.1));
+  border-radius: 4px;
+  color: var(--danger, var(--color-error, #dc2626));
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* ─── Mobile Adjustments ─── */
+@media (max-width: 640px) {
+  .progress-message {
+    padding: 14px;
+  }
+
+  .progress-intent {
+    font-size: 13px;
+  }
+
+  .progress-step-label {
+    font-size: 12px;
+  }
+
+  .progress-question-text {
+    font-size: 13px;
+  }
+
+  .progress-option-btn {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+}
