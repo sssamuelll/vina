@@ -17,8 +17,6 @@ import {
 import { ProjectMemory } from '../../copilot/memory';
 import { Planner } from '../../copilot/bridge/Planner';
 import { buildAgentContext, serializeContext } from '../../copilot/contextBuilder';
-import { DesignLogManager } from '../../copilot/vision/designLog';
-import { isTeachingModeEnabled } from '../../copilot/teachingContext';
 import { useBridge } from '../../copilot/hooks/useBridge';
 import { ProgressMessage } from './ProgressMessage';
 import { CostManager } from '../../copilot/costManager';
@@ -76,17 +74,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [sessionCostLabel, setSessionCostLabel] = useState('');
 
-  // Teaching mode (managed by AgentSettings)
-  useState(isTeachingModeEnabled);
-
   const costManagerRef = useRef(new CostManager(project.id));
   const memoryRef = useRef(new ProjectMemory(project.id));
-  const designLogRef = useRef(DesignLogManager.load(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
 
   // Bridge mode hook (called unconditionally per React rules)
-  // Uses ExecutionBridge for step-by-step execution when enabled via feature flag
+  // Uses ExecutionBridge for step-by-step execution
   const bridgeHook = useBridge({
     plannerLLM: async (userRequest) => {
       if (!providerConfig) return '';
@@ -179,7 +173,6 @@ ${contextStr}`;
   useEffect(() => {
     memoryRef.current = new ProjectMemory(project.id);
     costManagerRef.current = new CostManager(project.id);
-    designLogRef.current = DesignLogManager.load(project.id);
     // Clear UI messages when switching projects to prevent cross-project context leak
     setMessages([]);
     setSessionCostLabel('');
