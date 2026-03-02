@@ -84,6 +84,17 @@ describe('Bridge Types', () => {
       newParams: { edge: 'front-neckline' },
     };
     expect(decision.action).toBe('retry');
+    expect(decision.newParams).toEqual({ edge: 'front-neckline' });
+  });
+
+  it('ReasonerDecision alternative action', () => {
+    const decision: ReasonerDecision = {
+      action: 'alternative',
+      newStep: { type: 'execute', id: 'alt1', tool: 'altTool', params: {}, label: 'Alt' },
+      reason: 'Original tool unavailable',
+    };
+    expect(decision.action).toBe('alternative');
+    expect(decision.newStep).toBeDefined();
   });
 
   it('ReasonerDecision askUser action', () => {
@@ -102,6 +113,7 @@ describe('Bridge Types', () => {
       reason: 'Cannot find matching edge',
     };
     expect(decision.action).toBe('abort');
+    expect(decision.reason).toBe('Cannot find matching edge');
   });
 
   it('ExpandableSummary has short and details', () => {

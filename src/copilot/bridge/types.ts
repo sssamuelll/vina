@@ -57,8 +57,6 @@ export interface ExecutionPlan {
   intent: string;
   /** Ordered list of steps to execute */
   steps: Step[];
-  /** Optional context data for the plan */
-  context?: Record<string, unknown>;
 }
 
 // ─── Result Types ───────────────────────────────────────────────────────────
@@ -86,24 +84,32 @@ export interface StepResult {
  */
 export interface ReasonerInput {
   /** The step that failed */
-  step: Step;
+  failedStep: Step;
   /** The error encountered */
   error: string;
   /** Previous step results for context */
-  previousResults: StepResult[];
-  /** The full execution plan for context */
-  plan: ExecutionPlan;
+  resultsSoFar: StepResult[];
+  /** The user's original intent */
+  originalIntent: string;
 }
 
 /**
  * Decision from the Reasoner on how to handle an error.
  */
-export type ReasonerDecision =
-  | { action: 'retry'; newParams: Record<string, unknown> }
-  | { action: 'askUser'; question: string; options: string[] }
-  | { action: 'abort'; reason: string }
-  | { action: 'skip'; reason?: string }
-  | { action: 'continue' };
+export interface ReasonerDecision {
+  /** The action to take */
+  action: 'retry' | 'alternative' | 'askUser' | 'abort';
+  /** New parameters for retry action */
+  newParams?: Record<string, unknown>;
+  /** Alternative step for alternative action */
+  newStep?: Step;
+  /** Question to ask the user for askUser action */
+  question?: string;
+  /** Options for the user to choose from */
+  options?: string[];
+  /** Reason for the decision */
+  reason?: string;
+}
 
 // ─── UI Types ───────────────────────────────────────────────────────────────
 
@@ -120,7 +126,7 @@ export interface ExpandableSummary {
 /**
  * Status of a step in the progress tracker.
  */
-export type StepStatus = 'pending' | 'running' | 'done' | 'error' | 'skipped';
+export type StepStatus = 'pending' | 'running' | 'done' | 'failed';
 
 /**
  * A step in the progress state.
@@ -132,10 +138,8 @@ export interface ProgressStep {
   label: string;
   /** Current status */
   status: StepStatus;
-  /** Optional summary when done */
-  summary?: ExpandableSummary;
-  /** Optional error message */
-  error?: string;
+  /** Optional preview of the result */
+  resultPreview?: string;
 }
 
 /**
@@ -143,15 +147,19 @@ export interface ProgressStep {
  */
 export interface ProgressState {
   /** Overall execution status */
-  status: 'idle' | 'running' | 'paused' | 'done' | 'error';
+  status: 'planning' | 'running' | 'asking' | 'done' | 'failed';
   /** The intent being executed */
   intent: string;
   /** List of steps with their status */
   steps: ProgressStep[];
   /** Index of the currently executing step */
   currentStepIndex: number;
-  /** Final result summary when done */
-  finalSummary?: ExpandableSummary;
+  /** Question for the user when status is 'asking' */
+  question?: string;
+  /** Options for the user to choose from */
+  options?: string[];
+  /** Summary when done */
+  summary?: ExpandableSummary;
   /** Error message if execution failed */
   error?: string;
 }
@@ -191,10 +199,6 @@ export interface BridgeConfig {
   stepTimeout: number;
   /** Whether to enable automatic rollback on failure */
   enableRollback: boolean;
-  /** Whether to pause execution for user confirmation at each step */
-  requireConfirmation: boolean;
-  /** Whether to enable verbose logging */
-  verbose: boolean;
 }
 
 /**
@@ -204,8 +208,6 @@ export const DEFAULT_BRIDGE_CONFIG: BridgeConfig = {
   maxRetries: 3,
   stepTimeout: 30000,
   enableRollback: true,
-  requireConfirmation: false,
-  verbose: false,
 };
 
 // ─── Type Guards ────────────────────────────────────────────────────────────
