@@ -107,3 +107,17 @@ export interface EnrichedContext {
   relatedMeasurements: Record<string, number>;
   availableEdgesPerPiece: Record<string, string[]>;
 }
+
+// ─── Garment Knowledge ──────────────────────────────────────────────────────
+
+/**
+ * Knowledge about a specific piece type.
+ */
+export interface PieceTypeKnowledge {
+  /** Expected edge names for this piece type */
+  expectedEdges: string[];
+  /** Maps technical edge names to user terms (multilingual) */
+  edgeSemantics: Record<string, string[]>;
+  /** Maps edge names to related body measurements */
+  measurementRelations: Record<string, string>;
+}
