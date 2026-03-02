@@ -180,7 +180,9 @@ export type BridgeEvent =
   | { type: 'reasoner:decision'; decision: ReasonerDecision }
   | { type: 'user:prompt'; question: string; options: string[] }
   | { type: 'user:response'; response: string }
-  | { type: 'progress:update'; state: ProgressState };
+  | { type: 'progress:update'; state: ProgressState }
+  | { type: 'execution:complete'; success: boolean; summary?: ExpandableSummary }
+  | { type: 'ask:user'; question: string; options?: string[] };
 
 /**
  * Handler for bridge events.
