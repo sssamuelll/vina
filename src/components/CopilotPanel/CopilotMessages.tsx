@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import CopilotEmptyState from './CopilotEmptyState';
 
 /** A displayed message (extends CopilotMessage with streaming and tool call UI) */
@@ -45,8 +46,8 @@ const CopilotMessages = forwardRef<HTMLDivElement, CopilotMessagesProps>(({
       )}
       {messages.map((msg, i) => (
         <div key={i} className={`copilot-msg ${msg.role}`}>
-          <div className="copilot-msg-content">
-            {msg.content}
+          <div className="copilot-msg-content copilot-markdown">
+            <ReactMarkdown>{msg.content}</ReactMarkdown>
             {msg.toolCalls && msg.toolCalls.length > 0 && (
               <div
                 className={`copilot-tool-calls ${isMobile ? 'compact' : ''}`}
