@@ -10,3 +10,6 @@ crates/*/target/
 
 # Coverage
 coverage/
+
+# Worktrees
+.worktrees/

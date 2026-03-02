@@ -189,6 +189,19 @@ export type BridgeEvent =
  */
 export type BridgeEventHandler = (event: BridgeEvent) => void;
 
+// ─── Component Interfaces ──────────────────────────────────────────────────
+
+import type { ToolSchema } from './Planner';
+
+export interface IPlanner {
+  buildSystemPrompt(tools: ToolSchema[]): string;
+  parsePlan(response: string): ExecutionPlan;
+}
+
+export interface IReasoner {
+  analyze(input: ReasonerInput): Promise<ReasonerDecision>;
+}
+
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 /**
