@@ -1,4 +1,11 @@
 /**
+ * @deprecated This module is deprecated in favor of the ExecutionBridge system.
+ * Enable bridge mode with: localStorage.setItem('openclo-use-bridge', 'true')
+ * See: src/copilot/bridge/ for the new implementation.
+ * This file will be removed in a future version once bridge mode is validated.
+ */
+
+/**
  * Tool Executor — takes tool_calls from LLM responses, validates, and executes sequentially.
  *
  * Includes post-execution audits for geometry-modifying tools:
