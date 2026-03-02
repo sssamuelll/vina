@@ -10,7 +10,7 @@
  * @module copilot/intelligence/ContextEnricher
  */
 
-import type { PatternPiece, SemanticEdge } from '../../types/types';
+import type { PatternPiece, SemanticEdge } from '../../../types/types';
 import type {
   Resolution,
   PieceClassification,
@@ -21,7 +21,7 @@ import type {
 } from './types';
 import { MeasurementCalculator } from './MeasurementCalculator';
 import { getRelatedMeasurement } from './GarmentKnowledge';
-import { detectSemanticEdges } from '../../utils/semanticEdges';
+import { detectSemanticEdges } from '../../../utils/semanticEdges';
 
 /**
  * Get edges for a piece, using geometry-based detection if not populated.

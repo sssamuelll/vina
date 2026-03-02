@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { SemanticResolver } from '../SemanticResolver';
 import type { PieceClassification } from '../types';
-import type { PatternPiece } from '../../../types/types';
+import type { PatternPiece } from '../../../../types/types';
 
 describe('SemanticResolver', () => {
   const resolver = new SemanticResolver();

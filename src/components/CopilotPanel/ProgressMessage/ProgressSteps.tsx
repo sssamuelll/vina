@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ProgressStep } from '../../../copilot/bridge/types';
+import type { ProgressStep } from '../../../copilot/reasoning/bridge/types';
 
 export interface ProgressStepsProps {
   steps: ProgressStep[];

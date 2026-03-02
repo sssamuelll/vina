@@ -7,7 +7,7 @@
  * @module copilot/intelligence/types
  */
 
-import type { BodyMeasurements } from '../../types/types';
+import type { BodyMeasurements } from '../../../types/types';
 
 // ─── Piece Classification ────────────────────────────────────────────────────
 

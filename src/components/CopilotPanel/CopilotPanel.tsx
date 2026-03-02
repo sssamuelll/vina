@@ -15,7 +15,7 @@ import {
   PROVIDER_OPTIONS,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
-import { Planner } from '../../copilot/bridge/Planner';
+import { Planner } from '../../copilot/reasoning/bridge/Planner';
 import { buildAgentContext, serializeContext } from '../../copilot/perception/contextBuilder';
 import { useBridge } from '../../copilot/hooks/useBridge';
 import { ProgressMessage } from './ProgressMessage';
@@ -26,7 +26,7 @@ import CopilotHeader from './CopilotHeader';
 import CopilotMessages, { DisplayMessage } from './CopilotMessages';
 import CopilotInput from './CopilotInput';
 import './CopilotPanel.css';
-import { IntelligentContext } from '../../copilot/intelligence';
+import { IntelligentContext } from '../../copilot/reasoning/intelligence';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 

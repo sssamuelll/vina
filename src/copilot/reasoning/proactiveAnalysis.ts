@@ -10,7 +10,7 @@
  * @module proactiveAnalysis
  */
 
-import type { PatternPiece, Seam, PathCommand } from '../types/types';
+import type { PatternPiece, Seam, PathCommand } from '../../types/types';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

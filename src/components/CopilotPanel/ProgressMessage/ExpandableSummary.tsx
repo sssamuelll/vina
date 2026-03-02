@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ExpandableSummary as ExpandableSummaryType } from '../../../copilot/bridge/types';
+import type { ExpandableSummary as ExpandableSummaryType } from '../../../copilot/reasoning/bridge/types';
 
 export interface ExpandableSummaryProps {
   summary: ExpandableSummaryType;

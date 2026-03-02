@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { IntelligentContext } from '../IntelligentContext';
-import type { PatternPiece, BodyMeasurements } from '../../../types/types';
+import type { PatternPiece, BodyMeasurements } from '../../../../types/types';
 
 // Minimal state interface matching IntelligentContext constructor
 interface MockState {

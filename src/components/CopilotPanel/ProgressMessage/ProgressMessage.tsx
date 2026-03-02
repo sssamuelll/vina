@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { ProgressState } from '../../../copilot/bridge/types';
+import type { ProgressState } from '../../../copilot/reasoning/bridge/types';
 import './ProgressMessage.css';
 
 export interface ProgressMessageProps {

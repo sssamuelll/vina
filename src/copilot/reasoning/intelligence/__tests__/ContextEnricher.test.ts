@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ContextEnricher } from '../ContextEnricher';
 import type { Resolution, MeasurementContext, PieceClassification } from '../types';
-import type { PatternPiece } from '../../../types/types';
+import type { PatternPiece } from '../../../../types/types';
 
 describe('ContextEnricher', () => {
   const enricher = new ContextEnricher();

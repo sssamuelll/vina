@@ -12,7 +12,7 @@ import type {
   CalculatedValue,
   PieceType,
 } from './types';
-import type { BodyMeasurements } from '../../types/types';
+import type { BodyMeasurements } from '../../../types/types';
 import { getRelatedMeasurement } from './GarmentKnowledge';
 
 /**

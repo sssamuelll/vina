@@ -6,7 +6,7 @@ import {
   auditNotches,
   runProactiveAnalysis,
   formatWarnings,
-} from '../proactiveAnalysis';
+} from '../reasoning/proactiveAnalysis';
 import type { PatternPiece, Seam } from '../../types/types';
 
 function makePiece(overrides: Partial<PatternPiece> & { id: string; name: string }): PatternPiece {

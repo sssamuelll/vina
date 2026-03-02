@@ -3,7 +3,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
-import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/proactiveAnalysis';
+import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reasoning/proactiveAnalysis';
 import './BottomPanel.css';
 
 type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview';

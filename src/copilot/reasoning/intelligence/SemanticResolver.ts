@@ -10,7 +10,7 @@
  * @module copilot/intelligence/SemanticResolver
  */
 
-import type { PatternPiece, SemanticEdge } from '../../types/types';
+import type { PatternPiece, SemanticEdge } from '../../../types/types';
 import type {
   PieceClassification,
   Resolution,
@@ -22,7 +22,7 @@ import type {
   OperationType,
 } from './types';
 import { findEdgeByUserTerm } from './GarmentKnowledge';
-import { detectSemanticEdges } from '../../utils/semanticEdges';
+import { detectSemanticEdges } from '../../../utils/semanticEdges';
 
 /**
  * Get edges for a piece, using geometry-based detection if not populated.

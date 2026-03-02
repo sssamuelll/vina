@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import CopilotEmptyState from './CopilotEmptyState';
 import { ProgressMessage } from './ProgressMessage/ProgressMessage';
-import type { ProgressState } from '../../copilot/bridge/types';
+import type { ProgressState } from '../../copilot/reasoning/bridge/types';
 
 /** A displayed message (extends CopilotMessage with streaming and tool call UI) */
 export interface DisplayMessage {

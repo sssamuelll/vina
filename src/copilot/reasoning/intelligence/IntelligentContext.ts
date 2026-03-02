@@ -7,7 +7,7 @@
  * @module copilot/intelligence/IntelligentContext
  */
 
-import type { PatternPiece, BodyMeasurements } from '../../types/types';
+import type { PatternPiece, BodyMeasurements } from '../../../types/types';
 import type { PieceClassification, EnrichedContext, PieceType } from './types';
 import { SemanticResolver } from './SemanticResolver';
 import { ContextEnricher } from './ContextEnricher';

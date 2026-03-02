@@ -16,7 +16,7 @@ import {
   type BridgeEvent,
   type ReasonerLLM,
   DEFAULT_BRIDGE_CONFIG,
-} from '../bridge';
+} from '../reasoning/bridge';
 import { getDefaultRegistry } from '../tools/registry';
 
 export interface UseBridgeOptions {
