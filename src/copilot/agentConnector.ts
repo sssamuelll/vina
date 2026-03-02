@@ -1,4 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/**
+ * @deprecated This module is deprecated in favor of the ExecutionBridge system.
+ * Enable bridge mode with: localStorage.setItem('openclo-use-bridge', 'true')
+ * See: src/copilot/bridge/ for the new implementation.
+ * This file will be removed in a future version once bridge mode is validated.
+ */
+
 /**
  * Agent Connector — handles communication with external AI agents
  * 

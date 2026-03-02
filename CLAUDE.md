@@ -12,8 +12,22 @@ OpenClo.ai is a browser-based garment CAD with AI copilot and real-time XPBD clo
 src/
 ├── components/           # React UI components
 │   ├── CopilotPanel/    # AI assistant chat interface
+│   │   └── ProgressMessage/  # Bridge execution progress UI
 │   ├── Toolbar/         # 2D/3D tool buttons
 │   └── Viewport/        # 2D canvas and 3D viewer
+├── copilot/             # AI copilot system
+│   ├── bridge/          # Planner + Executor + Reasoner architecture
+│   │   ├── types.ts           # Step, ExecutionPlan, StepResult, etc.
+│   │   ├── Planner.ts         # LLM planning (JSON output)
+│   │   ├── Executor.ts        # Step execution (no LLM)
+│   │   ├── Reasoner.ts        # Error recovery (LLM on failure)
+│   │   ├── ResultStore.ts     # Result accumulation + variable resolution
+│   │   ├── SummaryGenerator.ts # Template-based summaries
+│   │   └── ExecutionBridge.ts # Main orchestrator
+│   ├── hooks/           # React integration
+│   │   └── useBridge.ts       # Bridge state management hook
+│   ├── tools/           # Copilot tool definitions
+│   └── features.ts      # Feature flags (bridge mode)
 ├── core/                # Semantic garment engine
 │   ├── geometry/        # Constraint-based geometry
 │   └── pattern/         # Pattern piece operations
@@ -104,9 +118,70 @@ npx tsc --noEmit      # Type check
 
 ### Add Copilot Tool
 
-1. Define tool in copilot bridge
-2. Register in tool registry
-3. Add execution handler
+1. Define tool schema in `src/copilot/tools/`
+2. Register in tool registry with `registerTool()`
+3. Implement execute handler returning `ToolResult`
+4. Add optional rollback function for reversible operations
+
+```typescript
+// Example tool with rollback support
+const result: ToolResult = {
+  success: true,
+  data: { /* result data */ },
+  rollback: () => dispatch(restorePreviousState(snapshot))
+};
+```
+
+## Copilot Bridge Architecture
+
+The copilot uses a **Planner + Executor + Reasoner** pattern to minimize hallucination and ensure reliable execution.
+
+### Flow
+
+```
+User Request → Planner (LLM) → Executor (no LLM) → Summary
+                                    ↓ (on error)
+                               Reasoner (LLM)
+```
+
+### Components
+
+| Component | LLM? | Purpose |
+|-----------|------|---------|
+| **Planner** | Yes | Generates JSON execution plan |
+| **Executor** | No | Runs steps, collects results |
+| **Reasoner** | Yes | Handles errors (retry/ask/abort) |
+| **SummaryGenerator** | No | Template-based output |
+
+### Step Types
+
+- **ExecuteStep**: Runs a tool directly, no LLM involvement
+- **EvaluateStep**: LLM interprets results (e.g., "Is fit acceptable?")
+
+### Variable References
+
+Steps can reference previous results with `$stepId.field` syntax:
+
+```json
+{
+  "type": "execute",
+  "tool": "modifyEdge",
+  "params": { "targetLength": "$measure1.result.length" }
+}
+```
+
+### Enabling Bridge Mode
+
+```javascript
+localStorage.setItem('openclo-use-bridge', 'true');
+```
+
+### Key Files
+
+- `src/copilot/bridge/ExecutionBridge.ts` - Main orchestrator
+- `src/copilot/hooks/useBridge.ts` - React integration
+- `src/copilot/features.ts` - Feature flags
+- `docs/plans/2026-03-02-copilot-bridge-architecture-design.md` - Full design doc
 
 ## Architecture Notes
 
@@ -119,4 +194,5 @@ npx tsc --noEmit      # Type check
 
 - [Cloth Simulation Research](docs/research/cloth-simulation-research.md)
 - [Fabric Calibration Guide](docs/research/fabric-calibration-guide.md)
+- [Copilot Bridge Architecture](docs/plans/2026-03-02-copilot-bridge-architecture-design.md)
 - [Architecture Spec](docs/specs/ARCHITECTURE.md)

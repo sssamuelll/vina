@@ -1,4 +1,11 @@
 /**
+ * @deprecated This module is deprecated in favor of the ExecutionBridge system.
+ * Enable bridge mode with: localStorage.setItem('openclo-use-bridge', 'true')
+ * See: src/copilot/bridge/ for the new implementation.
+ * This file will be removed in a future version once bridge mode is validated.
+ */
+
+/**
  * Agent Orchestration Loop — multi-turn tool use with LLM feedback.
  *
  * After the LLM calls tools, the results are fed back to the LLM

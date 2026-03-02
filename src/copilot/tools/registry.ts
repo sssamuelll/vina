@@ -51,6 +51,8 @@ export interface ToolResult {
   data?: Record<string, unknown>;
   /** Error message if success is false */
   error?: string;
+  /** Optional function to rollback/undo this tool's changes */
+  rollback?: () => void;
 }
 
 /**

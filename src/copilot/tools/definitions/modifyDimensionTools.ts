@@ -58,6 +58,9 @@ const modifyDimensionTool: ToolDefinition = {
       return { success: false, error: 'No pieces found' };
     }
 
+    // Save original pieces for rollback
+    const originalPieces = pieces.map(p => ({ ...p }));
+
     const results: Array<{ name: string; edge: string; nodes: number }> = [];
 
     for (const piece of pieces) {
@@ -92,6 +95,12 @@ const modifyDimensionTool: ToolDefinition = {
         amountMm: amount,
         amountCm: amount / 10,
         piecesModified: results,
+      },
+      // Rollback function to restore original pieces
+      rollback: () => {
+        for (const originalPiece of originalPieces) {
+          dispatch(updatePiece(originalPiece));
+        }
       },
     };
   },
