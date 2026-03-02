@@ -1,10 +1,8 @@
 import { MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch, store } from '../../store';
-import { AgentConfig, CopilotMessage, buildCopilotContext } from '../../copilot/protocol';
-import { sendToAgent } from '../../copilot/agentConnector';
-import { executeCommands } from '../../copilot/commandExecutor';
+import { useSelector } from 'react-redux';
+import { RootState, store } from '../../store';
+import { AgentConfig } from '../../copilot/protocol';
 import { getDefaultRegistry } from '../../copilot/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
@@ -17,16 +15,14 @@ import {
   PROVIDER_OPTIONS,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
-import { runAgentLoop, type AgentLoopResult } from '../../copilot/agentLoop';
 import { Planner } from '../../copilot/bridge/Planner';
 import { buildAgentContext, serializeContext } from '../../copilot/contextBuilder';
 import { DesignLogManager } from '../../copilot/vision/designLog';
 import { isTeachingModeEnabled } from '../../copilot/teachingContext';
-import { isBridgeModeEnabled } from '../../copilot/features';
 import { useBridge } from '../../copilot/hooks/useBridge';
 import { ProgressMessage } from './ProgressMessage';
 import { CostManager } from '../../copilot/costManager';
-import { RecoveryStrategy, getErrorMessage, classifyError, isOfflineMode } from '../../copilot/errorRecovery';
+import { getErrorMessage, classifyError, isOfflineMode } from '../../copilot/errorRecovery';
 import AgentSettings from '../../copilot/AgentSettings';
 import CopilotHeader from './CopilotHeader';
 import CopilotMessages, { DisplayMessage } from './CopilotMessages';
@@ -35,30 +31,6 @@ import './CopilotPanel.css';
 import { IntelligentContext } from '../../copilot/intelligence';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
-
-const PATRONAJE_SOUL = `You are a pattern-making copilot inside OpenClo. Act immediately, don't ask.
-
-RESPONSE RULES — CRITICAL:
-- Maximum 1-2 sentences per response
-- Report ONLY what was done: "Neckline reduced 2cm. Front: 314→294mm."
-- NEVER recap history ("this is the third time...")
-- NEVER assume previous context — treat each request as independent
-- NEVER ask "are you sure?" or offer alternatives — just execute
-- NEVER ask to restart simulation — do it automatically if needed
-
-WORKFLOW:
-1. User asks for garment → searchBlueprints() FIRST
-2. Blueprint found → executeBlueprint() IMMEDIATELY
-3. No blueprint → searchTemplates() as fallback
-
-DO NOT:
-- List options when a blueprint exists
-- Ask for measurements in project state
-- Generate geometry from imagination
-- Add unnecessary explanations or context
-
-Builtin blueprints: aldrich-bodice-front, aldrich-bodice-back, aldrich-sleeve.
-All measurements in mm. Default SA: 10mm.`;
 
 function loadAgentConfig(): AgentConfig {
   try {
@@ -90,9 +62,7 @@ interface CopilotPanelProps {
 }
 
 export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanelProps = {}) {
-  const dispatch = useDispatch<AppDispatch>();
   const project = useSelector((s: RootState) => s.project);
-  const editor = useSelector((s: RootState) => s.editor);
 
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -110,7 +80,6 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   useState(isTeachingModeEnabled);
 
   const costManagerRef = useRef(new CostManager(project.id));
-  const recoveryRef = useRef(new RecoveryStrategy());
   const memoryRef = useRef(new ProjectMemory(project.id));
   const designLogRef = useRef(DesignLogManager.load(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -225,7 +194,7 @@ ${contextStr}`;
     `${providerConfig.provider} / ${providerConfig.model.split('-').slice(0, 2).join('-')}`
   ) : agentConfig.name;
 
-  /** Send via the new LLM provider system with multi-turn agent loop */
+  /** Send via the bridge execution system */
   const handleProviderSend = useCallback(async (text: string) => {
     if (!providerConfig || !text.trim()) return;
 
@@ -238,131 +207,41 @@ ${contextStr}`;
     if (isMobile && navigator.vibrate) navigator.vibrate(30);
 
     try {
-      // Check if bridge mode is enabled via feature flag
-      if (isBridgeModeEnabled()) {
-        // Use bridge mode - step-by-step execution via ExecutionBridge
-        const bridgeResult = await bridgeHook.run(text);
+      // Use bridge mode - step-by-step execution via ExecutionBridge
+      const bridgeResult = await bridgeHook.run(text);
 
-        // Convert bridge result to display message
-        const content = bridgeResult.success
-          ? (bridgeResult.summary?.short ?? 'Done')
-          : (bridgeResult.error ?? 'Execution failed');
+      // Convert bridge result to display message
+      const content = bridgeResult.success
+        ? (bridgeResult.summary?.short ?? 'Done')
+        : (bridgeResult.error ?? 'Execution failed');
 
-        const assistantMsg: DisplayMessage = {
-          role: 'assistant',
-          content,
-          timestamp: Date.now(),
-          toolCalls: bridgeResult.results.map(r => ({
-            name: r.stepId,
-            success: r.success,
-          })),
-        };
-        setMessages(prev => [...prev, assistantMsg]);
+      const assistantMsg: DisplayMessage = {
+        role: 'assistant',
+        content,
+        timestamp: Date.now(),
+        toolCalls: bridgeResult.results.map(r => ({
+          name: r.stepId,
+          success: r.success,
+        })),
+      };
+      setMessages(prev => [...prev, assistantMsg]);
 
-        // Track cost estimate (rough)
-        const estimatedTokens = text.length * 4 + content.length;
-        costManagerRef.current.trackUsage(providerConfig.provider, estimatedTokens, content.length, providerConfig.model);
-        setSessionCostLabel(costManagerRef.current.formatSessionCost());
+      // Track cost estimate (rough)
+      const estimatedTokens = text.length * 4 + content.length;
+      costManagerRef.current.trackUsage(providerConfig.provider, estimatedTokens, content.length, providerConfig.model);
+      setSessionCostLabel(costManagerRef.current.formatSessionCost());
 
-        memoryRef.current.addMessage({
-          role: 'assistant',
-          content,
-          timestamp: Date.now(),
-          toolsCalled: bridgeResult.results.map(r => r.stepId),
-        });
-        memoryRef.current.save();
-      } else {
-        // Use existing agentLoop (default path)
-        const registry = getDefaultRegistry();
-        const provider = getProvider(providerConfig);
+      memoryRef.current.addMessage({
+        role: 'assistant',
+        content,
+        timestamp: Date.now(),
+        toolsCalled: bridgeResult.results.map(r => r.stepId),
+      });
+      memoryRef.current.save();
 
-        const assistantMsg: DisplayMessage = {
-          role: 'assistant', content: '', timestamp: Date.now(), toolCalls: [], isStreaming: true,
-        };
-        setMessages(prev => [...prev, assistantMsg]);
-
-        const getState = () => store.getState();
-        const designLog = designLogRef.current;
-        const result: AgentLoopResult = await recoveryRef.current.withRecovery(() =>
-          runAgentLoop(
-            text, provider, providerConfig, registry, dispatch, getState, memoryRef.current, PATRONAJE_SOUL,
-            {
-              onText: (chunk) => {
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last.role === 'assistant') {
-                    updated[updated.length - 1] = { ...last, content: last.content + chunk };
-                  }
-                  return updated;
-                });
-              },
-              onToolCallStart: (name) => {
-                if (isMobile && navigator.vibrate) navigator.vibrate(15);
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last.role === 'assistant') {
-                    const tc = [...(last.toolCalls || []), { name }];
-                    updated[updated.length - 1] = { ...last, toolCalls: tc };
-                  }
-                  return updated;
-                });
-              },
-              onToolCallEnd: (name, success) => {
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last.role === 'assistant' && last.toolCalls) {
-                    const tc = last.toolCalls.map(t =>
-                      t.name === name && t.success === undefined ? { ...t, success } : t
-                    );
-                    updated[updated.length - 1] = { ...last, toolCalls: tc };
-                  }
-                  return updated;
-                });
-              },
-              onDone: () => {
-                setMessages(prev => {
-                  const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  if (last.role === 'assistant') {
-                    let content = last.content;
-                    if (result.totalToolCalls > 0) {
-                      content += `\n${result.totalToolCalls} action${result.totalToolCalls > 1 ? 's' : ''} applied`;
-                      if (result.rounds.length > 1) content += ` (${result.rounds.length} rounds)`;
-                    }
-                    if (result.teachingContent.length > 0) content += '\n\n' + result.teachingContent[0];
-                    updated[updated.length - 1] = { ...last, content, isStreaming: false };
-                  }
-                  return updated;
-                });
-              },
-            },
-            // Pass design log context for cross-session memory (#143/#146)
-            {
-              designLogEntries: designLog.getEntries(),
-              overrides: designLog.getOverrides(),
-            },
-          )
-        );
-
-        const totalRoundCalls = result.rounds.reduce((sum, r) => sum + r.toolCalls.length, 0);
-        const estimatedInput = result.content.length * 4;
-        const estimatedOutput = result.content.length;
-        costManagerRef.current.trackUsage(providerConfig.provider, estimatedInput, estimatedOutput, providerConfig.model);
-        setSessionCostLabel(costManagerRef.current.formatSessionCost());
-
-        const allToolNames = result.rounds.flatMap(r => r.toolCalls.map(tc => tc.name));
-        memoryRef.current.addMessage({ role: 'assistant', content: result.content, timestamp: Date.now(), toolsCalled: allToolNames });
-        memoryRef.current.save();
-
-        if (costManagerRef.current.shouldWarn()) {
-          const warning = costManagerRef.current.getBudgetWarning();
-          if (warning) setMessages(prev => [...prev, { role: 'assistant', content: warning, timestamp: Date.now() }]);
-        }
-
-        void totalRoundCalls;
+      if (costManagerRef.current.shouldWarn()) {
+        const warning = costManagerRef.current.getBudgetWarning();
+        if (warning) setMessages(prev => [...prev, { role: 'assistant', content: warning, timestamp: Date.now() }]);
       }
     } catch (e: unknown) {
       const errorType = classifyError(e);
@@ -380,43 +259,17 @@ ${contextStr}`;
     } finally {
       setIsLoading(false);
     }
-  }, [providerConfig, dispatch, isMobile, bridgeHook]);
-
-  const handleLegacySend = useCallback(async (text: string) => {
-    if (!text.trim() || isLoading) return;
-    const userMsg: DisplayMessage = { role: 'user', content: text, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setIsLoading(true);
-    try {
-      const copilotMessages: CopilotMessage[] = messages
-        .filter(m => m.role === 'user' || m.role === 'assistant')
-        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content, timestamp: m.timestamp }));
-      const context = buildCopilotContext(project, editor, text, copilotMessages);
-      const response = await sendToAgent(agentConfig, context);
-      const { executed, errors } = executeCommands(response.commands, dispatch, project.pieces);
-      let content = response.message;
-      if (errors.length > 0) content += `\n⚠️ ${errors.join(', ')}`;
-      if (executed > 0) content += `\n✅ ${executed} action${executed > 1 ? 's' : ''} applied`;
-      setMessages(prev => [...prev, { role: 'assistant', content, timestamp: Date.now() }]);
-    } catch (e: unknown) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `❌ ${(e as Error).message}`, timestamp: Date.now() }]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, project, editor, messages, agentConfig, dispatch]);
+  }, [providerConfig, isMobile, bridgeHook]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text || isLoading) return;
-    if (isProviderMode) await handleProviderSend(text);
-    else await handleLegacySend(text);
-  }, [input, isLoading, isProviderMode, handleProviderSend, handleLegacySend]);
+    await handleProviderSend(text);
+  }, [input, isLoading, handleProviderSend]);
 
   const handleSendText = useCallback(async (text: string) => {
-    if (isProviderMode) await handleProviderSend(text);
-    else await handleLegacySend(text);
-  }, [isProviderMode, handleProviderSend, handleLegacySend]);
+    await handleProviderSend(text);
+  }, [handleProviderSend]);
 
   const handleSettingsSave = useCallback((config: ProviderConfig | null) => {
     setProviderConfig(config);
