@@ -31,10 +31,10 @@ describe('buildDomainBootstrap', () => {
     expect(prompt.toLowerCase()).toContain('language');
   });
 
-  it('includes ExecutionPlan JSON format instructions', () => {
+  it('mentions tool calling directly', () => {
     const prompt = buildDomainBootstrap();
-    expect(prompt).toContain('"intent"');
-    expect(prompt).toContain('"steps"');
-    expect(prompt).toContain('"execute"');
+    expect(prompt).toContain('calling tools directly');
+    expect(prompt).toContain('read-only tools');
+    expect(prompt).toContain('action tools');
   });
 });
