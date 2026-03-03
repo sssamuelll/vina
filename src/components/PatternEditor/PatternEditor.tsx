@@ -11,6 +11,7 @@ import { useSeamTool } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
+import { useEditPattern } from './useEditPattern';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool } from './useTransformTool';
 import { useEditorInteractions } from './useEditorInteractions';
@@ -117,6 +118,7 @@ export default function PatternEditor() {
 
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useEditCurve(zoom2D, pan2D);
+  const editPatternTool = useEditPattern(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
 
   const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {
@@ -154,7 +156,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool,
     });
 
   return (
@@ -228,6 +230,15 @@ export default function PatternEditor() {
             transformBbox={transformTool.bbox}
             transformHandles={transformTool.handles}
             transformPreview={transformTool.preview}
+            editPatternIsEditing={editPatternTool.isEditing}
+            editPatternEditingPieceId={editPatternTool.editingPieceId}
+            editPatternNodes={editPatternTool.nodes}
+            editPatternSelectedNodes={editPatternTool.selectedNodes}
+            editPatternSelectedSegments={editPatternTool.selectedSegments}
+            editPatternHoveredNode={editPatternTool.hoveredNode}
+            editPatternHoveredSegment={editPatternTool.hoveredSegment}
+            editPatternAddPointPreview={editPatternTool.addPointPreview}
+            editPatternMarquee={editPatternTool.marquee}
           />
         </g>
 

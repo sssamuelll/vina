@@ -1,5 +1,6 @@
 import { PatternPiece, Point2D, Tool2D } from '../../../types/types';
 import { NodeRef } from '../nodeEditorUtils';
+import type { EditableNode } from '../nodeEditorUtils';
 import SeamToolOverlay from './overlays/SeamToolOverlay';
 import NotchToolOverlay from './overlays/NotchToolOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';
@@ -8,6 +9,7 @@ import LineToolOverlay from './overlays/LineToolOverlay';
 import RectangleToolOverlay from './overlays/RectangleToolOverlay';
 import MeasureToolOverlay from './overlays/MeasureToolOverlay';
 import NodeEditorOverlay from './overlays/NodeEditorOverlay';
+import EditPatternOverlay from './overlays/EditPatternOverlay';
 import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
 import type { BBox, HandlePosition } from '../transformUtils';
 import type { TransformPreview } from '../useTransformTool';
@@ -75,6 +77,16 @@ interface ToolOverlayProps {
   transformBbox: BBox | null;
   transformHandles: HandlePosition[];
   transformPreview: TransformPreview | null;
+  // Edit Pattern
+  editPatternIsEditing: boolean;
+  editPatternEditingPieceId: string | null;
+  editPatternNodes: EditableNode[];
+  editPatternSelectedNodes: Set<number>;
+  editPatternSelectedSegments: Set<number>;
+  editPatternHoveredNode: number | null;
+  editPatternHoveredSegment: number | null;
+  editPatternAddPointPreview: Point2D | null;
+  editPatternMarquee: { start: Point2D; current: Point2D } | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -116,6 +128,21 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           bbox={props.transformBbox}
           handles={props.transformHandles}
           preview={props.transformPreview}
+        />
+      )}
+
+      {props.editPatternIsEditing && props.editPatternEditingPieceId && (
+        <EditPatternOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          editingPieceId={props.editPatternEditingPieceId}
+          nodes={props.editPatternNodes}
+          selectedNodes={props.editPatternSelectedNodes}
+          selectedSegments={props.editPatternSelectedSegments}
+          hoveredNode={props.editPatternHoveredNode}
+          hoveredSegment={props.editPatternHoveredSegment}
+          addPointPreview={props.editPatternAddPointPreview}
+          marquee={props.editPatternMarquee}
         />
       )}
 
