@@ -1,5 +1,5 @@
 import { PatternPiece, Point2D, UnitSystem } from '../../../../types/types';
-import { NodeRef } from '../../useNodeEditor';
+import { NodeRef } from '../../nodeEditorUtils';
 import { formatDimension } from '../../../../utils/units';
 
 interface EditorNode {

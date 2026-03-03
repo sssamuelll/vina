@@ -2,7 +2,7 @@
 import { PatternPiece, PathCommand } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
-import { extractNodes } from '../useNodeEditor';
+import { extractNodes } from '../nodeEditorUtils';
 
 /** Compute bounding box center of a path outline. */
 function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {

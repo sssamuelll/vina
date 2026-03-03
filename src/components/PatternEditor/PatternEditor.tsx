@@ -10,7 +10,7 @@ import { useLineTool } from './useLineTool';
 import { useSeamTool } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
-import { useNodeEditor } from './useNodeEditor';
+import { useEditCurve } from './useEditCurve';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool } from './useTransformTool';
 import { useEditorInteractions } from './useEditorInteractions';
@@ -116,7 +116,7 @@ export default function PatternEditor() {
   }, [dispatch]);
 
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
-  const nodeEditor = useNodeEditor(zoom2D, pan2D);
+  const nodeEditor = useEditCurve(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
 
   const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {

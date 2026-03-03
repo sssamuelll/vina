@@ -1,5 +1,5 @@
 import { PatternPiece, Point2D, Tool2D } from '../../../types/types';
-import { NodeRef } from '../useNodeEditor';
+import { NodeRef } from '../nodeEditorUtils';
 import SeamToolOverlay from './overlays/SeamToolOverlay';
 import NotchToolOverlay from './overlays/NotchToolOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';

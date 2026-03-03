@@ -4,7 +4,7 @@ import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
-import { extractNodes, NodeRef } from './useNodeEditor';
+import { extractNodes, NodeRef } from './nodeEditorUtils';
 
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
@@ -74,7 +74,7 @@ interface ToolHooks {
   nodeEditor: {
     isEditing: boolean;
     hoveredNode: unknown;
-    enterNodeEdit: (pieceId: string, selectedNode?: NodeRef) => void;
+    enterEdit: (pieceId: string, selectedNode?: NodeRef) => void;
     handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
     handleMouseUp: () => void;
@@ -193,7 +193,7 @@ export function useEditorInteractions(
     const target = e.target as SVGElement;
     const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
     if (pieceId) {
-      nodeEditor.enterNodeEdit(pieceId);
+      nodeEditor.enterEdit(pieceId);
     }
   }, [activeTool, nodeEditor]);
 
@@ -286,7 +286,7 @@ export function useEditorInteractions(
             const clickedNode = findClickedAnchorPoint(e, piece);
             if (clickedNode) {
               // Enter node editing mode with this node selected
-              nodeEditor.enterNodeEdit(pieceId, clickedNode);
+              nodeEditor.enterEdit(pieceId, clickedNode);
               return;
             }
           }
