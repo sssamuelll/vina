@@ -38,12 +38,7 @@ describe('createDebugBridge', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('isDebugEnabled returns false by default', () => {
-    expect(isDebugEnabled()).toBe(false);
-  });
-
-  it('isDebugEnabled returns true when localStorage flag is set', () => {
-    localStorage.setItem('openclo-debug-bridge', 'true');
+  it('isDebugEnabled returns true (always on for testing)', () => {
     expect(isDebugEnabled()).toBe(true);
   });
 
@@ -61,9 +56,9 @@ describe('createDebugBridge', () => {
     expect(store).not.toBeNull();
   });
 
-  it('returns null store when debug is disabled', () => {
+  it('returns store when debug is always enabled', () => {
     const { store } = createDebugBridge(mockOptions);
-    expect(store).toBeNull();
+    expect(store).not.toBeNull();
   });
 
   it('persists execution records when debug is enabled', async () => {

@@ -123,12 +123,16 @@ export class EnhancedReasoner implements IReasoner {
 
         const result = await this.executeMetaTool(toolCall);
 
-        // Add the assistant's tool call request to the conversation
-        messages.push({
+        // Add the assistant's tool call request (preserve reasoning_content for DeepSeek)
+        const assistantMsg: ChatMessage = {
           role: 'assistant',
           content: response.content || '',
           tool_calls: [toolCall],
-        });
+        };
+        if (response.reasoningContent) {
+          assistantMsg.reasoning_content = response.reasoningContent;
+        }
+        messages.push(assistantMsg);
 
         // Add the tool result to the conversation
         messages.push({

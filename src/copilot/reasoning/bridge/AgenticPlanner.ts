@@ -157,12 +157,16 @@ export class AgenticPlanner {
 
         const result = await this.executeMetaTool(toolCall);
 
-        // Add assistant message with tool call
-        messages.push({
+        // Add assistant message with tool call (preserve reasoning_content for DeepSeek)
+        const assistantMsg: ChatMessage = {
           role: 'assistant',
           content: response.content || '',
           tool_calls: [toolCall],
-        });
+        };
+        if (response.reasoningContent) {
+          assistantMsg.reasoning_content = response.reasoningContent;
+        }
+        messages.push(assistantMsg);
 
         // Add tool result message
         messages.push({

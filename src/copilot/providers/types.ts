@@ -17,6 +17,8 @@ export interface ChatMessage {
   tool_call_id?: string;
   /** For assistant messages: tool calls requested */
   tool_calls?: ProviderToolCall[];
+  /** For assistant messages: reasoning/thinking content (DeepSeek reasoner) */
+  reasoning_content?: string;
 }
 
 /**
@@ -58,6 +60,8 @@ export interface ProviderResponse {
   content: string;
   /** Tool calls requested by the assistant */
   toolCalls: ProviderToolCall[];
+  /** Reasoning/thinking content from the assistant (DeepSeek reasoner) */
+  reasoningContent?: string;
   /** Token usage info */
   usage?: {
     promptTokens: number;

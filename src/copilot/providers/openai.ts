@@ -33,6 +33,7 @@ interface OpenAIMessage {
     function: { name: string; arguments: string };
   }>;
   tool_call_id?: string;
+  reasoning_content?: string;
 }
 
 interface OpenAITool {
@@ -47,7 +48,7 @@ interface OpenAITool {
 function toOpenAIMessages(messages: ChatMessage[]): OpenAIMessage[] {
   return messages.map(msg => {
     if (msg.role === 'assistant' && msg.tool_calls) {
-      return {
+      const result: OpenAIMessage = {
         role: 'assistant' as const,
         content: msg.content || null,
         tool_calls: msg.tool_calls.map(tc => ({
@@ -56,12 +57,24 @@ function toOpenAIMessages(messages: ChatMessage[]): OpenAIMessage[] {
           function: { name: tc.name, arguments: tc.arguments },
         })),
       };
+      // DeepSeek reasoner requires reasoning_content on assistant messages
+      if (msg.reasoning_content !== undefined) {
+        result.reasoning_content = msg.reasoning_content;
+      }
+      return result;
     }
     if (msg.role === 'tool') {
       return {
         role: 'tool' as const,
         content: msg.content,
         tool_call_id: msg.tool_call_id,
+      };
+    }
+    if (msg.role === 'assistant' && msg.reasoning_content !== undefined) {
+      return {
+        role: msg.role,
+        content: msg.content,
+        reasoning_content: msg.reasoning_content,
       };
     }
     return {
@@ -157,6 +170,7 @@ export const openaiProvider: LLMProvider = {
     }
 
     let fullContent = '';
+    let fullReasoningContent = '';
     const toolCallsMap: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
     const reader = response.body!.getReader();
@@ -188,6 +202,11 @@ export const openaiProvider: LLMProvider = {
           if (delta.content) {
             fullContent += delta.content;
             onChunk({ type: 'text', content: delta.content });
+          }
+
+          // Reasoning content (DeepSeek reasoner)
+          if (delta.reasoning_content) {
+            fullReasoningContent += delta.reasoning_content;
           }
 
           // Tool calls
@@ -228,7 +247,11 @@ export const openaiProvider: LLMProvider = {
       onChunk({ type: 'tool_call_end', toolCall: { id: tc.id, name: tc.name, arguments: tc.arguments } });
     }
 
-    return { content: fullContent, toolCalls };
+    return {
+      content: fullContent,
+      toolCalls,
+      reasoningContent: fullReasoningContent || undefined,
+    };
   },
 };
 
@@ -253,9 +276,13 @@ function parseOpenAIResponse(data: Record<string, unknown>): ProviderResponse {
 
   const usage = data.usage as Record<string, number> | undefined;
 
+  // Capture reasoning_content from DeepSeek reasoner models
+  const reasoningContent = message?.reasoning_content as string | undefined;
+
   return {
     content,
     toolCalls,
+    reasoningContent: reasoningContent || undefined,
     usage: usage ? {
       promptTokens: usage.prompt_tokens || 0,
       completionTokens: usage.completion_tokens || 0,
