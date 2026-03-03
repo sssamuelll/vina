@@ -28,6 +28,7 @@ import type { ToolRegistry, Evaluator } from './Executor';
 import { Reasoner, type ReasonerLLM } from './Reasoner';
 import { ResultStore } from './ResultStore';
 import { SummaryGenerator } from './SummaryGenerator';
+import type { AgenticPlanner } from './AgenticPlanner';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,8 @@ export interface BridgeOptions {
   tools: ToolRegistry;
   /** Optional configuration */
   config?: BridgeConfig;
+  /** Optional agentic planner (replaces plannerLLM when provided) */
+  agenticPlanner?: AgenticPlanner;
 }
 
 /**
@@ -86,6 +89,7 @@ export class ExecutionBridge {
   private planner: Planner;
   private resultStore = new ResultStore();
   private summaryGenerator: SummaryGenerator;
+  private agenticPlanner: AgenticPlanner | null;
 
   /**
    * Create an ExecutionBridge.
@@ -100,6 +104,7 @@ export class ExecutionBridge {
     this.config = options.config ?? DEFAULT_BRIDGE_CONFIG;
     this.planner = new Planner();
     this.summaryGenerator = new SummaryGenerator();
+    this.agenticPlanner = options.agenticPlanner ?? null;
   }
 
   /**
@@ -170,6 +175,10 @@ export class ExecutionBridge {
    * Generate an execution plan from a user request.
    */
   private async generatePlan(userRequest: string): Promise<ExecutionPlan> {
+    if (this.agenticPlanner) {
+      return this.agenticPlanner.plan(userRequest);
+    }
+    // Legacy path
     const llmResponse = await this.plannerLLM(userRequest);
     return this.planner.parsePlan(llmResponse);
   }
