@@ -80,6 +80,13 @@ interface ToolHooks {
     handleMouseUp: () => void;
     handleKeyDown: (e: KeyboardEvent) => void;
   };
+  transformTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => boolean;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => boolean;
+    handleMouseUp: () => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    getCursor: (pt: Point2D) => string | null;
+  };
 }
 
 export function useEditorInteractions(
@@ -99,7 +106,7 @@ export function useEditorInteractions(
     startMouse: Point2D; startPos: Point2D;
   } | null>(null);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool } = tools;
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -132,7 +139,7 @@ export function useEditorInteractions(
   // Clear measurements when switching away
   useEffect(() => {
     if (activeTool !== 'measure') measureTool.clear();
-  }, [activeTool]);
+  }, [activeTool, measureTool]);
 
   // Delete/Backspace handler for selected internal line
   const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
@@ -153,13 +160,14 @@ export function useEditorInteractions(
     if (activeTool === 'line') handlers.push(lineTool.handleKeyDown);
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
     if (activeTool === 'measure') handlers.push(measureTool.handleKeyDown);
+    if (activeTool === 'transform') handlers.push(transformTool.handleKeyDown);
     if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
     if (activeTool === 'select' && selectedInternalLine) handlers.push(handleInternalLineKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown]);
+  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -204,6 +212,23 @@ export function useEditorInteractions(
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
     if (activeTool === 'grainline') { grainlineTool.handleMouseDown(e); return; }
     if (activeTool === 'measure') { measureTool.handleMouseDown(e); return; }
+    if (activeTool === 'transform') {
+      const handled = transformTool.handleMouseDown(e);
+      if (handled) return;
+      // Fall through to piece selection if no handle was hit
+      const target = e.target as SVGElement;
+      const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
+      if (pieceId) {
+        if (e.shiftKey) {
+          dispatch(togglePieceSelection(pieceId));
+        } else {
+          dispatch(selectPiece(pieceId));
+        }
+      } else {
+        dispatch(clearSelection());
+      }
+      return;
+    }
     if (activeTool === 'hand') {
       panRef.current = { startMouse: { x: e.clientX, y: e.clientY }, startPan: { ...pan2D } };
       return;
@@ -295,7 +320,7 @@ export function useEditorInteractions(
         dispatch(clearSelection());
       }
     }
-  }, [activeTool, pan2D, pen, dispatch, pieces, nodeEditor]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, transformTool, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -352,6 +377,10 @@ export function useEditorInteractions(
       const handled = nodeEditor.handleMouseMove(e);
       if (handled) return;
     }
+    if (activeTool === 'transform') {
+      const handled = transformTool.handleMouseMove(e);
+      if (handled) return;
+    }
     if (activeTool === 'pen') pen.handleMouseMove(e);
     if (activeTool === 'rectangle') rectTool.handleMouseMove(e);
     if (activeTool === 'line') lineTool.handleMouseMove(e);
@@ -359,7 +388,7 @@ export function useEditorInteractions(
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
     if (activeTool === 'grainline') grainlineTool.handleMouseMove(e);
     if (activeTool === 'measure') measureTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pen, seamTool, notchTool, grainlineTool, measureTool, dispatch]);
+  }, [activeTool, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, transformTool, nodeEditor, pieces, dispatch]);
 
   const handleMouseUp = useCallback(() => {
     panRef.current = null;
@@ -368,8 +397,9 @@ export function useEditorInteractions(
     if (activeTool === 'pen') pen.handleMouseUp();
     if (activeTool === 'rectangle') rectTool.handleMouseUp();
     if (activeTool === 'grainline') grainlineTool.handleMouseUp();
+    if (activeTool === 'transform') transformTool.handleMouseUp();
     if (nodeEditor.isEditing) nodeEditor.handleMouseUp();
-  }, [activeTool, pen, grainlineTool, nodeEditor]);
+  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
@@ -377,6 +407,7 @@ export function useEditorInteractions(
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
       case 'select': return dragRef.current ? 'grabbing' : 'default';
+      case 'transform': return 'default';
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';
       case 'grainline': return 'crosshair';

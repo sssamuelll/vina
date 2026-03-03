@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
 import { selectPiece, selectSeam } from '../../store/editorSlice';
-import { PatternPiece, Seam, InternalLine } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
@@ -12,6 +12,7 @@ import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useNodeEditor } from './useNodeEditor';
 import { useMeasureTool } from './useMeasureTool';
+import { useTransformTool } from './useTransformTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -117,7 +118,23 @@ export default function PatternEditor() {
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useNodeEditor(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
-  
+
+  const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {
+    for (const u of updates) {
+      const piece = pieces.find(p => p.id === u.id);
+      if (piece) {
+        dispatch(updatePiece({
+          ...piece,
+          outline: u.outline,
+          position: u.position,
+          updatedAt: Date.now(),
+        }));
+      }
+    }
+  }, [pieces, dispatch]);
+
+  const transformTool = useTransformTool(zoom2D, pan2D, pieces, selectedPieceIds, handleTransform);
+
   // Piece name editing callbacks
   const handlePieceNameDoubleClick = useCallback((pieceId: string) => {
     setEditingPieceNameId(pieceId);
@@ -137,7 +154,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool,
     });
 
   return (
@@ -208,6 +225,9 @@ export default function PatternEditor() {
             nodeEditorNodes={nodeEditor.nodes}
             selectedNode={nodeEditor.selectedNode}
             hoveredNode={nodeEditor.hoveredNode}
+            transformBbox={transformTool.bbox}
+            transformHandles={transformTool.handles}
+            transformPreview={transformTool.preview}
           />
         </g>
 

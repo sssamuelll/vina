@@ -8,6 +8,9 @@ import LineToolOverlay from './overlays/LineToolOverlay';
 import RectangleToolOverlay from './overlays/RectangleToolOverlay';
 import MeasureToolOverlay from './overlays/MeasureToolOverlay';
 import NodeEditorOverlay from './overlays/NodeEditorOverlay';
+import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
+import type { BBox, HandlePosition } from '../transformUtils';
+import type { TransformPreview } from '../useTransformTool';
 
 interface PenNode {
   anchor: Point2D;
@@ -69,6 +72,9 @@ interface ToolOverlayProps {
   nodeEditorNodes: EditorNode[];
   selectedNode: NodeRef | null;
   hoveredNode: NodeRef | null;
+  transformBbox: BBox | null;
+  transformHandles: HandlePosition[];
+  transformPreview: TransformPreview | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -102,6 +108,15 @@ export default function ToolOverlay(props: ToolOverlayProps) {
 
       {activeTool === 'measure' && (
         <MeasureToolOverlay zoom2D={zoom2D} measurements={props.measurements} currentStart={props.currentStart} cursorPos={props.cursorPos} formatDistance={props.formatDistance} />
+      )}
+
+      {activeTool === 'transform' && props.transformBbox && (
+        <TransformHandlesOverlay
+          zoom2D={zoom2D}
+          bbox={props.transformBbox}
+          handles={props.transformHandles}
+          preview={props.transformPreview}
+        />
       )}
 
       {props.nodeEditorIsEditing && props.nodeEditorEditingPieceId && (
