@@ -17,6 +17,7 @@ import {
   type ReasonerLLM,
   DEFAULT_BRIDGE_CONFIG,
 } from '../reasoning/bridge';
+import type { AgenticPlanner } from '../reasoning/bridge/AgenticPlanner';
 import { getDefaultRegistry } from '../action/tools/registry';
 import { createDebugBridge } from '../debug';
 
@@ -27,6 +28,8 @@ export interface UseBridgeOptions {
   evaluator: (input: unknown, question: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   /** LLM function for reasoner */
   reasonerLLM: ReasonerLLM;
+  /** Optional agentic planner (replaces plannerLLM) */
+  agenticPlanner?: AgenticPlanner;
 }
 
 export interface UseBridgeReturn {
@@ -80,6 +83,7 @@ export function useBridge(options: UseBridgeOptions): UseBridgeReturn {
         reasonerLLM: options.reasonerLLM,
         tools,
         config: DEFAULT_BRIDGE_CONFIG,
+        agenticPlanner: options.agenticPlanner,
       });
       bridgeRef.current = bridge;
     }

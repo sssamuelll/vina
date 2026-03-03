@@ -26,6 +26,12 @@ export class ConsoleLogger {
       'color: #6366f1'
     );
     console.log('Tools:', p.toolsProvided.join(', '));
+    if (p.metaToolCalls && p.metaToolCalls.length > 0) {
+      console.log(`%c  Meta-tool calls: ${p.metaToolCalls.length}`, 'color: #9b59b6');
+      for (const call of p.metaToolCalls) {
+        console.log(`    ${call.name}(${JSON.stringify(call.arguments)}) → ${Math.round(call.duration)}ms`);
+      }
+    }
     console.groupCollapsed('System prompt');
     console.log(p.systemPrompt);
     console.groupEnd();

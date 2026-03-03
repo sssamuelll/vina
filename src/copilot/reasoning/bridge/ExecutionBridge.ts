@@ -26,7 +26,9 @@ import { DEFAULT_BRIDGE_CONFIG, isExecuteStep } from './types';
 import { Planner } from './Planner';
 import type { ToolRegistry, Evaluator } from './Executor';
 import { Reasoner, type ReasonerLLM } from './Reasoner';
+import { ResultStore } from './ResultStore';
 import { SummaryGenerator } from './SummaryGenerator';
+import type { AgenticPlanner } from './AgenticPlanner';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -50,6 +52,8 @@ export interface BridgeOptions {
   tools: ToolRegistry;
   /** Optional configuration */
   config?: BridgeConfig;
+  /** Optional agentic planner (replaces plannerLLM when provided) */
+  agenticPlanner?: AgenticPlanner;
 }
 
 /**
@@ -83,7 +87,9 @@ export class ExecutionBridge {
   private config: BridgeConfig;
   private eventHandlers: BridgeEventHandler[] = [];
   private planner: Planner;
+  private resultStore = new ResultStore();
   private summaryGenerator: SummaryGenerator;
+  private agenticPlanner: AgenticPlanner | null;
 
   /**
    * Create an ExecutionBridge.
@@ -98,6 +104,7 @@ export class ExecutionBridge {
     this.config = options.config ?? DEFAULT_BRIDGE_CONFIG;
     this.planner = new Planner();
     this.summaryGenerator = new SummaryGenerator();
+    this.agenticPlanner = options.agenticPlanner ?? null;
   }
 
   /**
@@ -168,6 +175,10 @@ export class ExecutionBridge {
    * Generate an execution plan from a user request.
    */
   private async generatePlan(userRequest: string): Promise<ExecutionPlan> {
+    if (this.agenticPlanner) {
+      return this.agenticPlanner.plan(userRequest);
+    }
+    // Legacy path
     const llmResponse = await this.plannerLLM(userRequest);
     return this.planner.parsePlan(llmResponse);
   }
@@ -179,6 +190,7 @@ export class ExecutionBridge {
     plan: ExecutionPlan,
     originalIntent: string
   ): Promise<{ results: StepResult[]; success: boolean; error?: string }> {
+    this.resultStore.clear();
     const results: StepResult[] = [];
     const rollbacks: Array<() => void> = [];
 
@@ -196,6 +208,7 @@ export class ExecutionBridge {
       );
 
       results.push(stepResult);
+      this.resultStore.add(stepResult);
 
       if (!stepResult.success) {
         // Check if we should rollback
@@ -341,7 +354,8 @@ export class ExecutionBridge {
     }
 
     try {
-      const result = await tool(step.params);
+      const resolvedParams = this.resolveParams(step.params);
+      const result = await tool(resolvedParams);
       return {
         stepId: step.id,
         success: result.success,
@@ -379,6 +393,22 @@ export class ExecutionBridge {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  /**
+   * Resolve variable references in step params.
+   * Replaces string values starting with '$' using the ResultStore.
+   */
+  private resolveParams(params: Record<string, unknown>): Record<string, unknown> {
+    const resolved: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'string' && value.startsWith('$')) {
+        resolved[key] = this.resultStore.resolve(value);
+      } else {
+        resolved[key] = value;
+      }
+    }
+    return resolved;
   }
 
   /**

@@ -25,6 +25,14 @@ export interface PlanningRecord {
   parseError?: string;
   duration: number;
   tokenUsage?: TokenUsage;
+  metaToolCalls?: MetaToolCallRecord[];
+}
+
+export interface MetaToolCallRecord {
+  name: string;
+  arguments: Record<string, unknown>;
+  result: unknown;
+  duration: number;
 }
 
 export interface TokenUsage {

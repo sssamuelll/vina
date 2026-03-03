@@ -60,6 +60,12 @@ export function createDebugBridge(options: BridgeOptions): DebugBridgeResult {
         .map(s => (s as { tool: string }).tool);
       recorder.recordPlanningStart('', [...new Set(toolNames)]);
       recorder.recordPlanningEnd('', event.plan);
+
+      // Capture meta-tool calls from AgenticPlanner if present
+      if (options.agenticPlanner) {
+        const metaToolCalls = options.agenticPlanner.getLastMetaToolCalls();
+        recorder.recordPlanningMetaToolCalls(metaToolCalls);
+      }
     }
 
     if (event.type === 'execution:complete') {
