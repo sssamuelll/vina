@@ -18,17 +18,120 @@ import type {
   BridgeEventHandler,
   BridgeConfig,
   ReasonerInput,
+  ReasonerDecision,
   ExpandableSummary,
   ExecuteStep,
   EvaluateStep,
+  ToolRegistry,
+  Evaluator,
+  ReasonerLLM,
 } from './types';
 import { DEFAULT_BRIDGE_CONFIG, isExecuteStep } from './types';
 import { Planner } from './Planner';
-import type { ToolRegistry, Evaluator } from './Executor';
-import { Reasoner, type ReasonerLLM } from './Reasoner';
-import { ResultStore } from './ResultStore';
-import { SummaryGenerator } from './SummaryGenerator';
 import type { AgenticPlanner } from './AgenticPlanner';
+
+// ─── Inlined Classes (formerly separate files, deleted in Task 6) ───────────
+
+const VALID_ACTIONS = ['retry', 'alternative', 'askUser', 'abort'] as const;
+
+/** Reasoner — inlined from deleted Reasoner.ts */
+class Reasoner {
+  private llm: ReasonerLLM;
+  constructor(llm: ReasonerLLM) { this.llm = llm; }
+
+  async analyze(input: ReasonerInput): Promise<ReasonerDecision> {
+    const prompt = this.buildPrompt(input);
+    try {
+      const response = await this.llm(prompt);
+      return this.validateResponse(response);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      return { action: 'abort', reason: `Reasoner error: ${msg}` };
+    }
+  }
+
+  private buildPrompt(input: ReasonerInput): string {
+    const { failedStep, error, resultsSoFar, originalIntent } = input;
+    const stepLines = [`Type: ${failedStep.type}`, `ID: ${failedStep.id}`, `Label: ${failedStep.label}`];
+    if (isExecuteStep(failedStep)) {
+      stepLines.push(`Tool: ${failedStep.tool}`, `Params: ${JSON.stringify(failedStep.params, null, 2)}`);
+    } else {
+      stepLines.push(`Input: ${failedStep.input}`, `Decide: ${failedStep.decide}`);
+    }
+    const resultsCtx = resultsSoFar.length === 0 ? 'No previous results.' :
+      resultsSoFar.map(r => {
+        const status = r.success ? 'SUCCESS' : 'FAILED';
+        return `- Step ${r.stepId}: ${status}, Data: ${r.data ? JSON.stringify(r.data) : 'none'}${r.error ? `, Error: ${r.error}` : ''}`;
+      }).join('\n');
+    return `You are an error recovery assistant for a pattern modification system.\n\nA step in the execution plan has failed. Analyze the error and decide how to proceed.\n\n## Original Intent\n${originalIntent}\n\n## Failed Step\n${stepLines.join('\n')}\n\n## Error\n${error}\n\n## Previous Results\n${resultsCtx}\n\n## Available Actions\n1. **retry** - Retry the step with modified parameters (provide newParams)\n2. **alternative** - Use a different step instead (provide newStep)\n3. **askUser** - Ask the user for clarification (provide question and options)\n4. **abort** - Cannot recover, abort the execution (provide reason)`;
+  }
+
+  private validateResponse(response: unknown): ReasonerDecision {
+    if (typeof response !== 'object' || response === null) {
+      return { action: 'abort', reason: 'Invalid reasoner response: not an object' };
+    }
+    const obj = response as Record<string, unknown>;
+    if (typeof obj.action !== 'string' || !VALID_ACTIONS.includes(obj.action as typeof VALID_ACTIONS[number])) {
+      return { action: 'abort', reason: `Invalid reasoner response: action must be one of ${VALID_ACTIONS.join(', ')}` };
+    }
+    return {
+      action: obj.action as ReasonerDecision['action'],
+      newParams: obj.newParams as Record<string, unknown> | undefined,
+      newStep: obj.newStep as Step | undefined,
+      question: obj.question as string | undefined,
+      options: obj.options as string[] | undefined,
+      reason: obj.reason as string | undefined,
+    };
+  }
+}
+
+/** ResultStore — inlined from deleted ResultStore.ts */
+class ResultStore {
+  private results: Map<string, StepResult> = new Map();
+  private orderedResults: StepResult[] = [];
+
+  add(result: StepResult): void {
+    this.results.set(result.stepId, result);
+    this.orderedResults.push(result);
+  }
+
+  resolve(ref: string): unknown {
+    if (!ref.startsWith('$')) return ref;
+    const parts = ref.slice(1).split('.');
+    const result = this.results.get(parts[0]);
+    if (!result || parts[1] !== 'result') return undefined;
+    if (parts.length === 2) return result.data;
+    let current: unknown = result.data;
+    for (let i = 2; i < parts.length; i++) {
+      if (current === null || current === undefined || typeof current !== 'object') return undefined;
+      current = (current as Record<string, unknown>)[parts[i]];
+    }
+    return current;
+  }
+
+  clear(): void {
+    this.results.clear();
+    this.orderedResults = [];
+  }
+}
+
+/** SummaryGenerator — inlined from deleted SummaryGenerator.ts */
+class SummaryGenerator {
+  generate(intent: string, results: StepResult[], durationMs?: number): ExpandableSummary {
+    const successCount = results.filter(r => r.success).length;
+    const totalCount = results.length;
+    const short = totalCount === 0 ? `Completed ${intent}` :
+      successCount === totalCount ? `Completed ${intent} (${totalCount} steps)` :
+      `Completed ${intent} (${successCount}/${totalCount} steps)`;
+    const details: string[] = [];
+    if (results.length > 0) {
+      let statsLine = `${successCount} of ${results.length} steps completed`;
+      if (durationMs !== undefined) statsLine += ` in ${(durationMs / 1000).toFixed(1)}s`;
+      details.push(statsLine);
+    }
+    return { short, details };
+  }
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createInstrumentedTools } from '../middleware/ExecutorMiddleware';
 import { ExecutionRecorder } from '../ExecutionRecorder';
-import type { ToolRegistry } from '../../reasoning/bridge/Executor';
+import type { ToolRegistry } from '../../reasoning/bridge/types';
 
 describe('ExecutorMiddleware (createInstrumentedTools)', () => {
   let recorder: ExecutionRecorder;

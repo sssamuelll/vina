@@ -202,6 +202,49 @@ export interface IReasoner {
   analyze(input: ReasonerInput): Promise<ReasonerDecision>;
 }
 
+// ─── Legacy Executor Types ──────────────────────────────────────────────────
+// These types were originally in Executor.ts but are kept here while
+// ExecutionBridge (deleted in Task 7) still needs them.
+
+/**
+ * A tool function that executes with parameters and returns a result.
+ * @deprecated Use UnifiedToolRegistry from '../../action/tools/registry' instead
+ */
+export type ToolFunction = (params: Record<string, unknown>) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+
+/**
+ * Registry of available tools by name.
+ * @deprecated Use UnifiedToolRegistry from '../../action/tools/registry' instead
+ */
+export type ToolRegistry = Record<string, ToolFunction>;
+
+/**
+ * Evaluator function for evaluate steps (calls LLM).
+ */
+export type Evaluator = (input: unknown, question: string) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+
+/**
+ * Result of executing a full plan.
+ */
+export interface ExecutionResult {
+  /** Whether all steps succeeded */
+  success: boolean;
+  /** Results from all executed steps */
+  results: StepResult[];
+  /** ID of the step that failed (if any) */
+  failedStep?: string;
+  /** Error message if failed */
+  error?: string;
+}
+
+// ─── Legacy Reasoner Types ──────────────────────────────────────────────────
+
+/**
+ * LLM function type for the Reasoner.
+ * Takes a prompt string and returns a ReasonerDecision.
+ */
+export type ReasonerLLM = (prompt: string) => Promise<ReasonerDecision>;
+
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 /**

@@ -1,4 +1,4 @@
-import type { ToolRegistry, ToolFunction } from '../../reasoning/bridge/Executor';
+import type { ToolRegistry, ToolFunction } from '../../reasoning/bridge/types';
 import { ExecutionRecorder } from '../ExecutionRecorder';
 
 let stepCounter = 0;

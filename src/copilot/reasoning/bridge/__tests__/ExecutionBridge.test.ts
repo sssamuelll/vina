@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ExecutionBridge } from '../ExecutionBridge';
 import type { BridgeEvent } from '../types';
-import type { ToolRegistry } from '../Executor';
+import type { ToolRegistry } from '../types';
 
 // Mock dependencies
 const mockPlannerLLM = vi.fn();

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { IPlanner, IReasoner } from '../../reasoning/bridge/types';
+import type { IPlanner } from '../../reasoning/bridge/types';
 import { Planner } from '../../reasoning/bridge/Planner';
-import { Reasoner } from '../../reasoning/bridge/Reasoner';
 
 describe('Bridge Interfaces', () => {
   it('Planner satisfies IPlanner', () => {
@@ -11,9 +10,6 @@ describe('Bridge Interfaces', () => {
     expect(asInterface.parsePlan).toBeDefined();
   });
 
-  it('Reasoner satisfies IReasoner', () => {
-    const reasoner = new Reasoner(async () => ({ action: 'abort' as const }));
-    const asInterface: IReasoner = reasoner;
-    expect(asInterface.analyze).toBeDefined();
-  });
+  // Reasoner test removed — Reasoner class inlined into ExecutionBridge (Task 6)
+  // and will be deleted entirely in Task 7.
 });

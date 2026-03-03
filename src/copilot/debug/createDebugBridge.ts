@@ -7,7 +7,7 @@ import { AgenticRecorder } from './AgenticRecorder';
 import { AgenticConsoleLogger } from './AgenticConsoleLogger';
 import { DebugStore } from './DebugStore';
 import { createDebugAPI } from './debugAPI';
-import type { ToolRegistry } from '../reasoning/bridge/Executor';
+import type { ToolRegistry } from '../reasoning/bridge/types';
 
 export function isDebugEnabled(): boolean {
   // TODO: re-gate behind localStorage once stable
