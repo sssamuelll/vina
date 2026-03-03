@@ -267,6 +267,7 @@ export type ViewMode = '2d' | '3d' | 'split';
 export type Tool2D =
   | 'select'
   | 'transform'    // move/rotate/scale with gizmo
+  | 'editPattern'  // edit points and segments (Z key)
   | 'editCurve'    // edit curve points
   | 'editConstrain' // edit with constraints
   | 'movePattern'  // move pattern pieces
