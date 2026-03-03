@@ -18,6 +18,7 @@ import {
   DEFAULT_BRIDGE_CONFIG,
 } from '../reasoning/bridge';
 import { getDefaultRegistry } from '../action/tools/registry';
+import { createDebugBridge } from '../debug';
 
 export interface UseBridgeOptions {
   /** LLM function for planning */
@@ -70,7 +71,7 @@ export function useBridge(options: UseBridgeOptions): UseBridgeReturn {
         };
       }
 
-      bridgeRef.current = new ExecutionBridge({
+      const { bridge } = createDebugBridge({
         plannerLLM: async (userRequest) => {
           // The planner LLM receives the user request directly
           return options.plannerLLM(userRequest);
@@ -80,6 +81,7 @@ export function useBridge(options: UseBridgeOptions): UseBridgeReturn {
         tools,
         config: DEFAULT_BRIDGE_CONFIG,
       });
+      bridgeRef.current = bridge;
     }
     return bridgeRef.current;
   }, [dispatch, store, options]);
