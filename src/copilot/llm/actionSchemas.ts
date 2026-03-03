@@ -176,6 +176,27 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     examples: ['Add a point at the midpoint of edge 0'],
   },
   {
+    action: 'delete_point',
+    description: 'Delete a point from a piece outline',
+    category: 'geometry',
+    parameters: [
+      { name: 'pieceId', type: 'string', description: 'ID of the piece', required: true },
+      { name: 'pointIndex', type: 'number', description: 'Index of the point to delete', required: true },
+    ],
+    examples: ['Delete point 3 from the front bodice', 'Remove the extra point on edge 2'],
+    dangerous: true,
+  },
+  {
+    action: 'straighten_edge',
+    description: 'Convert a curved edge to a straight line',
+    category: 'geometry',
+    parameters: [
+      { name: 'pieceId', type: 'string', description: 'ID of the piece', required: true },
+      { name: 'edgeIndex', type: 'number', description: 'Index of the edge to straighten', required: true },
+    ],
+    examples: ['Straighten the armhole edge', 'Make edge 1 a straight line'],
+  },
+  {
     action: 'add_ease',
     description: 'Add ease to an edge or entire piece',
     category: 'geometry',

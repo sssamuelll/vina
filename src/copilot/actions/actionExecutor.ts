@@ -502,12 +502,97 @@ export class CopilotActionExecutor {
           summary: `Added dart at (${action.position[0]}, ${action.position[1]})`,
         };
 
-      case 'curve_edge':
-        // Curve implementation would convert L to C commands
+      case 'curve_edge': {
+        const piece = state.project.pieces.find(p => p.id === action.pieceId);
+        if (!piece) throw new Error('Piece not found');
+
+        const cmdIdx = action.edgeIndex + 1; // +1 because edgeIndex 0 = segment from M to first L
+        if (cmdIdx < 0 || cmdIdx >= piece.outline.length) {
+          throw new Error(`Edge index ${action.edgeIndex} out of range`);
+        }
+        const cmd = piece.outline[cmdIdx];
+        if (cmd.type !== 'L') {
+          return {
+            data: { pieceId: action.pieceId, edgeIndex: action.edgeIndex },
+            summary: `Edge ${action.edgeIndex} is already a curve`,
+          };
+        }
+
+        // Find previous anchor
+        let prevX = 0, prevY = 0;
+        for (let i = cmdIdx - 1; i >= 0; i--) {
+          const c = piece.outline[i];
+          if (c.type === 'M' || c.type === 'L') { prevX = c.values[0]; prevY = c.values[1]; break; }
+          if (c.type === 'C') { prevX = c.values[4]; prevY = c.values[5]; break; }
+          if (c.type === 'Q') { prevX = c.values[2]; prevY = c.values[3]; break; }
+        }
+
+        const endX = cmd.values[0], endY = cmd.values[1];
+        const dx = endX - prevX, dy = endY - prevY;
+
+        // Perpendicular offset for curvature
+        const nx = -dy, ny = dx;
+        const len = Math.hypot(nx, ny) || 1;
+        const offset = action.curvature * len * 0.3;
+
+        const midX = (prevX + endX) / 2 + (nx / len) * offset;
+        const midY = (prevY + endY) / 2 + (ny / len) * offset;
+
+        // Place cp1 and cp2 to create smooth curve through offset midpoint
+        const cp1x = prevX + (midX - prevX) * 2 / 3 + (endX - prevX) / 3;
+        const cp1y = prevY + (midY - prevY) * 2 / 3 + (endY - prevY) / 3;
+        const cp2x = endX + (midX - endX) * 2 / 3 + (prevX - endX) / 3;
+        const cp2y = endY + (midY - endY) * 2 / 3 + (prevY - endY) / 3;
+
+        const newOutline = piece.outline.map((c, i) => {
+          if (i !== cmdIdx) return c;
+          return { type: 'C' as const, values: [cp1x, cp1y, cp2x, cp2y, endX, endY] };
+        });
+
+        this.dispatch(updatePiece({ ...piece, outline: newOutline, updatedAt: Date.now() }));
+
         return {
           data: { pieceId: action.pieceId, edgeIndex: action.edgeIndex, curvature: action.curvature },
-          summary: `Curved edge ${action.edgeIndex}`,
+          summary: `Curved edge ${action.edgeIndex} with curvature ${action.curvature}`,
         };
+      }
+
+      case 'straighten_edge': {
+        const piece = state.project.pieces.find(p => p.id === action.pieceId);
+        if (!piece) throw new Error('Piece not found');
+
+        const cmdIdx = action.edgeIndex + 1;
+        if (cmdIdx < 0 || cmdIdx >= piece.outline.length) {
+          throw new Error(`Edge index ${action.edgeIndex} out of range`);
+        }
+        const cmd = piece.outline[cmdIdx];
+        if (cmd.type === 'L') {
+          return {
+            data: { pieceId: action.pieceId, edgeIndex: action.edgeIndex },
+            summary: `Edge ${action.edgeIndex} is already straight`,
+          };
+        }
+        if (cmd.type !== 'C' && cmd.type !== 'Q') {
+          throw new Error(`Edge ${action.edgeIndex} is not a curve (type: ${cmd.type})`);
+        }
+
+        // Get anchor point
+        const anchor = cmd.type === 'C'
+          ? { x: cmd.values[4], y: cmd.values[5] }
+          : { x: cmd.values[2], y: cmd.values[3] };
+
+        const newOutline = piece.outline.map((c, i) => {
+          if (i !== cmdIdx) return c;
+          return { type: 'L' as const, values: [anchor.x, anchor.y] };
+        });
+
+        this.dispatch(updatePiece({ ...piece, outline: newOutline, updatedAt: Date.now() }));
+
+        return {
+          data: { pieceId: action.pieceId, edgeIndex: action.edgeIndex },
+          summary: `Straightened edge ${action.edgeIndex}`,
+        };
+      }
 
       case 'split_edge':
         // Similar to add_point
