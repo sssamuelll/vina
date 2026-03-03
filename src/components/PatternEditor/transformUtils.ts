@@ -17,6 +17,9 @@ export interface BBox {
 
 const ROTATION_ARM_LENGTH = 25; // pixels (will be divided by zoom)
 
+// Commands whose values are not simple (x,y) pairs — skip for transform math
+const NON_XY_PAIR_COMMANDS = new Set(['Z', 'H', 'V', 'A']);
+
 /**
  * Compute the axis-aligned bounding box encompassing all selected pieces.
  * Accounts for piece position offset and all path coordinate values
@@ -38,6 +41,7 @@ export function computeBoundingBox(
     const ox = piece.position?.x ?? 0;
     const oy = piece.position?.y ?? 0;
     for (const cmd of piece.outline) {
+      if (NON_XY_PAIR_COMMANDS.has(cmd.type)) continue;
       const v = cmd.values;
       for (let i = 0; i < v.length; i += 2) {
         const px = v[i] + ox;
@@ -86,7 +90,7 @@ export function scaleOutline(
   scaleY: number,
 ): PathCommand[] {
   return outline.map(cmd => {
-    if (cmd.type === 'Z' || cmd.values.length === 0) return cmd;
+    if (NON_XY_PAIR_COMMANDS.has(cmd.type) || cmd.values.length === 0) return cmd;
     const newValues = [...cmd.values];
     for (let i = 0; i < newValues.length; i += 2) {
       newValues[i] = center.x + (newValues[i] - center.x) * scaleX;
@@ -110,7 +114,7 @@ export function rotateOutline(
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
   return outline.map(cmd => {
-    if (cmd.type === 'Z' || cmd.values.length === 0) return cmd;
+    if (NON_XY_PAIR_COMMANDS.has(cmd.type) || cmd.values.length === 0) return cmd;
     const newValues = [...cmd.values];
     for (let i = 0; i < newValues.length; i += 2) {
       const dx = newValues[i] - center.x;

@@ -9,6 +9,7 @@ import {
   scaleOutline,
   rotateOutline,
   type HandleId,
+  type BBox,
 } from './transformUtils';
 
 interface TransformDragState {
@@ -16,6 +17,7 @@ interface TransformDragState {
   origin: Point2D;
   current: Point2D;
   piecesSnapshot: PatternPiece[];
+  bboxSnapshot: BBox;
 }
 
 export interface TransformPreview {
@@ -79,6 +81,7 @@ export function useTransformTool(
         origin: pt,
         current: pt,
         piecesSnapshot: snapshot,
+        bboxSnapshot: { ...bbox },
       };
       dragRef.current = state;
       shiftRef.current = e.shiftKey;
@@ -90,7 +93,7 @@ export function useTransformTool(
 
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
-      if (!dragRef.current || !bbox) return false;
+      if (!dragRef.current) return false;
       shiftRef.current = e.shiftKey;
       const pt = toPattern(e);
       const updated = { ...dragRef.current, current: pt };
@@ -98,22 +101,23 @@ export function useTransformTool(
       setDrag(updated);
       return true;
     },
-    [toPattern, bbox],
+    [toPattern],
   );
 
   const handleMouseUp = useCallback(() => {
     const d = dragRef.current;
-    if (!d || !bbox) {
+    if (!d) {
       dragRef.current = null;
       setDrag(null);
       return;
     }
 
-    const center: Point2D = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+    const snappedBbox = d.bboxSnapshot;
+    const center: Point2D = { x: snappedBbox.x + snappedBbox.width / 2, y: snappedBbox.y + snappedBbox.height / 2 };
     const updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }> = [];
 
     if (d.handleId === 'rotate') {
-      const angle = computeRotationFromDrag(bbox, d.origin, d.current, shiftRef.current);
+      const angle = computeRotationFromDrag(snappedBbox, d.origin, d.current, shiftRef.current);
       for (const snap of d.piecesSnapshot) {
         const ox = snap.position.x;
         const oy = snap.position.y;
@@ -133,7 +137,7 @@ export function useTransformTool(
       }
     } else {
       const uniform = ['nw', 'ne', 'sw', 'se'].includes(d.handleId) && !shiftRef.current;
-      const { scaleX, scaleY } = computeScaleFromDrag(d.handleId, bbox, d.origin, d.current, uniform);
+      const { scaleX, scaleY } = computeScaleFromDrag(d.handleId, snappedBbox, d.origin, d.current, uniform);
       for (const snap of d.piecesSnapshot) {
         const ox = snap.position.x;
         const oy = snap.position.y;
@@ -151,7 +155,7 @@ export function useTransformTool(
     onTransform(updates);
     dragRef.current = null;
     setDrag(null);
-  }, [bbox, onTransform]);
+  }, [onTransform]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && dragRef.current) {
@@ -162,14 +166,15 @@ export function useTransformTool(
 
   // Compute preview transform for rendering ghost during drag
   let preview: TransformPreview | null = null;
-  if (drag && bbox) {
-    const center = { x: bbox.x + bbox.width / 2, y: bbox.y + bbox.height / 2 };
+  if (drag) {
+    const previewBbox = drag.bboxSnapshot;
+    const center = { x: previewBbox.x + previewBbox.width / 2, y: previewBbox.y + previewBbox.height / 2 };
     if (drag.handleId === 'rotate') {
-      const angle = computeRotationFromDrag(bbox, drag.origin, drag.current, shiftRef.current);
+      const angle = computeRotationFromDrag(previewBbox, drag.origin, drag.current, shiftRef.current);
       preview = { scaleX: 1, scaleY: 1, rotation: angle, centerX: center.x, centerY: center.y };
     } else {
       const uniform = ['nw', 'ne', 'sw', 'se'].includes(drag.handleId) && !shiftRef.current;
-      const { scaleX, scaleY } = computeScaleFromDrag(drag.handleId, bbox, drag.origin, drag.current, uniform);
+      const { scaleX, scaleY } = computeScaleFromDrag(drag.handleId, previewBbox, drag.origin, drag.current, uniform);
       preview = { scaleX, scaleY, rotation: 0, centerX: center.x, centerY: center.y };
     }
   }
