@@ -30,12 +30,17 @@ export interface ContextMenuState {
   /** ID of piece under cursor, or null for empty canvas */
   pieceId: string | null;
   pieceName?: string;
+  /** Segment command index for convert options (set when right-clicking in edit pattern mode) */
+  segmentIndex?: number;
+  /** Whether the segment is currently a curve */
+  segmentIsCurve?: boolean;
 }
 
 interface ContextMenuProps {
   menu: ContextMenuState;
   onClose: () => void;
   onRename?: (pieceId: string) => void;
+  onConvertSegment?: (commandIndex: number, toCurve: boolean) => void;
 }
 
 // ─── Menu Items ─────────────────────────────────────────────────────────────
@@ -51,7 +56,7 @@ interface MenuItem {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ContextMenu({ menu, onClose, onRename }: ContextMenuProps) {
+export default function ContextMenu({ menu, onClose, onRename, onConvertSegment }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const ref = useRef<HTMLDivElement>(null);
@@ -81,6 +86,15 @@ export default function ContextMenu({ menu, onClose, onRename }: ContextMenuProp
   if (!menu.visible) return null;
 
   const items: MenuItem[] = [];
+
+  if (menu.segmentIndex !== undefined) {
+    items.push({
+      label: menu.segmentIsCurve ? 'Convert to Line' : 'Convert to Curve',
+      icon: menu.segmentIsCurve ? '─' : '⌒',
+      action: () => { onConvertSegment?.(menu.segmentIndex!, !menu.segmentIsCurve); onClose(); },
+      separator: true,
+    });
+  }
 
   if (menu.pieceId) {
     // ── Piece context ──

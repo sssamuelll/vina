@@ -12,6 +12,7 @@ import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
+import { nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool } from './useTransformTool';
 import { useEditorInteractions } from './useEditorInteractions';
@@ -38,45 +39,6 @@ export default function PatternEditor() {
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>({
     visible: false, x: 0, y: 0, pieceId: null,
   });
-
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    // Determine which piece (if any) is under the cursor
-    const svg = e.currentTarget as SVGSVGElement;
-    const rect = svg.getBoundingClientRect();
-    const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-    const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
-
-    // Hit-test: find piece whose bounding box contains the point
-    let hitPiece: typeof pieces[0] | null = null;
-    for (const piece of pieces) {
-      if (!piece.outline?.length) continue;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const cmd of piece.outline) {
-        const v = cmd.values;
-        for (let i = 0; i < v.length; i += 2) {
-          const px = v[i] + (piece.position?.x ?? 0);
-          const py = v[i + 1] + (piece.position?.y ?? 0);
-          if (px < minX) minX = px;
-          if (px > maxX) maxX = px;
-          if (py < minY) minY = py;
-          if (py > maxY) maxY = py;
-        }
-      }
-      if (canvasX >= minX && canvasX <= maxX && canvasY >= minY && canvasY <= maxY) {
-        hitPiece = piece;
-        break;
-      }
-    }
-
-    setCtxMenu({
-      visible: true,
-      x: e.clientX,
-      y: e.clientY,
-      pieceId: hitPiece?.id ?? null,
-      pieceName: hitPiece?.name,
-    });
-  }, [pieces, pan2D, zoom2D]);
 
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
@@ -120,6 +82,59 @@ export default function PatternEditor() {
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    // Determine which piece (if any) is under the cursor
+    const svg = e.currentTarget as SVGSVGElement;
+    const rect = svg.getBoundingClientRect();
+    const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
+    const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+
+    // Hit-test: find piece whose bounding box contains the point
+    let hitPiece: typeof pieces[0] | null = null;
+    for (const piece of pieces) {
+      if (!piece.outline?.length) continue;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const cmd of piece.outline) {
+        const v = cmd.values;
+        for (let i = 0; i < v.length; i += 2) {
+          const px = v[i] + (piece.position?.x ?? 0);
+          const py = v[i + 1] + (piece.position?.y ?? 0);
+          if (px < minX) minX = px;
+          if (px > maxX) maxX = px;
+          if (py < minY) minY = py;
+          if (py > maxY) maxY = py;
+        }
+      }
+      if (canvasX >= minX && canvasX <= maxX && canvasY >= minY && canvasY <= maxY) {
+        hitPiece = piece;
+        break;
+      }
+    }
+
+    let segmentIndex: number | undefined;
+    let segmentIsCurve: boolean | undefined;
+    if (editPatternTool.isEditing && editPatternTool.editingPieceId && hitPiece?.id === editPatternTool.editingPieceId) {
+      const localPt = { x: canvasX - (hitPiece.position?.x ?? 0), y: canvasY - (hitPiece.position?.y ?? 0) };
+      const segHit = nearestSegment(localPt, hitPiece.outline);
+      if (segHit && segHit.distance <= 8 / zoom2D) {
+        segmentIndex = segHit.commandIndex;
+        const cmd = hitPiece.outline[segHit.commandIndex];
+        segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';
+      }
+    }
+
+    setCtxMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      pieceId: hitPiece?.id ?? null,
+      pieceName: hitPiece?.name,
+      segmentIndex,
+      segmentIsCurve,
+    });
+  }, [pieces, pan2D, zoom2D, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
   const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {
     for (const u of updates) {
@@ -253,6 +268,7 @@ export default function PatternEditor() {
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
+        onConvertSegment={(idx, toCurve) => editPatternTool.convertSegment(idx, toCurve)}
       />
     </div>
   );
