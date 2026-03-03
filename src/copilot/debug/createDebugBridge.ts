@@ -7,11 +7,8 @@ import { createDebugAPI } from './debugAPI';
 import type { ToolRegistry } from '../reasoning/bridge/Executor';
 
 export function isDebugEnabled(): boolean {
-  try {
-    return localStorage.getItem('openclo-debug-bridge') === 'true';
-  } catch {
-    return false;
-  }
+  // TODO: re-gate behind localStorage once stable
+  return true;
 }
 
 export interface DebugBridgeResult {
