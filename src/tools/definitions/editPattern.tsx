@@ -26,7 +26,7 @@ export const editPatternTool: ToolDefinition = {
   id: 'editPattern',
   name: 'Edit Pattern',
   context: '2d',
-  shortcut: 'z',
+  shortcut: 'q',
   icon: EditPatternIcon,
   cursor: 'default',
   group: 'select',
