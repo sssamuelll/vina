@@ -9,8 +9,7 @@
  *   User request → LLM (with meta-tools) → [meta-tool calls] → ... → ExecutionPlan JSON
  *
  * The loop terminates when the LLM responds with content (no tool calls),
- * which is then parsed as an ExecutionPlan. A safety limit (maxMetaToolCalls)
- * prevents infinite loops.
+ * which is then parsed as an ExecutionPlan.
  *
  * @module bridge/AgenticPlanner
  */
@@ -25,7 +24,7 @@ import type { ToolParametersSchema } from '../../action/tools/registry';
 import type { ExecutionPlan } from './types';
 import type { MetaToolDefinition } from './meta-tools/types';
 import type { RootState } from '../../../store';
-import { Planner, PlannerError } from './Planner';
+import { Planner } from './Planner';
 import { buildDomainBootstrap } from './domainBootstrap';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -64,8 +63,6 @@ export interface AgenticPlannerOptions {
   }>;
   /** State accessor for meta-tool execution */
   getState: () => RootState;
-  /** Max meta-tool calls before giving up (default: 10) */
-  maxMetaToolCalls?: number;
   /** Provider config to pass through to send */
   providerConfig?: unknown;
 }
@@ -85,7 +82,6 @@ export class AgenticPlanner {
   private metaTools: Map<string, MetaToolDefinition>;
   private toolSchemas: AgenticPlannerOptions['toolSchemas'];
   private getState: () => RootState;
-  private maxMetaToolCalls: number;
   private providerConfig: unknown;
   private parser: Planner;
   private lastMetaToolCalls: MetaToolCallRecord[] = [];
@@ -97,7 +93,6 @@ export class AgenticPlanner {
     );
     this.toolSchemas = options.toolSchemas;
     this.getState = options.getState;
-    this.maxMetaToolCalls = options.maxMetaToolCalls ?? 10;
     this.providerConfig = options.providerConfig;
     this.parser = new Planner();
   }
@@ -114,17 +109,16 @@ export class AgenticPlanner {
   /**
    * Plan an execution for the given user request.
    *
-   * The LLM may call meta-tools to gather garment context before producing
-   * a final ExecutionPlan JSON. The loop terminates when the LLM responds
-   * with content (no tool calls) or when the meta-tool call limit is reached.
+   * The LLM drives the loop: it calls meta-tools to gather garment context,
+   * and terminates naturally when it responds with content (no tool calls).
+   * The final response is parsed as an ExecutionPlan.
    *
    * @param userRequest - The user's natural language request
    * @returns Validated execution plan
-   * @throws PlannerError if the plan JSON is invalid or the loop limit is exceeded
+   * @throws If the plan JSON is invalid
    */
   async plan(userRequest: string): Promise<ExecutionPlan> {
     this.lastMetaToolCalls = [];
-    let metaToolCallCount = 0;
 
     const systemPrompt = this.buildSystemPrompt();
     const metaToolDefs = this.buildMetaToolDefs();
@@ -144,14 +138,6 @@ export class AgenticPlanner {
       // If LLM returns content without tool calls, it's the final plan
       if (response.toolCalls.length === 0) {
         return this.parser.parsePlan(response.content);
-      }
-
-      // Check meta-tool call limit
-      metaToolCallCount += response.toolCalls.length;
-      if (metaToolCallCount > this.maxMetaToolCalls) {
-        throw new PlannerError(
-          `Max meta-tool calls (${this.maxMetaToolCalls}) exceeded during planning`,
-        );
       }
 
       // Execute all meta-tools from this response

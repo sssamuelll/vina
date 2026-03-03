@@ -7,7 +7,7 @@
  *
  * Unlike the simple string-based Reasoner, this version:
  * - Sends structured messages with tool definitions to the LLM
- * - Processes tool_use calls in a loop (up to maxMetaToolCalls)
+ * - Processes tool_use calls in a loop until the LLM produces a final decision
  * - Parses the final JSON decision from the LLM response
  * - Falls back to abort on parse errors or LLM failures
  *
@@ -42,9 +42,6 @@ export interface EnhancedReasonerOptions {
   /** Function to get the current Redux store state */
   getState: () => RootState;
 
-  /** Maximum number of meta-tool calls before aborting (default: 3) */
-  maxMetaToolCalls?: number;
-
   /** Optional provider configuration passed through to the send function */
   providerConfig?: unknown;
 }
@@ -65,14 +62,12 @@ export class EnhancedReasoner implements IReasoner {
   private send: EnhancedReasonerOptions['send'];
   private metaTools: Map<string, MetaToolDefinition>;
   private getState: () => RootState;
-  private maxMetaToolCalls: number;
   private providerConfig: unknown;
 
   constructor(options: EnhancedReasonerOptions) {
     this.send = options.send;
     this.metaTools = new Map(options.metaTools.map(t => [t.name, t]));
     this.getState = options.getState;
-    this.maxMetaToolCalls = options.maxMetaToolCalls ?? 3;
     this.providerConfig = options.providerConfig;
   }
 
@@ -98,7 +93,6 @@ export class EnhancedReasoner implements IReasoner {
    * JSON decision (no more tool calls).
    */
   private async analyzeWithTools(input: ReasonerInput): Promise<ReasonerDecision> {
-    let metaToolCallCount = 0;
     const metaToolDefs = this.buildMetaToolDefs();
 
     const messages: ChatMessage[] = [
@@ -112,12 +106,6 @@ export class EnhancedReasoner implements IReasoner {
       // If no tool calls, the LLM has made its final decision
       if (response.toolCalls.length === 0) {
         return this.parseDecision(response.content);
-      }
-
-      // Check meta-tool call limit
-      metaToolCallCount += response.toolCalls.length;
-      if (metaToolCallCount > this.maxMetaToolCalls) {
-        return { action: 'abort', reason: 'Max meta-tool calls exceeded during recovery' };
       }
 
       // Execute all meta-tools from this response

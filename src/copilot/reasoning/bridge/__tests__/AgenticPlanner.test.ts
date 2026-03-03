@@ -78,34 +78,6 @@ describe('AgenticPlanner', () => {
     expect(mockMetaTool.execute).toHaveBeenCalled();
   });
 
-  it('respects maxMetaToolCalls limit', async () => {
-    const toolCall: ProviderToolCall = {
-      id: 'tc1',
-      name: 'getGarmentState',
-      arguments: '{}',
-    };
-
-    // LLM always wants to call tools (never outputs plan)
-    const send = createMockSend([
-      { content: '', toolCalls: [toolCall] },
-      { content: '', toolCalls: [toolCall] },
-      { content: '', toolCalls: [toolCall] },
-      { content: '', toolCalls: [toolCall] },
-      { content: '', toolCalls: [toolCall] },
-      { content: '', toolCalls: [toolCall] },
-    ]);
-
-    const planner = new AgenticPlanner({
-      send,
-      metaTools: [mockMetaTool],
-      toolSchemas: [],
-      getState: () => ({}) as never,
-      maxMetaToolCalls: 3,
-    });
-
-    await expect(planner.plan('test')).rejects.toThrow('Max meta-tool calls');
-  });
-
   it('throws PlannerError for invalid JSON response', async () => {
     const send = createMockSend([
       { content: 'not valid json', toolCalls: [] },
