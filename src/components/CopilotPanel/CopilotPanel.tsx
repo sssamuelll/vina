@@ -1,5 +1,5 @@
 import { MessageSquare } from 'lucide-react';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState, store } from '../../store';
 import { AgentConfig } from '../../copilot/protocol';
@@ -27,6 +27,8 @@ import CopilotMessages, { DisplayMessage } from './CopilotMessages';
 import CopilotInput from './CopilotInput';
 import './CopilotPanel.css';
 import { IntelligentContext } from '../../copilot/reasoning/intelligence';
+import { AgenticPlanner } from '../../copilot/reasoning/bridge/AgenticPlanner';
+import { getAllMetaTools } from '../../copilot/reasoning/bridge/meta-tools';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 
@@ -78,6 +80,32 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const memoryRef = useRef(new ProjectMemory(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
+
+  const agenticPlannerRef = useRef<AgenticPlanner | null>(null);
+
+  // Create AgenticPlanner when provider is configured
+  const agenticPlanner = useMemo(() => {
+    if (!providerConfig) return undefined;
+
+    const provider = getProvider(providerConfig);
+    const registry = getDefaultRegistry();
+    const toolSchemas = registry.list().map(t => ({
+      name: t.name,
+      description: t.description,
+      parameters: t.parameters,
+    }));
+
+    const planner = new AgenticPlanner({
+      send: (messages, tools, config) => provider.send(messages, tools, (config ?? providerConfig) as ProviderConfig),
+      metaTools: getAllMetaTools(),
+      toolSchemas,
+      getState: () => store.getState(),
+      providerConfig,
+    });
+
+    agenticPlannerRef.current = planner;
+    return planner;
+  }, [providerConfig]);
 
   // Bridge mode hook (called unconditionally per React rules)
   // Uses ExecutionBridge for step-by-step execution
@@ -149,6 +177,7 @@ ${contextStr}`;
         return { action: 'abort' as const, reason: 'Could not parse reasoner response' };
       }
     },
+    agenticPlanner,
   });
 
   // Listen for external settings toggle (from CopilotSidePanel)

@@ -9,6 +9,7 @@ import type {
   StepRecord,
   VariableResolution,
   TokenUsage,
+  MetaToolCallRecord,
 } from './types';
 
 /**
@@ -62,6 +63,11 @@ export class ExecutionRecorder {
   /** Record token usage for the planning LLM call. */
   recordPlanningTokens(usage: TokenUsage): void {
     this.planning.tokenUsage = usage;
+  }
+
+  /** Record meta-tool calls made during agentic planning. */
+  recordPlanningMetaToolCalls(calls: MetaToolCallRecord[]): void {
+    this.planning.metaToolCalls = calls;
   }
 
   /** Record the start of a step execution. */
