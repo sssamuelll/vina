@@ -64,7 +64,7 @@ export interface AgenticPlannerOptions {
   }>;
   /** State accessor for meta-tool execution */
   getState: () => RootState;
-  /** Max meta-tool calls before giving up (default: 5) */
+  /** Max meta-tool calls before giving up (default: 10) */
   maxMetaToolCalls?: number;
   /** Provider config to pass through to send */
   providerConfig?: unknown;
@@ -97,7 +97,7 @@ export class AgenticPlanner {
     );
     this.toolSchemas = options.toolSchemas;
     this.getState = options.getState;
-    this.maxMetaToolCalls = options.maxMetaToolCalls ?? 5;
+    this.maxMetaToolCalls = options.maxMetaToolCalls ?? 10;
     this.providerConfig = options.providerConfig;
     this.parser = new Planner();
   }
@@ -146,29 +146,34 @@ export class AgenticPlanner {
         return this.parser.parsePlan(response.content);
       }
 
-      // LLM wants to call meta-tools
+      // Check meta-tool call limit
+      metaToolCallCount += response.toolCalls.length;
+      if (metaToolCallCount > this.maxMetaToolCalls) {
+        throw new PlannerError(
+          `Max meta-tool calls (${this.maxMetaToolCalls}) exceeded during planning`,
+        );
+      }
+
+      // Execute all meta-tools from this response
+      const toolResults: Array<{ toolCall: ProviderToolCall; result: unknown }> = [];
       for (const toolCall of response.toolCalls) {
-        metaToolCallCount++;
-        if (metaToolCallCount > this.maxMetaToolCalls) {
-          throw new PlannerError(
-            `Max meta-tool calls (${this.maxMetaToolCalls}) exceeded during planning`,
-          );
-        }
-
         const result = await this.executeMetaTool(toolCall);
+        toolResults.push({ toolCall, result });
+      }
 
-        // Add assistant message with tool call (preserve reasoning_content for DeepSeek)
-        const assistantMsg: ChatMessage = {
-          role: 'assistant',
-          content: response.content || '',
-          tool_calls: [toolCall],
-        };
-        if (response.reasoningContent) {
-          assistantMsg.reasoning_content = response.reasoningContent;
-        }
-        messages.push(assistantMsg);
+      // Add ONE assistant message with ALL tool calls from this response
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: response.content || '',
+        tool_calls: response.toolCalls,
+      };
+      if (response.reasoningContent) {
+        assistantMsg.reasoning_content = response.reasoningContent;
+      }
+      messages.push(assistantMsg);
 
-        // Add tool result message
+      // Add tool result messages (one per tool call)
+      for (const { toolCall, result } of toolResults) {
         messages.push({
           role: 'tool',
           content: JSON.stringify(result),

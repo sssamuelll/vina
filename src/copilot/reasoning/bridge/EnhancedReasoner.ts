@@ -114,27 +114,32 @@ export class EnhancedReasoner implements IReasoner {
         return this.parseDecision(response.content);
       }
 
-      // Process each tool call from the LLM
+      // Check meta-tool call limit
+      metaToolCallCount += response.toolCalls.length;
+      if (metaToolCallCount > this.maxMetaToolCalls) {
+        return { action: 'abort', reason: 'Max meta-tool calls exceeded during recovery' };
+      }
+
+      // Execute all meta-tools from this response
+      const toolResults: Array<{ toolCall: ProviderToolCall; result: unknown }> = [];
       for (const toolCall of response.toolCalls) {
-        metaToolCallCount++;
-        if (metaToolCallCount > this.maxMetaToolCalls) {
-          return { action: 'abort', reason: 'Max meta-tool calls exceeded during recovery' };
-        }
-
         const result = await this.executeMetaTool(toolCall);
+        toolResults.push({ toolCall, result });
+      }
 
-        // Add the assistant's tool call request (preserve reasoning_content for DeepSeek)
-        const assistantMsg: ChatMessage = {
-          role: 'assistant',
-          content: response.content || '',
-          tool_calls: [toolCall],
-        };
-        if (response.reasoningContent) {
-          assistantMsg.reasoning_content = response.reasoningContent;
-        }
-        messages.push(assistantMsg);
+      // Add ONE assistant message with ALL tool calls from this response
+      const assistantMsg: ChatMessage = {
+        role: 'assistant',
+        content: response.content || '',
+        tool_calls: response.toolCalls,
+      };
+      if (response.reasoningContent) {
+        assistantMsg.reasoning_content = response.reasoningContent;
+      }
+      messages.push(assistantMsg);
 
-        // Add the tool result to the conversation
+      // Add tool result messages (one per tool call)
+      for (const { toolCall, result } of toolResults) {
         messages.push({
           role: 'tool',
           content: JSON.stringify(result),
