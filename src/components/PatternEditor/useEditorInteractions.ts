@@ -139,7 +139,8 @@ export function useEditorInteractions(
   // Clear measurements when switching away
   useEffect(() => {
     if (activeTool !== 'measure') measureTool.clear();
-  }, [activeTool, measureTool]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- measureTool.clear is stable (useCallback with [])
+  }, [activeTool, measureTool.clear]);
 
   // Delete/Backspace handler for selected internal line
   const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
