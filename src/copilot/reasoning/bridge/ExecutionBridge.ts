@@ -26,6 +26,7 @@ import { DEFAULT_BRIDGE_CONFIG, isExecuteStep } from './types';
 import { Planner } from './Planner';
 import type { ToolRegistry, Evaluator } from './Executor';
 import { Reasoner, type ReasonerLLM } from './Reasoner';
+import { ResultStore } from './ResultStore';
 import { SummaryGenerator } from './SummaryGenerator';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ export class ExecutionBridge {
   private config: BridgeConfig;
   private eventHandlers: BridgeEventHandler[] = [];
   private planner: Planner;
+  private resultStore = new ResultStore();
   private summaryGenerator: SummaryGenerator;
 
   /**
@@ -179,6 +181,7 @@ export class ExecutionBridge {
     plan: ExecutionPlan,
     originalIntent: string
   ): Promise<{ results: StepResult[]; success: boolean; error?: string }> {
+    this.resultStore.clear();
     const results: StepResult[] = [];
     const rollbacks: Array<() => void> = [];
 
@@ -196,6 +199,7 @@ export class ExecutionBridge {
       );
 
       results.push(stepResult);
+      this.resultStore.add(stepResult);
 
       if (!stepResult.success) {
         // Check if we should rollback
@@ -341,7 +345,8 @@ export class ExecutionBridge {
     }
 
     try {
-      const result = await tool(step.params);
+      const resolvedParams = this.resolveParams(step.params);
+      const result = await tool(resolvedParams);
       return {
         stepId: step.id,
         success: result.success,
@@ -379,6 +384,22 @@ export class ExecutionBridge {
         error: err instanceof Error ? err.message : String(err),
       };
     }
+  }
+
+  /**
+   * Resolve variable references in step params.
+   * Replaces string values starting with '$' using the ResultStore.
+   */
+  private resolveParams(params: Record<string, unknown>): Record<string, unknown> {
+    const resolved: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(params)) {
+      if (typeof value === 'string' && value.startsWith('$')) {
+        resolved[key] = this.resultStore.resolve(value);
+      } else {
+        resolved[key] = value;
+      }
+    }
+    return resolved;
   }
 
   /**
