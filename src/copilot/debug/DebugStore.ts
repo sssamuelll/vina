@@ -1,10 +1,10 @@
-import type { ExecutionRecord } from './types';
+import type { AgenticRecord } from './types';
 
 const STORAGE_KEY = 'openclo-debug-records';
 const MAX_RECORDS = 100;
 
 export class DebugStore {
-  private records: ExecutionRecord[] = [];
+  private records: AgenticRecord[] = [];
   private loaded = false;
 
   private ensureLoaded(): void {
@@ -29,28 +29,28 @@ export class DebugStore {
     }
   }
 
-  save(record: ExecutionRecord): void {
+  save(record: AgenticRecord): void {
     this.ensureLoaded();
     this.records.push(record);
     this.persist();
   }
 
-  getById(id: string): ExecutionRecord | null {
+  getById(id: string): AgenticRecord | null {
     this.ensureLoaded();
     return this.records.find(r => r.id === id) ?? null;
   }
 
-  getAll(): ExecutionRecord[] {
+  getAll(): AgenticRecord[] {
     this.ensureLoaded();
     return [...this.records];
   }
 
-  getRecent(limit: number): ExecutionRecord[] {
+  getRecent(limit: number): AgenticRecord[] {
     this.ensureLoaded();
     return this.records.slice(-limit);
   }
 
-  getFailures(): ExecutionRecord[] {
+  getFailures(): AgenticRecord[] {
     this.ensureLoaded();
     return this.records.filter(r => !r.success);
   }

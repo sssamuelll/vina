@@ -4,5 +4,5 @@
  * @module copilot/hooks
  */
 
-export { useBridge } from './useBridge';
-export type { UseBridgeOptions, UseBridgeReturn } from './useBridge';
+export { useAgenticLoop } from './useAgenticLoop';
+export type { UseAgenticLoopReturn, ToolCallProgress } from './useAgenticLoop';

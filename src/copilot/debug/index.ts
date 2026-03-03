@@ -1,7 +1,8 @@
-export { createDebugBridge, isDebugEnabled } from './createDebugBridge';
+export { createDebugAgenticLoop, isDebugEnabled } from './createDebugBridge';
+export type { DebugAgenticLoopResult } from './createDebugBridge';
 export { DebugStore } from './DebugStore';
-export { ConsoleLogger } from './ConsoleLogger';
-export { ExecutionRecorder } from './ExecutionRecorder';
+export { AgenticRecorder } from './AgenticRecorder';
+export { AgenticConsoleLogger } from './AgenticConsoleLogger';
 export { createDebugAPI } from './debugAPI';
-export type { ExecutionRecord, StepRecord, PlanningRecord, RetryRecord, VariableResolution, TokenUsage } from './types';
+export type { AgenticRecord, AgenticToolCallRecord } from './types';
 export type { DebugAPI } from './debugAPI';

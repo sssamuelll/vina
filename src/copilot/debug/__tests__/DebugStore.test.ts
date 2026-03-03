@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DebugStore } from '../DebugStore';
-import type { ExecutionRecord } from '../types';
+import type { AgenticRecord } from '../types';
 
 // Provide a minimal localStorage mock for node environment
 const localStorageMock = (() => {
@@ -30,20 +30,14 @@ Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
 });
 
-const makeRecord = (id: string, success = true, daysAgo = 0): ExecutionRecord => ({
+const makeRecord = (id: string, success = true, daysAgo = 0): AgenticRecord => ({
   id,
   timestamp: Date.now() - daysAgo * 86400000,
   userRequest: `request-${id}`,
-  duration: 1000,
+  toolCalls: [],
+  finalResponse: 'done',
+  totalDuration: 1000,
   success,
-  planning: {
-    systemPrompt: '',
-    toolsProvided: [],
-    rawResponse: '',
-    parsedPlan: null,
-    duration: 0,
-  },
-  steps: [],
 });
 
 describe('DebugStore', () => {

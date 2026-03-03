@@ -1,8 +1,7 @@
 /**
- * @deprecated This module is deprecated in favor of the ExecutionBridge system.
- * Enable bridge mode with: localStorage.setItem('openclo-use-bridge', 'true')
- * See: src/copilot/bridge/ for the new implementation.
- * This file will be removed in a future version once bridge mode is validated.
+ * @deprecated This module is deprecated in favor of the AgenticLoop system.
+ * See: src/copilot/reasoning/bridge/AgenticLoop.ts for the new implementation.
+ * This file will be removed in a future version.
  */
 
 /**
