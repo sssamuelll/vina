@@ -143,35 +143,25 @@ describe('useAgenticLoop integration', () => {
   // 2. The AgenticLoop mock is constructed and run is called
   // 3. Event sequences produce correct state via reduceToolCalls
 
-  // Use vi.mock with a self-contained factory (no outer variable references,
-  // since vi.mock is hoisted above imports)
-  vi.mock('../../reasoning/bridge/AgenticLoop', () => {
-    // Must be fully self-contained -- vi.mock is hoisted
-    class MockAgenticLoop {
-      static lastInstance: MockAgenticLoop | null = null;
-      options: unknown;
-      runCalls: Array<{ request: string; onEvent: (e: unknown) => void }> = [];
-
-      constructor(options: unknown) {
-        this.options = options;
-        MockAgenticLoop.lastInstance = this;
-      }
-
-      async run(request: string, onEvent: (e: unknown) => void): Promise<string> {
-        this.runCalls.push({ request, onEvent });
-        // Simulate a standard tool call sequence
-        onEvent({ type: 'tool:start', name: 'getGarmentState', args: {} });
-        onEvent({ type: 'tool:complete', name: 'getGarmentState', result: { success: true } });
-        onEvent({ type: 'complete', content: 'Done!' });
-        return 'Done!';
-      }
-
-      getLastToolCalls() {
-        return [];
-      }
-    }
-
-    return { AgenticLoop: MockAgenticLoop };
+  // Mock createDebugAgenticLoop to return a mock loop
+  vi.mock('../../debug/createDebugBridge', () => {
+    return {
+      createDebugAgenticLoop: (options: unknown) => {
+        const loop = {
+          options,
+          runCalls: [] as Array<{ request: string; onEvent: (e: unknown) => void }>,
+          async run(request: string, onEvent: (e: unknown) => void): Promise<string> {
+            loop.runCalls.push({ request, onEvent });
+            onEvent({ type: 'tool:start', name: 'getGarmentState', args: {} });
+            onEvent({ type: 'tool:complete', name: 'getGarmentState', result: { success: true } });
+            onEvent({ type: 'complete', content: 'Done!' });
+            return 'Done!';
+          },
+          getLastToolCalls() { return []; },
+        };
+        return { loop, store: null };
+      },
+    };
   });
 
   it('hook module exports useAgenticLoop and reduceToolCalls', async () => {
@@ -180,8 +170,8 @@ describe('useAgenticLoop integration', () => {
     expect(typeof mod.reduceToolCalls).toBe('function');
   });
 
-  it('AgenticLoop mock is constructable and run returns expected result', async () => {
-    const { AgenticLoop } = await import('../../reasoning/bridge/AgenticLoop');
+  it('createDebugAgenticLoop mock returns a working loop', async () => {
+    const { createDebugAgenticLoop } = await import('../../debug/createDebugBridge');
 
     const options = {
       send: vi.fn(),
@@ -191,8 +181,7 @@ describe('useAgenticLoop integration', () => {
       dispatch: vi.fn() as never,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const loop = new (AgenticLoop as any)(options);
+    const { loop } = createDebugAgenticLoop(options);
     const events: AgenticEvent[] = [];
     const result = await loop.run('test request', (e: AgenticEvent) => events.push(e));
 

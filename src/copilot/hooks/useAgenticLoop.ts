@@ -8,7 +8,8 @@
  */
 
 import { useState, useCallback } from 'react';
-import { AgenticLoop, type AgenticLoopOptions, type AgenticEvent } from '../reasoning/bridge/AgenticLoop';
+import { type AgenticLoopOptions, type AgenticEvent } from '../reasoning/bridge/AgenticLoop';
+import { createDebugAgenticLoop } from '../debug/createDebugBridge';
 
 export interface ToolCallProgress {
   name: string;
@@ -63,7 +64,7 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
     setToolCalls([]);
     setResponse(null);
 
-    const loop = new AgenticLoop(options);
+    const { loop } = createDebugAgenticLoop(options);
 
     const handleEvent = (event: AgenticEvent) => {
       switch (event.type) {
