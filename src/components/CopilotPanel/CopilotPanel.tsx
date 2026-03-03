@@ -23,6 +23,7 @@ import AgentSettings from '../../copilot/AgentSettings';
 import CopilotHeader from './CopilotHeader';
 import CopilotMessages, { DisplayMessage } from './CopilotMessages';
 import CopilotInput from './CopilotInput';
+import { ProgressMessage } from './ProgressMessage';
 import './CopilotPanel.css';
 import type { ChatMessage, ProviderToolDef } from '../../copilot/providers/types';
 
@@ -324,21 +325,12 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       />
 
       {/* Agentic loop progress indicator */}
-      {agenticHook.isRunning && agenticHook.toolCalls.length > 0 && (
-        <div className="progress-message progress-running">
-          <div className="progress-steps">
-            {agenticHook.toolCalls.map((tc, i) => (
-              <div key={i} className={`progress-step progress-step-${tc.status}`}>
-                <span className="progress-step-indicator">
-                  {tc.status === 'done' ? '\u2713' :
-                   tc.status === 'running' ? '\u25CF' :
-                   tc.status === 'error' ? '\u2717' : '\u25CB'}
-                </span>
-                <span className="progress-step-label">{tc.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+      {(agenticHook.isRunning || agenticHook.toolCalls.length > 0) && (
+        <ProgressMessage
+          toolCalls={agenticHook.toolCalls}
+          isRunning={agenticHook.isRunning}
+          response={agenticHook.response}
+        />
       )}
 
       <CopilotInput
