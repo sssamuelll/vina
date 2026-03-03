@@ -220,6 +220,11 @@ export function hitTestNode(
  * Find the nearest segment in an outline to a given point.
  * Returns the commandIndex, t parameter, distance, and the projected point.
  * Also checks the closing segment (last anchor back to first anchor).
+ *
+ * NOTE: For C/Q bezier segments, distance is computed against the chord (straight
+ * line between anchors), not the actual curve arc. This means clicks on a visible
+ * bezier arc far from the chord may not register. A future improvement should
+ * sample the bezier at N points and compute distance to the polyline approximation.
  */
 export function nearestSegment(
   point: Point2D,

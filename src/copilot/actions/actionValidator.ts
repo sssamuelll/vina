@@ -270,6 +270,12 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       return ok();
     }
 
+    case 'straighten_edge': {
+      const straightenResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
+      if (!straightenResult.valid) return straightenResult;
+      return ok();
+    }
+
     case 'split_edge': {
       const splitResult = validateEdgeIndex(state, action.pieceId, action.edgeIndex);
       if (!splitResult.valid) return splitResult;
@@ -562,7 +568,7 @@ export function validateAction(action: CopilotAction, state: RootState): Validat
   }
 
   // Geometry actions
-  if (['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'split_edge'].includes(action.action)) {
+  if (['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge'].includes(action.action)) {
     return validateGeometryAction(action as GeometryAction, state);
   }
 

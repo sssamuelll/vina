@@ -187,6 +187,17 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     dangerous: true,
   },
   {
+    action: 'curve_edge',
+    description: 'Convert a straight edge to a curve',
+    category: 'geometry',
+    parameters: [
+      { name: 'pieceId', type: 'string', description: 'ID of the piece', required: true },
+      { name: 'edgeIndex', type: 'number', description: 'Index of the edge to curve', required: true },
+      { name: 'curvature', type: 'number', description: 'Curvature amount (-1 to 1, positive = outward)', required: true },
+    ],
+    examples: ['Curve the side seam edge', 'Add curvature to edge 2'],
+  },
+  {
     action: 'straighten_edge',
     description: 'Convert a curved edge to a straight line',
     category: 'geometry',
