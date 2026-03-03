@@ -128,7 +128,7 @@ describe('getAllMetaTools', () => {
   it('returns 4 meta-tools', () => {
     const tools = getAllMetaTools();
     expect(tools).toHaveLength(4);
-    expect(tools.map(t => t.name)).toEqual(
+    expect(tools.map((t: { name: string }) => t.name)).toEqual(
       expect.arrayContaining(['getGarmentState', 'getPieceDetails', 'measureEdge', 'searchPieces']),
     );
   });
