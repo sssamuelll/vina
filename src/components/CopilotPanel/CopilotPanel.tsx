@@ -1,7 +1,7 @@
 import { MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useSelector } from 'react-redux';
-import { RootState, store } from '../../store';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState, AppDispatch, store } from '../../store';
 import { AgentConfig } from '../../copilot/protocol';
 import { getDefaultRegistry } from '../../copilot/action/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
@@ -15,10 +15,8 @@ import {
   PROVIDER_OPTIONS,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
-import { Planner } from '../../copilot/reasoning/bridge/Planner';
-import { buildAgentContext, serializeContext } from '../../copilot/perception/contextBuilder';
-import { useBridge } from '../../copilot/hooks/useBridge';
-import { ProgressMessage } from './ProgressMessage';
+import { useAgenticLoop } from '../../copilot/hooks/useAgenticLoop';
+import { getAllMetaTools } from '../../copilot/reasoning/bridge/meta-tools';
 import { CostManager } from '../../copilot/costManager';
 import { getErrorMessage, classifyError, isOfflineMode } from '../../copilot/errorRecovery';
 import AgentSettings from '../../copilot/AgentSettings';
@@ -26,9 +24,7 @@ import CopilotHeader from './CopilotHeader';
 import CopilotMessages, { DisplayMessage } from './CopilotMessages';
 import CopilotInput from './CopilotInput';
 import './CopilotPanel.css';
-import { IntelligentContext } from '../../copilot/reasoning/intelligence';
-import { AgenticPlanner } from '../../copilot/reasoning/bridge/AgenticPlanner';
-import { getAllMetaTools } from '../../copilot/reasoning/bridge/meta-tools';
+import type { ChatMessage, ProviderToolDef } from '../../copilot/providers/types';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 
@@ -81,103 +77,38 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
 
-  const agenticPlannerRef = useRef<AgenticPlanner | null>(null);
+  const dispatch = useDispatch<AppDispatch>();
 
-  // Create AgenticPlanner when provider is configured
-  const agenticPlanner = useMemo(() => {
-    if (!providerConfig) return undefined;
+  // Tool registry with Redux context
+  const registry = useMemo(() => {
+    const reg = getDefaultRegistry();
+    reg.setContext(dispatch, () => store.getState());
+    return reg;
+  }, [dispatch]);
 
-    const provider = getProvider(providerConfig);
-    const registry = getDefaultRegistry();
-    const toolSchemas = registry.list().map(t => ({
+  // Build action tool defs for the LLM
+  const actionToolDefs = useMemo(() => {
+    return registry.list().map(t => ({
       name: t.name,
       description: t.description,
       parameters: t.parameters,
     }));
+  }, [registry]);
 
-    const planner = new AgenticPlanner({
-      send: (messages, tools, config) => provider.send(messages, tools, (config ?? providerConfig) as ProviderConfig),
-      metaTools: getAllMetaTools(),
-      toolSchemas,
-      getState: () => store.getState(),
-      providerConfig,
-    });
-
-    agenticPlannerRef.current = planner;
-    return planner;
-  }, [providerConfig]);
-
-  // Bridge mode hook (called unconditionally per React rules)
-  // Uses ExecutionBridge for step-by-step execution
-  const bridgeHook = useBridge({
-    plannerLLM: async (userRequest) => {
-      if (!providerConfig) return '';
-
-      // Build proper system prompt with tools and context
-      const registry = getDefaultRegistry();
-      const planner = new Planner();
-
-      // Convert registry tools to Planner schema format
-      const toolSchemas = registry.list().map(t => ({
-        name: t.name,
-        description: t.description,
-        parameters: t.parameters,
-      }));
-
-      // Build system prompt with JSON instructions and tools
-      const plannerPrompt = planner.buildSystemPrompt(toolSchemas);
-
-      // NEW: Use IntelligentContext for enriched resolution
-      const intelligence = new IntelligentContext(store.getState());
-      const enrichedContext = intelligence.process(userRequest);
-      const enrichedStr = intelligence.getSerialized(enrichedContext);
-
-      // Add base project context for reference
-      const agentContext = buildAgentContext(store.getState(), []);
-      const contextStr = serializeContext(agentContext);
-
-      // Combine: Planner instructions + Enriched context + Project state
-      const systemPrompt = `${plannerPrompt}
-
-## Resolved Context (use these values)
-${enrichedStr}
-
-## Project State (reference only)
-${contextStr}`;
-
+  // Agentic loop hook
+  const agenticHook = useAgenticLoop({
+    send: useMemo(() => {
+      if (!providerConfig) return async () => ({ content: '', toolCalls: [] as never[] });
       const provider = getProvider(providerConfig);
-      const response = await provider.send(
-        [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userRequest }
-        ],
-        [],
-        providerConfig
-      );
-      return response.content;
-    },
-    evaluator: async () => {
-      // Evaluation always succeeds for now - can be enhanced later
-      return { success: true, data: { decision: 'proceed' } };
-    },
-    reasonerLLM: async (prompt) => {
-      if (!providerConfig) {
-        return { action: 'abort' as const, reason: 'No provider configured' };
-      }
-      const provider = getProvider(providerConfig);
-      const response = await provider.send(
-        [{ role: 'user', content: prompt }],
-        [],
-        providerConfig
-      );
-      // Parse response as JSON
-      try {
-        return JSON.parse(response.content);
-      } catch {
-        return { action: 'abort' as const, reason: 'Could not parse reasoner response' };
-      }
-    },
-    agenticPlanner,
+      return (messages: ChatMessage[], tools: ProviderToolDef[], config?: unknown) =>
+        provider.send(messages, tools, (config ?? providerConfig) as ProviderConfig);
+    }, [providerConfig]),
+    metaTools: useMemo(() => getAllMetaTools(), []),
+    actionToolDefs,
+    getState: () => store.getState(),
+    dispatch,
+    registry,
+    providerConfig: providerConfig ?? undefined,
   });
 
   // Listen for external settings toggle (from CopilotSidePanel)
@@ -216,7 +147,7 @@ ${contextStr}`;
     `${providerConfig.provider} / ${providerConfig.model.split('-').slice(0, 2).join('-')}`
   ) : agentConfig.name;
 
-  /** Send via the bridge execution system */
+  /** Send via the agentic loop */
   const handleProviderSend = useCallback(async (text: string) => {
     if (!providerConfig || !text.trim()) return;
 
@@ -229,21 +160,16 @@ ${contextStr}`;
     if (isMobile && navigator.vibrate) navigator.vibrate(30);
 
     try {
-      // Use bridge mode - step-by-step execution via ExecutionBridge
-      const bridgeResult = await bridgeHook.run(text);
-
-      // Convert bridge result to display message
-      const content = bridgeResult.success
-        ? (bridgeResult.summary?.short ?? 'Done')
-        : (bridgeResult.error ?? 'Execution failed');
+      const response = await agenticHook.run(text);
+      const content = response;
 
       const assistantMsg: DisplayMessage = {
         role: 'assistant',
         content,
         timestamp: Date.now(),
-        toolCalls: bridgeResult.results.map(r => ({
-          name: r.stepId,
-          success: r.success,
+        toolCalls: agenticHook.toolCalls.map(tc => ({
+          name: tc.name,
+          success: tc.status === 'done',
         })),
       };
       setMessages(prev => [...prev, assistantMsg]);
@@ -257,7 +183,7 @@ ${contextStr}`;
         role: 'assistant',
         content,
         timestamp: Date.now(),
-        toolsCalled: bridgeResult.results.map(r => r.stepId),
+        toolsCalled: agenticHook.toolCalls.map(tc => tc.name),
       });
       memoryRef.current.save();
 
@@ -281,7 +207,7 @@ ${contextStr}`;
     } finally {
       setIsLoading(false);
     }
-  }, [providerConfig, isMobile, bridgeHook]);
+  }, [providerConfig, isMobile, agenticHook]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
@@ -397,13 +323,22 @@ ${contextStr}`;
         onSendText={handleSendText}
       />
 
-      {/* Bridge mode progress indicator */}
-      {bridgeHook.progress && (
-        <ProgressMessage
-          state={bridgeHook.progress}
-          onAnswer={bridgeHook.answer}
-          onUndo={bridgeHook.undo}
-        />
+      {/* Agentic loop progress indicator */}
+      {agenticHook.isRunning && agenticHook.toolCalls.length > 0 && (
+        <div className="progress-message progress-running">
+          <div className="progress-steps">
+            {agenticHook.toolCalls.map((tc, i) => (
+              <div key={i} className={`progress-step progress-step-${tc.status}`}>
+                <span className="progress-step-indicator">
+                  {tc.status === 'done' ? '\u2713' :
+                   tc.status === 'running' ? '\u25CF' :
+                   tc.status === 'error' ? '\u2717' : '\u25CB'}
+                </span>
+                <span className="progress-step-label">{tc.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <CopilotInput

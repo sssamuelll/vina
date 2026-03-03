@@ -24,3 +24,5 @@ export type { AgenticPlannerOptions, MetaToolCallRecord } from './AgenticPlanner
 export { EnhancedReasoner } from './EnhancedReasoner';
 export type { EnhancedReasonerOptions } from './EnhancedReasoner';
 export { getAllMetaTools } from './meta-tools';
+export { AgenticLoop } from './AgenticLoop';
+export type { AgenticLoopOptions, AgenticEvent, AgenticEventHandler, ToolCallRecord } from './AgenticLoop';
