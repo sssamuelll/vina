@@ -241,6 +241,8 @@ export default function PatternEditor() {
             currentStart={measureTool.currentStart}
             cursorPos={measureTool.cursorPos}
             formatDistance={measureTool.formatDistance}
+            measureHoveredSnapPoint={measureTool.hoveredSnapPoint}
+            measureShowAngle={false}
             nodeEditorIsEditing={nodeEditor.isEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}

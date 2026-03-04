@@ -44,6 +44,9 @@ interface Measurement {
   startPoint: Point2D;
   endPoint: Point2D;
   distance: number;
+  isPathMeasurement: boolean;
+  pathPoints?: Point2D[];
+  angle?: number;
 }
 
 interface ToolOverlayProps {
@@ -71,6 +74,8 @@ interface ToolOverlayProps {
   currentStart: Point2D | null;
   cursorPos: Point2D | null;
   formatDistance: (d: number) => string;
+  measureHoveredSnapPoint?: Point2D | null;
+  measureShowAngle?: boolean;
   nodeEditorIsEditing: boolean;
   nodeEditorEditingPieceId: string | null;
   nodeEditorNodes: EditorNode[];
@@ -132,7 +137,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {activeTool === 'measure' && (
-        <MeasureToolOverlay zoom2D={zoom2D} measurements={props.measurements} currentStart={props.currentStart} cursorPos={props.cursorPos} formatDistance={props.formatDistance} />
+        <MeasureToolOverlay zoom2D={zoom2D} measurements={props.measurements} currentStart={props.currentStart} cursorPos={props.cursorPos} hoveredSnapPoint={props.measureHoveredSnapPoint ?? null} formatDistance={props.formatDistance} showAngle={props.measureShowAngle} />
       )}
 
       {activeTool === 'transform' && props.transformBbox && (
