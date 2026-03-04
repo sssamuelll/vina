@@ -20,6 +20,7 @@ import {
   resetSimulation,
   setViewMode3D,
 } from '../../../../store/simulationSlice';
+import { setCameraPreset, focusOnPiece } from '../../../../store/cameraSlice';
 
 /**
  * Anatomical landmarks that are good pinning candidates.
@@ -407,6 +408,62 @@ export const tools: ToolDefinition[] = [
         summary: ready
           ? `Garment is ready for simulation: ${pieces.length} pieces, ${seams.length} seams, ${totalLandmarks} landmarks.`
           : `Garment needs preparation: ${issues.join('; ')}`,
+      };
+    },
+  },
+
+  // ─── Camera Navigation ─────────────────────────────────────────────────────
+
+  {
+    name: 'setCameraView',
+    description:
+      'Set the 3D camera to a preset view angle or focus on a specific pattern piece. ' +
+      'Use view presets for standard angles (front, back, left, right, top, bottom, threeQuarterLeft, threeQuarterRight). ' +
+      'Use focusPieceId to zoom in on a specific piece.',
+    parameters: {
+      type: 'object',
+      properties: {
+        view: {
+          type: 'string',
+          enum: ['front', 'back', 'left', 'right', 'top', 'bottom', 'threeQuarterLeft', 'threeQuarterRight'],
+          description: 'Camera view preset name',
+        },
+        focusPieceId: {
+          type: 'string',
+          description: 'Piece ID to focus/zoom the camera on (alternative to view preset)',
+        },
+      },
+    },
+    execute: async (params, dispatch, getState) => {
+      const view = params.view as string | undefined;
+      const focusPieceIdParam = params.focusPieceId as string | undefined;
+
+      if (view) {
+        dispatch(setCameraPreset(view as Parameters<typeof setCameraPreset>[0]));
+        return {
+          success: true,
+          data: { view },
+          message: `Camera set to ${view} view.`,
+        };
+      }
+
+      if (focusPieceIdParam) {
+        const pieces = getState().project.pieces;
+        const piece = pieces.find((p: { id: string }) => p.id === focusPieceIdParam);
+        if (!piece) {
+          return { success: false, error: `Piece "${focusPieceIdParam}" not found.` };
+        }
+        dispatch(focusOnPiece(focusPieceIdParam));
+        return {
+          success: true,
+          data: { focusPieceId: focusPieceIdParam, pieceName: piece.name },
+          message: `Camera focused on piece "${piece.name}".`,
+        };
+      }
+
+      return {
+        success: false,
+        error: 'Provide either "view" (preset name) or "focusPieceId" (piece ID).',
       };
     },
   },
