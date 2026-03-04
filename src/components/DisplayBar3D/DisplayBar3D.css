@@ -1,7 +1,7 @@
 .display-bar-3d {
   position: absolute;
   left: 0;
-  top: 32px;
+  top: 0;
   bottom: 0;
   width: var(--toolbar2d-width, 42px);
   background: rgba(42, 42, 42, 0.85);
