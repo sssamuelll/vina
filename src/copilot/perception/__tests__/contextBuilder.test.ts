@@ -191,6 +191,10 @@ function mockState(overrides?: Partial<RootState>): RootState {
       ghostPreview: null,
       actionLogVisible: false,
     },
+    camera: {
+      pendingPreset: null,
+      pendingFocusPieceId: null,
+    },
   };
 
   if (overrides) {

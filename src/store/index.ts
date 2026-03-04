@@ -12,6 +12,7 @@ import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
 import blueprintReducer, { loadBlueprints } from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
+import cameraReducer from './cameraSlice';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { createReactiveSolverMiddleware } from './reactiveSolverMiddleware';
@@ -32,6 +33,7 @@ export const store = configureStore({
     construction: constructionReducer,
     blueprints: blueprintReducer,
     copilotUI: copilotUIReducer,
+    camera: cameraReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
