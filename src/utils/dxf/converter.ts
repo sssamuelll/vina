@@ -161,6 +161,29 @@ function circleToPath(d: DXFCircleData): PathCommand[] {
   ];
 }
 
+// ─── Geometric notch classification ───
+
+const NOTCH_MAX_LENGTH = 15; // mm
+
+function computePathLength(path: PathCommand[]): number {
+  let length = 0;
+  let cx = 0, cy = 0;
+  for (const cmd of path) {
+    if (cmd.type === 'M') {
+      cx = cmd.values[0]; cy = cmd.values[1];
+    } else if (cmd.type === 'L') {
+      const dx = cmd.values[0] - cx, dy = cmd.values[1] - cy;
+      length += Math.sqrt(dx * dx + dy * dy);
+      cx = cmd.values[0]; cy = cmd.values[1];
+    } else if (cmd.type === 'C') {
+      const dx = cmd.values[4] - cx, dy = cmd.values[5] - cy;
+      length += Math.sqrt(dx * dx + dy * dy);
+      cx = cmd.values[4]; cy = cmd.values[5];
+    }
+  }
+  return length;
+}
+
 // ─── Y-flip: DXF Y-up → screen Y-down ───
 
 function flipPathY(cmds: PathCommand[]): PathCommand[] {
@@ -301,11 +324,28 @@ function entitiesToPiece(
           outline.push(...path);
         }
         break;
-      case 'notch':
-        if (path.length > 0) {
-          internals.push({ id: crypto.randomUUID(), type: 'notch', path: flipPathY(path) });
+      case 'notch': {
+        const flipped = flipPathY(path);
+        const len = computePathLength(path);
+        if (len > 0 && len <= NOTCH_MAX_LENGTH) {
+          internals.push({
+            id: crypto.randomUUID(),
+            type: 'notch',
+            path: flipped,
+            notchOptions: {
+              shape: 'slit',
+              subType: 'straightforward',
+              length: 8,
+              width: 3,
+              angle: 0,
+              count: 1,
+            },
+          });
+        } else {
+          internals.push({ id: crypto.randomUUID(), type: 'notch', path: flipped });
         }
         break;
+      }
       case 'grainline':
         internals.push({ id: crypto.randomUUID(), type: 'grainline', path: flipPathY(path) });
         break;
