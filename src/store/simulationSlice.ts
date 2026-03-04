@@ -27,6 +27,9 @@ export interface ArrangementSnapshot {
 /** Which solver tier is currently active. */
 export type SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape';
 
+/** 3D surface rendering mode. */
+export type SurfaceMode3D = 'textured' | 'translucent' | 'mesh' | 'thick';
+
 /** Pin strength determines how firmly the vertex is held. */
 export type PinStrength = 'weak' | 'medium' | 'strong';
 
@@ -77,6 +80,14 @@ interface SimulationSliceState {
   pinnedVertices: Record<string, PinData>;
   /** Currently selected pin ID (for editing/dragging) */
   selectedPinId: string | null;
+  /** 3D visibility: show garment pieces */
+  showGarment: boolean;
+  /** 3D visibility: show seam connection lines */
+  showSeamlines3D: boolean;
+  /** 3D visibility: show internal lines (darts, notches, etc.) */
+  showInternalLines3D: boolean;
+  /** 3D surface rendering mode */
+  surfaceMode3D: SurfaceMode3D;
 }
 
 const initialState: SimulationSliceState = {
@@ -102,6 +113,10 @@ const initialState: SimulationSliceState = {
   arrangementSnapshot: null,
   pinnedVertices: {},
   selectedPinId: null,
+  showGarment: true,
+  showSeamlines3D: true,
+  showInternalLines3D: true,
+  surfaceMode3D: 'textured' as SurfaceMode3D,
 };
 
 const simulationSlice = createSlice({
@@ -242,6 +257,21 @@ const simulationSlice = createSlice({
         pin.strength = action.payload.strength;
       }
     },
+
+    // ─── 3D Display Toggles ──────────────────────────────────────────────────
+
+    toggleGarment(state) {
+      state.showGarment = !state.showGarment;
+    },
+    toggleSeamlines3D(state) {
+      state.showSeamlines3D = !state.showSeamlines3D;
+    },
+    toggleInternalLines3D(state) {
+      state.showInternalLines3D = !state.showInternalLines3D;
+    },
+    setSurfaceMode3D(state, action: PayloadAction<SurfaceMode3D>) {
+      state.surfaceMode3D = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -274,6 +304,11 @@ export const {
   clearAllPins,
   selectPin,
   setPinStrength,
+  // 3D display
+  toggleGarment,
+  toggleSeamlines3D,
+  toggleInternalLines3D,
+  setSurfaceMode3D,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

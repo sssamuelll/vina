@@ -113,6 +113,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       particleCount: 0,
       bodyCollision: false, viewMode3D: 'arrange' as const, arrangementSnapshot: null,
       pinnedVertices: {}, selectedPinId: null,
+      showGarment: true, showSeamlines3D: true, showInternalLines3D: true, surfaceMode3D: 'textured' as const,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
