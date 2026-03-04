@@ -14,6 +14,7 @@ import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
 import ScissorsOverlay from './overlays/ScissorsOverlay';
 import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
+import TopstitchOverlay from './overlays/TopstitchOverlay';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { BBox, HandlePosition } from '../transformUtils';
 import type { TransformPreview } from '../useTransformTool';
@@ -105,6 +106,15 @@ interface ToolOverlayProps {
   segmentSewingSegmentB: SegmentSelection | null;
   segmentSewingPendingSnap: SnapResult | null;
   segmentSewingHoveredSnap: SnapResult | null;
+  // Topstitch
+  topstitchMode: string;
+  topstitchHoveredEdge: { pieceId: string; edgeIndex: number; start: Point2D; end: Point2D } | null;
+  topstitchSegSnapA: { point: Point2D; edgeIndex: number; t: number; pieceId: string } | null;
+  topstitchSegHover: { point: Point2D } | null;
+  topstitchFreePieceId: string | null;
+  topstitchFreePoints: Point2D[];
+  topstitchFreeCursor: Point2D | null;
+  topstitchHoveredSnapPoint: Point2D | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -200,6 +210,21 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           segmentB={props.segmentSewingSegmentB}
           pendingSnap={props.segmentSewingPendingSnap}
           hoveredSnap={props.segmentSewingHoveredSnap}
+        />
+      )}
+
+      {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') && (
+        <TopstitchOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          mode={props.topstitchMode}
+          hoveredEdge={props.topstitchHoveredEdge}
+          segSnapA={props.topstitchSegSnapA}
+          segHover={props.topstitchSegHover}
+          freePieceId={props.topstitchFreePieceId}
+          freePoints={props.topstitchFreePoints}
+          freeCursor={props.topstitchFreeCursor}
+          hoveredSnapPoint={props.topstitchHoveredSnapPoint}
         />
       )}
     </>

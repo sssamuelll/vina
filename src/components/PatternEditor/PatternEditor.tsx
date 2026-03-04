@@ -18,6 +18,7 @@ import { useTransformTool } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
 import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
+import { useTopstitchTool } from './useTopstitchTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -89,6 +90,7 @@ export default function PatternEditor() {
   const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
   const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
+  const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -178,7 +180,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool,
     });
 
   return (
@@ -277,6 +279,14 @@ export default function PatternEditor() {
             segmentSewingSegmentB={segmentSewingTool.segmentB}
             segmentSewingPendingSnap={segmentSewingTool.pendingSnap}
             segmentSewingHoveredSnap={segmentSewingTool.hoveredSnap}
+            topstitchMode={topstitchTool.mode}
+            topstitchHoveredEdge={topstitchTool.hoveredEdge}
+            topstitchSegSnapA={topstitchTool.segSnapA}
+            topstitchSegHover={topstitchTool.segHover}
+            topstitchFreePieceId={topstitchTool.freePieceId}
+            topstitchFreePoints={topstitchTool.freePoints}
+            topstitchFreeCursor={topstitchTool.freeCursor}
+            topstitchHoveredSnapPoint={topstitchTool.hoveredSnapPoint}
           />
         </g>
 
