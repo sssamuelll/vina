@@ -5,11 +5,12 @@ interface HintTextProps {
   pieces: PatternPiece[];
   penNodesLength: number;
   nodeEditorIsEditing: boolean;
+  segmentSewingPhase?: string;
 }
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
-  nodeEditorIsEditing,
+  nodeEditorIsEditing, segmentSewingPhase,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -42,6 +43,22 @@ export default function HintText({
           Click to add points · Drag to curve · Click first point to close · Enter to finish open · Esc to cancel
         </text>
       )}
+
+      {activeTool === 'segmentSewing' && (() => {
+        const msgs: Record<string, string> = {
+          idle: 'Click on an edge to start segment A',
+          a_start: 'Click further along the same edge to define segment A end',
+          a_end: 'Click on a different piece to start segment B',
+          b_start: 'Click further along the same edge to define segment B end',
+          b_end: 'Press Enter to sew · Backspace to undo · Esc to cancel',
+        };
+        return (
+          <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
+            fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+            {msgs[segmentSewingPhase ?? 'idle'] ?? msgs.idle}
+          </text>
+        );
+      })()}
     </>
   );
 }

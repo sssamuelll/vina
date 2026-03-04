@@ -285,6 +285,7 @@ export default function PatternEditor() {
           pieces={pieces}
           penNodesLength={pen.nodes.length}
           nodeEditorIsEditing={nodeEditor.isEditing}
+          segmentSewingPhase={segmentSewingTool.phase}
         />
       </svg>
       <ContextMenu

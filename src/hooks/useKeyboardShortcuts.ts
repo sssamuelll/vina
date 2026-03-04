@@ -332,6 +332,13 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // N — Segment Sewing
+      if (key === 'n') {
+        dispatch(setActiveTool('segmentSewing' as any));
+        dispatch(setActiveTool2D('segmentSewing'));
+        return;
+      }
+
       // Check tool shortcuts from registry (fallback)
       const toolId = toolShortcuts[key];
       if (toolId) {
@@ -370,6 +377,7 @@ export function useKeyboardShortcuts() {
       { key: 'D', label: 'Dart', category: '2D Tools', action: () => {} },
       { key: 'X', label: 'Scissors', category: '2D Tools', action: () => {} },
       { key: 'W', label: 'Pin', category: '2D Tools', action: () => {} },
+      { key: 'N', label: 'Segment Sewing', category: '2D Tools', action: () => {} },
       // Sewing
       { key: 'B', label: 'Edit Sewing (Seam)', category: 'Sewing', action: () => {} },
       { key: 'F', label: 'Free Sewing', category: 'Sewing', action: () => {} },
