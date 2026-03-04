@@ -24,6 +24,7 @@ export const measureTool: ToolDefinition = {
   context: '2d',
   icon: MeasureIcon,
   cursor: 'crosshair',
+  shortcut: 'm',
   group: 'annotation',
   options: [
     {

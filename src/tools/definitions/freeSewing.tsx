@@ -25,7 +25,7 @@ export const freeSewingTool: ToolDefinition = {
   id: 'freesewing',
   name: 'Free Sewing',
   context: '2d',
-  shortcut: 'm',
+  shortcut: 'f',
   icon: FreeSewingIcon,
   cursor: 'crosshair',
   group: 'sewing',
