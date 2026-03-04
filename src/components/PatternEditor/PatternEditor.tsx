@@ -33,7 +33,7 @@ export default function PatternEditor() {
   const dispatch = useDispatch();
   const { pieces, seams } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
-  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, gridSize, units } = editor;
+  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, renderMode2D, gridSize, units } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
   
@@ -208,6 +208,8 @@ export default function PatternEditor() {
             showSeamAllowance={showSeamAllowance}
             defaultSeamAllowanceWidth={editor.defaultSeamAllowanceWidth}
             showGrainlines={showGrainlines}
+            showPieceNames={showPieceNames}
+            renderMode2D={renderMode2D}
             selectedInternalLine={editor.selectedInternalLine}
             editingPieceNameId={editingPieceNameId}
             onPieceNameDoubleClick={handlePieceNameDoubleClick}
@@ -215,12 +217,14 @@ export default function PatternEditor() {
             onPieceNameCancel={handlePieceNameCancel}
           />
           <ConstructionOverlay zoom2D={zoom2D} pieces={pieces} />
-          <SeamRenderer
-            seams={seams}
-            pieces={pieces}
-            zoom2D={zoom2D}
-            selectedSeamId={editor.selectedSeamId}
-          />
+          {showSewingLines && (
+            <SeamRenderer
+              seams={seams}
+              pieces={pieces}
+              zoom2D={zoom2D}
+              selectedSeamId={editor.selectedSeamId}
+            />
+          )}
           <ToolOverlay
             activeTool={activeTool}
             zoom2D={zoom2D}

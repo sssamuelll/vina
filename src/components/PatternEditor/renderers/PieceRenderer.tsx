@@ -38,6 +38,8 @@ interface PieceRendererProps {
   showSeamAllowance: boolean;
   defaultSeamAllowanceWidth: number;
   showGrainlines: boolean;
+  showPieceNames: boolean;
+  renderMode2D: 'textured' | 'translucent' | 'wireframe';
   selectedInternalLine?: { pieceId: string; lineId: string } | null;
   editingPieceNameId?: string | null;
   onPieceNameDoubleClick?: (pieceId: string) => void;
@@ -45,13 +47,15 @@ interface PieceRendererProps {
   onPieceNameCancel?: () => void;
 }
 
-export default function PieceRenderer({ 
-  pieces, 
-  selectedPieceIds, 
-  zoom2D, 
+export default function PieceRenderer({
+  pieces,
+  selectedPieceIds,
+  zoom2D,
   showSeamAllowance,
-  defaultSeamAllowanceWidth, 
+  defaultSeamAllowanceWidth,
   showGrainlines,
+  showPieceNames,
+  renderMode2D,
   selectedInternalLine,
   editingPieceNameId,
   onPieceNameDoubleClick,
@@ -75,7 +79,12 @@ export default function PieceRenderer({
           >
             <path
               d={pathToSVG(piece.outline)}
-              fill={isSelected ? 'rgba(255, 215, 0, 0.18)' : 'rgba(74, 158, 255, 0.08)'}
+              fill={
+                renderMode2D === 'wireframe' ? 'none'
+                : renderMode2D === 'translucent'
+                ? (isSelected ? 'rgba(255, 215, 0, 0.08)' : 'rgba(74, 158, 255, 0.03)')
+                : (isSelected ? 'rgba(255, 215, 0, 0.18)' : 'rgba(74, 158, 255, 0.08)')
+              }
               stroke={strokeColor}
               strokeWidth={1.5 / zoom2D}
               strokeLinejoin="round"
@@ -154,7 +163,7 @@ export default function PieceRenderer({
               );
             })}
 
-            {(() => {
+            {showPieceNames && (() => {
               // Calculate piece center from outline
               let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
               for (const cmd of piece.outline) {
