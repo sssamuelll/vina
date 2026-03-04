@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { removePiece, removeSeam, setProjectName, loadProject } from '../../store/projectSlice';
-import { toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
+import { setDefaultSAWidth, toggleSnapToGrid, clearSelection, selectSeam, undo, redo } from '../../store/editorSlice';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadProjectFile, uploadProjectFile } from '../../utils/projectIO';
@@ -170,10 +170,6 @@ export default function PropertiesPanel() {
 
           {/* Display */}
           <PropertySection id="display" title="DISPLAY" collapsed={!!collapsedSections.display} onToggle={toggleSection}>
-            <label className="panel-toggle">
-              <input type="checkbox" checked={editor.showSeamAllowance} onChange={() => dispatch(toggleSeamAllowance())} />
-              Seam allowance (Shift+S)
-            </label>
             {editor.showSeamAllowance && (
               <div className="panel-field">
                 <label>Default SA (mm)</label>
@@ -187,10 +183,6 @@ export default function PropertiesPanel() {
                 />
               </div>
             )}
-            <label className="panel-toggle">
-              <input type="checkbox" checked={editor.showGrainlines} onChange={() => dispatch(toggleGrainlines())} />
-              Grainlines
-            </label>
             <label className="panel-toggle">
               <input type="checkbox" checked={editor.snapToGrid} onChange={() => dispatch(toggleSnapToGrid())} />
               Snap to grid
