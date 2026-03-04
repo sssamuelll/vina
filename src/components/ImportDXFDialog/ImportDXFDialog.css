@@ -1,0 +1,108 @@
+.import-dxf-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.import-dxf-dialog {
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 20px;
+  width: 360px;
+  color: #ddd;
+  font-size: 13px;
+}
+
+.import-dxf-dialog h3 {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  color: #fff;
+}
+
+.import-dxf-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.import-dxf-row label {
+  flex-shrink: 0;
+  margin-right: 12px;
+}
+
+.import-dxf-row select,
+.import-dxf-row input[type="number"] {
+  flex: 1;
+  padding: 4px 8px;
+  background: #2a2a2a;
+  border: 1px solid #555;
+  border-radius: 4px;
+  color: #ddd;
+  font-size: 13px;
+}
+
+.import-dxf-radio-group {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+.import-dxf-radio-group label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.import-dxf-checkboxes {
+  border-top: 1px solid #333;
+  padding-top: 10px;
+  margin-top: 10px;
+}
+
+.import-dxf-checkboxes label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.import-dxf-summary {
+  background: #262626;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 12px 0;
+  font-size: 12px;
+  color: #aaa;
+}
+
+.import-dxf-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.import-dxf-actions button {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #333;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.import-dxf-actions button.primary {
+  background: #0078d4;
+  border-color: #0078d4;
+  color: #fff;
+}

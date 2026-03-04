@@ -474,12 +474,21 @@ export interface RedoAction {
   steps?: number;
 }
 
+export interface ImportDXFAction {
+  action: 'import_dxf';
+  fileContent: string;
+  unit?: 'mm' | 'cm' | 'inch' | 'auto';
+  scale?: number;
+  loadType?: 'open' | 'add';
+}
+
 export type ProjectAction =
   | SaveProjectAction
   | ExportDXFAction
   | ExportPDFAction
   | UndoAction
-  | RedoAction;
+  | RedoAction
+  | ImportDXFAction;
 
 // ============================================================================
 // Message Action (no-op, just display text)
@@ -563,7 +572,7 @@ export const ACTION_CATEGORIES = {
   simulation: ['start_simulation', 'stop_simulation', 'reset_simulation', 'set_fabric', 'show_fit_map'],
   avatar: ['set_avatar_measurement', 'set_avatar_measurements', 'set_pose', 'set_avatar_type'],
   view: ['zoom_to_piece', 'zoom_to_fit', 'switch_view', 'set_view_mode', 'toggle_panel'],
-  project: ['save_project', 'export_dxf', 'export_pdf', 'undo', 'redo'],
+  project: ['save_project', 'export_dxf', 'export_pdf', 'undo', 'redo', 'import_dxf'],
   message: ['message'],
 } as const;
 
@@ -600,6 +609,7 @@ export const UNDOABLE_ACTIONS = new Set([
   'create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams',
   'create_topstitch',
   'set_avatar_measurement', 'set_avatar_measurements',
+  'import_dxf',
 ]);
 
 /**

@@ -566,6 +566,14 @@ function validateProjectAction(action: ProjectAction, _state: RootState): Valida
       }
       return ok();
 
+    case 'import_dxf': {
+      const importAction = action as unknown as { fileContent?: string };
+      if (!importAction.fileContent || importAction.fileContent.trim().length === 0) {
+        return fail('import_dxf requires non-empty fileContent');
+      }
+      return ok();
+    }
+
     default:
       return fail(`Unknown project action`);
   }
@@ -624,7 +632,7 @@ export function validateAction(action: CopilotAction, state: RootState): Validat
   }
 
   // Project actions
-  if (['save_project', 'export_dxf', 'export_pdf', 'undo', 'redo'].includes(action.action)) {
+  if (['save_project', 'export_dxf', 'export_pdf', 'undo', 'redo', 'import_dxf'].includes(action.action)) {
     return validateProjectAction(action as ProjectAction, state);
   }
 
