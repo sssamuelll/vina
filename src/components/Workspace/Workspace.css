@@ -203,23 +203,9 @@
   pointer-events: none;
 }
 
-.viewport-2d {
-  background: var(--bg-canvas);
-  display: flex;
-  flex-direction: row;
-}
+.viewport-2d { background: var(--bg-canvas); }
 .viewport-3d {
   background: var(--bg-primary);
-  display: flex;
-  flex-direction: row;
-}
-
-/* Inner content area fills remaining space next to display bars */
-.viewport-2d-content,
-.viewport-3d-content {
-  flex: 1;
-  min-width: 0;
-  position: relative;
   display: flex;
   flex-direction: column;
 }

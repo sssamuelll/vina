@@ -1,13 +1,19 @@
 .display-bar-2d {
+  position: absolute;
+  right: 0;
+  top: 32px;
+  bottom: 0;
   width: var(--toolbar2d-width, 42px);
-  flex-shrink: 0;
-  background: var(--bg-secondary, rgba(42, 42, 42, 0.95));
+  background: rgba(42, 42, 42, 0.85);
+  backdrop-filter: blur(8px);
   border-left: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 8px 4px;
   gap: 0;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .display-bar-2d .db-separator {
