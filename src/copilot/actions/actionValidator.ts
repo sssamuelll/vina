@@ -205,6 +205,20 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       }
       return ok();
 
+    case 'link_pieces': {
+      const la = action as unknown as { pieceIdA?: string; pieceIdB?: string; mode?: string };
+      if (!la.pieceIdA || !pieceExists(state, la.pieceIdA)) return fail(`Piece "${la.pieceIdA}" not found`);
+      if (!la.pieceIdB || !pieceExists(state, la.pieceIdB)) return fail(`Piece "${la.pieceIdB}" not found`);
+      if (la.pieceIdA === la.pieceIdB) return fail('Cannot link a piece to itself');
+      if (la.mode !== 'symmetry' && la.mode !== 'instance') return fail('Mode must be "symmetry" or "instance"');
+      return ok();
+    }
+    case 'unlink_pieces': {
+      const ua = action as unknown as { pieceId?: string };
+      if (!ua.pieceId || !pieceExists(state, ua.pieceId)) return fail(`Piece "${ua.pieceId}" not found`);
+      return ok();
+    }
+
     default:
       return fail(`Unknown piece action`);
   }
@@ -597,7 +611,7 @@ export function validateAction(action: CopilotAction, state: RootState): Validat
   }
 
   // Piece actions
-  if (['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece'].includes(action.action)) {
+  if (['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece', 'link_pieces', 'unlink_pieces'].includes(action.action)) {
     return validatePieceAction(action as PieceAction, state);
   }
 

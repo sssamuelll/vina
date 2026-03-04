@@ -253,6 +253,28 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     examples: ['Merge the upper and lower bodice', 'Join these two pieces together', 'Combine the front panels'],
   },
 
+  // === Linked Editing ===
+  {
+    action: 'link_pieces',
+    description: 'Link two pieces for synchronized editing (symmetry or instance)',
+    category: 'piece',
+    parameters: [
+      { name: 'pieceIdA', type: 'string', description: 'First piece ID', required: true },
+      { name: 'pieceIdB', type: 'string', description: 'Second piece ID', required: true },
+      { name: 'mode', type: 'string', description: 'Link mode', required: true, enum: ['symmetry', 'instance'] },
+    ],
+    examples: ['Link the left and right sleeve as symmetry', 'Link these pieces as instances'],
+  },
+  {
+    action: 'unlink_pieces',
+    description: 'Remove linked editing from a piece pair',
+    category: 'piece',
+    parameters: [
+      { name: 'pieceId', type: 'string', description: 'ID of either linked piece', required: true },
+    ],
+    examples: ['Unlink the sleeves', 'Remove linked editing'],
+  },
+
   // === Seams ===
   {
     action: 'create_seam',

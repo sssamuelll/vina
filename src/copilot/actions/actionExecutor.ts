@@ -26,6 +26,8 @@ import {
   reverseSeam,
   addInternalLine,
   loadProject,
+  linkPieces,
+  unlinkPieces,
 } from '../../store/projectSlice';
 import { parseDXF } from '../../utils/dxf/parser';
 import { dxfToPatternPieces } from '../../utils/dxf/converter';
@@ -643,6 +645,24 @@ export class CopilotActionExecutor {
         return {
           data: { mergedPieceId: merged.id },
           summary: `Merged "${pieceA.name}" and "${pieceB.name}" into "${merged.name}"`,
+        };
+      }
+
+      case 'link_pieces': {
+        const la = action as unknown as { pieceIdA: string; pieceIdB: string; mode: 'symmetry' | 'instance' };
+        this.dispatch(linkPieces({ pieceIdA: la.pieceIdA, pieceIdB: la.pieceIdB, mode: la.mode }));
+        return {
+          data: { pieceIdA: la.pieceIdA, pieceIdB: la.pieceIdB, mode: la.mode },
+          summary: `Linked pieces as ${la.mode}`,
+        };
+      }
+
+      case 'unlink_pieces': {
+        const ua = action as unknown as { pieceId: string };
+        this.dispatch(unlinkPieces({ pieceId: ua.pieceId }));
+        return {
+          data: { pieceId: ua.pieceId },
+          summary: 'Removed linked editing',
         };
       }
 

@@ -128,6 +128,18 @@ export interface ScalePieceAction {
   factorY?: number;
 }
 
+export interface LinkPiecesAction {
+  action: 'link_pieces';
+  pieceIdA: string;
+  pieceIdB: string;
+  mode: 'symmetry' | 'instance';
+}
+
+export interface UnlinkPiecesAction {
+  action: 'unlink_pieces';
+  pieceId: string;
+}
+
 export type PieceAction =
   | CreatePieceAction
   | DuplicatePieceAction
@@ -136,7 +148,9 @@ export type PieceAction =
   | MirrorPieceAction
   | MovePieceAction
   | RotatePieceAction
-  | ScalePieceAction;
+  | ScalePieceAction
+  | LinkPiecesAction
+  | UnlinkPiecesAction;
 
 // ============================================================================
 // Geometry Modification
@@ -564,7 +578,7 @@ export interface ActionBatchResult {
 
 export const ACTION_CATEGORIES = {
   selection: ['select_piece', 'select_pieces', 'select_edge', 'select_point', 'clear_selection'],
-  piece: ['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece'],
+  piece: ['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece', 'link_pieces', 'unlink_pieces'],
   geometry: ['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge', 'split_piece', 'merge_pieces'],
   seam: ['create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams'],
   topstitch: ['create_topstitch'],
@@ -603,6 +617,7 @@ export const DANGEROUS_ACTIONS = new Set([
 export const UNDOABLE_ACTIONS = new Set([
   'create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece',
   'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece',
+  'link_pieces', 'unlink_pieces',
   'move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart',
   'curve_edge', 'straighten_edge', 'split_edge',
   'split_piece', 'merge_pieces',
