@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece } from '../../store/projectSlice';
-import { clearSelection } from '../../store/editorSlice';
+import { updatePiece, removePiece, unlinkPieces } from '../../store/projectSlice';
+import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions } from '../../types/types';
 import type { PatternPiece } from '../../types/types';
 import PropertySection from './PropertySection';
@@ -16,6 +16,7 @@ interface PiecePropertiesProps {
 export default function PieceProperties({ piece, collapsed, onToggle }: PiecePropertiesProps) {
   const dispatch = useDispatch();
   const fabrics = useSelector((s: RootState) => s.project.fabrics);
+  const pieces = useSelector((s: RootState) => s.project.pieces);
   const [notchSettings, setNotchSettings] = useState<NotchOptions>({
     shape: 'slit', subType: 'straightforward', length: 8, width: 3, angle: 0, count: 1,
   });
@@ -84,6 +85,31 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           onChange={() => dispatch(updatePiece({ ...piece, mirrored: !piece.mirrored, updatedAt: Date.now() }))}
         />
       </div>
+      {/* Linked Editing */}
+      {piece.linkedPieceId && (
+        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
+          <div style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Linked Editing</div>
+          <div style={{ fontSize: 12, marginBottom: 6 }}>
+            <span style={{ color: piece.linkMode === 'symmetry' ? '#64b5f6' : '#aed581' }}>
+              {piece.linkMode === 'symmetry' ? 'Symmetry' : 'Instance'}
+            </span>
+            {' linked to '}
+            <span
+              style={{ color: '#4a9eff', cursor: 'pointer', textDecoration: 'underline' }}
+              onClick={() => dispatch(selectPiece(piece.linkedPieceId!))}
+            >
+              {pieces.find(p => p.id === piece.linkedPieceId)?.name || piece.linkedPieceId}
+            </span>
+          </div>
+          <button
+            className="panel-delete"
+            onClick={() => dispatch(unlinkPieces({ pieceId: piece.id }))}
+            style={{ fontSize: 11, background: 'rgba(255,255,255,0.05)' }}
+          >
+            Remove Linked Editing
+          </button>
+        </div>
+      )}
       <button className="panel-delete" onClick={handleDeletePiece}>
         Delete Piece
       </button>
