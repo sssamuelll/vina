@@ -370,6 +370,59 @@ describe('convertToLine', () => {
   });
 });
 
+// ─── nearestSegment – bezier accuracy ───
+
+describe('nearestSegment – bezier accuracy', () => {
+  it('detects click on curved bezier arc far from chord', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [0, 50, 100, 50, 100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    // Click near the apex of the arc (~50, 37.5)
+    const hit = nearestSegment({ x: 50, y: 37.5 }, outline);
+    expect(hit).not.toBeNull();
+    expect(hit!.distance).toBeLessThan(2);
+    expect(hit!.commandIndex).toBe(1);
+  });
+
+  it('returns accurate t parameter for bezier hit', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [0, 50, 100, 50, 100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    const hit = nearestSegment({ x: 50, y: 37.5 }, outline);
+    expect(hit).not.toBeNull();
+    expect(hit!.t).toBeGreaterThan(0.3);
+    expect(hit!.t).toBeLessThan(0.7);
+  });
+
+  it('detects click on quadratic bezier arc', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'Q', values: [50, 80, 100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    const hit = nearestSegment({ x: 50, y: 40 }, outline);
+    expect(hit).not.toBeNull();
+    expect(hit!.distance).toBeLessThan(2);
+    expect(hit!.commandIndex).toBe(1);
+  });
+
+  it('still works for straight line segments', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const hit = nearestSegment({ x: 50, y: 0 }, outline);
+    expect(hit).not.toBeNull();
+    expect(hit!.distance).toBeLessThan(1);
+  });
+});
+
 // ─── applyNodeMove ───
 
 describe('applyNodeMove', () => {
