@@ -13,6 +13,7 @@ import { lineTool } from './definitions/line';
 import { internalShapeTool } from './definitions/internalShape';
 import { rectangleTool } from './definitions/rectangle';
 import { seamTool } from './definitions/seam';
+import { segmentSewingTool } from './definitions/segmentSewing';
 import { seamAllowanceTool } from './definitions/seamAllowance';
 import { notchTool } from './definitions/notch';
 import { grainlineTool } from './definitions/grainline';
@@ -73,6 +74,7 @@ const allTools = [
   
   // 2D Tools — Sewing
   seamTool,
+  segmentSewingTool,
   seamAllowanceTool,
   elasticTool,
   freeSewingTool,

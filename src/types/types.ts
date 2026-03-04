@@ -277,6 +277,7 @@ export type Tool2D =
   | 'internalShape' // internal shape (dashed rectangle)
   | 'rectangle'    // quick rectangular pieces
   | 'seam'         // connect edges between pieces
+  | 'segmentSewing' // connect partial edge segments
   | 'seamAllowance' // seam allowance editing
   | 'notch'        // add notch marks
   | 'grainline'    // set fabric grain direction
