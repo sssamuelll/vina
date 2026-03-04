@@ -321,6 +321,17 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     examples: ['Compare the armhole curves on front and back'],
     readOnly: true,
   },
+  {
+    action: 'measure_distance',
+    description: 'Measure straight-line distance between two points',
+    category: 'measurement',
+    parameters: [
+      { name: 'from', type: '{ x: number, y: number }', description: 'Start point coordinates', required: true },
+      { name: 'to', type: '{ x: number, y: number }', description: 'End point coordinates', required: true },
+    ],
+    examples: ['Measure distance between these two points', 'How far apart are these points?'],
+    readOnly: true,
+  },
 
   // === Simulation ===
   {
