@@ -18,6 +18,9 @@ import {
   duplicatePiece,
   flipPieceH,
   flipPieceV,
+  linkPieces,
+  unlinkPieces,
+  cloneAsLinked,
 } from '../../store/projectSlice';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 
@@ -59,6 +62,7 @@ interface MenuItem {
 export default function ContextMenu({ menu, onClose, onRename, onConvertSegment }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
+  const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on click outside or Escape
@@ -146,6 +150,48 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
       action: () => act(() => onRename?.(pid)),
       separator: true,
     });
+    // ─── Linked Editing ───
+    const piece = pieces.find(p => p.id === pid);
+    if (piece?.linkedPieceId) {
+      // Already linked — show unlink and select partner
+      items.push({
+        label: 'Remove Linked Editing',
+        icon: '🔗',
+        action: () => act(() => dispatch(unlinkPieces({ pieceId: pid }))),
+      });
+      items.push({
+        label: 'Select Linked Pattern',
+        icon: '👆',
+        action: () => act(() => dispatch(selectPiece(piece.linkedPieceId!))),
+        separator: true,
+      });
+    } else if (selectedPieceIds.length === 2) {
+      // Two pieces selected — show link options
+      items.push({
+        label: 'Apply Linked Editing – Symmetry Pattern',
+        icon: '🪞',
+        action: () => act(() => dispatch(linkPieces({ pieceIdA: selectedPieceIds[0], pieceIdB: selectedPieceIds[1], mode: 'symmetry' }))),
+      });
+      items.push({
+        label: 'Apply Linked Editing – Instance Pattern',
+        icon: '📋',
+        action: () => act(() => dispatch(linkPieces({ pieceIdA: selectedPieceIds[0], pieceIdB: selectedPieceIds[1], mode: 'instance' }))),
+        separator: true,
+      });
+    } else {
+      // Single unlinked piece — show clone options
+      items.push({
+        label: 'Clone with Linked Editing – Symmetry Pattern',
+        icon: '🪞',
+        action: () => act(() => dispatch(cloneAsLinked({ pieceId: pid, mode: 'symmetry' }))),
+      });
+      items.push({
+        label: 'Clone with Linked Editing – Instance Pattern',
+        icon: '📋',
+        action: () => act(() => dispatch(cloneAsLinked({ pieceId: pid, mode: 'instance' }))),
+        separator: true,
+      });
+    }
     items.push({
       label: 'Select',
       icon: '☐',

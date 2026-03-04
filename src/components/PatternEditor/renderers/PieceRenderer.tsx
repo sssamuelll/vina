@@ -62,6 +62,9 @@ export default function PieceRenderer({
     <>
       {pieces.map(piece => {
         const isSelected = selectedPieceIds.includes(piece.id);
+        const strokeColor = piece.linkedPieceId
+          ? piece.linkMode === 'symmetry' ? '#64b5f6' : '#aed581'
+          : '#4a9eff';
         const { cx, cy } = piece.outline?.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };
         return (
           <g
@@ -73,7 +76,7 @@ export default function PieceRenderer({
             <path
               d={pathToSVG(piece.outline)}
               fill={isSelected ? 'rgba(255, 215, 0, 0.18)' : 'rgba(74, 158, 255, 0.08)'}
-              stroke="#4a9eff"
+              stroke={strokeColor}
               strokeWidth={1.5 / zoom2D}
               strokeLinejoin="round"
             />
