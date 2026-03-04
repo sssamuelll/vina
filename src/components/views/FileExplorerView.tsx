@@ -3,8 +3,11 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addPiece, loadProject, addSeam, updateAvatar, updateMeasurements, setProjectName } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
+import type { DXFDocument } from '../../utils/dxf/types';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
+import ImportDXFDialog from '../ImportDXFDialog/ImportDXFDialog';
+import type { ImportDXFOptions } from '../ImportDXFDialog/ImportDXFDialog';
 import ExportSkillModal from '../ExportSkillModal/ExportSkillModal';
 import { importZprj } from '../../utils/formats/zprjImport';
 import { downloadZprj } from '../../utils/formats/zprjExport';
@@ -65,6 +68,7 @@ export default function FileExplorerView() {
 
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
   const [showExportSkillModal, setShowExportSkillModal] = useState(false);
+  const [dxfDialogDoc, setDxfDialogDoc] = useState<DXFDocument | null>(null);
 
   // ─── Cutting Layout State ───
   const [clPaperSize, setClPaperSize] = useState<PaperSize>('A0');
@@ -86,13 +90,54 @@ export default function FileExplorerView() {
       if (!file) return;
       const text = await file.text();
       const doc = parseDXF(text);
-      const dxfPieces = dxfToPatternPieces(doc);
-      for (const piece of dxfPieces) {
-        dispatch(addPiece(piece));
-      }
+      setDxfDialogDoc(doc);
       if (dxfInputRef.current) dxfInputRef.current.value = '';
     },
-    [dispatch],
+    [],
+  );
+
+  const handleDXFDialogImport = useCallback(
+    (options: ImportDXFOptions) => {
+      if (!dxfDialogDoc) return;
+      const dxfPieces = dxfToPatternPieces(dxfDialogDoc, {
+        unit: options.unit,
+        scale: options.scale,
+        importNotches: options.importNotches,
+        importGrainlines: options.importGrainlines,
+        importInternalLines: options.importInternalLines,
+      });
+      if (options.loadType === 'open') {
+        dispatch(loadProject({
+          id: `project-${Date.now()}`,
+          name: 'DXF Import',
+          pieces: dxfPieces,
+          seams: [],
+          fabrics: [],
+          avatar: {
+            id: 'default',
+            name: 'Default Avatar',
+            modelUrl: '',
+            measurements: {
+              height: 180,
+              chest: 96,
+              waist: 82,
+              hips: 96,
+              shoulder: 44,
+              armLength: 64,
+              inseam: 82,
+            },
+          },
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        }));
+      } else {
+        for (const piece of dxfPieces) {
+          dispatch(addPiece(piece));
+        }
+      }
+      setDxfDialogDoc(null);
+    },
+    [dxfDialogDoc, dispatch],
   );
 
   // ─── Import SVG ───
@@ -506,6 +551,15 @@ export default function FileExplorerView() {
           </Section>
         )}
       </div>
+
+      {/* Import DXF Dialog */}
+      {dxfDialogDoc && (
+        <ImportDXFDialog
+          doc={dxfDialogDoc}
+          onImport={handleDXFDialogImport}
+          onCancel={() => setDxfDialogDoc(null)}
+        />
+      )}
 
       {/* Export Skill Modal */}
       <ExportSkillModal

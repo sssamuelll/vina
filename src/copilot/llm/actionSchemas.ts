@@ -419,6 +419,20 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     examples: ['Zoom to the collar', 'Focus on the back panel'],
   },
 
+  // === Import ===
+  {
+    action: 'import_dxf',
+    description: 'Import pattern pieces from DXF-AAMA file content',
+    category: 'project',
+    parameters: [
+      { name: 'fileContent', type: 'string', description: 'Raw DXF file content', required: true },
+      { name: 'unit', type: 'string', description: 'Unit override', required: false, enum: ['mm', 'cm', 'inch', 'auto'] },
+      { name: 'scale', type: 'number', description: 'Scale percentage (100 = 1:1)', required: false, default: 100 },
+      { name: 'loadType', type: 'string', description: 'How to load pieces', required: false, enum: ['add', 'open'], default: 'add' },
+    ],
+    examples: ['Import this DXF file', 'Load DXF pattern pieces'],
+  },
+
   // === Project ===
   {
     action: 'undo',

@@ -25,7 +25,10 @@ import {
   removeSeam,
   reverseSeam,
   addInternalLine,
+  loadProject,
 } from '../../store/projectSlice';
+import { parseDXF } from '../../utils/dxf/parser';
+import { dxfToPatternPieces } from '../../utils/dxf/converter';
 import {
   selectPiece,
   clearSelection,
@@ -864,6 +867,53 @@ export class CopilotActionExecutor {
       case 'save_project':
         // Would trigger save dialog
         return { summary: 'Project saved' };
+
+      case 'import_dxf': {
+        const importAction = action as unknown as {
+          fileContent: string;
+          unit?: 'mm' | 'cm' | 'inch' | 'auto';
+          scale?: number;
+          loadType?: 'open' | 'add';
+        };
+        const doc = parseDXF(importAction.fileContent);
+        const importedPieces = dxfToPatternPieces(doc);
+
+        if (importAction.loadType === 'open') {
+          this.dispatch(loadProject({
+            id: uid(),
+            name: 'DXF Import',
+            pieces: importedPieces,
+            seams: [],
+            fabrics: [],
+            avatar: {
+              id: 'default',
+              name: 'Default Avatar',
+              modelUrl: '',
+              measurements: {
+                height: 180,
+                chest: 96,
+                waist: 82,
+                hips: 96,
+                shoulder: 44,
+                armLength: 64,
+                inseam: 82,
+              },
+            },
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          }));
+        } else {
+          for (const piece of importedPieces) {
+            this.dispatch(addPiece(piece));
+          }
+        }
+
+        const names = importedPieces.map(p => p.name);
+        return {
+          data: { count: importedPieces.length, names },
+          summary: `Imported ${importedPieces.length} piece(s): ${names.join(', ')}`,
+        };
+      }
 
       case 'export_dxf':
         return { summary: 'Exported DXF' };
