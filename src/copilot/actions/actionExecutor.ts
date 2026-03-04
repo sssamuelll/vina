@@ -876,7 +876,10 @@ export class CopilotActionExecutor {
           loadType?: 'open' | 'add';
         };
         const doc = parseDXF(importAction.fileContent);
-        const importedPieces = dxfToPatternPieces(doc);
+        const importedPieces = dxfToPatternPieces(doc, {
+          unit: importAction.unit,
+          scale: importAction.scale,
+        });
 
         if (importAction.loadType === 'open') {
           this.dispatch(loadProject({
