@@ -6,11 +6,12 @@ interface HintTextProps {
   penNodesLength: number;
   nodeEditorIsEditing: boolean;
   segmentSewingPhase?: string;
+  topstitchMode?: string;
 }
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
-  nodeEditorIsEditing, segmentSewingPhase,
+  nodeEditorIsEditing, segmentSewingPhase, topstitchMode,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -56,6 +57,21 @@ export default function HintText({
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
             fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
             {msgs[segmentSewingPhase ?? 'idle'] ?? msgs.idle}
+          </text>
+        );
+      })()}
+
+      {(activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree' || activeTool === 'topstitchEdit') && (() => {
+        const msgs: Record<string, string> = {
+          seamline: 'Click an edge to add topstitch along its full length',
+          segment: 'Click two points on the same edge to define topstitch segment',
+          free: 'Click to add points · Enter to confirm · Backspace to undo · Esc to cancel',
+          edit: 'Click a topstitch line to select and edit it',
+        };
+        return (
+          <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
+            fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+            {msgs[topstitchMode ?? 'seamline'] ?? msgs.seamline}
           </text>
         );
       })()}

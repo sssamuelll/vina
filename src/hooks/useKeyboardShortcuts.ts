@@ -339,6 +339,34 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // T — Edit Topstitch
+      if (key === 't') {
+        dispatch(setActiveTool('topstitchEdit' as any));
+        dispatch(setActiveTool2D('topstitchEdit'));
+        return;
+      }
+
+      // K — Segment Topstitch
+      if (key === 'k') {
+        dispatch(setActiveTool('topstitchSegment' as any));
+        dispatch(setActiveTool2D('topstitchSegment'));
+        return;
+      }
+
+      // L — Free Topstitch
+      if (key === 'l') {
+        dispatch(setActiveTool('topstitchFree' as any));
+        dispatch(setActiveTool2D('topstitchFree'));
+        return;
+      }
+
+      // ; — Seamline Topstitch
+      if (key === ';') {
+        dispatch(setActiveTool('topstitchSeamline' as any));
+        dispatch(setActiveTool2D('topstitchSeamline'));
+        return;
+      }
+
       // Check tool shortcuts from registry (fallback)
       const toolId = toolShortcuts[key];
       if (toolId) {
@@ -378,6 +406,10 @@ export function useKeyboardShortcuts() {
       { key: 'X', label: 'Scissors', category: '2D Tools', action: () => {} },
       { key: 'W', label: 'Pin', category: '2D Tools', action: () => {} },
       { key: 'N', label: 'Segment Sewing', category: '2D Tools', action: () => {} },
+      { key: 'T', label: 'Edit Topstitch', category: '2D Tools', action: () => {} },
+      { key: 'K', label: 'Segment Topstitch', category: '2D Tools', action: () => {} },
+      { key: 'L', label: 'Free Topstitch', category: '2D Tools', action: () => {} },
+      { key: ';', label: 'Seamline Topstitch', category: '2D Tools', action: () => {} },
       // Sewing
       { key: 'B', label: 'Edit Sewing (Seam)', category: 'Sewing', action: () => {} },
       { key: 'F', label: 'Free Sewing', category: 'Sewing', action: () => {} },

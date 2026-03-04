@@ -276,6 +276,28 @@ export type SeamAction =
   | AutoDetectSeamsAction;
 
 // ============================================================================
+// Topstitch Actions
+// ============================================================================
+
+export interface CreateTopstitchAction {
+  action: 'create_topstitch';
+  pieceId: string;
+  edgeIndex: number;
+  /** Stitch type */
+  stitchType?: 'straight' | 'zigzag' | 'triple';
+  /** Stitch length in mm */
+  stitchLength?: number;
+  /** Offset from edge in mm */
+  offset?: number;
+  /** Thread color (hex) */
+  threadColor?: string;
+  /** Number of parallel rows */
+  rows?: number;
+}
+
+export type TopstitchAction = CreateTopstitchAction;
+
+// ============================================================================
 // Measurement Actions
 // ============================================================================
 
@@ -483,6 +505,7 @@ export type CopilotAction =
   | PieceAction
   | GeometryAction
   | SeamAction
+  | TopstitchAction
   | MeasurementAction
   | SimulationAction
   | AvatarAction
@@ -535,6 +558,7 @@ export const ACTION_CATEGORIES = {
   piece: ['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece'],
   geometry: ['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge', 'split_piece', 'merge_pieces'],
   seam: ['create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams'],
+  topstitch: ['create_topstitch'],
   measurement: ['measure_edge', 'measure_piece_area', 'compare_edges', 'measure_distance'],
   simulation: ['start_simulation', 'stop_simulation', 'reset_simulation', 'set_fabric', 'show_fit_map'],
   avatar: ['set_avatar_measurement', 'set_avatar_measurements', 'set_pose', 'set_avatar_type'],
@@ -574,6 +598,7 @@ export const UNDOABLE_ACTIONS = new Set([
   'curve_edge', 'straighten_edge', 'split_edge',
   'split_piece', 'merge_pieces',
   'create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams',
+  'create_topstitch',
   'set_avatar_measurement', 'set_avatar_measurements',
 ]);
 

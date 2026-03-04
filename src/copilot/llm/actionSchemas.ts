@@ -288,6 +288,23 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     examples: ['Auto-detect seams for all pieces', 'Find seams for the bodice pieces'],
   },
 
+  // === Topstitch ===
+  {
+    action: 'create_topstitch',
+    description: 'Add a topstitch line along a piece edge',
+    category: 'topstitch',
+    parameters: [
+      { name: 'pieceId', type: 'string', description: 'ID of the piece', required: true },
+      { name: 'edgeIndex', type: 'number', description: 'Index of the edge to topstitch', required: true },
+      { name: 'stitchType', type: 'string', description: 'Stitch type', required: false, enum: ['straight', 'zigzag', 'triple'] },
+      { name: 'stitchLength', type: 'number', description: 'Stitch length in mm', required: false, default: 3 },
+      { name: 'offset', type: 'number', description: 'Offset from edge in mm', required: false, default: 5 },
+      { name: 'threadColor', type: 'string', description: 'Thread color (hex)', required: false, default: '#333' },
+      { name: 'rows', type: 'number', description: 'Number of parallel rows', required: false, default: 1 },
+    ],
+    examples: ['Add topstitch along the collar edge', 'Add a zigzag topstitch on edge 0'],
+  },
+
   // === Measurements ===
   {
     action: 'measure_edge',

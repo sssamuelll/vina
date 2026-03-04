@@ -11,7 +11,7 @@
  */
 
 import type { AppDispatch, RootState } from '../../store';
-import type { PatternPiece, Seam, PathCommand, ViewMode } from '../../types/types';
+import type { PatternPiece, Seam, PathCommand, ViewMode, InternalLine, TopstitchOptions } from '../../types/types';
 import {
   addPiece,
   updatePiece,
@@ -24,6 +24,7 @@ import {
   addSeam,
   removeSeam,
   reverseSeam,
+  addInternalLine,
 } from '../../store/projectSlice';
 import {
   selectPiece,
@@ -683,6 +684,57 @@ export class CopilotActionExecutor {
           data: { pieceIds: action.pieceIds },
           summary: `Auto-detected seams`,
         };
+
+      // ─── Topstitch ───
+      case 'create_topstitch': {
+        const piece = state.project.pieces.find(p => p.id === action.pieceId);
+        if (!piece) throw new Error(`Piece ${action.pieceId} not found`);
+
+        const edges = piece.outline.filter(c => c.type !== 'Z');
+        if (action.edgeIndex < 0 || action.edgeIndex >= edges.length) {
+          throw new Error(`Edge index ${action.edgeIndex} out of range`);
+        }
+
+        // Get edge endpoints
+        const startCmd = edges[action.edgeIndex];
+        const endCmd = edges[(action.edgeIndex + 1) % edges.length];
+        const x1 = startCmd.type === 'M' || startCmd.type === 'L' ? startCmd.values[0] : 0;
+        const y1 = startCmd.type === 'M' || startCmd.type === 'L' ? startCmd.values[1] : 0;
+        const x2 = endCmd.type === 'M' || endCmd.type === 'L' ? endCmd.values[0] : endCmd.type === 'C' ? endCmd.values[4] : 0;
+        const y2 = endCmd.type === 'M' || endCmd.type === 'L' ? endCmd.values[1] : endCmd.type === 'C' ? endCmd.values[5] : 0;
+
+        // Compute offset path (perpendicular normal)
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.hypot(dx, dy) || 1;
+        const offsetAmount = action.offset ?? 5;
+        const nx = (-dy / len) * offsetAmount;
+        const ny = (dx / len) * offsetAmount;
+
+        const topstitchOptions: TopstitchOptions = {
+          stitchType: action.stitchType ?? 'straight',
+          stitchLength: action.stitchLength ?? 3,
+          offset: offsetAmount,
+          threadColor: action.threadColor ?? '#333',
+          rows: action.rows ?? 1,
+        };
+
+        const line: InternalLine = {
+          id: uid(),
+          type: 'topstitch',
+          path: [
+            { type: 'M', values: [x1 + nx, y1 + ny] },
+            { type: 'L', values: [x2 + nx, y2 + ny] },
+          ],
+          topstitchOptions,
+        };
+
+        this.dispatch(addInternalLine({ pieceId: action.pieceId, line }));
+
+        return {
+          data: { pieceId: action.pieceId, lineId: line.id, edgeIndex: action.edgeIndex },
+          summary: `Added ${topstitchOptions.stitchType} topstitch along edge ${action.edgeIndex}`,
+        };
+      }
 
       // ─── Measurements ───
       case 'measure_edge': {
