@@ -32,6 +32,7 @@ import { edit3dTool } from './definitions/edit3d';
 import { avatarTool } from './definitions/avatar';
 import { tapeMeasureCircTool, tapeMeasureLinearTool } from './definitions/avatarTape';
 import { scissorsTool } from './definitions/scissors';
+import { mergeTool } from './definitions/merge';
 import { dartTool } from './definitions/dart';
 import { circleTool } from './definitions/circle';
 import { mirrorTool } from './definitions/mirror';
@@ -63,6 +64,7 @@ const allTools = [
   
   // 2D Tools — Pattern Editing
   scissorsTool,
+  mergeTool,
   mirrorTool,
   duplicateTool,
   addPieceTool,

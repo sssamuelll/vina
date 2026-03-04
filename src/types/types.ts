@@ -288,6 +288,8 @@ export type Tool2D =
   | 'fabricTexture' // fabric/texture assignment
   | 'flatten'      // flatten/iron
   | 'measure'      // distance / angle measurement
+  | 'scissors'     // split pattern pieces
+  | 'merge'        // merge adjacent pattern pieces
   | 'hand'         // pan
   | 'zoom';
 
