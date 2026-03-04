@@ -529,9 +529,10 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       return 'move';
     }
     if (state.hoveredNode !== null) return 'move';
+    if (state.addPointPreview !== null) return 'cell';
     if (state.hoveredSegment !== null) return 'pointer';
     return 'default';
-  }, [state.isEditing, state.hoveredNode, state.hoveredSegment]);
+  }, [state.isEditing, state.hoveredNode, state.hoveredSegment, state.addPointPreview]);
 
   return {
     ...state,

@@ -75,6 +75,31 @@ export default function EditPatternOverlay({
     }
   }
 
+  // Closing segment: last anchor → first anchor (Z command)
+  const zIndex = outline.findIndex(c => c.type === 'Z');
+  if (zIndex >= 0) {
+    const isClosingSelected = selectedSegments.has(zIndex);
+    const isClosingHovered = hoveredSegment === zIndex && !isClosingSelected;
+
+    if (isClosingSelected || isClosingHovered) {
+      const firstCmd = outline[0];
+      if (firstCmd.type === 'M') {
+        // prevX/prevY from the loop already hold the last anchor position
+        const d = `M ${prevX} ${prevY} L ${firstCmd.values[0]} ${firstCmd.values[1]}`;
+        segmentHighlights.push(
+          <path
+            key="seg-closing"
+            d={d}
+            fill="none"
+            stroke={isClosingSelected ? '#FFD700' : '#6BB3FF'}
+            strokeWidth={2.5 / zoom2D}
+            opacity={isClosingSelected ? 1 : 0.6}
+          />
+        );
+      }
+    }
+  }
+
   return (
     <>
       <g transform={`translate(${piece.position.x}, ${piece.position.y})`}>
