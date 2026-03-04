@@ -320,11 +320,15 @@ function getOutlineEdges(
 }
 
 /** Get the endpoint of an already-offset command. */
-function getEndpoint(cmd: PathCommand): Point2D {
+function getEndpoint(cmd: PathCommand, prevPt?: Point2D): Point2D {
   switch (cmd.type) {
     case 'M':
     case 'L':
       return { x: cmd.values[0], y: cmd.values[1] };
+    case 'H':
+      return { x: cmd.values[0], y: prevPt?.y ?? 0 };
+    case 'V':
+      return { x: prevPt?.x ?? 0, y: cmd.values[0] };
     case 'C':
       return { x: cmd.values[4], y: cmd.values[5] };
     case 'Q':

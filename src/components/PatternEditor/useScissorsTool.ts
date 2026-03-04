@@ -13,6 +13,7 @@ export interface ScissorsState {
   endPoint: Point2D | null;
   hoveredEdgePoint: Point2D | null;
   previewValid: boolean;
+  error: string | null;
 }
 
 const INITIAL_STATE: ScissorsState = {
@@ -21,6 +22,7 @@ const INITIAL_STATE: ScissorsState = {
   endPoint: null,
   hoveredEdgePoint: null,
   previewValid: false,
+  error: null,
 };
 
 const SNAP_THRESHOLD = 8; // screen pixels
@@ -113,6 +115,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
                 endPoint: null,
                 hoveredEdgePoint: null,
                 previewValid: false,
+                error: null,
               });
             } else {
               setState({ ...INITIAL_STATE, targetPieceId: targetId });
@@ -146,8 +149,11 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
         dispatch(addPiece(pieceA));
         dispatch(addPiece(pieceB));
         reset();
-      } catch {
-        // Invalid cut — ignore
+      } catch (err) {
+        setState(prev => ({
+          ...prev,
+          error: err instanceof Error ? err.message : 'Split failed',
+        }));
       }
     },
     [toPattern, pieces, selectedPieceIds, snapToOutline, validateCut, dispatch, reset],
