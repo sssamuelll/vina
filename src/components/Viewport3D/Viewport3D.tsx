@@ -69,6 +69,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const pieceFabrics = useSelector((s: RootState) => s.simulation.pieceFabrics);
   const defaultFabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
+  const showGarment = useSelector((s: RootState) => s.simulation.showGarment);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
@@ -306,7 +307,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         {/* AnchorPoints: only when 'arrangement' tool is active — mutually exclusive with pose */}
         <AnchorPoints measurements={avatar.measurements} visible={activeTool3D === 'arrangement' && !poseEditorOpen} />
 
-        {useClothSim ? (
+        {showGarment && (useClothSim ? (
           <SimulationErrorBoundary>
             <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
           </SimulationErrorBoundary>
@@ -334,7 +335,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
               />
             ); });
           })()
-        )}
+        ))}
 
         <ContactShadows position={[0, 0, 0]} opacity={0.4} scale={3} blur={2} far={2} />
 

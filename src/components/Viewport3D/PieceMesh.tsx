@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
 import type { PatternPiece, PathCommand, PieceCategory } from '../../types/types';
 
 /**
@@ -101,6 +103,7 @@ interface PieceMeshProps {
 }
 
 export default function PieceMesh({ piece, isSelected, position, placementRotation, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
+  const surfaceMode = useSelector((s: RootState) => s.simulation.surfaceMode3D);
   const geometry = useMemo(() => {
     const shape = commandsToShape(piece.outline);
     if (!shape) return null;
@@ -141,28 +144,41 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
 
   if (!geometry) return null;
 
+  const solidOpacity = surfaceMode === 'translucent'
+    ? (isSelected ? 0.4 : 0.2)
+    : surfaceMode === 'thick'
+    ? (isSelected ? 0.95 : 0.85)
+    : (isSelected ? 0.85 : 0.6);
+
+  const showSolid = surfaceMode !== 'mesh';
+  const showWireframe = surfaceMode === 'mesh' || surfaceMode === 'textured';
+
   return (
     <group position={position} rotation={finalRotation}>
       {/* Main face */}
-      <mesh geometry={geometry}>
-        <meshStandardMaterial
-          color={meshColor}
-          side={THREE.DoubleSide}
-          transparent
-          opacity={isSelected ? 0.85 : 0.6}
-          roughness={roughness}
-          metalness={0}
-        />
-      </mesh>
+      {showSolid && (
+        <mesh geometry={geometry}>
+          <meshStandardMaterial
+            color={meshColor}
+            side={THREE.DoubleSide}
+            transparent
+            opacity={solidOpacity}
+            roughness={roughness}
+            metalness={0}
+          />
+        </mesh>
+      )}
       {/* Wireframe outline */}
-      <mesh geometry={geometry}>
-        <meshBasicMaterial
-          color={wireColor}
-          wireframe
-          transparent
-          opacity={0.3}
-        />
-      </mesh>
+      {showWireframe && (
+        <mesh geometry={geometry}>
+          <meshBasicMaterial
+            color={surfaceMode === 'mesh' ? meshColor : wireColor}
+            wireframe
+            transparent
+            opacity={surfaceMode === 'mesh' ? 0.8 : 0.3}
+          />
+        </mesh>
+      )}
       {/* Floating piece name label */}
       {showLabel && (
         <Html

@@ -33,6 +33,7 @@ import { downloadPDF } from '../../utils/exportPDF';
 import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
+import DisplayBar3D from '../DisplayBar3D/DisplayBar3D';
 import './Workspace.css';
 
 /**
@@ -377,6 +378,7 @@ export default function Workspace() {
                 style={{ width: get3dWidth() }}
               >
                 <div className="viewport-label">3D VIEW</div>
+                <DisplayBar3D />
                 <div className="viewport3d-with-toolbar">
                   <ToolOptionsBar />
                   <Viewport3DErrorBoundary>
