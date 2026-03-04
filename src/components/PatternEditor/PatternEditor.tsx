@@ -17,6 +17,7 @@ import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
 import { useMergeTool } from './useMergeTool';
+import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -87,6 +88,7 @@ export default function PatternEditor() {
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
+  const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -176,7 +178,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool,
     });
 
   return (
@@ -270,6 +272,11 @@ export default function PatternEditor() {
             mergePieceIdB={mergeTool.pieceIdB}
             mergeSharedEdgeFound={mergeTool.sharedEdgeFound}
             mergeError={mergeTool.error}
+            segmentSewingPhase={segmentSewingTool.phase}
+            segmentSewingSegmentA={segmentSewingTool.segmentA}
+            segmentSewingSegmentB={segmentSewingTool.segmentB}
+            segmentSewingPendingSnap={segmentSewingTool.pendingSnap}
+            segmentSewingHoveredSnap={segmentSewingTool.hoveredSnap}
           />
         </g>
 

@@ -13,6 +13,8 @@ import EditPatternOverlay from './overlays/EditPatternOverlay';
 import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
 import ScissorsOverlay from './overlays/ScissorsOverlay';
 import MergeOverlay from './overlays/MergeOverlay';
+import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
+import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { BBox, HandlePosition } from '../transformUtils';
 import type { TransformPreview } from '../useTransformTool';
 
@@ -97,6 +99,12 @@ interface ToolOverlayProps {
   mergePieceIdB: string | null;
   mergeSharedEdgeFound: boolean;
   mergeError: string | null;
+  // Segment Sewing
+  segmentSewingPhase: string;
+  segmentSewingSegmentA: SegmentSelection | null;
+  segmentSewingSegmentB: SegmentSelection | null;
+  segmentSewingPendingSnap: SnapResult | null;
+  segmentSewingHoveredSnap: SnapResult | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -180,6 +188,18 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           pieceIdB={props.mergePieceIdB}
           sharedEdgeFound={props.mergeSharedEdgeFound}
           error={props.mergeError}
+        />
+      )}
+
+      {activeTool === 'segmentSewing' && (
+        <SegmentSewingOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          phase={props.segmentSewingPhase}
+          segmentA={props.segmentSewingSegmentA}
+          segmentB={props.segmentSewingSegmentB}
+          pendingSnap={props.segmentSewingPendingSnap}
+          hoveredSnap={props.segmentSewingHoveredSnap}
         />
       )}
     </>
