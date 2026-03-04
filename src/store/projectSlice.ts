@@ -303,6 +303,48 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Linked Editing ───
+    linkPieces(state, action: PayloadAction<{ pieceIdA: string; pieceIdB: string; mode: 'symmetry' | 'instance' }>) {
+      const { pieceIdA, pieceIdB, mode } = action.payload;
+      const a = state.pieces.find(p => p.id === pieceIdA);
+      const b = state.pieces.find(p => p.id === pieceIdB);
+      if (a && b) {
+        a.linkedPieceId = pieceIdB;
+        a.linkMode = mode;
+        b.linkedPieceId = pieceIdA;
+        b.linkMode = mode;
+        state.isDirty = true;
+      }
+    },
+    unlinkPieces(state, action: PayloadAction<{ pieceId: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece?.linkedPieceId) {
+        const partner = state.pieces.find(p => p.id === piece.linkedPieceId);
+        if (partner) {
+          partner.linkedPieceId = undefined;
+          partner.linkMode = undefined;
+        }
+        piece.linkedPieceId = undefined;
+        piece.linkMode = undefined;
+        state.isDirty = true;
+      }
+    },
+    cloneAsLinked(state, action: PayloadAction<{ pieceId: string; mode: 'symmetry' | 'instance' }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        const clone: PatternPiece = JSON.parse(JSON.stringify(piece));
+        clone.id = `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        clone.name = `${piece.name} (linked)`;
+        clone.position = { x: (piece.position?.x ?? 0) + 50, y: piece.position?.y ?? 0 };
+        clone.linkedPieceId = piece.id;
+        clone.linkMode = action.payload.mode;
+        piece.linkedPieceId = clone.id;
+        piece.linkMode = action.payload.mode;
+        state.pieces.push(clone);
+        state.isDirty = true;
+      }
+    },
+
     // ─── Fabrics ───
     addFabric(state, action: PayloadAction<Fabric>) {
       state.fabrics.push(action.payload);
@@ -342,6 +384,7 @@ export const {
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, reverseSeam,
+  linkPieces, unlinkPieces, cloneAsLinked,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;
