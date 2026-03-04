@@ -53,6 +53,7 @@ import {
 import { validateAction } from './actionValidator';
 import { resolvePieceQueryOrId } from './pieceQueryResolver';
 import { uid } from '../../utils/pathHelpers';
+import { splitPieceAtLine, mergePieces } from '../../utils/patternOps';
 
 // ============================================================================
 // Helpers
@@ -600,6 +601,46 @@ export class CopilotActionExecutor {
           data: { pieceId: action.pieceId, edgeIndex: action.edgeIndex, at: action.at },
           summary: `Split edge ${action.edgeIndex} at ${(action.at * 100).toFixed(0)}%`,
         };
+
+      case 'split_piece': {
+        const piece = state.project.pieces.find(p => p.id === action.pieceId);
+        if (!piece) throw new Error(`Piece ${action.pieceId} not found`);
+        const startPt = { x: action.startPoint[0], y: action.startPoint[1] };
+        const endPt = { x: action.endPoint[0], y: action.endPoint[1] };
+        const [pieceA, pieceB] = splitPieceAtLine(piece, startPt, endPt);
+        this.dispatch(removePiece(piece.id));
+        this.dispatch(addPiece(pieceA));
+        this.dispatch(addPiece(pieceB));
+        return {
+          data: { pieceAId: pieceA.id, pieceBId: pieceB.id },
+          summary: `Split "${piece.name}" into "${pieceA.name}" and "${pieceB.name}"`,
+        };
+      }
+
+      case 'merge_pieces': {
+        const pieceA = state.project.pieces.find(p => p.id === action.pieceIdA);
+        const pieceB = state.project.pieces.find(p => p.id === action.pieceIdB);
+        if (!pieceA) throw new Error(`Piece ${action.pieceIdA} not found`);
+        if (!pieceB) throw new Error(`Piece ${action.pieceIdB} not found`);
+        const merged = mergePieces(pieceA, pieceB);
+        this.dispatch(removePiece(pieceA.id));
+        this.dispatch(removePiece(pieceB.id));
+        this.dispatch(addPiece(merged));
+        // Remove seams between the two pieces
+        const seams = state.project.seams || [];
+        for (const seam of seams) {
+          if (
+            (seam.pieceA.pieceId === pieceA.id && seam.pieceB.pieceId === pieceB.id) ||
+            (seam.pieceA.pieceId === pieceB.id && seam.pieceB.pieceId === pieceA.id)
+          ) {
+            this.dispatch(removeSeam(seam.id));
+          }
+        }
+        return {
+          data: { mergedPieceId: merged.id },
+          summary: `Merged "${pieceA.name}" and "${pieceB.name}" into "${merged.name}"`,
+        };
+      }
 
       // ─── Seams ───
       case 'create_seam': {

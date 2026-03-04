@@ -230,6 +230,28 @@ const ACTION_SCHEMAS: ActionSchema[] = [
     ],
     examples: ['Add a bust dart at (100, 150) with 8cm depth'],
   },
+  {
+    action: 'split_piece',
+    description: 'Split a pattern piece into two pieces along a cut line between two points on the outline',
+    category: 'geometry',
+    parameters: [
+      { name: 'pieceId', type: 'string', description: 'ID of the piece to split', required: true },
+      { name: 'startPoint', type: '[number, number]', description: 'Start point [x, y] on the piece outline (in pattern space)', required: true },
+      { name: 'endPoint', type: '[number, number]', description: 'End point [x, y] on the piece outline (in pattern space)', required: true },
+    ],
+    examples: ['Split the front bodice from armhole to waist', 'Cut this piece in half horizontally'],
+    dangerous: true,
+  },
+  {
+    action: 'merge_pieces',
+    description: 'Merge two adjacent pattern pieces into one. The pieces must share an adjacent edge.',
+    category: 'geometry',
+    parameters: [
+      { name: 'pieceIdA', type: 'string', description: 'ID of the first piece', required: true },
+      { name: 'pieceIdB', type: 'string', description: 'ID of the second piece', required: true },
+    ],
+    examples: ['Merge the upper and lower bodice', 'Join these two pieces together', 'Combine the front panels'],
+  },
 
   // === Seams ===
   {

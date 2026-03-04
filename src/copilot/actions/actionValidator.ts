@@ -285,6 +285,32 @@ function validateGeometryAction(action: GeometryAction, state: RootState): Valid
       return ok();
     }
 
+    case 'split_piece': {
+      if (!pieceExists(state, action.pieceId)) {
+        return fail(`Piece "${action.pieceId}" not found`);
+      }
+      if (!Array.isArray(action.startPoint) || action.startPoint.length !== 2) {
+        return fail('startPoint must be [x, y]');
+      }
+      if (!Array.isArray(action.endPoint) || action.endPoint.length !== 2) {
+        return fail('endPoint must be [x, y]');
+      }
+      return ok();
+    }
+
+    case 'merge_pieces': {
+      if (!pieceExists(state, action.pieceIdA)) {
+        return fail(`Piece "${action.pieceIdA}" not found`);
+      }
+      if (!pieceExists(state, action.pieceIdB)) {
+        return fail(`Piece "${action.pieceIdB}" not found`);
+      }
+      if (action.pieceIdA === action.pieceIdB) {
+        return fail('Cannot merge a piece with itself');
+      }
+      return ok();
+    }
+
     default:
       return fail(`Unknown geometry action`);
   }
@@ -568,7 +594,7 @@ export function validateAction(action: CopilotAction, state: RootState): Validat
   }
 
   // Geometry actions
-  if (['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge'].includes(action.action)) {
+  if (['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge', 'split_piece', 'merge_pieces'].includes(action.action)) {
     return validateGeometryAction(action as GeometryAction, state);
   }
 

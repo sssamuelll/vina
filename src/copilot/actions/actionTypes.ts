@@ -210,6 +210,19 @@ export interface SplitEdgeAction {
   at: number;
 }
 
+export interface SplitPieceAction {
+  action: 'split_piece';
+  pieceId: string;
+  startPoint: [number, number];
+  endPoint: [number, number];
+}
+
+export interface MergePiecesAction {
+  action: 'merge_pieces';
+  pieceIdA: string;
+  pieceIdB: string;
+}
+
 export type GeometryAction =
   | MovePointAction
   | AddPointAction
@@ -218,7 +231,9 @@ export type GeometryAction =
   | AddDartAction
   | CurveEdgeAction
   | StraightenEdgeAction
-  | SplitEdgeAction;
+  | SplitEdgeAction
+  | SplitPieceAction
+  | MergePiecesAction;
 
 // ============================================================================
 // Seam Actions
@@ -518,7 +533,7 @@ export interface ActionBatchResult {
 export const ACTION_CATEGORIES = {
   selection: ['select_piece', 'select_pieces', 'select_edge', 'select_point', 'clear_selection'],
   piece: ['create_piece', 'duplicate_piece', 'delete_piece', 'rename_piece', 'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece'],
-  geometry: ['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge'],
+  geometry: ['move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart', 'curve_edge', 'straighten_edge', 'split_edge', 'split_piece', 'merge_pieces'],
   seam: ['create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams'],
   measurement: ['measure_edge', 'measure_piece_area', 'compare_edges', 'measure_distance'],
   simulation: ['start_simulation', 'stop_simulation', 'reset_simulation', 'set_fabric', 'show_fit_map'],
@@ -546,6 +561,7 @@ export const DANGEROUS_ACTIONS = new Set([
   'delete_piece',
   'delete_seam',
   'delete_point',
+  'split_piece',
 ]);
 
 /**
@@ -556,6 +572,7 @@ export const UNDOABLE_ACTIONS = new Set([
   'mirror_piece', 'move_piece', 'rotate_piece', 'scale_piece',
   'move_point', 'add_point', 'delete_point', 'add_ease', 'add_dart',
   'curve_edge', 'straighten_edge', 'split_edge',
+  'split_piece', 'merge_pieces',
   'create_seam', 'delete_seam', 'flip_seam_direction', 'auto_detect_seams',
   'set_avatar_measurement', 'set_avatar_measurements',
 ]);
