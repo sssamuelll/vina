@@ -7,7 +7,9 @@
  * @module patternOps
  */
 
-import type { PatternPiece, PathCommand, SemanticEdge, Dart } from '../types/types';
+import type { PatternPiece, PathCommand, SemanticEdge, Dart, Point2D } from '../types/types';
+import { findOutlineIntersections, splitOutlineAtPoints } from './geometry/splitOutline';
+import { findSharedEdge, mergeOutlines } from './geometry/mergeOutline';
 
 let _counter = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
@@ -41,7 +43,7 @@ function outlineBBox(outline: PathCommand[]): { minX: number; maxX: number; minY
   return { minX, maxX, minY, maxY };
 }
 
-// ─── splitPiece ───────────────────────────────────────────────────────────────
+// ─── splitPieceAxis ──────────────────────────────────────────────────────────
 
 /**
  * Split a piece along a horizontal or vertical line.
@@ -51,7 +53,7 @@ function outlineBBox(outline: PathCommand[]): { minX: number; maxX: number; minY
  * @param axis - 'horizontal' (split at Y) or 'vertical' (split at X)
  * @param position - Y or X coordinate to split at (in piece local coords)
  */
-export function splitPiece(
+export function splitPieceAxis(
   piece: PatternPiece,
   axis: 'horizontal' | 'vertical',
   position: number,
@@ -97,6 +99,89 @@ export function splitPiece(
   });
 
   return [pieceA, pieceB];
+}
+
+// Backward-compatible alias
+export { splitPieceAxis as splitPiece };
+
+// ─── splitPieceAtLine ────────────────────────────────────────────────────────
+
+/**
+ * Split a piece along an arbitrary line from startPoint to endPoint.
+ * Returns two new pieces with curve-preserving outlines.
+ * Points are in pattern space (absolute coordinates).
+ */
+export function splitPieceAtLine(
+  piece: PatternPiece,
+  startPoint: Point2D,
+  endPoint: Point2D,
+): [PatternPiece, PatternPiece] {
+  const localStart = { x: startPoint.x - piece.position.x, y: startPoint.y - piece.position.y };
+  const localEnd = { x: endPoint.x - piece.position.x, y: endPoint.y - piece.position.y };
+
+  const hits = findOutlineIntersections(piece.outline, localStart, localEnd);
+  if (hits.length < 2) {
+    throw new Error('Cut line must intersect the outline at exactly 2 points');
+  }
+
+  const [outlineA, outlineB] = splitOutlineAtPoints(piece.outline, hits[0], hits[1]);
+
+  const pieceA: PatternPiece = clonePiece(piece, {
+    name: `${piece.name} (A)`,
+    outline: outlineA,
+    internals: [],
+    edges: undefined,
+    darts: undefined,
+  });
+
+  const pieceB: PatternPiece = clonePiece(piece, {
+    name: `${piece.name} (B)`,
+    outline: outlineB,
+    internals: [],
+    position: { x: piece.position.x + 15, y: piece.position.y },
+    edges: undefined,
+    darts: undefined,
+  });
+
+  return [pieceA, pieceB];
+}
+
+// ─── mergePieces ─────────────────────────────────────────────────────────────
+
+/**
+ * Merge two adjacent pieces into one piece.
+ * The pieces must share an adjacent edge (within tolerance).
+ * Returns the merged piece, or throws if no shared edge is found.
+ */
+export function mergePieces(
+  pieceA: PatternPiece,
+  pieceB: PatternPiece,
+  tolerance: number = 2,
+): PatternPiece {
+  const shared = findSharedEdge(
+    pieceA.outline, pieceA.position,
+    pieceB.outline, pieceB.position,
+    tolerance,
+  );
+
+  if (!shared) {
+    throw new Error('No shared edge found between pieces');
+  }
+
+  const mergedOutline = mergeOutlines(
+    pieceA.outline, pieceA.position,
+    pieceB.outline, pieceB.position,
+    shared,
+  );
+
+  return clonePiece(pieceA, {
+    name: `${pieceA.name} + ${pieceB.name}`,
+    outline: mergedOutline,
+    position: { x: 0, y: 0 },
+    internals: [...pieceA.internals, ...pieceB.internals],
+    edges: undefined,
+    darts: [...(pieceA.darts ?? []), ...(pieceB.darts ?? [])],
+  });
 }
 
 // ─── addFullness ──────────────────────────────────────────────────────────────
