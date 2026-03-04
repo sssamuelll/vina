@@ -325,6 +325,10 @@ export interface EditorState {
   defaultSeamAllowanceWidth: number;  // mm fallback when piece has no SA set
   showGrainlines: boolean;
   showAnchorPoints: boolean;
+  showPieceNames: boolean;
+  showLineLengths: boolean;
+  showSewingLines: boolean;
+  renderMode2D: 'textured' | 'translucent' | 'wireframe';
   snapToGrid: boolean;
   gridSize: number;       // mm
   units: UnitSystem;

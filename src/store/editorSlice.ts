@@ -14,6 +14,10 @@ const initialState: EditorState = {
   defaultSeamAllowanceWidth: 10,
   showGrainlines: true,
   showAnchorPoints: false,
+  showPieceNames: true,
+  showLineLengths: false,
+  showSewingLines: true,
+  renderMode2D: 'textured' as const,
   snapToGrid: true,
   gridSize: 10,
   units: 'mm',
@@ -79,6 +83,18 @@ const editorSlice = createSlice({
     toggleAnchorPoints(state) {
       state.showAnchorPoints = !state.showAnchorPoints;
     },
+    togglePieceNames(state) {
+      state.showPieceNames = !state.showPieceNames;
+    },
+    toggleLineLengths(state) {
+      state.showLineLengths = !state.showLineLengths;
+    },
+    toggleSewingLines(state) {
+      state.showSewingLines = !state.showSewingLines;
+    },
+    setRenderMode2D(state, action: PayloadAction<'textured' | 'translucent' | 'wireframe'>) {
+      state.renderMode2D = action.payload;
+    },
     toggleSnapToGrid(state) {
       state.snapToGrid = !state.snapToGrid;
     },
@@ -102,6 +118,7 @@ export const {
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectSeam, selectInternalLine,
   setZoom2D, setPan2D,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
+  togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   setUnits,
   undo, redo,
 } = editorSlice.actions;
