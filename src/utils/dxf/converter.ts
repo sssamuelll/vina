@@ -214,6 +214,29 @@ function transformPath(cmds: PathCommand[], insert: DXFInsertData): PathCommand[
   }));
 }
 
+// ─── Import Options ───
+
+export interface DXFImportOptions {
+  unit?: 'mm' | 'cm' | 'inch' | 'auto';
+  scale?: number;  // percentage, default 100
+  importNotches?: boolean;
+  importGrainlines?: boolean;
+  importInternalLines?: boolean;
+}
+
+const UNIT_FACTORS: Record<string, number> = { mm: 1, cm: 10, inch: 25.4 };
+
+function resolveUnitFactor(unit: string | undefined, doc: DXFDocument): number {
+  if (!unit || unit === 'auto') {
+    const insunits = doc.header.get('$INSUNITS');
+    const code = typeof insunits === 'number' ? insunits : parseInt(String(insunits), 10);
+    if (code === 1) return UNIT_FACTORS.inch;
+    if (code === 5) return UNIT_FACTORS.cm;
+    return 1; // default mm
+  }
+  return UNIT_FACTORS[unit] ?? 1;
+}
+
 // ─── Main Converter ───
 
 /**
@@ -225,9 +248,10 @@ function transformPath(cmds: PathCommand[], insert: DXFInsertData): PathCommand[
  * while notch, grainline, and draw layers become internal lines.
  *
  * @param doc - Parsed DXF document from {@link parseDXF}
+ * @param options - Optional import options for unit, scale, and filters
  * @returns Array of pattern pieces with outlines, internals, and metadata
  */
-export function dxfToPatternPieces(doc: DXFDocument): PatternPiece[] {
+export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions): PatternPiece[] {
   const pieces: PatternPiece[] = [];
 
   if (doc.blocks.size > 0) {
@@ -247,6 +271,38 @@ export function dxfToPatternPieces(doc: DXFDocument): PatternPiece[] {
     // No blocks: group by entities, treat as single piece
     const piece = entitiesToPiece(doc.entities, 'Imported Piece', null);
     if (piece) pieces.push(piece);
+  }
+
+  // Apply scale and unit
+  const unitFactor = resolveUnitFactor(options?.unit, doc);
+  const scaleFactor = ((options?.scale ?? 100) / 100) * unitFactor;
+
+  if (scaleFactor !== 1) {
+    for (const piece of pieces) {
+      piece.outline = piece.outline.map(cmd => ({
+        type: cmd.type,
+        values: cmd.values.map(v => v * scaleFactor),
+      }));
+      piece.internals = piece.internals.map(internal => ({
+        ...internal,
+        path: internal.path.map(cmd => ({
+          type: cmd.type,
+          values: cmd.values.map(v => v * scaleFactor),
+        })),
+      }));
+    }
+  }
+
+  // Apply import filters
+  if (options) {
+    for (const piece of pieces) {
+      piece.internals = piece.internals.filter(internal => {
+        if (internal.type === 'notch' && options.importNotches === false) return false;
+        if (internal.type === 'grainline' && options.importGrainlines === false) return false;
+        if ((internal.type === 'dart' || internal.type === 'topstitch') && options.importInternalLines === false) return false;
+        return true;
+      });
+    }
   }
 
   return pieces;
