@@ -50,6 +50,10 @@ export interface PatternPiece {
   fabricId?: string;
   /** Link to construction piece (for overlay alignment) */
   constructionPieceId?: string;
+  /** ID of the linked partner piece (bidirectional) */
+  linkedPieceId?: string;
+  /** Link mode: symmetry (mirror) or instance (identical copy) */
+  linkMode?: 'symmetry' | 'instance';
   createdAt: number;
   updatedAt: number;
 }
