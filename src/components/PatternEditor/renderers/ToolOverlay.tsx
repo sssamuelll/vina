@@ -39,15 +39,7 @@ interface EditorNode {
   ref: NodeRef;
 }
 
-interface Measurement {
-  id: string;
-  startPoint: Point2D;
-  endPoint: Point2D;
-  distance: number;
-  isPathMeasurement: boolean;
-  pathPoints?: Point2D[];
-  angle?: number;
-}
+import type { Measurement } from '../useMeasureTool';
 
 interface ToolOverlayProps {
   activeTool: Tool2D;

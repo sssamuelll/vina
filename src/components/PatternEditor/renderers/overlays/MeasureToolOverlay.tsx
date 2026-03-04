@@ -1,14 +1,5 @@
 import type { Point2D } from '../../../../types/types';
-
-interface Measurement {
-  id: string;
-  startPoint: Point2D;
-  endPoint: Point2D;
-  distance: number;
-  isPathMeasurement: boolean;
-  pathPoints?: Point2D[];
-  angle?: number;
-}
+import type { Measurement } from '../../useMeasureTool';
 
 interface MeasureToolOverlayProps {
   zoom2D: number;
