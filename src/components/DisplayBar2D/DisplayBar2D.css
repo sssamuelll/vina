@@ -1,31 +1,32 @@
 .display-bar-2d {
   position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: var(--toolbar2d-width, 42px);
-  background: rgba(42, 42, 42, 0.85);
-  backdrop-filter: blur(8px);
-  border-left: 1px solid var(--border);
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  background: rgba(30, 30, 30, 0.75);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 8px 4px;
+  padding: 6px 3px;
   gap: 0;
   z-index: 10;
   pointer-events: auto;
 }
 
 .display-bar-2d .db-separator {
-  width: 20px;
+  width: 18px;
   height: 1px;
-  background: var(--border);
-  margin: 6px 0;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
 }
 
 .display-bar-2d .db-btn {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -35,12 +36,12 @@
   cursor: pointer;
   transition: all 0.12s;
   position: relative;
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.5);
 }
 
 .display-bar-2d .db-btn:hover {
-  background: var(--btn-bg-hover);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .display-bar-2d .db-btn.active {
@@ -57,13 +58,13 @@
   right: calc(100% + 8px);
   top: 50%;
   transform: translateY(-50%);
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+  background: rgba(20, 20, 20, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   padding: 4px 8px;
   font-size: 11px;
   font-family: 'Inter', sans-serif;
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.85);
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -77,6 +78,6 @@
 
 /* Radio mode: highlight active rendering mode */
 .display-bar-2d .db-btn.mode-active {
-  background: var(--accent-dim, rgba(74, 158, 255, 0.15));
+  background: rgba(74, 158, 255, 0.15);
   color: var(--accent);
 }
