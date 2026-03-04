@@ -14,6 +14,10 @@ import { internalShapeTool } from './definitions/internalShape';
 import { rectangleTool } from './definitions/rectangle';
 import { seamTool } from './definitions/seam';
 import { segmentSewingTool } from './definitions/segmentSewing';
+import { topstitchSeamlineTool } from './definitions/topstitchSeamline';
+import { topstitchSegmentTool } from './definitions/topstitchSegment';
+import { topstitchFreeTool } from './definitions/topstitchFree';
+import { topstitchEditTool } from './definitions/topstitchEdit';
 import { seamAllowanceTool } from './definitions/seamAllowance';
 import { notchTool } from './definitions/notch';
 import { grainlineTool } from './definitions/grainline';
@@ -75,6 +79,10 @@ const allTools = [
   // 2D Tools — Sewing
   seamTool,
   segmentSewingTool,
+  topstitchSeamlineTool,
+  topstitchSegmentTool,
+  topstitchFreeTool,
+  topstitchEditTool,
   seamAllowanceTool,
   elasticTool,
   freeSewingTool,

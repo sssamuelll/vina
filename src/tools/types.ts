@@ -12,9 +12,9 @@ export interface CopilotToolMetadata {
   /** Synonyms and related terms for better NL matching */
   keywords: string[];
   /** Does this tool require something to be selected first? */
-  requiresSelection?: 'piece' | 'edge' | 'point' | 'seam' | 'none';
+  requiresSelection?: 'piece' | 'edge' | 'point' | 'seam' | 'internalLine' | 'none';
   /** What does this tool produce or modify? */
-  produces?: 'piece' | 'seam' | 'point' | 'measurement' | 'simulation' | 'view' | 'none';
+  produces?: 'piece' | 'seam' | 'point' | 'measurement' | 'simulation' | 'view' | 'internalLine' | 'modification' | 'none';
   /** Can actions from this tool be undone? */
   undoable?: boolean;
   /** Is this a destructive action that needs confirmation? */
