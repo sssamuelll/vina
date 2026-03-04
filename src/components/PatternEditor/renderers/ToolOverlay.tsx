@@ -11,6 +11,8 @@ import MeasureToolOverlay from './overlays/MeasureToolOverlay';
 import NodeEditorOverlay from './overlays/NodeEditorOverlay';
 import EditPatternOverlay from './overlays/EditPatternOverlay';
 import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
+import ScissorsOverlay from './overlays/ScissorsOverlay';
+import MergeOverlay from './overlays/MergeOverlay';
 import type { BBox, HandlePosition } from '../transformUtils';
 import type { TransformPreview } from '../useTransformTool';
 
@@ -87,6 +89,17 @@ interface ToolOverlayProps {
   editPatternHoveredSegment: number | null;
   editPatternAddPointPreview: Point2D | null;
   editPatternMarquee: { start: Point2D; current: Point2D } | null;
+  // Scissors
+  scissorsTargetPieceId: string | null;
+  scissorsStartPoint: Point2D | null;
+  scissorsEndPoint: Point2D | null;
+  scissorsHoveredEdgePoint: Point2D | null;
+  scissorsPreviewValid: boolean;
+  // Merge
+  mergePieceIdA: string | null;
+  mergePieceIdB: string | null;
+  mergeSharedEdgeFound: boolean;
+  mergeError: string | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -148,6 +161,29 @@ export default function ToolOverlay(props: ToolOverlayProps) {
 
       {props.nodeEditorIsEditing && props.nodeEditorEditingPieceId && (
         <NodeEditorOverlay zoom2D={zoom2D} units={units} pieces={pieces} nodeEditorEditingPieceId={props.nodeEditorEditingPieceId} nodeEditorNodes={props.nodeEditorNodes} selectedNode={props.selectedNode} hoveredNode={props.hoveredNode} />
+      )}
+
+      {activeTool === 'scissors' && (
+        <ScissorsOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          targetPieceId={props.scissorsTargetPieceId}
+          startPoint={props.scissorsStartPoint}
+          endPoint={props.scissorsEndPoint}
+          hoveredEdgePoint={props.scissorsHoveredEdgePoint}
+          previewValid={props.scissorsPreviewValid}
+        />
+      )}
+
+      {activeTool === 'merge' && (
+        <MergeOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          pieceIdA={props.mergePieceIdA}
+          pieceIdB={props.mergePieceIdB}
+          sharedEdgeFound={props.mergeSharedEdgeFound}
+          error={props.mergeError}
+        />
       )}
     </>
   );

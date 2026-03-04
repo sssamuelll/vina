@@ -15,6 +15,8 @@ import { useEditPattern } from './useEditPattern';
 import { nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool } from './useTransformTool';
+import { useScissorsTool } from './useScissorsTool';
+import { useMergeTool } from './useMergeTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -81,6 +83,8 @@ export default function PatternEditor() {
   const grainlineTool = useGrainlineTool(zoom2D, pan2D, pieces, handleGrainlineSet);
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
+  const scissorsTool = useScissorsTool(zoom2D, pan2D);
+  const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -171,7 +175,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool,
     });
 
   return (
@@ -254,6 +258,15 @@ export default function PatternEditor() {
             editPatternHoveredSegment={editPatternTool.hoveredSegment}
             editPatternAddPointPreview={editPatternTool.addPointPreview}
             editPatternMarquee={editPatternTool.marquee}
+            scissorsTargetPieceId={scissorsTool.targetPieceId}
+            scissorsStartPoint={scissorsTool.startPoint}
+            scissorsEndPoint={scissorsTool.endPoint}
+            scissorsHoveredEdgePoint={scissorsTool.hoveredEdgePoint}
+            scissorsPreviewValid={scissorsTool.previewValid}
+            mergePieceIdA={mergeTool.pieceIdA}
+            mergePieceIdB={mergeTool.pieceIdB}
+            mergeSharedEdgeFound={mergeTool.sharedEdgeFound}
+            mergeError={mergeTool.error}
           />
         </g>
 
