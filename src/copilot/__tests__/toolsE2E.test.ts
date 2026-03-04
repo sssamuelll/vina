@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 117 tools registered', () => {
-      expect(registry.size).toBe(117); // +6 3D interaction tools (#142)
+    it('has 118 tools registered', () => {
+      expect(registry.size).toBe(118); // +7 3D interaction tools (#142, #138)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -399,7 +399,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(117); // +6 3D interaction tools (#142)
+      expect(names.length).toBe(118); // +7 3D interaction tools (#142, #138)
 
       // Key tools from every category
       const expected = [
