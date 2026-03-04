@@ -32,6 +32,7 @@ import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
 import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
+import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
 import './Workspace.css';
 
 /**
@@ -148,7 +149,7 @@ export default function Workspace() {
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-  }, []);
+  }, [dispatch]);
 
   useEffect(() => {
     loadFromStorage().then(saved => {
@@ -364,6 +365,7 @@ export default function Workspace() {
               >
                 <div className="viewport-label">PATTERN</div>
                 <PatternEditor />
+                <DisplayBar2D />
               </div>
 
               {viewMode === 'split' && (
