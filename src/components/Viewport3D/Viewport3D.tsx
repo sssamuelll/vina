@@ -20,6 +20,7 @@ import SimModeToggle from './SimModeToggle';
 import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import { useAvatarTape } from './useAvatarTape';
+import { useCameraPresets } from './useCameraPresets';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
@@ -74,6 +75,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
   const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
+  const cameraPresets = useCameraPresets(orbitRef);
 
   // Get cursor from active tool definition
   const toolCursor = toolRegistry.getTool(activeTool3D)?.cursor || 'default';
@@ -147,45 +149,6 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     controls.reset();
   }, []);
 
-  // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
-  // F10 — Snapshot 3D viewport (CLO3D: File > Snapshot > 3D Window)
-  // W — Toggle Pin Tool (#134)
-  // Ctrl+W — Clear all pins (#134)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
-        e.preventDefault();
-        setAvatarHidden(h => !h);
-      }
-      if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
-        e.preventDefault();
-        // Shift+F toggles arrangement tool on/off
-        dispatch(setActiveTool3D(activeTool3D === 'arrangement' ? 'camera' : 'arrangement'));
-      }
-      if (e.key === 'F10') {
-        e.preventDefault();
-        snapshot3D();
-      }
-      // W — Toggle Pin Tool (without modifiers)
-      if ((e.key === 'W' || e.key === 'w') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        dispatch(setActiveTool3D(activeTool3D === 'pin' ? 'camera' : 'pin'));
-      }
-      // Ctrl+W — Clear all pins
-      if ((e.key === 'W' || e.key === 'w') && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        dispatch(clearAllPins());
-        console.log('[Pin Tool] Cleared all pins');
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTool3D, dispatch]);
-
-
-
-
   const snapshot3D = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -225,6 +188,59 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     link.href = offscreen.toDataURL('image/png');
     link.click();
   }, []);
+
+  // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
+  // F10 — Snapshot 3D viewport (CLO3D: File > Snapshot > 3D Window)
+  // W — Toggle Pin Tool (#134)
+  // Ctrl+W — Clear all pins (#134)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
+        e.preventDefault();
+        setAvatarHidden(h => !h);
+      }
+      if (e.shiftKey && (e.key === 'F' || e.key === 'f')) {
+        e.preventDefault();
+        // Shift+F toggles arrangement tool on/off
+        dispatch(setActiveTool3D(activeTool3D === 'arrangement' ? 'camera' : 'arrangement'));
+      }
+      if (e.key === 'F10') {
+        e.preventDefault();
+        snapshot3D();
+      }
+      // W — Toggle Pin Tool (without modifiers)
+      if ((e.key === 'W' || e.key === 'w') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        dispatch(setActiveTool3D(activeTool3D === 'pin' ? 'camera' : 'pin'));
+      }
+      // Ctrl+W — Clear all pins
+      if ((e.key === 'W' || e.key === 'w') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        dispatch(clearAllPins());
+        console.log('[Pin Tool] Cleared all pins');
+      }
+
+      // ─── Numpad Camera Presets (CLO3D-standard) ───
+      if (e.code === 'Numpad2') { e.preventDefault(); cameraPresets.setCameraView('front'); }
+      if (e.code === 'Numpad8') { e.preventDefault(); cameraPresets.setCameraView('back'); }
+      if (e.code === 'Numpad4') { e.preventDefault(); cameraPresets.setCameraView('right'); }
+      if (e.code === 'Numpad6') { e.preventDefault(); cameraPresets.setCameraView('left'); }
+      if (e.code === 'Numpad5') { e.preventDefault(); cameraPresets.setCameraView('top'); }
+      if (e.code === 'Numpad0') { e.preventDefault(); cameraPresets.setCameraView('bottom'); }
+      if (e.code === 'Numpad1') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterRight'); }
+      if (e.code === 'Numpad3') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterLeft'); }
+
+      // ─── Focus (F) — zoom to selected piece (CLO3D-standard) ───
+      if ((e.key === 'F' || e.key === 'f') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        e.preventDefault();
+        if (selectedPieceIds.length > 0) {
+          cameraPresets.focusOnSelection(selectedPieceIds[0]);
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeTool3D, dispatch, cameraPresets, selectedPieceIds, snapshot3D]);
 
   useEffect(() => {
     const el = containerRef.current;
