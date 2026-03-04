@@ -33,6 +33,7 @@ export default function PatternEditor() {
   const editor = useSelector((s: RootState) => s.editor);
   const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, gridSize, units } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
+  const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
   
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
@@ -242,7 +243,7 @@ export default function PatternEditor() {
             cursorPos={measureTool.cursorPos}
             formatDistance={measureTool.formatDistance}
             measureHoveredSnapPoint={measureTool.hoveredSnapPoint}
-            measureShowAngle={false}
+            measureShowAngle={toolOptions?.measure?.showAngle ?? false}
             nodeEditorIsEditing={nodeEditor.isEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}

@@ -190,10 +190,10 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // Shift+M — Measure tool (displaced from M)
-      if (shift && key === 'm' && !ctrl) {
-        dispatch(setActiveTool('measure' as any));
-        dispatch(setActiveTool2D('measure'));
+      // Shift+F — Free Sewing (alternative)
+      if (shift && key === 'f' && !ctrl) {
+        dispatch(setActiveTool('freeSewing' as any));
+        dispatch(setActiveTool2D('freeSewing'));
         return;
       }
 
@@ -290,10 +290,24 @@ export function useKeyboardShortcuts() {
         return;
       }
 
-      // M — Free Sewing
+      // M — Measure
       if (key === 'm') {
+        dispatch(setActiveTool('measure' as any));
+        dispatch(setActiveTool2D('measure'));
+        return;
+      }
+
+      // F — Free Sewing
+      if (key === 'f') {
         dispatch(setActiveTool('freeSewing' as any));
         dispatch(setActiveTool2D('freeSewing'));
+        return;
+      }
+
+      // J — Merge Patterns
+      if (key === 'j') {
+        dispatch(setActiveTool('merge' as any));
+        dispatch(setActiveTool2D('merge'));
         return;
       }
 
@@ -358,11 +372,12 @@ export function useKeyboardShortcuts() {
       { key: 'W', label: 'Pin', category: '2D Tools', action: () => {} },
       // Sewing
       { key: 'B', label: 'Edit Sewing (Seam)', category: 'Sewing', action: () => {} },
-      { key: 'M', label: 'Free Sewing', category: 'Sewing', action: () => {} },
+      { key: 'F', label: 'Free Sewing', category: 'Sewing', action: () => {} },
       { key: 'B', ctrl: true, label: 'Reverse Sewing', category: 'Sewing', action: () => {} },
       // Displaced tools (Shift+Key)
       { key: 'G', shift: true, label: 'Grainline Tool', category: '2D Tools', action: () => {} },
-      { key: 'M', shift: true, label: 'Measure Tool', category: '2D Tools', action: () => {} },
+      { key: 'M', label: 'Measure', category: '2D Tools', action: () => {} },
+      { key: 'J', label: 'Merge Patterns', category: '2D Tools', action: () => {} },
       { key: 'N', shift: true, label: 'Notch Tool', category: '2D Tools', action: () => {} },
       { key: 'L', shift: true, label: 'Line Tool', category: '2D Tools', action: () => {} },
       // Selection
