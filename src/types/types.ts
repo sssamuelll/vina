@@ -90,7 +90,7 @@ export interface GrainLine {
   path: PathCommand[];
 }
 
-export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat';
+export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch';
 
 export type NotchShape = 'slit' | 't-notch' | 'v-internal' | 'v-external' | 'u-notch' | 'castle' | 'diamond';
 export type NotchSubType = 'straightforward' | 'bisector' | 'intersection';
@@ -104,11 +104,20 @@ export interface NotchOptions {
   count: number;     // 1, 2, or 3
 }
 
+export interface TopstitchOptions {
+  stitchType: 'straight' | 'zigzag' | 'triple';
+  stitchLength: number;
+  offset: number;
+  threadColor: string;
+  rows: number;
+}
+
 export interface InternalLine {
   id: string;
   type: InternalLineType;
   path: PathCommand[];
   notchOptions?: NotchOptions;
+  topstitchOptions?: TopstitchOptions;
 }
 
 // ─── Piece Classification ───
@@ -278,6 +287,10 @@ export type Tool2D =
   | 'rectangle'    // quick rectangular pieces
   | 'seam'         // connect edges between pieces
   | 'segmentSewing' // connect partial edge segments
+  | 'topstitchSeamline'  // topstitch along seam edge
+  | 'topstitchSegment'   // topstitch partial edge segment
+  | 'topstitchFree'      // freeform topstitch polyline
+  | 'topstitchEdit'      // edit existing topstitch
   | 'seamAllowance' // seam allowance editing
   | 'notch'        // add notch marks
   | 'grainline'    // set fabric grain direction
