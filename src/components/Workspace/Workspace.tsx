@@ -364,8 +364,10 @@ export default function Workspace() {
                 className={`viewport viewport-2d ${viewMode === '3d' ? 'viewport-collapsed' : ''}`}
                 style={{ width: get2dWidth() }}
               >
-                <div className="viewport-label">PATTERN</div>
-                <PatternEditor />
+                <div className="viewport-2d-content">
+                  <div className="viewport-label">PATTERN</div>
+                  <PatternEditor />
+                </div>
                 <DisplayBar2D />
               </div>
 
@@ -377,9 +379,10 @@ export default function Workspace() {
                 className={`viewport viewport-3d ${viewMode === '2d' ? 'viewport-collapsed' : ''}`}
                 style={{ width: get3dWidth() }}
               >
-                <div className="viewport-label">3D VIEW</div>
                 <DisplayBar3D />
-                <div className="viewport3d-with-toolbar">
+                <div className="viewport-3d-content">
+                  <div className="viewport-label">3D VIEW</div>
+                  <div className="viewport3d-with-toolbar">
                   <ToolOptionsBar />
                   <Viewport3DErrorBoundary>
                     <Viewport3D activeTool3D={activeTool3D as Tool3D} />
@@ -391,6 +394,7 @@ export default function Workspace() {
                       onToggleAvatarPanel={() => setAvatarPanelOpen(v => !v)}
                     />
                   </div>
+                </div>
                 </div>
               </div>
             </div>
