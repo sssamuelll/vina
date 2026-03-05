@@ -124,3 +124,57 @@ export const {
 } = editorSlice.actions;
 
 export default editorSlice.reducer;
+
+// ─── Fit View Utility ────────────────────────────────────────────────────────
+
+/**
+ * Compute zoom and pan to fit all pieces in the viewport with padding.
+ * Returns null if no pieces or all pieces have no outline data.
+ */
+export function computeFitView(
+  pieces: { position: Point2D; outline: { values: number[] }[] }[],
+  viewportWidth: number,
+  viewportHeight: number,
+  padding = 1.2,
+): { zoom: number; pan: Point2D } | null {
+  if (pieces.length === 0 || viewportWidth <= 0 || viewportHeight <= 0) return null;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let hasPoints = false;
+
+  for (const piece of pieces) {
+    for (const cmd of piece.outline) {
+      for (let i = 0; i < cmd.values.length - 1; i += 2) {
+        const px = cmd.values[i] + piece.position.x;
+        const py = cmd.values[i + 1] + piece.position.y;
+        minX = Math.min(minX, px);
+        minY = Math.min(minY, py);
+        maxX = Math.max(maxX, px);
+        maxY = Math.max(maxY, py);
+        hasPoints = true;
+      }
+    }
+  }
+
+  if (!hasPoints) return null;
+
+  const contentW = maxX - minX;
+  const contentH = maxY - minY;
+  if (contentW <= 0 && contentH <= 0) return null;
+
+  const zoom = Math.min(
+    viewportWidth / (contentW * padding),
+    viewportHeight / (contentH * padding),
+    5,
+  );
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
+
+  return {
+    zoom: Math.max(0.1, zoom),
+    pan: {
+      x: viewportWidth / 2 - centerX * zoom,
+      y: viewportHeight / 2 - centerY * zoom,
+    },
+  };
+}

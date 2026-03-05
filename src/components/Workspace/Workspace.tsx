@@ -3,7 +3,7 @@ import { useEffect, useCallback, useState, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import type { Tool2D } from '../../types/types';
-import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo } from '../../store/editorSlice';
+import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../../store/toolSlice';
 import { cycleCopilotPosition, setSplitRatio } from '../../store/layoutSlice';
 import { loadProject } from '../../store/projectSlice';
@@ -154,9 +154,46 @@ export default function Workspace() {
 
   useEffect(() => {
     loadFromStorage().then(saved => {
-      if (saved) dispatch(loadProject(saved));
+      if (saved) {
+        dispatch(loadProject(saved));
+        // Auto-center 2D viewport on loaded pieces
+        if (saved.pieces?.length > 0) {
+          requestAnimationFrame(() => {
+            const editor = document.querySelector('.pattern-editor');
+            if (editor) {
+              const fit = computeFitView(
+                saved.pieces,
+                editor.clientWidth,
+                editor.clientHeight,
+              );
+              if (fit) {
+                dispatch(setZoom2D(fit.zoom));
+                dispatch(setPan2D(fit.pan));
+              }
+            }
+          });
+        }
+      }
     });
   }, [dispatch]);
+
+  // ─── Auto-fit 2D viewport when pieces first appear (template load) ───
+  const prevPieceCount = useRef(0);
+  useEffect(() => {
+    if (prevPieceCount.current === 0 && pieces.length > 0) {
+      requestAnimationFrame(() => {
+        const editor = document.querySelector('.pattern-editor');
+        if (editor) {
+          const fit = computeFitView(pieces, editor.clientWidth, editor.clientHeight);
+          if (fit) {
+            dispatch(setZoom2D(fit.zoom));
+            dispatch(setPan2D(fit.pan));
+          }
+        }
+      });
+    }
+    prevPieceCount.current = pieces.length;
+  }, [pieces, dispatch]);
 
   useEffect(() => {
     // Debounced async save + periodic backup
