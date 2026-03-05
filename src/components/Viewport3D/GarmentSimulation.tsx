@@ -26,6 +26,7 @@ import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin, setIsWarmStarting } from '../../store/simulationSlice';
 import { classifyEdit } from '../../utils/cloth/editClassifier';
 import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
+import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
@@ -591,11 +592,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
               await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
 
-              // Load SDF BEFORE starting simulation to prevent explosion
+              // Load collision data BEFORE starting simulation to prevent explosion
               // Particles inside body will be pushed out before physics kicks in
               if (avatarModelUrl && !cancelled) {
-                console.log('[GarmentSimulation] Loading Avatar SDF before simulation start...');
+                console.log('[GarmentSimulation] Loading avatar collision data...');
                 try {
+                  // Extract collision mesh (fast, ~1ms)
+                  const collisionMesh = await withTimeout(
+                    extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
+                    5000,
+                    'Collision mesh extraction'
+                  );
+                  if (collisionMesh && !cancelled) {
+                    console.log('[GarmentSimulation] ✅ Collision mesh extracted:', collisionMesh.triCount, 'triangles');
+                    wasmClient.setCollisionMesh(collisionMesh);
+                  }
+
+                  // Also load SDF for Wasm-side collision (Wasm solver still uses SDF internally)
                   const sdf = await withTimeout(
                     loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current),
                     8000,
@@ -604,15 +617,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
                   if (sdf && !cancelled) {
                     console.log('[GarmentSimulation] ✅ SDF loaded, applying initial collision pass');
                     wasmClient.setSDF(sdf);
-                    // Apply initial collision to push particles outside body before physics
                     wasmClient.applyInitialCollision?.();
                     dispatch(setBodyCollision(true));
                   } else if (!cancelled) {
-                    console.warn('[GarmentSimulation] ❌ SDF generation returned null');
-                    dispatch(setBodyCollision(false));
+                    // Collision mesh was set even if SDF failed
+                    dispatch(setBodyCollision(!!collisionMesh));
                   }
                 } catch (e) {
-                  console.warn('[GarmentSimulation] SDF load timed out, starting without body collision:', e);
+                  console.warn('[GarmentSimulation] Collision data load failed:', e);
                   dispatch(setBodyCollision(false));
                 }
               }
@@ -644,24 +656,24 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             client.setFabric(fabricId);
             client.requestEdgeData();
 
-            // Load SDF BEFORE starting simulation to prevent explosion
+            // Load collision mesh BEFORE starting simulation (CPU)
             if (avatarModelUrl && !cancelled) {
-              console.log('[GarmentSimulation] Loading Avatar SDF before simulation start (CPU)...');
+              console.log('[GarmentSimulation] Extracting collision mesh (CPU)...');
               try {
-                const sdf = await withTimeout(
-                  loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current),
-                  8000,
-                  'SDF generation'
+                const collisionMesh = await withTimeout(
+                  extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
+                  5000,
+                  'Collision mesh extraction'
                 );
-                if (sdf && !cancelled) {
-                  console.log('[GarmentSimulation] ✅ SDF loaded for CPU solver');
-                  client.setSDF(sdf);
+                if (collisionMesh && !cancelled) {
+                  console.log('[GarmentSimulation] ✅ Collision mesh extracted for CPU:', collisionMesh.triCount, 'triangles');
+                  client.setCollisionMesh(collisionMesh);
                   dispatch(setBodyCollision(true));
                 } else if (!cancelled) {
                   dispatch(setBodyCollision(false));
                 }
               } catch (e) {
-                console.warn('[GarmentSimulation] SDF load timed out (CPU), starting without body collision:', e);
+                console.warn('[GarmentSimulation] Collision mesh extraction failed (CPU):', e);
                 dispatch(setBodyCollision(false));
               }
             }
