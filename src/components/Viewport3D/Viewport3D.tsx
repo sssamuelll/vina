@@ -23,6 +23,7 @@ import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets } from './useCameraPresets';
+import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
@@ -403,6 +404,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           dispatch(setViewMode3D('arrange'));
           dispatch(clearArrangementSnapshot());
         }}
+        onZoomToFit={() => handleResetCamera()}
+        onCameraPreset={(preset) => cameraPresets.setCameraView(preset as ViewPreset)}
       />
     </div>
   );

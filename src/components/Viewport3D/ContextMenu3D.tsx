@@ -36,6 +36,8 @@ interface ContextMenu3DProps {
   onSnapshot?: () => void;
   onSelectPiece?: (pieceId: string) => void;
   onResetArrangement?: () => void;
+  onZoomToFit?: () => void;
+  onCameraPreset?: (preset: string) => void;
 }
 
 export default function ContextMenu3D({
@@ -46,6 +48,8 @@ export default function ContextMenu3D({
   onSnapshot,
   onSelectPiece,
   onResetArrangement,
+  onZoomToFit,
+  onCameraPreset,
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -105,18 +109,60 @@ export default function ContextMenu3D({
       action: () => act(() => {/* TODO: reset pose */}),
     });
   } else {
-    // Background
+    // Background — camera presets section
+    items.push({
+      label: 'Front',
+      icon: '📷',
+      shortcut: 'Num2',
+      action: () => act(() => onCameraPreset?.('front')),
+    });
+    items.push({
+      label: 'Back',
+      icon: '📷',
+      shortcut: 'Num8',
+      action: () => act(() => onCameraPreset?.('back')),
+    });
+    items.push({
+      label: 'Left',
+      icon: '📷',
+      shortcut: 'Num6',
+      action: () => act(() => onCameraPreset?.('left')),
+    });
+    items.push({
+      label: 'Right',
+      icon: '📷',
+      shortcut: 'Num4',
+      action: () => act(() => onCameraPreset?.('right')),
+    });
+    items.push({
+      label: 'Top',
+      icon: '📷',
+      shortcut: 'Num5',
+      action: () => act(() => onCameraPreset?.('top')),
+    });
+    items.push({
+      label: 'Bottom',
+      icon: '📷',
+      shortcut: 'Num0',
+      action: () => act(() => onCameraPreset?.('bottom')),
+      separator: true,
+    });
     items.push({
       label: 'Reset Camera',
       icon: '🎥',
       action: () => act(() => onResetCamera?.()),
     });
     items.push({
+      label: 'Zoom to Fit',
+      icon: '🔍',
+      action: () => act(() => onZoomToFit?.()),
+      separator: true,
+    });
+    items.push({
       label: 'Toggle Avatar',
       icon: '👤',
       shortcut: 'Shift+A',
       action: () => act(() => onToggleAvatar?.()),
-      separator: true,
     });
     items.push({
       label: 'Reset 3D Arrangement',
