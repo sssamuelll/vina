@@ -206,6 +206,38 @@ export class ClothWorkerClient {
   }
 
   /**
+   * Set all collision bodies at once (replaces any existing bodies).
+   */
+  setCollisionBodies(bodies: Array<{ id: string; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }; friction: number; margin: number }>): void {
+    const transferables: ArrayBuffer[] = [];
+    const payload = bodies.map(b => {
+      transferables.push(b.mesh.vertices.buffer, b.mesh.normals.buffer);
+      return { id: b.id, mesh: b.mesh, friction: b.friction, margin: b.margin };
+    });
+    this.worker?.postMessage(
+      { type: 'setCollisionBodies', bodies: payload } as WorkerInMessage,
+      transferables,
+    );
+  }
+
+  /**
+   * Update a single collision body's mesh and properties.
+   */
+  updateCollisionBody(body: { id: string; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }; friction: number; margin: number }): void {
+    this.worker?.postMessage(
+      { type: 'updateCollisionBody', id: body.id, mesh: body.mesh, friction: body.friction, margin: body.margin } as WorkerInMessage,
+      [body.mesh.vertices.buffer, body.mesh.normals.buffer],
+    );
+  }
+
+  /**
+   * Remove a collision body by ID.
+   */
+  removeCollisionBody(id: string): void {
+    this.postMessage({ type: 'removeCollisionBody', id });
+  }
+
+  /**
    * Pin a particle in place.
    *
    * @param index - Particle index

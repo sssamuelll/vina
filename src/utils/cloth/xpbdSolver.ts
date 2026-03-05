@@ -320,10 +320,14 @@ export class XPBDClothSolver {
   /** Capsule colliders for avatar approximation */
   private capsuleColliders: CapsuleCollider[] = [];
 
-  /** Triangle collision mesh data for body collision */
-  private collisionMesh: CollisionMeshData | null = null;
-  /** Spatial hash over collision mesh triangles */
-  private collisionHash: TriangleSpatialHash | null = null;
+  /** Collision bodies: each has its own mesh, spatial hash, friction, and margin */
+  private collisionBodies: Array<{
+    id: string;
+    mesh: CollisionMeshData;
+    hash: TriangleSpatialHash;
+    friction: number;
+    margin: number;
+  }> = [];
 
   /** Seam constraints for multi-piece sewing */
   private seamConstraints: SeamConstraintSet | null = null;
@@ -589,17 +593,54 @@ export class XPBDClothSolver {
   }
 
   /**
-   * Set triangle collision mesh for body collision.
-   * Builds spatial hash over avatar triangles.
+   * Set triangle collision mesh for body collision (backward-compatible).
+   * Wraps single mesh as '__avatar__' collision body.
    */
   setCollisionMesh(mesh: CollisionMeshData | null): void {
-    this.collisionMesh = mesh;
     if (mesh && mesh.triCount > 0) {
       const cellSize = Math.max(0.02, (this.config.clothThickness ?? 0.002) * 10);
-      this.collisionHash = new TriangleSpatialHash(mesh, cellSize);
+      this.collisionBodies = [{
+        id: '__avatar__',
+        mesh,
+        hash: new TriangleSpatialHash(mesh, cellSize),
+        friction: 0,
+        margin: this.config.clothThickness ?? 0.005,
+      }];
     } else {
-      this.collisionHash = null;
+      this.collisionBodies = [];
     }
+  }
+
+  /**
+   * Set multiple collision bodies. Each gets its own spatial hash.
+   */
+  setCollisionBodies(bodies: Array<{ id: string; mesh: CollisionMeshData; friction: number; margin: number }>): void {
+    const cellSize = Math.max(0.02, (this.config.clothThickness ?? 0.002) * 10);
+    this.collisionBodies = bodies.map(b => ({
+      ...b,
+      hash: new TriangleSpatialHash(b.mesh, cellSize),
+    }));
+  }
+
+  /**
+   * Update a single collision body by id. Rebuilds its spatial hash.
+   */
+  updateCollisionBody(id: string, mesh: CollisionMeshData, friction: number, margin: number): void {
+    const cellSize = Math.max(0.02, (this.config.clothThickness ?? 0.002) * 10);
+    const existing = this.collisionBodies.findIndex(b => b.id === id);
+    const entry = { id, mesh, hash: new TriangleSpatialHash(mesh, cellSize), friction, margin };
+    if (existing >= 0) {
+      this.collisionBodies[existing] = entry;
+    } else {
+      this.collisionBodies.push(entry);
+    }
+  }
+
+  /**
+   * Remove a collision body by id.
+   */
+  removeCollisionBody(id: string): void {
+    this.collisionBodies = this.collisionBodies.filter(b => b.id !== id);
   }
 
   /**
@@ -923,14 +964,16 @@ export class XPBDClothSolver {
     }
 
     // Triangle mesh collision (exact distance, supports animation)
-    if (this.collisionMesh && this.collisionHash) {
+    for (const body of this.collisionBodies) {
       solveTriangleCollision(
         this.pos,
         this.invMass,
         this.numParticles,
-        this.collisionMesh,
-        this.collisionHash,
-        this.config.clothThickness ?? 0.005,
+        body.mesh,
+        body.hash,
+        body.margin,
+        body.friction,
+        this.prevPos,
       );
     }
   }

@@ -59,8 +59,14 @@ let animFrameId: ReturnType<typeof setTimeout> | null = null;
 const snapshots = new Map<string, Float32Array>();
 const MAX_SNAPSHOTS = 5;
 
-let collisionMesh: CollisionMeshData | null = null;
-let collisionHash: TriangleSpatialHash | null = null;
+interface WorkerCollisionBody {
+  id: string;
+  mesh: CollisionMeshData;
+  hash: TriangleSpatialHash;
+  friction: number;
+  margin: number;
+}
+let collisionBodies: WorkerCollisionBody[] = [];
 
 const FRAME_BUDGET_MS = 14;
 
@@ -75,10 +81,12 @@ function simulationLoop(): void {
 
   if (wasmExports?.memory) {
     // Apply JS-side triangle collision post-step
-    if (collisionMesh && collisionHash) {
+    if (collisionBodies.length > 0) {
       const posView = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
       const invMass = new Float32Array(n).fill(1.0);
-      solveTriangleCollision(posView, invMass, n, collisionMesh, collisionHash, 0.005);
+      for (const body of collisionBodies) {
+        solveTriangleCollision(posView, invMass, n, body.mesh, body.hash, body.margin, body.friction);
+      }
     }
     const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
     (self as unknown as Worker).postMessage(
@@ -219,21 +227,50 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'setCollisionMesh':
         if (msg.mesh) {
-          collisionMesh = msg.mesh;
-          collisionHash = new TriangleSpatialHash(msg.mesh, 0.05);
-          console.log('[WasmWorker] Collision mesh set:', msg.mesh.triCount, 'triangles');
+          collisionBodies = collisionBodies.filter(b => b.id !== '__avatar__');
+          collisionBodies.push({
+            id: '__avatar__',
+            mesh: msg.mesh,
+            hash: new TriangleSpatialHash(msg.mesh, 0.05),
+            friction: 0,
+            margin: 0.005,
+          });
+          console.log('[WasmWorker] Collision mesh set (avatar):', msg.mesh.triCount, 'triangles');
         }
         break;
 
+      case 'setCollisionBodies':
+        collisionBodies = (msg.bodies as Array<{ id: string; mesh: CollisionMeshData; friction: number; margin: number }>).map(b => ({
+          ...b,
+          hash: new TriangleSpatialHash(b.mesh, 0.05),
+        }));
+        console.log('[WasmWorker] Collision bodies set:', collisionBodies.length, 'bodies');
+        break;
+
+      case 'updateCollisionBody': {
+        const { id, mesh, friction, margin } = msg as { id: string; mesh: CollisionMeshData; friction: number; margin: number };
+        const idx = collisionBodies.findIndex(b => b.id === id);
+        const entry: WorkerCollisionBody = { id, mesh, hash: new TriangleSpatialHash(mesh, 0.05), friction, margin };
+        if (idx >= 0) collisionBodies[idx] = entry;
+        else collisionBodies.push(entry);
+        break;
+      }
+
+      case 'removeCollisionBody':
+        collisionBodies = collisionBodies.filter(b => b.id !== msg.id);
+        break;
+
       case 'applyInitialTriangleCollision':
-        if (solver && collisionMesh && collisionHash && wasmExports?.memory) {
+        if (solver && collisionBodies.length > 0 && wasmExports?.memory) {
           console.log('[WasmWorker] Running initial triangle collision settling...');
           const n = numParticles;
           const ptr = solver.positions_ptr();
           const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
           const invMass = new Float32Array(n).fill(1.0);
           for (let i = 0; i < 5; i++) {
-            solveTriangleCollision(positions, invMass, n, collisionMesh, collisionHash, 0.005);
+            for (const body of collisionBodies) {
+              solveTriangleCollision(positions, invMass, n, body.mesh, body.hash, body.margin, body.friction);
+            }
           }
           const frame = positions.slice();
           (self as unknown as Worker).postMessage(

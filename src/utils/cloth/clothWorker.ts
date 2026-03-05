@@ -40,6 +40,9 @@ export type WorkerInMessage =
   | { type: 'setSphereColliders'; colliders: SphereCollider[] }
   | { type: 'setCapsuleColliders'; colliders: CapsuleCollider[] }
   | { type: 'setCollisionMesh'; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number } }
+  | { type: 'setCollisionBodies'; bodies: Array<{ id: string; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }; friction: number; margin: number }> }
+  | { type: 'updateCollisionBody'; id: string; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }; friction: number; margin: number }
+  | { type: 'removeCollisionBody'; id: string }
   | { type: 'pinParticle'; index: number }
   | { type: 'unpinParticle'; index: number }
   | { type: 'getEdgeData' }
@@ -294,6 +297,27 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       case 'setCollisionMesh': {
         if (solver) {
           solver.setCollisionMesh(msg.mesh);
+        }
+        break;
+      }
+
+      case 'setCollisionBodies': {
+        if (solver) {
+          solver.setCollisionBodies(msg.bodies);
+        }
+        break;
+      }
+
+      case 'updateCollisionBody': {
+        if (solver) {
+          solver.updateCollisionBody(msg.id, msg.mesh, msg.friction, msg.margin);
+        }
+        break;
+      }
+
+      case 'removeCollisionBody': {
+        if (solver) {
+          solver.removeCollisionBody(msg.id);
         }
         break;
       }

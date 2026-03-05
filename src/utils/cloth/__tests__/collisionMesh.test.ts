@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractCollisionMesh } from '../collisionMesh';
+import { extractCollisionMesh, collisionMeshFromBuffers } from '../collisionMesh';
 
 type GeometryInput = Parameters<typeof extractCollisionMesh>[0];
 
@@ -79,5 +79,22 @@ describe('extractCollisionMesh', () => {
     const result = extractCollisionMesh(geo);
     expect(result.triCount).toBe(1);
     expect(result.vertices.length).toBe(9);
+  });
+});
+
+describe('collisionMeshFromBuffers', () => {
+  it('converts indexed vertex/index buffers to CollisionMeshData', () => {
+    // One triangle: (0,0,0), (1,0,0), (0,1,0)
+    const vertices = new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]);
+    const indices = new Uint32Array([0, 1, 2]);
+    const result = collisionMeshFromBuffers(vertices, indices);
+    expect(result).not.toBeNull();
+    expect(result!.triCount).toBe(1);
+    expect(result!.vertices.length).toBe(9);
+    expect(result!.normals.length).toBe(3);
+  });
+
+  it('returns null for empty buffers', () => {
+    expect(collisionMeshFromBuffers(new Float32Array(0), new Uint32Array(0))).toBeNull();
   });
 });

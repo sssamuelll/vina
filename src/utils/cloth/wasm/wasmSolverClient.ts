@@ -9,6 +9,7 @@
  */
 
 import type { SeamInitData } from '../clothWorker';
+import type { CollisionMeshData } from '../collisionMesh';
 
 export interface PieceMeshData {
   pieceId: string;
@@ -105,6 +106,35 @@ export class WasmSolverClient {
       { type: 'setCollisionMesh', mesh },
       [mesh.vertices.buffer, mesh.normals.buffer],
     );
+  }
+
+  /**
+   * Set multiple collision bodies at once, replacing all existing bodies.
+   */
+  setCollisionBodies(bodies: Array<{ id: string; mesh: CollisionMeshData; friction: number; margin: number }>): void {
+    const transferables: ArrayBuffer[] = [];
+    const payload = bodies.map(b => {
+      transferables.push(b.mesh.vertices.buffer, b.mesh.normals.buffer);
+      return { id: b.id, mesh: b.mesh, friction: b.friction, margin: b.margin };
+    });
+    this.worker?.postMessage({ type: 'setCollisionBodies', bodies: payload }, transferables);
+  }
+
+  /**
+   * Add or update a single collision body by id.
+   */
+  updateCollisionBody(body: { id: string; mesh: CollisionMeshData; friction: number; margin: number }): void {
+    this.worker?.postMessage(
+      { type: 'updateCollisionBody', id: body.id, mesh: body.mesh, friction: body.friction, margin: body.margin },
+      [body.mesh.vertices.buffer, body.mesh.normals.buffer],
+    );
+  }
+
+  /**
+   * Remove a collision body by id.
+   */
+  removeCollisionBody(id: string): void {
+    this.worker?.postMessage({ type: 'removeCollisionBody', id });
   }
 
   /**

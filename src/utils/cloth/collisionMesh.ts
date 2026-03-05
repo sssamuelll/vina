@@ -56,3 +56,18 @@ export function extractCollisionMesh(
 
   return { vertices, normals, triCount };
 }
+
+/**
+ * Convert raw vertex + index buffers to CollisionMeshData.
+ * Bridges avatarMeshExtractor output to collision format.
+ */
+export function collisionMeshFromBuffers(
+  vertices: Float32Array,
+  indices: Uint32Array,
+): CollisionMeshData | null {
+  if (vertices.length === 0 || indices.length === 0) return null;
+  return extractCollisionMesh({
+    attributes: { position: { array: vertices, count: vertices.length / 3 } },
+    index: { array: indices, count: indices.length },
+  });
+}
