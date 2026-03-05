@@ -6,6 +6,11 @@
  */
 
 import { Point2D, PathCommand, PatternPiece } from '../../types/types';
+import { distToSegmentWithT } from '../../utils/geometry/distance';
+import { evalCubic, evalQuadratic, distToBezier, lerp2D } from '../../utils/geometry/bezier';
+
+// Re-export for backward compatibility — other files may import from here
+export { distToSegmentWithT } from '../../utils/geometry/distance';
 
 // ─── Types ───
 
@@ -51,35 +56,6 @@ export function getAnchor(cmd: PathCommand): Point2D | null {
     default:
       return null;
   }
-}
-
-/**
- * Compute the distance from point (px, py) to the line segment (x1,y1)-(x2,y2),
- * returning the distance, the t parameter (0-1), and the closest point on the segment.
- */
-export function distToSegmentWithT(
-  px: number, py: number,
-  x1: number, y1: number,
-  x2: number, y2: number,
-): { distance: number; t: number; point: Point2D } {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const lenSq = dx * dx + dy * dy;
-
-  let t: number;
-  if (lenSq === 0) {
-    // Degenerate segment (zero length)
-    t = 0;
-  } else {
-    t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
-    t = Math.max(0, Math.min(1, t));
-  }
-
-  const projX = x1 + t * dx;
-  const projY = y1 + t * dy;
-  const distance = Math.hypot(px - projX, py - projY);
-
-  return { distance, t, point: { x: projX, y: projY } };
 }
 
 // ─── Public Functions ───
@@ -214,58 +190,6 @@ export function hitTestNode(
   }
 
   return closest;
-}
-
-/** Evaluate a cubic bezier at parameter t */
-function evalCubic(p0: Point2D, p1: Point2D, p2: Point2D, p3: Point2D, t: number): Point2D {
-  const mt = 1 - t;
-  const mt2 = mt * mt;
-  const t2 = t * t;
-  return {
-    x: mt2 * mt * p0.x + 3 * mt2 * t * p1.x + 3 * mt * t2 * p2.x + t2 * t * p3.x,
-    y: mt2 * mt * p0.y + 3 * mt2 * t * p1.y + 3 * mt * t2 * p2.y + t2 * t * p3.y,
-  };
-}
-
-/** Evaluate a quadratic bezier at parameter t */
-function evalQuadratic(p0: Point2D, p1: Point2D, p2: Point2D, t: number): Point2D {
-  const mt = 1 - t;
-  return {
-    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
-    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y,
-  };
-}
-
-/**
- * Compute distance from point to a bezier curve by sampling N points
- * and testing against the resulting polyline segments.
- */
-function distToBezier(
-  px: number, py: number,
-  evalFn: (t: number) => Point2D,
-  samples: number,
-): { distance: number; t: number; point: Point2D } {
-  let bestDist = Infinity;
-  let bestT = 0;
-  let bestPoint: Point2D = { x: 0, y: 0 };
-
-  let prev = evalFn(0);
-  for (let i = 1; i <= samples; i++) {
-    const tCurr = i / samples;
-    const curr = evalFn(tCurr);
-    const seg = distToSegmentWithT(px, py, prev.x, prev.y, curr.x, curr.y);
-
-    if (seg.distance < bestDist) {
-      bestDist = seg.distance;
-      const tPrev = (i - 1) / samples;
-      bestT = tPrev + seg.t * (tCurr - tPrev);
-      bestPoint = seg.point;
-    }
-
-    prev = curr;
-  }
-
-  return { distance: bestDist, t: bestT, point: bestPoint };
 }
 
 /**
@@ -553,11 +477,3 @@ export function convertToLine(
   return cmds;
 }
 
-// ─── Internal Geometry Helper ───
-
-function lerp2D(a: Point2D, b: Point2D, t: number): Point2D {
-  return {
-    x: a.x + t * (b.x - a.x),
-    y: a.y + t * (b.y - a.y),
-  };
-}
