@@ -13,6 +13,7 @@ import constructionReducer from './constructionSlice';
 import blueprintReducer, { loadBlueprints } from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
 import cameraReducer from './cameraSlice';
+import collisionBodyReducer from './collisionBodySlice';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { createReactiveSolverMiddleware } from './reactiveSolverMiddleware';
@@ -34,11 +35,12 @@ export const store = configureStore({
     blueprints: blueprintReducer,
     copilotUI: copilotUIReducer,
     camera: cameraReducer,
+    collisionBody: collisionBodyReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredPaths: ['project.pieces', 'project.avatar'],
+        ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies'],
         ignoredActions: ['project/loadProject', 'project/restoreState'],
       },
     }).concat(undoMiddleware, linkedEditingMiddleware, createReactiveSolverMiddleware()),

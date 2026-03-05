@@ -203,6 +203,10 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pendingPreset: null,
       pendingFocusPieceId: null,
     },
+    collisionBody: {
+      bodies: [],
+      selectedBodyId: null,
+    },
   };
 
   if (overrides) {
