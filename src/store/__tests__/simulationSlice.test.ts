@@ -10,6 +10,10 @@ import reducer, {
   setDefaultFabric,
   setParticleDistance,
   setPieceParticleDistance,
+  addSnapshot,
+  removeSnapshot,
+  setActiveSnapshot,
+  clearSnapshots,
 } from '../simulationSlice';
 
 const initial = () => reducer(undefined, { type: '@@INIT' });
@@ -91,6 +95,66 @@ describe('simulationSlice', () => {
 
     it('empty pieceParticleDistance by default', () => {
       expect(initial().pieceParticleDistance).toEqual({});
+    });
+  });
+
+  describe('snapshots', () => {
+    it('starts with empty snapshots', () => {
+      expect(initial().snapshots).toEqual([]);
+      expect(initial().activeSnapshotId).toBeNull();
+    });
+
+    it('addSnapshot adds metadata', () => {
+      const s = reducer(initial(), addSnapshot({
+        id: 'snap1', name: 'Version A', particleCount: 100, isAutoSave: false,
+      }));
+      expect(s.snapshots).toHaveLength(1);
+      expect(s.snapshots[0].name).toBe('Version A');
+      expect(s.snapshots[0].id).toBe('snap1');
+    });
+
+    it('addSnapshot limits to 4 entries', () => {
+      let s = initial();
+      for (let i = 0; i < 5; i++) {
+        s = reducer(s, addSnapshot({
+          id: `snap${i}`, name: `V${i}`, particleCount: 100, isAutoSave: false,
+        }));
+      }
+      expect(s.snapshots).toHaveLength(4);
+      // Oldest removed
+      expect(s.snapshots[0].id).toBe('snap1');
+    });
+
+    it('removeSnapshot removes by id', () => {
+      let s = reducer(initial(), addSnapshot({
+        id: 'snap1', name: 'A', particleCount: 100, isAutoSave: false,
+      }));
+      s = reducer(s, removeSnapshot('snap1'));
+      expect(s.snapshots).toHaveLength(0);
+    });
+
+    it('removeSnapshot clears activeSnapshotId if it matches', () => {
+      let s = reducer(initial(), addSnapshot({
+        id: 'snap1', name: 'A', particleCount: 100, isAutoSave: false,
+      }));
+      s = reducer(s, setActiveSnapshot('snap1'));
+      s = reducer(s, removeSnapshot('snap1'));
+      expect(s.activeSnapshotId).toBeNull();
+    });
+
+    it('setActiveSnapshot sets id', () => {
+      const s = reducer(initial(), setActiveSnapshot('snap1'));
+      expect(s.activeSnapshotId).toBe('snap1');
+    });
+
+    it('clearSnapshots resets all', () => {
+      let s = reducer(initial(), addSnapshot({
+        id: 'snap1', name: 'A', particleCount: 100, isAutoSave: false,
+      }));
+      s = reducer(s, setActiveSnapshot('snap1'));
+      s = reducer(s, clearSnapshots());
+      expect(s.snapshots).toEqual([]);
+      expect(s.activeSnapshotId).toBeNull();
     });
   });
 });

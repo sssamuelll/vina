@@ -234,6 +234,43 @@ export class ClothWorkerClient {
     this.postMessage({ type: 'getEdgeData' });
   }
 
+  /** Callback for snapshot saved confirmation. */
+  onSnapshotSaved: ((id: string, particleCount: number) => void) | null = null;
+
+  /** Callback for snapshot restored confirmation. */
+  onSnapshotRestored: ((id: string) => void) | null = null;
+
+  /** Callback for snapshot deleted confirmation. */
+  onSnapshotDeleted: ((id: string) => void) | null = null;
+
+  /**
+   * Save current particle positions as a named snapshot in the worker.
+   */
+  saveSnapshot(id: string): void {
+    this.postMessage({ type: 'saveSnapshot', id });
+  }
+
+  /**
+   * Restore particle positions from a previously saved snapshot.
+   */
+  restoreSnapshot(id: string): void {
+    this.postMessage({ type: 'restoreSnapshot', id });
+  }
+
+  /**
+   * Delete a snapshot from worker memory.
+   */
+  deleteSnapshot(id: string): void {
+    this.postMessage({ type: 'deleteSnapshot', id });
+  }
+
+  /**
+   * Apply positions for warm-start (after pattern edit, keeps draped state).
+   */
+  warmStart(positions: Float32Array): void {
+    this.postMessage({ type: 'warmStart', positions });
+  }
+
   /**
    * Terminate the worker and release resources.
    */
@@ -275,6 +312,18 @@ export class ClothWorkerClient {
 
       case 'edgeData':
         this.onEdgeData?.(msg.stretchingIds, msg.stretchingLengths);
+        break;
+
+      case 'snapshotSaved':
+        this.onSnapshotSaved?.(msg.id, msg.particleCount);
+        break;
+
+      case 'snapshotRestored':
+        this.onSnapshotRestored?.(msg.id);
+        break;
+
+      case 'snapshotDeleted':
+        this.onSnapshotDeleted?.(msg.id);
         break;
     }
   }

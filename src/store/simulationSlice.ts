@@ -45,6 +45,15 @@ export interface PinData {
   strength: PinStrength;
 }
 
+/** Metadata for a simulation state snapshot. Heavy data stays in worker. */
+export interface SimSnapshotMeta {
+  id: string;
+  name: string;
+  timestamp: number;
+  particleCount: number;
+  isAutoSave: boolean;
+}
+
 interface SimulationSliceState {
   /** Current simulation state */
   simulationState: SimulationState;
@@ -88,6 +97,10 @@ interface SimulationSliceState {
   showInternalLines3D: boolean;
   /** 3D surface rendering mode */
   surfaceMode3D: SurfaceMode3D;
+  /** Simulation state snapshots (max 4: 1 auto + 3 manual) */
+  snapshots: SimSnapshotMeta[];
+  /** Currently active snapshot ID */
+  activeSnapshotId: string | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -117,6 +130,8 @@ const initialState: SimulationSliceState = {
   showSeamlines3D: true,
   showInternalLines3D: true,
   surfaceMode3D: 'textured' as SurfaceMode3D,
+  snapshots: [],
+  activeSnapshotId: null,
 };
 
 const simulationSlice = createSlice({
@@ -272,6 +287,32 @@ const simulationSlice = createSlice({
     setSurfaceMode3D(state, action: PayloadAction<SurfaceMode3D>) {
       state.surfaceMode3D = action.payload;
     },
+
+    // ─── Snapshot Metadata ──────────────────────────────────────────────────
+
+    addSnapshot(state, action: PayloadAction<{
+      id: string; name: string; particleCount: number; isAutoSave: boolean;
+    }>) {
+      const { id, name, particleCount, isAutoSave } = action.payload;
+      state.snapshots.push({ id, name, timestamp: Date.now(), particleCount, isAutoSave });
+      // Max 4 entries (1 auto + 3 manual)
+      while (state.snapshots.length > 4) {
+        state.snapshots.shift();
+      }
+    },
+    removeSnapshot(state, action: PayloadAction<string>) {
+      state.snapshots = state.snapshots.filter(s => s.id !== action.payload);
+      if (state.activeSnapshotId === action.payload) {
+        state.activeSnapshotId = null;
+      }
+    },
+    setActiveSnapshot(state, action: PayloadAction<string | null>) {
+      state.activeSnapshotId = action.payload;
+    },
+    clearSnapshots(state) {
+      state.snapshots = [];
+      state.activeSnapshotId = null;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -309,6 +350,11 @@ export const {
   toggleSeamlines3D,
   toggleInternalLines3D,
   setSurfaceMode3D,
+  // Snapshots
+  addSnapshot,
+  removeSnapshot,
+  setActiveSnapshot,
+  clearSnapshots,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;
