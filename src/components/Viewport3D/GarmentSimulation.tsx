@@ -23,7 +23,9 @@ import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetec
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin } from '../../store/simulationSlice';
+import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin, setIsWarmStarting } from '../../store/simulationSlice';
+import { classifyEdit } from '../../utils/cloth/editClassifier';
+import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
@@ -249,7 +251,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const [, setMeshingStatus] = useState<string | null>(null);
   const initClientRef = useRef<SimulationInitClient | null>(null);
 
+  // Track previous pieces for edit classification
+  const prevPiecesRef = useRef<PatternPiece[]>([]);
+  // Track warm-start debounce timer
+  const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Track current stretching IDs for rest length computation
+  const stretchingIdsRef = useRef<Int32Array | null>(null);
+
   useEffect(() => {
+    // Skip re-meshing for dimension-only edits when solver is active
+    // The warm-start effect handles those
+    if (prevPiecesRef.current.length > 0 && (simulationState === 'running' || simulationState === 'paused')) {
+      const editType = classifyEdit(prevPiecesRef.current, pieces);
+      if (editType === 'dimension') {
+        return; // Warm-start effect handles this
+      }
+    }
+
     let cancelled = false;
     const client = new SimulationInitClient();
     initClientRef.current = client;
@@ -286,7 +304,80 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       client.dispose();
       initClientRef.current = null;
     };
-  }, [pieces, globalParticleDistance, pieceParticleDistances, dispatch]);
+  }, [pieces, globalParticleDistance, pieceParticleDistances, simulationState, dispatch]);
+
+  // Warm-start on dimension-only edits (skip full re-mesh, update constraints in-place)
+  useEffect(() => {
+    const prevPieces = prevPiecesRef.current;
+    prevPiecesRef.current = pieces;
+
+    // Skip on first render or when no solver is active
+    if (prevPieces.length === 0) return;
+    if (simulationState !== 'running' && simulationState !== 'paused') return;
+
+    const editType = classifyEdit(prevPieces, pieces);
+    if (editType !== 'dimension') return;
+
+    // Dimension edit detected — warm-start path
+    if (warmStartTimerRef.current) {
+      clearTimeout(warmStartTimerRef.current);
+    }
+
+    dispatch(setIsWarmStarting(true));
+
+    // Debounce 500ms before re-computing constraints
+    warmStartTimerRef.current = setTimeout(() => {
+      const client = new SimulationInitClient();
+      client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance)
+        .then(meshed => {
+          client.dispose();
+
+          const stretchIds = stretchingIdsRef.current;
+          if (!stretchIds || meshed.length === 0) return;
+
+          // Merge all piece vertices (same order as solver)
+          const totalVerts = meshed.reduce((sum, p) => sum + p.vertices.length, 0);
+          const mergedVerts = new Float32Array(totalVerts);
+          let offset = 0;
+          for (const p of meshed) {
+            mergedVerts.set(p.vertices, offset);
+            offset += p.vertices.length;
+          }
+
+          const newRestLengths = computeRestLengths(mergedVerts, stretchIds);
+
+          // Send to active solver
+          if (clientRef.current) {
+            clientRef.current.updateConstraints(newRestLengths);
+          } else if (wasmClientRef.current) {
+            wasmClientRef.current.updateConstraints(newRestLengths);
+          }
+
+          // Update pieceMeshes so static rendering matches
+          setPieceMeshes(meshed.map(m => {
+            const piece = pieces.find(p => p.id === m.pieceId);
+            return {
+              ...m,
+              outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
+            };
+          }));
+
+          dispatch(setIsWarmStarting(false));
+        })
+        .catch(err => {
+          client.dispose();
+          console.warn('[GarmentSimulation] Warm-start re-mesh failed:', err);
+          dispatch(setIsWarmStarting(false));
+        });
+    }, 500);
+
+    return () => {
+      if (warmStartTimerRef.current) {
+        clearTimeout(warmStartTimerRef.current);
+        warmStartTimerRef.current = null;
+      }
+    };
+  }, [pieces, simulationState, pieceParticleDistances, globalParticleDistance, dispatch]);
 
   // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
@@ -535,6 +626,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             client.onFrame = onFrame;
             client.onEdgeData = (ids, lengths) => {
               edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+              stretchingIdsRef.current = ids;
             };
 
             await withTimeout(client.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU worker init');
