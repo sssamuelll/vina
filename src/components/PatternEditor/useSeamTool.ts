@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
-import { PatternPiece, PathCommand, Point2D, Seam } from '../../types/types';
+import { PatternPiece, Point2D, Seam } from '../../types/types';
+import { distToSegment } from '../../utils/geometry/distance';
+import { getEdgeEndpoints } from '../../utils/geometry/path';
 
 /**
  * Edge = a segment of a piece's outline (between two consecutive path commands).
@@ -20,65 +22,6 @@ interface SeamToolState {
 }
 
 const EDGE_HIT_THRESHOLD = 15; // px in screen space
-
-/** Get the start and end points of a path command given previous position */
-function getEdgeEndpoints(
-  commands: PathCommand[],
-  edgeIndex: number,
-): { start: Point2D; end: Point2D } | null {
-  if (edgeIndex < 1 || edgeIndex >= commands.length) return null;
-
-  // Find the "current point" before this command by tracing from start
-  let cx = 0, cy = 0;
-  for (let i = 0; i < edgeIndex; i++) {
-    const cmd = commands[i];
-    const v = cmd.values;
-    switch (cmd.type) {
-      case 'M': case 'L': cx = v[0]; cy = v[1]; break;
-      case 'H': cx = v[0]; break;
-      case 'V': cy = v[0]; break;
-      case 'C': cx = v[4]; cy = v[5]; break;
-      case 'Q': cx = v[2]; cy = v[3]; break;
-      case 'Z': {
-        // Z returns to the M point
-        const m = commands[0];
-        if (m.type === 'M') { cx = m.values[0]; cy = m.values[1]; }
-        break;
-      }
-    }
-  }
-  const start = { x: cx, y: cy };
-
-  const cmd = commands[edgeIndex];
-  const v = cmd.values;
-  let end: Point2D;
-  switch (cmd.type) {
-    case 'L': end = { x: v[0], y: v[1] }; break;
-    case 'H': end = { x: v[0], y: cy }; break;
-    case 'V': end = { x: cx, y: v[0] }; break;
-    case 'C': end = { x: v[4], y: v[5] }; break;
-    case 'Q': end = { x: v[2], y: v[3] }; break;
-    case 'Z': {
-      const m = commands[0];
-      end = m.type === 'M' ? { x: m.values[0], y: m.values[1] } : start;
-      break;
-    }
-    default: return null;
-  }
-
-  return { start, end };
-}
-
-/** Distance from point to line segment */
-function distToSegment(p: Point2D, a: Point2D, b: Point2D): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lenSq = dx * dx + dy * dy;
-  if (lenSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
-  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
-  t = Math.max(0, Math.min(1, t));
-  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
-}
 
 /** Find the closest edge to a point across all pieces */
 function findClosestEdge(
@@ -211,12 +154,4 @@ export function useSeamTool(
   };
 }
 
-/** Get edge endpoints for rendering seam connections */
-/** Compute the length of an edge (straight-line distance between endpoints). */
-function getEdgeLength(commands: PathCommand[], edgeIndex: number): number {
-  const ep = getEdgeEndpoints(commands, edgeIndex);
-  if (!ep) return 0;
-  return Math.sqrt((ep.end.x - ep.start.x) ** 2 + (ep.end.y - ep.start.y) ** 2);
-}
-
-export { getEdgeEndpoints, getEdgeLength };
+export { getEdgeEndpoints, getEdgeLength } from '../../utils/geometry/path';
