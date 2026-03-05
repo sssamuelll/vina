@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../../store';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
 import { selectPiece, selectSeam } from '../../store/editorSlice';
+import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -31,11 +31,12 @@ import './PatternEditor.css';
 
 export default function PatternEditor() {
   const dispatch = useDispatch();
-  const { pieces, seams } = useSelector((s: RootState) => s.project);
-  const editor = useSelector((s: RootState) => s.editor);
+  const pieces = useSelector(selectPieces);
+  const seams = useSelector(selectSeams);
+  const editor = useSelector(selectEditor);
   const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, renderMode2D, gridSize, units } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
-  const toolOptions = useSelector((s: RootState) => s.tools.toolOptions);
+  const toolOptions = useSelector(selectToolOptions);
   
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
@@ -200,7 +201,7 @@ export default function PatternEditor() {
       >
         <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} />
 
-        <g transform={`translate(${pan2D.x}, ${pan2D.y}) scale(${zoom2D})`}>
+        <g data-pan-zoom-group transform={`translate(${pan2D.x}, ${pan2D.y}) scale(${zoom2D})`}>
           <PieceRenderer
             pieces={pieces}
             selectedPieceIds={selectedPieceIds}

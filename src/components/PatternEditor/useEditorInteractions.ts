@@ -4,6 +4,29 @@ import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
+
+/** Compute bounding box center (duplicated from PieceRenderer for drag transform). */
+function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const cmd of outline) {
+    const v = cmd.values;
+    if (cmd.type === 'M' || cmd.type === 'L') {
+      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+      if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
+    } else if (cmd.type === 'C') {
+      for (let i = 0; i < 6; i += 2) {
+        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
+        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
+      }
+    } else if (cmd.type === 'Q') {
+      for (let i = 0; i < 4; i += 2) {
+        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
+        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
+      }
+    }
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
 import { extractNodes, NodeRef } from './nodeEditorUtils';
 
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
@@ -142,8 +165,8 @@ export function useEditorInteractions(
   const dispatch = useDispatch();
   const selectedInternalLine = useSelector((s: RootState) => s.editor.selectedInternalLine);
   const svgRef = useRef<SVGSVGElement>(null);
-  const dragRef = useRef<{ pieceId: string; startMouse: Point2D; startPos: Point2D } | null>(null);
-  const panRef = useRef<{ startMouse: Point2D; startPan: Point2D } | null>(null);
+  const dragRef = useRef<{ pieceId: string; startMouse: Point2D; startPos: Point2D; lastPos?: Point2D } | null>(null);
+  const panRef = useRef<{ startMouse: Point2D; startPan: Point2D; lastPos?: Point2D } | null>(null);
   const internalLineDragRef = useRef<{
     pieceId: string; lineId: string; endpointIndex: 0 | 1;
     startMouse: Point2D; startPos: Point2D;
@@ -399,7 +422,14 @@ export function useEditorInteractions(
     if (panRef.current) {
       const dx = e.clientX - panRef.current.startMouse.x;
       const dy = e.clientY - panRef.current.startMouse.y;
-      dispatch(setPan2D({ x: panRef.current.startPan.x + dx, y: panRef.current.startPan.y + dy }));
+      // Update SVG transform directly during drag (no Redux dispatch)
+      const newX = panRef.current.startPan.x + dx;
+      const newY = panRef.current.startPan.y + dy;
+      const mainG = svgRef.current?.querySelector<SVGGElement>('[data-pan-zoom-group]');
+      if (mainG) {
+        mainG.setAttribute('transform', `translate(${newX}, ${newY}) scale(${zoom2D})`);
+      }
+      panRef.current.lastPos = { x: newX, y: newY };
       return;
     }
     if (editPattern.isEditing && activeTool === 'editPattern') {
@@ -447,7 +477,18 @@ export function useEditorInteractions(
     if (dragRef.current && activeTool === 'select') {
       const dx = (e.clientX - dragRef.current.startMouse.x) / zoom2D;
       const dy = (e.clientY - dragRef.current.startMouse.y) / zoom2D;
-      dispatch(movePiece({ id: dragRef.current.pieceId, x: dragRef.current.startPos.x + dx, y: dragRef.current.startPos.y + dy }));
+      const newX = dragRef.current.startPos.x + dx;
+      const newY = dragRef.current.startPos.y + dy;
+      // Update SVG transform directly during drag (no Redux dispatch)
+      const pieceG = svgRef.current?.querySelector<SVGGElement>(`[data-piece-id="${dragRef.current.pieceId}"]`);
+      if (pieceG) {
+        const piece = pieces.find(p => p.id === dragRef.current!.pieceId);
+        if (piece) {
+          const { cx, cy } = piece.outline?.length ? getOutlineCenterForDrag(piece.outline) : { cx: 0, cy: 0 };
+          pieceG.setAttribute('transform', `translate(${newX}, ${newY}) rotate(${piece.rotation}, ${cx}, ${cy})`);
+        }
+      }
+      dragRef.current.lastPos = { x: newX, y: newY };
       return;
     }
     if (nodeEditor.isEditing && activeTool === 'select') {
@@ -472,6 +513,14 @@ export function useEditorInteractions(
   }, [activeTool, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, transformTool, editPattern, nodeEditor, pieces, dispatch]);
 
   const handleMouseUp = useCallback(() => {
+    // Commit pan position to Redux on mouseUp
+    if (panRef.current?.lastPos) {
+      dispatch(setPan2D(panRef.current.lastPos));
+    }
+    // Commit piece position to Redux on mouseUp
+    if (dragRef.current?.lastPos) {
+      dispatch(movePiece({ id: dragRef.current.pieceId, x: dragRef.current.lastPos.x, y: dragRef.current.lastPos.y }));
+    }
     panRef.current = null;
     dragRef.current = null;
     internalLineDragRef.current = null;
@@ -483,7 +532,7 @@ export function useEditorInteractions(
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
     if (activeTool === 'merge') mergeTool.handleMouseUp();
-  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, mergeTool]);
+  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, mergeTool, dispatch]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
