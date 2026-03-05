@@ -8,7 +8,6 @@
  * @module wasmSolverClient
  */
 
-import type { SDFData } from '../sdfGenerator';
 import type { SeamInitData } from '../clothWorker';
 
 export interface PieceMeshData {
@@ -98,11 +97,6 @@ export class WasmSolverClient {
     });
   }
 
-  /** @deprecated Use setCollisionMesh() instead. Retained for Wasm solver compatibility. */
-  setSDF(sdf: SDFData): void {
-    this.worker?.postMessage({ type: 'setSDF', sdf });
-  }
-
   /**
    * Set triangle collision mesh for body collision (replaces SDF).
    */
@@ -114,11 +108,11 @@ export class WasmSolverClient {
   }
 
   /**
-   * Apply initial collision pass to push all particles outside the body.
-   * Call this AFTER setSDF() and BEFORE start() to prevent explosion.
+   * Apply initial triangle collision pass to settle particles outside body.
+   * Call AFTER setCollisionMesh() and BEFORE start().
    */
-  applyInitialCollision(): void {
-    this.worker?.postMessage({ type: 'applyInitialCollision' });
+  applyInitialTriangleCollision(): void {
+    this.worker?.postMessage({ type: 'applyInitialTriangleCollision' });
   }
 
   /**

@@ -14,11 +14,8 @@ import { createClothBuffers, destroyClothBuffers, updateSimParams, readbackPosit
 import clothShaderSrc from './shaders/cloth.wgsl?raw';
 import constraintsShaderSrc from './shaders/constraints.wgsl?raw';
 import normalsShaderSrc from './shaders/normals.wgsl?raw';
-import collisionShaderSrc from './shaders/collision.wgsl?raw';
 import selfCollisionShaderSrc from './shaders/selfCollision.wgsl?raw';
 import { buildAdjacency } from '../selfCollision';
-
-import type { SDFData } from '../sdfGenerator';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -63,25 +60,17 @@ export class GpuClothSolver {
   private postSolvePipeline: GPUComputePipeline | null = null;
   private normalAccumPipeline: GPUComputePipeline | null = null;
   private normalNormPipeline: GPUComputePipeline | null = null;
-  private collisionPipeline: GPUComputePipeline | null = null;
-
   // Bind groups
   private coreBindGroup: GPUBindGroup | null = null;
   private stretchBindGroup: GPUBindGroup | null = null;
   private seamBindGroup: GPUBindGroup | null = null;
   private normalBindGroup: GPUBindGroup | null = null;
-  private collisionBindGroup: GPUBindGroup | null = null;
 
   // Additional buffers for normals
   private triIdsBuffer: GPUBuffer | null = null;
   private normalsAtomicBuffer: GPUBuffer | null = null;
   private normalParamsBuffer: GPUBuffer | null = null;
   private numTriangles: number = 0;
-
-  // SDF collision
-  private sdfBuffer: GPUBuffer | null = null;
-  private collisionParamsBuffer: GPUBuffer | null = null;
-  private hasSDF: boolean = false;
 
   // Self-collision spatial hash
   private scHashCountPipeline: GPUComputePipeline | null = null;
@@ -214,15 +203,6 @@ export class GpuClothSolver {
         sm.end();
       }
 
-      // SDF body collision
-      if (this.hasSDF && this.collisionPipeline && this.collisionBindGroup) {
-        const col = encoder.beginComputePass({ label: 'collision' });
-        col.setPipeline(this.collisionPipeline);
-        col.setBindGroup(0, this.collisionBindGroup);
-        col.dispatchWorkgroups(particleWG);
-        col.end();
-      }
-
       // Self-collision (4 passes: hash, prefix sum, scatter, resolve)
       if (this.config.selfCollision && this.scHashCountPipeline && this.scBindGroup && this.scAdjBindGroup) {
         // Clear cellCount buffer
@@ -310,88 +290,6 @@ export class GpuClothSolver {
   }
 
   /**
-   * Upload SDF volume for body collision.
-   * SDF is generated CPU-side from avatar mesh, uploaded once (or per pose change).
-   */
-  setSDF(sdf: SDFData): void {
-    if (!this.buffers) return;
-
-    // Destroy old SDF buffers
-    this.sdfBuffer?.destroy();
-    this.collisionParamsBuffer?.destroy();
-
-    // Upload SDF volume
-    this.sdfBuffer = this.device.createBuffer({
-      label: 'sdfVolume',
-      size: sdf.distances.byteLength,
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Float32Array(this.sdfBuffer.getMappedRange()).set(sdf.distances);
-    this.sdfBuffer.unmap();
-
-    // Collision params uniform (must match CollisionParams struct in collision.wgsl)
-    // Layout: numParticles(u32), resolution(u32), pad, pad, minX, minY, minZ, cellSize, margin, friction, pad, pad
-    const cpData = new ArrayBuffer(48); // 12 × 4 bytes
-    const cpView = new DataView(cpData);
-    cpView.setUint32(0, this.buffers.numParticles, true);
-    cpView.setUint32(4, sdf.resolution, true);
-    cpView.setUint32(8, 0, true);  // pad
-    cpView.setUint32(12, 0, true); // pad
-    cpView.setFloat32(16, sdf.min[0], true);
-    cpView.setFloat32(20, sdf.min[1], true);
-    cpView.setFloat32(24, sdf.min[2], true);
-    cpView.setFloat32(28, sdf.cellSize, true);
-    cpView.setFloat32(32, this.config.collisionMargin, true);
-    cpView.setFloat32(36, 0.3, true);  // friction
-    cpView.setFloat32(40, 0, true); // pad
-    cpView.setFloat32(44, 0, true); // pad
-
-    this.collisionParamsBuffer = this.device.createBuffer({
-      label: 'collisionParams',
-      size: cpData.byteLength,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-    new Uint8Array(this.collisionParamsBuffer.getMappedRange()).set(new Uint8Array(cpData));
-    this.collisionParamsBuffer.unmap();
-
-    // Create collision bind group
-    if (this.collisionPipeline) {
-      this.collisionBindGroup = this.device.createBindGroup({
-        label: 'collision',
-        layout: this.collisionPipeline.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.collisionParamsBuffer } },
-          { binding: 1, resource: { buffer: this.buffers.positions } },
-          { binding: 2, resource: { buffer: this.buffers.prevPositions } },
-          { binding: 3, resource: { buffer: this.buffers.invMass } },
-          { binding: 4, resource: { buffer: this.sdfBuffer } },
-        ],
-      });
-      this.hasSDF = true;
-    }
-
-    console.log('[GpuSolver] SDF uploaded:', {
-      resolution: sdf.resolution,
-      volumeSize: `${(sdf.distances.byteLength / 1024).toFixed(0)}KB`,
-      bounds: `[${sdf.min.map(v => v.toFixed(2))}] → [${sdf.max.map(v => v.toFixed(2))}]`,
-    });
-  }
-
-  /**
-   * Clear SDF collision (cloth will pass through avatar).
-   */
-  clearSDF(): void {
-    this.sdfBuffer?.destroy();
-    this.collisionParamsBuffer?.destroy();
-    this.sdfBuffer = null;
-    this.collisionParamsBuffer = null;
-    this.collisionBindGroup = null;
-    this.hasSDF = false;
-  }
-
-  /**
    * Update solver config (fabric properties, etc.)
    */
   updateConfig(config: Partial<GpuSolverConfig>): void {
@@ -438,17 +336,10 @@ export class GpuClothSolver {
     this.postSolvePipeline = null;
     this.normalAccumPipeline = null;
     this.normalNormPipeline = null;
-    this.collisionPipeline = null;
     this.coreBindGroup = null;
     this.stretchBindGroup = null;
     this.seamBindGroup = null;
     this.normalBindGroup = null;
-    this.collisionBindGroup = null;
-    this.sdfBuffer?.destroy();
-    this.collisionParamsBuffer?.destroy();
-    this.sdfBuffer = null;
-    this.collisionParamsBuffer = null;
-    this.hasSDF = false;
     // Self-collision cleanup
     this.scParamsBuffer?.destroy();
     this.scCellCountBuffer?.destroy();
@@ -609,26 +500,6 @@ export class GpuClothSolver {
       compute: { module: normalsModule, entryPoint: 'normalizeNormals' },
     });
 
-    // Collision pipeline
-    const collisionModule = this.device.createShaderModule({
-      label: 'collision',
-      code: collisionShaderSrc,
-    });
-    const collisionLayout = this.device.createBindGroupLayout({
-      label: 'collision',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-        { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
-      ],
-    });
-    this.collisionPipeline = this.device.createComputePipeline({
-      label: 'collision',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [collisionLayout] }),
-      compute: { module: collisionModule, entryPoint: 'solveCollision' },
-    });
   }
 
   /**

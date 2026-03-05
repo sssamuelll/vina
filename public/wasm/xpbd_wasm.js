@@ -128,20 +128,6 @@ export class XpbdSolver {
         wasm.xpbdsolver_set_pins(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
-     * Upload SDF volume for body collision.
-     * @param {Float32Array} data
-     * @param {number} resolution
-     * @param {number} min_x
-     * @param {number} min_y
-     * @param {number} min_z
-     * @param {number} cell_size
-     */
-    set_sdf(data, resolution, min_x, min_y, min_z, cell_size) {
-        const ptr0 = passArrayF32ToWasm0(data, wasm.__wbindgen_malloc);
-        const len0 = WASM_VECTOR_LEN;
-        wasm.xpbdsolver_set_sdf(this.__wbg_ptr, ptr0, len0, resolution, min_x, min_y, min_z, cell_size);
-    }
-    /**
      * Set seam constraints.
      * @param {Uint32Array} ids
      * @param {Float32Array} target_dist

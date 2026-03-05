@@ -29,13 +29,6 @@ pub struct XpbdSolver {
     seam_ids: Vec<u32>,         // [a,b, a,b, ...]
     seam_target: Vec<f32>,      // target distance (usually 0)
 
-    // SDF collision
-    sdf_data: Vec<f32>,
-    sdf_resolution: u32,
-    sdf_min: [f32; 3],
-    sdf_cell_size: f32,
-    has_sdf: bool,
-
     // Self-collision
     self_collision: bool,
     thickness: f32,
@@ -97,11 +90,6 @@ impl XpbdSolver {
             bend_rest: Vec::new(),
             seam_ids: Vec::new(),
             seam_target: Vec::new(),
-            sdf_data: Vec::new(),
-            sdf_resolution: 0,
-            sdf_min: [0.0; 3],
-            sdf_cell_size: 0.0,
-            has_sdf: false,
             self_collision: false,
             thickness: 0.002,
             adjacency_offsets: Vec::new(),
@@ -181,15 +169,6 @@ impl XpbdSolver {
     /// Set triangle indices for air drag calculation.
     pub fn set_triangles(&mut self, tri_ids: &[u32]) {
         self.tri_ids = tri_ids.to_vec();
-    }
-
-    /// Upload SDF volume for body collision.
-    pub fn set_sdf(&mut self, data: &[f32], resolution: u32, min_x: f32, min_y: f32, min_z: f32, cell_size: f32) {
-        self.sdf_data = data.to_vec();
-        self.sdf_resolution = resolution;
-        self.sdf_min = [min_x, min_y, min_z];
-        self.sdf_cell_size = cell_size;
-        self.has_sdf = true;
     }
 
     /// Set adjacency for self-collision.
@@ -276,9 +255,6 @@ impl XpbdSolver {
             self.solve_stretch(sdt);
             self.solve_bend(sdt);
             self.solve_seams(sdt);
-            if self.has_sdf {
-                self.solve_sdf_collision();
-            }
             self.solve_ground_collision(); // Ground collision AFTER all constraints
             self.enforce_pins(); // Also enforce after constraints
             self.post_solve(sdt);
@@ -481,28 +457,6 @@ impl XpbdSolver {
         }
     }
 
-    fn solve_sdf_collision(&mut self) {
-        let res = self.sdf_resolution as usize;
-        if res == 0 || self.sdf_data.is_empty() { return; }
-
-        for i in 0..self.num_particles {
-            if self.inv_mass[i] == 0.0 { continue; }
-            let idx = i * 3;
-            let px = self.positions[idx];
-            let py = self.positions[idx + 1];
-            let pz = self.positions[idx + 2];
-
-            let dist = self.sample_sdf(px, py, pz);
-            if dist < self.collision_margin {
-                let (gx, gy, gz) = self.sdf_gradient(px, py, pz);
-                let correction = self.collision_margin - dist;
-                self.positions[idx] += gx * correction;
-                self.positions[idx + 1] += gy * correction;
-                self.positions[idx + 2] += gz * correction;
-            }
-        }
-    }
-
     /// Ground plane collision - clamps particles to ground plane
     /// Friction is handled separately in post_solve at velocity level
     fn solve_ground_collision(&mut self) {
@@ -515,62 +469,6 @@ impl XpbdSolver {
                 self.positions[idx + 1] = self.ground_y;
             }
         }
-    }
-
-    fn sample_sdf(&self, px: f32, py: f32, pz: f32) -> f32 {
-        let res = self.sdf_resolution as usize;
-        let gx = (px - self.sdf_min[0]) / self.sdf_cell_size;
-        let gy = (py - self.sdf_min[1]) / self.sdf_cell_size;
-        let gz = (pz - self.sdf_min[2]) / self.sdf_cell_size;
-
-        let fres = (res - 1) as f32;
-        if gx < 0.0 || gx >= fres || gy < 0.0 || gy >= fres || gz < 0.0 || gz >= fres {
-            return 1.0;
-        }
-
-        let x0 = gx as usize;
-        let y0 = gy as usize;
-        let z0 = gz as usize;
-        let x1 = (x0 + 1).min(res - 1);
-        let y1 = (y0 + 1).min(res - 1);
-        let z1 = (z0 + 1).min(res - 1);
-
-        let fx = gx - x0 as f32;
-        let fy = gy - y0 as f32;
-        let fz = gz - z0 as f32;
-
-        let idx = |x: usize, y: usize, z: usize| -> usize { z * res * res + y * res + x };
-
-        let c000 = self.sdf_data[idx(x0, y0, z0)];
-        let c100 = self.sdf_data[idx(x1, y0, z0)];
-        let c010 = self.sdf_data[idx(x0, y1, z0)];
-        let c110 = self.sdf_data[idx(x1, y1, z0)];
-        let c001 = self.sdf_data[idx(x0, y0, z1)];
-        let c101 = self.sdf_data[idx(x1, y0, z1)];
-        let c011 = self.sdf_data[idx(x0, y1, z1)];
-        let c111 = self.sdf_data[idx(x1, y1, z1)];
-
-        let c00 = c000 * (1.0 - fx) + c100 * fx;
-        let c01 = c001 * (1.0 - fx) + c101 * fx;
-        let c10 = c010 * (1.0 - fx) + c110 * fx;
-        let c11 = c011 * (1.0 - fx) + c111 * fx;
-
-        let c0 = c00 * (1.0 - fy) + c10 * fy;
-        let c1 = c01 * (1.0 - fy) + c11 * fy;
-
-        c0 * (1.0 - fz) + c1 * fz
-    }
-
-    fn sdf_gradient(&self, px: f32, py: f32, pz: f32) -> (f32, f32, f32) {
-        let h = self.sdf_cell_size * 0.5;
-        let dx = self.sample_sdf(px + h, py, pz) - self.sample_sdf(px - h, py, pz);
-        let dy = self.sample_sdf(px, py + h, pz) - self.sample_sdf(px, py - h, pz);
-        let dz = self.sample_sdf(px, py, pz + h) - self.sample_sdf(px, py, pz - h);
-        let len = (dx * dx + dy * dy + dz * dz).sqrt();
-        if len < 1e-12 {
-            return (0.0, 1.0, 0.0);
-        }
-        (dx / len, dy / len, dz / len)
     }
 
     /// Apply aerodynamic drag force per triangle.

@@ -287,17 +287,17 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
         // Request edge data for fit map computation
         client.requestEdgeData();
 
-        // Start simulation immediately — SDF loads later (non-blocking)
+        // Start simulation immediately — collision mesh loads later (non-blocking)
         client.start();
 
-        // Generate SDF in background (non-blocking via worker)
+        // Extract collision mesh in background (non-blocking)
         if (avatarModelUrl) {
-          import('../../utils/cloth/avatarSDF').then(({ buildAvatarSDF }) =>
-            buildAvatarSDF(avatarModelUrl, avatarHeight)
-          ).then(sdf => {
-            client.setSDF(sdf);
+          import('../../utils/cloth/avatarCollisionMesh').then(({ extractAvatarCollisionMesh }) =>
+            extractAvatarCollisionMesh(avatarModelUrl, avatarHeight)
+          ).then(mesh => {
+            if (mesh) client.setCollisionMesh(mesh);
           }).catch(e => {
-            console.warn('[ClothMesh] Avatar SDF generation failed:', e);
+            console.warn('[ClothMesh] Avatar collision mesh extraction failed:', e);
           });
         }
       }).catch(() => {

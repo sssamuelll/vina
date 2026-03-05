@@ -2,7 +2,7 @@
  * GarmentSimulation — R3F component that handles multi-piece cloth simulation with seams.
  *
  * Always merges all pieces into one shared solver (with or without seams).
- * All heavy work (meshing, SDF, simulation) runs in Web Workers.
+ * All heavy work (meshing, collision mesh extraction, simulation) runs in Web Workers.
  *
  * @module GarmentSimulation
  */
@@ -34,160 +34,6 @@ import { useGeometricPreview } from './useGeometricPreview';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
-// ─── SDF Cache + Deduplication ────────────────────────────────────────────────
-
-/** In-flight deduplication: same avatar+height returns same promise */
-const _sdfInflight = new Map<string, Promise<import('../../utils/cloth/sdfGenerator').SDFData | null>>();
-
-function sdfCacheKey(url: string, height: number): string {
-  return `sdf|${url}|${height.toFixed(4)}`;
-}
-
-const SDF_IDB_STORE = 'sdf-cache';
-const SDF_IDB_VERSION = 1;
-
-async function openSdfIdb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open('openclo-sdf', SDF_IDB_VERSION);
-    req.onupgradeneeded = () => { req.result.createObjectStore(SDF_IDB_STORE); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function getSdfFromIdb(key: string): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
-  try {
-    const db = await openSdfIdb();
-    return new Promise((resolve) => {
-      const tx = db.transaction(SDF_IDB_STORE, 'readonly');
-      const req = tx.objectStore(SDF_IDB_STORE).get(key);
-      req.onsuccess = () => {
-        const val = req.result;
-        if (val && val.distances && val.resolution) {
-          // Reconstruct Float32Array from stored ArrayBuffer
-          resolve({
-            ...val,
-            distances: val.distances instanceof Float32Array ? val.distances : new Float32Array(val.distances),
-          });
-        } else {
-          resolve(null);
-        }
-      };
-      req.onerror = () => resolve(null);
-    });
-  } catch {
-    return null;
-  }
-}
-
-async function putSdfToIdb(key: string, sdf: import('../../utils/cloth/sdfGenerator').SDFData): Promise<void> {
-  try {
-    const db = await openSdfIdb();
-    const tx = db.transaction(SDF_IDB_STORE, 'readwrite');
-    // Store distances as plain ArrayBuffer for IDB compatibility
-    tx.objectStore(SDF_IDB_STORE).put({
-      distances: sdf.distances.buffer.slice(0),
-      resolution: sdf.resolution,
-      min: sdf.min,
-      max: sdf.max,
-      cellSize: sdf.cellSize,
-    }, key);
-  } catch { /* best effort */ }
-}
-
-/**
- * Load avatar mesh and generate SDF off the main thread.
- * Features: in-flight deduplication, IndexedDB persistence, worker-only generation.
- */
-async function loadSDFInWorker(
-  avatarUrl: string,
-  avatarHeight: number,
-  initClient: SimulationInitClient | null,
-): Promise<import('../../utils/cloth/sdfGenerator').SDFData | null> {
-  const key = sdfCacheKey(avatarUrl, avatarHeight);
-
-  // 1. In-flight deduplication
-  const inflight = _sdfInflight.get(key);
-  if (inflight) {
-    console.log('[SDF] Returning in-flight promise (deduplicated)');
-    return inflight;
-  }
-
-  const promise = (async () => {
-    // 2. Check IndexedDB cache
-    const cached = await getSdfFromIdb(key);
-    if (cached) {
-      console.log('[SDF] Loaded from IndexedDB cache');
-      return cached;
-    }
-
-    // 3. Extract mesh data on main thread (fast — GLB parse + bone transforms)
-    const { extractMeshData } = await import('../../utils/cloth/avatarSDF');
-    const THREE = await import('three');
-    const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-    const { isVRMFile, loadVRM } = await import('../../utils/avatar/vrmLoader');
-
-    let scene: THREE.Group;
-    if (isVRMFile(avatarUrl)) {
-      const result = await loadVRM(avatarUrl);
-      scene = result.scene;
-    } else {
-      const loader = new GLTFLoader();
-      const gltf = await loader.loadAsync(avatarUrl);
-      scene = gltf.scene as THREE.Group;
-    }
-
-    // Scale + center (same as avatarSDF.ts)
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    if (size.y > 0) {
-      const scale = avatarHeight / size.y;
-      scene.scale.setScalar(scale);
-      const scaledBox = new THREE.Box3().setFromObject(scene);
-      const scaledCenter = new THREE.Vector3();
-      scaledBox.getCenter(scaledCenter);
-      scene.position.y = -scaledBox.min.y;
-      scene.position.x = -scaledCenter.x;
-      scene.position.z = -scaledCenter.z;
-    }
-    scene.updateMatrixWorld(true);
-
-    const { vertices, indices } = extractMeshData(scene);
-    if (vertices.length === 0 || indices.length === 0) return null;
-
-    // 4. Heavy SDF generation in worker — cascade: 32³ → 16³
-    if (initClient) {
-      try {
-        const sdf = await initClient.generateSDF(
-          new Float32Array(vertices), new Uint32Array(indices), 32);
-        if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 32³ in worker, cached to IDB'); }
-        return sdf;
-      } catch {
-        console.warn('[SDF] 32³ failed, trying 16³ fallback');
-        try {
-          const sdf = await initClient.generateSDF(
-            new Float32Array(vertices), new Uint32Array(indices), 16);
-          if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 16³ in worker, cached to IDB'); }
-          return sdf;
-        } catch {
-          console.warn('[SDF] 16³ also failed');
-          return null;
-        }
-      }
-    }
-
-    // 5. No worker available — generate directly (still off main React render)
-    const { generateSDF } = await import('../../utils/cloth/sdfGenerator');
-    const sdf = generateSDF(vertices, indices, 32);
-    if (sdf) { putSdfToIdb(key, sdf); console.log('[SDF] Generated 32³ directly, cached to IDB'); }
-    return sdf;
-  })();
-
-  _sdfInflight.set(key, promise);
-  promise.finally(() => _sdfInflight.delete(key));
-  return promise;
-}
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
@@ -565,12 +411,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
               if (!cancelled) gpuClient.start();
 
-              // SDF loaded via worker after simulation starts (truly non-blocking)
+              // GPU solver doesn't support triangle collision yet
               if (avatarModelUrl && !cancelled) {
-                loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current).then(sdf => {
-                  if (sdf && !cancelled) { gpuClient.setSDF(sdf); dispatch(setBodyCollision(true)); }
-                  else if (!sdf && !cancelled) { dispatch(setBodyCollision(false)); }
-                }).catch(e => { console.warn('[GarmentSimulation] Avatar SDF failed:', e); dispatch(setBodyCollision(false)); });
+                dispatch(setBodyCollision(false));
               }
               return;
             }
@@ -592,12 +435,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
               await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
 
-              // Load collision data BEFORE starting simulation to prevent explosion
-              // Particles inside body will be pushed out before physics kicks in
+              // Load collision mesh BEFORE starting simulation to prevent explosion
               if (avatarModelUrl && !cancelled) {
                 console.log('[GarmentSimulation] Loading avatar collision data...');
                 try {
-                  // Extract collision mesh (fast, ~1ms)
                   const collisionMesh = await withTimeout(
                     extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
                     5000,
@@ -606,22 +447,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
                   if (collisionMesh && !cancelled) {
                     console.log('[GarmentSimulation] ✅ Collision mesh extracted:', collisionMesh.triCount, 'triangles');
                     wasmClient.setCollisionMesh(collisionMesh);
-                  }
-
-                  // Also load SDF for Wasm-side collision (Wasm solver still uses SDF internally)
-                  const sdf = await withTimeout(
-                    loadSDFInWorker(avatarModelUrl, avatarHeight, initClientRef.current),
-                    8000,
-                    'SDF generation'
-                  );
-                  if (sdf && !cancelled) {
-                    console.log('[GarmentSimulation] ✅ SDF loaded, applying initial collision pass');
-                    wasmClient.setSDF(sdf);
-                    wasmClient.applyInitialCollision?.();
+                    wasmClient.applyInitialTriangleCollision();
                     dispatch(setBodyCollision(true));
                   } else if (!cancelled) {
-                    // Collision mesh was set even if SDF failed
-                    dispatch(setBodyCollision(!!collisionMesh));
+                    dispatch(setBodyCollision(false));
                   }
                 } catch (e) {
                   console.warn('[GarmentSimulation] Collision data load failed:', e);

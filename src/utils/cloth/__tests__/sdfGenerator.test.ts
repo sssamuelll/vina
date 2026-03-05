@@ -8,7 +8,6 @@ import {
   sampleSDF,
   sdfGradient
 } from '../sdfGenerator';
-import { XPBDClothSolver, type ClothMeshData } from '../xpbdSolver';
 
 // ─── Test Utilities ──────────────────────────────────────────────────────────
 
@@ -390,47 +389,7 @@ describe('SDF Generator', () => {
   });
 });
 
-describe('Integration with XPBDClothSolver', () => {
-  it('XPBDClothSolver accepts and uses SDF data', () => {
-    // Create a simple cloth mesh
-    const clothMeshData: ClothMeshData = {
-      vertices: new Float32Array([
-        -0.5, 2.0, -0.5,  // Top-left
-         0.5, 2.0, -0.5,  // Top-right
-         0.5, 2.0,  0.5,  // Bottom-right
-        -0.5, 2.0,  0.5,  // Bottom-left
-      ]),
-      triIds: new Int32Array([
-        0, 1, 2,
-        0, 2, 3,
-      ])
-    };
-    
-    const solver = new XPBDClothSolver(clothMeshData);
-    
-    // Create SDF for a sphere that the cloth will collide with
-    const { vertices, indices } = createSphereMesh(1.0, 16);
-    const sdf = generateSDF(vertices, indices, 32);
-    
-    expect(sdf).not.toBeNull();
-    if (!sdf) return;
-    
-    // Test that solver can receive SDF (we'll implement this method)
-    expect(() => solver.setSDF(sdf)).not.toThrow();
-    
-    // Move cloth particles inside the sphere
-    solver.pos[1] = 0; // Move second vertex inside sphere
-    solver.pos[4] = 0; // Move third vertex inside sphere
-    
-    // Run one simulation step
-    solver.step();
-    
-    // Particles should be pushed out of the sphere
-    // This is a integration test - the exact positions depend on implementation
-    expect(solver.pos[1]).not.toBe(0); // Should have been moved
-    expect(solver.pos[4]).not.toBe(0); // Should have been moved
-  });
-});
+// Integration with XPBDClothSolver — SDF tests removed (SDF replaced by triangle collision)
 
 describe('Edge cases and error handling', () => {
   it('handles empty mesh gracefully', () => {

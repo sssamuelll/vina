@@ -10,7 +10,6 @@
  * @module xpbdSolver
  */
 
-import { type SDFData, sampleSDF, sdfGradient } from './sdfGenerator';
 import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
 import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfCollision';
 import { type LRAConstraint, buildLRAConstraints, solveLRA } from './longRangeAttachments';
@@ -321,10 +320,7 @@ export class XPBDClothSolver {
   /** Capsule colliders for avatar approximation */
   private capsuleColliders: CapsuleCollider[] = [];
 
-  /** SDF data for accurate avatar body collision */
-  private sdfData: SDFData | null = null;
-
-  /** Triangle collision mesh data (replaces SDF) */
+  /** Triangle collision mesh data for body collision */
   private collisionMesh: CollisionMeshData | null = null;
   /** Spatial hash over collision mesh triangles */
   private collisionHash: TriangleSpatialHash | null = null;
@@ -593,19 +589,7 @@ export class XPBDClothSolver {
   }
 
   /**
-   * Set SDF data for accurate avatar body collision.
-   *
-   * @deprecated Use `setCollisionMesh()` instead. SDF collision is retained
-   * for backward compatibility with the Wasm solver.
-   *
-   * @param sdf - Signed distance field data or null to disable
-   */
-  setSDF(sdf: SDFData | null): void {
-    this.sdfData = sdf;
-  }
-
-  /**
-   * Set triangle collision mesh for body collision (replaces SDF).
+   * Set triangle collision mesh for body collision.
    * Builds spatial hash over avatar triangles.
    */
   setCollisionMesh(mesh: CollisionMeshData | null): void {
@@ -938,34 +922,7 @@ export class XPBDClothSolver {
       }
     }
 
-    // SDF collision (accurate avatar body collision)
-    if (this.sdfData) {
-      const epsilon = 0.001; // 1mm offset to avoid z-fighting
-      
-      for (let i = 0; i < this.numParticles; i++) {
-        if (this.invMass[i] === 0.0) continue;
-
-        const pi = 3 * i;
-        const point: [number, number, number] = [this.pos[pi], this.pos[pi + 1], this.pos[pi + 2]];
-        
-        // Sample SDF at particle position
-        const distance = sampleSDF(this.sdfData, point);
-        
-        // If particle is inside body (distance < 0)
-        if (distance < 0) {
-          // Compute gradient (push direction)
-          const gradient = sdfGradient(this.sdfData, point);
-          
-          // Push particle to surface with small offset
-          const pushDistance = -distance + epsilon;
-          this.pos[pi] += gradient[0] * pushDistance;
-          this.pos[pi + 1] += gradient[1] * pushDistance;
-          this.pos[pi + 2] += gradient[2] * pushDistance;
-        }
-      }
-    }
-
-    // Triangle mesh collision (replaces SDF — exact distance, supports animation)
+    // Triangle mesh collision (exact distance, supports animation)
     if (this.collisionMesh && this.collisionHash) {
       solveTriangleCollision(
         this.pos,

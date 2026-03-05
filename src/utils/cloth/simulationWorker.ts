@@ -1,14 +1,13 @@
 /**
- * Simulation Init Worker — offloads heavy meshing + SDF computation from main thread.
+ * Simulation Init Worker — offloads heavy meshing from main thread.
  *
- * Runs CDT meshing, placement transforms, and SDF generation in a Web Worker
- * so the UI never freezes during simulation startup.
+ * Runs CDT meshing and placement transforms in a Web Worker so the UI
+ * never freezes during simulation startup.
  *
  * @module simulationWorker
  */
 
 import { meshPiece } from '../mesh';
-import { generateSDF, type SDFData } from './sdfGenerator';
 import type { PatternPiece } from '../../types/types';
 
 // ─── Message Types ──────────────────────────────────────────────────────────
@@ -34,19 +33,6 @@ export interface MeshPieceResponse {
   error?: string;
 }
 
-export interface SDFRequest {
-  type: 'generateSDF';
-  vertices: Float32Array;
-  indices: Uint32Array;
-  resolution: number;
-}
-
-export interface SDFResponse {
-  type: 'sdfResult';
-  sdf: SDFData | null;
-  error?: string;
-}
-
 export interface ProgressMessage {
   type: 'progress';
   stage: string;
@@ -54,8 +40,8 @@ export interface ProgressMessage {
   total: number;
 }
 
-export type WorkerRequest = MeshPieceRequest | SDFRequest;
-export type WorkerResponse = MeshPieceResponse | SDFResponse | ProgressMessage;
+export type WorkerRequest = MeshPieceRequest;
+export type WorkerResponse = MeshPieceResponse | ProgressMessage;
 
 // ─── Worker Handler ─────────────────────────────────────────────────────────
 
@@ -86,25 +72,4 @@ ctx.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
     }
   }
 
-  if (msg.type === 'generateSDF') {
-    try {
-      const sdf = generateSDF(msg.vertices, msg.indices, msg.resolution);
-      const response: SDFResponse = {
-        type: 'sdfResult',
-        sdf,
-      };
-      if (sdf) {
-        ctx.postMessage(response, [sdf.distances.buffer]);
-      } else {
-        ctx.postMessage(response);
-      }
-    } catch (err) {
-      const response: SDFResponse = {
-        type: 'sdfResult',
-        sdf: null,
-        error: String(err),
-      };
-      ctx.postMessage(response);
-    }
-  }
 });

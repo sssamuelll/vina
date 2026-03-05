@@ -1,14 +1,13 @@
 /**
  * Simulation Init Client — async interface to the simulation worker.
  *
- * Provides promise-based API for meshing and SDF generation that runs
- * off the main thread. Falls back to synchronous execution if worker fails.
+ * Provides promise-based API for meshing that runs off the main thread.
+ * Falls back to synchronous execution if worker fails.
  *
  * @module simulationInitClient
  */
 
 import type { PatternPiece } from '../../types/types';
-import type { SDFData } from './sdfGenerator';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -34,11 +33,6 @@ export class SimulationInitClient {
     resolve: (v: { vertices: Float32Array; triIds: Int32Array }) => void;
     reject: (e: Error) => void;
   }>();
-  private pendingSDF: {
-    resolve: (v: SDFData | null) => void;
-    reject: (e: Error) => void;
-  } | null = null;
-
   onProgress?: (p: SimInitProgress) => void;
 
   constructor() {
@@ -69,18 +63,6 @@ export class SimulationInitClient {
           pending.reject(new Error(msg.error));
         } else {
           pending.resolve({ vertices: msg.vertices, triIds: msg.triIds });
-        }
-      }
-    }
-
-    if (msg.type === 'sdfResult') {
-      if (this.pendingSDF) {
-        const { resolve, reject } = this.pendingSDF;
-        this.pendingSDF = null;
-        if (msg.error) {
-          reject(new Error(msg.error));
-        } else {
-          resolve(msg.sdf);
         }
       }
     }
@@ -124,33 +106,6 @@ export class SimulationInitClient {
   }
 
   /**
-   * Generate SDF off the main thread.
-   */
-  async generateSDF(vertices: Float32Array, indices: Uint32Array, resolution: number): Promise<SDFData | null> {
-    if (!this.worker) {
-      // Fallback: dynamic import + sync execution
-      const { generateSDF } = await import('./sdfGenerator');
-      return generateSDF(vertices, indices, resolution);
-    }
-
-    return new Promise((resolve, reject) => {
-      this.pendingSDF = { resolve, reject };
-      this.worker!.postMessage(
-        { type: 'generateSDF', vertices, indices, resolution },
-        [vertices.buffer, indices.buffer],
-      );
-
-      // Timeout: 20s for SDF (32³ grid should complete in <15s)
-      setTimeout(() => {
-        if (this.pendingSDF) {
-          this.pendingSDF = null;
-          reject(new Error('SDF generation timeout'));
-        }
-      }, 20000);
-    });
-  }
-
-  /**
    * Mesh all pieces, returning results as they complete.
    */
   async meshAllPieces(
@@ -188,10 +143,6 @@ export class SimulationInitClient {
       p.reject(error);
     }
     this.pendingMesh.clear();
-    if (this.pendingSDF) {
-      this.pendingSDF.reject(error);
-      this.pendingSDF = null;
-    }
   }
 
   /**

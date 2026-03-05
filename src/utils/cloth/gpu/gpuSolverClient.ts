@@ -11,7 +11,6 @@
 
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
 import { extractStretchConstraints, extractBendConstraints, type SeamConstraintData } from './gpuBuffers';
-import type { SDFData } from '../sdfGenerator';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -120,13 +119,6 @@ export class GpuSolverClient {
       seam,
       triangles,
     );
-  }
-
-  /**
-   * Set avatar SDF for body collision.
-   */
-  setSDF(sdf: SDFData): void {
-    this.solver.setSDF(sdf);
   }
 
   /**

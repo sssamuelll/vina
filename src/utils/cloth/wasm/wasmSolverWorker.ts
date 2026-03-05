@@ -7,6 +7,8 @@
 import { extractStretchConstraints, extractBendConstraints } from '../gpu/gpuBuffers';
 import { mergeMeshes, buildSeamConstraints } from '../seamAssembly';
 import type { PathCommand } from '../../../types/types';
+import type { CollisionMeshData } from '../collisionMesh';
+import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -29,7 +31,6 @@ interface WasmXpbdSolver {
   set_bend_with_types(ids: Uint32Array, rest_angles: Float32Array, edge_types: Uint8Array): void;
   set_seams(ids: Uint32Array, target: Float32Array): void;
   set_triangles(tri_ids: Uint32Array): void;
-  set_sdf(data: Float32Array, resolution: number, minX: number, minY: number, minZ: number, cellSize: number): void;
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
   set_pins(indices: Uint32Array, positions: Float32Array): void;
   clear_pins(): void;
@@ -58,6 +59,9 @@ let animFrameId: ReturnType<typeof setTimeout> | null = null;
 const snapshots = new Map<string, Float32Array>();
 const MAX_SNAPSHOTS = 5;
 
+let collisionMesh: CollisionMeshData | null = null;
+let collisionHash: TriangleSpatialHash | null = null;
+
 const FRAME_BUDGET_MS = 14;
 
 function simulationLoop(): void {
@@ -65,25 +69,31 @@ function simulationLoop(): void {
 
   const t0 = performance.now();
   solver.step(1 / 60);
-  const elapsed = performance.now() - t0;
 
-  // Read positions from Wasm memory
   const n = numParticles;
   const ptr = solver.positions_ptr();
-  let positions: Float32Array;
 
   if (wasmExports?.memory) {
-    positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
+    // Apply JS-side triangle collision post-step
+    if (collisionMesh && collisionHash) {
+      const posView = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
+      const invMass = new Float32Array(n).fill(1.0);
+      solveTriangleCollision(posView, invMass, n, collisionMesh, collisionHash, 0.005);
+    }
+    const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
+    (self as unknown as Worker).postMessage(
+      { type: 'frame', positions },
+      [positions.buffer],
+    );
   } else {
-    // Should never happen after successful init, but safety fallback
-    positions = new Float32Array(n * 3);
+    const positions = new Float32Array(n * 3);
+    (self as unknown as Worker).postMessage(
+      { type: 'frame', positions },
+      [positions.buffer],
+    );
   }
 
-  (self as unknown as Worker).postMessage(
-    { type: 'frame', positions },
-    [positions.buffer],
-  );
-
+  const elapsed = performance.now() - t0;
   const delay = elapsed > FRAME_BUDGET_MS ? Math.min(elapsed, 50) : 1000 / 60;
   animFrameId = setTimeout(simulationLoop, delay);
 }
@@ -207,53 +217,30 @@ self.onmessage = async (event: MessageEvent) => {
         (self as unknown as Worker).postMessage({ type: 'stopped' });
         break;
 
-      case 'setSDF':
-        if (solver && msg.sdf) {
-          solver.set_sdf(
-            msg.sdf.distances, msg.sdf.resolution,
-            msg.sdf.min[0], msg.sdf.min[1], msg.sdf.min[2], msg.sdf.cellSize,
-          );
+      case 'setCollisionMesh':
+        if (msg.mesh) {
+          collisionMesh = msg.mesh;
+          collisionHash = new TriangleSpatialHash(msg.mesh, 0.05);
+          console.log('[WasmWorker] Collision mesh set:', msg.mesh.triCount, 'triangles');
         }
         break;
 
-      case 'setCollisionMesh':
-        // Triangle collision for Wasm solver — uses JS-side collision
-        // (Rust/Wasm port is out of scope for v1)
-        console.log('[WasmWorker] setCollisionMesh received:', msg.mesh?.triCount, 'triangles');
-        // Store on globalThis for potential future JS-side collision pass
-        (self as unknown as Record<string, unknown>).__collisionMesh = msg.mesh;
-        break;
-
-      case 'applyInitialCollision':
-        // Run settling steps to push particles outside body BEFORE physics starts.
-        // Uses small timestep with no gravity to resolve collisions without explosion.
-        if (solver) {
-          console.log('[WasmWorker] Running initial collision settling...');
-          // Temporarily configure solver with zero gravity for settling
-          solver.configure(5, 0.95, 0, 0.0, 0.01, false, 0.002, 0.005, 0.0, 0.0, 0.0, 0.0, 0.001, 1.0, 1.0, 0.3);
-
-          // Run several small steps to let SDF collision push particles out
-          for (let i = 0; i < 20; i++) {
-            solver.step(1 / 120); // Small timestep
-          }
-
-          // Restore normal gravity
-          solver.configure(15, 0.99, -9.81, 0.0, 0.01, false, 0.002, 0.005, 0.0, 1.0, 0.0, 0.0, 0.001, 1.0, 1.0, 0.3);
-
-          // Send settled positions to client
+      case 'applyInitialTriangleCollision':
+        if (solver && collisionMesh && collisionHash && wasmExports?.memory) {
+          console.log('[WasmWorker] Running initial triangle collision settling...');
           const n = numParticles;
           const ptr = solver.positions_ptr();
-          let positions: Float32Array;
-          if (wasmExports?.memory) {
-            positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
-          } else {
-            positions = new Float32Array(n * 3);
+          const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
+          const invMass = new Float32Array(n).fill(1.0);
+          for (let i = 0; i < 5; i++) {
+            solveTriangleCollision(positions, invMass, n, collisionMesh, collisionHash, 0.005);
           }
+          const frame = positions.slice();
           (self as unknown as Worker).postMessage(
-            { type: 'frame', positions },
-            [positions.buffer],
+            { type: 'frame', positions: frame },
+            [frame.buffer],
           );
-          console.log('[WasmWorker] Initial collision settling complete');
+          console.log('[WasmWorker] Initial triangle collision settling complete');
         }
         break;
 
