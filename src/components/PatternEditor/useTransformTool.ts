@@ -10,7 +10,7 @@ import {
   rotateOutline,
   type HandleId,
   type BBox,
-} from './transformUtils';
+} from '../../utils/geometry/transform';
 
 interface TransformDragState {
   handleId: HandleId;

@@ -16,7 +16,7 @@ import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
-import type { BBox, HandlePosition } from '../transformUtils';
+import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 
 interface PenNode {

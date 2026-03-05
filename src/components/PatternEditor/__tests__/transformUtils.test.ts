@@ -4,7 +4,7 @@ import {
   computeHandlePositions,
   scaleOutline,
   rotateOutline,
-} from '../transformUtils';
+} from '../../../utils/geometry/transform';
 import type { PathCommand, PatternPiece } from '../../../types/types';
 
 const makeRect = (x: number, y: number, w: number, h: number): PathCommand[] => [

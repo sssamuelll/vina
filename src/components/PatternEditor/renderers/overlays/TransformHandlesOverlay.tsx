@@ -1,4 +1,4 @@
-import type { BBox, HandlePosition } from '../../transformUtils';
+import type { BBox, HandlePosition } from '../../../../utils/geometry/transform';
 import type { TransformPreview } from '../../useTransformTool';
 
 interface TransformHandlesOverlayProps {
