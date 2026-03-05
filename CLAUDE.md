@@ -31,11 +31,16 @@ src/
 ├── core/                # Semantic garment engine
 │   ├── geometry/        # Constraint-based geometry
 │   └── pattern/         # Pattern piece operations
+├── types/
+│   └── collisionBody.ts  # CollisionBody interface
 ├── utils/
 │   ├── cloth/           # XPBD cloth simulation
 │   │   ├── physicalFabric.ts    # 32 fabric presets
 │   │   ├── xpbdSolver.ts        # TypeScript solver (JS fallback)
+│   │   ├── triangleCollision.ts # Triangle mesh collision solver
+│   │   ├── collisionMesh.ts     # CollisionMeshData + extraction helpers
 │   │   └── wasm/                # WASM worker interface
+│   ├── import/          # Mesh import (OBJ/FBX/GLB/GLTF)
 │   └── mesh/            # Meshing utilities
 └── stores/              # Zustand state management
 
@@ -182,6 +187,40 @@ localStorage.setItem('openclo-use-bridge', 'true');
 - `src/copilot/hooks/useBridge.ts` - React integration
 - `src/copilot/features.ts` - Feature flags
 - `docs/plans/2026-03-02-copilot-bridge-architecture-design.md` - Full design doc
+
+## Collision Bodies
+
+Any 3D mesh (OBJ/FBX/GLB/GLTF) can be imported as a collision body alongside the avatar.
+
+### CollisionBody Redux Slice (`src/store/collisionBodySlice.ts`)
+
+State: `{ bodies: CollisionBody[], selectedBodyId: string | null }`
+
+Key actions: `addCollisionBody`, `removeCollisionBody`, `updateCollisionBodyTransform`, `updateCollisionBodyCollision`, `selectCollisionBody`, `setAnimationState`
+
+### Multi-Body Collision Architecture
+
+- Avatar collision mesh is entry `__avatar__` in the collision body array
+- Each body gets its own `TriangleSpatialHash` for spatial queries
+- Solver iterates all bodies per particle: `for (body of collisionBodies) { solveTriangleCollision(...) }`
+- Per-body `friction` (0-1) and `margin`/offset (meters)
+
+### Worker Messages
+
+Both WASM and CPU workers support:
+- `setCollisionBodies` — replace entire array
+- `updateCollisionBody` — add/update single body by id
+- `removeCollisionBody` — remove by id
+- `setCollisionMesh` — backward-compatible (wraps as `__avatar__`)
+
+### Key Files
+
+- `src/types/collisionBody.ts` — CollisionBody interface
+- `src/store/collisionBodySlice.ts` — Redux CRUD + selection
+- `src/components/Viewport3D/CollisionBodyMesh.tsx` — R3F mesh + TransformControls gizmo + animation
+- `src/components/Viewport3D/CollisionBodyPanel.tsx` — UI panel (import, friction/offset sliders)
+- `src/utils/cloth/triangleCollision.ts` — `solveTriangleCollision` with friction param
+- `src/utils/cloth/collisionMesh.ts` — `CollisionMeshData` + `collisionMeshFromBuffers` helper
 
 ## Architecture Notes
 

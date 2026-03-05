@@ -54,11 +54,17 @@ src/
 ├── components/        # UI Layers
 │   ├── Viewport2D/    # Interactive SVG view with semantic ghosting
 │   ├── Viewport3D/    # R3F-based viewport with XPBD simulation
+│   │   ├── CollisionBodyMesh.tsx   # Imported collision objects with gizmo
+│   │   └── CollisionBodyPanel.tsx  # Collision body management UI
 │   └── Workspace/     # Synchronized 2D/3D state management
+├── types/             # Shared TypeScript interfaces
+│   └── collisionBody.ts  # CollisionBody type (transform, collision, animation)
 ├── utils/             # Industrial utilities
-│   ├── physics/       # Rust/WASM XPBD implementation
+│   ├── cloth/         # XPBD solver, triangle collision, multi-body worker protocol
+│   ├── import/        # Mesh import (OBJ/FBX/GLB/GLTF)
 │   └── export/        # Professional DXF/PDF/OBJ generation
-└── store/             # Reactive project state
+└── store/             # Reactive project state (Redux Toolkit)
+    └── collisionBodySlice.ts  # Multi-body collision state management
 ```
 
 ## Key Architectural Decisions

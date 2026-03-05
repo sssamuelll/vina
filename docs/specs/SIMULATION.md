@@ -19,7 +19,7 @@ OpenClo.ai implements an **XPBD solver** in **Rust (WASM)** for maximum performa
 1. **Distance Constraints**: Maintain the integrity of the pattern.
 2. **Bending Constraints**: Model fabric stiffness and drape.
 3. **Seam Constraints**: Dynamic distance constraints that "pull" pieces together during assembly.
-4. **Collision Constraints**: Resolved via SDF (Signed Distance Fields).
+4. **Collision Constraints**: Resolved via triangle mesh collision with per-body spatial hashing.
 
 ---
 
@@ -46,11 +46,21 @@ OpenClo.ai uses a **Semantic-Aware Placement** system to automatically position 
 
 ---
 
-## Collision Detection ✅ COMPLETE (v0.5)
+## Collision Detection ✅ COMPLETE (v0.6)
 
 ### Avatar Collision
-- **SDF Lookup**: The avatar is pre-computed as a 64³ Signed Distance Field in a Web Worker.
-- **Fast Projection**: Vertices inside the body are projected to the surface in a single step using SDF normals.
+- **Triangle Mesh Collision**: The avatar mesh is extracted to flat `CollisionMeshData` (vertices + normals + triCount) and sent to the worker.
+- **TriangleSpatialHash**: 3x3x3 cell spatial hash for O(1) nearest-triangle queries per particle.
+- **Point-to-Triangle Distance**: Barycentric projection with edge-distance fallback for robust collision resolution.
+
+### Universal Collision Bodies ✅ NEW (v0.6)
+- **Multi-Body Array**: Any imported mesh (furniture, mannequins, props) can act as a collision body alongside the avatar.
+- **Per-Body Properties**: Each body has independent `friction` (0-1) and `offset`/margin (meters).
+- **Transform Gizmo**: `@react-three/drei` TransformControls for live translate/rotate/scale.
+- **Animation Playback**: GLB/FBX with embedded clips play via `THREE.AnimationMixer`; posed vertices re-extracted and sent to worker.
+- **Redux State**: `collisionBodySlice` manages CRUD, selection, transform, and animation state.
+- **Worker Protocol**: `setCollisionBodies`, `updateCollisionBody`, `removeCollisionBody` messages on both WASM and CPU workers.
+- **Avatar as `__avatar__`**: The avatar collision mesh is entry `__avatar__` in the body array, preserving backward compatibility.
 
 ### Self-Collision
 - **Spatial Hashing**: A grid-based spatial hash allows for $O(n)$ self-collision detection between garment layers.
@@ -64,7 +74,7 @@ OpenClo.ai uses a **Semantic-Aware Placement** system to automatically position 
 |-----------|----------------|--------|
 | **Force Integration** | Rust/Wasm | < 0.5ms |
 | **Constraint Loop** | Rust/Wasm | < 8.0ms |
-| **SDF Collision** | Wasm + Web Worker | < 2.0ms |
+| **Triangle Collision** | JS (per-body spatial hash) | < 2.0ms |
 | **Self-Collision** | Spatial Hash (Wasm) | < 3.0ms |
 | **Mesh Geometry Update**| TypedArrays | < 1.0ms |
 | **Total Frame Time** | — | **< 14.5ms** |

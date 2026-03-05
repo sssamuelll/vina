@@ -8,6 +8,7 @@ Our goal is to reach **v1.0.0 (Production Ready)** by Q2 2026.
 ## [Current Phase] v0.7.x — Precision & UX Polish (March 2026)
 *Focus: Refined editing tools and ergonomic drafting.*
 
+- [x] **Universal Collision Bodies**: Any imported mesh (furniture, mannequins, props) as collision objects with per-body friction, offset, transform gizmo, and GLB/FBX animation playback.
 - [ ] **3D Navigation Pro**: Full orbital control with industry-standard shortcuts (CLO3D/Blender).
 - [ ] **2D Display Bar**: Context-sensitive floating toolbar for rapid drafting.
 - [ ] **Linked Editing**: Symmetric pattern propagation (left sleeve changes sync with right).
