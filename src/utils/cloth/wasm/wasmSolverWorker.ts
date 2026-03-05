@@ -314,6 +314,13 @@ self.onmessage = async (event: MessageEvent) => {
         break;
       }
 
+      case 'updateConstraints': {
+        // TODO: Wasm solver needs Rust-side update_rest_lengths binding
+        console.warn('[WasmWorker] updateConstraints not yet supported for Wasm solver');
+        self.postMessage({ type: 'constraintsUpdated' });
+        break;
+      }
+
       case 'dispose':
         running = false;
         if (animFrameId !== null) {

@@ -47,7 +47,8 @@ export type WorkerInMessage =
   | { type: 'saveSnapshot'; id: string }
   | { type: 'restoreSnapshot'; id: string }
   | { type: 'deleteSnapshot'; id: string }
-  | { type: 'warmStart'; positions: Float32Array };
+  | { type: 'warmStart'; positions: Float32Array }
+  | { type: 'updateConstraints'; restLengths: Float32Array };
 
 /** Messages sent from worker → main thread */
 export type WorkerOutMessage =
@@ -59,7 +60,8 @@ export type WorkerOutMessage =
   | { type: 'error'; message: string }
   | { type: 'snapshotSaved'; id: string; particleCount: number }
   | { type: 'snapshotRestored'; id: string }
-  | { type: 'snapshotDeleted'; id: string };
+  | { type: 'snapshotDeleted'; id: string }
+  | { type: 'constraintsUpdated' };
 
 // ─── Worker State ───────────────────────────────────────────────────────────
 
@@ -384,6 +386,22 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
             solver.prevPos.set(incoming);
             solver.vel.fill(0);
           }
+        }
+        break;
+      }
+
+      case 'updateConstraints': {
+        if (solver) {
+          solver.updateRestLengths(msg.restLengths);
+          (self as unknown as Worker).postMessage(
+            { type: 'constraintsUpdated' } satisfies WorkerOutMessage,
+          );
+          // Send a frame with current positions so rendering updates
+          const snap = solver.getSnapshot();
+          (self as unknown as Worker).postMessage(
+            { type: 'frame', ...snap } satisfies WorkerOutMessage,
+            [snap.positions.buffer],
+          );
         }
         break;
       }
