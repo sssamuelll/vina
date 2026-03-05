@@ -1118,6 +1118,17 @@ export class XPBDClothSolver {
   }
 
   /**
+   * Update stretch constraint rest lengths in-place.
+   * Used for warm-start on dimension-only pattern edits.
+   */
+  updateRestLengths(newLengths: Float32Array): void {
+    const count = Math.min(newLengths.length, this.stretchingLengths.length);
+    for (let i = 0; i < count; i++) {
+      this.stretchingLengths[i] = newLengths[i];
+    }
+  }
+
+  /**
    * Get current positions as a read-only view.
    */
   getPositions(): Float32Array {

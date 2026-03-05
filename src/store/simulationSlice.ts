@@ -101,6 +101,8 @@ interface SimulationSliceState {
   snapshots: SimSnapshotMeta[];
   /** Currently active snapshot ID */
   activeSnapshotId: string | null;
+  /** Whether the simulation is warm-starting after a dimension edit */
+  isWarmStarting: boolean;
 }
 
 const initialState: SimulationSliceState = {
@@ -132,6 +134,7 @@ const initialState: SimulationSliceState = {
   surfaceMode3D: 'textured' as SurfaceMode3D,
   snapshots: [],
   activeSnapshotId: null,
+  isWarmStarting: false,
 };
 
 const simulationSlice = createSlice({
@@ -313,6 +316,9 @@ const simulationSlice = createSlice({
       state.snapshots = [];
       state.activeSnapshotId = null;
     },
+    setIsWarmStarting(state, action: PayloadAction<boolean>) {
+      state.isWarmStarting = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -355,6 +361,7 @@ export const {
   removeSnapshot,
   setActiveSnapshot,
   clearSnapshots,
+  setIsWarmStarting,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;
