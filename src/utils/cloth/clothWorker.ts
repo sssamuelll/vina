@@ -43,7 +43,11 @@ export type WorkerInMessage =
   | { type: 'setSDF'; sdf: SDFData }
   | { type: 'pinParticle'; index: number }
   | { type: 'unpinParticle'; index: number }
-  | { type: 'getEdgeData' };
+  | { type: 'getEdgeData' }
+  | { type: 'saveSnapshot'; id: string }
+  | { type: 'restoreSnapshot'; id: string }
+  | { type: 'deleteSnapshot'; id: string }
+  | { type: 'warmStart'; positions: Float32Array };
 
 /** Messages sent from worker → main thread */
 export type WorkerOutMessage =
@@ -52,7 +56,10 @@ export type WorkerOutMessage =
   | { type: 'edgeData'; stretchingIds: Int32Array; stretchingLengths: Float32Array }
   | { type: 'stopped' }
   | { type: 'progress'; stage: string }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'snapshotSaved'; id: string; particleCount: number }
+  | { type: 'snapshotRestored'; id: string }
+  | { type: 'snapshotDeleted'; id: string };
 
 // ─── Worker State ───────────────────────────────────────────────────────────
 
