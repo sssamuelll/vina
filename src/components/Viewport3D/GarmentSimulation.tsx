@@ -27,6 +27,9 @@ import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin
 import { classifyEdit } from '../../utils/cloth/editClassifier';
 import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
+import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
+import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
+import { importMesh } from '../../utils/import/meshImporter';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
@@ -88,6 +91,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
   const pinnedVertices = useSelector((s: RootState) => s.simulation.pinnedVertices);
+  const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
 
   // Async meshing via Web Worker (never blocks main thread)
   const [pieceMeshes, setPieceMeshes] = useState<Array<{
@@ -458,6 +462,37 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
                 }
               }
 
+              // Load collision bodies (WASM)
+              if (!cancelled) {
+                for (const body of collisionBodies) {
+                  if (!body.collision.enabled || cancelled) continue;
+                  try {
+                    const result = await importMesh(body.meshUrl, body.name, {});
+                    const scene = result.scene;
+                    scene.position.set(...body.transform.position);
+                    scene.rotation.set(
+                      body.transform.rotation[0] * (Math.PI / 180),
+                      body.transform.rotation[1] * (Math.PI / 180),
+                      body.transform.rotation[2] * (Math.PI / 180),
+                    );
+                    scene.scale.set(...body.transform.scale);
+                    scene.updateMatrixWorld(true);
+                    const { vertices, indices } = extractMeshData(scene);
+                    const mesh = collisionMeshFromBuffers(vertices, indices);
+                    if (mesh && !cancelled) {
+                      wasmClient.updateCollisionBody({
+                        id: body.id,
+                        mesh,
+                        friction: body.collision.friction,
+                        margin: body.collision.offset,
+                      });
+                    }
+                  } catch (e) {
+                    console.warn('[GarmentSimulation] Collision body load failed:', body.name, e);
+                  }
+                }
+              }
+
               if (!cancelled) wasmClient.start();
               return;
             } else if (!cancelled) {
@@ -504,6 +539,37 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
               } catch (e) {
                 console.warn('[GarmentSimulation] Collision mesh extraction failed (CPU):', e);
                 dispatch(setBodyCollision(false));
+              }
+            }
+
+            // Load collision bodies (CPU)
+            if (!cancelled) {
+              for (const body of collisionBodies) {
+                if (!body.collision.enabled || cancelled) continue;
+                try {
+                  const result = await importMesh(body.meshUrl, body.name, {});
+                  const scene = result.scene;
+                  scene.position.set(...body.transform.position);
+                  scene.rotation.set(
+                    body.transform.rotation[0] * (Math.PI / 180),
+                    body.transform.rotation[1] * (Math.PI / 180),
+                    body.transform.rotation[2] * (Math.PI / 180),
+                  );
+                  scene.scale.set(...body.transform.scale);
+                  scene.updateMatrixWorld(true);
+                  const { vertices, indices } = extractMeshData(scene);
+                  const mesh = collisionMeshFromBuffers(vertices, indices);
+                  if (mesh && !cancelled) {
+                    client.updateCollisionBody({
+                      id: body.id,
+                      mesh,
+                      friction: body.collision.friction,
+                      margin: body.collision.offset,
+                    });
+                  }
+                } catch (e) {
+                  console.warn('[GarmentSimulation] Collision body load failed:', body.name, e);
+                }
               }
             }
 
@@ -570,7 +636,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       neuralClientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, dispatch]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, dispatch]);
 
   // Sync pinned vertices to Wasm solver
   useEffect(() => {
