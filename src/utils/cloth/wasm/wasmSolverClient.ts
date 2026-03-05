@@ -47,6 +47,9 @@ export class WasmSolverClient {
   onFrame?: (positions: Float32Array) => void;
   onReady?: () => void;
   onError?: (error: string) => void;
+  onSnapshotSaved?: (id: string, particleCount: number) => void;
+  onSnapshotRestored?: (id: string) => void;
+  onSnapshotDeleted?: (id: string) => void;
 
   /**
    * Initialize with merged multi-piece mesh data and seam connections.
@@ -142,6 +145,34 @@ export class WasmSolverClient {
     this.worker?.postMessage({ type: 'clearPins' });
   }
 
+  /**
+   * Save current particle positions as a named snapshot in the worker.
+   */
+  saveSnapshot(id: string): void {
+    this.worker?.postMessage({ type: 'saveSnapshot', id });
+  }
+
+  /**
+   * Restore particle positions from a previously saved snapshot.
+   */
+  restoreSnapshot(id: string): void {
+    this.worker?.postMessage({ type: 'restoreSnapshot', id });
+  }
+
+  /**
+   * Delete a snapshot from worker memory.
+   */
+  deleteSnapshot(id: string): void {
+    this.worker?.postMessage({ type: 'deleteSnapshot', id });
+  }
+
+  /**
+   * Apply positions for warm-start (after pattern edit, keeps draped state).
+   */
+  warmStart(positions: Float32Array): void {
+    this.worker?.postMessage({ type: 'warmStart', positions });
+  }
+
   start(): void {
     this.worker?.postMessage({ type: 'start' });
   }
@@ -181,6 +212,15 @@ export class WasmSolverClient {
         this.readyReject = null;
         this.readyResolve = null;
         this.onError?.(msg.message);
+        break;
+      case 'snapshotSaved':
+        this.onSnapshotSaved?.(msg.id, msg.particleCount);
+        break;
+      case 'snapshotRestored':
+        this.onSnapshotRestored?.(msg.id);
+        break;
+      case 'snapshotDeleted':
+        this.onSnapshotDeleted?.(msg.id);
         break;
     }
   };

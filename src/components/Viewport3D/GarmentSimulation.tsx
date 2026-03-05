@@ -7,7 +7,7 @@
  * @module GarmentSimulation
  */
 
-import { Suspense, useRef, useEffect, useCallback, useMemo, useState } from 'react';
+import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
@@ -200,6 +200,12 @@ function seamsToInitData(seams: Seam[]): SeamInitData[] {
   }));
 }
 
+export interface GarmentSimulationHandle {
+  saveSnapshot: (id: string) => void;
+  restoreSnapshot: (id: string) => void;
+  deleteSnapshot: (id: string) => void;
+}
+
 interface GarmentSimulationProps {
   pieces: PatternPiece[];
   seams: Seam[];
@@ -211,7 +217,7 @@ interface GarmentSimulationProps {
  * Merged multi-piece simulation component.
  * Renders all pieces as a single merged mesh with vertex colors.
  */
-function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationProps) {
+const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationProps>(function MergedSimulation({ pieces, seams, onFitMapStats }, ref) {
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
@@ -374,6 +380,21 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
   const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
+
+  useImperativeHandle(ref, () => ({
+    saveSnapshot: (id: string) => {
+      clientRef.current?.saveSnapshot(id);
+      wasmClientRef.current?.saveSnapshot(id);
+    },
+    restoreSnapshot: (id: string) => {
+      clientRef.current?.restoreSnapshot(id);
+      wasmClientRef.current?.restoreSnapshot(id);
+    },
+    deleteSnapshot: (id: string) => {
+      clientRef.current?.deleteSnapshot(id);
+      wasmClientRef.current?.deleteSnapshot(id);
+    },
+  }), []);
 
   // Apply placement transforms (pure math, no Three.js objects per vertex)
   // Uses placeGarmentPieces for consistency with staticGeometry rendering
@@ -780,7 +801,7 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
       <PinRenderer livePositions={positionsRef.current || undefined} />
     </>
   );
-}
+});
 
 /**
  * GarmentSimulation — always uses MergedSimulation for all pieces.
@@ -790,10 +811,12 @@ function MergedSimulation({ pieces, seams, onFitMapStats }: GarmentSimulationPro
  * freezing the browser. MergedSimulation uses Web Workers for everything.
  * When no seams exist, the solver simply has no seam constraints.
  */
-export default function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }: GarmentSimulationProps) {
+const GarmentSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationProps>(function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }, ref) {
   return (
     <Suspense fallback={null}>
-      <MergedSimulation pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} onInspect={onInspect} />
+      <MergedSimulation ref={ref} pieces={pieces} seams={seams} onFitMapStats={onFitMapStats} onInspect={onInspect} />
     </Suspense>
   );
-}
+});
+
+export default GarmentSimulation;

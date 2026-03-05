@@ -8,6 +8,7 @@ import DraggablePiece from './DraggablePiece';
 import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
+import type { GarmentSimulationHandle } from './GarmentSimulation';
 import { SimulationErrorBoundary } from './SimulationErrorBoundary';
 import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
@@ -75,6 +76,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
 
+  const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
   const orbitRef = useRef<React.ComponentRef<typeof OrbitControls>>(null);
   const cameraPresets = useCameraPresets(orbitRef);
@@ -310,7 +312,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
         {showGarment && (useClothSim ? (
           <SimulationErrorBoundary>
-            <GarmentSimulation pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
+            <GarmentSimulation ref={simRef} pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
           </SimulationErrorBoundary>
         ) : (
           (() => {
@@ -374,9 +376,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
       {/* Snapshot A/B comparison bar */}
       <SnapshotBar
-        onSaveSnapshot={() => {}}
-        onRestoreSnapshot={() => {}}
-        onDeleteSnapshot={() => {}}
+        onSaveSnapshot={(id) => simRef.current?.saveSnapshot(id)}
+        onRestoreSnapshot={(id) => simRef.current?.restoreSnapshot(id)}
+        onDeleteSnapshot={(id) => simRef.current?.deleteSnapshot(id)}
       />
 
       {/* Status indicators */}
