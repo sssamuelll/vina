@@ -14,6 +14,9 @@ import {
   resetSimulation,
   setFitMapMode,
   updateFitMapConfig,
+  addSnapshot,
+  removeSnapshot,
+  setActiveSnapshot,
 } from '../../../../store/simulationSlice';
 import type { FitMapMode } from '../../../../utils/cloth/fitMaps';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
@@ -198,6 +201,126 @@ const configureFitMapTool: ToolDefinition = {
   },
 };
 
+// ─── saveSimulationState ────────────────────────────────────────────────────
+
+const saveSimulationStateTool: ToolDefinition = {
+  name: 'saveSimulationState',
+  description:
+    'Save the current 3D draping state as a named snapshot for later comparison. ' +
+    '/ Guardar el estado actual de caída 3D como snapshot con nombre.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Human-readable name for this state / Nombre legible para este estado' },
+    },
+    required: ['name'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const name = params.name as string;
+    const id = `copilot-${Date.now()}`;
+    const state = getState();
+    const particleCount = state.simulation.particleCount ?? 0;
+
+    dispatch(addSnapshot({ id, name, particleCount, isAutoSave: false }));
+    dispatch(setActiveSnapshot(id));
+
+    // Emit custom event for GarmentSimulation to pick up
+    window.dispatchEvent(new CustomEvent('openclo:snapshotSave', { detail: { id } }));
+
+    return { success: true, data: { id, name, particleCount } };
+  },
+};
+
+// ─── restoreSimulationState ─────────────────────────────────────────────────
+
+const restoreSimulationStateTool: ToolDefinition = {
+  name: 'restoreSimulationState',
+  description:
+    'Restore a previously saved draping state by name. ' +
+    '/ Restaurar un estado de caída guardado previamente por nombre.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Name of the saved state / Nombre del estado guardado' },
+    },
+    required: ['name'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const name = params.name as string;
+    const state = getState();
+    const snapshots = state.simulation.snapshots ?? [];
+    const snap = snapshots.find((s: { name: string }) => s.name === name);
+    if (!snap) {
+      return { success: false, error: `No snapshot named "${name}" found` };
+    }
+
+    dispatch(setActiveSnapshot(snap.id));
+    window.dispatchEvent(new CustomEvent('openclo:snapshotRestore', { detail: { id: snap.id } }));
+
+    return { success: true, data: { restored: true, name: snap.name } };
+  },
+};
+
+// ─── listSimulationStates ───────────────────────────────────────────────────
+
+const listSimulationStatesTool: ToolDefinition = {
+  name: 'listSimulationStates',
+  description:
+    'List all saved simulation state snapshots. ' +
+    '/ Listar todos los snapshots de estado de simulación guardados.',
+  parameters: {
+    type: 'object',
+    properties: {},
+  },
+  execute: async (_params, _dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const snapshots = state.simulation.snapshots ?? [];
+    return {
+      success: true,
+      data: {
+        snapshots: snapshots
+          .filter((s: { isAutoSave: boolean }) => !s.isAutoSave)
+          .map((s: { id: string; name: string; timestamp: number; particleCount: number }) => ({
+            id: s.id,
+            name: s.name,
+            timestamp: s.timestamp,
+            particleCount: s.particleCount,
+          })),
+      },
+    };
+  },
+};
+
+// ─── deleteSimulationState ──────────────────────────────────────────────────
+
+const deleteSimulationStateTool: ToolDefinition = {
+  name: 'deleteSimulationState',
+  description:
+    'Delete a saved simulation state snapshot by name. ' +
+    '/ Eliminar un snapshot de estado de simulación por nombre.',
+  parameters: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: 'Name of the state to delete / Nombre del estado a eliminar' },
+    },
+    required: ['name'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const name = params.name as string;
+    const state = getState();
+    const snapshots = state.simulation.snapshots ?? [];
+    const snap = snapshots.find((s: { name: string }) => s.name === name);
+    if (!snap) {
+      return { success: false, error: `No snapshot named "${name}" found` };
+    }
+
+    dispatch(removeSnapshot(snap.id));
+    window.dispatchEvent(new CustomEvent('openclo:snapshotDelete', { detail: { id: snap.id } }));
+
+    return { success: true, data: { deleted: true, name } };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   setFabricTool,
   listFabricsTool,
@@ -205,4 +328,8 @@ export const tools: ToolDefinition[] = [
   pauseSimulationTool,
   setFitMapModeTool,
   configureFitMapTool,
+  saveSimulationStateTool,
+  restoreSimulationStateTool,
+  listSimulationStatesTool,
+  deleteSimulationStateTool,
 ];

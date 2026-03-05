@@ -72,6 +72,9 @@ export interface AgentContext {
   simulation: {
     state: string;
     pieceFabrics: Record<string, string>;
+    snapshots: Array<{ name: string; timestamp: number }>;
+    hasPreEditSnapshot: boolean;
+    particleCount: number;
   };
   /** Names of active pattern skills matched from user message */
   activeSkills: string[];
@@ -156,6 +159,11 @@ export function buildAgentContext(state: RootState, activeSkills: string[] = [])
     simulation: {
       state: simulation.simulationState,
       pieceFabrics: simulation.pieceFabrics,
+      snapshots: simulation.snapshots
+        .filter(s => !s.isAutoSave)
+        .map(s => ({ name: s.name, timestamp: s.timestamp })),
+      hasPreEditSnapshot: simulation.snapshots.some(s => s.isAutoSave),
+      particleCount: simulation.particleCount,
     },
     activeSkills,
   };
@@ -203,7 +211,13 @@ export function serializeContext(context: AgentContext): string {
   }
 
   if (context.simulation.state !== 'idle') {
-    parts.push(`\nSimulation: ${context.simulation.state}`);
+    parts.push(`\nSimulation: ${context.simulation.state} (${context.simulation.particleCount} particles)`);
+    if (context.simulation.snapshots.length > 0) {
+      parts.push(`Snapshots: ${context.simulation.snapshots.map(s => s.name).join(', ')}`);
+    }
+    if (context.simulation.hasPreEditSnapshot) {
+      parts.push(`Pre-edit snapshot available (undo will restore draping)`);
+    }
   }
 
   return parts.join('\n');

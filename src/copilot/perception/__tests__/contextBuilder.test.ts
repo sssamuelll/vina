@@ -668,6 +668,9 @@ describe('Context Builder - Enhanced Agent Context', () => {
     simulation: {
       simulationState: 'idle',
       pieceFabrics: {},
+      snapshots: [],
+      activeSnapshotId: null,
+      particleCount: 0,
     },
   } as unknown as RootState;
 
