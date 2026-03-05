@@ -274,10 +274,6 @@ export class NeuralDrapeClient {
     this.ort = null;
   }
 
-  // No-op for API compatibility with other solver clients
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  setSDF(_sdf: unknown): void { /* Neural drape doesn't use SDF */ }
-
   private tick = (): void => {
     if (!this.running) return;
 

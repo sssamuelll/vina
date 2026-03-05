@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { NeuralDrapeClient, isNeuralDrapeAvailable } from '../neuralDrapeClient';
 
@@ -89,14 +89,6 @@ describe('NeuralDrapeClient', () => {
     ]);
     client.start();
     await client.dispose();
-    // No crash = success
-  });
-
-  it('setSDF is a no-op (API compatibility)', async () => {
-    await client.initMultiPiece([
-      { pieceId: 'a', vertices: new Float32Array([0, 0, 0]), triIds: new Int32Array(0) },
-    ]);
-    client.setSDF({ distances: new Float32Array(0), resolution: 0, min: [0, 0, 0], cellSize: 0 });
     // No crash = success
   });
 

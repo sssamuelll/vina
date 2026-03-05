@@ -1,7 +1,7 @@
 /**
  * Collision Mesh Data — flat triangle representation for worker-side collision.
  *
- * Replaces SDFData for body collision. Extracted on main thread from
+ * Flat triangle representation for body collision. Extracted on main thread from
  * Three.js BufferGeometry, transferred to worker via postMessage.
  *
  * @module collisionMesh

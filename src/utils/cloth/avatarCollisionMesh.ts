@@ -8,7 +8,7 @@ import { extractCollisionMesh } from './collisionMesh';
 
 /**
  * Load avatar model, extract mesh data, and convert to flat CollisionMeshData.
- * Reuses the same avatar loading pipeline as loadSDFInWorker.
+ * Reuses the same avatar loading pipeline as GarmentSimulation.
  */
 export async function extractAvatarCollisionMesh(
   avatarUrl: string,
@@ -29,7 +29,7 @@ export async function extractAvatarCollisionMesh(
     scene = gltf.scene as import('three').Group;
   }
 
-  // Scale + center (same transforms as AvatarModel.tsx and avatarSDF.ts)
+  // Scale + center (same transforms as AvatarModel.tsx)
   const box = new THREE.Box3().setFromObject(scene);
   const size = new THREE.Vector3();
   box.getSize(size);
