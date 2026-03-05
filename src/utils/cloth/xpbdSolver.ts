@@ -594,7 +594,10 @@ export class XPBDClothSolver {
 
   /**
    * Set SDF data for accurate avatar body collision.
-   * 
+   *
+   * @deprecated Use `setCollisionMesh()` instead. SDF collision is retained
+   * for backward compatibility with the Wasm solver.
+   *
    * @param sdf - Signed distance field data or null to disable
    */
   setSDF(sdf: SDFData | null): void {

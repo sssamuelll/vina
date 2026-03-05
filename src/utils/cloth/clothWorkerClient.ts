@@ -199,6 +199,8 @@ export class ClothWorkerClient {
   /**
    * Set SDF data for accurate avatar body collision.
    *
+   * @deprecated Use `setCollisionMesh()` instead.
+   *
    * @param sdf - Signed distance field data
    */
   setSDF(sdf: SDFData): void {

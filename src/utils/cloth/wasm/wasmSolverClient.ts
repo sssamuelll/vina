@@ -98,6 +98,7 @@ export class WasmSolverClient {
     });
   }
 
+  /** @deprecated Use setCollisionMesh() instead. Retained for Wasm solver compatibility. */
   setSDF(sdf: SDFData): void {
     this.worker?.postMessage({ type: 'setSDF', sdf });
   }

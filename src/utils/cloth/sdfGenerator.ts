@@ -1,10 +1,10 @@
 /**
  * SDF (Signed Distance Field) Generator for Avatar Body Collision
- * 
- * Generates a 3D signed distance field from triangle mesh data.
- * Optimized for Web Worker execution — zero allocations in hot loop,
- * integer-keyed spatial hash, no string operations.
- * 
+ *
+ * @deprecated Use triangle mesh collision via `collisionMesh.ts` and
+ * `triangleCollision.ts` instead. SDF is retained as fallback for the
+ * Wasm solver until Rust-side triangle collision is implemented.
+ *
  * @module sdfGenerator
  */
 
