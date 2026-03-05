@@ -5,6 +5,8 @@ import projectReducer, {
   addSeam, addInternalLine, setInternalLine,
   setProjectName, loadProject, updateMeasurements,
   setAvatarMode, setAvatarModelUrl,
+  bringToFront, sendToBack, bringForward, sendBackward,
+  lockPiece, unlockPiece,
 } from '../store/projectSlice';
 import editorReducer, {
   setViewMode, setActiveTool, selectPiece, clearSelection,
@@ -166,6 +168,59 @@ describe('projectSlice', () => {
     store.dispatch(addPiece(makePiece('p1')));
     expect(store.getState().project.pieces[0].zOrder).toBeUndefined();
     expect(store.getState().project.pieces[0].locked).toBeUndefined();
+  });
+
+  it('bringToFront sets highest zOrder', () => {
+    const store = createStore();
+    const p1 = makePiece('p1'); p1.zOrder = 0;
+    const p2 = makePiece('p2'); p2.zOrder = 1;
+    const p3 = makePiece('p3'); p3.zOrder = 2;
+    store.dispatch(addPiece(p1));
+    store.dispatch(addPiece(p2));
+    store.dispatch(addPiece(p3));
+    store.dispatch(bringToFront('p1'));
+    expect(store.getState().project.pieces.find(p => p.id === 'p1')!.zOrder).toBe(3);
+  });
+
+  it('sendToBack sets lowest zOrder', () => {
+    const store = createStore();
+    const p1 = makePiece('p1'); p1.zOrder = 2;
+    const p2 = makePiece('p2'); p2.zOrder = 0;
+    store.dispatch(addPiece(p1));
+    store.dispatch(addPiece(p2));
+    store.dispatch(sendToBack('p1'));
+    expect(store.getState().project.pieces.find(p => p.id === 'p1')!.zOrder).toBe(-1);
+  });
+
+  it('bringForward increments zOrder by 1', () => {
+    const store = createStore();
+    const p1 = makePiece('p1'); p1.zOrder = 1;
+    store.dispatch(addPiece(p1));
+    store.dispatch(bringForward('p1'));
+    expect(store.getState().project.pieces.find(p => p.id === 'p1')!.zOrder).toBe(2);
+  });
+
+  it('sendBackward decrements zOrder by 1', () => {
+    const store = createStore();
+    const p1 = makePiece('p1'); p1.zOrder = 3;
+    store.dispatch(addPiece(p1));
+    store.dispatch(sendBackward('p1'));
+    expect(store.getState().project.pieces.find(p => p.id === 'p1')!.zOrder).toBe(2);
+  });
+
+  it('lockPiece sets locked to true', () => {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('p1')));
+    store.dispatch(lockPiece('p1'));
+    expect(store.getState().project.pieces[0].locked).toBe(true);
+  });
+
+  it('unlockPiece sets locked to false', () => {
+    const store = createStore();
+    const p1 = makePiece('p1'); p1.locked = true;
+    store.dispatch(addPiece(p1));
+    store.dispatch(unlockPiece('p1'));
+    expect(store.getState().project.pieces[0].locked).toBe(false);
   });
 });
 

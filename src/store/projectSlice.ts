@@ -345,6 +345,54 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Z-Order ───
+    bringToFront(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        const maxZ = Math.max(0, ...state.pieces.map(p => p.zOrder ?? 0));
+        piece.zOrder = maxZ + 1;
+        state.isDirty = true;
+      }
+    },
+    sendToBack(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        const minZ = Math.min(0, ...state.pieces.map(p => p.zOrder ?? 0));
+        piece.zOrder = minZ - 1;
+        state.isDirty = true;
+      }
+    },
+    bringForward(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        piece.zOrder = (piece.zOrder ?? 0) + 1;
+        state.isDirty = true;
+      }
+    },
+    sendBackward(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        piece.zOrder = (piece.zOrder ?? 0) - 1;
+        state.isDirty = true;
+      }
+    },
+
+    // ─── Lock ───
+    lockPiece(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        piece.locked = true;
+        state.isDirty = true;
+      }
+    },
+    unlockPiece(state, action: PayloadAction<string>) {
+      const piece = state.pieces.find(p => p.id === action.payload);
+      if (piece) {
+        piece.locked = false;
+        state.isDirty = true;
+      }
+    },
+
     // ─── Fabrics ───
     addFabric(state, action: PayloadAction<Fabric>) {
       state.fabrics.push(action.payload);
@@ -385,6 +433,8 @@ export const {
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, reverseSeam,
   linkPieces, unlinkPieces, cloneAsLinked,
+  bringToFront, sendToBack, bringForward, sendBackward,
+  lockPiece, unlockPiece,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;
