@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import {
@@ -17,6 +17,7 @@ import type { CuttingLayoutConfig } from '../../utils/export/cuttingLayout';
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
 import { checkPieceOverlap, isWithinBounds, computeUtilization } from '../../utils/export/markerCollision';
 import MarkerPiece from './MarkerPiece';
+import MarkerContextMenu, { type MarkerContextMenuState } from './MarkerContextMenu';
 
 export default function MarkerEditor() {
   const dispatch = useDispatch();
@@ -26,6 +27,11 @@ export default function MarkerEditor() {
   const projectName = useSelector((s: RootState) => s.project.name);
 
   const { layout, paperWidth, paperHeight, margin, showGrid, gridSpacing, selectedPieceIndex, fabricUtilization } = marker;
+
+  const [markerCtxMenu, setMarkerCtxMenu] = useState<MarkerContextMenuState>({
+    visible: false, x: 0, y: 0, pieceIndex: null,
+  });
+  const markerCtxPageRef = useRef(0);
 
   // Collision detection per page
   const collisionMap = useMemo(() => {
@@ -103,6 +109,18 @@ export default function MarkerEditor() {
   const handleBackgroundClick = useCallback(() => {
     dispatch(deselectPiece());
   }, [dispatch]);
+
+  const handlePieceContextMenu = useCallback((pageIndex: number, pieceIndex: number, e: React.MouseEvent) => {
+    const piece = layout?.pages[pageIndex]?.pieces[pieceIndex];
+    setMarkerCtxMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      pieceIndex,
+      pieceName: piece?.pieceName,
+    });
+    markerCtxPageRef.current = pageIndex;
+  }, [layout]);
 
   if (!marker.isOpen || !layout) return null;
 
@@ -248,6 +266,7 @@ export default function MarkerEditor() {
                   onSelect={(idx) => dispatch(selectPiece({ page: pageIndex, piece: idx }))}
                   onDrag={(idx, pos) => handleDrag(pageIndex, idx, pos)}
                   onRotate={(idx, deg) => handleRotate(pageIndex, idx, deg)}
+                  onContextMenu={(idx, e) => handlePieceContextMenu(pageIndex, idx, e)}
                   gridSnap={showGrid ? gridSpacing : undefined}
                 />
               ))}
@@ -255,6 +274,24 @@ export default function MarkerEditor() {
           </div>
         ))}
       </div>
+
+      <MarkerContextMenu
+        menu={markerCtxMenu}
+        onClose={() => setMarkerCtxMenu(m => ({ ...m, visible: false }))}
+        onRotate={(deg) => {
+          if (markerCtxMenu.pieceIndex !== null) {
+            dispatch(rotatePiece({ pageIndex: markerCtxPageRef.current, pieceIndex: markerCtxMenu.pieceIndex, degrees: deg }));
+          }
+        }}
+        onFlipH={() => {
+          // Marker flip not yet implemented in markerSlice
+        }}
+        onSelect={() => {
+          if (markerCtxMenu.pieceIndex !== null) {
+            dispatch(selectPiece({ page: markerCtxPageRef.current, piece: markerCtxMenu.pieceIndex }));
+          }
+        }}
+      />
     </div>
   );
 }

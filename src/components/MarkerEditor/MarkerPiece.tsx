@@ -9,6 +9,7 @@ export interface MarkerPieceProps {
   onSelect: (index: number) => void;
   onDrag: (index: number, newPos: [number, number]) => void;
   onRotate: (index: number, degrees: number) => void;
+  onContextMenu?: (index: number, e: React.MouseEvent) => void;
   gridSnap?: number;
 }
 
@@ -43,6 +44,7 @@ export default function MarkerPiece({
   onSelect,
   onDrag,
   onRotate,
+  onContextMenu,
   gridSnap,
 }: MarkerPieceProps) {
   const [dragging, setDragging] = useState(false);
@@ -104,8 +106,12 @@ export default function MarkerPiece({
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    onRotate(index, 90);
-  }, [index, onRotate]);
+    if (onContextMenu) {
+      onContextMenu(index, e);
+    } else {
+      onRotate(index, 90);
+    }
+  }, [index, onRotate, onContextMenu]);
 
   const outlinePath = coordsToPath(piece.outline);
   const saPath = piece.seamAllowance ? coordsToPath(piece.seamAllowance) : null;
