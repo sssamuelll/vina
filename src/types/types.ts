@@ -54,6 +54,10 @@ export interface PatternPiece {
   linkedPieceId?: string;
   /** Link mode: symmetry (mirror) or instance (identical copy) */
   linkMode?: 'symmetry' | 'instance';
+  /** Rendering order in 2D canvas (higher = drawn on top). Default 0. */
+  zOrder?: number;
+  /** When true, piece cannot be moved/edited interactively */
+  locked?: boolean;
   createdAt: number;
   updatedAt: number;
 }

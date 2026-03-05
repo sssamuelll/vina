@@ -150,6 +150,23 @@ describe('projectSlice', () => {
     expect(store.getState().project.avatarModelUrl).toBe('https://example.com/model.glb');
     expect(store.getState().project.avatarMode).toBe('model');
   });
+
+  it('piece has optional zOrder and locked fields', () => {
+    const store = createStore();
+    const piece = makePiece('p1');
+    piece.zOrder = 5;
+    piece.locked = true;
+    store.dispatch(addPiece(piece));
+    expect(store.getState().project.pieces[0].zOrder).toBe(5);
+    expect(store.getState().project.pieces[0].locked).toBe(true);
+  });
+
+  it('piece defaults to no zOrder or locked', () => {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('p1')));
+    expect(store.getState().project.pieces[0].zOrder).toBeUndefined();
+    expect(store.getState().project.pieces[0].locked).toBeUndefined();
+  });
 });
 
 describe('editorSlice', () => {
