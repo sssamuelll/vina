@@ -69,6 +69,10 @@ let animFrameId: ReturnType<typeof setTimeout> | null = null;
 let cachedMergedMesh: MergedMesh | null = null;
 let cachedOutlines: Map<string, Array<{ type: string; values: number[] }>> | null = null;
 
+/** Snapshot storage: id → copy of particle positions */
+const snapshots = new Map<string, Float32Array>();
+const MAX_SNAPSHOTS = 5; // 1 auto pre-edit + 3 manual + 1 buffer
+
 /** Max time budget per frame in ms. If substeps exceed this, skip remaining. */
 const FRAME_BUDGET_MS = 14; // ~60fps target, leave 2ms headroom
 
@@ -318,6 +322,68 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
             (outMsg as { stretchingIds: Int32Array }).stretchingIds.buffer,
             (outMsg as { stretchingLengths: Float32Array }).stretchingLengths.buffer,
           ]);
+        }
+        break;
+      }
+
+      case 'saveSnapshot': {
+        if (solver) {
+          const positions = new Float32Array(solver.pos);
+          snapshots.set(msg.id, positions);
+          // Evict oldest if over limit
+          if (snapshots.size > MAX_SNAPSHOTS) {
+            const oldest = snapshots.keys().next().value;
+            if (oldest !== undefined) snapshots.delete(oldest);
+          }
+          (self as unknown as Worker).postMessage({
+            type: 'snapshotSaved',
+            id: msg.id,
+            particleCount: solver.numParticles,
+          } satisfies WorkerOutMessage);
+        }
+        break;
+      }
+
+      case 'restoreSnapshot': {
+        if (solver) {
+          const saved = snapshots.get(msg.id);
+          if (saved && saved.length === solver.pos.length) {
+            solver.pos.set(saved);
+            solver.prevPos.set(saved);
+            solver.vel.fill(0);
+            (self as unknown as Worker).postMessage({
+              type: 'snapshotRestored',
+              id: msg.id,
+            } satisfies WorkerOutMessage);
+            // Send frame with restored positions
+            const snap = solver.getSnapshot();
+            (self as unknown as Worker).postMessage(
+              { type: 'frame', positions: snap.positions, numParticles: snap.numParticles, triIds: snap.triIds } satisfies WorkerOutMessage,
+              [snap.positions.buffer],
+            );
+          }
+        }
+        break;
+      }
+
+      case 'deleteSnapshot': {
+        snapshots.delete(msg.id);
+        (self as unknown as Worker).postMessage({
+          type: 'snapshotDeleted',
+          id: msg.id,
+        } satisfies WorkerOutMessage);
+        break;
+      }
+
+      case 'warmStart': {
+        if (solver) {
+          const incoming = new Float32Array(msg.positions);
+          // If same particle count, restore directly; otherwise ignore (topology changed)
+          if (incoming.length === solver.pos.length) {
+            solver.pos.set(incoming);
+            solver.prevPos.set(incoming);
+            solver.vel.fill(0);
+          }
         }
         break;
       }
