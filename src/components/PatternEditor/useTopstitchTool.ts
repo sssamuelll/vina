@@ -4,47 +4,11 @@ import { RootState } from '../../store';
 import { addInternalLine } from '../../store/projectSlice';
 import { selectInternalLine } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, PathCommand, InternalLine, TopstitchOptions, Tool2D } from '../../types/types';
-import { getEdgeEndpoints } from './useSeamTool';
+import { getEdgeEndpoints, computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
 import { snapToEdge } from './useSegmentSewingTool';
 
-// ─── Pure functions (exported for testing) ────────────────────────────
-
-export function computeOffsetPath(
-  start: Point2D,
-  end: Point2D,
-  offset: number,
-): PathCommand[] {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const len = Math.hypot(dx, dy);
-  if (len === 0) return [];
-
-  const nx = -dy / len;
-  const ny = dx / len;
-
-  return [
-    { type: 'M', values: [start.x + nx * offset, start.y + ny * offset] },
-    { type: 'L', values: [end.x + nx * offset, end.y + ny * offset] },
-  ];
-}
-
-export function computeSegmentOffsetPath(
-  start: Point2D,
-  end: Point2D,
-  t0: number,
-  t1: number,
-  offset: number,
-): PathCommand[] {
-  const segStart = {
-    x: start.x + (end.x - start.x) * t0,
-    y: start.y + (end.y - start.y) * t0,
-  };
-  const segEnd = {
-    x: start.x + (end.x - start.x) * t1,
-    y: start.y + (end.y - start.y) * t1,
-  };
-  return computeOffsetPath(segStart, segEnd, offset);
-}
+// Re-export pure functions for backward compatibility
+export { computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
