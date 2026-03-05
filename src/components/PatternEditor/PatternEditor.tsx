@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
-import { selectPiece, selectSeam } from '../../store/editorSlice';
+import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
@@ -143,8 +143,9 @@ export default function PatternEditor() {
       pieceName: hitPiece?.name,
       segmentIndex,
       segmentIsCurve,
+      activeTool,
     });
-  }, [pieces, pan2D, zoom2D, editPatternTool.isEditing, editPatternTool.editingPieceId]);
+  }, [pieces, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
   const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {
     for (const u of updates) {
@@ -183,6 +184,17 @@ export default function PatternEditor() {
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool,
     });
+
+  const handleZoomToFit = useCallback(() => {
+    const svgEl = svgRef.current;
+    if (!svgEl || pieces.length === 0) return;
+    const rect = svgEl.getBoundingClientRect();
+    const fit = computeFitView(pieces, rect.width, rect.height);
+    if (fit) {
+      dispatch(setZoom2D(fit.zoom));
+      dispatch(setPan2D(fit.pan));
+    }
+  }, [pieces, dispatch, svgRef]);
 
   return (
     <div className="pattern-editor">
@@ -309,6 +321,7 @@ export default function PatternEditor() {
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
         onRename={(id) => setEditingPieceNameId(id)}
         onConvertSegment={(idx, toCurve) => editPatternTool.convertSegment(idx, toCurve)}
+        onZoomToFit={handleZoomToFit}
       />
     </div>
   );

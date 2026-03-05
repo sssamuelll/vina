@@ -21,8 +21,15 @@ import {
   linkPieces,
   unlinkPieces,
   cloneAsLinked,
+  bringToFront,
+  sendToBack,
+  bringForward,
+  sendBackward,
+  lockPiece,
+  unlockPiece,
+  addPiece,
 } from '../../store/projectSlice';
-import { selectPiece, clearSelection } from '../../store/editorSlice';
+import { selectPiece, clearSelection, copyPieces, createPastedPieces } from '../../store/editorSlice';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,6 +44,8 @@ export interface ContextMenuState {
   segmentIndex?: number;
   /** Whether the segment is currently a curve */
   segmentIsCurve?: boolean;
+  /** Active tool when context menu was opened */
+  activeTool?: string;
 }
 
 interface ContextMenuProps {
@@ -44,6 +53,7 @@ interface ContextMenuProps {
   onClose: () => void;
   onRename?: (pieceId: string) => void;
   onConvertSegment?: (commandIndex: number, toCurve: boolean) => void;
+  onZoomToFit?: () => void;
 }
 
 // ─── Menu Items ─────────────────────────────────────────────────────────────
@@ -59,10 +69,11 @@ interface MenuItem {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ContextMenu({ menu, onClose, onRename, onConvertSegment }: ContextMenuProps) {
+export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
+  const clipboard = useSelector((s: RootState) => s.editor.clipboard);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on click outside or Escape
@@ -103,10 +114,52 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
   if (menu.pieceId) {
     // ── Piece context ──
     const pid = menu.pieceId;
+    const piece = pieces.find(p => p.id === pid);
 
     // Find current rotation to add to it
-    const currentRotation = pieces?.find(p => p.id === pid)?.rotation ?? 0;
+    const currentRotation = piece?.rotation ?? 0;
 
+    // Copy
+    items.push({
+      label: 'Copy',
+      icon: '📄',
+      shortcut: 'Ctrl+C',
+      action: () => act(() => {
+        if (piece) dispatch(copyPieces({ pieces: [piece] }));
+      }),
+    });
+    // Paste
+    if (clipboard) {
+      items.push({
+        label: 'Paste',
+        icon: '📋',
+        shortcut: 'Ctrl+V',
+        action: () => act(() => {
+          const pasted = createPastedPieces(clipboard);
+          pasted.forEach(p => dispatch(addPiece(p)));
+        }),
+      });
+      items.push({
+        label: 'Mirror Paste',
+        icon: '🪞',
+        shortcut: 'Ctrl+R',
+        action: () => act(() => {
+          const pasted = createPastedPieces(clipboard, true);
+          pasted.forEach(p => dispatch(addPiece(p)));
+        }),
+        separator: true,
+      });
+    } else {
+      items.push({
+        label: 'Paste',
+        icon: '📋',
+        shortcut: 'Ctrl+V',
+        action: () => {},
+        separator: true,
+      });
+    }
+
+    // Rotate
     items.push({
       label: 'Rotate 90°',
       icon: '↻',
@@ -124,6 +177,8 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
       action: () => act(() => dispatch(rotatePiece({ id: pid, rotation: currentRotation - 90 }))),
       separator: true,
     });
+
+    // Flip
     items.push({
       label: 'Flip Horizontal',
       icon: '↔',
@@ -137,12 +192,46 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
       action: () => act(() => dispatch(flipPieceV(pid))),
       separator: true,
     });
+
+    // Z-order
+    items.push({
+      label: 'Bring to Front',
+      icon: '⬆',
+      action: () => act(() => dispatch(bringToFront(pid))),
+    });
+    items.push({
+      label: 'Bring Forward',
+      icon: '↑',
+      action: () => act(() => dispatch(bringForward(pid))),
+    });
+    items.push({
+      label: 'Send Backward',
+      icon: '↓',
+      action: () => act(() => dispatch(sendBackward(pid))),
+    });
+    items.push({
+      label: 'Send to Back',
+      icon: '⬇',
+      action: () => act(() => dispatch(sendToBack(pid))),
+      separator: true,
+    });
+
+    // Duplicate
     items.push({
       label: 'Duplicate',
       icon: '⧉',
       shortcut: 'Ctrl+D',
       action: () => act(() => dispatch(duplicatePiece(pid))),
     });
+
+    // Lock / Unlock
+    items.push({
+      label: piece?.locked ? 'Unlock' : 'Lock',
+      icon: piece?.locked ? '🔓' : '🔒',
+      action: () => act(() => dispatch(piece?.locked ? unlockPiece(pid) : lockPiece(pid))),
+    });
+
+    // Rename
     items.push({
       label: 'Rename…',
       icon: '✏️',
@@ -150,8 +239,8 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
       action: () => act(() => onRename?.(pid)),
       separator: true,
     });
+
     // ─── Linked Editing ───
-    const piece = pieces.find(p => p.id === pid);
     if (piece?.linkedPieceId) {
       // Already linked — show unlink and select partner
       items.push({
@@ -192,6 +281,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
         separator: true,
       });
     }
+
     items.push({
       label: 'Select',
       icon: '☐',
@@ -206,6 +296,32 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment 
     });
   } else {
     // ── Empty canvas context ──
+    if (clipboard) {
+      items.push({
+        label: 'Paste',
+        icon: '📋',
+        shortcut: 'Ctrl+V',
+        action: () => act(() => {
+          const pasted = createPastedPieces(clipboard);
+          pasted.forEach(p => dispatch(addPiece(p)));
+        }),
+      });
+      items.push({
+        label: 'Mirror Paste',
+        icon: '🪞',
+        shortcut: 'Ctrl+R',
+        action: () => act(() => {
+          const pasted = createPastedPieces(clipboard, true);
+          pasted.forEach(p => dispatch(addPiece(p)));
+        }),
+        separator: true,
+      });
+    }
+    items.push({
+      label: 'Zoom to Fit',
+      icon: '⊞',
+      action: () => act(() => onZoomToFit?.()),
+    });
     items.push({
       label: 'Deselect All',
       icon: '☐',
