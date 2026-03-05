@@ -29,6 +29,7 @@ import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
+import { useGeometricPreview } from './useGeometricPreview';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -488,6 +489,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     },
   }), []);
 
+  // Geometric preview: instant vertex displacement on dimension edits
+  useGeometricPreview({
+    pieces,
+    simulationState,
+    positionsRef,
+    onPreviewFrame: onFrame ? (positions) => {
+      onFrame(positions);
+    } : null,
+  });
+
   // Apply placement transforms (pure math, no Three.js objects per vertex)
   // Uses placeGarmentPieces for consistency with staticGeometry rendering
   const placedMeshes = useMemo(() => {
@@ -677,6 +688,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       startSim().catch(e => console.error('[GarmentSimulation] Start failed:', e));
 
       return () => {
+        // Cancel any pending warm-start
+        if (warmStartTimerRef.current) {
+          clearTimeout(warmStartTimerRef.current);
+          warmStartTimerRef.current = null;
+        }
         cancelled = true;
         clientRef.current?.dispose();
         clientRef.current = null;
@@ -689,6 +705,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         positionsRef.current = null;
       };
     } else if (simulationState === 'idle') {
+      // Cancel pending warm-start and clear warm-start state
+      if (warmStartTimerRef.current) {
+        clearTimeout(warmStartTimerRef.current);
+        warmStartTimerRef.current = null;
+      }
+      dispatch(setIsWarmStarting(false));
       clientRef.current?.dispose();
       clientRef.current = null;
       gpuClientRef.current?.dispose();
