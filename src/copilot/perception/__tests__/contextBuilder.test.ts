@@ -115,6 +115,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pinnedVertices: {}, selectedPinId: null,
       showGarment: true, showSeamlines3D: true, showInternalLines3D: true, surfaceMode3D: 'textured' as const,
       snapshots: [], activeSnapshotId: null,
+      isWarmStarting: false,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
