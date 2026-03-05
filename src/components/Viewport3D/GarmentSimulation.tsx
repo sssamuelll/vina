@@ -25,6 +25,7 @@ import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin } from '../../store/simulationSlice';
 import PinRenderer from './PinRenderer';
+import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
@@ -692,6 +693,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
     };
   }, [staticGeometry]);
+
+  // Register snapshot callbacks with undo middleware when simulation is active
+  useEffect(() => {
+    if (simulationState !== 'idle') {
+      const unregister = registerSimulationCallbacks(
+        (id) => {
+          clientRef.current?.saveSnapshot(id);
+          wasmClientRef.current?.saveSnapshot(id);
+        },
+        (id) => {
+          clientRef.current?.restoreSnapshot(id);
+          wasmClientRef.current?.restoreSnapshot(id);
+        },
+      );
+      return unregister;
+    }
+  }, [simulationState]);
 
   // Listen for 3D export events from copilot tools
   useEffect(() => {

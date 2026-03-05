@@ -1,6 +1,29 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Middleware } from '@reduxjs/toolkit';
 import { RootState } from './index';
+
+// ─── Simulation Snapshot Integration ────────────────────────────────────────
+
+/** Worker snapshot callbacks — registered by GarmentSimulation when simulation is active */
+let _snapshotSave: ((id: string) => void) | null = null;
+let _snapshotRestore: ((id: string) => void) | null = null;
+
+/**
+ * Register simulation snapshot callbacks for undo integration.
+ * Called by GarmentSimulation when simulation becomes active.
+ * Returns a cleanup function to unregister.
+ */
+export function registerSimulationCallbacks(
+  save: (id: string) => void,
+  restore: (id: string) => void,
+): () => void {
+  _snapshotSave = save;
+  _snapshotRestore = restore;
+  return () => {
+    _snapshotSave = null;
+    _snapshotRestore = null;
+  };
+}
 
 const MAX_HISTORY = 50;
 const UNDO_BATCH_MS = 500; // Batch rapid changes (e.g. slider drags) into one undo step
@@ -115,7 +138,13 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     if (entry) undoState.futureEntries.push(entry);
     const previous = undoState.past.pop()!;
     bumpRevision();
-    return next({ type: 'project/restoreState', payload: previous });
+    const result = next({ type: 'project/restoreState', payload: previous });
+    // Restore simulation state if simulation is active
+    const simStateAfterUndo = (store.getState() as RootState).simulation?.simulationState;
+    if (simStateAfterUndo && simStateAfterUndo !== 'idle' && _snapshotRestore) {
+      _snapshotRestore('auto-pre-edit');
+    }
+    return result;
   }
 
   if (actionType === 'editor/redo') {
@@ -134,6 +163,12 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     const now = Date.now();
     const isSameAction = actionType === undoState.batchingAction;
     const isRecent = (now - undoState.lastSnapshotTime) < UNDO_BATCH_MS;
+
+    // Auto-save simulation state before pattern edit (for undo integration)
+    const simState = (store.getState() as RootState).simulation?.simulationState;
+    if (simState && simState !== 'idle' && _snapshotSave && !(isSameAction && isRecent)) {
+      _snapshotSave('auto-pre-edit');
+    }
 
     // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step
     if (!(isSameAction && isRecent)) {
