@@ -1,0 +1,95 @@
+.snapshot-bar {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 6px 12px;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.snapshot-bar .snap-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.snapshot-bar .snap-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.snapshot-bar .snap-chip.active {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.snapshot-bar .snap-chip .snap-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+
+.snapshot-bar .snap-chip:hover .snap-delete {
+  opacity: 0.6;
+}
+
+.snapshot-bar .snap-chip .snap-delete:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.snapshot-bar .snap-save-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.snapshot-bar .snap-save-btn:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.snapshot-bar .snap-save-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}

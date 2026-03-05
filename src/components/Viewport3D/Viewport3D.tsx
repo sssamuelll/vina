@@ -17,6 +17,7 @@ import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
+import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import { useAvatarTape } from './useAvatarTape';
@@ -369,6 +370,13 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         avatarHidden={avatarHidden}
         onToggleAvatar={() => setAvatarHidden(h => !h)}
         onSnapshot={snapshot3D}
+      />
+
+      {/* Snapshot A/B comparison bar */}
+      <SnapshotBar
+        onSaveSnapshot={() => {}}
+        onRestoreSnapshot={() => {}}
+        onDeleteSnapshot={() => {}}
       />
 
       {/* Status indicators */}
