@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem } from '../types/types';
+import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece } from '../types/types';
 import { NEW_PROJECT } from './actions';
 
 const initialState: EditorState = {
@@ -21,6 +21,7 @@ const initialState: EditorState = {
   snapToGrid: true,
   gridSize: 10,
   units: 'mm',
+  clipboard: null,
 };
 
 const editorSlice = createSlice({
@@ -104,6 +105,14 @@ const editorSlice = createSlice({
     setUnits(state, action: PayloadAction<UnitSystem>) {
       state.units = action.payload;
     },
+    copyPieces(state, action: PayloadAction<{ pieces: PatternPiece[] }>) {
+      state.clipboard = {
+        pieces: JSON.parse(JSON.stringify(action.payload.pieces)),
+      };
+    },
+    clearClipboard(state) {
+      state.clipboard = null;
+    },
     // These are intercepted by undoMiddleware — they never actually modify editor state
     undo() {},
     redo() {},
@@ -120,10 +129,35 @@ export const {
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   setUnits,
+  copyPieces, clearClipboard,
   undo, redo,
 } = editorSlice.actions;
 
 export default editorSlice.reducer;
+
+// ─── Clipboard Utility ──────────────────────────────────────────────────────
+
+/**
+ * Generate paste payloads from clipboard pieces.
+ * Returns new PatternPiece objects with fresh IDs and offset positions.
+ * Caller dispatches addPiece() for each one.
+ */
+export function createPastedPieces(clipboard: { pieces: PatternPiece[] }, mirror = false): PatternPiece[] {
+  return clipboard.pieces.map(p => {
+    const clone: PatternPiece = JSON.parse(JSON.stringify(p));
+    clone.id = `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    clone.name = `${p.name} (${mirror ? 'mirror' : 'copy'})`;
+    clone.position = {
+      x: (p.position?.x ?? 0) + 30,
+      y: (p.position?.y ?? 0) + 30,
+    };
+    clone.createdAt = Date.now();
+    clone.updatedAt = Date.now();
+    clone.linkedPieceId = undefined;
+    clone.linkMode = undefined;
+    return clone;
+  });
+}
 
 // ─── Fit View Utility ────────────────────────────────────────────────────────
 

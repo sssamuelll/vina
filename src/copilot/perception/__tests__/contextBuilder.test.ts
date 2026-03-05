@@ -97,6 +97,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       snapToGrid: true,
       gridSize: 10,
       units: 'mm',
+      clipboard: null,
     },
     simulation: {
       simulationState: 'idle',

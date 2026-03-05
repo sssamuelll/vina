@@ -12,6 +12,7 @@ import editorReducer, {
   setViewMode, setActiveTool, selectPiece, clearSelection,
   togglePieceSelection, selectSeam, setZoom2D, setPan2D,
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid,
+  copyPieces, clearClipboard, createPastedPieces,
 } from '../store/editorSlice';
 import { undoMiddleware, canUndo, canRedo } from '../store/undoMiddleware';
 import { PatternPiece } from '../types/types';
@@ -338,5 +339,43 @@ describe('undoMiddleware', () => {
     store.dispatch(setActiveTool('pen'));
     store.dispatch(setViewMode('3d'));
     expect(canUndo()).toBe(false);
+  });
+});
+
+describe('clipboard (editorSlice)', () => {
+  it('copyPieces stores deep copies in clipboard', () => {
+    const store = createStore();
+    const p1 = makePiece('p1');
+    p1.name = 'Front';
+    store.dispatch(addPiece(p1));
+    store.dispatch(copyPieces({ pieces: [p1] }));
+    const clip = store.getState().editor.clipboard;
+    expect(clip).not.toBeNull();
+    expect(clip!.pieces).toHaveLength(1);
+    expect(clip!.pieces[0].name).toBe('Front');
+  });
+
+  it('createPastedPieces generates new pieces with offset', () => {
+    const p1 = makePiece('p1');
+    const pasted = createPastedPieces({ pieces: [p1] });
+    expect(pasted).toHaveLength(1);
+    expect(pasted[0].id).not.toBe('p1');
+    expect(pasted[0].position.x).toBe(30);
+    expect(pasted[0].position.y).toBe(30);
+    expect(pasted[0].name).toContain('copy');
+  });
+
+  it('createPastedPieces with mirror flag', () => {
+    const p1 = makePiece('p1');
+    const pasted = createPastedPieces({ pieces: [p1] }, true);
+    expect(pasted[0].name).toContain('mirror');
+  });
+
+  it('clearClipboard resets clipboard to null', () => {
+    const store = createStore();
+    store.dispatch(copyPieces({ pieces: [makePiece('p1')] }));
+    expect(store.getState().editor.clipboard).not.toBeNull();
+    store.dispatch(clearClipboard());
+    expect(store.getState().editor.clipboard).toBeNull();
   });
 });

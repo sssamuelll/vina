@@ -336,4 +336,8 @@ export interface EditorState {
   snapToGrid: boolean;
   gridSize: number;       // mm
   units: UnitSystem;
+  /** Clipboard for copy/paste */
+  clipboard: {
+    pieces: PatternPiece[];
+  } | null;
 }
