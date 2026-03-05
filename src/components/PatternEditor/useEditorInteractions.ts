@@ -410,7 +410,9 @@ export function useEditorInteractions(
           } else {
             dispatch(selectPiece(pieceId));
           }
-          dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
+          if (!piece.locked) {
+            dragRef.current = { pieceId, startMouse: { x: e.clientX, y: e.clientY }, startPos: { ...piece.position } };
+          }
         }
       } else {
         dispatch(clearSelection());
