@@ -50,6 +50,7 @@ export class WasmSolverClient {
   onSnapshotSaved?: (id: string, particleCount: number) => void;
   onSnapshotRestored?: (id: string) => void;
   onSnapshotDeleted?: (id: string) => void;
+  onConstraintsUpdated?: () => void;
 
   /**
    * Initialize with merged multi-piece mesh data and seam connections.
@@ -173,6 +174,17 @@ export class WasmSolverClient {
     this.worker?.postMessage({ type: 'warmStart', positions });
   }
 
+  /**
+   * Update stretch constraint rest lengths in-place.
+   * Solver continues from current positions with new constraints.
+   */
+  updateConstraints(restLengths: Float32Array): void {
+    this.worker?.postMessage(
+      { type: 'updateConstraints', restLengths },
+      [restLengths.buffer],
+    );
+  }
+
   start(): void {
     this.worker?.postMessage({ type: 'start' });
   }
@@ -221,6 +233,9 @@ export class WasmSolverClient {
         break;
       case 'snapshotDeleted':
         this.onSnapshotDeleted?.(msg.id);
+        break;
+      case 'constraintsUpdated':
+        this.onConstraintsUpdated?.();
         break;
     }
   };

@@ -243,6 +243,9 @@ export class ClothWorkerClient {
   /** Callback for snapshot deleted confirmation. */
   onSnapshotDeleted: ((id: string) => void) | null = null;
 
+  /** Called when constraints have been updated. */
+  onConstraintsUpdated: (() => void) | null = null;
+
   /**
    * Save current particle positions as a named snapshot in the worker.
    */
@@ -269,6 +272,17 @@ export class ClothWorkerClient {
    */
   warmStart(positions: Float32Array): void {
     this.postMessage({ type: 'warmStart', positions });
+  }
+
+  /**
+   * Update stretch constraint rest lengths in-place.
+   * Solver continues from current positions with new constraints.
+   */
+  updateConstraints(restLengths: Float32Array): void {
+    this.worker?.postMessage(
+      { type: 'updateConstraints', restLengths } as WorkerInMessage,
+      [restLengths.buffer],
+    );
   }
 
   /**
@@ -324,6 +338,10 @@ export class ClothWorkerClient {
 
       case 'snapshotDeleted':
         this.onSnapshotDeleted?.(msg.id);
+        break;
+
+      case 'constraintsUpdated':
+        this.onConstraintsUpdated?.();
         break;
     }
   }
