@@ -79,7 +79,7 @@ interface SimulationSliceState {
   frameTimeMs: number;
   /** Particle count in active simulation */
   particleCount: number;
-  /** Whether body collision (SDF) is active */
+  /** Whether body collision is active */
   bodyCollision: boolean;
   /** 3D viewport mode */
   viewMode3D: ViewMode3D;
@@ -197,7 +197,7 @@ const simulationSlice = createSlice({
     setParticleCount(state, action: PayloadAction<number>) {
       state.particleCount = action.payload;
     },
-    /** Set body collision (SDF) status. */
+    /** Set body collision status. */
     setBodyCollision(state, action: PayloadAction<boolean>) {
       state.bodyCollision = action.payload;
     },

@@ -569,7 +569,7 @@ describe('XPBDClothSolver - Air Drag', () => {
 
 // ─── Triangle Collision ─────────────────────────────────────────────────
 
-describe('Triangle collision (BVH replacement for SDF)', () => {
+describe('Triangle collision (BVH)', () => {
   it('pushes particle inside body outward when collisionMesh is set', () => {
     // Collision body: a large flat floor at y=0 with normals pointing up
     const collisionMesh = {

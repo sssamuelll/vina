@@ -24,7 +24,7 @@ describe('QUALITY_PRESETS', () => {
     const p = QUALITY_PRESETS.production;
     expect(p.substeps).toBeGreaterThanOrEqual(30);
     expect(p.selfCollision).toBe(true);
-    expect(p.sdfResolution).toBe(128);
+    expect(p.collisionResolution).toBe(128);
   });
 
   it('particle distance decreases with quality', () => {

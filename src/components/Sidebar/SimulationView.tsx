@@ -152,7 +152,7 @@ export default function SimulationView() {
       <div style={{ fontSize: '11px', color: '#666', display: 'flex', flexDirection: 'column', gap: '3px', marginBottom: '16px' }}>
         <div>{pieces.length} piece{pieces.length !== 1 ? 's' : ''} • {simulation.particleCount > 0 ? `${simulation.particleCount.toLocaleString()} particles` : 'no mesh'}</div>
         {simulation.frameTimeMs > 0 && <div>{simulation.frameTimeMs.toFixed(1)}ms/frame • {Math.round(1000 / simulation.frameTimeMs)} FPS</div>}
-        <div>Solver: {simulation.solverTier} {simulation.bodyCollision ? '• SDF ✓' : '• No body collision'}</div>
+        <div>Solver: {simulation.solverTier} {simulation.bodyCollision ? '• Collision ✓' : '• No body collision'}</div>
       </div>
 
       {/* Default Fabric */}

@@ -780,7 +780,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
  * GarmentSimulation — always uses MergedSimulation for all pieces.
  *
  * Previously had a ClothMesh-per-piece fallback for no-seam patterns,
- * but that path ran CDT meshing + SDF generation on the main thread,
+ * but that path ran CDT meshing + collision setup on the main thread,
  * freezing the browser. MergedSimulation uses Web Workers for everything.
  * When no seams exist, the solver simply has no seam constraints.
  */

@@ -21,8 +21,8 @@ export interface QualityPreset {
   substeps: number;
   /** Enable self-collision detection */
   selfCollision: boolean;
-  /** SDF volume resolution (N³ grid) */
-  sdfResolution: number;
+  /** Body collision mesh resolution (triangle count target) */
+  collisionResolution: number;
   /** Enable bending constraints */
   bendingEnabled: boolean;
   /** Target FPS */
@@ -35,7 +35,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     particleDistance: 10,
     substeps: 5,
     selfCollision: false,
-    sdfResolution: 32,
+    collisionResolution: 32,
     bendingEnabled: false,
     targetFPS: 60,
   },
@@ -44,7 +44,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     particleDistance: 5,
     substeps: 15,
     selfCollision: true,
-    sdfResolution: 64,
+    collisionResolution: 64,
     bendingEnabled: true,
     targetFPS: 60,
   },
@@ -53,7 +53,7 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     particleDistance: 3,
     substeps: 30,
     selfCollision: true,
-    sdfResolution: 128,
+    collisionResolution: 128,
     bendingEnabled: true,
     targetFPS: 30, // production allows lower FPS for quality
   },
@@ -208,13 +208,13 @@ export function estimateGPUMemoryMB(numParticles: number, preset: QualityPreset)
   // Self-collision hash table: 2N × 4 bytes (cellCount + cellStart + entries)
   const scBytes = preset.selfCollision ? numParticles * 2 * 12 : 0;
 
-  // SDF volume: resolution³ × 4 bytes
-  const sdfBytes = Math.pow(preset.sdfResolution, 3) * 4;
+  // Collision mesh: estimate based on resolution target
+  const collisionBytes = preset.collisionResolution * 9 * 4; // triangles × 9 floats × 4 bytes
 
   // Adjacency: ~6 neighbors per particle average = offsets(N×4) + neighbors(6N×4)
   const adjBytes = preset.selfCollision ? numParticles * 28 : 0;
 
-  const total = particleBytes + stretchBytes + bendBytes + scBytes + sdfBytes + adjBytes;
+  const total = particleBytes + stretchBytes + bendBytes + scBytes + collisionBytes + adjBytes;
   return total / (1024 * 1024);
 }
 

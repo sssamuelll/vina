@@ -196,7 +196,7 @@ export class ClothWorkerClient {
   }
 
   /**
-   * Set triangle collision mesh for body collision (replaces SDF).
+   * Set triangle collision mesh for body collision.
    */
   setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
     this.worker?.postMessage(

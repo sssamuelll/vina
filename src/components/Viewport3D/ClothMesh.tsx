@@ -20,7 +20,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, PathCommand } from '../../types/types';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
-// buildAvatarSDF moved to dynamic import to avoid main-thread SDF generation
+// Avatar collision mesh is loaded via dynamic import
 import {
   computeFitMapData,
   fabricToFitParams,

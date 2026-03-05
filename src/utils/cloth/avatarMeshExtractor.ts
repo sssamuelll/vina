@@ -27,7 +27,7 @@ export interface ExtractedMeshData {
  * 
  * Traverses the scene to find all Mesh objects, extracts their geometry,
  * applies world transforms, and merges into a single mesh suitable for
- * SDF generation.
+ * collision detection.
  * 
  * @param scene - Three.js Object3D (scene, group, or single mesh)
  * @returns Extracted mesh data or null if no valid geometry found
@@ -123,7 +123,7 @@ export function extractAvatarMesh(scene: THREE.Object3D): ExtractedMeshData | nu
 }
 
 /**
- * Create a simple test mesh for debugging SDF generation.
+ * Create a simple test mesh for debugging collision detection.
  * 
  * @param type - Type of test mesh ('sphere' | 'cube')
  * @param resolution - Tessellation resolution for sphere
@@ -148,7 +148,7 @@ export function createTestMesh(type: 'sphere' | 'cube', resolution: number = 32)
 }
 
 /**
- * Validate extracted mesh data for SDF generation.
+ * Validate extracted mesh data for collision detection.
  * 
  * @param meshData - Extracted mesh data
  * @returns Validation result with details
@@ -214,11 +214,11 @@ export function validateMeshData(meshData: ExtractedMeshData): {
   
   // Performance warnings
   if (numVertices > 100000) {
-    warnings.push(`Large vertex count (${numVertices}) may impact SDF generation performance`);
+    warnings.push(`Large vertex count (${numVertices}) may impact collision detection performance`);
   }
   
   if (numTriangles > 200000) {
-    warnings.push(`Large triangle count (${numTriangles}) may impact SDF generation performance`);
+    warnings.push(`Large triangle count (${numTriangles}) may impact collision detection performance`);
   }
   
   return {

@@ -102,8 +102,8 @@ export default function StatusBar() {
         )}
         {simulation.bodyCollision && (
           <>
-            <span className="status-item" title="Body collision (SDF) enabled">
-              SDF ✓
+            <span className="status-item" title="Body collision enabled">
+              Collision ✓
             </span>
             <span className="status-separator" />
           </>

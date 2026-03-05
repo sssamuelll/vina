@@ -410,7 +410,7 @@ export function computeFitMap(
  * Compute pressure points: vertices where the garment is in contact with the avatar.
  *
  * Uses distance from each garment vertex to nearest avatar surface point.
- * Avatar surface is approximated via SDF values if available, or a simple
+ * Avatar surface is approximated via collision mesh distance, or a simple
  * distance threshold from avatar body capsules.
  *
  * @param positions - Current garment positions
