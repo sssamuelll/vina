@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Point2D, PatternPiece, InternalLine } from '../../types/types';
+import { findNearestPiece } from '../../utils/geometry/hitTest';
 
 interface LineToolState {
   /** First click point */
@@ -35,45 +36,12 @@ export function useLineTool(
     };
   }, [zoom2D, pan2D]);
 
-  /** Find the nearest piece to a point (by checking if point is inside bounding box + margin) */
-  const findNearestPiece = useCallback((pt: Point2D): string | null => {
-    let bestId: string | null = null;
-    let bestDist = Infinity;
-    const MARGIN = 50;
-
-    for (const piece of pieces) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      for (const cmd of piece.outline) {
-        for (let i = 0; i < cmd.values.length - 1; i += 2) {
-          const px = cmd.values[i] + piece.position.x;
-          const py = cmd.values[i + 1] + piece.position.y;
-          minX = Math.min(minX, px);
-          minY = Math.min(minY, py);
-          maxX = Math.max(maxX, px);
-          maxY = Math.max(maxY, py);
-        }
-      }
-      // Expand bbox by margin
-      if (pt.x >= minX - MARGIN && pt.x <= maxX + MARGIN &&
-          pt.y >= minY - MARGIN && pt.y <= maxY + MARGIN) {
-        const cx = (minX + maxX) / 2;
-        const cy = (minY + maxY) / 2;
-        const dist = Math.hypot(pt.x - cx, pt.y - cy);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestId = piece.id;
-        }
-      }
-    }
-    return bestId;
-  }, [pieces]);
-
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const pt = toPattern(e);
 
     if (!state.startPoint) {
       // First click — set start point
-      const nearestPiece = findNearestPiece(pt);
+      const nearestPiece = findNearestPiece(pt, pieces);
       setState({ startPoint: pt, cursorPos: pt, pieceId: nearestPiece });
     } else {
       // Second click — complete the line
@@ -90,7 +58,7 @@ export function useLineTool(
       }
       setState({ startPoint: null, cursorPos: null, pieceId: null });
     }
-  }, [toPattern, state.startPoint, state.pieceId, findNearestPiece, onComplete]);
+  }, [toPattern, state.startPoint, state.pieceId, pieces, onComplete]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (!state.startPoint) return;

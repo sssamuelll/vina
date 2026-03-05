@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { PatternPiece, Point2D, InternalLine } from '../../types/types';
+import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
 
 /**
  * Grainline tool: click+drag inside a piece to draw an arrow
@@ -15,29 +16,6 @@ interface GrainlineState {
   /** Current drag point */
   endPoint: Point2D | null;
   isDragging: boolean;
-}
-
-function hitTestPiece(pt: Point2D, pieces: PatternPiece[]): PatternPiece | null {
-  // Simple bounding box hit test
-  for (const piece of pieces) {
-    const cmds = piece.outline;
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const cmd of cmds) {
-      const v = cmd.values;
-      for (let i = 0; i < v.length; i += 2) {
-        if (i + 1 < v.length) {
-          const x = v[i] + piece.position.x;
-          const y = v[i + 1] + piece.position.y;
-          minX = Math.min(minX, x); minY = Math.min(minY, y);
-          maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
-        }
-      }
-    }
-    if (pt.x >= minX && pt.x <= maxX && pt.y >= minY && pt.y <= maxY) {
-      return piece;
-    }
-  }
-  return null;
 }
 
 function createGrainline(start: Point2D, end: Point2D): InternalLine {
@@ -72,7 +50,7 @@ export function useGrainlineTool(
     const rect = svg.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
 
-    const piece = hitTestPiece(pt, pieces);
+    const piece = hitTestPieceBBox(pt, pieces);
     if (!piece) return;
 
     const local = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
