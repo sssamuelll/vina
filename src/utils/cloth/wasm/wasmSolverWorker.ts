@@ -55,6 +55,9 @@ let numParticles = 0;
 let running = false;
 let animFrameId: ReturnType<typeof setTimeout> | null = null;
 
+const snapshots = new Map<string, Float32Array>();
+const MAX_SNAPSHOTS = 5;
+
 const FRAME_BUDGET_MS = 14;
 
 function simulationLoop(): void {
@@ -83,6 +86,13 @@ function simulationLoop(): void {
 
   const delay = elapsed > FRAME_BUDGET_MS ? Math.min(elapsed, 50) : 1000 / 60;
   animFrameId = setTimeout(simulationLoop, delay);
+}
+
+function readPositions(): Float32Array | null {
+  if (!solver || !wasmExports?.memory) return null;
+  const n = numParticles;
+  const ptr = solver.positions_ptr();
+  return new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
 }
 
 self.onmessage = async (event: MessageEvent) => {
@@ -252,6 +262,57 @@ self.onmessage = async (event: MessageEvent) => {
           solver.clear_pins();
         }
         break;
+
+      case 'saveSnapshot': {
+        const positions = readPositions();
+        if (positions) {
+          snapshots.set(msg.id, positions);
+          if (snapshots.size > MAX_SNAPSHOTS) {
+            const oldest = snapshots.keys().next().value;
+            if (oldest !== undefined) snapshots.delete(oldest);
+          }
+          (self as unknown as Worker).postMessage({
+            type: 'snapshotSaved', id: msg.id, particleCount: numParticles,
+          });
+        }
+        break;
+      }
+
+      case 'restoreSnapshot': {
+        const saved = snapshots.get(msg.id);
+        if (saved && solver && wasmExports?.memory) {
+          // Write positions back into wasm memory
+          const ptr = solver.positions_ptr();
+          const target = new Float32Array(wasmExports.memory.buffer, ptr, numParticles * 3);
+          target.set(saved);
+          (self as unknown as Worker).postMessage({ type: 'snapshotRestored', id: msg.id });
+          // Send updated frame
+          const positions = new Float32Array(wasmExports.memory.buffer, ptr, numParticles * 3).slice();
+          (self as unknown as Worker).postMessage(
+            { type: 'frame', positions },
+            [positions.buffer],
+          );
+        }
+        break;
+      }
+
+      case 'deleteSnapshot': {
+        snapshots.delete(msg.id);
+        (self as unknown as Worker).postMessage({ type: 'snapshotDeleted', id: msg.id });
+        break;
+      }
+
+      case 'warmStart': {
+        if (solver && wasmExports?.memory) {
+          const incoming = new Float32Array(msg.positions);
+          if (incoming.length === numParticles * 3) {
+            const ptr = solver.positions_ptr();
+            const target = new Float32Array(wasmExports.memory.buffer, ptr, numParticles * 3);
+            target.set(incoming);
+          }
+        }
+        break;
+      }
 
       case 'dispose':
         running = false;
