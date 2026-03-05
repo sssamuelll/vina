@@ -3,6 +3,23 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.7.0-dev] — 2026-03-05 (Current)
+
+### In Progress
+- **3D Navigation Polish** — Orbital controls and ergonomic viewport shortcuts
+- **DXF Import Completion** — Full support for grading and notches in legacy ingestion
+- **Display Bar 2D** — Quick-access contextual tools for pattern drafting
+- **Linked Editing** — Real-time propagation of changes between symmetric pieces
+
+## [0.6.0] — 2026-02-27
+
+### Added
+- **Architectural Shift** — Migrated core solver to **Rust-based WASM** for sub-millisecond physics updates
+- **Cognitive Engine Foundation** — Transition from "chatbot" to "Situated AI Agent" with design memory
+- **Copilot Brilliance Suite** — Persistent Design Memory, 3D Visual Perception, and Intent Prediction
+- **Silent Ingestion Layer** — Automated hydration of Seamly2D/DXF files into the Semantic Graph model
+- **Skill Marketplace SDK** — Namespacing and guardrails for community plugins
+
 ## [0.5.0] — 2026-02-21
 
 ### Added

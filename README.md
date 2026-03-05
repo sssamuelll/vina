@@ -8,7 +8,9 @@
 
 **The Cognitive Design Engine for Professional Fashion Engineering.**
 
-OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **AI Copilot** and **Deterministic XPBD Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
+> **Status (March 2026):** Currently in **v0.6.0 "Architectural Shift"**. We have transitioned to a Rust-based physics engine and a fully agentic design loop. See our [Roadmap](ROADMAP.md) for the path to v1.0.
+
+OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Deterministic XPBD Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
 
 **[Launch Workspace →](https://openclo.sdar.dev)**
 

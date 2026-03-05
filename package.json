@@ -1,9 +1,9 @@
 {
   "name": "openclo",
   "private": false,
-  "version": "0.4.0",
+  "version": "0.6.0",
   "type": "module",
-  "description": "Open source 3D garment design — 2D pattern editor + 3D cloth simulation + AI copilot",
+  "description": "Cognitive Design Engine for Professional Fashion Engineering — Semantic Pattern Editor + XPBD Simulation + Situated AI Copilot",
   "bin": {
     "openclo": "./dist-server/index.js"
   },

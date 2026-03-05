@@ -8,6 +8,12 @@
 
 ---
 
+## Estado del Proyecto (Marzo 2026)
+
+- **Versión Actual:** v0.6.0 "Architectural Shift"
+- **Hitos:** Implementación de XPBD en Rust/WASM, Motor Semántico consolidado, y Copilot con Memoria Durable.
+- **Próximo Objetivo:** v0.7.0 "Precision & UX" (Ver [Roadmap](../ROADMAP.md)).
+
 ## Resumen Ejecutivo
 
 La industria de la moda digital está fragmentada: soluciones propietarias de alto costo (CLO3D, Marvelous Designer) dominan el mercado profesional, mientras que soluciones open source potentes (Seamly2D/Valentina para patronaje CAD, Blender para simulación/renderizado) existen aisladas, sin comunicación fluida entre ellas.

@@ -35,6 +35,7 @@ const makeRecord = (id: string, success = true, daysAgo = 0): AgenticRecord => (
   timestamp: Date.now() - daysAgo * 86400000,
   userRequest: `request-${id}`,
   toolCalls: [],
+  turns: [],
   finalResponse: 'done',
   totalDuration: 1000,
   success,

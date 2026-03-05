@@ -142,6 +142,7 @@ export class AgenticLoop {
         const start = performance.now();
         let result: unknown;
         let isMetaTool = false;
+        let toolError: string | undefined;
 
         try {
           const metaTool = this.metaTools.get(toolCall.name);
@@ -153,14 +154,13 @@ export class AgenticLoop {
           } else {
             result = { success: false, error: `Unknown tool: ${toolCall.name}` };
           }
-
-          onEvent({ type: 'tool:complete', name: toolCall.name, result });
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : String(err);
           result = { success: false, error: errorMsg };
-          onEvent({ type: 'tool:error', name: toolCall.name, error: errorMsg });
+          toolError = errorMsg;
         }
 
+        // Record BEFORE firing event so getLastToolCalls() is up-to-date
         const duration = performance.now() - start;
         this.lastToolCalls.push({
           name: toolCall.name,
@@ -169,6 +169,12 @@ export class AgenticLoop {
           duration,
           isMetaTool,
         });
+
+        if (toolError) {
+          onEvent({ type: 'tool:error', name: toolCall.name, error: toolError });
+        } else {
+          onEvent({ type: 'tool:complete', name: toolCall.name, result });
+        }
 
         messages.push({
           role: 'tool',
