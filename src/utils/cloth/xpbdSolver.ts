@@ -15,6 +15,8 @@ import { type SeamConstraintSet, solveSeamConstraints } from './seamAssembly';
 import { SpatialHashGrid, buildAdjacency, solveSelfCollision } from './selfCollision';
 import { type LRAConstraint, buildLRAConstraints, solveLRA } from './longRangeAttachments';
 import { EdgeType, classifyEdgeType } from './gpu/gpuBuffers';
+import type { CollisionMeshData } from './collisionMesh';
+import { TriangleSpatialHash, solveTriangleCollision } from './triangleCollision';
 
 // ─── Vector Math on Float32Array ────────────────────────────────────────────
 
@@ -322,6 +324,11 @@ export class XPBDClothSolver {
   /** SDF data for accurate avatar body collision */
   private sdfData: SDFData | null = null;
 
+  /** Triangle collision mesh data (replaces SDF) */
+  private collisionMesh: CollisionMeshData | null = null;
+  /** Spatial hash over collision mesh triangles */
+  private collisionHash: TriangleSpatialHash | null = null;
+
   /** Seam constraints for multi-piece sewing */
   private seamConstraints: SeamConstraintSet | null = null;
 
@@ -592,6 +599,20 @@ export class XPBDClothSolver {
    */
   setSDF(sdf: SDFData | null): void {
     this.sdfData = sdf;
+  }
+
+  /**
+   * Set triangle collision mesh for body collision (replaces SDF).
+   * Builds spatial hash over avatar triangles.
+   */
+  setCollisionMesh(mesh: CollisionMeshData | null): void {
+    this.collisionMesh = mesh;
+    if (mesh && mesh.triCount > 0) {
+      const cellSize = Math.max(0.02, (this.config.clothThickness ?? 0.002) * 10);
+      this.collisionHash = new TriangleSpatialHash(mesh, cellSize);
+    } else {
+      this.collisionHash = null;
+    }
   }
 
   /**
@@ -939,6 +960,18 @@ export class XPBDClothSolver {
           this.pos[pi + 2] += gradient[2] * pushDistance;
         }
       }
+    }
+
+    // Triangle mesh collision (replaces SDF — exact distance, supports animation)
+    if (this.collisionMesh && this.collisionHash) {
+      solveTriangleCollision(
+        this.pos,
+        this.invMass,
+        this.numParticles,
+        this.collisionMesh,
+        this.collisionHash,
+        this.config.clothThickness ?? 0.005,
+      );
     }
   }
 

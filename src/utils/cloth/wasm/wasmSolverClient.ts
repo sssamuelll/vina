@@ -103,6 +103,16 @@ export class WasmSolverClient {
   }
 
   /**
+   * Set triangle collision mesh for body collision (replaces SDF).
+   */
+  setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+    this.worker?.postMessage(
+      { type: 'setCollisionMesh', mesh },
+      [mesh.vertices.buffer, mesh.normals.buffer],
+    );
+  }
+
+  /**
    * Apply initial collision pass to push all particles outside the body.
    * Call this AFTER setSDF() and BEFORE start() to prevent explosion.
    */

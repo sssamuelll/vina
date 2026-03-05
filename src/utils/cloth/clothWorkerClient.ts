@@ -206,6 +206,16 @@ export class ClothWorkerClient {
   }
 
   /**
+   * Set triangle collision mesh for body collision (replaces SDF).
+   */
+  setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+    this.worker?.postMessage(
+      { type: 'setCollisionMesh', mesh } as WorkerInMessage,
+      [mesh.vertices.buffer, mesh.normals.buffer],
+    );
+  }
+
+  /**
    * Pin a particle in place.
    *
    * @param index - Particle index

@@ -566,3 +566,44 @@ describe('XPBDClothSolver - Air Drag', () => {
     expect(keHigh).toBeLessThan(keLow);
   });
 });
+
+// ─── Triangle Collision ─────────────────────────────────────────────────
+
+describe('Triangle collision (BVH replacement for SDF)', () => {
+  it('pushes particle inside body outward when collisionMesh is set', () => {
+    // Collision body: a large flat floor at y=0 with normals pointing up
+    const collisionMesh = {
+      vertices: new Float32Array([
+        -5, 0, -5,  5, 0, -5,  5, 0, 5,
+        -5, 0, -5,  5, 0, 5,  -5, 0, 5,
+      ]),
+      normals: new Float32Array([0, 1, 0, 0, 1, 0]),
+      triCount: 2,
+    };
+
+    // Cloth mesh: a small triangle with one vertex below the collision floor.
+    // We need at least one triangle so particles get non-zero invMass.
+    const meshData: ClothMeshData = {
+      vertices: new Float32Array([
+        0, -0.001, 0,   // v0: slightly below the collision floor
+        0.01, -0.001, 0, // v1: also below
+        0, -0.001, 0.01, // v2: also below
+      ]),
+      triIds: new Int32Array([0, 1, 2]),
+    };
+
+    const solver = new XPBDClothSolver(meshData, {
+      gravity: [0, 0, 0],       // no gravity — isolate collision effect
+      groundY: -100,             // move ground far away
+      selfCollision: false,
+    });
+    solver.setCollisionMesh(collisionMesh);
+    solver.step();
+
+    const positions = solver.getPositions();
+    // All three vertices should have been pushed above y=0 by the collision solver
+    expect(positions[1]).toBeGreaterThanOrEqual(0);
+    expect(positions[4]).toBeGreaterThanOrEqual(0);
+    expect(positions[7]).toBeGreaterThanOrEqual(0);
+  });
+});

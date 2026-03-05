@@ -41,6 +41,7 @@ export type WorkerInMessage =
   | { type: 'setSphereColliders'; colliders: SphereCollider[] }
   | { type: 'setCapsuleColliders'; colliders: CapsuleCollider[] }
   | { type: 'setSDF'; sdf: SDFData }
+  | { type: 'setCollisionMesh'; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number } }
   | { type: 'pinParticle'; index: number }
   | { type: 'unpinParticle'; index: number }
   | { type: 'getEdgeData' }
@@ -295,6 +296,13 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
       case 'setSDF': {
         if (solver) {
           solver.setSDF(msg.sdf);
+        }
+        break;
+      }
+
+      case 'setCollisionMesh': {
+        if (solver) {
+          solver.setCollisionMesh(msg.mesh);
         }
         break;
       }

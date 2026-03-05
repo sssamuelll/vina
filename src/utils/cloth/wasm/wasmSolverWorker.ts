@@ -216,6 +216,14 @@ self.onmessage = async (event: MessageEvent) => {
         }
         break;
 
+      case 'setCollisionMesh':
+        // Triangle collision for Wasm solver — uses JS-side collision
+        // (Rust/Wasm port is out of scope for v1)
+        console.log('[WasmWorker] setCollisionMesh received:', msg.mesh?.triCount, 'triangles');
+        // Store on globalThis for potential future JS-side collision pass
+        (self as unknown as Record<string, unknown>).__collisionMesh = msg.mesh;
+        break;
+
       case 'applyInitialCollision':
         // Run settling steps to push particles outside body BEFORE physics starts.
         // Uses small timestep with no gravity to resolve collisions without explosion.
