@@ -119,4 +119,41 @@ describe('solveTriangleCollision', () => {
     expect(pos[4]).toBeCloseTo(1.0, 5);
     expect(pos[7]).toBeCloseTo(margin, 3);
   });
+
+  it('applies friction to tangential velocity when prevPos provided', () => {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const margin = 0.005;
+    // Particle below floor, sliding in X
+    const pos = new Float32Array([1.0, -0.01, 0]);
+    const prevPos = new Float32Array([0.0, -0.01, 0]);
+    const invMass = new Float32Array([1.0]);
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, margin, 0.5, prevPos);
+    // Y should be pushed to margin
+    expect(pos[1]).toBeCloseTo(margin, 3);
+    // X should be partially dampened: original slide was 1.0, friction 0.5 removes half
+    expect(pos[0]).toBeCloseTo(0.5, 1);
+  });
+
+  it('zero friction preserves tangential velocity', () => {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const margin = 0.005;
+    const pos = new Float32Array([1.0, -0.01, 0]);
+    const prevPos = new Float32Array([0.0, -0.01, 0]);
+    const invMass = new Float32Array([1.0]);
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, margin, 0, prevPos);
+    expect(pos[1]).toBeCloseTo(margin, 3);
+    expect(pos[0]).toBeCloseTo(1.0, 3); // no friction dampening
+  });
+
+  it('backward-compatible: no friction/prevPos params works as before', () => {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const margin = 0.005;
+    const pos = new Float32Array([0, -0.01, 0]);
+    const invMass = new Float32Array([1.0]);
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, margin);
+    expect(pos[1]).toBeCloseTo(margin, 3);
+  });
 });

@@ -223,6 +223,8 @@ export function solveTriangleCollision(
   mesh: CollisionMeshData,
   hash: TriangleSpatialHash,
   collisionMargin: number,
+  friction: number = 0,
+  prevPos?: Float32Array,
 ): void {
   for (let p = 0; p < numParticles; p++) {
     if (invMass[p] === 0) continue;
@@ -261,6 +263,20 @@ export function solveTriangleCollision(
       pos[pi]     += bestNx * pushDist;
       pos[pi + 1] += bestNy * pushDist;
       pos[pi + 2] += bestNz * pushDist;
+
+      // Position-based friction: dampen tangential displacement
+      if (friction > 0 && prevPos) {
+        const dx = pos[pi] - prevPos[pi];
+        const dy = pos[pi + 1] - prevPos[pi + 1];
+        const dz = pos[pi + 2] - prevPos[pi + 2];
+        const vn = dx * bestNx + dy * bestNy + dz * bestNz;
+        const tx = dx - vn * bestNx;
+        const ty = dy - vn * bestNy;
+        const tz = dz - vn * bestNz;
+        pos[pi]     -= friction * tx;
+        pos[pi + 1] -= friction * ty;
+        pos[pi + 2] -= friction * tz;
+      }
     }
   }
 }
