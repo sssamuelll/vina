@@ -14,7 +14,7 @@ export async function extractAvatarCollisionMesh(
   avatarUrl: string,
   avatarHeight: number,
 ): Promise<CollisionMeshData | null> {
-  const { extractMeshData } = await import('./avatarSDF');
+  const { extractMeshData } = await import('./avatarMeshExtractor');
   const THREE = await import('three');
   const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
   const { isVRMFile, loadVRM } = await import('../avatar/vrmLoader');

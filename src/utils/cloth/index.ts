@@ -1,9 +1,9 @@
 /**
  * Cloth Simulation Module
- * 
+ *
  * Exports all types and utilities for cloth simulation including
- * XPBD solver, SDF generation, and avatar mesh extraction.
- * 
+ * XPBD solver and avatar mesh extraction.
+ *
  * @module cloth
  */
 
@@ -19,17 +19,11 @@ export {
   type ClothSnapshot
 } from './xpbdSolver';
 
-// SDF generation exports
-export {
-  generateSDF,
-  sampleSDF,
-  sdfGradient,
-  type SDFData
-} from './sdfGenerator';
-
 // Avatar mesh extraction exports
 export {
   extractAvatarMesh,
+  extractMeshData,
+  applyAPose,
   createTestMesh,
   validateMeshData,
   type ExtractedMeshData

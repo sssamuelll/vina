@@ -1,14 +1,13 @@
 /**
- * Tests for avatarSDF utility.
+ * Tests for avatarMeshExtractor utility.
  *
- * Note: GLB loading requires WebGL context which isn't available in vitest,
- * so we test the mesh extraction and SDF generation parts directly.
+ * Tests the mesh extraction functions that extract world-space vertices
+ * and indices from Three.js scenes.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { extractMeshData, clearAvatarSDFCache } from '../avatarSDF';
-import { generateSDF, type SDFData } from '../sdfGenerator';
+import { extractMeshData } from '../avatarMeshExtractor';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -71,51 +70,5 @@ describe('extractMeshData', () => {
     const { vertices, indices } = extractMeshData(group);
     expect(vertices.length).toBe(0);
     expect(indices.length).toBe(0);
-  });
-});
-
-describe('SDF generation from extracted mesh', () => {
-  it('generates SDF with expected shape', () => {
-    const scene = makeBoxScene(1);
-    const { vertices, indices } = extractMeshData(scene);
-    const resolution = 16; // Small for fast tests
-
-    const sdf = generateSDF(vertices, indices, resolution);
-
-    expect(sdf).not.toBeNull();
-    const s = sdf as SDFData;
-    expect(s.resolution).toBe(resolution);
-    expect(s.distances.length).toBe(resolution ** 3);
-    expect(s.distances).toBeInstanceOf(Float32Array);
-    expect(s.min).toHaveLength(3);
-    expect(s.max).toHaveLength(3);
-    expect(s.cellSize).toBeGreaterThan(0);
-
-    // Bounds should enclose the box
-    for (let axis = 0; axis < 3; axis++) {
-      expect(s.min[axis]).toBeLessThan(-0.5);
-      expect(s.max[axis]).toBeGreaterThan(0.5);
-    }
-  });
-
-  it('has negative distances inside the mesh', () => {
-    const scene = makeBoxScene(2);
-    const { vertices, indices } = extractMeshData(scene);
-    const sdf = generateSDF(vertices, indices, 16)!;
-
-    // Center of the grid should be inside (negative distance)
-    const mid = Math.floor(sdf.resolution / 2);
-    const centerIdx = mid * sdf.resolution * sdf.resolution + mid * sdf.resolution + mid;
-    expect(sdf.distances[centerIdx]).toBeLessThanOrEqual(0);
-  });
-});
-
-describe('clearAvatarSDFCache', () => {
-  beforeEach(() => {
-    clearAvatarSDFCache();
-  });
-
-  it('does not throw', () => {
-    expect(() => clearAvatarSDFCache()).not.toThrow();
   });
 });

@@ -1,16 +1,19 @@
 /**
- * Avatar Mesh Extractor for SDF Generation
- * 
- * Extracts vertex and index data from Three.js scenes to create
- * a unified mesh suitable for SDF generation.
- * 
+ * Avatar Mesh Extractor — extracts vertex and index data from Three.js scenes.
+ *
+ * Provides functions for extracting world-space mesh data from avatar scenes,
+ * including skinned mesh support and A-pose bone rotations.
+ *
  * @module avatarMeshExtractor
  */
 
 import * as THREE from 'three';
+import { POSE_PRESETS } from '../../store/avatarSlice';
+
+const DEG2RAD = Math.PI / 180;
 
 /**
- * Extracted mesh data ready for SDF generation.
+ * Extracted mesh data for collision or analysis.
  */
 export interface ExtractedMeshData {
   /** Flat vertex array [x0,y0,z0, x1,y1,z1, ...] */
@@ -222,5 +225,106 @@ export function validateMeshData(meshData: ExtractedMeshData): {
     valid: errors.length === 0,
     errors,
     warnings
+  };
+}
+
+// ─── A-Pose helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Apply the same A-pose bone rotations that AvatarModel.tsx applies.
+ * Uses the same Euler rotation approach for consistency.
+ */
+export function applyAPose(scene: THREE.Object3D): void {
+  const boneMap = new Map<string, THREE.Bone>();
+  const bindPoses = new Map<string, THREE.Quaternion>();
+
+  // Collect bones
+  scene.traverse((obj) => {
+    if (!(obj as THREE.Bone).isBone) return;
+    const bone = obj as THREE.Bone;
+    boneMap.set(bone.name, bone);
+    bindPoses.set(bone.name, bone.quaternion.clone());
+  });
+
+  // Apply A-pose rotations using the same logic as AvatarModel.tsx
+  const aPoseJoints = POSE_PRESETS['A-pose'];
+  boneMap.forEach((bone, name) => {
+    const bindPose = bindPoses.get(name);
+    if (!bindPose) return;
+
+    const jointRot = aPoseJoints[name];
+    if (jointRot) {
+      const euler = new THREE.Euler(jointRot.x * DEG2RAD, jointRot.y * DEG2RAD, jointRot.z * DEG2RAD, 'ZYX');
+      const rotQ = new THREE.Quaternion().setFromEuler(euler);
+      bone.quaternion.copy(bindPose).multiply(rotQ);
+    } else {
+      bone.quaternion.copy(bindPose);
+    }
+  });
+}
+
+// ─── Mesh extraction (with skinning support) ─────────────────────────────────
+
+/**
+ * Extract world-space vertices and indices from all meshes in a scene.
+ * For SkinnedMesh, bakes skeleton transforms into vertex positions.
+ */
+export function extractMeshData(scene: THREE.Object3D): {
+  vertices: Float32Array;
+  indices: Uint32Array;
+} {
+  const allVertices: number[] = [];
+  const allIndices: number[] = [];
+  let vertexOffset = 0;
+
+  scene.traverse((obj) => {
+    if (!(obj as THREE.Mesh).isMesh) return;
+    const mesh = obj as THREE.Mesh;
+    const geo = mesh.geometry;
+    if (!geo) return;
+
+    const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
+    if (!posAttr) return;
+
+    const numVerts = posAttr.count;
+    const isSkinnedMesh = (mesh as THREE.SkinnedMesh).isSkinnedMesh;
+    const skinned = isSkinnedMesh ? (mesh as THREE.SkinnedMesh) : null;
+
+    if (skinned?.skeleton) {
+      skinned.skeleton.update();
+    }
+
+    const tempVec = new THREE.Vector3();
+
+    for (let i = 0; i < numVerts; i++) {
+      tempVec.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+
+      if (skinned) {
+        skinned.applyBoneTransform(i, tempVec);
+        tempVec.applyMatrix4(mesh.matrixWorld);
+      } else {
+        tempVec.applyMatrix4(mesh.matrixWorld);
+      }
+
+      allVertices.push(tempVec.x, tempVec.y, tempVec.z);
+    }
+
+    const index = geo.index;
+    if (index) {
+      for (let i = 0; i < index.count; i++) {
+        allIndices.push(index.getX(i) + vertexOffset);
+      }
+    } else {
+      for (let i = 0; i < numVerts; i++) {
+        allIndices.push(i + vertexOffset);
+      }
+    }
+
+    vertexOffset += numVerts;
+  });
+
+  return {
+    vertices: new Float32Array(allVertices),
+    indices: new Uint32Array(allIndices),
   };
 }
