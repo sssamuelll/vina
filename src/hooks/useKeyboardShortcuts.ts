@@ -18,9 +18,11 @@ import {
   toggleSeamAllowance,
   undo,
   redo,
+  copyPieces,
+  createPastedPieces,
 } from '../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
-import { removePiece, reverseSeam } from '../store/projectSlice';
+import { removePiece, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
   resetSimulation,
@@ -58,6 +60,7 @@ export function useKeyboardShortcuts() {
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectState = useSelector((s: RootState) => s.project);
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
+  const clipboard = useSelector((s: RootState) => s.editor.clipboard);
 
   // Tool registry shortcuts
   const toolShortcuts = useMemo(() => toolRegistry.getShortcuts(), []);
@@ -91,6 +94,52 @@ export function useKeyboardShortcuts() {
       if (ctrl && ((key === 'z' && shift) || key === 'y')) {
         e.preventDefault();
         dispatch(redo());
+        return;
+      }
+
+      // Ctrl+C — Copy selected pieces
+      if (ctrl && key === 'c' && !shift) {
+        e.preventDefault();
+        if (selectedPieceIds.length > 0) {
+          const selectedPieces = pieces.filter(p => selectedPieceIds.includes(p.id));
+          if (selectedPieces.length > 0) {
+            dispatch(copyPieces({ pieces: selectedPieces }));
+          }
+        }
+        return;
+      }
+
+      // Ctrl+V — Paste
+      if (ctrl && key === 'v' && !shift) {
+        e.preventDefault();
+        if (clipboard) {
+          const newPieces = createPastedPieces(clipboard);
+          for (const p of newPieces) {
+            dispatch(addPiece(p));
+          }
+        }
+        return;
+      }
+
+      // Ctrl+R — Mirror Paste (CLO3D convention)
+      if (ctrl && key === 'r' && !shift) {
+        e.preventDefault();
+        if (clipboard) {
+          const newPieces = createPastedPieces(clipboard, true);
+          for (const p of newPieces) {
+            dispatch(addPiece(p));
+            dispatch(flipPieceH(p.id));
+          }
+        }
+        return;
+      }
+
+      // Ctrl+D — Duplicate selected
+      if (ctrl && key === 'd' && !shift) {
+        e.preventDefault();
+        for (const id of selectedPieceIds) {
+          dispatch(duplicatePiece(id));
+        }
         return;
       }
 
@@ -382,7 +431,7 @@ export function useKeyboardShortcuts() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [dispatch, pieces, selectedPieceIds, selectedSeamId, simulationState, viewMode3D, avatar, projectState, viewMode, toolShortcuts]);
+  }, [dispatch, pieces, selectedPieceIds, selectedSeamId, simulationState, viewMode3D, avatar, projectState, viewMode, toolShortcuts, clipboard]);
 
   // Build exportable shortcut map (for help overlay)
   useEffect(() => {
@@ -429,6 +478,10 @@ export function useKeyboardShortcuts() {
       { key: 'Z', ctrl: true, label: 'Undo', category: 'Edit', action: () => {} },
       { key: 'Z', ctrl: true, shift: true, label: 'Redo', category: 'Edit', action: () => {} },
       { key: 'Y', ctrl: true, label: 'Redo', category: 'Edit', action: () => {} },
+      { key: 'C', ctrl: true, label: 'Copy', category: 'Edit', action: () => {} },
+      { key: 'V', ctrl: true, label: 'Paste', category: 'Edit', action: () => {} },
+      { key: 'R', ctrl: true, label: 'Mirror Paste', category: 'Edit', action: () => {} },
+      { key: 'D', ctrl: true, label: 'Duplicate', category: 'Edit', action: () => {} },
       { key: 'Delete', label: 'Delete Selected', category: 'Edit', action: () => {} },
       // View
       { key: 'S', shift: true, label: 'Toggle Seam Allowance', category: 'View', action: () => {} },

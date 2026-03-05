@@ -1,5 +1,5 @@
 
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { PatternPiece, PathCommand } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
@@ -243,6 +243,24 @@ const SinglePiece = memo(function SinglePiece({
         }
       })()}
 
+      {piece.locked && (() => {
+        const { cx, cy } = piece.outline?.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };
+        return (
+          <text
+            x={cx}
+            y={cy + 14 / zoom2D}
+            fontSize={10 / zoom2D}
+            fill="#ff9800"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            pointerEvents="none"
+            fontFamily="Inter, sans-serif"
+          >
+            locked
+          </text>
+        );
+      })()}
+
       {isSelected && (() => {
         const nodes = extractNodes(piece);
         return (
@@ -297,9 +315,14 @@ export default function PieceRenderer({
   onPieceNameSave,
   onPieceNameCancel
 }: PieceRendererProps) {
+  const sortedPieces = useMemo(
+    () => [...pieces].sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+    [pieces],
+  );
+
   return (
     <>
-      {pieces.map(piece => (
+      {sortedPieces.map(piece => (
         <SinglePiece
           key={piece.id}
           piece={piece}
