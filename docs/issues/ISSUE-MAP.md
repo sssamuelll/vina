@@ -89,11 +89,15 @@ Every feature gap identified in [COMPETITIVE-GAP-ANALYSIS.md](../specs/COMPETITI
 | Gap Feature | Issue | Status |
 |-------------|-------|--------|
 | Morph target deformation | #8 + *#229 | Existing + Expanded |
+| IK solver | *#268 | New |
+| Apply morph weights to mesh | *#269 | New |
+| Collision mesh auto-update | *#270 | New |
 | Soft/deformable avatars | *#246 | New |
 | AI pose generator | *#247 | New |
 | Avatar size sets | *#229 | New |
 | Dress form avatars | *#248 | New |
 | Full joint-based posing | *#229 | New |
+| ~~MakeHuman morph targets~~ | — | Deferred (covered by #269 + standard GLB/FBX import) |
 
 ## §9. Fit Analysis & Visualization
 
@@ -206,6 +210,7 @@ See: [Gerber Integration Spec](../specs/GERBER-INTEGRATION-SPEC.md)
 | Tier 2 (Important) | #192, #191, #195, #120, #15, #8 | #225, #226, #227, #228, #229, #230, #231, #232, #233, #234, #235, #236, #237 | 19 |
 | Tier 3 (Nice to Have) | — | #238, #239, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249, #250, #251 | 14 |
 | Gerber Integration | — | #252–#267 | 16 |
-| **Total** | **9 existing** | **49 new** | **58** |
+| Avatar High-Impact | — | #268, #269, #270 | 3 |
+| **Total** | **9 existing** | **52 new** | **61** |
 
 Every gap attribute in the competitive analysis is now tracked by at least one issue.

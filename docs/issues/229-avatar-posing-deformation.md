@@ -63,6 +63,13 @@ Implement full avatar posing with IK/FK joint manipulation, morph target deforma
 - #8 — Research: parametric avatar deformation (existing research issue)
 - #118 — Avatar Tools epic (closed — measurement tapes and pose tools)
 - #227 — Advanced Grading (3D review per size needs size-specific avatars)
+- #268 — IK Solver Implementation (extracted from Phase 1)
+- #269 — Apply Morph Weights to Avatar Mesh (extracted from Phase 2)
+- #270 — Collision Mesh Auto-Update on Avatar Deformation (cross-cutting dependency)
+
+## Notes
+
+**MakeHuman morph targets — deferred.** MakeHuman exports standard GLB/FBX which our loader already handles. The only gap is reading blend shape data from meshes, which is covered by the general morph target work in Phase 2. No MakeHuman-specific integration is needed — it will work automatically once #269 and blend shape loading are implemented.
 
 ## Acceptance Criteria
 
