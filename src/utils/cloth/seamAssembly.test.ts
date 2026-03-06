@@ -209,13 +209,11 @@ describe('buildSeamConstraints', () => {
   ];
 
   it('generates constraints for matching edges', () => {
-    // Sew right edge of A (vertices 1→2) to left edge of B (vertices 3→0 wrapping, but let's use 0→3)
-    // Actually for outlineA: flattenPath gives [0,0],[10,0],[10,10],[0,10],[0,0]
-    // Right edge of A = vertices 1→2, left edge of B = vertices 0→3
+    // Sew right edge of A (vertices 1→2) to left edge of B (vertices 0→3)
     const seam: Seam = {
       id: 's1',
-      pieceA: { pieceId: 'a', edgeStart: 1, edgeEnd: 2 },
-      pieceB: { pieceId: 'b', edgeStart: 0, edgeEnd: 3 },
+      pieceA: { pieceId: 'a', edgeName: 'rightEdge' },
+      pieceB: { pieceId: 'b', edgeName: 'leftEdge' },
       type: 'standard',
     };
 
@@ -228,7 +226,11 @@ describe('buildSeamConstraints', () => {
     outlines.set('a', outlineA);
     outlines.set('b', outlineB);
 
-    const result = buildSeamConstraints([seam], outlines, merged);
+    const pieces = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }> }>();
+    pieces.set('a', { edges: [{ name: 'rightEdge', segmentRange: [1, 2] }] });
+    pieces.set('b', { edges: [{ name: 'leftEdge', segmentRange: [0, 3] }] });
+
+    const result = buildSeamConstraints([seam], outlines, merged, pieces);
     expect(result.count).toBe(2); // 2 vertices on shorter edge
     expect(result.ids.length).toBe(4);
     expect(result.restLengths.length).toBe(2);
@@ -241,8 +243,8 @@ describe('buildSeamConstraints', () => {
   it('skips seams with missing outlines', () => {
     const seam: Seam = {
       id: 's1',
-      pieceA: { pieceId: 'missing', edgeStart: 0, edgeEnd: 1 },
-      pieceB: { pieceId: 'b', edgeStart: 0, edgeEnd: 1 },
+      pieceA: { pieceId: 'missing', edgeName: 'edge1' },
+      pieceB: { pieceId: 'b', edgeName: 'edge2' },
       type: 'standard',
     };
     const merged = mergeMeshes([]);

@@ -45,11 +45,9 @@ function seamsToInitData(seams: Seam[]): SeamInitData[] {
   return seams.map(s => ({
     id: s.id,
     pieceAId: s.pieceA.pieceId,
-    pieceAEdgeStart: s.pieceA.edgeStart,
-    pieceAEdgeEnd: s.pieceA.edgeEnd,
+    pieceAEdgeName: s.pieceA.edgeName,
     pieceBId: s.pieceB.pieceId,
-    pieceBEdgeStart: s.pieceB.edgeStart,
-    pieceBEdgeEnd: s.pieceB.edgeEnd,
+    pieceBEdgeName: s.pieceB.edgeName,
     type: s.type,
   }));
 }
@@ -99,6 +97,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     vertices: Float32Array;
     triIds: Int32Array;
     outline: Array<{ type: string; values: number[] }>;
+    edges?: Array<{ name: string; segmentRange: [number, number] }>;
   }>>([]);
   const [, setMeshingStatus] = useState<string | null>(null);
   const initClientRef = useRef<SimulationInitClient | null>(null);
@@ -137,6 +136,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         return {
           ...m,
           outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
+          edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
         };
       });
 
@@ -211,6 +211,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             return {
               ...m,
               outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
+              edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
             };
           }));
 

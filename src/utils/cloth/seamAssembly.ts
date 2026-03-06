@@ -8,7 +8,7 @@
  * @module seamAssembly
  */
 
-import type { PathCommand, Point2D, Seam } from '../../types/types';
+import type { PathCommand, Point2D, Seam, SemanticEdge } from '../../types/types';
 import { flattenPath } from '../seam/index';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -333,12 +333,14 @@ export function mergeMeshes(
 /**
  * Build seam constraints from a list of seams, outlines, and a merged mesh.
  *
- * For each seam, parameterizes both edges, matches vertices, and creates
- * XPBD distance constraints that will pull the pairs together.
+ * For each seam, resolves edge names to segment ranges using piece edge data,
+ * parameterizes both edges, matches vertices, and creates XPBD distance
+ * constraints that will pull the pairs together.
  *
- * @param seams - Seam definitions
+ * @param seams - Seam definitions (edge-name based)
  * @param outlines - Map of pieceId → outline PathCommand[]
  * @param mergedMesh - The merged mesh (needed for piece offsets and positions)
+ * @param pieces - Optional map of pieceId → { edges } for resolving edge names to segment ranges
  * @param config - Optional seam constraint configuration
  * @returns SeamConstraintSet ready for the solver
  */
@@ -346,6 +348,7 @@ export function buildSeamConstraints(
   seams: Seam[],
   outlines: Map<string, PathCommand[]>,
   mergedMesh: MergedMesh,
+  pieces?: Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>,
   config: SeamConstraintConfig = DEFAULT_SEAM_CONFIG,
 ): SeamConstraintSet {
   const allPairs: Array<{ idA: number; idB: number; compliance: number }> = [];
@@ -360,11 +363,18 @@ export function buildSeamConstraints(
     const offsetB = mergedMesh.pieces.find(p => p.pieceId === seam.pieceB.pieceId);
     if (!offsetA || !offsetB) continue;
 
-    // Default maxEdgeLength is 15 in CDT, but we should ideally pass this from config
-    const maxEdgeLength = 15; 
+    // Resolve edge names to segment ranges
+    const pieceAData = pieces?.get(seam.pieceA.pieceId);
+    const pieceBData = pieces?.get(seam.pieceB.pieceId);
+    const edgeADef = pieceAData?.edges?.find(e => e.name === seam.pieceA.edgeName);
+    const edgeBDef = pieceBData?.edges?.find(e => e.name === seam.pieceB.edgeName);
+    if (!edgeADef || !edgeBDef) continue;
 
-    const edgeA = parameterizeEdge(outlineA, seam.pieceA.edgeStart, seam.pieceA.edgeEnd, offsetA.vertexOffset, 12, maxEdgeLength);
-    const edgeB = parameterizeEdge(outlineB, seam.pieceB.edgeStart, seam.pieceB.edgeEnd, offsetB.vertexOffset, 12, maxEdgeLength);
+    // Default maxEdgeLength is 15 in CDT, but we should ideally pass this from config
+    const maxEdgeLength = 15;
+
+    const edgeA = parameterizeEdge(outlineA, edgeADef.segmentRange[0], edgeADef.segmentRange[1], offsetA.vertexOffset, 12, maxEdgeLength);
+    const edgeB = parameterizeEdge(outlineB, edgeBDef.segmentRange[0], edgeBDef.segmentRange[1], offsetB.vertexOffset, 12, maxEdgeLength);
 
     const pairs = matchVertices(edgeA, edgeB);
     const compliance = config.compliance[seam.type];
