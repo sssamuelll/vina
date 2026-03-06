@@ -173,6 +173,31 @@ Every feature gap identified in [COMPETITIVE-GAP-ANALYSIS.md](../specs/COMPETITI
 
 ---
 
+## §16. Gerber Feature Integration
+
+| Gap Feature | Issue | Status |
+|-------------|-------|--------|
+| Walk Seam Verification | *#252 | New |
+| Seam Corner Types (7+) | *#253 | New |
+| Shrink/Stretch Compensation | *#254 | New |
+| Piece Bookmarks (version compare) | *#255 | New |
+| Multi-Dimensional Grading | *#256 (extends #227) | New |
+| Fabric Codes on Pieces | *#257 | New |
+| Accordion Pleats & Create Fold | *#258 (extends #226) | New |
+| Pattern Wizard Macros | *#259 | New |
+| Pre-Marking Rules | *#260 | New |
+| Walk/Measure Along Curve | *#261 | New |
+| DXF Wizard (Auto-Detect Format) | *#262 | New |
+| Colorway Support (Gerber-style) | *#263 (extends #221) | New |
+| Annotation Library | *#264 | New |
+| Group Pieces | *#265 | New |
+| Click'n'Go (Reduced Confirmations) | *#266 | New |
+| Digital Print File Generation | *#267 | New |
+
+See: [Gerber Integration Spec](../specs/GERBER-INTEGRATION-SPEC.md)
+
+---
+
 ## Summary
 
 | Category | Existing Issues | New Issues | Total |
@@ -180,6 +205,7 @@ Every feature gap identified in [COMPETITIVE-GAP-ANALYSIS.md](../specs/COMPETITI
 | Tier 1 (Critical) | #34, #33, #194 | #219, #220, #221, #222, #223, #224 | 9 |
 | Tier 2 (Important) | #192, #191, #195, #120, #15, #8 | #225, #226, #227, #228, #229, #230, #231, #232, #233, #234, #235, #236, #237 | 19 |
 | Tier 3 (Nice to Have) | — | #238, #239, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249, #250, #251 | 14 |
-| **Total** | **9 existing** | **33 new** | **42** |
+| Gerber Integration | — | #252–#267 | 16 |
+| **Total** | **9 existing** | **49 new** | **58** |
 
 Every gap attribute in the competitive analysis is now tracked by at least one issue.

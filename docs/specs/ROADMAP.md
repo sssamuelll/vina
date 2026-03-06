@@ -66,7 +66,25 @@ The "Core Simulation Pipeline Gap" has been closed. OpenClo.ai now features a pr
 
 ---
 
-## v0.8: Collaboration & Enterprise (NEXT)
+## v0.8: Gerber Parity & Production Readiness (NEXT)
+
+### Gerber Feature Integration (16 features — [spec](../specs/GERBER-INTEGRATION-SPEC.md))
+- [ ] **Walk Seam Verification** (#252) — Verify sewn edge length matching with tolerance.
+- [ ] **Seam Corner Types** (#253) — 7+ professional corner treatments (mitered, envelope, etc.).
+- [ ] **Shrink/Stretch Compensation** (#254) — Auto-adjust patterns for fabric shrinkage.
+- [ ] **Piece Bookmarks** (#255) — Save/compare pattern piece versions.
+- [ ] **Multi-Dimensional Grading** (#256) — Grade across bust × height × hip simultaneously.
+- [ ] **Fabric Codes on Pieces** (#257) — Assign material IDs for BOM and production.
+- [ ] **Accordion Pleats & Create Fold** (#258) — Pleat tools with 3D fold simulation.
+- [ ] **Pattern Wizard Macros** (#259) — Record/replay pattern operation sequences.
+- [ ] **Pre-Marking Rules** (#260) — Piece placement constraints for nesting.
+- [ ] **Walk/Measure Along Curve** (#261) — Arc-length measurement for curved seams.
+- [ ] **DXF Wizard** (#262) — Auto-detect DXF format on import.
+- [ ] **Colorway Support** (#263) — Gerber-compatible fabric code overrides per colorway.
+- [ ] **Annotation Library** (#264) — Shared production note templates.
+- [ ] **Group Pieces** (#265) — Batch operations on piece groups.
+- [ ] **Click'n'Go** (#266) — Expert mode with reduced confirmations.
+- [ ] **Digital Print File Generation** (#267) — Export marker + artwork for digital printing.
 
 ### Team Workflows
 - [ ] **Multi-User Sync** — Real-time collaborative drafting (Figma-style).

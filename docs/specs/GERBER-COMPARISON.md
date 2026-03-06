@@ -353,11 +353,25 @@ Gerber AccuMark and OpenClo serve **different segments of the value chain**:
 
 The overlap is in **2D pattern design and grading** — where both compete directly. The non-overlapping areas represent **partnership or integration opportunities** rather than direct competition.
 
-### Recommended Integrations (rather than rebuilding)
+### Gerber Feature Integration Plan
 
-Instead of rebuilding Gerber's production features, OpenClo should focus on **interoperability**:
+We are implementing **16 Gerber-inspired features** (#252–#267) to make OpenClo patterns production-ready. See [GERBER-INTEGRATION-SPEC.md](./GERBER-INTEGRATION-SPEC.md) for full details.
+
+| Sprint | Features | Goal |
+|--------|----------|------|
+| Sprint 1 | #252 Walk Seam, #257 Fabric Codes, #253 Seam Corners | Foundation — data model + QA tools |
+| Sprint 2 | #254 Shrink Compensation, #255 Bookmarks, #261 Curve Measure | Pattern engineering tools |
+| Sprint 3 | #256 Multi-Dim Grading, #258 Pleats & Folds | Complex geometry + grading overhaul |
+| Sprint 4 | #259 Macros, #262 DXF Wizard, #263 Colorways | Automation + interop |
+| Sprint 5 | #260 Pre-Marking, #264 Annotations, #265 Groups | Production metadata |
+| Sprint 6 | #266 Click'n'Go, #267 Print File Gen | UX polish + output |
+
+### Interoperability Strategy
+
+In addition to the 16 integrated features, OpenClo maintains **interoperability** with Gerber's ecosystem:
 
 1. **DXF/AAMA export** → Already done. Gerber can import OpenClo patterns.
 2. **RUL grade rule export** → Add to #227. Let Gerber users import OpenClo grading.
-3. **Marker-ready output** → Export patterns with fabric codes and grain direction that Gerber's AccuNest can consume.
+3. **Marker-ready output** → Export patterns with fabric codes (#257) and grain direction that Gerber's AccuNest can consume.
 4. **MTM API integration** → OpenClo designs + Gerber MTM automation = end-to-end custom tailoring.
+5. **DXF Wizard** (#262) → Auto-detect Gerber DXF format on import for seamless round-trip.
