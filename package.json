@@ -1,7 +1,7 @@
 {
   "name": "openclo",
   "private": false,
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "module",
   "description": "Cognitive Design Engine for Professional Fashion Engineering — Semantic Pattern Editor + XPBD Simulation + Situated AI Copilot",
   "bin": {

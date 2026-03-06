@@ -7,6 +7,7 @@ Thanks for your interest in OpenClo! This guide will get you up and running.
 - **Node.js 18+**
 - **npm** or **pnpm**
 - Git
+- **Rust + wasm-pack** (only if modifying the XPBD solver)
 
 ## Setup
 
@@ -23,22 +24,55 @@ Open `http://localhost:5180`
 
 ```
 src/
-├── components/     # React UI components (editor, viewport, panels)
-├── utils/          # Core engines (seam allowance, nesting, grading, DXF, PDF...)
-├── store/          # Redux Toolkit slices
-├── types/          # TypeScript type definitions
+├── components/        # React UI components
+│   ├── ActivityBar/       # VS Code-style navigation strip
+│   ├── CopilotPanel/      # AI assistant chat interface
+│   ├── DisplayBar2D/      # 2D context toolbar (toggles, render modes)
+│   ├── PatternEditor/     # 2D SVG canvas + tool hooks
+│   ├── Viewport3D/        # R3F 3D viewport, collision bodies, snapshots
+│   ├── Toolbar2D/         # 2D tool buttons
+│   ├── Toolbar3D/         # 3D tool buttons
+│   └── Workspace/         # Synchronized 2D/3D layout
+├── copilot/           # AI copilot system
+│   ├── reasoning/bridge/  # AgenticLoop, meta-tools, domain bootstrap
+│   ├── action/skills/     # Skill system (SkillBuilder, marketplace, registry)
+│   ├── memory/            # Durable design memory
+│   └── providers/         # LLM providers (Anthropic, OpenAI, Ollama)
+├── tools/             # Tool definitions (45 tools)
+│   └── definitions/       # Individual tool schemas + handlers
+├── store/             # Redux Toolkit slices
+│   ├── collisionBodySlice.ts  # Multi-body collision state
+│   ├── simulationSlice.ts     # Simulation + snapshots
+│   ├── cameraSlice.ts         # 3D camera presets
+│   └── linkedEditingMiddleware.ts  # Symmetric propagation
+├── utils/             # Core engines
+│   ├── cloth/             # XPBD solver, triangle collision, fabric library
+│   ├── dxf/               # DXF parser, converter, AAMA export
+│   ├── geometry/          # Geometry extraction + utilities
+│   ├── grading/           # Multi-size scaling
+│   ├── nesting/           # Bin packing layout
+│   └── seam/              # Seam allowance engine
+├── types/             # TypeScript type definitions
+└── workers/           # Web Workers (WASM + CPU solvers)
+
+crates/
+└── xpbd-wasm/         # Rust WASM cloth solver
+
 docs/
-├── specs/          # Architecture, roadmap, file format specs
+├── specs/             # Architecture, roadmap, simulation, testing specs
+├── api/               # API documentation (DXF, grading, nesting, etc.)
+├── research/          # Cloth simulation research, fabric calibration
+└── business/          # Strategy and pitch documents
 ```
 
 ## Running Tests
 
 ```bash
-npx vitest run          # 82 unit tests
-npx vitest run --watch  # watch mode
+npx vitest run          # Unit tests (186 test files)
+npx vitest run --watch  # Watch mode
+npm run test:e2e        # E2E tests (Playwright)
+npx tsc --noEmit        # Type check
 ```
-
-E2E tests use Puppeteer — see `e2e/` directory.
 
 ## Code Style
 
@@ -63,16 +97,29 @@ Each engine in `src/utils/` is an independent module:
 - **No external dependencies** for algorithm code — pure TypeScript math
 - **Must have unit tests** — see existing `*.test.ts` files for patterns
 - **Single responsibility** — one engine, one concern (e.g., seam allowance, nesting, grading)
-- **Deterministic** — same input → same output, no side effects
+- **Deterministic** — same input, same output, no side effects
 - Export pure functions, not classes (unless state is truly needed)
 
-Current engines: seam allowance, nesting (bin packing), grading, formula, DXF parser/exporter, PDF exporter, OBJ exporter.
+Current engines: seam allowance, nesting (bin packing), grading, formula, DXF parser/converter/exporter, PDF exporter, OBJ exporter, cloth simulation (XPBD), triangle collision, edit classifier, geometry utilities.
+
+## Adding a Tool
+
+1. Create a definition file in `src/tools/definitions/yourTool.tsx`
+2. Define the tool schema with name, shortcut, icon, and options
+3. Implement the execute handler
+4. Register in the tool registry
+5. Add tests
+
+## Adding a Fabric Preset
+
+1. Edit `src/utils/cloth/physicalFabric.ts`
+2. Add to `PHYSICAL_FABRIC_LIBRARY` array with realistic textile properties
 
 ## Terminology Guide
 
 Use consistent terminology across code, comments, and docs:
 
-| English | Español | Description |
+| English | Espanol | Description |
 |---------|---------|-------------|
 | Pattern piece | Pieza | A single flat shape to be cut from fabric |
 | Seam | Costura | Where two pieces are sewn together |
@@ -81,7 +128,8 @@ Use consistent terminology across code, comments, and docs:
 | Seam allowance | Margen de costura | Extra fabric around the sewing line |
 | Grading | Escalado | Scaling a pattern across sizes |
 | Dart | Pinza | V-shaped fold for shaping |
-| Bodice | Corpiño | Upper body pattern block |
+| Bodice | Corpino | Upper body pattern block |
+| Topstitch | Pespunte | Decorative/structural visible stitch line |
 
 ## Code of Conduct
 
