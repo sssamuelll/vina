@@ -95,6 +95,16 @@ describe('edgeExtractor', () => {
       expect(e.edgeIndex).toBe(i);
     });
   });
+
+  it('assigns semantic edge names', () => {
+    const piece = makeRect('r4', 'Front', 0, 0, 100, 200);
+    const edges = extractEdges(piece);
+    // Every edge should have a non-empty name
+    for (const edge of edges) {
+      expect(edge.name).toBeTruthy();
+      expect(typeof edge.name).toBe('string');
+    }
+  });
 });
 
 // ─── Naming Heuristics ──────────────────────────────────────────────────────
@@ -325,6 +335,9 @@ describe('autoSew', () => {
     const topSeam = result.seams[0];
     expect(topSeam.confidence).toBeGreaterThan(0.4);
     expect(topSeam.seam.pieceA.pieceId).not.toBe(topSeam.seam.pieceB.pieceId);
+    // Seams should use edgeName (not edgeStart/edgeEnd)
+    expect(topSeam.seam.pieceA.edgeName).toBeTruthy();
+    expect(topSeam.seam.pieceB.edgeName).toBeTruthy();
   });
 
   it('matches front/back/sleeve correctly', () => {

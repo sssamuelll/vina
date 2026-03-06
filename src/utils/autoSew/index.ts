@@ -161,15 +161,13 @@ export function autoSew(
       id: `auto-seam-${Date.now()}-${idx}`,
       pieceA: {
         pieceId: candidate.edgeA.pieceId,
-        edgeStart: candidate.edgeA.segStart,
-        edgeEnd: candidate.edgeA.segEnd,
+        edgeName: candidate.edgeA.name,
       },
       pieceB: {
         pieceId: candidate.edgeB.pieceId,
-        edgeStart: candidate.edgeB.segStart,
-        edgeEnd: candidate.edgeB.segEnd,
+        edgeName: candidate.edgeB.name,
       },
-      type: 'standard',
+      type: 'standard' as const,
     },
     confidence: candidate.confidence,
     reason: candidate.breakdown.reason,

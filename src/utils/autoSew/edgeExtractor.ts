@@ -11,6 +11,7 @@
  */
 
 import type { PatternPiece, PathCommand } from '../../types/types';
+import { detectSemanticEdges } from '../semanticEdges';
 
 export interface Point2D {
   x: number;
@@ -36,6 +37,8 @@ export interface Edge {
   end: Point2D;
   /** All sampled points along the edge (for shape comparison) */
   points: Point2D[];
+  /** Semantic edge name (e.g. "armhole", "sideSeam") */
+  name: string;
 }
 
 // ─── Geometry helpers ───────────────────────────────────────────────────────
@@ -200,7 +203,9 @@ export function extractEdges(piece: PatternPiece): Edge[] {
       start: segments[0].startPt,
       end: segments[segments.length - 1].endPt,
       points: allPts,
+      name: '',
     });
+    assignSemanticNames(edges, piece);
     return edges;
   }
 
@@ -236,10 +241,26 @@ export function extractEdges(piece: PatternPiece): Edge[] {
       start: edgeSegments[0].startPt,
       end: edgeSegments[edgeSegments.length - 1].endPt,
       points: allPts,
+      name: '',
     });
   }
 
+  assignSemanticNames(edges, piece);
   return edges;
+}
+
+/**
+ * Match extracted edges to semantic edge names using detectSemanticEdges.
+ * Falls back to `edge-{index}` when no semantic edge overlaps.
+ */
+function assignSemanticNames(edges: Edge[], piece: PatternPiece): void {
+  const semanticEdges = detectSemanticEdges(piece);
+  for (const edge of edges) {
+    const match = semanticEdges.find(se =>
+      se.segmentRange[0] <= edge.segStart && se.segmentRange[1] >= edge.segEnd
+    );
+    edge.name = match?.name ?? `edge-${edge.edgeIndex}`;
+  }
 }
 
 function computeNormal(points: Point2D[], at: Point2D): Point2D {
