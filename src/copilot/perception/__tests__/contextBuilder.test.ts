@@ -52,8 +52,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       seams: [
         {
           id: 'seam-1',
-          pieceA: { pieceId: 'piece-1', edgeStart: 1, edgeEnd: 2 },
-          pieceB: { pieceId: 'piece-2', edgeStart: 3, edgeEnd: 4 },
+          pieceA: { pieceId: 'piece-1', edgeName: 'sideSeam' },
+          pieceB: { pieceId: 'piece-2', edgeName: 'sideSeam' },
           type: 'standard',
         },
       ],

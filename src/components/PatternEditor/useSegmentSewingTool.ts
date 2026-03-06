@@ -312,16 +312,26 @@ export function useSegmentSewingTool(
         return;
       }
       if (e.key === 'Enter' && state.phase === 'b_end' && state.segmentA && state.segmentB) {
+        // Resolve semantic edge names from edge indices
+        const segA = state.segmentA;
+        const segB = state.segmentB;
+        const pieceAObj = pieces.find(p => p.id === segA.pieceId);
+        const pieceBObj = pieces.find(p => p.id === segB.pieceId);
+        const edgeAName = pieceAObj?.edges?.find(
+          e => segA.edgeIndex >= e.segmentRange[0] && segA.edgeIndex < e.segmentRange[1]
+        )?.name ?? `edge-${segA.edgeIndex}`;
+        const edgeBName = pieceBObj?.edges?.find(
+          e => segB.edgeIndex >= e.segmentRange[0] && segB.edgeIndex < e.segmentRange[1]
+        )?.name ?? `edge-${segB.edgeIndex}`;
+
         const seam: Omit<Seam, 'id'> = {
           pieceA: {
-            pieceId: state.segmentA.pieceId,
-            edgeStart: state.segmentA.edgeIndex,
-            edgeEnd: state.segmentA.edgeIndex,
+            pieceId: segA.pieceId,
+            edgeName: edgeAName,
           },
           pieceB: {
-            pieceId: state.segmentB.pieceId,
-            edgeStart: state.segmentB.edgeIndex,
-            edgeEnd: state.segmentB.edgeIndex,
+            pieceId: segB.pieceId,
+            edgeName: edgeBName,
           },
           type: seamType as Seam['type'],
         };

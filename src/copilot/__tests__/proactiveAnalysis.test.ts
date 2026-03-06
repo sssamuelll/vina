@@ -131,8 +131,8 @@ describe('auditNotches', () => {
     ];
     const seams: Seam[] = [{
       id: 's-1',
-      pieceA: { pieceId: '1', edgeStart: 0, edgeEnd: 1 },
-      pieceB: { pieceId: '2', edgeStart: 0, edgeEnd: 1 },
+      pieceA: { pieceId: '1', edgeName: 'sideSeam' },
+      pieceB: { pieceId: '2', edgeName: 'sideSeam' },
       type: 'standard',
     }];
     const warnings = auditNotches(pieces, seams);
@@ -150,8 +150,8 @@ describe('auditNotches', () => {
     ];
     const seams: Seam[] = [{
       id: 's-1',
-      pieceA: { pieceId: '1', edgeStart: 0, edgeEnd: 1 },
-      pieceB: { pieceId: '2', edgeStart: 0, edgeEnd: 1 },
+      pieceA: { pieceId: '1', edgeName: 'sideSeam' },
+      pieceB: { pieceId: '2', edgeName: 'sideSeam' },
       type: 'standard',
     }];
     const warnings = auditNotches(pieces, seams);

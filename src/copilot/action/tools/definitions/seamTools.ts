@@ -102,24 +102,23 @@ const auditSeamAllowancesTool: ToolDefinition = {
 const createSeamTool: ToolDefinition = {
   name: 'createSeam',
   description:
-    'Connect two edges from different pieces with a seam (costura). ' +
-    '/ Conectar dos bordes de diferentes piezas con una costura.',
+    'Connect two named edges from different pieces with a seam (costura). ' +
+    'Use edge names like "armhole", "sideSeam", "hemline", "shoulder". ' +
+    '/ Conectar dos bordes nombrados de diferentes piezas con una costura.',
   parameters: {
     type: 'object',
     properties: {
       pieceAId: { type: 'string', description: 'First piece ID / ID de la primera pieza' },
-      edgeAStart: { type: 'integer', description: 'Start segment index on piece A / Índice de segmento inicial en pieza A' },
-      edgeAEnd: { type: 'integer', description: 'End segment index on piece A / Índice de segmento final en pieza A' },
+      edgeAName: { type: 'string', description: 'Semantic edge name on piece A (e.g. "armhole", "sideSeam") / Nombre del borde semántico en pieza A' },
       pieceBId: { type: 'string', description: 'Second piece ID / ID de la segunda pieza' },
-      edgeBStart: { type: 'integer', description: 'Start segment index on piece B / Índice de segmento inicial en pieza B' },
-      edgeBEnd: { type: 'integer', description: 'End segment index on piece B / Índice de segmento final en pieza B' },
+      edgeBName: { type: 'string', description: 'Semantic edge name on piece B / Nombre del borde semántico en pieza B' },
       seamType: {
         type: 'string',
         enum: ['standard', 'french', 'flat-felled', 'overlock'],
         description: 'Seam type / Tipo de costura',
       },
     },
-    required: ['pieceAId', 'edgeAStart', 'edgeAEnd', 'pieceBId', 'edgeBStart', 'edgeBEnd'],
+    required: ['pieceAId', 'edgeAName', 'pieceBId', 'edgeBName'],
   },
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const state = getState();
@@ -129,19 +128,20 @@ const createSeamTool: ToolDefinition = {
     if (!pieceA) return { success: false, error: `Piece A "${params.pieceAId}" not found` };
     if (!pieceB) return { success: false, error: `Piece B "${params.pieceBId}" not found` };
 
+    const edgeAName = params.edgeAName as string;
+    const edgeBName = params.edgeBName as string;
+
+    // Validate edge names exist on the pieces
+    const edgeA = pieceA.edges?.find(e => e.name === edgeAName);
+    const edgeB = pieceB.edges?.find(e => e.name === edgeBName);
+    if (!edgeA) return { success: false, error: `Edge "${edgeAName}" not found on piece "${pieceA.name}". Available: ${pieceA.edges?.map(e => e.name).join(', ') || 'none (run detectEdges first)'}` };
+    if (!edgeB) return { success: false, error: `Edge "${edgeBName}" not found on piece "${pieceB.name}". Available: ${pieceB.edges?.map(e => e.name).join(', ') || 'none (run detectEdges first)'}` };
+
     const seamId = `seam-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`;
     const seam: Seam = {
       id: seamId,
-      pieceA: {
-        pieceId: params.pieceAId as string,
-        edgeStart: params.edgeAStart as number,
-        edgeEnd: params.edgeAEnd as number,
-      },
-      pieceB: {
-        pieceId: params.pieceBId as string,
-        edgeStart: params.edgeBStart as number,
-        edgeEnd: params.edgeBEnd as number,
-      },
+      pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName },
+      pieceB: { pieceId: params.pieceBId as string, edgeName: edgeBName },
       type: (params.seamType as Seam['type']) || 'standard',
     };
 

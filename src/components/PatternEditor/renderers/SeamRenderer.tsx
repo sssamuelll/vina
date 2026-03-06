@@ -49,8 +49,14 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
         if (!pieceA || !pieceB) return null;
 
-        const epA = getEdgeEndpoints(pieceA.outline, seam.pieceA.edgeStart);
-        const epB = getEdgeEndpoints(pieceB.outline, seam.pieceB.edgeStart);
+        // Resolve semantic edge name to segment index
+        const semEdgeA = pieceA.edges?.find(e => e.name === seam.pieceA.edgeName);
+        const semEdgeB = pieceB.edges?.find(e => e.name === seam.pieceB.edgeName);
+        const segIdxA = semEdgeA?.segmentRange[0] ?? 1;
+        const segIdxB = semEdgeB?.segmentRange[0] ?? 1;
+
+        const epA = getEdgeEndpoints(pieceA.outline, segIdxA);
+        const epB = getEdgeEndpoints(pieceB.outline, segIdxB);
         if (!epA || !epB) return null;
 
         const offA = pieceA.position;
@@ -66,8 +72,8 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         };
 
         // Length validation
-        const lenA = getEdgeLength(pieceA.outline, seam.pieceA.edgeStart);
-        const lenB = getEdgeLength(pieceB.outline, seam.pieceB.edgeStart);
+        const lenA = getEdgeLength(pieceA.outline, segIdxA);
+        const lenB = getEdgeLength(pieceB.outline, segIdxB);
         const maxLen = Math.max(lenA, lenB, 0.01);
         const mismatch = Math.abs(lenA - lenB) / maxLen;
         const hasMismatch = mismatch > 0.05; // >5% difference

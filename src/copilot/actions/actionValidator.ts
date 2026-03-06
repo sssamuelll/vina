@@ -343,20 +343,22 @@ function validateSeamAction(action: SeamAction, state: RootState): ValidationRes
       if (!pieceExists(state, action.pieceB)) {
         return fail(`Piece B "${action.pieceB}" not found`);
       }
-      // Handle both single index and [start, end] range formats
-      const edgeAIdx = Array.isArray(action.edgeA) ? action.edgeA[0] : action.edgeA;
-      const edgeBIdx = Array.isArray(action.edgeB) ? action.edgeB[0] : action.edgeB;
-      const edgeAResult = validateEdgeIndex(state, action.pieceA, edgeAIdx);
-      if (!edgeAResult.valid) return edgeAResult;
-      const edgeBResult = validateEdgeIndex(state, action.pieceB, edgeBIdx);
-      if (!edgeBResult.valid) return edgeBResult;
-      // Check for existing seam (comparing against edgeStart/edgeEnd)
+      // Validate edge names exist on the pieces
+      const pA = getPiece(state, action.pieceA);
+      const pB = getPiece(state, action.pieceB);
+      if (pA && !pA.edges?.some(e => e.name === action.edgeAName)) {
+        return fail(`Edge "${action.edgeAName}" not found on piece "${pA.name}"`);
+      }
+      if (pB && !pB.edges?.some(e => e.name === action.edgeBName)) {
+        return fail(`Edge "${action.edgeBName}" not found on piece "${pB.name}"`);
+      }
+      // Check for existing seam (comparing against edgeName)
       const existingSeam = state.project.seams.find(
         s =>
-          (s.pieceA.pieceId === action.pieceA && s.pieceA.edgeStart === edgeAIdx) ||
-          (s.pieceB.pieceId === action.pieceA && s.pieceB.edgeStart === edgeAIdx) ||
-          (s.pieceA.pieceId === action.pieceB && s.pieceA.edgeStart === edgeBIdx) ||
-          (s.pieceB.pieceId === action.pieceB && s.pieceB.edgeStart === edgeBIdx)
+          (s.pieceA.pieceId === action.pieceA && s.pieceA.edgeName === action.edgeAName) ||
+          (s.pieceB.pieceId === action.pieceA && s.pieceB.edgeName === action.edgeAName) ||
+          (s.pieceA.pieceId === action.pieceB && s.pieceA.edgeName === action.edgeBName) ||
+          (s.pieceB.pieceId === action.pieceB && s.pieceB.edgeName === action.edgeBName)
       );
       if (existingSeam) {
         return warn(['One or both edges already have seams']);

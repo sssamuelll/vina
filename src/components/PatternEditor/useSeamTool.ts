@@ -112,16 +112,24 @@ export function useSeamTool(
       // Second edge — must be different piece
       if (edge.pieceId === state.firstEdge.pieceId) return; // same piece, ignore
 
+      // Resolve semantic edge names from edge indices
+      const pieceAObj = pieces.find(p => p.id === state.firstEdge!.pieceId);
+      const pieceBObj = pieces.find(p => p.id === edge.pieceId);
+      const edgeAName = pieceAObj?.edges?.find(
+        e => state.firstEdge!.edgeIndex >= e.segmentRange[0] && state.firstEdge!.edgeIndex < e.segmentRange[1]
+      )?.name ?? `edge-${state.firstEdge.edgeIndex}`;
+      const edgeBName = pieceBObj?.edges?.find(
+        e => edge.edgeIndex >= e.segmentRange[0] && edge.edgeIndex < e.segmentRange[1]
+      )?.name ?? `edge-${edge.edgeIndex}`;
+
       onComplete({
         pieceA: {
           pieceId: state.firstEdge.pieceId,
-          edgeStart: state.firstEdge.edgeIndex,
-          edgeEnd: state.firstEdge.edgeIndex,
+          edgeName: edgeAName,
         },
         pieceB: {
           pieceId: edge.pieceId,
-          edgeStart: edge.edgeIndex,
-          edgeEnd: edge.edgeIndex,
+          edgeName: edgeBName,
         },
         type: 'standard',
       });

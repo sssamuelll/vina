@@ -82,12 +82,13 @@ export async function importZprj(file: File | ArrayBuffer): Promise<ZprjImportRe
           const pieceA = pieces.find(p => p.name.toLowerCase() === (s.piece1 || '').toLowerCase());
           const pieceB = pieces.find(p => p.name.toLowerCase() === (s.piece2 || '').toLowerCase());
           if (pieceA && pieceB) {
-            const edge1 = Array.isArray(s.edge1) ? s.edge1 : [0, 0];
-            const edge2 = Array.isArray(s.edge2) ? s.edge2 : [0, 0];
+            // edge1/edge2 may be a string (edge name) or legacy [start, end] array
+            const edgeName1 = typeof s.edge1 === 'string' ? s.edge1 : `edge-${Array.isArray(s.edge1) ? s.edge1[0] : 0}`;
+            const edgeName2 = typeof s.edge2 === 'string' ? s.edge2 : `edge-${Array.isArray(s.edge2) ? s.edge2[0] : 0}`;
             seams.push({
               id: `seam-${seams.length}`,
-              pieceA: { pieceId: pieceA.id, edgeStart: edge1[0], edgeEnd: edge1[1] },
-              pieceB: { pieceId: pieceB.id, edgeStart: edge2[0], edgeEnd: edge2[1] },
+              pieceA: { pieceId: pieceA.id, edgeName: edgeName1 },
+              pieceB: { pieceId: pieceB.id, edgeName: edgeName2 },
               type: (s.type === 'french' || s.type === 'flat-felled' || s.type === 'overlock') ? s.type : 'standard',
             });
           }

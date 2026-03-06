@@ -668,14 +668,10 @@ export class CopilotActionExecutor {
 
       // ─── Seams ───
       case 'create_seam': {
-        // Convert edge indices to edge ranges
-        const edgeA = Array.isArray(action.edgeA) ? action.edgeA : [action.edgeA, action.edgeA];
-        const edgeB = Array.isArray(action.edgeB) ? action.edgeB : [action.edgeB, action.edgeB];
-
         const seam: Seam = {
           id: uid(),
-          pieceA: { pieceId: action.pieceA, edgeStart: edgeA[0], edgeEnd: edgeA[1] },
-          pieceB: { pieceId: action.pieceB, edgeStart: edgeB[0], edgeEnd: edgeB[1] },
+          pieceA: { pieceId: action.pieceA, edgeName: action.edgeAName },
+          pieceB: { pieceId: action.pieceB, edgeName: action.edgeBName },
           type: action.type || 'standard',
         };
 

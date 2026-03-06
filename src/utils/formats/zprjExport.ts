@@ -45,9 +45,9 @@ export async function exportZprj(
       const p2 = pieces.find(p => p.id === s.pieceB.pieceId);
       return {
         piece1: p1?.name || s.pieceA.pieceId,
-        edge1: [s.pieceA.edgeStart, s.pieceA.edgeEnd],
+        edge1: s.pieceA.edgeName,
         piece2: p2?.name || s.pieceB.pieceId,
-        edge2: [s.pieceB.edgeStart, s.pieceB.edgeEnd],
+        edge2: s.pieceB.edgeName,
         type: s.type,
       };
     }),

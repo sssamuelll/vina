@@ -256,11 +256,11 @@ export type GeometryAction =
 export interface CreateSeamAction {
   action: 'create_seam';
   pieceA: string;
-  /** Edge range for piece A: [start, end] indices */
-  edgeA: number | [number, number];
+  /** Semantic edge name on piece A (e.g. "armhole", "sideSeam") */
+  edgeAName: string;
   pieceB: string;
-  /** Edge range for piece B: [start, end] indices */
-  edgeB: number | [number, number];
+  /** Semantic edge name on piece B */
+  edgeBName: string;
   /** Seam type for simulation */
   type?: 'standard' | 'french' | 'flat-felled' | 'overlock';
 }

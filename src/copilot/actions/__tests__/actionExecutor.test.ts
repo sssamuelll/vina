@@ -278,9 +278,9 @@ describe('CopilotActionExecutor', () => {
       const action: CopilotAction = {
         action: 'create_seam',
         pieceA: 'piece-1',
-        edgeA: 0,
+        edgeAName: 'sideSeam',
         pieceB: 'piece-2',
-        edgeB: 2,
+        edgeBName: 'sideSeam',
       };
       const result = await executor.execute(action);
 
