@@ -52,8 +52,8 @@ describe('projectSlice', () => {
     store.dispatch(addPiece(makePiece('p1')));
     store.dispatch(addPiece(makePiece('p2')));
     store.dispatch(addSeam({
-      id: 's1', pieceA: { pieceId: 'p1', edgeStart: 0, edgeEnd: 1 },
-      pieceB: { pieceId: 'p2', edgeStart: 0, edgeEnd: 1 }, type: 'standard',
+      id: 's1', pieceA: { pieceId: 'p1', edgeName: 'sideSeam' },
+      pieceB: { pieceId: 'p2', edgeName: 'sideSeam' }, type: 'standard',
     }));
     store.dispatch(removePiece('p1'));
     expect(store.getState().project.pieces).toHaveLength(1);

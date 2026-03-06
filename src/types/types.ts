@@ -158,13 +158,13 @@ export interface SemanticEdge {
 
 // ─── Seams (connections between pieces) ───
 
-/** A seam connects two edges from different pattern pieces */
+/** A seam connects two named edges from different pattern pieces */
 export interface Seam {
   id: string;
-  /** First piece + edge segment indices */
-  pieceA: { pieceId: string; edgeStart: number; edgeEnd: number };
-  /** Second piece + edge segment indices */
-  pieceB: { pieceId: string; edgeStart: number; edgeEnd: number };
+  /** First piece + semantic edge name */
+  pieceA: { pieceId: string; edgeName: string };
+  /** Second piece + semantic edge name */
+  pieceB: { pieceId: string; edgeName: string };
   /** Seam type affects 3D simulation */
   type: 'standard' | 'french' | 'flat-felled' | 'overlock';
 }
