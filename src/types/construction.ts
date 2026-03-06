@@ -103,8 +103,6 @@ export interface CPiece {
   closed: boolean;
   /** Block this piece belongs to */
   blockId?: string;
-  /** Normalization offset applied by buildPiece (for overlay alignment) */
-  normOffset?: { x: number; y: number };
 }
 
 // ─── Construction State ─────────────────────────────────────────────────────

@@ -12,7 +12,6 @@ import { selectPiece } from '../../../../store/editorSlice';
 import { startSimulation } from '../../../../store/simulationSlice';
 import { autoSew } from '../../../../utils/autoSew';
 import { buildPieceWithOffset } from '../../../../utils/construction/pieceBuilder';
-import { setConstructionPieceNormOffset } from '../../../../store/constructionSlice';
 import { clearConstruction } from '../../../../store/constructionSlice';
 
 // ─── Lazy-load pattern JSONs via Vite glob ──────────────────────────────────
@@ -239,7 +238,7 @@ const loadSeamlyPatternTool: ToolDefinition = {
     for (const cPiece of result.pieces) {
       console.log('[loadSeamlyPattern] building piece:', cPiece.name, 'id:', cPiece.id);
       try {
-        const { piece, normOffset } = buildPieceWithOffset(cPiece, result.points, result.curves, ctx);
+        const { piece } = buildPieceWithOffset(cPiece, result.points, result.curves, ctx);
         console.log('[loadSeamlyPattern] built:', cPiece.name, 'outline:', piece.outline.length, 'cmds',
           piece.outline.map(c => c.type).join(' '));
 
@@ -260,8 +259,6 @@ const loadSeamlyPatternTool: ToolDefinition = {
             }
           }
         }
-
-        dispatch(setConstructionPieceNormOffset({ pieceId: cPiece.id, normOffset }));
 
         const xs = piece.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
         const ys = piece.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 1));

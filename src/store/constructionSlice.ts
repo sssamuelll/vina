@@ -176,11 +176,6 @@ const constructionSlice = createSlice({
       });
     },
 
-    setConstructionPieceNormOffset(state, action: PayloadAction<{ pieceId: string; normOffset: { x: number; y: number } }>) {
-      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
-      if (piece) piece.normOffset = action.payload.normOffset;
-    },
-
     removeConstructionPiece(state, action: PayloadAction<string>) {
       state.pieces = state.pieces.filter(p => p.id !== action.payload);
     },
@@ -282,7 +277,6 @@ export const {
   addCurve,
   removeCurve,
   addConstructionPiece,
-  setConstructionPieceNormOffset,
   removeConstructionPiece,
   addNodeToPiece,
   setVariable,

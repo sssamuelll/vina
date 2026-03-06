@@ -2,10 +2,6 @@
  * ConstructionOverlay — renders construction points, lines, and curves
  * aligned to their corresponding pattern pieces in local coordinates.
  *
- * Each CPiece's construction geometry is rendered inside the same
- * coordinate space as its PatternPiece (applying normOffset to shift
- * from absolute construction coords to piece-local coords).
- *
  * For manual construction (no pieces yet), falls back to absolute rendering.
  */
 
@@ -50,9 +46,6 @@ export default function ConstructionOverlay({ zoom2D, pieces }: ConstructionOver
           const patternPiece = pieces.find(p => p.constructionPieceId === cPiece.id);
           if (!patternPiece) return null;
 
-          const offsetX = cPiece.normOffset?.x ?? 0;
-          const offsetY = cPiece.normOffset?.y ?? 0;
-
           // Get points and curves for this block
           const blockPoints = points.filter(p => p.blockId === cPiece.blockId);
           const blockCurves = curves.filter(c => c.blockId === cPiece.blockId);
@@ -67,21 +60,21 @@ export default function ConstructionOverlay({ zoom2D, pieces }: ConstructionOver
               transform={`translate(${patternPiece.position.x}, ${patternPiece.position.y})`}
             >
               {/* Curves */}
-              {renderCurves(blockCurves, ptMap, offsetX, offsetY, strokeWidth)}
+              {renderCurves(blockCurves, ptMap, 0, 0, strokeWidth)}
 
               {/* Points */}
               {blockPoints.filter(p => p.visible).map(point => (
                 <g key={point.id}>
                   <circle
-                    cx={point.x - offsetX} cy={point.y - offsetY}
+                    cx={point.x} cy={point.y}
                     r={pointSize}
                     fill={selectedEntity?.id === point.id ? COLORS.pointSelected : COLORS.point}
                     stroke="#fff"
                     strokeWidth={strokeWidth * 0.5}
                   />
                   <text
-                    x={point.x - offsetX + pointSize + 3 / zoom2D}
-                    y={point.y - offsetY - pointSize}
+                    x={point.x + pointSize + 3 / zoom2D}
+                    y={point.y - pointSize}
                     fontSize={fontSize}
                     fill={COLORS.label}
                     fontFamily="monospace"
