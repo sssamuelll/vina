@@ -69,6 +69,19 @@ describe('detectSemanticEdges', () => {
     expect(edgeNames.some(n => n.includes('sleeveCap') || n.includes('top'))).toBe(true);
   });
 
+  it('generates deterministic IDs from pieceId + edgeName', () => {
+    const piece = makePiece('Front Bodice', bodiceFrontOutline);
+    piece.id = 'test-piece-1';
+    const edges1 = detectSemanticEdges(piece);
+    const edges2 = detectSemanticEdges(piece);
+    // Same piece → same IDs
+    expect(edges1.map(e => e.id)).toEqual(edges2.map(e => e.id));
+    // IDs should contain piece ID
+    for (const edge of edges1) {
+      expect(edge.id).toBe(`test-piece-1:${edge.name}`);
+    }
+  });
+
   it('returns empty for degenerate piece', () => {
     const piece = makePiece('Tiny', [
       { type: 'M', values: [0, 0] },

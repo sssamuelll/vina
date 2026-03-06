@@ -9,9 +9,6 @@
 
 import type { PatternPiece, PathCommand, SemanticEdge, SemanticEdgeType } from '../types/types';
 
-let _edgeCounter = 0;
-function edgeId(): string { return `edge-${++_edgeCounter}`; }
-
 // ─── Outline Sampling ─────────────────────────────────────────────────────────
 
 interface Segment {
@@ -229,7 +226,7 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
     const finalName = existing.length > 0 ? `${name}-${existing.length + 1}` : name;
 
     edges.push({
-      id: edgeId(),
+      id: `${piece.id}:${finalName}`,
       name: finalName,
       segmentRange: [startIdx, endIdx],
       edgeType,
