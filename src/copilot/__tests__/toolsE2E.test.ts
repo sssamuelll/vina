@@ -163,14 +163,25 @@ describe('Tools E2E', () => {
       await executeTool(store, create, { name: 'Piece A', outline: RECT_OUTLINE });
       await executeTool(store, create, { name: 'Piece B', outline: RECT_OUTLINE });
 
+      // Detect edges on both pieces so createSeam can validate edge names
+      const detectEdges = registry.get('detectEdges')!;
       const pieces = store.getState().project.pieces;
-      const seamTool = registry.get('createSeam')!;
+      await executeTool(store, detectEdges, { pieceId: pieces[0].id });
+      await executeTool(store, detectEdges, { pieceId: pieces[1].id });
 
+      // Re-fetch pieces after edge detection
+      const updatedPieces = store.getState().project.pieces;
+      const edgeNameA = updatedPieces[0].edges?.[0]?.name;
+      const edgeNameB = updatedPieces[1].edges?.[0]?.name;
+      expect(edgeNameA).toBeTruthy();
+      expect(edgeNameB).toBeTruthy();
+
+      const seamTool = registry.get('createSeam')!;
       const result = await executeTool(store, seamTool, {
-        pieceAId: pieces[0].id,
-        edgeA: 0,
-        pieceBId: pieces[1].id,
-        edgeB: 0,
+        pieceAId: updatedPieces[0].id,
+        edgeAName: edgeNameA,
+        pieceBId: updatedPieces[1].id,
+        edgeBName: edgeNameB,
       });
 
       expect(result.success).toBe(true);

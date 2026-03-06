@@ -33,6 +33,10 @@ function createMockState(overrides: Partial<RootState['project']> = {}): () => R
           rotation: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          edges: [
+            { id: 'piece-1:sideSeam', name: 'sideSeam', segmentRange: [1, 2] as [number, number], edgeType: 'seam' as const, length: 200 },
+            { id: 'piece-1:hemline', name: 'hemline', segmentRange: [2, 3] as [number, number], edgeType: 'hem' as const, length: 100 },
+          ],
         },
         {
           id: 'piece-2',
@@ -50,13 +54,17 @@ function createMockState(overrides: Partial<RootState['project']> = {}): () => R
           rotation: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
+          edges: [
+            { id: 'piece-2:sideSeam', name: 'sideSeam', segmentRange: [1, 2] as [number, number], edgeType: 'seam' as const, length: 200 },
+            { id: 'piece-2:hemline', name: 'hemline', segmentRange: [2, 3] as [number, number], edgeType: 'hem' as const, length: 100 },
+          ],
         },
       ],
       seams: [
         {
           id: 'seam-1',
-          pieceA: { pieceId: 'piece-1', edgeIndex: 1 },
-          pieceB: { pieceId: 'piece-2', edgeIndex: 3 },
+          pieceA: { pieceId: 'piece-1', edgeName: 'sideSeam' },
+          pieceB: { pieceId: 'piece-2', edgeName: 'sideSeam' },
           type: 'standard',
         },
       ],
