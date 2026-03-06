@@ -14,28 +14,41 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 | Feature | Gerber AccuMark | OpenClo | Notes |
 |---------|:-:|:-:|-------|
 | Freeform point/line drawing | Yes | Yes | Both have full pen/polygon tools |
-| Rectangle/circle primitives | Yes | Yes | |
-| Bezier/spline curves | Yes | Yes | Gerber uses "smooth" points |
-| Split/combine pieces | Yes | Yes | Scissors + merge tools |
-| Add/manipulate darts | Yes | Yes | |
-| Mirror/copy pieces | Yes | Yes | |
-| Seam allowance (per-edge) | Yes | Yes | Gerber: "shrink/grow" |
+| Rectangle/circle/conic primitives | Yes | Yes | Gerber: conics replace corners with arcs |
+| Bezier/spline curves | Yes | Yes | Gerber: "Edit Line with Handles" bezier mode |
+| Split piece (7 methods) | Yes | Yes | Gerber: on line, point-to-point, H, V, etc. |
+| Combine/merge pieces | Yes | Yes | Gerber: option to convert merge to internal line |
+| Add/manipulate darts | Yes | Yes | Gerber: fisheye dart, balanced/one-sided resize, pivot |
+| Mirror/copy/flip pieces | Yes | Yes | Gerber: X/Y/XY flip + set/rotate |
+| Seam allowance (per-edge) | Yes | Yes | Gerber: define seam, swap sew/cut, auto-update seam |
+| Seam corner types (7+) | Yes | Partial | **Gerber has** — mitered, double mitered, slant, envelope, squared, match, trim mirrored |
 | Internal lines/shapes | Yes | Yes | |
-| Notch tool (multiple types) | Yes | Yes | Both have 5+ notch types |
-| Grainline | Yes | Yes | |
+| Notch tool (5+ types) | Yes | Yes | Gerber: add group on line, reference notch, P-Notch table |
+| Grainline with orientation symbol | Yes | Yes | |
+| Trace piece from existing | Yes | Yes | Gerber: SHIFT+F3 outline area → new piece |
 | Drill holes | Yes | No | **Gerber has** — placement markers for pockets, buttons |
-| Piece numbering/annotation | Yes | Partial | Gerber has annotation library |
-| Pleats/tucks | Yes | No | **Gerber has** — pleat creation tools |
-| Fullness distribution | Yes | No | **Gerber has** — redistribute ease along edges |
+| Piece numbering/annotation | Yes | Partial | Gerber: annotation library (V16.1) with shared templates |
+| Accordion pleats | Yes | No | **Gerber has** — auto pre-folded pattern for 3D |
+| Create fold (collars/cuffs) | Yes | No | **Gerber has** — fold/crease lines |
+| Tapered fullness | Yes | No | **Gerber has** — fullness extending to internal line |
+| Shrink/stretch compensation | Yes | No | **Gerber has** — linear or % shrink per fabric; auto-updates grades |
 | Piece digitizing from table | Yes | No | **Gerber has** via AccuScan |
-| Clip image tool | Yes | No | **Gerber has** — fill segments with images using internal lines |
-| Trace from image | Yes | No | **Gerber has** — trace over scanned images |
-| Macro recording | Yes | No | **Gerber has** — Pattern Wizard macros |
-| Piece bookmarks | Yes | No | **Gerber has** — save/compare piece versions |
+| Clip image tool | Yes | No | **Gerber has** (V16.0) — fill segments with images across all sizes |
+| Image placement on patterns | Yes | No | **Gerber has** — fabric fills, trim images (PNG/JPG/TIF/BMP) |
+| Adobe Illustrator integration | Yes | No | **Gerber has** — import/modify AI graphics in CAD |
+| Trace from scanned image | Yes | No | **Gerber has** — trace over scanned images |
+| Pattern Wizard macros | Yes | No | **Gerber has** — record/replay; 3 custom groups × 25 scripts (V2025.1) |
+| Piece bookmarks | Yes | No | **Gerber has** — save/compare piece versions (V2024.1) |
+| Walk seam verification | Yes | No | **Gerber has** — verify seam matching between pieces |
+| Click'n'Go preference | Yes | No | **Gerber has** — reduces confirmation clicks |
+| Group pieces (V2025.1) | Yes | No | **Gerber has** — batch PDS actions on grouped pieces |
+| Colorway support | Yes | No | **Gerber has** — multiple color combos without duplicating models |
+| Digital print file generation | Yes | No | **Gerber has** — automated with batch processing |
 | Linked editing (symmetry) | No | Yes | **OpenClo has** — automatic mirrored piece editing |
 | AI copilot for patternmaking | No | Yes | **OpenClo has** — natural language pattern commands |
 | Constraint-based geometry | No | Yes | **OpenClo has** — parametric relationships |
 | Real-time parametric sliders | No | Yes | **OpenClo has** — adjust dimensions via sliders |
+| Real-time 2D↔3D live link | No | Yes | **OpenClo has** — edit pattern, see 3D update instantly |
 
 ### 2. Grading & Sizing
 
@@ -56,35 +69,53 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 | Feature | Gerber AccuMark | OpenClo | Notes |
 |---------|:-:|:-:|-------|
-| Manual marker placement | Yes | No | Gerber: Easy Marking interactive tool |
-| Automatic nesting | Yes | Partial (#195) | Gerber + AccuNest — industrial-grade |
-| AccuNest optimization | Yes | No | **Gerber has** — AI-powered nesting with 2-5% material savings |
-| Cloud nesting | Yes | No | **Gerber has** — cloud-based nesting service |
-| Sectional markers | Yes | No | **Gerber has** — split markers into sections for staging |
-| Shade zone nesting | Yes | No | **Gerber has** — nesting with fabric shade variation zones |
+| Easy Marking (interactive) | Yes | No | **Gerber has** — Marker Wizard + floating toolbox |
+| Step/tilt/flip/rotate tools | Yes | No | **Gerber has** — precise piece nudging (=, [, ], ' keys) |
+| Pre-Marking Rules | Yes | No | **Gerber has** — automated placement before manual marking |
+| Rule Editor | Yes | No | **Gerber has** — define piece placement relative to others |
+| Combine markers (up to 99) | Yes | No | **Gerber has** — up to 20,000 pieces / 1,000 bundles |
+| AccuNest PE (single-core) | Yes | No | **Gerber has** — multi-algorithm nesting engine |
+| AccuNest MC (multi-core) | Yes | No | **Gerber has** — up to 2% better utilization than PE |
+| Cloud nesting | Yes | No | **Gerber has** — Quick + Flex modes, large-volume simultaneous |
+| NESTERpack | Yes | No | **Gerber has** — shorten markers with auto rotate/flip/tilt |
+| Partial placement + cloud finish | Yes | No | **Gerber has** — manual critical pieces, cloud nests the rest |
+| Sectional markers | Yes | No | **Gerber has** — split into sections for staging |
+| Shade zone nesting | Yes | No | **Gerber has** — zones for fabric shade variations |
 | Bundle markers | Yes | No | **Gerber has** — group pieces by bundle for cutting |
-| Fabric utilization reports | Yes | No | **Gerber has** — waste % and cost reports |
-| Marker constraints | Yes | No | **Gerber has** — tilt limits, gap, buffer, grain direction |
+| Marker info bar | Yes | No | **Gerber has** — utilization (CU/TU), waste (CW/TW) |
+| Overlap control (OL tolerance) | Yes | No | **Gerber has** — configurable; negative = add spacing |
+| Buffer zones (rounded corners) | Yes | No | **Gerber has** — segment/classic buffer methods |
+| Tilt allowances per piece | Yes | No | **Gerber has** — configurable grain deviation |
+| Stripe/plaid matching | Yes | No | **Gerber has** — 0/1/2+ match lines, cross-piece matching |
+| Matching tables in orders | Yes | No | **Gerber has** — category-to-category point matching |
+| Defect avoidance | Yes | No | **Gerber has** — predefine unusable areas on material |
+| Splice zones | Yes | No | **Gerber has** — manage fabric roll splices |
 | Multi-fabric markers | Yes | No | **Gerber has** — different fabrics in same marker |
-| Stripe/plaid matching | Yes | No | **Gerber has** — match patterns across pieces |
-| Roll width/length configuration | Yes | No | **Gerber has** |
-| Costing markers vs production markers | Yes | No | **Gerber has** — fast costing vs optimized production |
+| Roll width/length config | Yes | No | **Gerber has** |
+| Costing vs production markers | Yes | No | **Gerber has** — fast costing vs optimized production |
 | Marker plotting | Yes | No | **Gerber has** — direct output to plotters |
+| Basic nesting | Partial (#195) | Partial | OpenClo: planned basic auto-nesting |
 
 ### 4. 3D Simulation
 
 | Feature | Gerber AccuMark | OpenClo | Notes |
 |---------|:-:|:-:|-------|
-| Cloth physics simulation | Via VStitcher | Yes (XPBD) | OpenClo: native Rust WASM solver |
+| Cloth physics simulation | Yes (Avametric engine) | Yes (XPBD) | Gerber: licensed engine; OpenClo: native WASM |
+| Real-time simulation | Yes | Yes | **OpenClo better** — native, no third-party license |
 | Self-collision | Via VStitcher | Yes | |
-| Real-time simulation | Via VStitcher | Yes | **OpenClo better** — native, not third-party |
-| Fabric presets library | 42 presets | 32+ presets | Gerber: Lectra-tested fabrics |
+| Fabric presets library | 42 presets (Lectra Labs) | 32+ presets | Gerber: lab-tested mechanical properties |
+| KES-F fabric coefficients | Yes | No | **Gerber has** — precise textile test data input |
+| Fabric scanner support (Vizoo/xRite) | Yes | No | **Gerber has** — optical property capture from hardware |
+| 3D stitching in avatar window | Yes | No | **Gerber has** — create sew relations directly in 3D |
+| Elastic lines on perimeter | Yes | Partial | **Gerber has** — indicate elastic gathering for 3D |
+| Mark-up/drawing on 3D | Yes | No | **Gerber has** — draw on 3D for pattern adjustments |
+| AR visualization (Avametric) | Yes | No | **Gerber has** — augmented reality garment try-on |
+| Image Edition in 3D | Yes | No | **Gerber has** — graphic design placement reflected 2D↔3D |
 | Collision bodies (multi-mesh) | No | Yes | **OpenClo has** — import any mesh as collision body |
 | Simulation snapshots (A/B/C) | No | Yes | **OpenClo has** — compare drape states |
-| Air drag / damping | No | Yes | **OpenClo has** — anisotropic air resistance |
-| WASM + JS fallback | No | Yes | **OpenClo has** — works on any browser |
-| Avatar customization | Yes | Yes | Both support parametric + imported avatars |
-| Mark-up/drawing on 3D | Yes | No | **Gerber has** — draw on 3D simulation for adjustments |
+| Air drag / anisotropic damping | No | Yes | **OpenClo has** — per-direction air resistance |
+| WASM + JS fallback | No | Yes | **OpenClo has** — works on any browser, any OS |
+| BVH triangle collision | No | Yes | **OpenClo has** — spatial hash + BVH collision pipeline |
 
 ### 5. Avatar System
 
@@ -135,13 +166,20 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 
 | Feature | Gerber AccuMark | OpenClo | Notes |
 |---------|:-:|:-:|-------|
-| Cut order planning | Yes | No | **Gerber has** — optimize cut orders per production run |
+| Cut order planning | Yes | No | **Gerber has** — multi-order planning together |
 | Spread planning | Yes | No | **Gerber has** — plan fabric lay-up sequences |
-| Material utilization tracking | Yes | No | **Gerber has** — track consumption vs estimates |
-| Production scheduling | Yes | No | **Gerber has** — timeline and resource planning |
-| Order management | Yes | No | **Gerber has** — manage customer/production orders |
-| Cost estimation | Yes | No | **Gerber has** — per-order cost calculation |
+| Time Plan tool | Yes | No | **Gerber has** — schedule by location, date, time |
+| Working hours per location | Yes | No | **Gerber has** — define shifts per production site |
+| Visualize workload | Yes | No | **Gerber has** — workload heatmap across locations |
+| Fabric roll management | Yes | No | **Gerber has** — plan based on available rolls |
+| Cutting table availability | Yes | No | **Gerber has** — coordinate across tables |
+| Digital cut tickets | Yes | No | **Gerber has** — barcodes for spreader/cutter retrieval |
+| Production Tracker | Yes | No | **Gerber has** — track orders from CAD to cutting |
+| Fabric consumption calc (V2025.1) | Yes | No | **Gerber has** — monitor costs throughout development |
+| Multi-spread cut tickets | Yes | No | **Gerber has** — XL125-Spreader section recognition |
+| Batch cut ticket regeneration | Yes | No | **Gerber has** — reprocess existing markers |
 | Integration with ERP | Yes | No | **Gerber has** — connect to factory ERP systems |
+| Up to 80% productivity boost | Yes | No | **Gerber claims** vs manual planning |
 
 ### 9. Made-to-Measure (MTM)
 
@@ -178,17 +216,24 @@ Gerber AccuMark is a **production-focused** 2D CAD + cutting room suite. Unlike 
 | Plotter output | Yes | No | **Gerber has** — direct print to large-format plotters |
 | Laser/knife cutter support | Yes | No | **Gerber has** — multi-ply + single-ply cutting |
 
-### 12. File Formats
+### 12. File Formats & Interoperability
 
 | Feature | Gerber AccuMark | OpenClo | Notes |
 |---------|:-:|:-:|-------|
-| DXF (AAMA/ASTM) | Yes | Yes | |
-| Gerber native (.zip storage) | Yes | No | Gerber proprietary format |
+| DXF (AAMA/ASTM) | Yes | Yes | Both: industry-standard pattern exchange |
+| Standard DXF (AutoCAD) | Yes | Yes | |
+| Gerber native (.zip storage) | Yes | No | Gerber proprietary packaged format |
 | PDF/AI export | Yes | Yes | |
-| RUL (grade rules) | Yes | No | Gerber: import/export grade rules |
+| RUL (grade rules) | Yes | No | **Gerber has** — import/export grade rules |
+| TIIP format | Yes | No | **Gerber has** — legacy interop |
+| IGES format | Yes | No | **Gerber has** — CAD interop |
+| HPGL (plotter) | Yes | No | **Gerber has** — direct plotter output |
+| MDL (Lectra Versalis) | Yes | No | **Gerber has** — Lectra cutter + Design Concept |
+| Data Conversion Utility (DCU) | Yes | No | **Gerber has** — import from Assyst, Lectra, Investronica |
+| DXF Wizard auto-detection | Yes | No | **Gerber has** — auto-identifies DXF file type (V10.4+) |
 | OBJ/FBX 3D export | Via VStitcher | Yes | |
 | CSV measurements | Yes | Partial | |
-| Lectra/Optitex interop | Yes | No | **Gerber has** — cross-platform pattern exchange |
+| AccuMark ZIP export | Yes | No | **Gerber has** — packaged with notes, charts, 3D, rules |
 
 ### 13. Collaboration & Cloud
 
