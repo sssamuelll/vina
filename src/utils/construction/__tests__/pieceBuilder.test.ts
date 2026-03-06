@@ -1,38 +1,71 @@
 import { describe, it, expect } from 'vitest';
-import { buildPiece } from '../pieceBuilder';
-import type { CPoint, CCurve, CPiece } from '../../../types/construction';
+import { buildPiece, buildPieceWithOffset } from '../pieceBuilder';
+import type { CPoint, CPiece } from '../../../types/construction';
+import type { FormulaContext } from '../../seamly2d/formulaEvaluator';
 
-describe('Piece Builder', () => {
-  const ctx = { measurements: {}, variables: {} };
+function makeCtx(): FormulaContext {
+  return { measurements: {}, variables: {} };
+}
 
-  function pt(id: string, label: string, x: number, y: number): CPoint {
-    return { id, label, x, y, definition: { type: 'manual', x, y }, visible: true };
-  }
+function pt(id: string, label: string, x: number, y: number): CPoint {
+  return { id, label, x, y, definition: { type: 'manual', x, y }, visible: true };
+}
 
-  it('builds a simple rectangular piece from 4 points', () => {
-    const points: CPoint[] = [
-      pt('p1', 'A', 0, 0),
-      pt('p2', 'B', 200, 0),
-      pt('p3', 'C', 200, 300),
-      pt('p4', 'D', 0, 300),
-    ];
-    const cPiece: CPiece = {
-      id: 'cp1', name: 'Test Rect', closed: true, seamAllowance: 10,
-      nodes: [
-        { pointId: 'p1', connection: 'line' },
-        { pointId: 'p2', connection: 'line' },
-        { pointId: 'p3', connection: 'line' },
-        { pointId: 'p4', connection: 'line' },
-      ],
-    };
+function makePoints(): CPoint[] {
+  return [
+    pt('p1', 'A', 100, 200),
+    pt('p2', 'B', 300, 200),
+    pt('p3', 'C', 300, 500),
+    pt('p4', 'D', 100, 500),
+  ];
+}
 
-    const piece = buildPiece(cPiece, points, [], ctx);
-    expect(piece.name).toBe('Test Rect');
-    // M + L(B) + L(C) + L(D) + L(back to A) + Z = 6, or M + 3L + Z = 5
-    expect(piece.outline.length).toBeGreaterThanOrEqual(4);
-    expect(piece.outline[0].type).toBe('M');
-    expect(piece.outline[piece.outline.length - 1].type).toBe('Z');
-    expect(piece.seamAllowance).toBe(10);
+function makePiece(): CPiece {
+  return {
+    id: 'cp1',
+    name: 'Front',
+    nodes: [
+      { pointId: 'p1', connection: 'line' },
+      { pointId: 'p2', connection: 'line' },
+      { pointId: 'p3', connection: 'line' },
+      { pointId: 'p4', connection: 'line' },
+    ],
+    seamAllowance: 10,
+    closed: true,
+  };
+}
+
+describe('buildPiece', () => {
+  it('preserves absolute coordinates (no normalization)', () => {
+    const piece = buildPiece(makePiece(), makePoints(), [], makeCtx());
+    // First command is M to point A (100, 200)
+    expect(piece.outline[0]).toEqual({ type: 'M', values: [100, 200] });
+    // Second command is L to point B (300, 200)
+    expect(piece.outline[1]).toEqual({ type: 'L', values: [300, 200] });
+  });
+
+  it('returns zero normOffset', () => {
+    const { piece, normOffset } = buildPieceWithOffset(
+      makePiece(), makePoints(), [], makeCtx()
+    );
+    expect(normOffset).toEqual({ x: 0, y: 0 });
+    // Coordinates should still be absolute
+    expect(piece.outline[0].values).toEqual([100, 200]);
+  });
+
+  it('uses existingPieceId when provided', () => {
+    const piece = buildPiece(makePiece(), makePoints(), [], makeCtx(), 'existing-id');
+    expect(piece.id).toBe('existing-id');
+  });
+
+  it('generates new id when existingPieceId not provided', () => {
+    const piece = buildPiece(makePiece(), makePoints(), [], makeCtx());
+    expect(piece.id).toMatch(/^piece-/);
+  });
+
+  it('sets position to { x: 0, y: 0 } for absolute coords', () => {
+    const piece = buildPiece(makePiece(), makePoints(), [], makeCtx());
+    expect(piece.position).toEqual({ x: 0, y: 0 });
   });
 
   it('builds a piece with curve connection', () => {
@@ -41,11 +74,11 @@ describe('Piece Builder', () => {
       pt('p2', 'B', 100, 0),
       pt('p3', 'C', 200, 100),
     ];
-    const curves: CCurve[] = [
+    const curves = [
       {
         id: 'cv1', label: 'neckCurve', visible: true,
         definition: {
-          type: 'spline',
+          type: 'spline' as const,
           from: 'p1', to: 'p2',
           angle1: 0, angle2: 270,
           length1: 50, length2: 50,
@@ -61,33 +94,9 @@ describe('Piece Builder', () => {
       ],
     };
 
-    const piece = buildPiece(cPiece, points, curves, ctx);
-    // Should have a C (cubic bezier) command for the curve
+    const piece = buildPiece(cPiece, points, curves, makeCtx());
     const hasCurve = piece.outline.some(cmd => cmd.type === 'C');
     expect(hasCurve).toBe(true);
-  });
-
-  it('normalizes piece position near origin', () => {
-    const points: CPoint[] = [
-      pt('p1', 'A', 500, 500),
-      pt('p2', 'B', 700, 500),
-      pt('p3', 'C', 700, 800),
-      pt('p4', 'D', 500, 800),
-    ];
-    const cPiece: CPiece = {
-      id: 'cp1', name: 'Offset', closed: true, seamAllowance: 10,
-      nodes: [
-        { pointId: 'p1', connection: 'line' },
-        { pointId: 'p2', connection: 'line' },
-        { pointId: 'p3', connection: 'line' },
-        { pointId: 'p4', connection: 'line' },
-      ],
-    };
-
-    const piece = buildPiece(cPiece, points, [], ctx);
-    // First M command should be near 0,0
-    expect(piece.outline[0].values[0]).toBe(0);
-    expect(piece.outline[0].values[1]).toBe(0);
   });
 
   it('handles pieces with point lookup by label', () => {
@@ -105,7 +114,7 @@ describe('Piece Builder', () => {
       ],
     };
 
-    const piece = buildPiece(cPiece, points, [], ctx);
+    const piece = buildPiece(cPiece, points, [], makeCtx());
     expect(piece.outline.length).toBeGreaterThan(0);
   });
 });

@@ -40,7 +40,11 @@ export function buildPiece(
 }
 
 /**
- * Build a PatternPiece and return the normalization offset for overlay alignment.
+ * Build a PatternPiece and return the normalization offset (always zero).
+ *
+ * Coordinates are kept absolute — no normalization is applied.
+ * The normOffset field is retained for API compatibility and will be
+ * removed in a follow-up task.
  *
  * @param cPiece - Construction piece definition
  * @param points - All resolved construction points
@@ -124,40 +128,26 @@ export function buildPieceWithOffset(
     outline.push({ type: 'Z', values: [] });
   }
 
-  // Normalize: shift so bounding box starts near origin
-  const allX = outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
-  const allY = outline.flatMap(c => c.values.filter((_, i) => i % 2 === 1));
-  const minX = allX.length > 0 ? Math.min(...allX) : 0;
-  const minY = allY.length > 0 ? Math.min(...allY) : 0;
-
-  if (minX !== 0 || minY !== 0) {
-    for (const cmd of outline) {
-      for (let i = 0; i < cmd.values.length; i += 2) {
-        cmd.values[i] -= minX;
-        if (i + 1 < cmd.values.length) cmd.values[i + 1] -= minY;
-      }
-    }
-  }
+  // No normalization: keep absolute construction coordinates.
+  // View-level positioning is handled by piece.position in the 2D editor.
 
   const now = Date.now();
 
   return {
     piece: {
-      // Use existing ID if provided (upsert behavior), otherwise generate new
       id: existingPieceId || uid(),
       name: cPiece.name,
       outline,
       internals: [],
-      position: { x: 50, y: 50 },
+      position: { x: 0, y: 0 },
       rotation: 0,
       mirrored: false,
       seamAllowance: cPiece.seamAllowance,
       constructionPieceId: cPiece.id,
-      // Preserve createdAt for existing pieces, set new for new pieces
-      createdAt: existingPieceId ? now : now, // TODO: fetch original createdAt from store
+      createdAt: now,
       updatedAt: now,
     },
-    normOffset: { x: minX, y: minY },
+    normOffset: { x: 0, y: 0 },
   };
 }
 
