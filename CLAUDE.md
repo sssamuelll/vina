@@ -42,6 +42,9 @@ src/
 │   │   └── wasm/                # WASM worker interface
 │   ├── import/          # Mesh import (OBJ/FBX/GLB/GLTF)
 │   └── mesh/            # Meshing utilities
+├── workers/             # Web Worker pool for reactive solver
+├── store/               # Redux slices + middleware
+│   └── reactiveSolverMiddleware.ts  # Parametric rebuild pipeline
 └── stores/              # Zustand state management
 
 crates/
@@ -222,6 +225,55 @@ Both WASM and CPU workers support:
 - `src/utils/cloth/triangleCollision.ts` — `solveTriangleCollision` with friction param
 - `src/utils/cloth/collisionMesh.ts` — `CollisionMeshData` + `collisionMeshFromBuffers` helper
 
+## Reactive Solver Middleware
+
+Automatically rebuilds pattern pieces when measurements or variables change. Two-phase pipeline with worker pool support.
+
+### Flow
+
+```
+Trigger Action → Phase 1: Resolve Points (sync, < 16ms)
+               → Phase 2: Build Pieces (debounced, main thread or worker pool)
+```
+
+### Trigger Actions
+
+- `project/updateMeasurements` — body measurements changed
+- `construction/setVariable` — construction variable changed
+- `parametric/setVariableOverride` — slider moved
+- `parametric/setVariableOverrides` — batch variable update
+- `parametric/activateTemplate` — new template loaded
+
+### Key Concepts
+
+- **Generation tracking**: Each trigger increments `generationId`. Stale work is cancelled.
+- **Adaptive debounce**: 50–400ms based on median of recent compute times.
+- **Priority scheduling**: Selected piece builds first, then visible, then off-screen.
+- **Main thread fallback**: Datasets under 50 points skip workers entirely.
+- **Piece identity**: `pieceIdentityMap` in constructionSlice maps construction piece IDs to pattern piece IDs, enabling upsert behavior across rebuilds.
+
+### API
+
+```typescript
+import {
+  createReactiveSolverMiddleware, // Middleware factory
+  getSolverMetrics,               // { totalResolves, computeTimes, cancelledJobs, errors }
+  getSolverState,                 // { generationId, poolReady, pendingJobs, debounceMs }
+  subscribeToComputingState,      // listener(isComputing: boolean) → unsubscribe
+  getIsComputing,                 // Current computing state
+  warmupSolver,                   // Pre-initialize worker pool
+  shutdownSolver,                 // Cleanup pool + timers
+} from './store/reactiveSolverMiddleware';
+```
+
+### Key Files
+
+- `src/store/reactiveSolverMiddleware.ts` — Middleware implementation
+- `src/types/reactiveSolver.ts` — Types (jobs, results, strategies, metrics)
+- `src/workers/workerPool.ts` — Web Worker pool with priority queue
+- `src/workers/workerProtocol.ts` — Serialization + transfer strategy
+- `src/store/__tests__/reactiveSolverMiddleware.test.ts` — Integration tests
+
 ## Architecture Notes
 
 - **Solver Selection**: WASM preferred, JS fallback if WASM fails
@@ -235,3 +287,4 @@ Both WASM and CPU workers support:
 - [Fabric Calibration Guide](docs/research/fabric-calibration-guide.md)
 - [Copilot Bridge Architecture](docs/plans/2026-03-02-copilot-bridge-architecture-design.md)
 - [Architecture Spec](docs/specs/ARCHITECTURE.md)
+- [Reactive Solver Middleware Design](docs/plans/2026-02-27-reactive-solver-middleware-design.md)
