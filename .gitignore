@@ -13,3 +13,10 @@ coverage/
 
 # Worktrees
 .worktrees/
+
+# Tool artifacts
+.copyclip/
+.playwright-mcp/
+copyclip_metrics.jsonl
+snapshot-*.md
+screenshots/
