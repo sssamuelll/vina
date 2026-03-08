@@ -12,7 +12,7 @@
  * @module FitMapToggle
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { setFitMapMode, updateFitMapConfig } from '../../store/simulationSlice';
@@ -242,21 +242,6 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
   const toggle = useCallback((mode: FitMapMode) => {
     dispatch(setFitMapMode(fitMapMode === mode ? 'none' : mode));
   }, [dispatch, fitMapMode]);
-
-  // Keyboard shortcuts — match CLO3D exactly
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!e.altKey) return;
-      switch (e.key) {
-        case '6': e.preventDefault(); toggle('stress'); break;
-        case '7': e.preventDefault(); toggle('strain'); break;
-        case '8': e.preventDefault(); toggle('fit'); break;
-        case '9': e.preventDefault(); toggle('pressure'); break;
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [toggle]);
 
   if (simulationState === 'idle') return null;
 
