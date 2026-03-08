@@ -1,22 +1,24 @@
-# OpenClo — Testing Spec
+# OpenClo — Testing Spec (v0.7)
 
-## Current Coverage (v0.4)
+## Current Coverage
 
-### Unit Tests (Vitest) — 82 tests, 7 suites
+### Unit Tests (Vitest) — 186 test files
 
-| Suite | Tests | What It Covers |
-|-------|-------|----------------|
-| `utils.test.ts` | 4 | pathToSVG conversion, constants |
-| `patternTemplates.test.ts` | 18 | All 8 generators, scaling, internal consistency |
-| `exportDXF.test.ts` | 9 | DXF header, layers, bezier approximation, multi-piece |
-| `exportPDF.test.ts` | 9 | PDF structure, operators, curves, colors |
-| `protocol.test.ts` | 8 | buildCopilotContext, bounds calculation, history |
-| `commandExecutor.test.ts` | 11 | All command types + error handling |
-| `store.test.ts` | 23 | projectSlice, editorSlice, undoMiddleware |
+The test suite has grown significantly from the initial 82 tests across 7 suites to 186 test files covering all major subsystems:
 
-### E2E Tests (Puppeteer) — 16 suites
+| Area | Test Files | What It Covers |
+|------|-----------|----------------|
+| `src/utils/` | 40+ | DXF parser/converter/export, cloth simulation, geometry, grading, nesting, seam allowance, formula engine, edit classifier |
+| `src/store/` | 15+ | Redux slices (project, editor, simulation, collision body, camera), linked editing middleware, undo middleware |
+| `src/copilot/` | 30+ | AgenticLoop, skill system, SkillBuilder, marketplace, memory, providers, tool execution |
+| `src/components/` | 20+ | PatternEditor hooks, tool interactions, overlay rendering |
+| `src/tools/` | 20+ | Tool definition schemas, handler execution |
+| `src/hooks/` | 10+ | Custom React hooks |
+| `src/workers/` | 5+ | Worker message protocols, solver integration |
 
-Covers: grid rendering, pen tool (straight + curves), select, drag, delete, zoom, keyboard shortcuts (7 keys), templates, undo/redo, measure tool, hint text, chat panel, properties panel, mobile layout.
+### E2E Tests (Playwright)
+
+Covers: grid rendering, pen tool (straight + curves), select, drag, delete, zoom, keyboard shortcuts, templates, undo/redo, measure tool, hint text, chat panel, properties panel, mobile layout, simulation controls.
 
 ## Testing Strategy
 
@@ -24,10 +26,14 @@ Covers: grid rendering, pen tool (straight + curves), select, drag, delete, zoom
 
 **Always unit test:**
 - Geometry calculations (outline generation, bounding box, offset curves)
-- File format parsers and generators (DXF, PDF, ZPRJ)
-- Redux state transitions (slices, undo/redo middleware)
-- Command executor (AI command → state change)
-- Template generators (measurements → correct PathCommands)
+- File format parsers and generators (DXF, PDF)
+- Redux state transitions (slices, middleware, undo/redo)
+- Copilot tool execution (tool handlers, result validation)
+- Agentic loop behavior (meta-tools, action tools, iteration)
+- Skill system (SkillBuilder, marketplace, validation)
+- Template generators (measurements to correct PathCommands)
+- Linked editing propagation (instance and symmetry modes)
+- Edit classifier (dimension vs. topology classification)
 - Utility functions
 
 **Don't unit test:**
@@ -38,26 +44,30 @@ Covers: grid rendering, pen tool (straight + curves), select, drag, delete, zoom
 ### E2E Tests — What to Test
 
 **Critical user flows:**
-- Draw a piece → appears in 2D and 3D
-- Edit nodes → piece shape changes
-- Create seam → edges connected
-- Import DXF → pieces appear
-- Export DXF → valid file generated
-- Save → Load → same state
+- Draw a piece, appears in 2D and 3D
+- Edit nodes, piece shape changes
+- Create seam, edges connected
+- Import DXF, pieces appear
+- Export DXF, valid file generated
+- Save, Load, same state
 - Undo/Redo chain
+- Segment sewing workflow
+- Topstitch application
+- Linked editing propagation
+- Simulation snapshot comparison
 - Mobile: chat panel loads, no editor visible
 
-### Integration Tests (needed for v0.5+)
+### Integration Tests
 
 **File format round-trips:**
-- Export DXF → Import DXF → compare pieces (within tolerance)
-- Create project → Export .zprj → Import .zprj → compare state
-- Import CLO3D .zprj → pieces have correct names, positions, seam allowances
+- Export DXF, Import DXF, compare pieces (within tolerance)
+- Create project, Export, Import, compare state
 
 **Simulation stability:**
-- Simple garment (4 pieces) → simulate 500 frames → no NaN positions
-- Garment on avatar → no vertices inside avatar after settle
-- Seam constraints → sewn vertices stay within 0.1mm
+- Simple garment (4 pieces), simulate 500 frames, no NaN positions
+- Garment on avatar, no vertices inside avatar after settle
+- Seam constraints, sewn vertices stay within 0.1mm
+- Multi-body collision, cloth drapes correctly on imported meshes
 
 ## Test Data
 
@@ -67,8 +77,6 @@ Covers: grid rendering, pen tool (straight + curves), select, drag, delete, zoom
 src/__tests__/fixtures/
 ├── simple-bodice.dxf        — 2-piece bodice (ASTM layers)
 ├── full-garment.dxf         — 6-piece dress (CLO3D export)
-├── clo3d-sample.zprj        — real CLO3D project file
-├── gerber-sample.zip        — real AccuMark export
 ├── edge-cases/
 │   ├── empty.dxf            — valid DXF, no entities
 │   ├── no-layers.dxf        — entities without layer assignment
@@ -104,8 +112,14 @@ jobs:
       - uses: actions/setup-node@v4
       - run: npm ci
       - run: npm run test          # vitest
-      - run: npm run test:e2e      # puppeteer
+      - run: npm run test:e2e      # playwright
       - run: npm run bench         # performance
 ```
 
-Currently only deploy workflow exists. Test workflow needed.
+## Running Tests
+
+```bash
+npm run test          # Unit tests (Vitest)
+npm run test:e2e      # E2E tests (Playwright)
+npx tsc --noEmit      # Type check
+```

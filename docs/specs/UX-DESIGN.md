@@ -1,83 +1,137 @@
-# OpenClo — UX/UI Design Spec
+# OpenClo — UX/UI Design Spec (v0.7)
 
 ## Design Philosophy
 
-**Charter risk:** "Curva de aprendizaje — interfaz demasiado técnica para diseñadores de moda tradicionales."
+**Charter risk:** "Curva de aprendizaje — interfaz demasiado tecnica para disenadores de moda tradicionales."
 
-**Mitigation:** UX en terminología de modistería, no de ingeniería 3D. The user is a patronista, not a CAD engineer.
+**Mitigation:** UX en terminologia de modisteria, no de ingenieria 3D. The user is a patronista, not a CAD engineer.
 
-## Core Principle: Modistería, Not Engineering
+## Core Principle: Modisteria, Not Engineering
 
-| ❌ Engineering Term | ✅ OpenClo Term |
-|---------------------|-----------------|
+| Engineering Term | OpenClo Term |
+|------------------|--------------|
 | NURBS curve | Curva (just "curve") |
-| Tessellation | — (hidden from user) |
-| Polygon mesh | — (hidden from user) |
-| Constraint solver | — (hidden from user) |
+| Tessellation | (hidden from user) |
+| Polygon mesh | (hidden from user) |
+| Constraint solver | (hidden from user) |
 | Translate/Rotate | Mover / Girar |
-| Boolean operation | — (not exposed) |
-| Node graph | — (not exposed in v1) |
+| Boolean operation | (not exposed) |
+| Node graph | (not exposed in v1) |
 
 The user sees: pattern pieces, seams, darts, fabrics, measurements. Everything else is implementation detail.
 
 ## Layout
 
-### Desktop (≥768px)
+### Desktop (>= 768px)
 
 ```
-┌─────────────────────────────────────────────────┐
-│ Toolbar (tools + actions + view mode)            │
-├──────────┬──────────────────┬───────────────┬────┤
-│          │                  │               │    │
-│  Chat    │   2D Editor      │  3D Viewport  │ P  │
-│  Panel   │   (SVG canvas)   │  (Three.js)   │ r  │
-│          │                  │               │ o  │
-│  (280px) │   (flex)         │  (flex)       │ p  │
-│          │                  │               │ s  │
-│          │                  │               │    │
-├──────────┴──────────────────┴───────────────┴────┤
-│ Status bar (coordinates, zoom, piece count)       │
-└──────────────────────────────────────────────────┘
++---------------------------------------------------+
+| Toolbar (tools + actions + view mode)              |
++----------+------------------+---------------+------+
+|          |                  |               |      |
+|  Chat    |   2D Editor      |  3D Viewport  |  P   |
+|  Panel   |   (SVG canvas)   |  (Three.js)   |  r   |
+|          |                  |               |  o   |
+|  (280px) |   (flex)         |  (flex)       |  p   |
+|          |                  |               |  s   |
+|          |  [Display Bar]   |  [SnapshotBar]|      |
++----------+------------------+---------------+------+
+| Status bar (coordinates, zoom, piece count)        |
++---------------------------------------------------+
 ```
 
 - **Draggable dividers** between all panels
 - **View modes:** 2D only | Split | 3D only (toggle or keyboard shortcut)
 - **Chat panel:** collapsible to icon strip
 - **Properties panel:** collapsible to 40px icon sidebar
+- **Display Bar 2D:** Floating toolbar with toggles for seam allowance, piece names, line lengths, grainlines, sewing lines, and render modes (textured, translucent, wireframe)
+- **Snapshot Bar:** A/B/C comparison UI in 3D viewport
 
 ### Mobile (<768px)
 
 **Chat only.** No attempt to fit a CAD editor on a phone.
 
 ```
-┌──────────────────┐
-│ OpenClo    ⚙️    │
-├──────────────────┤
-│                  │
-│  Chat messages   │
-│                  │
-│  [suggestions]   │
-│                  │
-├──────────────────┤
-│ Type a message…  │
-└──────────────────┘
++------------------+
+| OpenClo          |
++------------------+
+|                  |
+|  Chat messages   |
+|                  |
+|  [suggestions]   |
+|                  |
++------------------+
+| Type a message...+
++------------------+
 ```
 
-Use cases: quick measurement checks, ask copilot questions, review project status.
+## Tool Palette (45 Tools)
 
-## Tool Palette
+### Core Drawing Tools
 
 | Icon | Tool | Shortcut | Description |
 |------|------|----------|-------------|
-| ↖ | Select | V | Click to select pieces, drag to move |
-| ✒ | Pen | P | Draw outlines — click for corners, drag for curves |
-| / | Line | L | Straight lines (darts, internal lines) |
-| ▭ | Rectangle | R | Quick rectangular pieces |
-| ⟡ | Seam | S | Connect edges between pieces |
-| ⊥ | Notch | N | Add notch marks to edges |
-| ↕ | Grainline | G | Set fabric grain direction |
-| 📏 | Measure | M | Click two points to measure distance |
-| ✋ | Hand | H | Pan the canvas |
+| Select | Select | V | Click to select pieces, drag to move |
+| Pen | Pen | P | Draw outlines (click = corners, drag = curves) |
+| Line | Line | L | Straight lines (darts, internal lines) |
+| Rectangle | Rectangle | R | Quick rectangular pieces |
+| Circle | Circle | C | Circular shapes |
+| Hand | Hand | H | Pan the canvas |
+| Zoom | Zoom | Z | Zoom in/out |
+
+### Sewing & Assembly Tools
+
+| Tool | Shortcut | Description |
+|------|----------|-------------|
+| Seam | S | Connect edges between pieces |
+| Segment Sewing | N | Multi-seam type (standard, french, flat-felled, overlock) |
+| Free Sewing | - | Free-form sewing path |
+| Notch | - | Add notch marks to edges (7 types) |
+
+### Pattern Modification Tools
+
+| Tool | Shortcut | Description |
+|------|----------|-------------|
+| Scissors (Split) | X | Split pattern pieces |
+| Merge | J | Merge adjacent pieces |
+| Mirror | - | Mirror pattern pieces |
+| Dart | - | Add/modify darts |
+| Edit Curve | - | Modify bezier curves |
+| Edit Constrain | - | Apply geometric constraints |
+| Grainline | G | Set fabric grain direction |
+| Elastic | - | Apply elastic constraints |
+
+### Decoration & Annotation Tools
+
+| Tool | Shortcut | Description |
+|------|----------|-------------|
+| Topstitch Edit | - | Edit existing topstitch lines |
+| Topstitch Free | - | Free-form topstitch |
+| Topstitch Seamline | - | Topstitch along seam lines |
+| Topstitch Segment | - | Topstitch along segments |
+| Text Annotation | - | Add text labels |
+| Internal Shape | - | Internal construction lines |
+
+### Measurement & Utility Tools
+
+| Tool | Shortcut | Description |
+|------|----------|-------------|
+| Measure | M | Click two points to measure distance (mm/cm/inches) |
+| Grading | - | Multi-size pattern scaling |
+| Seam Allowance | - | Apply seam allowance offset |
+| Flatten | - | Flatten 3D to 2D |
+
+### 3D Tools
+
+| Tool | Shortcut | Description |
+|------|----------|-------------|
+| Simulate | Space | Toggle cloth simulation |
+| Camera | - | 8 view presets (front/back/left/right/top/bottom/3-quarter) |
+| Pin | - | Pin fabric in 3D |
+| Pose | - | Avatar pose control |
+| Avatar | - | Avatar configuration |
+| Transform | - | 3D transform controls |
+| Edit 3D | - | Direct 3D editing |
 
 ## Interaction Patterns
 
@@ -92,23 +146,24 @@ Use cases: quick measurement checks, ask copilot questions, review project statu
 1. Select Seam tool (S)
 2. Click edge on Piece A (highlights in green)
 3. Click edge on Piece B (highlights in blue)
-4. If lengths differ > 5%: warning toast ("Sisa 2cm más larga que manga — ¿ease o error?")
-5. Seam created, visible as dashed line in 2D, constraint in 3D
+4. If lengths differ > 5%: warning toast
+5. Seam created with stable edge-name reference
 
-### Editing Nodes
-1. Double-click a piece outline
-2. Anchor points appear as squares
-3. Bezier handles appear as circles connected by lines
-4. Drag anchor to move point
-5. Drag handle to adjust curve
-6. Click empty space to deselect
+### Segment Sewing
+1. Select Segment Sewing tool (N)
+2. Select seam type: standard, french, flat-felled, or overlock
+3. Click segments to connect
+4. Seam properties automatically configured per type
 
-### Adding a Dart
-1. Select piece
-2. Select Line tool (or ask copilot: "añade pinza en busto")
-3. Click dart start on edge, click dart apex, click dart end on edge
-4. Dart appears as two fold lines
-5. 3D mesh updates with fold
+### Linked Editing
+1. Select two pattern pieces
+2. Link them as "instance" (identical) or "symmetry" (mirrored)
+3. Edit one piece — changes automatically propagate to the partner
+
+### Topstitching
+1. Select one of 4 topstitch modes (edit, free, seamline, segment)
+2. Draw or select the stitch path
+3. Topstitch overlay renders in real-time on the pattern
 
 ## Color System
 
@@ -140,7 +195,9 @@ Context-sensitive text at bottom of 2D editor:
 | Select tool, piece hovered | "Clic para seleccionar, Doble clic para editar nodos" |
 | Seam tool, no selection | "Selecciona el primer borde" |
 | Seam tool, one edge selected | "Selecciona el segundo borde para crear costura" |
+| Segment sewing tool | "Selecciona segmentos para coser" |
 | Measure tool | "Clic en dos puntos para medir distancia" |
+| Topstitch tool | "Selecciona un borde o dibuja una linea de pespunte" |
 
 ### Toasts
 - Success: piece created, seam connected, file exported
@@ -150,7 +207,7 @@ Context-sensitive text at bottom of 2D editor:
 ### Empty State
 First launch with no project:
 - "Empieza dibujando una pieza con la herramienta Pluma (P)"
-- "O genera un patrón base con el Copilot →"
+- "O genera un patron base con el Copilot"
 - Quick-start templates: "Cuerpo base", "Falda", "Manga"
 
 ## Keyboard Shortcuts
@@ -162,10 +219,12 @@ First launch with no project:
 | L | Line tool |
 | R | Rectangle tool |
 | S | Seam tool |
-| N | Notch tool |
+| N | Segment sewing tool |
 | G | Grainline tool |
 | M | Measure tool |
 | H | Hand (pan) tool |
+| X | Scissors (split) tool |
+| J | Merge tool |
 | Delete/Backspace | Delete selected |
 | Ctrl+Z | Undo |
 | Ctrl+Shift+Z | Redo |
