@@ -51,6 +51,7 @@ export class WasmSolverClient {
   onSnapshotRestored?: (id: string) => void;
   onSnapshotDeleted?: (id: string) => void;
   onConstraintsUpdated?: () => void;
+  onEdgeData?: (ids: Int32Array, lengths: Float32Array) => void;
 
   /**
    * Initialize with merged multi-piece mesh data and seam connections.
@@ -220,6 +221,14 @@ export class WasmSolverClient {
     );
   }
 
+  /**
+   * Request edge constraint data (IDs + rest lengths) from the worker.
+   * Response arrives asynchronously via onEdgeData callback.
+   */
+  requestEdgeData(): void {
+    this.worker?.postMessage({ type: 'getEdgeData' });
+  }
+
   start(): void {
     this.worker?.postMessage({ type: 'start' });
   }
@@ -271,6 +280,9 @@ export class WasmSolverClient {
         break;
       case 'constraintsUpdated':
         this.onConstraintsUpdated?.();
+        break;
+      case 'edgeData':
+        this.onEdgeData?.(msg.stretchingIds, msg.stretchingLengths);
         break;
     }
   };
