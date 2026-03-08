@@ -1,14 +1,18 @@
 /**
  * ShortcutHelp — ? key overlay showing all keyboard shortcuts.
  * Grouped by category, CLO3D-style.
+ *
+ * Now reads shortcut definitions from the centralized ShortcutRegistry
+ * and registers its toggle/close via useShortcut.
  */
 
-import { useEffect, useState } from 'react';
+import { useState, useCallback } from 'react';
 import { X } from 'lucide-react';
-import { getShortcutMap, type ShortcutEntry } from '../../hooks/useKeyboardShortcuts';
+import { useShortcut, useShortcutRegistry } from '../../shortcuts';
+import type { ShortcutDef } from '../../shortcuts';
 import './ShortcutHelp.css';
 
-function formatKey(entry: ShortcutEntry): string {
+function formatKey(entry: ShortcutDef): string {
   const parts: string[] = [];
   if (entry.ctrl) parts.push('Ctrl');
   if (entry.shift) parts.push('Shift');
@@ -19,25 +23,21 @@ function formatKey(entry: ShortcutEntry): string {
 
 export default function ShortcutHelp() {
   const [visible, setVisible] = useState(false);
+  const registry = useShortcutRegistry();
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
-        e.preventDefault();
-        setVisible(v => !v);
-      }
-      if (e.key === 'Escape' && visible) {
-        setVisible(false);
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [visible]);
+  const toggleHelp = useCallback(() => setVisible(v => !v), []);
+  const closeHelp = useCallback(() => { if (visible) setVisible(false); }, [visible]);
+
+  useShortcut('view.helpOverlay', toggleHelp);
+  useShortcut('view.helpOverlayAlt', toggleHelp);
+
+  // Escape to close is handled by the global 'selection.deselect' shortcut,
+  // but we also want it to close the help overlay when visible
+  useShortcut('selection.deselect', closeHelp);
 
   if (!visible) return null;
 
-  const shortcuts = getShortcutMap();
+  const shortcuts = registry?.getAllDefs() ?? [];
   const categories = [...new Set(shortcuts.map(s => s.category))];
 
   return (

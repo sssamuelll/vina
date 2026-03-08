@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { ShortcutProvider } from './shortcuts';
 import './index.css';
 
 // Initialize tool registry
@@ -22,6 +23,8 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ShortcutProvider>
+      <App />
+    </ShortcutProvider>
   </StrictMode>,
 );

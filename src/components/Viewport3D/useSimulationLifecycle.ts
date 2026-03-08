@@ -1,0 +1,332 @@
+/**
+ * useSimulationLifecycle — Manages solver selection cascade and client lifecycle.
+ *
+ * Owns the solver tier selection (GPU → WASM → CPU → Neural), client refs,
+ * start/stop/pause logic, collision loading, and frame callbacks.
+ *
+ * Collision loading is integrated into the startup sequence because it MUST
+ * complete before the solver starts (otherwise cloth falls through the avatar).
+ * The collision code is deduplicated via a helper function — previously it was
+ * copy-pasted for WASM and CPU paths.
+ *
+ * Extracted from GarmentSimulation.tsx for separation of concerns.
+ */
+
+import { useRef, useEffect, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../../store';
+import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
+import type { SeamInitData } from '../../utils/cloth/clothWorker';
+import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
+import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
+import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
+import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
+import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting } from '../../store/simulationSlice';
+import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
+import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
+import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
+import { importMesh } from '../../utils/import/meshImporter';
+import type { SolverEdgeData } from '../../utils/cloth/fitMaps';
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export interface SimulationClients {
+  cpu: ClothWorkerClient | null;
+  wasm: WasmSolverClient | null;
+  gpu: GpuSolverClient | null;
+  neural: NeuralDrapeClient | null;
+}
+
+export interface PlacedMesh {
+  pieceId: string;
+  vertices: Float32Array;
+  triIds: Int32Array;
+  outline: Array<{ type: string; values: number[] }>;
+  edges?: Array<{ name: string; segmentRange: [number, number] }>;
+}
+
+interface UseSimulationLifecycleProps {
+  placedMeshes: PlacedMesh[];
+  seamInitData: SeamInitData[];
+  fabricId: string;
+  /** Ref populated by this hook with stretching constraint IDs (for warm-start) */
+  stretchingIdsRef: React.MutableRefObject<Int32Array | null>;
+}
+
+interface UseSimulationLifecycleResult {
+  clients: SimulationClients;
+  /** Ref to current solver positions — updated every frame */
+  positionsRef: React.MutableRefObject<Float32Array | null>;
+  /** Ref to edge data for fit maps */
+  edgeDataRef: React.MutableRefObject<SolverEdgeData | null>;
+  /** Stable onFrame callback for solver clients */
+  onFrame: (positions: Float32Array) => void;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Race a promise against a timeout */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} timed out (${ms}ms)`)), ms)),
+  ]);
+}
+
+/** Load avatar collision mesh and custom bodies into a solver client (shared between WASM and CPU paths) */
+async function loadCollision(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  client: { setCollisionMesh: (mesh: any) => void; updateCollisionBody: (data: any) => void },
+  avatarModelUrl: string | null,
+  avatarHeight: number,
+  collisionBodies: Array<{
+    id: string;
+    name: string;
+    meshUrl: string;
+    collision: { enabled: boolean; friction: number; offset: number };
+    transform: { position: [number, number, number]; rotation: [number, number, number]; scale: [number, number, number] };
+  }>,
+  dispatch: ReturnType<typeof useDispatch>,
+  cancelled: { value: boolean },
+  isWasm: boolean,
+): Promise<void> {
+  // Avatar collision mesh
+  if (avatarModelUrl && !cancelled.value) {
+    try {
+      const collisionMesh = await withTimeout(
+        extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
+        5000,
+        'Collision mesh extraction',
+      );
+      if (collisionMesh && !cancelled.value) {
+        console.log('[SimLifecycle] ✅ Collision mesh extracted:', collisionMesh.triCount, 'triangles');
+        client.setCollisionMesh(collisionMesh);
+        if (isWasm && 'applyInitialTriangleCollision' in client) {
+          (client as WasmSolverClient).applyInitialTriangleCollision();
+        }
+        dispatch(setBodyCollision(true));
+      } else if (!cancelled.value) {
+        dispatch(setBodyCollision(false));
+      }
+    } catch (e) {
+      console.warn('[SimLifecycle] Collision mesh extraction failed:', e);
+      if (!cancelled.value) dispatch(setBodyCollision(false));
+    }
+  }
+
+  // Custom collision bodies
+  if (!cancelled.value) {
+    for (const body of collisionBodies) {
+      if (!body.collision.enabled || cancelled.value) continue;
+      try {
+        const result = await importMesh(body.meshUrl, body.name, {});
+        const scene = result.scene;
+        scene.position.set(...body.transform.position);
+        scene.rotation.set(
+          body.transform.rotation[0] * (Math.PI / 180),
+          body.transform.rotation[1] * (Math.PI / 180),
+          body.transform.rotation[2] * (Math.PI / 180),
+        );
+        scene.scale.set(...body.transform.scale);
+        scene.updateMatrixWorld(true);
+        const { vertices, indices } = extractMeshData(scene);
+        const mesh = collisionMeshFromBuffers(vertices, indices);
+        if (mesh && !cancelled.value) {
+          client.updateCollisionBody({
+            id: body.id,
+            mesh,
+            friction: body.collision.friction,
+            margin: body.collision.offset,
+          });
+        }
+      } catch (e) {
+        console.warn('[SimLifecycle] Collision body load failed:', body.name, e);
+      }
+    }
+  }
+}
+
+// ─── Hook ────────────────────────────────────────────────────────────────────
+
+export function useSimulationLifecycle({
+  placedMeshes,
+  seamInitData,
+  fabricId,
+  stretchingIdsRef,
+}: UseSimulationLifecycleProps): UseSimulationLifecycleResult {
+  const dispatch = useDispatch();
+  const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
+  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
+  const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
+
+  const positionsRef = useRef<Float32Array | null>(null);
+  const edgeDataRef = useRef<SolverEdgeData | null>(null);
+
+  const clientRef = useRef<ClothWorkerClient | null>(null);
+  const gpuClientRef = useRef<GpuSolverClient | null>(null);
+  const wasmClientRef = useRef<WasmSolverClient | null>(null);
+  const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
+
+  const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const lastFrameTimeRef = useRef(0);
+  const frameCountRef = useRef(0);
+
+  const onFrame = useCallback((positions: Float32Array) => {
+    positionsRef.current = positions;
+    const now = performance.now();
+    if (lastFrameTimeRef.current > 0) {
+      frameCountRef.current++;
+      if (frameCountRef.current % 30 === 0) {
+        const avgMs = (now - lastFrameTimeRef.current) / 30;
+        dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
+      }
+    }
+    lastFrameTimeRef.current = now;
+  }, [dispatch]);
+
+  // Start/stop simulation — solver tier cascade
+  useEffect(() => {
+    if (simulationState === 'running' && placedMeshes.length > 0) {
+      let cancelled = false;
+      const cancelFlag = { get value() { return cancelled; } };
+
+      const startSim = async () => {
+        // ─── WebGPU (DISABLED) ─────────────────────────────────────────
+        if (false as boolean && isWebGPUAvailable()) {
+          try {
+            const gpuCtx = await withTimeout(initWebGPU(), 5000, 'WebGPU init');
+            if (gpuCtx && !cancelled) {
+              console.log('[SimLifecycle] 🟢 Using WebGPU solver');
+              dispatch(setSolverTier('webgpu'));
+              const gpuClient = new GpuSolverClient(gpuCtx.device);
+              gpuClientRef.current = gpuClient;
+              gpuClient.onFrame = onFrame;
+              await withTimeout(gpuClient.initMultiPiece(placedMeshes), 10000, 'GPU solver init');
+              if (!cancelled) gpuClient.start();
+              return;
+            }
+          } catch (e) {
+            console.warn('[SimLifecycle] WebGPU failed, falling back:', e);
+          }
+        }
+
+        // ─── WASM XPBD ────────────────────────────────────────────────
+        if (!cancelled) {
+          try {
+            const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 5000, 'Wasm check').catch(() => false);
+            if (wasmAvailable && !cancelled) {
+              console.log('[SimLifecycle] 🟠 Using Wasm XPBD solver');
+              dispatch(setSolverTier('wasm'));
+              const wasmClient = new WasmSolverClient();
+              wasmClientRef.current = wasmClient;
+              wasmClient.onFrame = onFrame;
+              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
+
+              // Load collision BEFORE starting (prevents explosion)
+              await loadCollision(wasmClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, true);
+
+              if (!cancelled) wasmClient.start();
+              return;
+            } else if (!cancelled) {
+              console.warn('[SimLifecycle] Wasm solver not available');
+            }
+          } catch (e) {
+            console.warn('[SimLifecycle] Wasm failed, falling back to CPU:', e);
+          }
+        }
+
+        // ─── CPU Web Worker ────────────────────────────────────────────
+        if (!cancelled) {
+          try {
+            console.log('[SimLifecycle] 🟡 Using CPU solver (Web Worker fallback)');
+            dispatch(setSolverTier('cpu-worker'));
+            const client = new ClothWorkerClient();
+            clientRef.current = client;
+            client.onFrame = onFrame;
+            client.onEdgeData = (ids, lengths) => {
+              edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+              stretchingIdsRef.current = ids;
+            };
+            await withTimeout(client.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU worker init');
+            client.setFabric(fabricId);
+            client.requestEdgeData();
+
+            // Load collision BEFORE starting (prevents explosion)
+            await loadCollision(client, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, false);
+
+            if (!cancelled) client.start();
+            return;
+          } catch (e) {
+            console.warn('[SimLifecycle] CPU worker failed, falling back to Neural Drape:', e);
+          }
+        }
+
+        // ─── Neural Drape (analytical fallback) ────────────────────────
+        if (cancelled) return;
+        console.log('[SimLifecycle] 🔵 Using Neural Drape (analytical preview)');
+        dispatch(setSolverTier('neural-drape'));
+        const neuralClient = new NeuralDrapeClient();
+        neuralClientRef.current = neuralClient;
+        neuralClient.onFrame = onFrame;
+        await neuralClient.initMultiPiece(placedMeshes);
+        if (!cancelled) neuralClient.start();
+      };
+
+      startSim().catch(e => console.error('[SimLifecycle] Start failed:', e));
+
+      return () => {
+        if (warmStartTimerRef.current) {
+          clearTimeout(warmStartTimerRef.current);
+          warmStartTimerRef.current = null;
+        }
+        cancelled = true;
+        clientRef.current?.dispose();
+        clientRef.current = null;
+        gpuClientRef.current?.dispose();
+        gpuClientRef.current = null;
+        wasmClientRef.current?.dispose();
+        wasmClientRef.current = null;
+        neuralClientRef.current?.dispose();
+        neuralClientRef.current = null;
+        positionsRef.current = null;
+      };
+    } else if (simulationState === 'idle') {
+      if (warmStartTimerRef.current) {
+        clearTimeout(warmStartTimerRef.current);
+        warmStartTimerRef.current = null;
+      }
+      dispatch(setIsWarmStarting(false));
+      clientRef.current?.dispose();
+      clientRef.current = null;
+      gpuClientRef.current?.dispose();
+      gpuClientRef.current = null;
+      wasmClientRef.current?.dispose();
+      wasmClientRef.current = null;
+      neuralClientRef.current?.dispose();
+      neuralClientRef.current = null;
+      positionsRef.current = null;
+      dispatch(setSolverTier('none'));
+      dispatch(setFrameTime(0));
+    } else if (simulationState === 'paused') {
+      clientRef.current?.stop();
+      gpuClientRef.current?.stop();
+      wasmClientRef.current?.stop();
+      neuralClientRef.current?.stop();
+    }
+    return undefined;
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
+
+  return {
+    clients: {
+      cpu: clientRef.current,
+      wasm: wasmClientRef.current,
+      gpu: gpuClientRef.current,
+      neural: neuralClientRef.current,
+    },
+    positionsRef,
+    edgeDataRef,
+    onFrame,
+  };
+}

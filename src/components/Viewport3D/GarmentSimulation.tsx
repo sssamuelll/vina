@@ -4,39 +4,36 @@
  * Always merges all pieces into one shared solver (with or without seams).
  * All heavy work (meshing, collision mesh extraction, simulation) runs in Web Workers.
  *
+ * Simulation concerns are separated into hooks:
+ * - useSimulationLifecycle: solver tier cascade, collision loading, start/stop/pause
+ * - useCollisionBodies: pin sync to WASM solver
+ * - useMeshing: async piece meshing, edit classification, warm-start
+ *
+ * This component retains only rendering, geometry building, and UI interaction.
+ *
  * @module GarmentSimulation
  */
 
-import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import { Suspense, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam } from '../../types/types';
-import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
-import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
-import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
-import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setParticleCount, setBodyCollision, addPin, setIsWarmStarting } from '../../store/simulationSlice';
-import { classifyEdit } from '../../utils/cloth/editClassifier';
-import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
-import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
-import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
-import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
-import { importMesh } from '../../utils/import/meshImporter';
+import { addPin } from '../../store/simulationSlice';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
+import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
+import { useCollisionBodies } from './useCollisionBodies';
+import { useMeshing } from './useMeshing';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
-
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
@@ -73,177 +70,31 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
-  const positionsRef = useRef<Float32Array | null>(null);
-  const clientRef = useRef<ClothWorkerClient | null>(null);
-  const edgeDataRef = useRef<import('../../utils/cloth/fitMaps').SolverEdgeData | null>(null);
   const pieceColorsRef = useRef<Float32Array | null>(null);
+
+  // Shared refs for breaking circular dependency between useMeshing and useSimulationLifecycle
+  const clientsRef = useRef<SimulationClients>({ cpu: null, wasm: null, gpu: null, neural: null });
+  const stretchingIdsRef = useRef<Int32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
-  const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
-  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100; // cm → m
-  const globalParticleDistance = useSelector((s: RootState) => s.simulation.particleDistance);
-  const pieceParticleDistances = useSelector((s: RootState) => s.simulation.pieceParticleDistance);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
-  const pinnedVertices = useSelector((s: RootState) => s.simulation.pinnedVertices);
-  const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
-
-  // Async meshing via Web Worker (never blocks main thread)
-  const [pieceMeshes, setPieceMeshes] = useState<Array<{
-    pieceId: string;
-    vertices: Float32Array;
-    triIds: Int32Array;
-    outline: Array<{ type: string; values: number[] }>;
-    edges?: Array<{ name: string; segmentRange: [number, number] }>;
-  }>>([]);
-  const [, setMeshingStatus] = useState<string | null>(null);
-  const initClientRef = useRef<SimulationInitClient | null>(null);
-
-  // Track previous pieces for edit classification
-  const prevPiecesRef = useRef<PatternPiece[]>([]);
-  // Track warm-start debounce timer
-  const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Track current stretching IDs for rest length computation
-  const stretchingIdsRef = useRef<Int32Array | null>(null);
-
-  useEffect(() => {
-    // Skip re-meshing for dimension-only edits when solver is active
-    // The warm-start effect handles those
-    if (prevPiecesRef.current.length > 0 && (simulationState === 'running' || simulationState === 'paused')) {
-      const editType = classifyEdit(prevPiecesRef.current, pieces);
-      if (editType === 'dimension') {
-        return; // Warm-start effect handles this
-      }
-    }
-
-    let cancelled = false;
-    const client = new SimulationInitClient();
-    initClientRef.current = client;
-    client.onProgress = (p) => {
-      if (!cancelled) setMeshingStatus(`${p.stage} (${p.current}/${p.total})`);
-    };
-
-    (async () => {
-      setMeshingStatus('Meshing pieces...');
-      const meshed = await client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance);
-      if (cancelled) return;
-
-      const result = meshed.map(m => {
-        const piece = pieces.find(p => p.id === m.pieceId);
-        return {
-          ...m,
-          outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
-          edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
-        };
-      });
-
-      setPieceMeshes(result);
-      const totalParticles = result.reduce((sum, p) => sum + p.vertices.length / 3, 0);
-      dispatch(setParticleCount(totalParticles));
-      setMeshingStatus(null);
-    })().catch(err => {
-      if (!cancelled) {
-        console.error('[GarmentSimulation] Async meshing failed:', err);
-        setMeshingStatus(null);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      client.dispose();
-      initClientRef.current = null;
-    };
-  }, [pieces, globalParticleDistance, pieceParticleDistances, simulationState, dispatch]);
-
-  // Warm-start on dimension-only edits (skip full re-mesh, update constraints in-place)
-  useEffect(() => {
-    const prevPieces = prevPiecesRef.current;
-    prevPiecesRef.current = pieces;
-
-    // Skip on first render or when no solver is active
-    if (prevPieces.length === 0) return;
-    if (simulationState !== 'running' && simulationState !== 'paused') return;
-
-    const editType = classifyEdit(prevPieces, pieces);
-    if (editType !== 'dimension') return;
-
-    // Dimension edit detected — warm-start path
-    if (warmStartTimerRef.current) {
-      clearTimeout(warmStartTimerRef.current);
-    }
-
-    dispatch(setIsWarmStarting(true));
-
-    // Debounce 500ms before re-computing constraints
-    warmStartTimerRef.current = setTimeout(() => {
-      const client = new SimulationInitClient();
-      client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance)
-        .then(meshed => {
-          client.dispose();
-
-          const stretchIds = stretchingIdsRef.current;
-          if (!stretchIds || meshed.length === 0) return;
-
-          // Merge all piece vertices (same order as solver)
-          const totalVerts = meshed.reduce((sum, p) => sum + p.vertices.length, 0);
-          const mergedVerts = new Float32Array(totalVerts);
-          let offset = 0;
-          for (const p of meshed) {
-            mergedVerts.set(p.vertices, offset);
-            offset += p.vertices.length;
-          }
-
-          const newRestLengths = computeRestLengths(mergedVerts, stretchIds);
-
-          // Send to active solver
-          if (clientRef.current) {
-            clientRef.current.updateConstraints(newRestLengths);
-          } else if (wasmClientRef.current) {
-            wasmClientRef.current.updateConstraints(newRestLengths);
-          }
-
-          // Update pieceMeshes so static rendering matches
-          setPieceMeshes(meshed.map(m => {
-            const piece = pieces.find(p => p.id === m.pieceId);
-            return {
-              ...m,
-              outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
-              edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
-            };
-          }));
-
-          dispatch(setIsWarmStarting(false));
-        })
-        .catch(err => {
-          client.dispose();
-          console.warn('[GarmentSimulation] Warm-start re-mesh failed:', err);
-          dispatch(setIsWarmStarting(false));
-        });
-    }, 500);
-
-    return () => {
-      if (warmStartTimerRef.current) {
-        clearTimeout(warmStartTimerRef.current);
-        warmStartTimerRef.current = null;
-      }
-    };
-  }, [pieces, simulationState, pieceParticleDistances, globalParticleDistance, dispatch]);
-
-  // Compute placements for each piece
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
 
-  // Build merged geometry for rendering (static initial state)
-  // Uses pure math Euler rotation — no per-vertex Three.js object allocation
+  // ─── Meshing ────────────────────────────────────────────────────────────────
+
+  const pieceMeshes = useMeshing({ pieces, clientsRef, stretchingIdsRef });
+
+  // ─── Geometry building ──────────────────────────────────────────────────────
+
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    // Compute placements
     const placements = placeGarmentPieces(pieces, avatarMeasurements);
 
-    // Count totals
     let totalVerts = 0;
     for (const p of pieceMeshes) {
       totalVerts += p.vertices.length / 3;
@@ -260,7 +111,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const color = new THREE.Color(PIECE_COLORS[pi % PIECE_COLORS.length]);
       const placement = placements[pi];
 
-      // Pure math Euler rotation (XYZ order) — no Three.js objects per vertex
       const [rx, ry, rz] = placement.rotation;
       const [px, py, pz] = placement.position;
       const cx = Math.cos(rx), sx = Math.sin(rx);
@@ -269,7 +119,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
       for (let vi = 0; vi < numVerts; vi++) {
         const vx = p.vertices[vi * 3], vy = p.vertices[vi * 3 + 1], vz = p.vertices[vi * 3 + 2];
-        // Euler XYZ: Rz * Ry * Rx * v
         const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
         const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
         const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
@@ -278,14 +127,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         positions[(vOffset + vi) * 3 + 2] = z2 + pz;
       }
 
-      // Set vertex colors
       for (let i = 0; i < numVerts; i++) {
         colors[(vOffset + i) * 3] = color.r;
         colors[(vOffset + i) * 3 + 1] = color.g;
         colors[(vOffset + i) * 3 + 2] = color.b;
       }
 
-      // Copy indices with offset
       for (let i = 0; i < p.triIds.length; i++) {
         indices.push(p.triIds[i] + vOffset);
       }
@@ -305,60 +152,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
 
-  const lastFrameTimeRef = useRef(0);
-  const frameCountRef = useRef(0);
-  const onFrame = useCallback((positions: Float32Array) => {
-    positionsRef.current = positions;
-    // Track frame time (report every 30 frames to avoid Redux spam)
-    const now = performance.now();
-    if (lastFrameTimeRef.current > 0) {
-      frameCountRef.current++;
-      if (frameCountRef.current % 30 === 0) {
-        const avgMs = (now - lastFrameTimeRef.current) / 30;
-        dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
-      }
-    }
-    lastFrameTimeRef.current = now;
-  }, [dispatch]);
+  // ─── Placed meshes for solver init ──────────────────────────────────────────
 
-  // GPU solver client ref
-  const gpuClientRef = useRef<GpuSolverClient | null>(null);
-  const wasmClientRef = useRef<WasmSolverClient | null>(null);
-  const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
-
-  useImperativeHandle(ref, () => ({
-    saveSnapshot: (id: string) => {
-      clientRef.current?.saveSnapshot(id);
-      wasmClientRef.current?.saveSnapshot(id);
-    },
-    restoreSnapshot: (id: string) => {
-      clientRef.current?.restoreSnapshot(id);
-      wasmClientRef.current?.restoreSnapshot(id);
-    },
-    deleteSnapshot: (id: string) => {
-      clientRef.current?.deleteSnapshot(id);
-      wasmClientRef.current?.deleteSnapshot(id);
-    },
-  }), []);
-
-  // Geometric preview: instant vertex displacement on dimension edits
-  useGeometricPreview({
-    pieces,
-    simulationState,
-    positionsRef,
-    onPreviewFrame: onFrame ? (positions) => {
-      onFrame(positions);
-    } : null,
-  });
-
-  // Apply placement transforms (pure math, no Three.js objects per vertex)
-  // Uses placeGarmentPieces for consistency with staticGeometry rendering
   const placedMeshes = useMemo(() => {
     if (pieceMeshes.length === 0) return [];
 
-    // Use placeGarmentPieces to correctly distribute pieces around avatar
-    // This handles 'unknown' pieces by spreading them in a circle rather than
-    // placing them all at the same position (which causes explosion on sim start)
     const placements = placeGarmentPieces(pieces, avatarMeasurements);
 
     return pieceMeshes.map((pm, i) => {
@@ -384,278 +182,53 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     });
   }, [pieceMeshes, pieces, avatarMeasurements]);
 
-  // Start/stop simulation — WebGPU preferred, CPU Web Worker fallback
+  // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
+
+  const { clients, positionsRef, edgeDataRef, onFrame } = useSimulationLifecycle({
+    placedMeshes,
+    seamInitData,
+    fabricId,
+    stretchingIdsRef,
+  });
+
+  // Sync clientsRef so useMeshing's warm-start can access latest solver clients
   useEffect(() => {
-    if (simulationState === 'running' && placedMeshes.length > 0) {
-      let cancelled = false;
+    clientsRef.current = clients;
+  });
 
-      // Race a promise against a timeout
-      function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-        return Promise.race([
-          p,
-          new Promise<T>((_, rej) => setTimeout(() => rej(new Error(`${label} timed out (${ms}ms)`)), ms)),
-        ]);
-      }
+  // ─── Pin sync ───────────────────────────────────────────────────────────────
 
-      const startSim = async () => {
-        // ─── WebGPU (DISABLED) ─────────────────────────────────────────
-        // WebGPU shader compilation blocks the main thread (sync GPU calls).
-        // WGSL shaders are unvalidated on real GPU. Skipping until validated.
-        // TODO: Re-enable after shader validation + async compilation.
-        if (false as boolean && isWebGPUAvailable()) {
-          try {
-            const gpuCtx = await withTimeout(initWebGPU(), 5000, 'WebGPU init');
-            if (gpuCtx && !cancelled) {
-              console.log('[GarmentSimulation] 🟢 Using WebGPU solver');
-              dispatch(setSolverTier('webgpu'));
-              const gpuClient = new GpuSolverClient(gpuCtx.device);
-              gpuClientRef.current = gpuClient;
-              gpuClient.onFrame = onFrame;
+  useCollisionBodies({ clients });
 
-              await withTimeout(gpuClient.initMultiPiece(placedMeshes), 10000, 'GPU solver init');
+  // ─── Snapshot imperative handle ─────────────────────────────────────────────
 
-              if (!cancelled) gpuClient.start();
+  useImperativeHandle(ref, () => ({
+    saveSnapshot: (id: string) => {
+      clients.cpu?.saveSnapshot(id);
+      clients.wasm?.saveSnapshot(id);
+    },
+    restoreSnapshot: (id: string) => {
+      clients.cpu?.restoreSnapshot(id);
+      clients.wasm?.restoreSnapshot(id);
+    },
+    deleteSnapshot: (id: string) => {
+      clients.cpu?.deleteSnapshot(id);
+      clients.wasm?.deleteSnapshot(id);
+    },
+  }), [clients]);
 
-              // GPU solver doesn't support triangle collision yet
-              if (avatarModelUrl && !cancelled) {
-                dispatch(setBodyCollision(false));
-              }
-              return;
-            }
-          } catch (e) {
-            console.warn('[GarmentSimulation] WebGPU failed, falling back:', e);
-          }
-        }
+  // Geometric preview: instant vertex displacement on dimension edits
+  useGeometricPreview({
+    pieces,
+    simulationState,
+    positionsRef,
+    onPreviewFrame: onFrame ? (positions) => {
+      onFrame(positions);
+    } : null,
+  });
 
-        // ─── Try Wasm XPBD (~3x faster than JS) ──────────────────────
-        if (!cancelled) {
-          try {
-            const wasmAvailable = await withTimeout(isWasmSolverAvailable(), 5000, 'Wasm check').catch(() => false);
-            if (wasmAvailable && !cancelled) {
-              console.log('[GarmentSimulation] 🟠 Using Wasm XPBD solver');
-              dispatch(setSolverTier('wasm'));
-              const wasmClient = new WasmSolverClient();
-              wasmClientRef.current = wasmClient;
-              wasmClient.onFrame = onFrame;
+  // ─── Per-frame geometry update ──────────────────────────────────────────────
 
-              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
-
-              // Load collision mesh BEFORE starting simulation to prevent explosion
-              if (avatarModelUrl && !cancelled) {
-                console.log('[GarmentSimulation] Loading avatar collision data...');
-                try {
-                  const collisionMesh = await withTimeout(
-                    extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
-                    5000,
-                    'Collision mesh extraction'
-                  );
-                  if (collisionMesh && !cancelled) {
-                    console.log('[GarmentSimulation] ✅ Collision mesh extracted:', collisionMesh.triCount, 'triangles');
-                    wasmClient.setCollisionMesh(collisionMesh);
-                    wasmClient.applyInitialTriangleCollision();
-                    dispatch(setBodyCollision(true));
-                  } else if (!cancelled) {
-                    dispatch(setBodyCollision(false));
-                  }
-                } catch (e) {
-                  console.warn('[GarmentSimulation] Collision data load failed:', e);
-                  dispatch(setBodyCollision(false));
-                }
-              }
-
-              // Load collision bodies (WASM)
-              if (!cancelled) {
-                for (const body of collisionBodies) {
-                  if (!body.collision.enabled || cancelled) continue;
-                  try {
-                    const result = await importMesh(body.meshUrl, body.name, {});
-                    const scene = result.scene;
-                    scene.position.set(...body.transform.position);
-                    scene.rotation.set(
-                      body.transform.rotation[0] * (Math.PI / 180),
-                      body.transform.rotation[1] * (Math.PI / 180),
-                      body.transform.rotation[2] * (Math.PI / 180),
-                    );
-                    scene.scale.set(...body.transform.scale);
-                    scene.updateMatrixWorld(true);
-                    const { vertices, indices } = extractMeshData(scene);
-                    const mesh = collisionMeshFromBuffers(vertices, indices);
-                    if (mesh && !cancelled) {
-                      wasmClient.updateCollisionBody({
-                        id: body.id,
-                        mesh,
-                        friction: body.collision.friction,
-                        margin: body.collision.offset,
-                      });
-                    }
-                  } catch (e) {
-                    console.warn('[GarmentSimulation] Collision body load failed:', body.name, e);
-                  }
-                }
-              }
-
-              if (!cancelled) wasmClient.start();
-              return;
-            } else if (!cancelled) {
-              console.warn('[GarmentSimulation] Wasm solver not available or timed out');
-            }
-          } catch (e) {
-            console.warn('[GarmentSimulation] Wasm failed, falling back to CPU:', e);
-          }
-        }
-
-        // ─── Tier 3: CPU Web Worker ──────────────────────────────────
-        if (!cancelled) {
-          try {
-            console.log('[GarmentSimulation] 🟡 Using CPU solver (Web Worker fallback)');
-            dispatch(setSolverTier('cpu-worker'));
-            const client = new ClothWorkerClient();
-            clientRef.current = client;
-            client.onFrame = onFrame;
-            client.onEdgeData = (ids, lengths) => {
-              edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
-              stretchingIdsRef.current = ids;
-            };
-
-            await withTimeout(client.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU worker init');
-            client.setFabric(fabricId);
-            client.requestEdgeData();
-
-            // Load collision mesh BEFORE starting simulation (CPU)
-            if (avatarModelUrl && !cancelled) {
-              console.log('[GarmentSimulation] Extracting collision mesh (CPU)...');
-              try {
-                const collisionMesh = await withTimeout(
-                  extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
-                  5000,
-                  'Collision mesh extraction'
-                );
-                if (collisionMesh && !cancelled) {
-                  console.log('[GarmentSimulation] ✅ Collision mesh extracted for CPU:', collisionMesh.triCount, 'triangles');
-                  client.setCollisionMesh(collisionMesh);
-                  dispatch(setBodyCollision(true));
-                } else if (!cancelled) {
-                  dispatch(setBodyCollision(false));
-                }
-              } catch (e) {
-                console.warn('[GarmentSimulation] Collision mesh extraction failed (CPU):', e);
-                dispatch(setBodyCollision(false));
-              }
-            }
-
-            // Load collision bodies (CPU)
-            if (!cancelled) {
-              for (const body of collisionBodies) {
-                if (!body.collision.enabled || cancelled) continue;
-                try {
-                  const result = await importMesh(body.meshUrl, body.name, {});
-                  const scene = result.scene;
-                  scene.position.set(...body.transform.position);
-                  scene.rotation.set(
-                    body.transform.rotation[0] * (Math.PI / 180),
-                    body.transform.rotation[1] * (Math.PI / 180),
-                    body.transform.rotation[2] * (Math.PI / 180),
-                  );
-                  scene.scale.set(...body.transform.scale);
-                  scene.updateMatrixWorld(true);
-                  const { vertices, indices } = extractMeshData(scene);
-                  const mesh = collisionMeshFromBuffers(vertices, indices);
-                  if (mesh && !cancelled) {
-                    client.updateCollisionBody({
-                      id: body.id,
-                      mesh,
-                      friction: body.collision.friction,
-                      margin: body.collision.offset,
-                    });
-                  }
-                } catch (e) {
-                  console.warn('[GarmentSimulation] Collision body load failed:', body.name, e);
-                }
-              }
-            }
-
-            if (!cancelled) client.start();
-            return;
-          } catch (e) {
-            console.warn('[GarmentSimulation] CPU worker failed, falling back to Neural Drape:', e);
-          }
-        }
-
-        // ─── Tier 4: Neural Drape (analytical fallback) ─────────────
-        if (cancelled) return;
-        console.log('[GarmentSimulation] 🔵 Using Neural Drape (analytical preview)');
-        dispatch(setSolverTier('neural-drape'));
-        const neuralClient = new NeuralDrapeClient();
-        neuralClientRef.current = neuralClient;
-        neuralClient.onFrame = onFrame;
-
-        await neuralClient.initMultiPiece(placedMeshes);
-        if (!cancelled) neuralClient.start();
-      };
-
-      startSim().catch(e => console.error('[GarmentSimulation] Start failed:', e));
-
-      return () => {
-        // Cancel any pending warm-start
-        if (warmStartTimerRef.current) {
-          clearTimeout(warmStartTimerRef.current);
-          warmStartTimerRef.current = null;
-        }
-        cancelled = true;
-        clientRef.current?.dispose();
-        clientRef.current = null;
-        gpuClientRef.current?.dispose();
-        gpuClientRef.current = null;
-        wasmClientRef.current?.dispose();
-        wasmClientRef.current = null;
-        neuralClientRef.current?.dispose();
-        neuralClientRef.current = null;
-        positionsRef.current = null;
-      };
-    } else if (simulationState === 'idle') {
-      // Cancel pending warm-start and clear warm-start state
-      if (warmStartTimerRef.current) {
-        clearTimeout(warmStartTimerRef.current);
-        warmStartTimerRef.current = null;
-      }
-      dispatch(setIsWarmStarting(false));
-      clientRef.current?.dispose();
-      clientRef.current = null;
-      gpuClientRef.current?.dispose();
-      gpuClientRef.current = null;
-      wasmClientRef.current?.dispose();
-      wasmClientRef.current = null;
-      neuralClientRef.current?.dispose();
-      neuralClientRef.current = null;
-      positionsRef.current = null;
-      dispatch(setSolverTier('none'));
-      dispatch(setFrameTime(0));
-    } else if (simulationState === 'paused') {
-      clientRef.current?.stop();
-      gpuClientRef.current?.stop();
-      wasmClientRef.current?.stop();
-      neuralClientRef.current?.stop();
-    }
-    return undefined;
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, dispatch]);
-
-  // Sync pinned vertices to Wasm solver
-  useEffect(() => {
-    const wasmClient = wasmClientRef.current;
-    if (!wasmClient) return;
-
-    const pins = Object.values(pinnedVertices);
-    if (pins.length === 0) {
-      wasmClient.clearPins();
-    } else {
-      wasmClient.setPins(pins.map(p => ({
-        vertexIndex: p.vertexIndex,
-        position: p.targetPosition,
-      })));
-    }
-  }, [pinnedVertices]);
-
-  // Per-frame geometry update
   useFrame(() => {
     if (!meshRef.current || !staticGeometry) return;
     const positions = positionsRef.current;
@@ -672,7 +245,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // Compute fit map overlay colors
     const colorAttr = staticGeometry.getAttribute('color') as THREE.BufferAttribute;
     if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr) {
-      // Save original piece colors on first fit-map frame
       if (!pieceColorsRef.current) {
         pieceColorsRef.current = new Float32Array(colorAttr.array as Float32Array);
       }
@@ -690,7 +262,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         onFitMapStats?.(mapData.stats);
       }
     } else if (fitMapMode === 'none' && pieceColorsRef.current && colorAttr) {
-      // Restore original piece colors
       (colorAttr.array as Float32Array).set(pieceColorsRef.current);
       colorAttr.needsUpdate = true;
       pieceColorsRef.current = null;
@@ -721,17 +292,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (simulationState !== 'idle') {
       const unregister = registerSimulationCallbacks(
         (id) => {
-          clientRef.current?.saveSnapshot(id);
-          wasmClientRef.current?.saveSnapshot(id);
+          clients.cpu?.saveSnapshot(id);
+          clients.wasm?.saveSnapshot(id);
         },
         (id) => {
-          clientRef.current?.restoreSnapshot(id);
-          wasmClientRef.current?.restoreSnapshot(id);
+          clients.cpu?.restoreSnapshot(id);
+          clients.wasm?.restoreSnapshot(id);
         },
       );
       return unregister;
     }
-  }, [simulationState]);
+  }, [simulationState, clients]);
 
   // Listen for 3D export events from copilot tools
   useEffect(() => {
@@ -777,7 +348,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     const positions = positionsRef.current;
     if (!positions) return;
 
-    // Find the nearest vertex to the click point
     const clickPoint = e.point;
     const numParticles = positions.length / 3;
 
@@ -796,7 +366,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
     }
 
-    // Add pin at the nearest vertex
     const pinPosition: [number, number, number] = [
       positions[nearestIdx * 3],
       positions[nearestIdx * 3 + 1],
@@ -810,7 +379,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     }));
 
     console.log(`[Pin Tool] Added pin at vertex ${nearestIdx}, position:`, pinPosition);
-  }, [activeTool3D, dispatch, pinStrength]);
+  }, [activeTool3D, dispatch, pinStrength, positionsRef]);
 
   if (!staticGeometry) return null;
 
@@ -845,11 +414,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
 /**
  * GarmentSimulation — always uses MergedSimulation for all pieces.
- *
- * Previously had a ClothMesh-per-piece fallback for no-seam patterns,
- * but that path ran CDT meshing + collision setup on the main thread,
- * freezing the browser. MergedSimulation uses Web Workers for everything.
- * When no seams exist, the solver simply has no seam constraints.
  */
 const GarmentSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationProps>(function GarmentSimulation({ pieces, seams, onFitMapStats, onInspect }, ref) {
   return (

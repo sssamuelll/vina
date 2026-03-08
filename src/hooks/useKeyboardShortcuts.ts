@@ -2,13 +2,14 @@
 /**
  * useKeyboardShortcuts — CLO3D-compatible global keyboard shortcut system.
  *
- * Implements the full CLO3D shortcut map from Core 8 manual.
- * Context-aware: same key can do different things in 2D vs 3D.
+ * Registers all shortcut handlers with the centralized ShortcutRegistry.
+ * The actual keydown listener is in ShortcutProvider — this hook only
+ * registers/unregisters handlers as state changes.
  *
- * @see GitHub issue #124
+ * @see GitHub issue #124, #12
  */
 
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import {
@@ -21,7 +22,7 @@ import {
   copyPieces,
   createPastedPieces,
 } from '../store/editorSlice';
-import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
+import { setActiveTool2D } from '../store/toolSlice';
 import { removePiece, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
@@ -34,96 +35,55 @@ import {
 } from '../store/simulationSlice';
 import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
 import { saveToLocalStorage } from '../utils/projectIO';
-import { toolRegistry } from '../tools';
+import { useShortcutRegistry } from '../shortcuts/useShortcut';
 
-export interface ShortcutEntry {
-  key: string;
-  ctrl?: boolean;
-  shift?: boolean;
-  alt?: boolean;
-  label: string;
-  category: 'Simulation' | '3D Tools' | '2D Tools' | 'Sewing' | 'Selection' | 'Edit' | 'File' | 'View';
-  action: () => void;
+// Re-export ShortcutEntry type for backwards compatibility
+export type { ShortcutDef as ShortcutEntry } from '../shortcuts/ShortcutRegistry';
+
+import { DEFAULT_SHORTCUTS } from '../shortcuts/defaults';
+
+/** Exportable shortcut map for help overlay — now reads from registry */
+export function getShortcutMap() {
+  return DEFAULT_SHORTCUTS;
 }
-
-/** Exportable shortcut map for help overlay */
-let _shortcutMap: ShortcutEntry[] = [];
-export function getShortcutMap(): ShortcutEntry[] { return _shortcutMap; }
 
 export function useKeyboardShortcuts() {
   const dispatch = useDispatch();
+  const registry = useShortcutRegistry();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const selectedSeamId = useSelector((s: RootState) => s.editor.selectedSeamId);
-  const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectState = useSelector((s: RootState) => s.project);
-  const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
 
-  // Tool registry shortcuts
-  const toolShortcuts = useMemo(() => toolRegistry.getShortcuts(), []);
-
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      // Don't trigger when typing in inputs
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+    if (!registry) return;
 
-      const ctrl = e.metaKey || e.ctrlKey;
-      const shift = e.shiftKey;
-      const key = e.key.toLowerCase();
+    // ─── Define all handlers ────────────────────────────────────────────
 
-      // ─── File shortcuts ───────────────────────────────────────────────
+    const handlers: Array<[string, () => void]> = [
+      // File
+      ['file.save', () => saveToLocalStorage(projectState)],
 
-      // Ctrl+S — Save project
-      if (ctrl && key === 's' && !shift) {
-        e.preventDefault();
-        saveToLocalStorage(projectState);
-        return;
-      }
-
-      // Ctrl+Z — Undo
-      if (ctrl && key === 'z' && !shift) {
-        e.preventDefault();
-        dispatch(undo());
-        return;
-      }
-
-      // Ctrl+Shift+Z / Ctrl+Y — Redo
-      if (ctrl && ((key === 'z' && shift) || key === 'y')) {
-        e.preventDefault();
-        dispatch(redo());
-        return;
-      }
-
-      // Ctrl+C — Copy selected pieces
-      if (ctrl && key === 'c' && !shift) {
-        e.preventDefault();
+      // Edit
+      ['edit.undo', () => dispatch(undo())],
+      ['edit.redo', () => dispatch(redo())],
+      ['edit.redoAlt', () => dispatch(redo())],
+      ['edit.copy', () => {
         if (selectedPieceIds.length > 0) {
           const selectedPieces = pieces.filter(p => selectedPieceIds.includes(p.id));
-          if (selectedPieces.length > 0) {
-            dispatch(copyPieces({ pieces: selectedPieces }));
-          }
+          if (selectedPieces.length > 0) dispatch(copyPieces({ pieces: selectedPieces }));
         }
-        return;
-      }
-
-      // Ctrl+V — Paste
-      if (ctrl && key === 'v' && !shift) {
-        e.preventDefault();
+      }],
+      ['edit.paste', () => {
         if (clipboard) {
           const newPieces = createPastedPieces(clipboard);
-          for (const p of newPieces) {
-            dispatch(addPiece(p));
-          }
+          for (const p of newPieces) dispatch(addPiece(p));
         }
-        return;
-      }
-
-      // Ctrl+R — Mirror Paste (CLO3D convention)
-      if (ctrl && key === 'r' && !shift) {
-        e.preventDefault();
+      }],
+      ['edit.mirrorPaste', () => {
         if (clipboard) {
           const newPieces = createPastedPieces(clipboard, true);
           for (const p of newPieces) {
@@ -131,52 +91,30 @@ export function useKeyboardShortcuts() {
             dispatch(flipPieceH(p.id));
           }
         }
-        return;
-      }
-
-      // Ctrl+D — Duplicate selected
-      if (ctrl && key === 'd' && !shift) {
-        e.preventDefault();
-        for (const id of selectedPieceIds) {
-          dispatch(duplicatePiece(id));
+      }],
+      ['edit.duplicate', () => {
+        for (const id of selectedPieceIds) dispatch(duplicatePiece(id));
+      }],
+      ['edit.delete', () => {
+        if (selectedPieceIds.length > 0) {
+          selectedPieceIds.forEach(id => dispatch(removePiece(id)));
+          dispatch(clearSelection());
         }
-        return;
-      }
+      }],
+      ['edit.deleteAlt', () => {
+        if (selectedPieceIds.length > 0) {
+          selectedPieceIds.forEach(id => dispatch(removePiece(id)));
+          dispatch(clearSelection());
+        }
+      }],
 
-      // ─── Selection shortcuts ──────────────────────────────────────────
+      // Selection
+      ['selection.selectAll', () => dispatch(selectAllPieces(pieces.map(p => p.id)))],
+      ['selection.deselect', () => dispatch(clearSelection())],
+      ['selection.reverseSeam', () => { if (selectedSeamId) dispatch(reverseSeam(selectedSeamId)); }],
 
-      // Ctrl+A — Select All pieces
-      if (ctrl && key === 'a' && !shift) {
-        e.preventDefault();
-        dispatch(selectAllPieces(pieces.map(p => p.id)));
-        return;
-      }
-
-      // Ctrl+B — Reverse sewing direction
-      if (ctrl && key === 'b' && !shift && selectedSeamId) {
-        e.preventDefault();
-        dispatch(reverseSeam(selectedSeamId));
-        return;
-      }
-
-      // Escape — Clear selection / hide gizmo
-      if (key === 'escape') {
-        dispatch(clearSelection());
-        return;
-      }
-
-      // Delete / Backspace — Delete selected pieces
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedPieceIds.length > 0) {
-        selectedPieceIds.forEach(id => dispatch(removePiece(id)));
-        dispatch(clearSelection());
-        return;
-      }
-
-      // ─── Simulation shortcuts ─────────────────────────────────────────
-
-      // Shift+Space — Simulate Hi-Res (production quality)
-      if (key === ' ' && shift) {
-        e.preventDefault();
+      // Simulation
+      ['sim.hiRes', () => {
         if (viewMode3D === 'arrange') {
           dispatch(setQualityLevel('production'));
           dispatch(setParticleDistance(3));
@@ -190,14 +128,9 @@ export function useKeyboardShortcuts() {
           dispatch(setViewMode3D('simulate'));
           dispatch(startSimulation());
         }
-        return;
-      }
-
-      // Space — Toggle Arrange ↔ Simulate mode
-      if (key === ' ') {
-        e.preventDefault();
+      }],
+      ['sim.toggle', () => {
         if (viewMode3D === 'arrange') {
-          // Save arrangement snapshot, switch to simulate
           const placements = placeGarmentPieces(pieces, avatar.measurements);
           const snapshot: Record<string, [number, number, number]> = {};
           pieces.forEach((p, i) => {
@@ -208,286 +141,61 @@ export function useKeyboardShortcuts() {
           dispatch(setViewMode3D('simulate'));
           dispatch(startSimulation());
         } else {
-          // Back to arrange
           dispatch(resetSimulation());
           dispatch(setViewMode3D('arrange'));
         }
-        return;
-      }
-
-      // Ctrl+F — Reset 3D Arrangement
-      if (ctrl && key === 'f' && !shift) {
-        e.preventDefault();
+      }],
+      ['sim.reset', () => {
         dispatch(resetSimulation());
         dispatch(setViewMode3D('arrange'));
         dispatch(clearArrangementSnapshot());
-        return;
-      }
+      }],
 
-      // ─── View shortcuts ───────────────────────────────────────────────
+      // View
+      ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
 
-      // Shift+S — Toggle seam allowance visibility
-      if (shift && key === 's' && !ctrl) {
-        dispatch(toggleSeamAllowance());
-        return;
-      }
+      // 2D Tools (CLO3D mapping)
+      ['tool.transform', () => { dispatch(setActiveTool('transform' as any)); dispatch(setActiveTool2D('transform')); }],
+      ['tool.select', () => { dispatch(setActiveTool('select' as any)); dispatch(setActiveTool2D('select')); }],
+      ['tool.editCurve', () => { dispatch(setActiveTool('editCurve' as any)); dispatch(setActiveTool2D('editCurve')); }],
+      ['tool.editConstrain', () => { dispatch(setActiveTool('editConstrain' as any)); dispatch(setActiveTool2D('editConstrain')); }],
+      ['tool.pen', () => { dispatch(setActiveTool('pen' as any)); dispatch(setActiveTool2D('pen')); }],
+      ['tool.rectangle', () => { dispatch(setActiveTool('rectangle' as any)); dispatch(setActiveTool2D('rectangle')); }],
+      ['tool.circle', () => { dispatch(setActiveTool('circle' as any)); dispatch(setActiveTool2D('circle')); }],
+      ['tool.internalShape', () => { dispatch(setActiveTool('internalShape' as any)); dispatch(setActiveTool2D('internalShape')); }],
+      ['tool.trace', () => { dispatch(setActiveTool('trace' as any)); dispatch(setActiveTool2D('trace')); }],
+      ['tool.dart', () => { dispatch(setActiveTool('dart' as any)); dispatch(setActiveTool2D('dart')); }],
+      ['tool.scissors', () => { dispatch(setActiveTool('scissors' as any)); dispatch(setActiveTool2D('scissors')); }],
+      ['tool.pin', () => { dispatch(setActiveTool('pin' as any)); dispatch(setActiveTool2D('pin')); }],
+      ['tool.measure', () => { dispatch(setActiveTool('measure' as any)); dispatch(setActiveTool2D('measure')); }],
+      ['tool.merge', () => { dispatch(setActiveTool('merge' as any)); dispatch(setActiveTool2D('merge')); }],
+      ['tool.topstitchEdit', () => { dispatch(setActiveTool('topstitchEdit' as any)); dispatch(setActiveTool2D('topstitchEdit')); }],
+      ['tool.topstitchSegment', () => { dispatch(setActiveTool('topstitchSegment' as any)); dispatch(setActiveTool2D('topstitchSegment')); }],
+      ['tool.topstitchFree', () => { dispatch(setActiveTool('topstitchFree' as any)); dispatch(setActiveTool2D('topstitchFree')); }],
+      ['tool.topstitchSeamline', () => { dispatch(setActiveTool('topstitchSeamline' as any)); dispatch(setActiveTool2D('topstitchSeamline')); }],
 
-      // Shift+G — Grainline tool (displaced from G)
-      if (shift && key === 'g' && !ctrl) {
-        dispatch(setActiveTool('grainline' as any));
-        dispatch(setActiveTool2D('grainline'));
-        return;
-      }
+      // Sewing
+      ['tool.seam', () => { dispatch(setActiveTool('seam' as any)); dispatch(setActiveTool2D('seam')); }],
+      ['tool.freeSewing', () => { dispatch(setActiveTool('freeSewing' as any)); dispatch(setActiveTool2D('freeSewing')); }],
+      ['tool.segmentSewing', () => { dispatch(setActiveTool('segmentSewing' as any)); dispatch(setActiveTool2D('segmentSewing')); }],
 
-      // Shift+F — Free Sewing (alternative)
-      if (shift && key === 'f' && !ctrl) {
-        dispatch(setActiveTool('freeSewing' as any));
-        dispatch(setActiveTool2D('freeSewing'));
-        return;
-      }
+      // Shift+Key tools
+      ['tool.grainline', () => { dispatch(setActiveTool('grainline' as any)); dispatch(setActiveTool2D('grainline')); }],
+      ['tool.freeSewingAlt', () => { dispatch(setActiveTool('freeSewing' as any)); dispatch(setActiveTool2D('freeSewing')); }],
+      ['tool.notch', () => { dispatch(setActiveTool('notch' as any)); dispatch(setActiveTool2D('notch')); }],
+      ['tool.line', () => { dispatch(setActiveTool('line' as any)); dispatch(setActiveTool2D('line')); }],
+    ];
 
-      // Shift+N — Notch tool (displaced from N)
-      if (shift && key === 'n' && !ctrl) {
-        dispatch(setActiveTool('notch' as any));
-        dispatch(setActiveTool2D('notch'));
-        return;
-      }
+    // ─── Register all handlers ──────────────────────────────────────────
 
-      // Shift+L — Line tool (displaced from L)
-      if (shift && key === 'l' && !ctrl) {
-        dispatch(setActiveTool('line' as any));
-        dispatch(setActiveTool2D('line'));
-        return;
-      }
+    for (const [id, handler] of handlers) {
+      registry.registerHandler(id, handler);
+    }
 
-      // ─── CLO3D 2D Tool shortcuts (no modifiers) ────────────────────────
-      if (ctrl || shift || e.altKey) return;
-
-      // Q — Select/Move (3D camera tool)
-      if (key === 'q') {
-        dispatch(setActiveTool3D('camera'));
-        return;
-      }
-
-      // A — Transform Pattern
-      if (key === 'a') {
-        dispatch(setActiveTool('transform' as any));
-        dispatch(setActiveTool2D('transform'));
-        return;
-      }
-
-      // Z — Edit Pattern (Select)
-      if (key === 'z') {
-        dispatch(setActiveTool('select' as any));
-        dispatch(setActiveTool2D('select'));
-        return;
-      }
-
-      // V — Edit Curve Point
-      if (key === 'v') {
-        dispatch(setActiveTool('editCurve' as any));
-        dispatch(setActiveTool2D('editCurve'));
-        return;
-      }
-
-      // C — Edit Curvature
-      if (key === 'c') {
-        dispatch(setActiveTool('editConstrain' as any));
-        dispatch(setActiveTool2D('editConstrain'));
-        return;
-      }
-
-      // H — Polygon (Pen)
-      if (key === 'h') {
-        dispatch(setActiveTool('pen' as any));
-        dispatch(setActiveTool2D('pen'));
-        return;
-      }
-
-      // S — Rectangle
-      if (key === 's') {
-        dispatch(setActiveTool('rectangle' as any));
-        dispatch(setActiveTool2D('rectangle'));
-        return;
-      }
-
-      // E — Ellipse (Circle)
-      if (key === 'e') {
-        dispatch(setActiveTool('circle' as any));
-        dispatch(setActiveTool2D('circle'));
-        return;
-      }
-
-      // G — Internal Shape
-      if (key === 'g') {
-        dispatch(setActiveTool('internalShape' as any));
-        dispatch(setActiveTool2D('internalShape'));
-        return;
-      }
-
-      // I — Trace
-      if (key === 'i') {
-        dispatch(setActiveTool('trace' as any));
-        dispatch(setActiveTool2D('trace'));
-        return;
-      }
-
-      // B — Edit Sewing (Seam)
-      if (key === 'b') {
-        dispatch(setActiveTool('seam' as any));
-        dispatch(setActiveTool2D('seam'));
-        return;
-      }
-
-      // M — Measure
-      if (key === 'm') {
-        dispatch(setActiveTool('measure' as any));
-        dispatch(setActiveTool2D('measure'));
-        return;
-      }
-
-      // F — Free Sewing
-      if (key === 'f') {
-        dispatch(setActiveTool('freeSewing' as any));
-        dispatch(setActiveTool2D('freeSewing'));
-        return;
-      }
-
-      // J — Merge Patterns
-      if (key === 'j') {
-        dispatch(setActiveTool('merge' as any));
-        dispatch(setActiveTool2D('merge'));
-        return;
-      }
-
-      // D — Dart
-      if (key === 'd') {
-        dispatch(setActiveTool('dart' as any));
-        dispatch(setActiveTool2D('dart'));
-        return;
-      }
-
-      // X — Scissors
-      if (key === 'x') {
-        dispatch(setActiveTool('scissors' as any));
-        dispatch(setActiveTool2D('scissors'));
-        return;
-      }
-
-      // W — Pin
-      if (key === 'w') {
-        dispatch(setActiveTool('pin' as any));
-        dispatch(setActiveTool2D('pin'));
-        return;
-      }
-
-      // N — Segment Sewing
-      if (key === 'n') {
-        dispatch(setActiveTool('segmentSewing' as any));
-        dispatch(setActiveTool2D('segmentSewing'));
-        return;
-      }
-
-      // T — Edit Topstitch
-      if (key === 't') {
-        dispatch(setActiveTool('topstitchEdit' as any));
-        dispatch(setActiveTool2D('topstitchEdit'));
-        return;
-      }
-
-      // K — Segment Topstitch
-      if (key === 'k') {
-        dispatch(setActiveTool('topstitchSegment' as any));
-        dispatch(setActiveTool2D('topstitchSegment'));
-        return;
-      }
-
-      // L — Free Topstitch
-      if (key === 'l') {
-        dispatch(setActiveTool('topstitchFree' as any));
-        dispatch(setActiveTool2D('topstitchFree'));
-        return;
-      }
-
-      // ; — Seamline Topstitch
-      if (key === ';') {
-        dispatch(setActiveTool('topstitchSeamline' as any));
-        dispatch(setActiveTool2D('topstitchSeamline'));
-        return;
-      }
-
-      // Check tool shortcuts from registry (fallback)
-      const toolId = toolShortcuts[key];
-      if (toolId) {
-        const tool = toolRegistry.getTool(toolId);
-        if (tool) {
-          if (tool.context === '2d' || tool.context === 'both') {
-            dispatch(setActiveTool(toolId as any));
-            dispatch(setActiveTool2D(toolId));
-          }
-        }
+    return () => {
+      for (const [id] of handlers) {
+        registry.unregisterHandler(id);
       }
     };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [dispatch, pieces, selectedPieceIds, selectedSeamId, simulationState, viewMode3D, avatar, projectState, viewMode, toolShortcuts, clipboard]);
-
-  // Build exportable shortcut map (for help overlay)
-  useEffect(() => {
-    _shortcutMap = [
-      // Simulation
-      { key: 'Space', label: 'Toggle Simulation', category: 'Simulation', action: () => {} },
-      { key: 'Space', shift: true, label: 'Simulate Hi-Res', category: 'Simulation', action: () => {} },
-      // 3D Tools
-      { key: 'Q', label: 'Select/Move (3D)', category: '3D Tools', action: () => {} },
-      // 2D Tools (CLO3D mapping)
-      { key: 'A', label: 'Transform Pattern', category: '2D Tools', action: () => {} },
-      { key: 'Z', label: 'Edit Pattern (Select)', category: '2D Tools', action: () => {} },
-      { key: 'V', label: 'Edit Curve Point', category: '2D Tools', action: () => {} },
-      { key: 'C', label: 'Edit Curvature', category: '2D Tools', action: () => {} },
-      { key: 'H', label: 'Polygon (Pen)', category: '2D Tools', action: () => {} },
-      { key: 'S', label: 'Rectangle', category: '2D Tools', action: () => {} },
-      { key: 'E', label: 'Ellipse (Circle)', category: '2D Tools', action: () => {} },
-      { key: 'G', label: 'Internal Shape', category: '2D Tools', action: () => {} },
-      { key: 'I', label: 'Trace', category: '2D Tools', action: () => {} },
-      { key: 'D', label: 'Dart', category: '2D Tools', action: () => {} },
-      { key: 'X', label: 'Scissors', category: '2D Tools', action: () => {} },
-      { key: 'W', label: 'Pin', category: '2D Tools', action: () => {} },
-      { key: 'N', label: 'Segment Sewing', category: '2D Tools', action: () => {} },
-      { key: 'T', label: 'Edit Topstitch', category: '2D Tools', action: () => {} },
-      { key: 'K', label: 'Segment Topstitch', category: '2D Tools', action: () => {} },
-      { key: 'L', label: 'Free Topstitch', category: '2D Tools', action: () => {} },
-      { key: ';', label: 'Seamline Topstitch', category: '2D Tools', action: () => {} },
-      // Sewing
-      { key: 'B', label: 'Edit Sewing (Seam)', category: 'Sewing', action: () => {} },
-      { key: 'F', label: 'Free Sewing', category: 'Sewing', action: () => {} },
-      { key: 'B', ctrl: true, label: 'Reverse Sewing', category: 'Sewing', action: () => {} },
-      // Displaced tools (Shift+Key)
-      { key: 'G', shift: true, label: 'Grainline Tool', category: '2D Tools', action: () => {} },
-      { key: 'M', label: 'Measure', category: '2D Tools', action: () => {} },
-      { key: 'J', label: 'Merge Patterns', category: '2D Tools', action: () => {} },
-      { key: 'N', shift: true, label: 'Notch Tool', category: '2D Tools', action: () => {} },
-      { key: 'L', shift: true, label: 'Line Tool', category: '2D Tools', action: () => {} },
-      // Selection
-      { key: 'Escape', label: 'Deselect / Hide Gizmo', category: 'Selection', action: () => {} },
-      { key: 'A', ctrl: true, label: 'Select All', category: 'Selection', action: () => {} },
-      // File
-      { key: 'S', ctrl: true, label: 'Save', category: 'File', action: () => {} },
-      // Edit
-      { key: 'Z', ctrl: true, label: 'Undo', category: 'Edit', action: () => {} },
-      { key: 'Z', ctrl: true, shift: true, label: 'Redo', category: 'Edit', action: () => {} },
-      { key: 'Y', ctrl: true, label: 'Redo', category: 'Edit', action: () => {} },
-      { key: 'C', ctrl: true, label: 'Copy', category: 'Edit', action: () => {} },
-      { key: 'V', ctrl: true, label: 'Paste', category: 'Edit', action: () => {} },
-      { key: 'R', ctrl: true, label: 'Mirror Paste', category: 'Edit', action: () => {} },
-      { key: 'D', ctrl: true, label: 'Duplicate', category: 'Edit', action: () => {} },
-      { key: 'Delete', label: 'Delete Selected', category: 'Edit', action: () => {} },
-      // View
-      { key: 'S', shift: true, label: 'Toggle Seam Allowance', category: 'View', action: () => {} },
-      { key: 'A', shift: true, label: 'Toggle Avatar', category: 'View', action: () => {} },
-      { key: 'F10', label: 'Snapshot 3D', category: 'View', action: () => {} },
-      { key: 'F', ctrl: true, label: 'Reset 3D Arrangement', category: 'View', action: () => {} },
-    ];
-  }, []);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, avatar, projectState, clipboard]);
 }
