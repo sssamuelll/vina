@@ -24,7 +24,7 @@ import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin } from '../../store/simulationSlice';
+import { addPin, setFitMapStats } from '../../store/simulationSlice';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
@@ -260,12 +260,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         (colorAttr.array as Float32Array).set(mapData.colors);
         colorAttr.needsUpdate = true;
         onFitMapStats?.(mapData.stats);
+        dispatch(setFitMapStats(mapData.stats));
       }
     } else if (fitMapMode === 'none' && pieceColorsRef.current && colorAttr) {
       (colorAttr.array as Float32Array).set(pieceColorsRef.current);
       colorAttr.needsUpdate = true;
       pieceColorsRef.current = null;
       onFitMapStats?.(null);
+      dispatch(setFitMapStats(null));
     }
   });
 
