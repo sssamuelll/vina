@@ -284,6 +284,21 @@ impl XpbdSolver {
         self.num_particles
     }
 
+    /// Pointer to stretch constraint indices [a,b, a,b, ...] for fit map computation.
+    pub fn stretch_ids_ptr(&self) -> *const u32 {
+        self.stretch_ids.as_ptr()
+    }
+
+    /// Pointer to stretch constraint rest lengths for fit map computation.
+    pub fn stretch_rest_ptr(&self) -> *const f32 {
+        self.stretch_rest.as_ptr()
+    }
+
+    /// Number of stretch constraints (each constraint = one edge = one pair of IDs).
+    pub fn num_stretch_edges(&self) -> usize {
+        self.stretch_rest.len()
+    }
+
     // ─── Internal solver passes ─────────────────────────────────────────
 
     fn pre_solve(&mut self, sdt: f32) {

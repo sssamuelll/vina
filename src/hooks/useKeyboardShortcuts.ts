@@ -32,6 +32,7 @@ import {
   setParticleDistance,
   saveArrangementSnapshot,
   clearArrangementSnapshot,
+  setFitMapMode,
 } from '../store/simulationSlice';
 import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
 import { saveToLocalStorage } from '../utils/projectIO';
@@ -54,6 +55,7 @@ export function useKeyboardShortcuts() {
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const selectedSeamId = useSelector((s: RootState) => s.editor.selectedSeamId);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
+  const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectState = useSelector((s: RootState) => s.project);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
@@ -184,6 +186,13 @@ export function useKeyboardShortcuts() {
       ['tool.freeSewingAlt', () => { dispatch(setActiveTool('freeSewing' as any)); dispatch(setActiveTool2D('freeSewing')); }],
       ['tool.notch', () => { dispatch(setActiveTool('notch' as any)); dispatch(setActiveTool2D('notch')); }],
       ['tool.line', () => { dispatch(setActiveTool('line' as any)); dispatch(setActiveTool2D('line')); }],
+
+      // Fit Maps
+      ['fitmap.stress', () => dispatch(setFitMapMode(fitMapMode === 'stress' ? 'none' : 'stress'))],
+      ['fitmap.strain', () => dispatch(setFitMapMode(fitMapMode === 'strain' ? 'none' : 'strain'))],
+      ['fitmap.fit', () => dispatch(setFitMapMode(fitMapMode === 'fit' ? 'none' : 'fit'))],
+      ['fitmap.pressure', () => dispatch(setFitMapMode(fitMapMode === 'pressure' ? 'none' : 'pressure'))],
+      ['fitmap.none', () => dispatch(setFitMapMode('none'))],
     ];
 
     // ─── Register all handlers ──────────────────────────────────────────
@@ -197,5 +206,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, avatar, projectState, clipboard]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, fitMapMode, avatar, projectState, clipboard]);
 }

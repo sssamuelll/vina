@@ -8,7 +8,7 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
-import type { FitMapMode, FitMapConfig } from '../utils/cloth/fitMaps';
+import type { FitMapMode, FitMapConfig, FitMapStats } from '../utils/cloth/fitMaps';
 import type { QualityLevel } from '../utils/cloth/gpu/qualityPresets';
 
 /** Simulation lifecycle state. */
@@ -103,6 +103,8 @@ interface SimulationSliceState {
   activeSnapshotId: string | null;
   /** Whether the simulation is warm-starting after a dimension edit */
   isWarmStarting: boolean;
+  /** Latest fit map statistics (null when no fit map active) */
+  fitMapStats: FitMapStats | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -135,6 +137,7 @@ const initialState: SimulationSliceState = {
   snapshots: [],
   activeSnapshotId: null,
   isWarmStarting: false,
+  fitMapStats: null,
 };
 
 const simulationSlice = createSlice({
@@ -319,6 +322,10 @@ const simulationSlice = createSlice({
     setIsWarmStarting(state, action: PayloadAction<boolean>) {
       state.isWarmStarting = action.payload;
     },
+    /** Set the latest fit map statistics (null to clear). */
+    setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
+      state.fitMapStats = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -362,6 +369,7 @@ export const {
   setActiveSnapshot,
   clearSnapshots,
   setIsWarmStarting,
+  setFitMapStats,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

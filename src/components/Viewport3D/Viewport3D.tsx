@@ -121,6 +121,20 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [avatarHidden, setAvatarHidden] = useState(false);
   const [collisionPanelOpen, setCollisionPanelOpen] = useState(false);
 
+  // Expose fitMapStats to window for Playwright E2E testing
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__OPENCLO_FIT_MAP_STATS__ = fitMapStats;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        delete (window as any).__OPENCLO_FIT_MAP_STATS__;
+      }
+    };
+  }, [fitMapStats]);
+
   const poseEditorOpen = useSelector((s: RootState) => s.avatar.poseEditorOpen);
   const [ctxMenu, setCtxMenu] = useState<ContextMenu3DState>({
     visible: false, x: 0, y: 0, target: 'background',

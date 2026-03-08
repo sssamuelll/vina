@@ -92,6 +92,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'fitmap.strain', key: '7', alt: true, label: 'Strain Map', category: '3D Tools', context: '3d' },
   { id: 'fitmap.fit', key: '8', alt: true, label: 'Fit Map', category: '3D Tools', context: '3d' },
   { id: 'fitmap.pressure', key: '9', alt: true, label: 'Pressure Points', category: '3D Tools', context: '3d' },
+  { id: 'fitmap.none', key: '0', alt: true, label: 'Fit Map Off', category: '3D Tools', context: '3d' },
 
   // ─── Copilot ────────────────────────────────────────────────────────────────
   { id: 'copilot.focusChat', key: '/', ctrl: true, label: 'Focus Chat Input', category: 'View', context: 'copilot' },

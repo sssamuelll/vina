@@ -222,7 +222,12 @@ export function useSimulationLifecycle({
               const wasmClient = new WasmSolverClient();
               wasmClientRef.current = wasmClient;
               wasmClient.onFrame = onFrame;
+              wasmClient.onEdgeData = (ids, lengths) => {
+                edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
+                stretchingIdsRef.current = ids;
+              };
               await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
+              wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
               await loadCollision(wasmClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, true);

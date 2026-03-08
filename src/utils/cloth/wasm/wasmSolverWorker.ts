@@ -45,6 +45,9 @@ interface WasmXpbdSolver {
   step(dt: number): void;
   positions_ptr(): number;
   num_particles(): number;
+  num_stretch_edges(): number;
+  stretch_ids_ptr(): number;
+  stretch_rest_ptr(): number;
   free(): void;
 }
 
@@ -343,6 +346,24 @@ self.onmessage = async (event: MessageEvent) => {
             target.set(incoming);
           }
         }
+        break;
+      }
+
+      case 'getEdgeData': {
+        if (!solver || !wasmExports?.memory) {
+          (self as unknown as Worker).postMessage({ type: 'edgeData', stretchingIds: new Int32Array(0), stretchingLengths: new Float32Array(0) });
+          break;
+        }
+        const numEdges = solver.num_stretch_edges();
+        const idsPtr = solver.stretch_ids_ptr();
+        const restPtr = solver.stretch_rest_ptr();
+        // Read from WASM memory — copy to avoid detached buffer issues
+        const stretchingIds = new Int32Array(new Uint32Array(wasmExports.memory.buffer, idsPtr, numEdges * 2)).buffer.slice(0);
+        const stretchingLengths = new Float32Array(wasmExports.memory.buffer, restPtr, numEdges).slice();
+        (self as unknown as Worker).postMessage(
+          { type: 'edgeData', stretchingIds: new Int32Array(stretchingIds), stretchingLengths },
+          [stretchingIds, stretchingLengths.buffer],
+        );
         break;
       }
 

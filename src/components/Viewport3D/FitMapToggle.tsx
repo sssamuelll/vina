@@ -12,11 +12,12 @@
  * @module FitMapToggle
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { setFitMapMode } from '../../store/simulationSlice';
+import { setFitMapMode, updateFitMapConfig } from '../../store/simulationSlice';
 import type { FitMapMode, FitMapStats } from '../../utils/cloth/fitMaps';
+import { DEFAULT_FIT_MAP_CONFIG } from '../../utils/cloth/fitMaps';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -178,6 +179,54 @@ const S = {
     whiteSpace: 'nowrap' as const,
     boxShadow: '0 1px 4px rgba(0,0,0,0.4)',
   },
+  // Config popover panel
+  configPanel: {
+    position: 'absolute' as const,
+    top: 44,
+    right: 0,
+    background: 'rgba(30,30,30,0.96)',
+    borderRadius: 4,
+    padding: '10px 14px',
+    zIndex: 20,
+    fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
+    fontSize: 11,
+    color: '#fff',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+    minWidth: 200,
+  },
+  configRow: {
+    display: 'flex' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'space-between' as const,
+    marginBottom: 6,
+    gap: 6,
+  },
+  configLabel: {
+    fontSize: 11,
+    color: '#bbb',
+    whiteSpace: 'nowrap' as const,
+  },
+  configInput: {
+    width: 50,
+    background: '#333',
+    border: '1px solid #555',
+    borderRadius: 3,
+    color: '#fff',
+    padding: '2px 4px',
+    fontSize: 11,
+    fontVariantNumeric: 'tabular-nums' as const,
+  },
+  configResetBtn: {
+    marginTop: 4,
+    width: '100%' as const,
+    background: '#444',
+    border: '1px solid #666',
+    borderRadius: 3,
+    color: '#ccc',
+    padding: '4px 8px',
+    fontSize: 10,
+    cursor: 'pointer',
+  },
 };
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -188,25 +237,11 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const [hovered, setHovered] = useState<FitMapMode | null>(null);
+  const [showConfig, setShowConfig] = useState(false);
 
   const toggle = useCallback((mode: FitMapMode) => {
     dispatch(setFitMapMode(fitMapMode === mode ? 'none' : mode));
   }, [dispatch, fitMapMode]);
-
-  // Keyboard shortcuts — match CLO3D exactly
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (!e.altKey) return;
-      switch (e.key) {
-        case '6': e.preventDefault(); toggle('stress'); break;
-        case '7': e.preventDefault(); toggle('strain'); break;
-        case '8': e.preventDefault(); toggle('fit'); break;
-        case '9': e.preventDefault(); toggle('pressure'); break;
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [toggle]);
 
   if (simulationState === 'idle') return null;
 
@@ -262,6 +297,149 @@ export default function FitMapToggle({ stats, inspectedValue, avatarHidden, onTo
             <circle cx="12" cy="12" r="3" />
           </svg>
         </button>
+
+        {/* Config gear button */}
+        <button
+          onClick={() => setShowConfig(!showConfig)}
+          title="Fit Map Config"
+          style={S.toggleBtn(showConfig)}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" style={S.toggleIcon(showConfig)}>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+          </svg>
+        </button>
+
+        {/* Config popover */}
+        {showConfig && (
+          <div style={S.configPanel}>
+            <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Fit Map Config</div>
+
+            {/* Stress Range */}
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Stress Range (kPa)</div>
+            <div style={S.configRow}>
+              <label style={S.configLabel}>
+                Min
+                <input
+                  type="number"
+                  aria-label="Stress Min"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={fitMapConfig.stressRange[0]}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ stressRange: [v, fitMapConfig.stressRange[1]] }));
+                  }}
+                />
+              </label>
+              <label style={S.configLabel}>
+                Max
+                <input
+                  type="number"
+                  aria-label="Stress Max"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={fitMapConfig.stressRange[1]}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ stressRange: [fitMapConfig.stressRange[0], v] }));
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Strain Range */}
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Strain Range (%)</div>
+            <div style={S.configRow}>
+              <label style={S.configLabel}>
+                Min
+                <input
+                  type="number"
+                  aria-label="Strain Min"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={+(fitMapConfig.strainRange[0] * 100).toFixed(1)}
+                  step={1}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ strainRange: [v / 100, fitMapConfig.strainRange[1]] }));
+                  }}
+                />
+              </label>
+              <label style={S.configLabel}>
+                Max
+                <input
+                  type="number"
+                  aria-label="Strain Max"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={+(fitMapConfig.strainRange[1] * 100).toFixed(1)}
+                  step={1}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ strainRange: [fitMapConfig.strainRange[0], v / 100] }));
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Fit Thresholds */}
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Fit Thresholds (%)</div>
+            <div style={S.configRow}>
+              <label style={S.configLabel}>
+                Tight
+                <input
+                  type="number"
+                  aria-label="Fit Tight"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={+(fitMapConfig.fitThresholds[0] * 100).toFixed(1)}
+                  step={1}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ fitThresholds: [v / 100, fitMapConfig.fitThresholds[1]] }));
+                  }}
+                />
+              </label>
+              <label style={S.configLabel}>
+                Can't Wear
+                <input
+                  type="number"
+                  aria-label="Fit Can't Wear"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={+(fitMapConfig.fitThresholds[1] * 100).toFixed(1)}
+                  step={1}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ fitThresholds: [fitMapConfig.fitThresholds[0], v / 100] }));
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Pressure Distance */}
+            <div style={{ ...S.configLabel, marginBottom: 2 }}>Pressure Distance (mm)</div>
+            <div style={S.configRow}>
+              <label style={S.configLabel}>
+                Distance
+                <input
+                  type="number"
+                  aria-label="Pressure Distance"
+                  style={{ ...S.configInput, marginLeft: 4 }}
+                  value={+(fitMapConfig.pressureDistance * 1000).toFixed(1)}
+                  step={0.1}
+                  onChange={(e) => {
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) dispatch(updateFitMapConfig({ pressureDistance: v / 1000 }));
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Reset to defaults */}
+            <button
+              style={S.configResetBtn}
+              onClick={() => dispatch(updateFitMapConfig(DEFAULT_FIT_MAP_CONFIG))}
+            >
+              Reset to Defaults
+            </button>
+          </div>
+        )}
 
         {/* Hover tooltip */}
         {hovered && (

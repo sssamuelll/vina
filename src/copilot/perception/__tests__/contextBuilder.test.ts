@@ -117,6 +117,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       showGarment: true, showSeamlines3D: true, showInternalLines3D: true, surfaceMode3D: 'textured' as const,
       snapshots: [], activeSnapshotId: null,
       isWarmStarting: false,
+      fitMapStats: null,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {

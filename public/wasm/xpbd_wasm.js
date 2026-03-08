@@ -66,6 +66,14 @@ export class XpbdSolver {
         return ret >>> 0;
     }
     /**
+     * Number of stretch constraints (each constraint = one edge = one pair of IDs).
+     * @returns {number}
+     */
+    num_stretch_edges() {
+        const ret = wasm.xpbdsolver_num_stretch_edges(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Get pointer to positions buffer (for zero-copy JS access).
      * @returns {number}
      */
@@ -182,6 +190,22 @@ export class XpbdSolver {
      */
     step(dt) {
         wasm.xpbdsolver_step(this.__wbg_ptr, dt);
+    }
+    /**
+     * Pointer to stretch constraint indices [a,b, a,b, ...] for fit map computation.
+     * @returns {number}
+     */
+    stretch_ids_ptr() {
+        const ret = wasm.xpbdsolver_stretch_ids_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Pointer to stretch constraint rest lengths for fit map computation.
+     * @returns {number}
+     */
+    stretch_rest_ptr() {
+        const ret = wasm.xpbdsolver_stretch_rest_ptr(this.__wbg_ptr);
+        return ret >>> 0;
     }
 }
 if (Symbol.dispose) XpbdSolver.prototype[Symbol.dispose] = XpbdSolver.prototype.free;

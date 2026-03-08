@@ -24,12 +24,16 @@ export { getGarmentStateTool } from './getGarmentState';
 export { getPieceDetailsTool } from './getPieceDetails';
 export { measureEdgeTool } from './measureEdge';
 export { searchPiecesTool } from './searchPieces';
+export { getFitMapStatsTool } from './getFitMapStats';
+export { getFitMapByPieceTool } from './getFitMapByPiece';
 
 import type { MetaToolDefinition } from './types';
 import { getGarmentStateTool } from './getGarmentState';
 import { getPieceDetailsTool } from './getPieceDetails';
 import { measureEdgeTool } from './measureEdge';
 import { searchPiecesTool } from './searchPieces';
+import { getFitMapStatsTool } from './getFitMapStats';
+import { getFitMapByPieceTool } from './getFitMapByPiece';
 
 /**
  * Returns all registered meta-tools as an array.
@@ -41,5 +45,7 @@ export function getAllMetaTools(): MetaToolDefinition[] {
     getPieceDetailsTool,
     measureEdgeTool,
     searchPiecesTool,
+    getFitMapStatsTool,
+    getFitMapByPieceTool,
   ];
 }
