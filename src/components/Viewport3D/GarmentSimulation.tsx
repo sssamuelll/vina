@@ -102,8 +102,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     const positions = new Float32Array(totalVerts * 3);
     const colors = new Float32Array(totalVerts * 3);
+    const uvs = new Float32Array(totalVerts * 2);
     const indices: number[] = [];
     let vOffset = 0;
+    let hasUVs = false;
 
     for (let pi = 0; pi < pieceMeshes.length; pi++) {
       const p = pieceMeshes[pi];
@@ -133,6 +135,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         colors[(vOffset + i) * 3 + 2] = color.b;
       }
 
+      // UV coordinates from 2D pattern space for texture mapping (static, set once)
+      if (p.uvs && p.uvs.length >= numVerts * 2) {
+        uvs.set(p.uvs.subarray(0, numVerts * 2), vOffset * 2);
+        hasUVs = true;
+      }
+
       for (let i = 0; i < p.triIds.length; i++) {
         indices.push(p.triIds[i] + vOffset);
       }
@@ -144,6 +152,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     const colorAttr = new THREE.BufferAttribute(colors, 3);
     geo.setAttribute('color', colorAttr);
+    if (hasUVs) {
+      geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    }
     geo.setIndex(indices);
     geo.computeVertexNormals();
 

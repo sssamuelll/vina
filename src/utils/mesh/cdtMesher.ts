@@ -42,6 +42,12 @@ const DEFAULT_CONFIG: Required<MeshConfig> = {
   curveResolution: 12,
 };
 
+/**
+ * UV scale factor: pattern coordinates (mm) are divided by this value.
+ * 100mm = 1 UV unit, so textures tile every 10cm in pattern space.
+ */
+const PATTERN_UV_SCALE = 100;
+
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
 /**
@@ -303,7 +309,15 @@ function convertToClothMeshData(
     triIds[i * 3 + 2] = triangles[i][2];
   }
 
-    return { vertices, triIds };
+  // UVs from 2D pattern coordinates — pattern pieces are in mm,
+  // normalized so textures tile at a reasonable rate (1 UV unit = 100mm = 10cm)
+  const uvs = new Float32Array(points.length * 2);
+  for (let i = 0; i < points.length; i++) {
+    uvs[i * 2] = points[i][0] / PATTERN_UV_SCALE;
+    uvs[i * 2 + 1] = points[i][1] / PATTERN_UV_SCALE;
+  }
+
+    return { vertices, triIds, uvs };
   }
   
   /**
