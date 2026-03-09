@@ -7,6 +7,7 @@ import {
   togglePoseEditor, toggleIK,
   POSE_PRESETS, JOINT_CONSTRAINTS,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
+  setMorphTarget,
 } from '../../store/avatarSlice';
 import {
   setAvatarModelUrl, setAvatarMode, updateMeasurements,
@@ -62,10 +63,14 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
   );
   const jointRotation = useMemo(() => jointRotationRaw ?? { x: 0, y: 0, z: 0 }, [jointRotationRaw]);
 
+  const availableMorphTargets = useSelector((s: RootState) => s.avatar.availableMorphTargets);
+  const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
+
   // Section collapse
   const [avatarOpen, setAvatarOpen] = useState(true);
   const [poseOpen, setPoseOpen] = useState(true);
   const [jointDetailsOpen, setJointDetailsOpen] = useState(true);
+  const [bodyShapeOpen, setBodyShapeOpen] = useState(true);
 
   // File input ref
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -148,6 +153,10 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
 
   const handleMeasurement = useCallback((key: keyof BodyMeasurements, value: number) => {
     dispatch(updateMeasurements({ [key]: value }));
+  }, [dispatch]);
+
+  const handleMorphTarget = useCallback((name: string, value: number) => {
+    dispatch(setMorphTarget({ name, value }));
   }, [dispatch]);
 
   // Joint rotation handler
@@ -267,6 +276,39 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
               </div>
             )}
           </div>
+
+          {/* ── Body Shape Section (native morph targets) ── */}
+          {availableMorphTargets.length > 0 && (
+            <div className="ap-section">
+              <button className="ap-section-header" onClick={() => setBodyShapeOpen(!bodyShapeOpen)}>
+                <span className={`ap-chevron ${bodyShapeOpen ? 'open' : ''}`}>▸</span>
+                Body Shape
+              </button>
+              {bodyShapeOpen && (
+                <div className="ap-section-body">
+                  <div className="ap-slider-group">
+                    {availableMorphTargets.map(name => {
+                      const val = morphTargets[name] ?? 0;
+                      return (
+                        <div key={name}>
+                          <div className="ap-slider-label">
+                            <span>{name}</span>
+                            <span>{Math.round(val * 100)}%</span>
+                          </div>
+                          <div className="ap-slider-control">
+                            <input
+                              type="range" min={0} max={1} step={0.01} value={val}
+                              onChange={e => handleMorphTarget(name, Number(e.target.value))}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* ── Pose Section ── */}
           <div className="ap-section">
