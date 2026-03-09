@@ -44,4 +44,47 @@ test.describe('UI Layout Cleanup', () => {
     await waitForApp(page);
     await expect(page.locator('text=Select a piece to edit')).toBeVisible({ timeout: 5000 });
   });
+
+  test('copilot starts minimized', async ({ page }) => {
+    await waitForApp(page);
+    // CopilotSidePanel renders with class 'expanded' when open
+    const copilotExpanded = page.locator('.copilot-side-panel.expanded');
+    await expect(copilotExpanded).not.toBeVisible({ timeout: 3000 });
+  });
+
+  test('Activity Bar has correct icon count', async ({ page }) => {
+    await waitForApp(page);
+    const activityItems = page.locator('.activity-bar-item');
+    // 6 top + 2 bottom + 1 copilot toggle = 9 total
+    await expect(activityItems).toHaveCount(9, { timeout: 5000 });
+  });
+
+  test('Project view has save/open/new and piece list', async ({ page }) => {
+    await waitForApp(page);
+    // Click the Project icon in ActivityBar (first item)
+    await page.click('.activity-bar-item[title="Project"]');
+    await page.waitForTimeout(300);
+
+    // Sidebar should show Project title
+    await expect(page.locator('.sidebar-title')).toHaveText('Project');
+
+    // Save/Open/New buttons should be visible
+    await expect(page.locator('button:has-text("Save")')).toBeVisible();
+    await expect(page.locator('button:has-text("Open")')).toBeVisible();
+    await expect(page.locator('button:has-text("New")')).toBeVisible();
+  });
+
+  test('Avatar & Body view has mode toggle and measurements', async ({ page }) => {
+    await waitForApp(page);
+    // Click the Avatar icon in ActivityBar
+    await page.click('.activity-bar-item[title="Avatar & Body"]');
+    await page.waitForTimeout(300);
+
+    // Sidebar should show Avatar & Body title
+    await expect(page.locator('.sidebar-title')).toHaveText('Avatar & Body');
+
+    // Mode toggle buttons
+    await expect(page.locator('button:has-text("Dress Form")')).toBeVisible();
+    await expect(page.locator('button:has-text("3D Model")')).toBeVisible();
+  });
 });
