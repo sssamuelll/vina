@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
-import { setJointRotation, clampJointRotation } from '../../store/avatarSlice';
+import { setJointRotation, clampJointRotation, IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS } from '../../store/avatarSlice';
 import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
 import type { VRM } from '@pixiv/three-vrm';
@@ -172,6 +172,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const boneMap = useRef<Map<string, THREE.Bone>>(new Map());
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
   const ikSolver = useRef<CCDIKSolver | null>(null);
+  const ikTargetHelpers = useRef<Map<string, THREE.Object3D>>(new Map());
 
   const dispatch = useDispatch();
   const joints = useSelector((s: RootState) => s.avatar.pose.joints);
@@ -372,6 +373,11 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const initializeIK = (activeScene: THREE.Object3D) => {
     if (!activeScene || boneMap.current.size === 0) return;
 
+    // Clean up old target helpers
+    ikTargetHelpers.current.forEach(helper => helper.parent?.remove(helper));
+    ikTargetHelpers.current.clear();
+    ikSolver.current = null;
+
     try {
       let mesh: THREE.SkinnedMesh | null = null;
       activeScene.traverse((child) => {
@@ -381,26 +387,72 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       });
       if (!mesh || !(mesh as THREE.SkinnedMesh).skeleton) return;
 
-      // Create IK chains
       const skeleton = (mesh as THREE.SkinnedMesh).skeleton!;
-      const iks = ikChains.map(chain => {
-        const bones = chain.bones.map(boneName => {
+      const iks: Array<{
+        target: number;
+        effector: number;
+        links: Array<{ index: number; rotationMin?: THREE.Vector3; rotationMax?: THREE.Vector3 }>;
+      }> = [];
+
+      for (const chain of ikChains) {
+        const endEffectorBoneName = IK_END_EFFECTOR_BONES[chain.name];
+        if (!endEffectorBoneName) continue;
+
+        const endEffectorBone = boneMap.current.get(endEffectorBoneName);
+        if (!endEffectorBone) continue;
+
+        // Create invisible target helper
+        const target = new THREE.Object3D();
+        target.name = `ik-target-${chain.name}`;
+        // Position at end-effector's current world position
+        const worldPos = new THREE.Vector3();
+        endEffectorBone.getWorldPosition(worldPos);
+        target.position.copy(worldPos);
+        activeScene.add(target);
+        ikTargetHelpers.current.set(chain.name, target);
+
+        // We need the target in the skeleton's bones array for CCDIKSolver
+        skeleton.bones.push(target as unknown as THREE.Bone);
+        const targetIndex = skeleton.bones.length - 1;
+
+        const effectorBone = boneMap.current.get(chain.bones[chain.bones.length - 1]);
+        if (!effectorBone) continue;
+        const effectorIndex = skeleton.bones.indexOf(effectorBone);
+
+        // Build links from chain bones (excluding last which is effector)
+        const links = chain.bones.slice(0, -1).map(boneName => {
           const bone = boneMap.current.get(boneName);
-          if (!bone) {
-            console.warn(`[AvatarModel] IK bone not found: ${boneName}`);
-            return null;
+          if (!bone) return null;
+          const idx = skeleton.bones.indexOf(bone);
+
+          // Convert JOINT_CONSTRAINTS to radians for CCD link limits
+          const constraints = JOINT_CONSTRAINTS[boneName];
+          if (constraints) {
+            return {
+              index: idx,
+              rotationMin: new THREE.Vector3(
+                constraints.minX * DEG2RAD,
+                constraints.minY * DEG2RAD,
+                constraints.minZ * DEG2RAD
+              ),
+              rotationMax: new THREE.Vector3(
+                constraints.maxX * DEG2RAD,
+                constraints.maxY * DEG2RAD,
+                constraints.maxZ * DEG2RAD
+              ),
+            };
           }
-          return { index: skeleton.bones.indexOf(bone) };
-        }).filter(b => b !== null);
+          return { index: idx };
+        }).filter((l): l is NonNullable<typeof l> => l !== null);
 
-        if (bones.length === 0) return null;
-
-        return {
-          target: bones[bones.length - 1]!.index, // End effector
-          effector: bones[bones.length - 1]!.index,
-          links: bones.slice(0, -1).map(b => ({ index: b!.index })),
-        };
-      }).filter(ik => ik !== null);
+        if (links.length > 0) {
+          iks.push({
+            target: targetIndex,
+            effector: effectorIndex,
+            links,
+          });
+        }
+      }
 
       if (iks.length > 0) {
         ikSolver.current = new CCDIKSolver(mesh, iks);
