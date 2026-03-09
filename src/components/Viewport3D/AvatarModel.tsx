@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
-import { setJointRotation, clampJointRotation, IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS } from '../../store/avatarSlice';
+import { setJointRotation, IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS } from '../../store/avatarSlice';
+import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
 import type { VRM } from '@pixiv/three-vrm';
@@ -510,38 +511,62 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     });
 
     // Apply IK if enabled and solver is available
-    if (ikEnabled && ikSolver.current && ikTargets.length > 0) {
+    if (ikEnabled && ikSolver.current && ikTargetHelpers.current.size > 0) {
       try {
-        ikSolver.current.update();
-        
-        // Extract updated bone rotations and store them back in Redux
-        boneMap.current.forEach((bone, name) => {
-          const bindPose = bindPoses.current.get(name);
-          if (!bindPose) return;
-          
-          // Calculate rotation difference from bind pose
-          const currentRot = bone.quaternion.clone();
-          const relativeRot = new THREE.Quaternion().multiplyQuaternions(currentRot, bindPose.clone().invert());
-          
-          // Convert to Euler angles
-          const euler = new THREE.Euler().setFromQuaternion(relativeRot, 'ZYX');
-          const rotation = {
-            x: euler.x * (180 / Math.PI),
-            y: euler.y * (180 / Math.PI),
-            z: euler.z * (180 / Math.PI),
-          };
-          
-          // Only update if significantly different from current joint rotation
-          const current = joints[name];
-          if (!current || 
-              Math.abs(rotation.x - current.x) > 1 ||
-              Math.abs(rotation.y - current.y) > 1 ||
-              Math.abs(rotation.z - current.z) > 1) {
-            
-            const clamped = clampJointRotation(name, rotation);
-            dispatch(setJointRotation({ joint: name, rotation: clamped }));
+        // Update target helper positions from Redux ikTargets
+        for (const target of ikTargets) {
+          const helper = ikTargetHelpers.current.get(target.name);
+          if (helper) {
+            helper.position.set(target.position.x, target.position.y, target.position.z);
           }
-        });
+        }
+
+        // Run CCD solver
+        ikSolver.current.update();
+
+        // Post-solve: apply swing-twist constraints and sync back to Redux
+        const updates: Array<{ joint: string; rotation: { x: number; y: number; z: number } }> = [];
+
+        for (const chain of ikChains) {
+          for (const boneName of chain.bones) {
+            const bone = boneMap.current.get(boneName);
+            const bindPose = bindPoses.current.get(boneName);
+            if (!bone || !bindPose) continue;
+
+            // Extract rotation relative to bind pose
+            const relativeRot = bindPose.clone().invert().multiply(bone.quaternion.clone());
+
+            // Apply swing-twist constraint
+            const constraint = ANATOMICAL_CONSTRAINTS[boneName];
+            if (constraint) {
+              const constrainedQ = clampSwingTwist(relativeRot, constraint);
+              // Apply constrained rotation back to bone
+              bone.quaternion.copy(bindPose).multiply(constrainedQ);
+
+              // Convert to Euler for Redux
+              const euler = new THREE.Euler().setFromQuaternion(constrainedQ, 'ZYX');
+              const rotation = {
+                x: euler.x * (180 / Math.PI),
+                y: euler.y * (180 / Math.PI),
+                z: euler.z * (180 / Math.PI),
+              };
+
+              // Only dispatch if significantly different (>1°)
+              const current = joints[boneName];
+              if (!current ||
+                  Math.abs(rotation.x - current.x) > 1 ||
+                  Math.abs(rotation.y - current.y) > 1 ||
+                  Math.abs(rotation.z - current.z) > 1) {
+                updates.push({ joint: boneName, rotation });
+              }
+            }
+          }
+        }
+
+        // Batch dispatch (one per bone that changed)
+        for (const update of updates) {
+          dispatch(setJointRotation(update));
+        }
       } catch (error) {
         console.warn('[AvatarModel] IK solving failed:', error);
       }
