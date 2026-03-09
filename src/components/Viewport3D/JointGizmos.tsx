@@ -14,6 +14,7 @@ interface JointGizmosProps {
 const COLOR_IDLE = new THREE.Color('#4488ff');
 const COLOR_HOVER = new THREE.Color('#ffcc00');
 const COLOR_SELECTED = new THREE.Color('#44ff44');
+const COLOR_IK_MODE = new THREE.Color('#ff8844');
 
 function JointSphere({
   boneName,
@@ -28,6 +29,7 @@ function JointSphere({
   const [hovered, setHovered] = useState(false);
   const selectedJoint = useSelector((s: RootState) => s.avatar.selectedJoint);
   const isSelected = selectedJoint === boneName;
+  const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
   const { scene } = useThree();
 
   // Find the bone in the scene's skeleton
@@ -53,7 +55,7 @@ function JointSphere({
     meshRef.current.position.copy(pos);
   });
 
-  const color = isSelected ? COLOR_SELECTED : hovered ? COLOR_HOVER : COLOR_IDLE;
+  const color = ikEnabled ? COLOR_IK_MODE : isSelected ? COLOR_SELECTED : hovered ? COLOR_HOVER : COLOR_IDLE;
   const scale = hovered || isSelected ? 1.6 : 1;
 
   return (
@@ -76,6 +78,7 @@ function JointSphere({
         document.body.style.cursor = '';
       }}
       onPointerDown={(e) => {
+        if (ikEnabled) return; // IK mode — gizmos are visual only
         e.stopPropagation();
         poseDrag.onGizmoPointerDown(boneName, e);
         document.body.style.cursor = 'grabbing';

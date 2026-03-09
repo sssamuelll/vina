@@ -12,6 +12,7 @@ import type { GarmentSimulationHandle } from './GarmentSimulation';
 import { SimulationErrorBoundary } from './SimulationErrorBoundary';
 import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
+import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
@@ -27,6 +28,7 @@ import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets } from './useCameraPresets';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
+import { toggleIK } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
 
@@ -253,6 +255,14 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       if (e.code === 'Numpad1') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterRight'); }
       if (e.code === 'Numpad3') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterLeft'); }
 
+      // I — Toggle IK mode (when pose editor is open)
+      if ((e.key === 'I' || e.key === 'i') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+        if (poseEditorOpen) {
+          e.preventDefault();
+          dispatch(toggleIK());
+        }
+      }
+
       // ─── Focus (F) — zoom to selected piece (CLO3D-standard) ───
       if ((e.key === 'F' || e.key === 'f') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
         e.preventDefault();
@@ -263,7 +273,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool3D, dispatch, cameraPresets, selectedPieceIds, snapshot3D]);
+  }, [activeTool3D, dispatch, cameraPresets, selectedPieceIds, snapshot3D, poseEditorOpen]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -329,6 +339,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
         {/* JointGizmos: always mounted when avatar present; internally checks poseEditorOpen */}
         <JointGizmos poseDrag={poseDrag} setOrbitEnabled={setOrbitEnabled} />
+        <IKEndEffectorGizmos setOrbitEnabled={setOrbitEnabled} />
         <AvatarTapes />
         {/* AnchorPoints: only when 'arrangement' tool is active — mutually exclusive with pose */}
         <AnchorPoints measurements={avatar.measurements} visible={activeTool3D === 'arrangement' && !poseEditorOpen} />
