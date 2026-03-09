@@ -22,13 +22,8 @@ async function waitForApp(page: Page) {
 }
 
 async function drawRect(page: Page) {
-  const svg = page.locator('svg.pattern-svg');
-  await svg.click(); // Focus the 2D canvas
-  await page.waitForTimeout(200);
-
   await page.keyboard.press('r');
-  await page.waitForTimeout(200);
-
+  const svg = page.locator('svg.pattern-svg');
   const box = await svg.boundingBox();
   if (!box) throw new Error('Pattern SVG not found');
 
@@ -38,11 +33,10 @@ async function drawRect(page: Page) {
   await page.mouse.down();
   await page.mouse.move(cx + 80, cy + 80, { steps: 10 });
   await page.mouse.up();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
 
   // Verify piece was created
-  const piecesIndicator = page.locator('text=/Pieces:\\s*[1-9]/');
-  await expect(piecesIndicator).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('text=Pieces: 1')).toBeVisible({ timeout: 5000 });
 }
 
 async function selectPiece(page: Page) {

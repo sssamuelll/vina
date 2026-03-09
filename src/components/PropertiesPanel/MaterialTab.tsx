@@ -4,6 +4,9 @@ import type { RootState } from '../../store';
 import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride } from '../../store/simulationSlice';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 
+// Note: Drag-drop textures use blob URLs which are session-scoped and won't
+// survive page reload. This is intentional for quick previews — persistent
+// texture storage would require a backend or IndexedDB, which is out of scope.
 function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughness' | 'ao'; pieceId: string }) {
   const dispatch = useDispatch();
   const overrides = useSelector((s: RootState) => s.simulation.pieceTextureOverrides[pieceId]);
@@ -13,9 +16,11 @@ function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughnes
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file || !file.type.startsWith('image/')) return;
+    // Revoke previous blob URL to prevent memory leak
+    if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
     const blobUrl = URL.createObjectURL(file);
     dispatch(setPieceTextureOverride({ pieceId, slot, url: blobUrl }));
-  }, [dispatch, pieceId, slot]);
+  }, [dispatch, pieceId, slot, url]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -44,7 +49,10 @@ function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughnes
       <span style={{ fontSize: 10, color: '#aaa', textTransform: 'capitalize', flex: 1 }}>{slot}</span>
       {url && (
         <button
-          onClick={() => dispatch(setPieceTextureOverride({ pieceId, slot, url: null }))}
+          onClick={() => {
+            if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
+            dispatch(setPieceTextureOverride({ pieceId, slot, url: null }));
+          }}
           style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 12 }}
         >
           x

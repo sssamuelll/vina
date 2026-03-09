@@ -253,8 +253,9 @@ const assignFabricTool: ToolDefinition = {
       },
       rollback: () => {
         dispatch(setFabric({ pieceId, fabricId: prevFabricId }));
-        if (prevTint) {
-          dispatch(setPieceTint({ pieceId, tint: prevTint }));
+        if (tint) {
+          // We changed the tint, so restore previous value (or reset to white if none)
+          dispatch(setPieceTint({ pieceId, tint: prevTint ?? '#ffffff' }));
         }
       },
     };

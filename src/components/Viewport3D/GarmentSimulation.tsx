@@ -85,6 +85,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
+  const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 
@@ -357,6 +359,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   }, [fabricId]);
 
+  // Effective tint: first piece with a custom tint, or fallback to fabric color
+  const effectiveTint = useMemo(() => {
+    for (const p of pieces) {
+      if (pieceTints[p.id]) return pieceTints[p.id];
+    }
+    return renderParams.color;
+  }, [pieces, pieceTints, renderParams.color]);
+
+  // Effective UV transform: first piece with custom UV, or fallback to fabric defaults
+  const effectiveUV = useMemo(() => {
+    for (const p of pieces) {
+      const uv = pieceUVTransforms[p.id];
+      if (uv) return uv;
+    }
+    return { repeatX: renderParams.mapRepeat[0], repeatY: renderParams.mapRepeat[1], rotation: renderParams.mapRotation };
+  }, [pieces, pieceUVTransforms, renderParams.mapRepeat, renderParams.mapRotation]);
+
   // ─── Texture loading ───────────────────────────────────────────────────────
 
   const [textures, setTextures] = useState<{
@@ -383,18 +402,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       t.ao ? textureManager.load(base + t.ao, 'srgb-linear') : Promise.resolve(null),
     ]).then(([map, normalMap, roughnessMap, aoMap]) => {
       if (cancelled) return;
-      // Apply UV repeat from render params
-      [map, normalMap, roughnessMap, aoMap].forEach(tex => {
-        if (tex) {
-          tex.repeat.set(renderParams.mapRepeat[0], renderParams.mapRepeat[1]);
-          tex.needsUpdate = true;
-        }
-      });
       setTextures({ map, normalMap, roughnessMap, aoMap });
     });
 
     return () => { cancelled = true; };
-  }, [fabricId, renderParams.mapRepeat]);
+  }, [fabricId]);
+
+  // Apply UV repeat/rotation from effective UV (responds to Redux slider changes)
+  useEffect(() => {
+    const rotRad = (effectiveUV.rotation ?? 0) * Math.PI / 180;
+    [textures.map, textures.normalMap, textures.roughnessMap, textures.aoMap].forEach(tex => {
+      if (tex) {
+        tex.repeat.set(effectiveUV.repeatX, effectiveUV.repeatY);
+        tex.rotation = rotRad;
+        tex.needsUpdate = true;
+      }
+    });
+  }, [textures, effectiveUV.repeatX, effectiveUV.repeatY, effectiveUV.rotation]);
 
   // Pin tool: click handler to find nearest vertex and add pin
   const handleMeshClick = useCallback((e: ThreeEvent<MouseEvent>) => {
@@ -448,7 +472,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       >
         <meshPhysicalMaterial
           vertexColors={fitMapMode !== 'none'}
-          color={renderParams.color || '#ffffff'}
+          color={effectiveTint || '#ffffff'}
           side={THREE.DoubleSide}
           transparent
           opacity={renderParams.opacity}
