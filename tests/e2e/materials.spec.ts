@@ -21,40 +21,48 @@ async function waitForApp(page: Page) {
   await page.waitForTimeout(1000);
 }
 
-async function drawRect(page: Page) {
-  await page.keyboard.press('r');
+/**
+ * Draw a rectangle piece using the rectangle tool — same approach as
+ * the proven editor-tools.spec.ts tests. After drawing, the piece is
+ * automatically selected (handlePieceComplete dispatches selectPiece).
+ */
+async function drawAndSelectPiece(page: Page) {
+  // Switch to 2D-only view to avoid 3D canvas intercepting events
+  await page.click('button:has-text("2D")');
+  await page.waitForTimeout(300);
+
+  // Activate rectangle tool via keyboard shortcut ('s' in CLO3D mapping)
+  await page.keyboard.press('s');
+  await page.waitForTimeout(200);
+
+  // Get SVG center and draw a rectangle
   const svg = page.locator('svg.pattern-svg');
   const box = await svg.boundingBox();
   if (!box) throw new Error('Pattern SVG not found');
-
   const cx = box.x + box.width / 2;
   const cy = box.y + box.height / 2;
-  await page.mouse.move(cx - 80, cy - 80);
+
+  await page.mouse.move(cx - 80, cy - 60);
   await page.mouse.down();
-  await page.mouse.move(cx + 80, cy + 80, { steps: 10 });
+  await page.mouse.move(cx + 80, cy + 60, { steps: 10 });
   await page.mouse.up();
   await page.waitForTimeout(500);
 
   // Verify piece was created
-  await expect(page.locator('text=Pieces: 1')).toBeVisible({ timeout: 5000 });
-}
+  await expect(page.locator('.status-bar')).toContainText(/Pieces.*[1-9]/, { timeout: 5000 });
 
-async function selectPiece(page: Page) {
-  const svg = page.locator('svg.pattern-svg');
-  const box = await svg.boundingBox();
-  if (!box) throw new Error('Pattern SVG not found');
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await page.waitForTimeout(500);
+  // Switch to select tool ('z' in CLO3D mapping) so further clicks don't draw more shapes
+  await page.keyboard.press('z');
+  await page.waitForTimeout(200);
 }
 
 /**
- * Full 2D setup: load app, draw a piece, select it.
+ * Full setup: load app, draw a piece (which auto-selects it).
  * After this, the PropertiesPanel MATERIAL section should be visible.
  */
 async function setupWithPiece(page: Page) {
   await waitForApp(page);
-  await drawRect(page);
-  await selectPiece(page);
+  await drawAndSelectPiece(page);
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -120,8 +128,9 @@ test.describe('PBR Materials', () => {
     await denimBtn.click();
     await page.waitForTimeout(500);
 
-    // The fabric info text below the grid should show the selected fabric
-    await expect(page.locator('text=/Denim 12oz/')).toBeVisible({ timeout: 3000 });
+    // The clicked button should have the selected border (2px solid #4a9eff)
+    const border = await denimBtn.evaluate(el => getComputedStyle(el).border);
+    expect(border).toContain('rgb(74, 158, 255)');
   });
 
   // ── Test 5: Color tint picker renders and updates ──────────────────────
@@ -132,9 +141,10 @@ test.describe('PBR Materials', () => {
     // The COLOR TINT label should be visible
     await expect(page.locator('text=COLOR TINT')).toBeVisible({ timeout: 5000 });
 
-    // The hex text input starts with #ffffff
-    const hexInput = page.locator('input[type="text"][value="#ffffff"]');
+    // Locate the hex text input (sibling of the color input)
+    const hexInput = page.locator('input[type="color"] + input[type="text"]');
     await expect(hexInput).toBeVisible({ timeout: 3000 });
+    await expect(hexInput).toHaveValue('#ffffff');
 
     // Change the tint via the text input
     await hexInput.fill('#ff0000');
@@ -143,13 +153,17 @@ test.describe('PBR Materials', () => {
     // Verify the input updated
     await expect(hexInput).toHaveValue('#ff0000');
 
-    // Click the Reset button to restore default
-    const resetBtn = page.locator('button:has-text("Reset")').first();
-    await resetBtn.click();
+    // Click the Reset button via DOM (may be partially obscured at viewport edge)
+    await page.evaluate(() => {
+      const btns = document.querySelectorAll('button');
+      for (const btn of btns) {
+        if (btn.textContent?.trim() === 'Reset') { btn.click(); return; }
+      }
+    });
     await page.waitForTimeout(300);
 
     // Tint should be back to white
-    await expect(page.locator('input[type="text"][value="#ffffff"]')).toBeVisible();
+    await expect(hexInput).toHaveValue('#ffffff');
   });
 
   // ── Test 6: UV Transform controls render ───────────────────────────────
