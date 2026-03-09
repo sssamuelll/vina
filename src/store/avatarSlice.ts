@@ -148,6 +148,14 @@ export const IK_CHAINS: IKChain[] = [
   },
 ];
 
+/** Maps each IK chain to the bone whose world position becomes the initial target */
+export const IK_END_EFFECTOR_BONES: Record<string, string> = {
+  leftArm: 'LeftHand',
+  rightArm: 'RightHand',
+  leftLeg: 'LeftFoot',
+  rightLeg: 'RightFoot',
+};
+
 /**
  * Clamp joint rotation using swing-twist biomechanical constraints.
  * Falls back to simple per-axis clamp for joints without anatomical definition.

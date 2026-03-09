@@ -197,6 +197,7 @@ function ToolButton({
     <div className="tool3d-btn-wrapper">
       <button
         className={`tool3d-btn ${active ? 'active' : ''} ${hasSubTools ? 'has-subtools' : ''}`}
+        data-tool-id={tool.id}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerLeave}

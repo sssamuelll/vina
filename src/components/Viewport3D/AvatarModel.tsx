@@ -5,10 +5,11 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js';
 import * as THREE from 'three';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
-import { setJointRotation, clampJointRotation } from '../../store/avatarSlice';
+import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS } from '../../store/avatarSlice';
+import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
 import type { VRM } from '@pixiv/three-vrm';
@@ -172,8 +173,9 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const boneMap = useRef<Map<string, THREE.Bone>>(new Map());
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
   const ikSolver = useRef<CCDIKSolver | null>(null);
+  const ikTargetHelpers = useRef<Map<string, THREE.Object3D>>(new Map());
+  const ikSolvedRotations = useRef<Map<string, THREE.Quaternion>>(new Map());
 
-  const dispatch = useDispatch();
   const joints = useSelector((s: RootState) => s.avatar.pose.joints);
   const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const ikChains = useSelector((s: RootState) => s.avatar.pose.ikChains);
@@ -372,6 +374,31 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const initializeIK = (activeScene: THREE.Object3D) => {
     if (!activeScene || boneMap.current.size === 0) return;
 
+    // Clean up old target helpers and remove pushed entries from skeleton
+    if (ikTargetHelpers.current.size > 0) {
+      let cleanupMesh: THREE.SkinnedMesh | null = null;
+      activeScene.traverse((child) => {
+        if (!cleanupMesh && (child as THREE.SkinnedMesh).isSkinnedMesh) {
+          cleanupMesh = child as THREE.SkinnedMesh;
+        }
+      });
+      const cleanupSkeleton = cleanupMesh ? (cleanupMesh as THREE.SkinnedMesh).skeleton : null;
+
+      ikTargetHelpers.current.forEach(helper => {
+        helper.parent?.remove(helper);
+        // Remove from skeleton.bones/boneInverses to prevent array growth
+        if (cleanupSkeleton) {
+          const idx = cleanupSkeleton.bones.indexOf(helper as unknown as THREE.Bone);
+          if (idx !== -1) {
+            cleanupSkeleton.bones.splice(idx, 1);
+            cleanupSkeleton.boneInverses.splice(idx, 1);
+          }
+        }
+      });
+    }
+    ikTargetHelpers.current.clear();
+    ikSolver.current = null;
+
     try {
       let mesh: THREE.SkinnedMesh | null = null;
       activeScene.traverse((child) => {
@@ -381,26 +408,76 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       });
       if (!mesh || !(mesh as THREE.SkinnedMesh).skeleton) return;
 
-      // Create IK chains
       const skeleton = (mesh as THREE.SkinnedMesh).skeleton!;
-      const iks = ikChains.map(chain => {
-        const bones = chain.bones.map(boneName => {
+      const iks: Array<{
+        target: number;
+        effector: number;
+        links: Array<{ index: number; rotationMin?: THREE.Vector3; rotationMax?: THREE.Vector3 }>;
+      }> = [];
+
+      for (const chain of ikChains) {
+        const endEffectorBoneName = IK_END_EFFECTOR_BONES[chain.name];
+        if (!endEffectorBoneName) continue;
+
+        const endEffectorBone = boneMap.current.get(endEffectorBoneName);
+        if (!endEffectorBone) continue;
+
+        // Create invisible target helper
+        const target = new THREE.Object3D();
+        target.name = `ik-target-${chain.name}`;
+        // Position at end-effector's current world position
+        const worldPos = new THREE.Vector3();
+        endEffectorBone.getWorldPosition(worldPos);
+        target.position.copy(worldPos);
+        activeScene.add(target);
+        ikTargetHelpers.current.set(chain.name, target);
+
+        // We need the target in the skeleton's bones array for CCDIKSolver
+        // Must also push a corresponding boneInverse matrix to keep arrays in sync,
+        // otherwise Skeleton.update() crashes accessing undefined boneInverses[i].elements
+        skeleton.bones.push(target as unknown as THREE.Bone);
+        skeleton.boneInverses.push(new THREE.Matrix4());
+        const targetIndex = skeleton.bones.length - 1;
+
+        // The effector is the end-effector bone (hand/foot), not the last link
+        const effectorIndex = skeleton.bones.indexOf(endEffectorBone);
+
+        // CCDIKSolver expects links ordered child→parent:
+        //   links[0] = direct parent of effector, links[n] = root of chain
+        // chain.bones is root→child, so we reverse the entire array for links
+        const links = [...chain.bones].reverse().map(boneName => {
           const bone = boneMap.current.get(boneName);
-          if (!bone) {
-            console.warn(`[AvatarModel] IK bone not found: ${boneName}`);
-            return null;
+          if (!bone) return null;
+          const idx = skeleton.bones.indexOf(bone);
+
+          // Convert JOINT_CONSTRAINTS to radians for CCD link limits
+          const constraints = JOINT_CONSTRAINTS[boneName];
+          if (constraints) {
+            return {
+              index: idx,
+              rotationMin: new THREE.Vector3(
+                constraints.minX * DEG2RAD,
+                constraints.minY * DEG2RAD,
+                constraints.minZ * DEG2RAD
+              ),
+              rotationMax: new THREE.Vector3(
+                constraints.maxX * DEG2RAD,
+                constraints.maxY * DEG2RAD,
+                constraints.maxZ * DEG2RAD
+              ),
+            };
           }
-          return { index: skeleton.bones.indexOf(bone) };
-        }).filter(b => b !== null);
+          return { index: idx };
+        }).filter((l): l is NonNullable<typeof l> => l !== null);
 
-        if (bones.length === 0) return null;
-
-        return {
-          target: bones[bones.length - 1]!.index, // End effector
-          effector: bones[bones.length - 1]!.index,
-          links: bones.slice(0, -1).map(b => ({ index: b!.index })),
-        };
-      }).filter(ik => ik !== null);
+        if (links.length > 0) {
+          iks.push({
+            target: targetIndex,
+            effector: effectorIndex,
+            links,
+          });
+        }
+      }
 
       if (iks.length > 0) {
         ikSolver.current = new CCDIKSolver(mesh, iks);
@@ -458,41 +535,49 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     });
 
     // Apply IK if enabled and solver is available
-    if (ikEnabled && ikSolver.current && ikTargets.length > 0) {
+    if (ikEnabled && ikSolver.current && ikTargetHelpers.current.size > 0) {
       try {
-        ikSolver.current.update();
-        
-        // Extract updated bone rotations and store them back in Redux
-        boneMap.current.forEach((bone, name) => {
-          const bindPose = bindPoses.current.get(name);
-          if (!bindPose) return;
-          
-          // Calculate rotation difference from bind pose
-          const currentRot = bone.quaternion.clone();
-          const relativeRot = new THREE.Quaternion().multiplyQuaternions(currentRot, bindPose.clone().invert());
-          
-          // Convert to Euler angles
-          const euler = new THREE.Euler().setFromQuaternion(relativeRot, 'ZYX');
-          const rotation = {
-            x: euler.x * (180 / Math.PI),
-            y: euler.y * (180 / Math.PI),
-            z: euler.z * (180 / Math.PI),
-          };
-          
-          // Only update if significantly different from current joint rotation
-          const current = joints[name];
-          if (!current || 
-              Math.abs(rotation.x - current.x) > 1 ||
-              Math.abs(rotation.y - current.y) > 1 ||
-              Math.abs(rotation.z - current.z) > 1) {
-            
-            const clamped = clampJointRotation(name, rotation);
-            dispatch(setJointRotation({ joint: name, rotation: clamped }));
+        // Update target helper positions from Redux ikTargets
+        for (const target of ikTargets) {
+          const helper = ikTargetHelpers.current.get(target.name);
+          if (helper) {
+            helper.position.set(target.position.x, target.position.y, target.position.z);
           }
-        });
+        }
+
+        // Run CCD solver
+        ikSolver.current.update();
+
+        // Post-solve: apply swing-twist constraints directly on bones.
+        // We store solved rotations in a ref (not Redux) to avoid infinite
+        // useFrame → dispatch → useEffect → applyPose loops.
+        for (const chain of ikChains) {
+          for (const boneName of chain.bones) {
+            const bone = boneMap.current.get(boneName);
+            const bindPose = bindPoses.current.get(boneName);
+            if (!bone || !bindPose) continue;
+
+            // Extract rotation relative to bind pose
+            const relativeRot = bindPose.clone().invert().multiply(bone.quaternion.clone());
+
+            // Apply swing-twist constraint
+            const constraint = ANATOMICAL_CONSTRAINTS[boneName];
+            if (constraint) {
+              const constrainedQ = clampSwingTwist(relativeRot, constraint);
+              bone.quaternion.copy(bindPose).multiply(constrainedQ);
+              // Cache so FK section doesn't overwrite IK-solved rotations
+              ikSolvedRotations.current.set(boneName, bone.quaternion.clone());
+            } else {
+              ikSolvedRotations.current.set(boneName, bone.quaternion.clone());
+            }
+          }
+        }
       } catch (error) {
         console.warn('[AvatarModel] IK solving failed:', error);
       }
+    } else {
+      // Clear IK-solved rotations when IK is disabled
+      ikSolvedRotations.current.clear();
     }
   };
 

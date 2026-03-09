@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
   loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
-  togglePoseEditor,
+  togglePoseEditor, toggleIK,
   POSE_PRESETS, JOINT_CONSTRAINTS,
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
 } from '../../store/avatarSlice';
@@ -54,11 +54,13 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
 
   // Pose state
   const activePreset = useSelector((s: RootState) => s.avatar.pose.activePreset);
+  const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
   const savedPoses = useSelector((s: RootState) => s.avatar.savedPoses);
   const selectedJoint = useSelector((s: RootState) => s.avatar.selectedJoint);
-  const jointRotation = useSelector(
+  const jointRotationRaw = useSelector(
     (s: RootState) => selectedJoint ? s.avatar.pose.joints[selectedJoint] : null
-  ) ?? { x: 0, y: 0, z: 0 };
+  );
+  const jointRotation = useMemo(() => jointRotationRaw ?? { x: 0, y: 0, z: 0 }, [jointRotationRaw]);
 
   // Section collapse
   const [avatarOpen, setAvatarOpen] = useState(true);
@@ -297,7 +299,14 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
                   <button className="ap-btn" style={{ flex: 1 }} onClick={() => {
                     const name = prompt('Pose name:');
                     if (name) dispatch(savePose(name));
-                  }}>💾 Save Pose</button>
+                  }}>Save Pose</button>
+                  <button
+                    className={`ik-toggle-btn ${ikEnabled ? 'active' : ''}`}
+                    onClick={() => dispatch(toggleIK())}
+                    title={ikEnabled ? 'Switch to FK (Direct Joint Rotation)' : 'Switch to IK (Drag End-Effectors)'}
+                  >
+                    {ikEnabled ? 'IK Mode' : 'FK Mode'}
+                  </button>
                 </div>
 
                 {/* Saved custom poses */}
