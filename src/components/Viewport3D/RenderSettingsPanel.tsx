@@ -29,6 +29,7 @@ interface RenderSettingsPanelProps {
   onExportStill?: (w: number, h: number, transparent: boolean) => void;
   onExportTurntable?: () => void;
   onExportAllViews?: (w: number, h: number, transparent: boolean) => void;
+  onExport3D?: (format: '3d-glb' | '3d-gltf' | '3d-usdz', includeAvatar: boolean, scale: number) => void;
 }
 
 export default function RenderSettingsPanel({
@@ -37,6 +38,7 @@ export default function RenderSettingsPanel({
   onExportStill,
   onExportTurntable,
   onExportAllViews,
+  onExport3D,
 }: RenderSettingsPanelProps) {
   const dispatch = useDispatch<AppDispatch>();
 
@@ -69,6 +71,9 @@ export default function RenderSettingsPanel({
   const [exportWidth, setExportWidth] = useState(2048);
   const [exportHeight, setExportHeight] = useState(2048);
   const [exportTransparent, setExportTransparent] = useState(false);
+  const [export3DFormat, setExport3DFormat] = useState<'3d-glb' | '3d-gltf' | '3d-usdz'>('3d-glb');
+  const [export3DIncludeAvatar, setExport3DIncludeAvatar] = useState(true);
+  const [export3DScale, setExport3DScale] = useState(0.001); // mm → m
 
   // HDRI file input ref
   const hdriInputRef = useRef<HTMLInputElement>(null);
@@ -465,6 +470,49 @@ export default function RenderSettingsPanel({
                   onClick={() => onExportAllViews?.(exportWidth, exportHeight, exportTransparent)}
                 >
                   Export All Views
+                </button>
+
+                {/* 3D Model Export */}
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#999', marginTop: 8, marginBottom: 2 }}>3D Model</div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <label style={{ fontSize: 10, color: '#888' }}>Format</label>
+                  <select
+                    className="ap-select"
+                    style={{ width: 'auto' }}
+                    value={export3DFormat}
+                    onChange={e => setExport3DFormat(e.target.value as '3d-glb' | '3d-gltf' | '3d-usdz')}
+                  >
+                    <option value="3d-glb">GLB</option>
+                    <option value="3d-gltf">glTF</option>
+                    <option value="3d-usdz">USDZ</option>
+                  </select>
+                  <label style={{ fontSize: 10, color: '#888' }}>Scale</label>
+                  <select
+                    className="ap-select"
+                    style={{ width: 'auto' }}
+                    value={export3DScale}
+                    onChange={e => setExport3DScale(Number(e.target.value))}
+                  >
+                    <option value={1.0}>mm</option>
+                    <option value={0.1}>cm</option>
+                    <option value={0.001}>m</option>
+                    <option value={0.03937}>inches</option>
+                  </select>
+                </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={export3DIncludeAvatar}
+                    onChange={e => setExport3DIncludeAvatar(e.target.checked)}
+                  />
+                  Include avatar
+                </label>
+                <button
+                  className="ap-btn accent"
+                  disabled={!onExport3D}
+                  onClick={() => onExport3D?.(export3DFormat, export3DIncludeAvatar, export3DScale)}
+                >
+                  Export 3D
                 </button>
               </div>
             )}

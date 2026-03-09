@@ -18,6 +18,9 @@ import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
+import { collectExportScene } from '../../utils/export/sceneCollector';
+import { downloadGLTF } from '../../utils/export/gltfExporter';
+import { downloadUSDZ } from '../../utils/export/usdzExporter';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
@@ -261,6 +264,44 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     exportAllViews(gl, sc, cam, { width, height, transparent });
   }, []);
 
+  const handleExport3D = useCallback(async (
+    format: '3d-glb' | '3d-gltf' | '3d-usdz',
+    includeAvatar: boolean,
+    scale: number,
+  ) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    if (!sc) return;
+
+    // Get garment mesh from window global (set by GarmentSimulation)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const garmentMesh = (window as any).__OPENCLO_CLOTH_MESH__ as THREE.Mesh | undefined;
+
+    const group = collectExportScene(sc, {
+      garmentMesh: garmentMesh || null,
+      includeAvatar,
+      scale,
+    });
+
+    const timestamp = Date.now();
+    try {
+      if (format === '3d-usdz') {
+        await downloadUSDZ(group, { filename: `openclo-${timestamp}` });
+      } else {
+        const binary = format === '3d-glb';
+        await downloadGLTF(group, {
+          binary,
+          scale: 1, // scale already applied by collector
+          filename: `openclo-${timestamp}`,
+        });
+      }
+    } catch (err) {
+      console.error('[3D Export] Failed:', err);
+    }
+  }, []);
+
   // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
   // F10 — Snapshot 3D viewport (CLO3D: File > Snapshot > 3D Window)
   // W — Toggle Pin Tool (#134)
@@ -488,6 +529,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onExportStill={handleExportStill}
         onExportTurntable={handleExportTurntable}
         onExportAllViews={handleExportAllViews}
+        onExport3D={handleExport3D}
       />
 
       {/* Collision Body toggle + panel */}
