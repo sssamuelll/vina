@@ -40,9 +40,9 @@ test.describe('UI Layout Cleanup', () => {
     await expect(page.locator('.properties-panel >> text=SIMULATION')).not.toBeVisible({ timeout: 2000 });
   });
 
-  test('PropertiesPanel shows empty state without piece selection', async ({ page }) => {
+  test('PropertiesPanel starts collapsed without piece selection', async ({ page }) => {
     await waitForApp(page);
-    await expect(page.locator('text=Select a piece to edit')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('.properties-panel.collapsed')).toBeVisible({ timeout: 5000 });
   });
 
   test('copilot starts minimized', async ({ page }) => {
