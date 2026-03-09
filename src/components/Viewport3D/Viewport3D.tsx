@@ -26,6 +26,7 @@ import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
 import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
+import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets } from './useCameraPresets';
 import type { ViewPreset } from '../../store/cameraSlice';
@@ -320,6 +321,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         }}
       >
         <EnvironmentSetup />
+        <CustomLights />
 
         {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
         {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
