@@ -1,6 +1,6 @@
 import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
+import { OrbitControls, Grid, ContactShadows, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -296,7 +296,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
         onPointerMissed={() => dispatch(clearSelection())}
         onCreated={({ gl, scene, camera }) => {
           scene.background = new THREE.Color('#f0f0f0');
@@ -306,11 +306,15 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           (containerRef.current as unknown as Record<string, unknown>).__camera = camera;
         }}
       >
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[3, 5, 4]} intensity={0.7} castShadow shadow-mapSize={1024} />
-        <directionalLight position={[-3, 4, -2]} intensity={0.4} />
-        <directionalLight position={[0, 2, 5]} intensity={0.3} />
+        <ambientLight intensity={0.3} />
+        <directionalLight position={[3, 5, 4]} intensity={0.5} castShadow shadow-mapSize={1024} />
+        <directionalLight position={[-3, 4, -2]} intensity={0.25} />
+        <directionalLight position={[0, 2, 5]} intensity={0.2} />
         <hemisphereLight args={['#ffffff', '#b0c4de', 0.3]} />
+        <Environment
+          files="/hdri/studio-soft.hdr"
+          background={false}
+        />
 
         {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
         {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
