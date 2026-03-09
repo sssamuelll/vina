@@ -24,6 +24,7 @@ import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
+import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets } from './useCameraPresets';
@@ -124,6 +125,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
   const [collisionPanelOpen, setCollisionPanelOpen] = useState(false);
+  const [renderPanelOpen, setRenderPanelOpen] = useState(false);
 
   // Expose fitMapStats to window for Playwright E2E testing
   useEffect(() => {
@@ -413,6 +415,32 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onSaveSnapshot={(id) => simRef.current?.saveSnapshot(id)}
         onRestoreSnapshot={(id) => simRef.current?.restoreSnapshot(id)}
         onDeleteSnapshot={(id) => simRef.current?.deleteSnapshot(id)}
+      />
+
+      {/* Render Settings toggle + panel */}
+      <button
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: renderPanelOpen ? 290 : (collisionPanelOpen ? 334 : 52),
+          zIndex: 25,
+          background: renderPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: 6,
+          color: renderPanelOpen ? '#4a9eff' : '#ccc',
+          padding: '6px 10px',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontFamily: 'Inter, sans-serif',
+        }}
+        title="Render Settings"
+        onClick={() => setRenderPanelOpen(!renderPanelOpen)}
+      >
+        Render
+      </button>
+      <RenderSettingsPanel
+        open={renderPanelOpen}
+        onClose={() => setRenderPanelOpen(false)}
       />
 
       {/* Collision Body toggle + panel */}
