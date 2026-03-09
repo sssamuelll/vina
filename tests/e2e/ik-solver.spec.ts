@@ -60,4 +60,48 @@ test.describe('IK Solver', () => {
     await page.waitForTimeout(300);
     await expect(ikToggle).toHaveText('FK Mode');
   });
+
+  test('IK mode produces no console errors (skeleton sync)', async ({ page }) => {
+    // Collect console errors
+    const errors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') errors.push(msg.text());
+    });
+
+    await waitForApp(page);
+    await openAvatarPanel(page);
+
+    const ikToggle = page.locator('.ik-toggle-btn');
+    await ikToggle.click({ force: true });
+    await page.waitForTimeout(300);
+    await expect(ikToggle).toHaveText('IK Mode');
+
+    // Wait several frames for IK solver to run
+    await page.waitForTimeout(2000);
+
+    // No TypeError from skeleton.boneInverses mismatch
+    const skeletonErrors = errors.filter(e =>
+      e.includes('Cannot read properties of undefined') ||
+      e.includes('boneInverses')
+    );
+    expect(skeletonErrors).toHaveLength(0);
+  });
+
+  test('IK solver runs without Maximum update depth error', async ({ page }) => {
+    const warnings: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'warning') warnings.push(msg.text());
+    });
+
+    await waitForApp(page);
+    await openAvatarPanel(page);
+
+    const ikToggle = page.locator('.ik-toggle-btn');
+    await ikToggle.click({ force: true });
+    await page.waitForTimeout(2000);
+
+    // Should not have "Maximum update depth exceeded" warnings
+    const depthErrors = warnings.filter(e => e.includes('Maximum update depth'));
+    expect(depthErrors).toHaveLength(0);
+  });
 });
