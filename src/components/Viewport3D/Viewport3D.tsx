@@ -1,6 +1,6 @@
 import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, ContactShadows, Environment } from '@react-three/drei';
+import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -16,6 +16,8 @@ import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
+import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
+import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
@@ -24,6 +26,9 @@ import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
+import RenderSettingsPanel from './RenderSettingsPanel';
+import EnvironmentSetup from './EnvironmentSetup';
+import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets } from './useCameraPresets';
 import type { ViewPreset } from '../../store/cameraSlice';
@@ -78,6 +83,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const showGarment = useSelector((s: RootState) => s.simulation.showGarment);
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
+  const { groundVisible, shadowOpacity, shadowBlur } = useSelector((s: RootState) => s.renderSettings);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
@@ -122,6 +128,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
   const [avatarHidden, setAvatarHidden] = useState(false);
   const [collisionPanelOpen, setCollisionPanelOpen] = useState(false);
+  const [renderPanelOpen, setRenderPanelOpen] = useState(false);
 
   // Expose fitMapStats to window for Playwright E2E testing
   useEffect(() => {
@@ -212,6 +219,46 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     link.download = `openclo-fitmap-${Date.now()}.png`;
     link.href = offscreen.toDataURL('image/png');
     link.click();
+  }, []);
+
+  const handleExportStill = useCallback((width: number, height: number, transparent: boolean) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
+    if (!gl || !sc || !cam) return;
+    exportStill(gl, sc, cam, { width, height, transparent });
+  }, []);
+
+  const handleExportTurntable = useCallback(async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
+    if (!gl || !sc || !cam) return;
+    // Read config from Redux store directly
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { turntableFrameCount: number; turntableDirection: 'cw' | 'ccw' } } } | undefined;
+    const config = store?.getState().renderSettings;
+    const blob = await renderTurntable(gl, sc, cam, {
+      frameCount: config?.turntableFrameCount ?? 36,
+      direction: config?.turntableDirection ?? 'cw',
+    });
+    downloadBlob(blob, `openclo-turntable-${Date.now()}.webm`);
+  }, []);
+
+  const handleExportAllViews = useCallback((width: number, height: number, transparent: boolean) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
+    if (!gl || !sc || !cam) return;
+    exportAllViews(gl, sc, cam, { width, height, transparent });
   }, []);
 
   // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
@@ -306,25 +353,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.0 }}
+        gl={{ antialias: true }}
         onPointerMissed={() => dispatch(clearSelection())}
         onCreated={({ gl, scene, camera }) => {
-          scene.background = new THREE.Color('#f0f0f0');
           // Store refs for snapshot (readPixels needs a fresh render)
           (containerRef.current as unknown as Record<string, unknown>).__gl = gl;
           (containerRef.current as unknown as Record<string, unknown>).__scene = scene;
           (containerRef.current as unknown as Record<string, unknown>).__camera = camera;
         }}
       >
-        <ambientLight intensity={0.3} />
-        <directionalLight position={[3, 5, 4]} intensity={0.5} castShadow shadow-mapSize={1024} />
-        <directionalLight position={[-3, 4, -2]} intensity={0.25} />
-        <directionalLight position={[0, 2, 5]} intensity={0.2} />
-        <hemisphereLight args={['#ffffff', '#b0c4de', 0.3]} />
-        <Environment
-          files="/hdri/studio-soft.hdr"
-          background={false}
-        />
+        <EnvironmentSetup />
+        <CustomLights />
 
         {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
         {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (
@@ -379,12 +418,14 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           })()
         ))}
 
-        <ContactShadows position={[0, 0, 0]} opacity={0.4} scale={3} blur={2} far={2} />
+        <ContactShadows position={[0, 0, 0]} opacity={shadowOpacity} scale={3} blur={shadowBlur} far={2} />
 
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
-          <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial color="#ffffff" />
-        </mesh>
+        {groundVisible && (
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
+            <planeGeometry args={[20, 20]} />
+            <meshStandardMaterial color="#ffffff" />
+          </mesh>
+        )}
 
         <Grid
           args={[10, 10]}
@@ -418,6 +459,35 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onSaveSnapshot={(id) => simRef.current?.saveSnapshot(id)}
         onRestoreSnapshot={(id) => simRef.current?.restoreSnapshot(id)}
         onDeleteSnapshot={(id) => simRef.current?.deleteSnapshot(id)}
+      />
+
+      {/* Render Settings toggle + panel */}
+      <button
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: renderPanelOpen ? 290 : (collisionPanelOpen ? 334 : 52),
+          zIndex: 25,
+          background: renderPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          borderRadius: 6,
+          color: renderPanelOpen ? '#4a9eff' : '#ccc',
+          padding: '6px 10px',
+          cursor: 'pointer',
+          fontSize: 12,
+          fontFamily: 'Inter, sans-serif',
+        }}
+        title="Render Settings"
+        onClick={() => setRenderPanelOpen(!renderPanelOpen)}
+      >
+        Render
+      </button>
+      <RenderSettingsPanel
+        open={renderPanelOpen}
+        onClose={() => setRenderPanelOpen(false)}
+        onExportStill={handleExportStill}
+        onExportTurntable={handleExportTurntable}
+        onExportAllViews={handleExportAllViews}
       />
 
       {/* Collision Body toggle + panel */}
