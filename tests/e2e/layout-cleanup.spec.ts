@@ -68,10 +68,11 @@ test.describe('UI Layout Cleanup', () => {
     // Sidebar should show Project title
     await expect(page.locator('.sidebar-title')).toHaveText('Project');
 
-    // Save/Open/New buttons should be visible
-    await expect(page.locator('button:has-text("Save")')).toBeVisible();
-    await expect(page.locator('button:has-text("Open")')).toBeVisible();
-    await expect(page.locator('button:has-text("New")')).toBeVisible();
+    // Save/Open/New buttons should be visible (scoped to sidebar to avoid duplicates)
+    const sidebar = page.locator('.sidebar');
+    await expect(sidebar.locator('button:has-text("Save Project")')).toBeVisible();
+    await expect(sidebar.locator('button:has-text("Open Project")')).toBeVisible();
+    await expect(sidebar.locator('button:has-text("New Project")')).toBeVisible();
   });
 
   test('Avatar & Body view has mode toggle and measurements', async ({ page }) => {
@@ -83,8 +84,9 @@ test.describe('UI Layout Cleanup', () => {
     // Sidebar should show Avatar & Body title
     await expect(page.locator('.sidebar-title')).toHaveText('Avatar & Body');
 
-    // Mode toggle buttons
-    await expect(page.locator('button:has-text("Dress Form")')).toBeVisible();
-    await expect(page.locator('button:has-text("3D Model")')).toBeVisible();
+    // Mode toggle buttons (scoped to sidebar to avoid duplicates in 3D panel)
+    const sidebar = page.locator('.sidebar');
+    await expect(sidebar.locator('button:has-text("Dress Form")')).toBeVisible();
+    await expect(sidebar.locator('button:has-text("3D Model")')).toBeVisible();
   });
 });
