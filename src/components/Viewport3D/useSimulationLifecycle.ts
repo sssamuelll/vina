@@ -159,6 +159,8 @@ export function useSimulationLifecycle({
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
+  const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
@@ -169,6 +171,7 @@ export function useSimulationLifecycle({
   const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
 
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const collisionRebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const lastFrameTimeRef = useRef(0);
   const frameCountRef = useRef(0);
@@ -322,6 +325,41 @@ export function useSimulationLifecycle({
     }
     return undefined;
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
+
+  // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
+  useEffect(() => {
+    // Only rebuild if simulation is running and we have a solver client
+    const activeClient = wasmClientRef.current || clientRef.current;
+    if (!activeClient || simulationState !== 'running' || !avatarModelUrl) return;
+
+    // Debounce 200ms to batch rapid slider movements
+    if (collisionRebuildTimer.current) {
+      clearTimeout(collisionRebuildTimer.current);
+    }
+
+    collisionRebuildTimer.current = setTimeout(async () => {
+      try {
+        const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight);
+        if (!collisionMesh) return;
+
+        // Check client is still alive (user may have stopped sim)
+        const client = wasmClientRef.current || clientRef.current;
+        if (client) {
+          console.log('[SimLifecycle] ♻️ Collision mesh rebuilt for measurement change:', collisionMesh.triCount, 'tris');
+          client.setCollisionMesh(collisionMesh);
+        }
+      } catch (e) {
+        console.warn('[SimLifecycle] Collision mesh rebuild failed:', e);
+      }
+    }, 200);
+
+    return () => {
+      if (collisionRebuildTimer.current) {
+        clearTimeout(collisionRebuildTimer.current);
+        collisionRebuildTimer.current = null;
+      }
+    };
+  }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState]);
 
   return {
     clients: {
