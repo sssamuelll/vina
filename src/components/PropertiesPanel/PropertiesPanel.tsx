@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Box, Minus, X } from 'lucide-react';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { removeSeam } from '../../store/projectSlice';
@@ -14,7 +14,19 @@ export default function PropertiesPanel() {
   const { pieces, seams } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
-  const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
+  const [isPanelCollapsed, setIsPanelCollapsed] = useState(true);
+  const prevSelectedRef = useRef(selectedPiece?.id);
+
+  // Auto-expand when a piece is selected, auto-collapse when deselected
+  useEffect(() => {
+    const prevId = prevSelectedRef.current;
+    prevSelectedRef.current = selectedPiece?.id;
+    if (selectedPiece && !prevId) {
+      setIsPanelCollapsed(false);
+    } else if (!selectedPiece && prevId) {
+      setIsPanelCollapsed(true);
+    }
+  }, [selectedPiece]);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     piece: false,
     material: false,
