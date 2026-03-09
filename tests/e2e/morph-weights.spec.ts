@@ -26,10 +26,11 @@ test.describe('Morph Weights (#271)', () => {
     await waitForApp(page);
     await openAvatarPanel(page);
 
-    // Verify measurement sliders exist
-    await expect(page.locator('text=Height')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('text=Chest')).toBeVisible({ timeout: 3000 });
-    await expect(page.locator('text=Waist')).toBeVisible({ timeout: 3000 });
+    // Verify measurement sliders exist (scoped to avatar panel to avoid template library matches)
+    const panel = page.locator('.avatar-panel');
+    await expect(panel.locator('text=Height')).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('text=Chest')).toBeVisible({ timeout: 3000 });
+    await expect(panel.locator('text=Waist')).toBeVisible({ timeout: 3000 });
   });
 
   test('changing measurements produces no console errors', async ({ page }) => {
