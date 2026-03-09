@@ -89,11 +89,19 @@ describe('collectExportScene', () => {
     expect(group.scale.z).toBeCloseTo(0.1);
   });
 
-  it('returns empty group when garmentMesh is null', () => {
+  it('returns empty group when garmentMesh is null and includeAvatar is false', () => {
     const { scene } = makeTestScene();
-    const group = collectExportScene(scene, { garmentMesh: null });
+    const group = collectExportScene(scene, { garmentMesh: null, includeAvatar: false });
     let meshCount = 0;
     group.traverse((obj: THREE.Object3D) => { if ((obj as THREE.Mesh).isMesh) meshCount++; });
     expect(meshCount).toBe(0);
+  });
+
+  it('includes avatar even when garmentMesh is null', () => {
+    const { scene } = makeTestScene();
+    const group = collectExportScene(scene, { garmentMesh: null, includeAvatar: true });
+    let hasSkinnedMesh = false;
+    group.traverse((obj: THREE.Object3D) => { if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true; });
+    expect(hasSkinnedMesh).toBe(true);
   });
 });

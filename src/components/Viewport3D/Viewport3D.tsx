@@ -286,15 +286,19 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     });
 
     const timestamp = Date.now();
-    if (format === '3d-usdz') {
-      await downloadUSDZ(group, { filename: `openclo-${timestamp}` });
-    } else {
-      const binary = format === '3d-glb';
-      await downloadGLTF(group, {
-        binary,
-        scale: 1, // scale already applied by collector
-        filename: `openclo-${timestamp}`,
-      });
+    try {
+      if (format === '3d-usdz') {
+        await downloadUSDZ(group, { filename: `openclo-${timestamp}` });
+      } else {
+        const binary = format === '3d-glb';
+        await downloadGLTF(group, {
+          binary,
+          scale: 1, // scale already applied by collector
+          filename: `openclo-${timestamp}`,
+        });
+      }
+    } catch (err) {
+      console.error('[3D Export] Failed:', err);
     }
   }, []);
 

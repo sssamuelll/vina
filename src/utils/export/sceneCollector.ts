@@ -23,7 +23,7 @@ export function collectExportScene(
   }
 
   // 2. Add avatar — find groups containing SkinnedMesh
-  if (includeAvatar && garmentMesh) {
+  if (includeAvatar) {
     for (const child of scene.children) {
       if (child === garmentMesh) continue;
       let hasSkinnedMesh = false;
