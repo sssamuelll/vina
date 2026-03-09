@@ -336,9 +336,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     const fabric = getPhysicalFabric(fabricId);
     if (fabric) return toMeshPhysicalParams(fabric);
     return {
-      roughness: 0.7, metalness: 0, sheen: 0.15, sheenRoughness: 0.7,
+      color: '#e8e4df', roughness: 0.7, metalness: 0, sheen: 0.15, sheenRoughness: 0.7,
       sheenColor: '#e8e4df', clearcoat: 0, clearcoatRoughness: 0,
-      transmission: 0, thickness: 0.5, ior: 1.5, opacity: 0.85,
+      transmission: 0, thickness: 0.5, ior: 1.5, opacity: 0.85, side: 'double' as const,
+      map: null, normalMap: null, roughnessMap: null, aoMap: null,
+      mapRepeat: [4, 4] as [number, number], mapRotation: 0,
     };
   }, [fabricId]);
 

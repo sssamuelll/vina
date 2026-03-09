@@ -105,6 +105,17 @@ interface SimulationSliceState {
   isWarmStarting: boolean;
   /** Latest fit map statistics (null when no fit map active) */
   fitMapStats: FitMapStats | null;
+  /** Per-piece color tint (hex string, white = no tint) */
+  pieceTints: Record<string, string>;
+  /** Per-piece texture overrides from custom uploads (slot → blob URL) */
+  pieceTextureOverrides: Record<string, {
+    diffuse?: string;
+    normal?: string;
+    roughness?: string;
+    ao?: string;
+  }>;
+  /** Per-piece UV transform */
+  pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number }>;
 }
 
 const initialState: SimulationSliceState = {
@@ -138,6 +149,9 @@ const initialState: SimulationSliceState = {
   activeSnapshotId: null,
   isWarmStarting: false,
   fitMapStats: null,
+  pieceTints: {},
+  pieceTextureOverrides: {},
+  pieceUVTransforms: {},
 };
 
 const simulationSlice = createSlice({
@@ -326,6 +340,42 @@ const simulationSlice = createSlice({
     setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
       state.fitMapStats = action.payload;
     },
+
+    // ─── PBR Material Overrides ───────────────────────────────────────────────
+
+    /** Set per-piece color tint (hex string). */
+    setPieceTint(state, action: PayloadAction<{ pieceId: string; tint: string }>) {
+      state.pieceTints[action.payload.pieceId] = action.payload.tint;
+    },
+    /** Set per-piece texture override for a specific slot. Pass null to clear. */
+    setPieceTextureOverride(state, action: PayloadAction<{
+      pieceId: string;
+      slot: 'diffuse' | 'normal' | 'roughness' | 'ao';
+      url: string | null;
+    }>) {
+      const { pieceId, slot, url } = action.payload;
+      if (!state.pieceTextureOverrides[pieceId]) {
+        state.pieceTextureOverrides[pieceId] = {};
+      }
+      if (url) {
+        state.pieceTextureOverrides[pieceId][slot] = url;
+      } else {
+        delete state.pieceTextureOverrides[pieceId][slot];
+      }
+    },
+    /** Set per-piece UV transform (partial merge with defaults). */
+    setPieceUVTransform(state, action: PayloadAction<{
+      pieceId: string;
+      repeatX?: number;
+      repeatY?: number;
+      rotation?: number;
+    }>) {
+      const { pieceId, ...transform } = action.payload;
+      state.pieceUVTransforms[pieceId] = {
+        ...(state.pieceUVTransforms[pieceId] ?? { repeatX: 4, repeatY: 4, rotation: 0 }),
+        ...transform,
+      };
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -370,6 +420,10 @@ export const {
   clearSnapshots,
   setIsWarmStarting,
   setFitMapStats,
+  // PBR material overrides
+  setPieceTint,
+  setPieceTextureOverride,
+  setPieceUVTransform,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;

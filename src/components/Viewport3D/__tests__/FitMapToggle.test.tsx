@@ -49,6 +49,9 @@ function createTestStore() {
         activeSnapshotId: null,
         isWarmStarting: false,
         fitMapStats: null,
+        pieceTints: {},
+        pieceTextureOverrides: {},
+        pieceUVTransforms: {},
       },
     },
   });

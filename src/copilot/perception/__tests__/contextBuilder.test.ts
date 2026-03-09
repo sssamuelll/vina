@@ -118,6 +118,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       snapshots: [], activeSnapshotId: null,
       isWarmStarting: false,
       fitMapStats: null,
+      pieceTints: {},
+      pieceTextureOverrides: {},
+      pieceUVTransforms: {},
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
