@@ -45,13 +45,20 @@ export async function extractAvatarCollisionMesh(
   }
   scene.updateMatrixWorld(true);
 
-  const { vertices, indices } = extractMeshData(scene);
+  const { vertices, indices, normals } = extractMeshData(scene);
+  console.log(`[AvatarCollision] extractMeshData: ${vertices.length / 3} verts, ${indices.length / 3} tris, normals=${normals ? normals.length / 3 : 'NONE'}`);
+
   if (vertices.length === 0 || indices.length === 0) return null;
 
   const geo = {
-    attributes: { position: { array: vertices, count: vertices.length / 3 } },
+    attributes: {
+      position: { array: vertices, count: vertices.length / 3 },
+      ...(normals ? { normal: { array: normals } } : {}),
+    },
     index: { array: indices, count: indices.length },
   };
 
-  return extractCollisionMesh(geo as Parameters<typeof extractCollisionMesh>[0]);
+  const result = extractCollisionMesh(geo as Parameters<typeof extractCollisionMesh>[0]);
+
+  return result;
 }

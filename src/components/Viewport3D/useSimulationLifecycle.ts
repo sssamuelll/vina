@@ -129,8 +129,8 @@ async function loadCollision(
         );
         scene.scale.set(...body.transform.scale);
         scene.updateMatrixWorld(true);
-        const { vertices, indices } = extractMeshData(scene);
-        const mesh = collisionMeshFromBuffers(vertices, indices);
+        const { vertices, indices, normals } = extractMeshData(scene);
+        const mesh = collisionMeshFromBuffers(vertices, indices, normals);
         if (mesh && !cancelled.value) {
           client.updateCollisionBody({
             id: body.id,

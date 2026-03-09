@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import { detectBodyRegion, computePlacement, placeGarmentPieces } from '../garmentPlacement';
 import type { PatternPiece, BodyMeasurements } from '../../../types/types';
@@ -118,5 +118,25 @@ describe('placeGarmentPieces', () => {
     const positions = placements.map(p => p.position.join(','));
     const unique = new Set(positions);
     expect(unique.size).toBe(3);
+  });
+
+  it('unknown pieces include X rotation to stand upright', () => {
+    const pieces = [makePiece('A'), makePiece('B')];
+    const placements = placeGarmentPieces(pieces, MEAS);
+    for (const p of placements) {
+      // X rotation must be -π/2 to stand the piece up from horizontal XZ plane
+      expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 5);
+    }
+  });
+
+  it('does not double-toggle sleeve assignment', () => {
+    const pieces = [
+      makePiece('Sleeve One', 'sleeve'),
+      makePiece('Sleeve Two', 'sleeve'),
+    ];
+    const placements = placeGarmentPieces(pieces, MEAS);
+    // First sleeve should be left, second right (toggle alternation)
+    expect(placements[0].position[0]).toBeLessThan(0); // left = -X
+    expect(placements[1].position[0]).toBeGreaterThan(0); // right = +X
   });
 });

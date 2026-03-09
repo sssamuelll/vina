@@ -216,6 +216,9 @@ export class TriangleSpatialHash {
   }
 }
 
+/** Maximum displacement per collision correction (meters). Prevents NaN cascade. */
+const MAX_PUSH_DIST = 0.05;
+
 export function solveTriangleCollision(
   pos: Float32Array,
   invMass: Float32Array,
@@ -231,6 +234,10 @@ export function solveTriangleCollision(
 
     const pi = p * 3;
     const px = pos[pi], py = pos[pi + 1], pz = pos[pi + 2];
+
+    // Skip NaN particles — they can't be recovered by collision
+    if (px !== px || py !== py || pz !== pz) continue;
+
     const nearby = hash.query(px, py, pz);
 
     if (nearby.length === 0) continue;
@@ -256,9 +263,12 @@ export function solveTriangleCollision(
     }
 
     if (bestSide < 0 || minDist < collisionMargin) {
-      const pushDist = bestSide < 0
+      let pushDist = bestSide < 0
         ? collisionMargin + minDist
         : collisionMargin - minDist;
+
+      // Clamp to prevent extreme displacements that cause NaN cascade
+      if (pushDist > MAX_PUSH_DIST) pushDist = MAX_PUSH_DIST;
 
       pos[pi]     += bestNx * pushDist;
       pos[pi + 1] += bestNy * pushDist;
