@@ -5,10 +5,10 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js';
 import * as THREE from 'three';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
-import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS } from '../../store/avatarSlice';
+import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
@@ -175,9 +175,12 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const ikSolver = useRef<CCDIKSolver | null>(null);
   const ikTargetHelpers = useRef<Map<string, THREE.Object3D>>(new Map());
   const ikSolvedRotations = useRef<Map<string, THREE.Quaternion>>(new Map());
+  const morphMeshes = useRef<THREE.SkinnedMesh[]>([]);
 
+  const dispatch = useDispatch();
   const joints = useSelector((s: RootState) => s.avatar.pose.joints);
   const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
   const ikChains = useSelector((s: RootState) => s.avatar.pose.ikChains);
   const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
   const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
@@ -362,6 +365,24 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     }
     groupRef.current.add(scene);
 
+    // Detect native morph targets (blendshapes)
+    morphMeshes.current = [];
+    const morphNames = new Set<string>();
+    scene.traverse((child) => {
+      const mesh = child as THREE.SkinnedMesh;
+      if (mesh.isSkinnedMesh && mesh.morphTargetDictionary && mesh.morphTargetInfluences) {
+        morphMeshes.current.push(mesh);
+        for (const name of Object.keys(mesh.morphTargetDictionary)) {
+          morphNames.add(name);
+        }
+      }
+    });
+    if (morphNames.size > 0) {
+      dispatch(setAvailableMorphTargets(Array.from(morphNames).sort()));
+    } else {
+      dispatch(clearMorphTargets());
+    }
+
     // Initialize IK solver
     initializeIK(scene);
 
@@ -534,6 +555,17 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       }
     });
 
+    // Apply native morph target influences
+    for (const mesh of morphMeshes.current) {
+      if (!mesh.morphTargetDictionary || !mesh.morphTargetInfluences) continue;
+      for (const [name, index] of Object.entries(mesh.morphTargetDictionary)) {
+        const value = morphTargets[name];
+        if (value !== undefined) {
+          mesh.morphTargetInfluences[index] = value;
+        }
+      }
+    }
+
     // Apply IK if enabled and solver is available
     if (ikEnabled && ikSolver.current && ikTargetHelpers.current.size > 0) {
       try {
@@ -586,7 +618,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     if (boneMap.current.size > 0) {
       applyPose.current();
     }
-  }, [joints, measurements]);
+  }, [joints, measurements, morphTargets]);
 
   // Also apply every frame for smooth animation + VRM spring bones
   useFrame((_, delta) => {
