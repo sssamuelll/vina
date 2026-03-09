@@ -279,16 +279,18 @@ export function placeGarmentPieces(
   _sleeveToggle = false;
   _cuffToggle = false;
 
-  // Track unknowns for circular fallback distribution
+  // Compute regions ONCE to avoid double-calling detectBodyRegion
+  // (it has toggle side effects for sleeve/cuff L/R assignment)
+  const regions = pieces.map(p => detectBodyRegion(p));
+  const unknownCount = regions.filter(r => r === 'unknown').length;
   let unknownIndex = 0;
-  const unknownCount = pieces.filter(p => detectBodyRegion(p) === 'unknown').length;
 
-  return pieces.map((piece) => {
-    const region = detectBodyRegion(piece);
+  return pieces.map((piece, i) => {
+    const region = regions[i];
     const geo = outlineBBox(piece.outline);
 
     if (region === 'unknown') {
-      // Distribute unknowns in a circle
+      // Distribute unknowns in a circle around the torso, standing upright
       const d = deriveDimensions(measurements);
       const radius = Math.max(d.chestRadius, d.hipRadius) + 0.15;
       const angle = (unknownIndex / Math.max(unknownCount, 1)) * Math.PI * 2 - Math.PI / 2;
@@ -299,7 +301,9 @@ export function placeGarmentPieces(
           (d.shoulderHeight + d.waistHeight) / 2,
           Math.sin(angle) * radius,
         ] as [number, number, number],
-        rotation: [0, -angle - Math.PI / 2, 0] as [number, number, number],
+        // -π/2 on X stands the piece up from horizontal to vertical,
+        // Y rotation faces it outward from the circle
+        rotation: [-Math.PI / 2, -angle - Math.PI / 2, 0] as [number, number, number],
       };
     }
 

@@ -81,6 +81,16 @@ export interface PhysicalFabric {
   notes?: string;
   /** Tags for search */
   tags: string[];
+  /** Optional texture map paths */
+  textures?: FabricTextures;
+}
+
+/** Paths to texture map files relative to public/textures/fabrics/ */
+export interface FabricTextures {
+  diffuse?: string;
+  normal?: string;
+  roughness?: string;
+  ao?: string;
 }
 
 // ─── Library ────────────────────────────────────────────────────────────────
@@ -102,6 +112,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.5, frictionBody: 0.4, internalDamping: 0.3, surfaceRoughness: 0.3,
     tensileStrengthWarp: 450, tensileStrengthWeft: 280, tearStrength: 15, maxStretchBeforeBreak: 8,
     source: 'library', tags: ['cotton', 'woven', 'plain', 'shirt', 'dress', 'lightweight'],
+    textures: { diffuse: 'cotton-poplin/diffuse.jpg', normal: 'cotton-poplin/normal.png' },
   },
   {
     id: 'cotton-broadcloth',
@@ -164,6 +175,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.7, frictionBody: 0.55, internalDamping: 0.6, surfaceRoughness: 0.6,
     tensileStrengthWarp: 800, tensileStrengthWeft: 500, tearStrength: 35, maxStretchBeforeBreak: 5,
     source: 'library', tags: ['denim', 'cotton', 'twill', 'heavy', 'jeans', 'rigid'],
+    textures: { diffuse: 'denim-indigo/diffuse.jpg', normal: 'denim-indigo/normal.png', roughness: 'denim-indigo/roughness.jpg' },
   },
   {
     id: 'stretch-denim',
@@ -209,6 +221,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.55, frictionBody: 0.45, internalDamping: 0.45, surfaceRoughness: 0.4,
     tensileStrengthWarp: 550, tensileStrengthWeft: 350, tearStrength: 18, maxStretchBeforeBreak: 7,
     source: 'library', tags: ['cotton', 'twill', 'chino', 'trouser', 'workwear'],
+    textures: { diffuse: 'cotton-twill/diffuse.jpg', normal: 'cotton-twill/normal.png' },
   },
 
   // ─── WOVENS: Satin ────────────────────────────────────────────────────
@@ -226,6 +239,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.25, frictionBody: 0.2, internalDamping: 0.1, surfaceRoughness: 0.05,
     tensileStrengthWarp: 250, tensileStrengthWeft: 180, tearStrength: 8, maxStretchBeforeBreak: 18,
     source: 'library', tags: ['silk', 'satin', 'luxury', 'evening', 'lightweight', 'fluid'],
+    textures: { diffuse: 'silk-charmeuse/diffuse.jpg', normal: 'silk-charmeuse/normal.png', roughness: 'silk-charmeuse/roughness.jpg' },
   },
   {
     id: 'duchess-satin',
@@ -258,6 +272,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.45, frictionBody: 0.4, internalDamping: 0.4, surfaceRoughness: 0.35,
     tensileStrengthWarp: 300, tensileStrengthWeft: 200, tearStrength: 12, maxStretchBeforeBreak: 80,
     source: 'library', tags: ['cotton', 'jersey', 'knit', 'tshirt', 'casual', 'stretch'],
+    textures: { diffuse: 'jersey-knit/diffuse.jpg', normal: 'jersey-knit/normal.png' },
   },
   {
     id: 'ponte-roma',
@@ -365,6 +380,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.2, frictionBody: 0.15, internalDamping: 0.1, surfaceRoughness: 0.1,
     tensileStrengthWarp: 120, tensileStrengthWeft: 80, tearStrength: 3, maxStretchBeforeBreak: 12,
     source: 'library', tags: ['chiffon', 'sheer', 'fluid', 'evening', 'blouse', 'lightweight'],
+    textures: { diffuse: 'chiffon-sheer/diffuse.jpg', normal: 'chiffon-sheer/normal.png' },
   },
   {
     id: 'tulle',
@@ -397,6 +413,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.5, frictionBody: 0.4, internalDamping: 0.35, surfaceRoughness: 0.5,
     tensileStrengthWarp: 500, tensileStrengthWeft: 350, tearStrength: 18, maxStretchBeforeBreak: 4,
     source: 'library', tags: ['linen', 'natural', 'summer', 'crisp', 'woven'],
+    textures: { diffuse: 'linen-plain/diffuse.jpg', normal: 'linen-plain/normal.png' },
   },
   {
     id: 'wool-crepe',
@@ -427,6 +444,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.6, frictionBody: 0.5, internalDamping: 0.5, surfaceRoughness: 0.5,
     tensileStrengthWarp: 450, tensileStrengthWeft: 300, tearStrength: 18, maxStretchBeforeBreak: 8,
     source: 'library', tags: ['wool', 'flannel', 'suiting', 'coat', 'winter'],
+    textures: { diffuse: 'wool-tweed/diffuse.jpg', normal: 'wool-tweed/normal.png', roughness: 'wool-tweed/roughness.jpg', ao: 'wool-tweed/ao.jpg' },
   },
 
   // ─── HEAVY / STRUCTURED ───────────────────────────────────────────────
@@ -444,6 +462,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.7, frictionBody: 0.6, internalDamping: 0.65, surfaceRoughness: 0.7,
     tensileStrengthWarp: 1000, tensileStrengthWeft: 700, tearStrength: 45, maxStretchBeforeBreak: 3,
     source: 'library', tags: ['canvas', 'heavy', 'bag', 'upholstery', 'workwear', 'rigid'],
+    textures: { diffuse: 'canvas-heavy/diffuse.jpg', normal: 'canvas-heavy/normal.png', roughness: 'canvas-heavy/roughness.jpg' },
   },
   {
     id: 'ripstop-nylon',
@@ -476,6 +495,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.6, frictionBody: 0.5, internalDamping: 0.8, surfaceRoughness: 0.15,
     tensileStrengthWarp: 200, tensileStrengthWeft: 150, tearStrength: 25, maxStretchBeforeBreak: 40,
     source: 'library', tags: ['leather', 'lambskin', 'jacket', 'luxury', 'natural'],
+    textures: { diffuse: 'leather-smooth/diffuse.jpg', normal: 'leather-smooth/normal.png', roughness: 'leather-smooth/roughness.jpg', ao: 'leather-smooth/ao.jpg' },
   },
   {
     id: 'faux-leather',
@@ -508,6 +528,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.75, frictionBody: 0.6, internalDamping: 0.7, surfaceRoughness: 0.3,
     tensileStrengthWarp: 300, tensileStrengthWeft: 250, tearStrength: 20, maxStretchBeforeBreak: 40,
     source: 'library', tags: ['neoprene', 'wetsuit', 'technical', 'structured', 'insulation'],
+    textures: { diffuse: 'neoprene/diffuse.jpg', roughness: 'neoprene/roughness.jpg' },
   },
   {
     id: 'felt',
@@ -538,6 +559,7 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     friction: 0.6, frictionBody: 0.5, internalDamping: 0.55, surfaceRoughness: 0.7,
     tensileStrengthWarp: 250, tensileStrengthWeft: 200, tearStrength: 12, maxStretchBeforeBreak: 35,
     source: 'library', tags: ['fleece', 'polar', 'polyester', 'winter', 'casual', 'soft'],
+    textures: { diffuse: 'fleece/diffuse.jpg', normal: 'fleece/normal.png' },
   },
   {
     id: 'velvet',
@@ -701,6 +723,14 @@ export interface FabricRenderParams {
   ior: number;
   opacity: number;
   side: 'double';
+  /** Loaded texture maps — null if no textures available */
+  map: import('three').Texture | null;
+  normalMap: import('three').Texture | null;
+  roughnessMap: import('three').Texture | null;
+  aoMap: import('three').Texture | null;
+  /** UV transform */
+  mapRepeat: [number, number];
+  mapRotation: number;
 }
 
 /**
@@ -732,7 +762,16 @@ const WEAVE_RENDER_DEFAULTS: Record<WeaveType, Partial<FabricRenderParams>> = {
  * @param pf Physical fabric definition
  * @param baseColor Optional base color (default: neutral off-white)
  */
-export function toMeshPhysicalParams(pf: PhysicalFabric, baseColor?: string): FabricRenderParams {
+export function toMeshPhysicalParams(
+  pf: PhysicalFabric,
+  baseColor?: string,
+  loadedTextures?: {
+    map?: import('three').Texture | null;
+    normalMap?: import('three').Texture | null;
+    roughnessMap?: import('three').Texture | null;
+    aoMap?: import('three').Texture | null;
+  },
+): FabricRenderParams {
   const defaults = WEAVE_RENDER_DEFAULTS[pf.weaveType] || WEAVE_RENDER_DEFAULTS['plain'];
 
   // Surface roughness: combine physical roughness with weave preset
@@ -771,6 +810,12 @@ export function toMeshPhysicalParams(pf: PhysicalFabric, baseColor?: string): Fa
     ior: 1.5,
     opacity,
     side: 'double',
+    map: loadedTextures?.map ?? null,
+    normalMap: loadedTextures?.normalMap ?? null,
+    roughnessMap: loadedTextures?.roughnessMap ?? null,
+    aoMap: loadedTextures?.aoMap ?? null,
+    mapRepeat: [4, 4],
+    mapRotation: 0,
   };
 }
 

@@ -279,6 +279,16 @@ impl XpbdSolver {
         self.positions.as_ptr()
     }
 
+    /// Get pointer to velocities buffer (for JS-side collision velocity correction).
+    pub fn velocities_ptr(&self) -> *const f32 {
+        self.velocities.as_ptr()
+    }
+
+    /// Get pointer to previous positions buffer (for JS-side collision correction).
+    pub fn prev_positions_ptr(&self) -> *const f32 {
+        self.prev_positions.as_ptr()
+    }
+
     /// Get number of particles.
     pub fn num_particles(&self) -> usize {
         self.num_particles

@@ -20,6 +20,8 @@ export interface ExtractedMeshData {
   vertices: Float32Array;
   /** Triangle indices [i0,i1,i2, i3,i4,i5, ...] */
   indices: Uint32Array;
+  /** Optional vertex normals [nx0,ny0,nz0, ...] for face orientation hints */
+  normals?: Float32Array;
 }
 
 /**
@@ -269,13 +271,12 @@ export function applyAPose(scene: THREE.Object3D): void {
  * Extract world-space vertices and indices from all meshes in a scene.
  * For SkinnedMesh, bakes skeleton transforms into vertex positions.
  */
-export function extractMeshData(scene: THREE.Object3D): {
-  vertices: Float32Array;
-  indices: Uint32Array;
-} {
+export function extractMeshData(scene: THREE.Object3D): ExtractedMeshData {
   const allVertices: number[] = [];
+  const allNormals: number[] = [];
   const allIndices: number[] = [];
   let vertexOffset = 0;
+  let anyNormals = false;
 
   scene.traverse((obj) => {
     if (!(obj as THREE.Mesh).isMesh) return;
@@ -286,6 +287,9 @@ export function extractMeshData(scene: THREE.Object3D): {
     const posAttr = geo.getAttribute('position') as THREE.BufferAttribute | undefined;
     if (!posAttr) return;
 
+    const normalAttr = geo.getAttribute('normal') as THREE.BufferAttribute | undefined;
+    if (normalAttr) anyNormals = true;
+
     const numVerts = posAttr.count;
     const isSkinnedMesh = (mesh as THREE.SkinnedMesh).isSkinnedMesh;
     const skinned = isSkinnedMesh ? (mesh as THREE.SkinnedMesh) : null;
@@ -295,9 +299,13 @@ export function extractMeshData(scene: THREE.Object3D): {
     }
 
     const tempVec = new THREE.Vector3();
+    const tempNorm = new THREE.Vector3();
+    // For non-skinned meshes, compute normal matrix once
+    const normalMatrix = (!skinned && normalAttr) ? new THREE.Matrix3().getNormalMatrix(mesh.matrixWorld) : null;
 
     for (let i = 0; i < numVerts; i++) {
-      tempVec.set(posAttr.getX(i), posAttr.getY(i), posAttr.getZ(i));
+      const origX = posAttr.getX(i), origY = posAttr.getY(i), origZ = posAttr.getZ(i);
+      tempVec.set(origX, origY, origZ);
 
       if (skinned) {
         skinned.applyBoneTransform(i, tempVec);
@@ -306,7 +314,28 @@ export function extractMeshData(scene: THREE.Object3D): {
         tempVec.applyMatrix4(mesh.matrixWorld);
       }
 
-      allVertices.push(tempVec.x, tempVec.y, tempVec.z);
+      const worldX = tempVec.x, worldY = tempVec.y, worldZ = tempVec.z;
+      allVertices.push(worldX, worldY, worldZ);
+
+      // Extract vertex normals per-mesh (fill zeros if this mesh lacks normals)
+      if (normalAttr) {
+        if (skinned) {
+          // Transform (position + normal) through bone transforms, then subtract
+          // transformed position to isolate the rotation-only normal transform.
+          const nx = normalAttr.getX(i), ny = normalAttr.getY(i), nz = normalAttr.getZ(i);
+          tempNorm.set(origX + nx, origY + ny, origZ + nz);
+          skinned.applyBoneTransform(i, tempNorm);
+          tempNorm.applyMatrix4(mesh.matrixWorld);
+          allNormals.push(tempNorm.x - worldX, tempNorm.y - worldY, tempNorm.z - worldZ);
+        } else {
+          tempNorm.set(normalAttr.getX(i), normalAttr.getY(i), normalAttr.getZ(i));
+          tempNorm.applyMatrix3(normalMatrix!);
+          allNormals.push(tempNorm.x, tempNorm.y, tempNorm.z);
+        }
+      } else {
+        // No normals for this mesh — fill zeros (centroid fallback will handle these)
+        allNormals.push(0, 0, 0);
+      }
     }
 
     const index = geo.index;
@@ -323,8 +352,12 @@ export function extractMeshData(scene: THREE.Object3D): {
     vertexOffset += numVerts;
   });
 
-  return {
+  const result: ExtractedMeshData = {
     vertices: new Float32Array(allVertices),
     indices: new Uint32Array(allIndices),
   };
+  if (anyNormals && allNormals.length > 0) {
+    result.normals = new Float32Array(allNormals);
+  }
+  return result;
 }

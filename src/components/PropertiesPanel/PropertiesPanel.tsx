@@ -11,6 +11,7 @@ import PropertySection from './PropertySection';
 import PieceProperties from './PieceProperties';
 import AvatarProperties from './AvatarProperties';
 import SimulationProperties from './SimulationProperties';
+import MaterialTab from './MaterialTab';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -24,6 +25,7 @@ export default function PropertiesPanel() {
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     project: false,
     piece: false,
+    material: false,
     avatar: true,
     display: false,
     export: false,
@@ -134,6 +136,13 @@ export default function PropertiesPanel() {
           {/* Piece properties */}
           {selectedPiece && (
             <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />
+          )}
+
+          {/* Material */}
+          {selectedPiece && (
+            <PropertySection id="material" title="MATERIAL" collapsed={!!collapsedSections.material} onToggle={toggleSection}>
+              <MaterialTab />
+            </PropertySection>
           )}
 
           {/* Seams */}

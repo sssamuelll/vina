@@ -32,6 +32,8 @@ export interface MeshedPiece {
   triIds: Int32Array;
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
+  /** UV coordinates from 2D pattern space for texture mapping */
+  uvs?: Float32Array;
 }
 
 interface UseMeshingProps {

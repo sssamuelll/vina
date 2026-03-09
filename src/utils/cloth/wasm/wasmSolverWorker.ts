@@ -44,6 +44,8 @@ interface WasmXpbdSolver {
             internal_damping: number): void;
   step(dt: number): void;
   positions_ptr(): number;
+  velocities_ptr(): number;
+  prev_positions_ptr(): number;
   num_particles(): number;
   num_stretch_edges(): number;
   stretch_ids_ptr(): number;
@@ -71,26 +73,151 @@ interface WorkerCollisionBody {
 }
 let collisionBodies: WorkerCollisionBody[] = [];
 
+/** Number of outer substeps managed by JS (collision applied between each) */
+let jsSubsteps = 15;
+/** Pre-allocated inverse mass array for collision solver (avoids GC pressure) */
+let invMassCache: Float32Array | null = null;
+/** Pre-allocated buffer for saving positions before collision (avoids per-frame allocation) */
+let preCollisionBuf: Float32Array | null = null;
+
 const FRAME_BUDGET_MS = 14;
+
+/** Maximum particle velocity (m/s). Matches JS solver's maxVelocity.
+ * Without this, the Rust solver's 900Hz substep rate amplifies constraint
+ * corrections into extreme velocities that compound exponentially. */
+const MAX_PARTICLE_VEL = 5.0;
+const MAX_PARTICLE_VEL_SQ = MAX_PARTICLE_VEL * MAX_PARTICLE_VEL;
 
 function simulationLoop(): void {
   if (!running || !solver) return;
 
   const t0 = performance.now();
-  solver.step(1 / 60);
-
   const n = numParticles;
-  const ptr = solver.positions_ptr();
+  const hasCollision = collisionBodies.length > 0 && wasmExports?.memory;
 
-  if (wasmExports?.memory) {
-    // Apply JS-side triangle collision post-step
-    if (collisionBodies.length > 0) {
-      const posView = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
-      const invMass = new Float32Array(n).fill(1.0);
+  if (hasCollision) {
+    // Per-substep collision with velocity correction.
+    // Each substep: Rust solver integrates + constrains, JS applies triangle
+    // collision, then corrects Rust velocity so the next substep starts with
+    // collision-aware velocity (prevents tunneling).
+    const sdt = 1 / (60 * jsSubsteps);
+    const invSdt = 1.0 / sdt;
+
+    // Ensure caches are the right size
+    if (!invMassCache || invMassCache.length !== n) {
+      invMassCache = new Float32Array(n).fill(1.0);
+    }
+    const n3 = n * 3;
+    if (!preCollisionBuf || preCollisionBuf.length !== n3) {
+      preCollisionBuf = new Float32Array(n3);
+    }
+
+    const mem = wasmExports!.memory;
+    for (let s = 0; s < jsSubsteps; s++) {
+      solver.step(sdt);
+
+      // Get live views into WASM memory for positions, velocities, prev_positions
+      const posPtr = solver.positions_ptr();
+      const velPtr = solver.velocities_ptr();
+      const prevPtr = solver.prev_positions_ptr();
+      const posView = new Float32Array(mem.buffer, posPtr, n3);
+      const velView = new Float32Array(mem.buffer, velPtr, n3);
+      const prevView = new Float32Array(mem.buffer, prevPtr, n3);
+
+      // Save positions before collision for velocity correction
+      preCollisionBuf.set(posView);
+
+      // Apply triangle collision — modifies posView in-place
       for (const body of collisionBodies) {
-        solveTriangleCollision(posView, invMass, n, body.mesh, body.hash, body.margin, body.friction);
+        solveTriangleCollision(posView, invMassCache, n, body.mesh, body.hash, body.margin, body.friction);
+      }
+
+      // NaN guard: if any position went NaN, reset to previous valid positions.
+      let hasNaN = false;
+      for (let i = 0; i < n3; i++) {
+        if (posView[i] !== posView[i]) {
+          hasNaN = true;
+          break;
+        }
+      }
+      if (hasNaN) {
+        for (let i = 0; i < n3; i++) {
+          if (posView[i] !== posView[i]) posView[i] = prevView[i];
+        }
+      }
+
+      // Derive velocity from PRE-COLLISION positions (natural dynamics only).
+      // Collision push corrects position but must NOT create velocity — otherwise
+      // push distance (up to 0.05m) gets amplified at substep rate (900Hz) into
+      // extreme velocity (0.05 * 900 = 45 m/s), causing the cloth to explode.
+      // The JS CPU solver avoids this with a maxVelocity clamp (5 m/s), but the
+      // correct fix is to exclude collision push from velocity derivation entirely.
+      for (let i = 0; i < n3; i++) {
+        velView[i] = (preCollisionBuf[i] - prevView[i]) * invSdt;
+      }
+
+      // For collision-corrected particles, also zero the velocity component
+      // pointing INTO the body surface (inelastic collision response).
+      // This prevents the particle from immediately tunneling back in.
+      for (let p = 0; p < n; p++) {
+        const i3 = p * 3;
+        const dx = posView[i3] - preCollisionBuf[i3];
+        const dy = posView[i3 + 1] - preCollisionBuf[i3 + 1];
+        const dz = posView[i3 + 2] - preCollisionBuf[i3 + 2];
+        const dLenSq = dx * dx + dy * dy + dz * dz;
+        if (dLenSq > 1e-20) {
+          // Particle was collision-corrected — push direction ≈ surface normal
+          const invDLen = 1.0 / Math.sqrt(dLenSq);
+          const nx = dx * invDLen, ny = dy * invDLen, nz = dz * invDLen;
+          // Natural velocity component in the normal direction
+          const vn = velView[i3] * nx + velView[i3 + 1] * ny + velView[i3 + 2] * nz;
+          if (vn < 0) {
+            // Natural velocity points INTO the surface — zero this component
+            velView[i3] -= vn * nx;
+            velView[i3 + 1] -= vn * ny;
+            velView[i3 + 2] -= vn * nz;
+          }
+        }
+      }
+
+      // Clamp velocity magnitude to prevent explosions.
+      // The Rust solver's post_solve has no maxVelocity clamp (unlike the JS solver
+      // which clamps to 5 m/s). At 900Hz substep rate, constraint corrections of
+      // 0.05m become 45 m/s, compounding exponentially into cloth explosion.
+      for (let p = 0; p < n; p++) {
+        const i3 = p * 3;
+        const vSq = velView[i3] * velView[i3] + velView[i3 + 1] * velView[i3 + 1] + velView[i3 + 2] * velView[i3 + 2];
+        if (vSq > MAX_PARTICLE_VEL_SQ) {
+          const scale = MAX_PARTICLE_VEL / Math.sqrt(vSq);
+          velView[i3] *= scale;
+          velView[i3 + 1] *= scale;
+          velView[i3 + 2] *= scale;
+        }
       }
     }
+  } else {
+    // No collision bodies — run all substeps at once (original path)
+    solver.step(1 / 60);
+
+    // Clamp velocity even without collision — Rust solver has no internal clamp
+    if (wasmExports?.memory) {
+      const velPtr = solver.velocities_ptr();
+      const velView = new Float32Array(wasmExports.memory.buffer, velPtr, n * 3);
+      for (let p = 0; p < n; p++) {
+        const i3 = p * 3;
+        const vSq = velView[i3] * velView[i3] + velView[i3 + 1] * velView[i3 + 1] + velView[i3 + 2] * velView[i3 + 2];
+        if (vSq > MAX_PARTICLE_VEL_SQ) {
+          const scale = MAX_PARTICLE_VEL / Math.sqrt(vSq);
+          velView[i3] *= scale;
+          velView[i3 + 1] *= scale;
+          velView[i3 + 2] *= scale;
+        }
+      }
+    }
+  }
+
+  if (wasmExports?.memory) {
+    const ptr = solver.positions_ptr();
     const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3).slice();
     (self as unknown as Worker).postMessage(
       { type: 'frame', positions },
@@ -190,8 +317,14 @@ self.onmessage = async (event: MessageEvent) => {
         }
 
         const config = msg.config ?? {};
+        // Store desired substeps for JS-managed collision loop, configure
+        // Rust solver with substeps=1 so each solver.step() is a single substep.
+        // The JS simulation loop calls step() jsSubsteps times with collision
+        // correction between each, preventing particles from tunneling through
+        // the avatar mesh.
+        jsSubsteps = config.substeps ?? 15;
         solver.configure(
-          config.substeps ?? 15,
+          1,  // substeps=1: JS manages substep loop for per-substep collision
           config.damping ?? 0.99,
           config.gravityY ?? -9.81,
           config.stretchCompliance ?? 0.0,
@@ -208,7 +341,7 @@ self.onmessage = async (event: MessageEvent) => {
           config.bendComplianceWeft ?? 1.0,
           config.internalDamping ?? 0.3,
         );
-        console.log('[WasmWorker] Solver configured with dragCoefficient =', config.dragCoefficient ?? 1.0);
+        console.log('[WasmWorker] Solver configured with dragCoefficient =', config.dragCoefficient ?? 1.0, 'jsSubsteps =', jsSubsteps);
 
         (self as unknown as Worker).postMessage({ type: 'ready', numParticles: totalVerts });
         break;
@@ -265,22 +398,22 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'applyInitialTriangleCollision':
         if (solver && collisionBodies.length > 0 && wasmExports?.memory) {
-          console.log('[WasmWorker] Running initial triangle collision settling...');
           const n = numParticles;
           const ptr = solver.positions_ptr();
           const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
+
           const invMass = new Float32Array(n).fill(1.0);
           for (let i = 0; i < 5; i++) {
             for (const body of collisionBodies) {
               solveTriangleCollision(positions, invMass, n, body.mesh, body.hash, body.margin, body.friction);
             }
           }
+
           const frame = positions.slice();
           (self as unknown as Worker).postMessage(
             { type: 'frame', positions: frame },
             [frame.buffer],
           );
-          console.log('[WasmWorker] Initial triangle collision settling complete');
         }
         break;
 

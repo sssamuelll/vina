@@ -30,6 +30,7 @@ export interface MeshPieceResponse {
   pieceId: string;
   vertices: Float32Array;
   triIds: Int32Array;
+  uvs?: Float32Array;
   error?: string;
 }
 
@@ -58,8 +59,11 @@ ctx.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
         pieceId: msg.piece.id,
         vertices: result.vertices,
         triIds: result.triIds,
+        uvs: result.uvs,
       };
-      ctx.postMessage(response, [result.vertices.buffer, result.triIds.buffer]);
+      const transfers: ArrayBuffer[] = [result.vertices.buffer, result.triIds.buffer];
+      if (result.uvs) transfers.push(result.uvs.buffer);
+      ctx.postMessage(response, transfers);
     } catch (err) {
       const response: MeshPieceResponse = {
         type: 'meshPieceResult',

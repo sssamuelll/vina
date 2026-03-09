@@ -1,5 +1,5 @@
 /**
- * Fabric Tools — search, select, and compare physical fabrics via copilot.
+ * Fabric Tools — search, select, compare, and assign physical fabrics via copilot.
  *
  * @module fabricTools
  */
@@ -12,6 +12,7 @@ import {
   toXPBDParams,
   type PhysicalFabric,
 } from '../../../../utils/cloth/physicalFabric';
+import { setFabric, setPieceTint } from '../../../../store/simulationSlice';
 
 function fabricSummary(f: PhysicalFabric) {
   return {
@@ -173,8 +174,97 @@ const compareFabricsTool: ToolDefinition = {
   },
 };
 
+const assignFabricTool: ToolDefinition = {
+  name: 'assignFabric',
+  description:
+    'Assign a physical fabric to a pattern piece. Updates the simulation fabric and optionally sets a tint color. ' +
+    'Supports rollback to restore the previous fabric assignment. ' +
+    '/ Asignar una tela física a una pieza de patrón. Actualiza la tela de simulación y opcionalmente establece un color de tinte.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: {
+        type: 'string',
+        description: 'ID of the pattern piece to assign the fabric to / ID de la pieza de patrón',
+      },
+      fabricId: {
+        type: 'string',
+        description: 'Fabric ID from the physical fabric library (e.g., "denim-12oz", "cotton-poplin") / ID de tela',
+      },
+      tint: {
+        type: 'string',
+        description: 'Optional hex color tint for the fabric (e.g., "#ff0000") / Color de tinte opcional',
+      },
+    },
+    required: ['pieceId', 'fabricId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const fabricId = params.fabricId as string;
+    const tint = params.tint as string | undefined;
+
+    const state = getState();
+
+    // Validate piece exists
+    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) {
+      return {
+        success: false,
+        error: `Piece "${pieceId}" not found. Use searchFabrics or list pieces first.`,
+      };
+    }
+
+    // Validate fabric exists in the physical library
+    const fabric = getPhysicalFabric(fabricId);
+    if (!fabric) {
+      const suggestions = searchPhysicalFabrics(fabricId);
+      return {
+        success: false,
+        error: `Fabric "${fabricId}" not found. ${
+          suggestions.length > 0
+            ? `Did you mean: ${suggestions.slice(0, 3).map(f => f.id).join(', ')}?`
+            : 'Use searchFabrics to find available fabrics.'
+        }`,
+      };
+    }
+
+    // Snapshot previous state for rollback
+    const prevFabricId =
+      state.simulation.pieceFabrics[pieceId] ?? state.simulation.defaultFabricId;
+    const prevTint: string | undefined = state.simulation.pieceTints[pieceId];
+
+    // Dispatch fabric assignment
+    dispatch(setFabric({ pieceId, fabricId }));
+
+    // Optionally dispatch tint
+    if (tint) {
+      dispatch(setPieceTint({ pieceId, tint }));
+    }
+
+    return {
+      success: true,
+      data: {
+        pieceId,
+        pieceName: (piece as { name?: string }).name ?? pieceId,
+        fabricId: fabric.id,
+        fabricName: fabric.name,
+        tint: tint ?? null,
+        previousFabricId: prevFabricId,
+      },
+      rollback: () => {
+        dispatch(setFabric({ pieceId, fabricId: prevFabricId }));
+        if (tint) {
+          // We changed the tint, so restore previous value (or reset to white if none)
+          dispatch(setPieceTint({ pieceId, tint: prevTint ?? '#ffffff' }));
+        }
+      },
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   searchFabricsTool,
   getFabricDetailsTool,
   compareFabricsTool,
+  assignFabricTool,
 ];

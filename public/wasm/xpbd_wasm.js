@@ -82,6 +82,14 @@ export class XpbdSolver {
         return ret >>> 0;
     }
     /**
+     * Get pointer to previous positions buffer (for JS-side collision correction).
+     * @returns {number}
+     */
+    prev_positions_ptr() {
+        const ret = wasm.xpbdsolver_prev_positions_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
      * Set adjacency for self-collision.
      * @param {Uint32Array} offsets
      * @param {Uint32Array} neighbors
@@ -205,6 +213,14 @@ export class XpbdSolver {
      */
     stretch_rest_ptr() {
         const ret = wasm.xpbdsolver_stretch_rest_ptr(this.__wbg_ptr);
+        return ret >>> 0;
+    }
+    /**
+     * Get pointer to velocities buffer (for JS-side collision velocity correction).
+     * @returns {number}
+     */
+    velocities_ptr() {
+        const ret = wasm.xpbdsolver_velocities_ptr(this.__wbg_ptr);
         return ret >>> 0;
     }
 }

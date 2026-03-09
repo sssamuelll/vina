@@ -34,6 +34,7 @@ import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
 import DisplayBar3D from '../DisplayBar3D/DisplayBar3D';
+import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
 import './Workspace.css';
 
 /**
@@ -431,6 +432,7 @@ export default function Workspace() {
                 </div>
               </div>
             </div>
+            <PropertiesPanel />
           </div>
 
           <BottomPanel
