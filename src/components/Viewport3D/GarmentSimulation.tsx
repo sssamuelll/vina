@@ -14,7 +14,7 @@
  * @module GarmentSimulation
  */
 
-import { Suspense, useRef, useEffect, useCallback, useMemo, forwardRef, useImperativeHandle } from 'react';
+import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
@@ -25,6 +25,8 @@ import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats } from '../../store/simulationSlice';
+import { textureManager } from '../../utils/textures/TextureManager';
+import type { Texture } from 'three';
 import PinRenderer from './PinRenderer';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
@@ -355,6 +357,45 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   }, [fabricId]);
 
+  // ─── Texture loading ───────────────────────────────────────────────────────
+
+  const [textures, setTextures] = useState<{
+    map: Texture | null;
+    normalMap: Texture | null;
+    roughnessMap: Texture | null;
+    aoMap: Texture | null;
+  }>({ map: null, normalMap: null, roughnessMap: null, aoMap: null });
+
+  useEffect(() => {
+    const fabric = getPhysicalFabric(fabricId);
+    if (!fabric?.textures) {
+      setTextures({ map: null, normalMap: null, roughnessMap: null, aoMap: null });
+      return;
+    }
+    const base = '/textures/fabrics/';
+    const t = fabric.textures;
+    let cancelled = false;
+
+    Promise.all([
+      t.diffuse ? textureManager.load(base + t.diffuse, 'srgb') : Promise.resolve(null),
+      t.normal ? textureManager.load(base + t.normal, 'srgb-linear') : Promise.resolve(null),
+      t.roughness ? textureManager.load(base + t.roughness, 'srgb-linear') : Promise.resolve(null),
+      t.ao ? textureManager.load(base + t.ao, 'srgb-linear') : Promise.resolve(null),
+    ]).then(([map, normalMap, roughnessMap, aoMap]) => {
+      if (cancelled) return;
+      // Apply UV repeat from render params
+      [map, normalMap, roughnessMap, aoMap].forEach(tex => {
+        if (tex) {
+          tex.repeat.set(renderParams.mapRepeat[0], renderParams.mapRepeat[1]);
+          tex.needsUpdate = true;
+        }
+      });
+      setTextures({ map, normalMap, roughnessMap, aoMap });
+    });
+
+    return () => { cancelled = true; };
+  }, [fabricId, renderParams.mapRepeat]);
+
   // Pin tool: click handler to find nearest vertex and add pin
   const handleMeshClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     if (activeTool3D !== 'pin') return;
@@ -406,7 +447,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         onClick={handleMeshClick}
       >
         <meshPhysicalMaterial
-          vertexColors
+          vertexColors={fitMapMode !== 'none'}
+          color={renderParams.color || '#ffffff'}
           side={THREE.DoubleSide}
           transparent
           opacity={renderParams.opacity}
@@ -420,6 +462,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           transmission={renderParams.transmission}
           thickness={renderParams.thickness}
           ior={renderParams.ior}
+          map={fitMapMode === 'none' ? textures.map : null}
+          normalMap={textures.normalMap}
+          roughnessMap={fitMapMode === 'none' ? textures.roughnessMap : null}
+          aoMap={textures.aoMap}
         />
       </mesh>
       <PinRenderer livePositions={positionsRef.current || undefined} />

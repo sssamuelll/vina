@@ -1,8 +1,58 @@
 import { useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { setFabric, setPieceTint, setPieceUVTransform } from '../../store/simulationSlice';
+import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride } from '../../store/simulationSlice';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric } from '../../utils/cloth/physicalFabric';
+
+function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughness' | 'ao'; pieceId: string }) {
+  const dispatch = useDispatch();
+  const overrides = useSelector((s: RootState) => s.simulation.pieceTextureOverrides[pieceId]);
+  const url = overrides?.[slot];
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const blobUrl = URL.createObjectURL(file);
+    dispatch(setPieceTextureOverride({ pieceId, slot, url: blobUrl }));
+  }, [dispatch, pieceId, slot]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  return (
+    <div
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '4px 0',
+        borderBottom: '1px solid #333',
+      }}
+    >
+      <div style={{ width: 28, height: 28, background: '#333', borderRadius: 3, border: '1px dashed #555', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        {url ? (
+          <img src={url} alt={slot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <span style={{ fontSize: 8, color: '#666' }}>+</span>
+        )}
+      </div>
+      <span style={{ fontSize: 10, color: '#aaa', textTransform: 'capitalize', flex: 1 }}>{slot}</span>
+      {url && (
+        <button
+          onClick={() => dispatch(setPieceTextureOverride({ pieceId, slot, url: null }))}
+          style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 12 }}
+        >
+          x
+        </button>
+      )}
+    </div>
+  );
+}
 
 export default function MaterialTab() {
   const dispatch = useDispatch();
@@ -130,6 +180,18 @@ export default function MaterialTab() {
             />
           </label>
         </div>
+      </div>
+
+      {/* Texture Map Slots */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>TEXTURE OVERRIDES</div>
+        {(['diffuse', 'normal', 'roughness', 'ao'] as const).map(slot => (
+          <TextureSlot
+            key={slot}
+            slot={slot}
+            pieceId={selectedPieceId}
+          />
+        ))}
       </div>
     </div>
   );
