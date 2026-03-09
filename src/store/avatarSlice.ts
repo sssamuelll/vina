@@ -34,6 +34,8 @@ export interface AvatarState {
   savedPoses: SavedPose[];
   avatarProfiles: AvatarProfile[];
   activeProfileId: string | null;
+  morphTargets: Record<string, number>;
+  availableMorphTargets: string[];
 }
 
 export const EDITABLE_JOINTS = [
@@ -218,6 +220,8 @@ const initialState: AvatarState = {
   savedPoses: [],
   avatarProfiles: [],
   activeProfileId: null,
+  morphTargets: {},
+  availableMorphTargets: [],
 };
 
 const avatarSlice = createSlice({
@@ -351,6 +355,24 @@ const avatarSlice = createSlice({
         chain.target = action.payload.target;
       }
     },
+
+    // ─── Morph Targets (native GLB blendshapes) ───
+    setAvailableMorphTargets(state, action: PayloadAction<string[]>) {
+      state.availableMorphTargets = action.payload;
+      state.morphTargets = {};
+      for (const name of action.payload) {
+        state.morphTargets[name] = 0;
+      }
+    },
+    setMorphTarget(state, action: PayloadAction<{ name: string; value: number }>) {
+      const { name, value } = action.payload;
+      if (!state.availableMorphTargets.includes(name)) return;
+      state.morphTargets[name] = Math.max(0, Math.min(1, value));
+    },
+    clearMorphTargets(state) {
+      state.availableMorphTargets = [];
+      state.morphTargets = {};
+    },
   },
 });
 
@@ -359,5 +381,6 @@ export const {
   loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
   loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
   toggleIK, setIKTarget, removeIKTarget, updateIKChainTarget,
+  setAvailableMorphTargets, setMorphTarget, clearMorphTargets,
 } = avatarSlice.actions;
 export default avatarSlice.reducer;

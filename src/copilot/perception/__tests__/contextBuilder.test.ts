@@ -162,6 +162,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       savedPoses: [],
       avatarProfiles: [],
       activeProfileId: null,
+      morphTargets: {},
+      availableMorphTargets: [],
     },
     tools: {
       activeTool2D: 'select',
