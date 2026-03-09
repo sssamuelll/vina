@@ -211,6 +211,21 @@ function mockState(overrides?: Partial<RootState>): RootState {
       bodies: [],
       selectedBodyId: null,
     },
+    renderSettings: {
+      hdriPreset: 'studio-soft',
+      hdriRotation: 0,
+      hdriCustomUrl: null,
+      toneMapping: 'aces' as const,
+      exposure: 1.0,
+      backgroundMode: 'hdri' as const,
+      backgroundColor: '#f0f0f0',
+      lights: [],
+      groundVisible: true,
+      shadowOpacity: 0.4,
+      shadowBlur: 2,
+      turntableFrameCount: 36,
+      turntableDirection: 'cw' as const,
+    },
   };
 
   if (overrides) {
