@@ -374,8 +374,28 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const initializeIK = (activeScene: THREE.Object3D) => {
     if (!activeScene || boneMap.current.size === 0) return;
 
-    // Clean up old target helpers
-    ikTargetHelpers.current.forEach(helper => helper.parent?.remove(helper));
+    // Clean up old target helpers and remove pushed entries from skeleton
+    if (ikTargetHelpers.current.size > 0) {
+      let cleanupMesh: THREE.SkinnedMesh | null = null;
+      activeScene.traverse((child) => {
+        if (!cleanupMesh && (child as THREE.SkinnedMesh).isSkinnedMesh) {
+          cleanupMesh = child as THREE.SkinnedMesh;
+        }
+      });
+      const cleanupSkeleton = cleanupMesh ? (cleanupMesh as THREE.SkinnedMesh).skeleton : null;
+
+      ikTargetHelpers.current.forEach(helper => {
+        helper.parent?.remove(helper);
+        // Remove from skeleton.bones/boneInverses to prevent array growth
+        if (cleanupSkeleton) {
+          const idx = cleanupSkeleton.bones.indexOf(helper as unknown as THREE.Bone);
+          if (idx !== -1) {
+            cleanupSkeleton.bones.splice(idx, 1);
+            cleanupSkeleton.boneInverses.splice(idx, 1);
+          }
+        }
+      });
+    }
     ikTargetHelpers.current.clear();
     ikSolver.current = null;
 
@@ -413,7 +433,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
         ikTargetHelpers.current.set(chain.name, target);
 
         // We need the target in the skeleton's bones array for CCDIKSolver
+        // Must also push a corresponding boneInverse matrix to keep arrays in sync,
+        // otherwise Skeleton.update() crashes accessing undefined boneInverses[i].elements
         skeleton.bones.push(target as unknown as THREE.Bone);
+        skeleton.boneInverses.push(new THREE.Matrix4());
         const targetIndex = skeleton.bones.length - 1;
 
         const effectorBone = boneMap.current.get(chain.bones[chain.bones.length - 1]);
