@@ -1,15 +1,12 @@
 import { X } from 'lucide-react';
 import type { SidebarView } from '../ActivityBar/ActivityBar';
 import {
-  PatternExplorerView,
-  MeasurementsView,
   GradingView,
-  NestingView,
-  FileExplorerView,
   SettingsView,
 } from '../views';
+import ProjectView from '../views/ProjectView';
+import AvatarBodyView from '../views/AvatarBodyView';
 import PluginManager from '../PluginManager/PluginManager';
-import SkillMarketplace from '../SkillMarketplace/SkillMarketplace';
 import SimulationView from './SimulationView';
 import ParametricView from './ParametricView';
 import HistoryView from '../views/HistoryView';
@@ -22,13 +19,10 @@ interface SidebarProps {
 }
 
 const viewTitles: Record<SidebarView, string> = {
-  explorer: 'Pattern Explorer',
-  measurements: 'Measurements',
+  explorer: 'Project',
+  avatar: 'Avatar & Body',
   grading: 'Grading',
-  nesting: 'Nesting',
-  files: 'File Browser',
   plugins: 'Plugins',
-  skills: 'Skills',
   settings: 'Settings',
   simulation: 'Simulation',
   parametric: 'Parametric',
@@ -49,13 +43,10 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             </button>
           </div>
           <div className="sidebar-content">
-            {activeView === 'explorer' && <PatternExplorerView />}
-            {activeView === 'measurements' && <MeasurementsView />}
+            {activeView === 'explorer' && <ProjectView />}
+            {activeView === 'avatar' && <AvatarBodyView />}
             {activeView === 'grading' && <GradingView />}
-            {activeView === 'nesting' && <NestingView />}
-            {activeView === 'files' && <FileExplorerView />}
             {activeView === 'plugins' && <PluginManager />}
-            {activeView === 'skills' && <SkillMarketplace />}
             {activeView === 'settings' && <SettingsView />}
             {activeView === 'simulation' && <SimulationView />}
             {activeView === 'parametric' && <ParametricView />}

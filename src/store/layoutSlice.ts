@@ -29,7 +29,7 @@ function loadLayoutFromStorage(): LayoutState {
   // Default layout
   return {
     copilotPosition: 'right',
-    copilotOpen: true,
+    copilotOpen: false,
     copilotSize: 340,
     primaryView: '2d',
     splitRatio: 0.5,
@@ -124,7 +124,7 @@ const layoutSlice = createSlice({
     resetLayout(state) {
       Object.assign(state, {
         copilotPosition: 'right',
-        copilotOpen: true,
+        copilotOpen: false,
         copilotSize: 340,
         primaryView: '2d',
         splitRatio: 0.5,

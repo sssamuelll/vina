@@ -1,18 +1,18 @@
-import { FileText, Ruler, Layers, LayoutGrid, Play, Folder, Plug, Settings, SlidersHorizontal, History, Sparkles } from 'lucide-react';
+import { FileText, Layers, Play, Plug, Settings, SlidersHorizontal, History, User, MessageSquare } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
+import { RootState } from '../../store';
+import { toggleCopilot } from '../../store/layoutSlice';
 import './ActivityBar.css';
 
 export type SidebarView =
   | 'explorer'
-  | 'measurements'
+  | 'avatar'
   | 'grading'
-  | 'nesting'
-  | 'files'
-  | 'plugins'
-  | 'skills'
-  | 'settings'
   | 'simulation'
   | 'parametric'
-  | 'history';
+  | 'history'
+  | 'plugins'
+  | 'settings';
 
 interface ActivityBarProps {
   activeView: SidebarView | null;
@@ -27,75 +27,20 @@ interface ActivityItem {
 }
 
 const items: ActivityItem[] = [
-  {
-    id: 'explorer',
-    label: 'Pattern Explorer',
-    position: 'top',
-    icon: <FileText size={20} />,
-  },
-  {
-    id: 'measurements',
-    label: 'Measurements',
-    position: 'top',
-    icon: <Ruler size={20} />,
-  },
-  {
-    id: 'grading',
-    label: 'Grading',
-    position: 'top',
-    icon: <Layers size={20} />,
-  },
-  {
-    id: 'nesting',
-    label: 'Nesting',
-    position: 'top',
-    icon: <LayoutGrid size={20} />,
-  },
-  {
-    id: 'simulation',
-    label: 'Simulation',
-    position: 'top',
-    icon: <Play size={20} />,
-  },
-  {
-    id: 'parametric',
-    label: 'Parametric',
-    position: 'top',
-    icon: <SlidersHorizontal size={20} />,
-  },
-  {
-    id: 'history',
-    label: 'History',
-    position: 'top',
-    icon: <History size={20} />,
-  },
-  {
-    id: 'files',
-    label: 'Files',
-    position: 'top',
-    icon: <Folder size={20} />,
-  },
-  {
-    id: 'skills',
-    label: 'Skills Marketplace',
-    position: 'bottom',
-    icon: <Sparkles size={20} />,
-  },
-  {
-    id: 'plugins',
-    label: 'Plugins',
-    position: 'bottom',
-    icon: <Plug size={20} />,
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-    position: 'bottom',
-    icon: <Settings size={20} />,
-  },
+  { id: 'explorer', label: 'Project', position: 'top', icon: <FileText size={20} /> },
+  { id: 'avatar', label: 'Avatar & Body', position: 'top', icon: <User size={20} /> },
+  { id: 'simulation', label: 'Simulation', position: 'top', icon: <Play size={20} /> },
+  { id: 'parametric', label: 'Parametric', position: 'top', icon: <SlidersHorizontal size={20} /> },
+  { id: 'grading', label: 'Grading', position: 'top', icon: <Layers size={20} /> },
+  { id: 'history', label: 'History', position: 'top', icon: <History size={20} /> },
+  { id: 'plugins', label: 'Plugins', position: 'bottom', icon: <Plug size={20} /> },
+  { id: 'settings', label: 'Settings', position: 'bottom', icon: <Settings size={20} /> },
 ];
 
 export default function ActivityBar({ activeView, onViewChange }: ActivityBarProps) {
+  const dispatch = useDispatch();
+  const copilotOpen = useSelector((s: RootState) => s.layout.copilotOpen);
+
   const topItems = items.filter(i => i.position === 'top');
   const bottomItems = items.filter(i => i.position === 'bottom');
 
@@ -132,6 +77,13 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
             <span className="activity-bar-icon">{item.icon}</span>
           </button>
         ))}
+        <button
+          className={`activity-bar-item ${copilotOpen ? 'active' : ''}`}
+          onClick={() => dispatch(toggleCopilot())}
+          title="Copilot"
+        >
+          <span className="activity-bar-icon"><MessageSquare size={20} /></span>
+        </button>
       </div>
     </div>
   );
