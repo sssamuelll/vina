@@ -16,6 +16,8 @@ import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
+import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
+import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
@@ -217,6 +219,46 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     link.download = `openclo-fitmap-${Date.now()}.png`;
     link.href = offscreen.toDataURL('image/png');
     link.click();
+  }, []);
+
+  const handleExportStill = useCallback((width: number, height: number, transparent: boolean) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
+    if (!gl || !sc || !cam) return;
+    exportStill(gl, sc, cam, { width, height, transparent });
+  }, []);
+
+  const handleExportTurntable = useCallback(async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
+    if (!gl || !sc || !cam) return;
+    // Read config from Redux store directly
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { turntableFrameCount: number; turntableDirection: 'cw' | 'ccw' } } } | undefined;
+    const config = store?.getState().renderSettings;
+    const blob = await renderTurntable(gl, sc, cam, {
+      frameCount: config?.turntableFrameCount ?? 36,
+      direction: config?.turntableDirection ?? 'cw',
+    });
+    downloadBlob(blob, `openclo-turntable-${Date.now()}.webm`);
+  }, []);
+
+  const handleExportAllViews = useCallback((width: number, height: number, transparent: boolean) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const refs = container as unknown as Record<string, unknown>;
+    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const sc = refs.__scene as THREE.Scene | undefined;
+    const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
+    if (!gl || !sc || !cam) return;
+    exportAllViews(gl, sc, cam, { width, height, transparent });
   }, []);
 
   // Shift+A — Toggle avatar visibility (CLO3D: Show Avatar)
@@ -443,6 +485,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       <RenderSettingsPanel
         open={renderPanelOpen}
         onClose={() => setRenderPanelOpen(false)}
+        onExportStill={handleExportStill}
+        onExportTurntable={handleExportTurntable}
+        onExportAllViews={handleExportAllViews}
       />
 
       {/* Collision Body toggle + panel */}
