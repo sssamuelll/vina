@@ -1,15 +1,19 @@
 /**
  * DraggablePiece — Wrapper around PieceMesh that enables 3D drag in Arrange mode.
  *
- * Uses @react-three/drei PivotControls for CLO3D-style gizmo:
+ * Uses @react-three/drei TransformControls for gizmo:
  * - Translate along XYZ axes
- * - Rotate around XYZ axes
  * - Only active when piece is selected and in arrange mode
+ *
+ * TransformControls uses MeshBasicMaterial + LineBasicMaterial internally,
+ * which are compatible with WebGPURenderer's NodeMaterial system.
+ * (PivotControls was replaced because it uses LineMaterial extending
+ * ShaderMaterial, which WebGPURenderer rejects.)
  */
 
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useEffect } from 'react';
 import type { ThreeEvent } from '@react-three/fiber';
-import { PivotControls } from '@react-three/drei';
+import { TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import PieceMesh from './PieceMesh';
 import type { PatternPiece } from '../../types/types';
@@ -43,7 +47,7 @@ export default function DraggablePiece({
   fabricColor,
   fabricRoughness,
 }: DraggablePieceProps) {
-  const matrixRef = useRef(new THREE.Matrix4());
+  const groupRef = useRef<THREE.Group>(null);
   const actualPos = arrangementOverride || position;
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
@@ -51,41 +55,38 @@ export default function DraggablePiece({
     onSelect(piece.id);
   }, [piece.id, onSelect]);
 
-  const handleDragStart = useCallback(() => {
+  const handleMouseDown = useCallback(() => {
     setOrbitEnabled(false);
   }, [setOrbitEnabled]);
 
-  const handleDrag = useCallback((local: THREE.Matrix4) => {
-    matrixRef.current.copy(local);
-  }, []);
-
-  const handleDragEnd = useCallback(() => {
+  const handleMouseUp = useCallback(() => {
     setOrbitEnabled(true);
-    const pos = new THREE.Vector3();
-    pos.setFromMatrixPosition(matrixRef.current);
-    onDragEnd(piece.id, [
-      actualPos[0] + pos.x,
-      actualPos[1] + pos.y,
-      actualPos[2] + pos.z,
-    ]);
-  }, [piece.id, actualPos, onDragEnd, setOrbitEnabled]);
+    if (!groupRef.current) return;
+    const pos = groupRef.current.position;
+    onDragEnd(piece.id, [pos.x, pos.y, pos.z]);
+  }, [piece.id, onDragEnd, setOrbitEnabled]);
+
+  // Set initial position when actualPos changes
+  useEffect(() => {
+    if (groupRef.current) {
+      groupRef.current.position.set(...actualPos);
+    }
+  }, [actualPos]);
 
   const showGizmo = canDrag && isSelected;
 
   if (showGizmo) {
     return (
-      <PivotControls
-        anchor={[0, 0, 0]}
-        offset={actualPos}
-        depthTest={false}
-        scale={0.4}
-        lineWidth={2}
-        activeAxes={[true, true, true]}
-        onDragStart={handleDragStart}
-        onDrag={handleDrag}
-        onDragEnd={handleDragEnd}
+      <TransformControls
+        mode="translate"
+        size={0.6}
+        showX
+        showY
+        showZ
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
       >
-        <group onClick={handleClick}>
+        <group ref={groupRef} onClick={handleClick} position={actualPos}>
           <PieceMesh
             piece={piece}
             isSelected={isSelected}
@@ -96,7 +97,7 @@ export default function DraggablePiece({
             fabricRoughness={fabricRoughness}
           />
         </group>
-      </PivotControls>
+      </TransformControls>
     );
   }
 
