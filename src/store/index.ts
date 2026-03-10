@@ -15,6 +15,7 @@ import copilotUIReducer from './copilotUISlice';
 import cameraReducer from './cameraSlice';
 import collisionBodyReducer from './collisionBodySlice';
 import renderSettingsReducer from './renderSettingsSlice';
+import animationReducer from './animationSlice';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { createReactiveSolverMiddleware } from './reactiveSolverMiddleware';
@@ -38,6 +39,7 @@ export const store = configureStore({
     camera: cameraReducer,
     collisionBody: collisionBodyReducer,
     renderSettings: renderSettingsReducer,
+    animation: animationReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
