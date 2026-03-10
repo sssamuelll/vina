@@ -72,22 +72,6 @@
   background: transparent;
 }
 
-.sidebar-content .properties-panel .panel-toggle-btn {
-  display: none;
-}
-
-.sidebar-content .properties-panel.collapsed {
-  width: 100%;
-}
-
-.sidebar-content .properties-panel.collapsed .panel-icons {
-  display: none;
-}
-
-.sidebar-content .properties-panel.collapsed .panel-content {
-  display: flex;
-}
-
 /* Placeholder views */
 .sidebar-placeholder {
   display: flex;

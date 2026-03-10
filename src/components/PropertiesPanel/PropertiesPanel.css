@@ -7,42 +7,6 @@
   display: flex;
   flex-direction: column;
   position: relative;
-  transition: all 0.2s ease;
-}
-
-.properties-panel.collapsed {
-  width: 40px;
-  min-width: 40px;
-  overflow: hidden;
-}
-
-.properties-panel.expanded {
-  width: var(--panel-width);
-}
-
-.panel-toggle-btn {
-  position: absolute;
-  left: -28px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 28px;
-  height: 32px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-right: none;
-  border-radius: 6px 0 0 6px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: var(--btn-transition);
-  z-index: 10;
-}
-
-.panel-toggle-btn:hover {
-  background: var(--bg-panel);
-  color: var(--text-primary);
 }
 
 .panel-content {
@@ -58,10 +22,6 @@
 @keyframes panelFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
-}
-
-.panel-icons {
-  animation: panelFadeIn 0.2s ease;
 }
 
 .panel-section {
@@ -272,37 +232,4 @@ select.panel-input {
 
 .panel-labeled-btn:hover span {
   color: var(--text-secondary);
-}
-
-/* Collapsed icon strip */
-.panel-icons {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 8px 4px;
-  width: 40px;
-}
-
-.panel-icon-shortcut {
-  width: 32px;
-  height: 32px;
-  background: none;
-  border: none;
-  border-radius: 6px;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s;
-}
-
-.panel-icon-shortcut:hover {
-  color: var(--text-primary);
-}
-
-/* Hide toggle tab when collapsed — icon strip is the panel */
-.properties-panel.collapsed .panel-toggle-btn {
-  left: -28px;
 }
