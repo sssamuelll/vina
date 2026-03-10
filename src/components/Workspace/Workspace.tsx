@@ -34,7 +34,6 @@ import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
 import DisplayBar3D from '../DisplayBar3D/DisplayBar3D';
-import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
 import './Workspace.css';
 
 /**
@@ -116,18 +115,6 @@ export default function Workspace() {
   // ─── 3D Toolbar ───
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const [avatarPanelOpen, setAvatarPanelOpen] = useState(false);
-
-  // ─── Properties Panel ───
-  const [propertiesPanelOpen, setPropertiesPanelOpen] = useState(false);
-  const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
-  const prevSelectedRef = useRef(selectedPieceIds);
-  useEffect(() => {
-    const hadSelection = prevSelectedRef.current.length > 0;
-    const hasSelection = selectedPieceIds.length > 0;
-    prevSelectedRef.current = selectedPieceIds;
-    if (hasSelection && !hadSelection) setPropertiesPanelOpen(true);
-    else if (!hasSelection && hadSelection) setPropertiesPanelOpen(false);
-  }, [selectedPieceIds]);
 
   // ─── Split ratio (draggable divider) ───
   const editorsRef = useRef<HTMLDivElement>(null);
@@ -405,10 +392,7 @@ export default function Workspace() {
           <div className="editors-with-toolbar">
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
-              <Toolbar2D
-                propertiesPanelOpen={propertiesPanelOpen}
-                onTogglePropertiesPanel={() => setPropertiesPanelOpen(v => !v)}
-              />
+              <Toolbar2D />
             </div>
 
             {/* Viewports — ALWAYS mounted, sized via CSS width (VS Code pattern) */}
@@ -447,7 +431,6 @@ export default function Workspace() {
                 </div>
               </div>
             </div>
-            {propertiesPanelOpen && <PropertiesPanel />}
           </div>
 
           <BottomPanel
