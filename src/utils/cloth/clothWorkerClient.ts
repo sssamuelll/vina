@@ -32,6 +32,7 @@ export type FrameCallback = (positions: Float32Array, numParticles: number, triI
 export class ClothWorkerClient {
   private worker: Worker | null = null;
   private readyResolve: (() => void) | null = null;
+  private readyReject: ((e: Error) => void) | null = null;
 
   /** Called each time the worker produces a new frame. */
   onFrame: FrameCallback | null = null;
@@ -66,12 +67,18 @@ export class ClothWorkerClient {
     };
 
     this.worker.onerror = (err) => {
-      this.onError?.(err.message);
+      err.preventDefault();
+      const msg = err.message || 'Cloth worker crashed';
+      this.readyReject?.(new Error(msg));
+      this.readyReject = null;
+      this.readyResolve = null;
+      this.onError?.(msg);
     };
 
     // Wait for 'ready' message
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve;
+      this.readyReject = reject;
       this.postMessage({ type: 'init', meshData, config });
     });
   }
@@ -101,11 +108,17 @@ export class ClothWorkerClient {
     };
 
     this.worker.onerror = (err) => {
-      this.onError?.(err.message);
+      err.preventDefault();
+      const msg = err.message || 'Cloth worker crashed';
+      this.readyReject?.(new Error(msg));
+      this.readyReject = null;
+      this.readyResolve = null;
+      this.onError?.(msg);
     };
 
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve;
+      this.readyReject = reject;
       this.postMessage({ type: 'initMultiPiece', pieces, seams, config });
     });
   }
@@ -327,6 +340,7 @@ export class ClothWorkerClient {
     }
     this.isRunning = false;
     this.readyResolve = null;
+    this.readyReject = null;
   }
 
   // ─── Internal ──────────────────────────────────────────────────────────
@@ -341,6 +355,7 @@ export class ClothWorkerClient {
         if (this.readyResolve) {
           this.readyResolve();
           this.readyResolve = null;
+          this.readyReject = null;
         }
         break;
 
@@ -353,6 +368,9 @@ export class ClothWorkerClient {
         break;
 
       case 'error':
+        this.readyReject?.(new Error(msg.message));
+        this.readyReject = null;
+        this.readyResolve = null;
         this.onError?.(msg.message);
         break;
 
