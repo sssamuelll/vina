@@ -249,10 +249,12 @@ self.onmessage = async (event: MessageEvent) => {
   try {
     switch (msg.type) {
       case 'init': {
-        // Load Wasm module inside the worker
+        // Load Wasm module inside the worker (cache-bust with version)
         const baseUrl = msg.baseUrl ?? '/';
-        const wasmModule = await import(/* @vite-ignore */ `${baseUrl}wasm/xpbd_wasm.js`) as unknown as WasmModule;
-        const initResult = await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm`);
+        const v = msg.wasmVersion ?? '';
+        const qs = v ? `?v=${v}` : '';
+        const wasmModule = await import(/* @vite-ignore */ `${baseUrl}wasm/xpbd_wasm.js${qs}`) as unknown as WasmModule;
+        const initResult = await wasmModule.default(`${baseUrl}wasm/xpbd_wasm_bg.wasm${qs}`);
 
         // wasm-bindgen default() returns instance.exports which has .memory
         // But verify it actually has memory — fallback to module-level wasm if not
