@@ -247,7 +247,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     link.click();
   }, []);
 
-  const handleExportStill = useCallback((width: number, height: number, transparent: boolean) => {
+  const handleExportStill = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
@@ -255,7 +255,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    exportStill(gl, sc, cam, { width, height, transparent });
+    await exportStill(gl, sc, cam, { width, height, transparent });
   }, []);
 
   const handleExportTurntable = useCallback(async () => {
@@ -276,7 +276,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     downloadBlob(blob, `openclo-turntable-${Date.now()}.webm`);
   }, []);
 
-  const handleExportAllViews = useCallback((width: number, height: number, transparent: boolean) => {
+  const handleExportAllViews = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
@@ -284,7 +284,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    exportAllViews(gl, sc, cam, { width, height, transparent });
+    await exportAllViews(gl, sc, cam, { width, height, transparent });
   }, []);
 
   const handleExport3D = useCallback(async (
