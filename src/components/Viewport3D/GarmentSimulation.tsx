@@ -81,6 +81,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const stretchingIdsRef = useRef<Int32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
+  const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
@@ -213,6 +214,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     clientsRef.current = clients;
   });
 
+  // ─── GPU zero-copy: bind StorageBufferAttributes to geometry ─────────────
+  useEffect(() => {
+    if (!staticGeometry || solverTier !== 'webgpu' || !clients.gpu) return;
+    const posAttr = clients.gpu.getPositionStorageAttribute();
+    const normAttr = clients.gpu.getNormalStorageAttribute();
+    if (posAttr) staticGeometry.setAttribute('position', posAttr);
+    if (normAttr) staticGeometry.setAttribute('normal', normAttr);
+  }, [staticGeometry, solverTier, clients.gpu]);
+
   // ─── Pin sync ───────────────────────────────────────────────────────────────
 
   useCollisionBodies({ clients });
@@ -257,20 +267,26 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // During playback, the playback hook handles position updates
     if (isPlayingBack) return;
 
-    const positions = positionsRef.current;
-    if (!positions) return;
-
-    const posAttr = staticGeometry.getAttribute('position') as THREE.BufferAttribute;
-    if (posAttr && posAttr.array.length === positions.length) {
-      (posAttr.array as Float32Array).set(positions);
-      posAttr.needsUpdate = true;
-      staticGeometry.computeVertexNormals();
-      staticGeometry.computeBoundingSphere();
+    // GPU zero-copy: positions/normals live on GPU via StorageBufferAttribute
+    // Only fit map colors need CPU update (handled below)
+    if (solverTier !== 'webgpu') {
+      const positions = positionsRef.current;
+      if (positions) {
+        const posAttr = staticGeometry.getAttribute('position') as THREE.BufferAttribute;
+        if (posAttr && posAttr.array.length === positions.length) {
+          (posAttr.array as Float32Array).set(positions);
+          posAttr.needsUpdate = true;
+          staticGeometry.computeVertexNormals();
+          staticGeometry.computeBoundingSphere();
+        }
+      }
     }
 
-    // Compute fit map overlay colors
+    const positions = positionsRef.current;
+
+    // Compute fit map overlay colors (requires CPU-side positions — skip in GPU zero-copy mode)
     const colorAttr = staticGeometry.getAttribute('color') as THREE.BufferAttribute;
-    if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr) {
+    if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr && positions && positions.length > 0) {
       if (!pieceColorsRef.current) {
         pieceColorsRef.current = new Float32Array(colorAttr.array as Float32Array);
       }
