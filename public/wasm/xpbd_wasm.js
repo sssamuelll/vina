@@ -193,6 +193,15 @@ export class XpbdSolver {
         wasm.xpbdsolver_set_triangles(this.__wbg_ptr, ptr0, len0);
     }
     /**
+     * Set wind direction and strength (world-space force vector).
+     * @param {number} wx
+     * @param {number} wy
+     * @param {number} wz
+     */
+    set_wind(wx, wy, wz) {
+        wasm.xpbdsolver_set_wind(this.__wbg_ptr, wx, wy, wz);
+    }
+    /**
      * Step the simulation forward one frame.
      * @param {number} dt
      */

@@ -228,6 +228,18 @@ function mockState(overrides?: Partial<RootState>): RootState {
       turntableFrameCount: 36,
       turntableDirection: 'cw' as const,
     },
+    animation: {
+      duration: 10,
+      fps: 24,
+      currentFrame: 0,
+      playbackState: 'stopped',
+      loop: false,
+      autoKeying: false,
+      tracks: [],
+      recording: false,
+      recordedFrameCount: 0,
+      recordedVertexCount: 0,
+    },
   };
 
   if (overrides) {

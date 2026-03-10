@@ -34,6 +34,7 @@ import EnvironmentSetup from './EnvironmentSetup';
 import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets } from './useCameraPresets';
+import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
 import { toggleIK } from '../../store/avatarSlice';
@@ -72,6 +73,12 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
 export { Viewport3DErrorBoundary };
 
+/** Drives keyframe animation playback inside the R3F Canvas context. */
+function AnimationDriver() {
+  useAnimationPlayback();
+  return null;
+}
+
 interface Viewport3DProps {
   activeTool3D?: Tool3D;
 }
@@ -87,6 +94,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const showGarment = useSelector((s: RootState) => s.simulation.showGarment);
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const { groundVisible, shadowOpacity, shadowBlur } = useSelector((s: RootState) => s.renderSettings);
+  const playbackState = useSelector((s: RootState) => s.animation.playbackState);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
@@ -115,6 +123,13 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       RIGHT: THREE.MOUSE.ROTATE,
     };
   }, [cameraMode]);
+
+  // Disable OrbitControls during animation playback
+  useEffect(() => {
+    if (orbitRef.current) {
+      orbitRef.current.enabled = playbackState !== 'playing';
+    }
+  }, [playbackState]);
 
   const setOrbitEnabled = useCallback((enabled: boolean) => {
     if (orbitRef.current) {
@@ -413,6 +428,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       >
         <EnvironmentSetup />
         <CustomLights />
+        <AnimationDriver />
 
         {!avatarHidden && avatarMode === 'dressform' && <Mannequin />}
         {!avatarHidden && avatarMode === 'model' && avatarModelUrl && (

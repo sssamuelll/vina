@@ -4,9 +4,10 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reasoning/proactiveAnalysis';
+import Timeline from '../Timeline/Timeline';
 import './BottomPanel.css';
 
-type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview';
+type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline';
 
 interface BottomPanelProps {
   isOpen: boolean;
@@ -20,6 +21,7 @@ function buildTabs(problemCount: number): { id: BottomTab; label: string }[] {
     { id: 'problems', label: problemCount > 0 ? `Problems (${problemCount})` : 'Problems' },
     { id: 'output', label: 'Output' },
     { id: 'nesting-preview', label: 'Nesting Preview' },
+    { id: 'timeline', label: 'Timeline' },
   ];
 }
 
@@ -177,6 +179,7 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
               <span>Nesting preview will appear here</span>
             </div>
           )}
+          {activeTab === 'timeline' && <Timeline />}
         </div>
       </div>
     </div>

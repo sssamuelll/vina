@@ -34,6 +34,8 @@ import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
+import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
+import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -215,6 +217,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   useCollisionBodies({ clients });
 
+  // ─── Animation recording + playback ────────────────────────────────────────
+
+  const recorder = useSimulationRecorder({ positionsRef });
+  const { isPlayingBack } = useSimulationPlayback({ meshRef, recorder });
+
   // ─── Snapshot imperative handle ─────────────────────────────────────────────
 
   useImperativeHandle(ref, () => ({
@@ -246,6 +253,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   useFrame(() => {
     if (!meshRef.current || !staticGeometry) return;
+
+    // During playback, the playback hook handles position updates
+    if (isPlayingBack) return;
+
     const positions = positionsRef.current;
     if (!positions) return;
 

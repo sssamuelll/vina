@@ -99,31 +99,31 @@ export class SkillRegistry {
   async initialize(): Promise<void> {
     if (this.initialized) return;
 
-    // Open persistence
-    await this.persistence.open();
-
-    // Migrate from localStorage if needed
-    await this.persistence.migrateFromLocalStorage();
-
-    // Load core skills
+    // Load core skills (always available, no persistence needed)
     for (const skill of CORE_SKILLS) {
       this.skills.set(skill.nsid, skill);
       this.indexTriggers(skill.nsid, skill.skill.triggers);
     }
 
-    // Load persisted community skills
-    const persisted = await this.persistence.getAllSkills();
-    for (const skill of persisted) {
-      this.skills.set(skill.nsid, skill);
-      if (skill.enabled) {
-        this.indexTriggers(skill.nsid, skill.skill.triggers);
-      }
-    }
+    // Try to load persisted community skills (IndexedDB may be unavailable)
+    try {
+      await this.persistence.open();
+      await this.persistence.migrateFromLocalStorage();
 
-    // Load preferences
-    const prefs = await this.persistence.getAllPreferences();
-    for (const pref of prefs) {
-      this.preferences.set(pref.trigger, pref.preferredNsid);
+      const persisted = await this.persistence.getAllSkills();
+      for (const skill of persisted) {
+        this.skills.set(skill.nsid, skill);
+        if (skill.enabled) {
+          this.indexTriggers(skill.nsid, skill.skill.triggers);
+        }
+      }
+
+      const prefs = await this.persistence.getAllPreferences();
+      for (const pref of prefs) {
+        this.preferences.set(pref.trigger, pref.preferredNsid);
+      }
+    } catch (e) {
+      console.warn('[SkillRegistry] IndexedDB unavailable, running with core skills only:', e);
     }
 
     this.initialized = true;
