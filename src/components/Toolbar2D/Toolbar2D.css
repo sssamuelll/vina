@@ -180,3 +180,17 @@
 .strip-item.hovered .strip-tooltip {
   opacity: 1;
 }
+
+/* ─── Spacer pushes toggle button to bottom ─── */
+.toolbar2d-spacer {
+  flex: 1;
+}
+
+/* ─── Toggle button (Properties panel) ─── */
+.tool-btn-toggle.active {
+  background: var(--btn-bg-hover);
+}
+
+.tool-btn-toggle.active .tool-icon {
+  color: var(--accent);
+}
