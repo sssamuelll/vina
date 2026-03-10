@@ -2,6 +2,7 @@ import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCa
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
+import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -71,6 +72,31 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
 }
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+
+/**
+ * Create a WebGPURenderer (with WebGL2 fallback when WebGPU is unavailable).
+ *
+ * R3F 8.x's `gl` factory must return synchronously, so we fire-and-forget
+ * `renderer.init()`.  Three.js buffers draw commands internally until the
+ * async initialisation resolves, so the first few frames are a no-op while
+ * the GPU backend spins up.
+ */
+function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
+  const renderer = new WebGPURenderer({
+    canvas,
+    antialias: true,
+    alpha: true,
+    // Falls back to WebGL2 on browsers without WebGPU support
+    forceWebGL: !navigator.gpu,
+  });
+
+  // Fire-and-forget — Three.js queues commands until the backend is ready
+  renderer.init().catch((err) => {
+    console.warn('[Viewport3D] WebGPURenderer.init() failed, frames may not render:', err);
+  });
+
+  return renderer;
+}
 
 export { Viewport3DErrorBoundary };
 
@@ -209,34 +235,15 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const camera = store.__camera as THREE.Camera | undefined;
     if (!renderer || !scene || !camera) return;
 
-    // Force a render so the framebuffer is fresh, then capture
+    // Force a render so the canvas content is current, then capture.
+    // canvas.toDataURL() works for both WebGL and WebGPU canvases,
+    // unlike readPixels which is WebGL-only.
     renderer.render(scene, camera);
     const canvas = renderer.domElement;
-    // After render(), the buffer is available for readPixels
-    const glCtx = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (!glCtx) return;
-
-    const w = glCtx.drawingBufferWidth;
-    const h = glCtx.drawingBufferHeight;
-    const pixels = new Uint8Array(w * h * 4);
-    glCtx.readPixels(0, 0, w, h, glCtx.RGBA, glCtx.UNSIGNED_BYTE, pixels);
-
-    // Flip vertically (WebGL is bottom-up)
-    const offscreen = document.createElement('canvas');
-    offscreen.width = w;
-    offscreen.height = h;
-    const ctx = offscreen.getContext('2d')!;
-    const imageData = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      const srcRow = (h - 1 - y) * w * 4;
-      const dstRow = y * w * 4;
-      imageData.data.set(pixels.subarray(srcRow, srcRow + w * 4), dstRow);
-    }
-    ctx.putImageData(imageData, 0, 0);
 
     const link = document.createElement('a');
     link.download = `openclo-fitmap-${Date.now()}.png`;
-    link.href = offscreen.toDataURL('image/png');
+    link.href = canvas.toDataURL('image/png');
     link.click();
   }, []);
 
@@ -418,7 +425,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         shadows
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
-        gl={{ antialias: true }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        gl={createWebGPURenderer as any}
         onPointerMissed={() => dispatch(clearSelection())}
         onCreated={({ gl, scene, camera }) => {
           // Store refs for snapshot (readPixels needs a fresh render)
