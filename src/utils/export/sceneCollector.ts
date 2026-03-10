@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 export interface CollectExportSceneOptions {
   garmentMesh: THREE.Mesh | null;
@@ -31,7 +32,7 @@ export function collectExportScene(
         if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true;
       });
       if (hasSkinnedMesh) {
-        group.add(child.clone(true));
+        group.add(SkeletonUtils.clone(child));
       }
     }
   }
