@@ -38,8 +38,15 @@ export class GpuSolverClient {
   /** Called each frame with updated positions */
   onFrame: ((positions: Float32Array) => void) | null = null;
 
-  /** Whether to skip CPU readback (zero-copy mode). Default true. */
-  private zeroCopy: boolean = true;
+  /** Whether to skip CPU readback (zero-copy mode).
+   *  Disabled by default: StorageBufferAttribute patching doesn't work
+   *  with Three.js WebGPURenderer's internal attribute management.
+   *  The renderer creates its own GPU buffers and ignores the patched
+   *  gpuBuffer field, so positions never update on screen. */
+  private zeroCopy: boolean = false;
+
+  /** Guard against concurrent readback requests (mapAsync throws if pending). */
+  private readbackPending: boolean = false;
 
   /** Cached StorageBufferAttributes for rendering. */
   private positionAttr: StorageBufferAttribute | null = null;
@@ -235,11 +242,17 @@ export class GpuSolverClient {
     if (this.zeroCopy) {
       // Zero-copy: no readback. Signal frame for timing only.
       this.onFrame?.(new Float32Array(0));
-    } else {
+    } else if (!this.readbackPending) {
+      // CPU readback: copy positions from GPU to CPU each frame.
+      // Guard prevents concurrent mapAsync calls which throw.
+      this.readbackPending = true;
       this.solver.readPositions().then(positions => {
+        this.readbackPending = false;
         if (positions && this.onFrame) {
           this.onFrame(positions);
         }
+      }).catch(() => {
+        this.readbackPending = false;
       });
     }
 
