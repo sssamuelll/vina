@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Play, Pause, Square, Repeat, Circle, KeyRound, Download } from 'lucide-react';
 import type { RootState } from '../../store';
@@ -10,6 +11,7 @@ import {
   setRecording,
   setCurrentFrame,
 } from '../../store/animationSlice';
+import ExportDialog from './ExportDialog';
 
 function formatTimecode(frame: number, fps: number): string {
   const totalSeconds = frame / fps;
@@ -22,6 +24,7 @@ export default function TimelineToolbar() {
   const dispatch = useDispatch();
   const { playbackState, loop, autoKeying, fps, currentFrame, duration, recording } =
     useSelector((s: RootState) => s.animation);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const totalFrames = Math.floor(duration * fps);
 
@@ -94,9 +97,19 @@ export default function TimelineToolbar() {
 
       <div style={{ flex: 1 }} />
 
-      <button title="Export">
+      <button title="Export" onClick={() => setExportOpen(true)}>
         <Download size={14} />
       </button>
+
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        renderer={null}
+        scene={null}
+        camera={null}
+        clothMesh={null}
+        recorder={null}
+      />
     </div>
   );
 }
