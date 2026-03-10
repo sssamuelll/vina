@@ -244,6 +244,9 @@ export function useSimulationLifecycle({
             }
           } catch (e) {
             console.warn('[SimLifecycle] Wasm failed, falling back to CPU:', e);
+            // Clean up broken WASM client before falling through
+            wasmClientRef.current?.dispose();
+            wasmClientRef.current = null;
           }
         }
 
