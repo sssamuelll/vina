@@ -3,6 +3,7 @@ import { ToolDefinition } from '../types';
 export const pinTool: ToolDefinition = {
   id: 'pin',
   name: 'Pin',
+  description: 'Fix cloth points in place during simulation',
   context: '3d',
   shortcut: 'w',
   icon: ({ size = 18 }: { size?: number }) => (

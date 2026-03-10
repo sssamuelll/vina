@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
+// eslint-disable-next-line react-refresh/only-export-components
 const Edit3DIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   <svg 
     width={size} 
@@ -21,6 +21,7 @@ const Edit3DIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const edit3dTool: ToolDefinition = {
   id: 'edit',
   name: 'Edit Mode',
+  description: 'Select and manipulate garment pieces in 3D',
   context: '3d',
   icon: Edit3DIcon,
   cursor: 'pointer',

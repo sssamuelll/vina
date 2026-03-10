@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
+// eslint-disable-next-line react-refresh/only-export-components
 const AvatarIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   <svg 
     width={size} 
@@ -21,6 +21,7 @@ const AvatarIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const avatarTool: ToolDefinition = {
   id: 'avatar',
   name: 'Avatar',
+  description: 'Configure avatar body and measurements',
   context: '3d',
   icon: AvatarIcon,
   cursor: 'pointer',
