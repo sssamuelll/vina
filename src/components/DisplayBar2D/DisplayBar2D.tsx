@@ -9,6 +9,7 @@ import {
   togglePieceNames, toggleLineLengths, toggleSewingLines,
   setRenderMode2D,
 } from '../../store/editorSlice';
+import ToolTooltip from '../Toolbar3D/ToolTooltip';
 import './DisplayBar2D.css';
 
 type RenderMode = 'textured' | 'translucent' | 'wireframe';
@@ -47,27 +48,27 @@ export default function DisplayBar2D() {
   return (
     <div className="display-bar-2d">
       {toggles.map(t => (
-        <button
-          key={t.label}
-          className={`db-btn ${t.active ? 'active' : ''}`}
-          onClick={t.onClick}
-        >
-          {t.icon}
-          <span className="db-tooltip">{t.label}</span>
-        </button>
+        <ToolTooltip key={t.label} name={t.label} position="left">
+          <button
+            className={`db-btn ${t.active ? 'active' : ''}`}
+            onClick={t.onClick}
+          >
+            {t.icon}
+          </button>
+        </ToolTooltip>
       ))}
 
       <div className="db-separator" />
 
       {modes.map(m => (
-        <button
-          key={m.mode}
-          className={`db-btn ${editor.renderMode2D === m.mode ? 'mode-active' : ''}`}
-          onClick={() => dispatch(setRenderMode2D(m.mode))}
-        >
-          {m.icon}
-          <span className="db-tooltip">{m.label}</span>
-        </button>
+        <ToolTooltip key={m.mode} name={m.label} position="left">
+          <button
+            className={`db-btn ${editor.renderMode2D === m.mode ? 'mode-active' : ''}`}
+            onClick={() => dispatch(setRenderMode2D(m.mode))}
+          >
+            {m.icon}
+          </button>
+        </ToolTooltip>
       ))}
     </div>
   );

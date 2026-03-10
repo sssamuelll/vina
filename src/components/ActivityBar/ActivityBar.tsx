@@ -2,6 +2,7 @@ import { FileText, Layers, Play, Plug, Settings, SlidersHorizontal, History, Use
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { toggleCopilot } from '../../store/layoutSlice';
+import ToolTooltip from '../Toolbar3D/ToolTooltip';
 import './ActivityBar.css';
 
 export type SidebarView =
@@ -56,34 +57,35 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
     <div className="activity-bar">
       <div className="activity-bar-top">
         {topItems.map(item => (
-          <button
-            key={item.id}
-            className={`activity-bar-item ${activeView === item.id ? 'active' : ''}`}
-            onClick={() => handleClick(item.id)}
-            title={item.label}
-          >
-            <span className="activity-bar-icon">{item.icon}</span>
-          </button>
+          <ToolTooltip key={item.id} name={item.label} position="right">
+            <button
+              className={`activity-bar-item ${activeView === item.id ? 'active' : ''}`}
+              onClick={() => handleClick(item.id)}
+            >
+              <span className="activity-bar-icon">{item.icon}</span>
+            </button>
+          </ToolTooltip>
         ))}
       </div>
       <div className="activity-bar-bottom">
         {bottomItems.map(item => (
-          <button
-            key={item.id}
-            className={`activity-bar-item ${activeView === item.id ? 'active' : ''}`}
-            onClick={() => handleClick(item.id)}
-            title={item.label}
-          >
-            <span className="activity-bar-icon">{item.icon}</span>
-          </button>
+          <ToolTooltip key={item.id} name={item.label} position="right">
+            <button
+              className={`activity-bar-item ${activeView === item.id ? 'active' : ''}`}
+              onClick={() => handleClick(item.id)}
+            >
+              <span className="activity-bar-icon">{item.icon}</span>
+            </button>
+          </ToolTooltip>
         ))}
-        <button
-          className={`activity-bar-item ${copilotOpen ? 'active' : ''}`}
-          onClick={() => dispatch(toggleCopilot())}
-          title="Copilot"
-        >
-          <span className="activity-bar-icon"><MessageSquare size={20} /></span>
-        </button>
+        <ToolTooltip name="Copilot" position="right">
+          <button
+            className={`activity-bar-item ${copilotOpen ? 'active' : ''}`}
+            onClick={() => dispatch(toggleCopilot())}
+          >
+            <span className="activity-bar-icon"><MessageSquare size={20} /></span>
+          </button>
+        </ToolTooltip>
       </div>
     </div>
   );
