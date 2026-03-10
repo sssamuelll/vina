@@ -253,21 +253,28 @@ export class GpuSolverClient {
   private loop = (): void => {
     if (!this.running) return;
 
+    if (this.readbackPending) {
+      // Previous readback still in flight — don't submit more GPU work.
+      // Submitting step() while mapAsync is pending causes queue saturation:
+      // each step adds ~900 compute passes, and mapAsync can't resolve
+      // until ALL queued work drains, creating an ever-growing backlog.
+      this.animFrameId = requestAnimationFrame(this.loop);
+      return;
+    }
+
     this.solver.step();
 
     if (this.zeroCopy) {
-      // Zero-copy: no readback. Signal frame for timing only.
       this.onFrame?.(new Float32Array(0));
-    } else if (!this.readbackPending) {
-      // CPU readback: copy positions from GPU to CPU each frame.
-      // Guard prevents concurrent mapAsync calls which throw.
+    } else {
       this.readbackPending = true;
       this.solver.readPositions().then(positions => {
         this.readbackPending = false;
         if (positions && this.onFrame) {
           this.onFrame(positions);
         }
-      }).catch(() => {
+      }).catch((e) => {
+        console.warn('[GpuSolverClient] Readback failed:', e);
         this.readbackPending = false;
       });
     }
