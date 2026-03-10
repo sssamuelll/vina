@@ -8,6 +8,7 @@ import { setActiveTool } from '../../store/editorSlice';
 import { setActiveTool2D } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
 import type { ToolDefinition } from '../../tools';
+import ToolTooltip from '../Toolbar3D/ToolTooltip';
 import './Toolbar2D.css';
 
 /**
@@ -161,19 +162,26 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
 
   return (
     <div className="tool-group-wrapper">
-      <button
-        ref={btnRef}
-        className={`tool-btn ${isGroupActive ? 'active' : ''}`}
-        onPointerDown={handlePointerDown}
-        onPointerUp={handlePointerUp}
-        onPointerLeave={handlePointerLeave}
-        title={`${visibleTool.name}${visibleTool.shortcut ? ` (${visibleTool.shortcut.toUpperCase()})` : ''}`}
+      <ToolTooltip
+        name={visibleTool.name}
+        shortcut={visibleTool.shortcut}
+        description={visibleTool.description}
+        hasSubTools={hasSubs}
+        position="right"
       >
-        <span className="tool-icon">
-          <IconComponent size={18} />
-        </span>
-        {hasSubs && <span className="tool-sub-triangle" />}
-      </button>
+        <button
+          ref={btnRef}
+          className={`tool-btn ${isGroupActive ? 'active' : ''}`}
+          onPointerDown={handlePointerDown}
+          onPointerUp={handlePointerUp}
+          onPointerLeave={handlePointerLeave}
+        >
+          <span className="tool-icon">
+            <IconComponent size={18} />
+          </span>
+          {hasSubs && <span className="tool-sub-triangle" />}
+        </button>
+      </ToolTooltip>
       {stripEl}
     </div>
   );
@@ -220,15 +228,16 @@ export default function Toolbar2D({ propertiesPanelOpen, onTogglePropertiesPanel
       ))}
 
       <div className="toolbar2d-spacer" />
-      <button
-        className={`tool-btn tool-btn-toggle ${propertiesPanelOpen ? 'active' : ''}`}
-        onClick={onTogglePropertiesPanel}
-        title="Piece Properties"
-      >
-        <span className="tool-icon">
-          <PanelRight size={18} />
-        </span>
-      </button>
+      <ToolTooltip name="Piece Properties" position="right">
+        <button
+          className={`tool-btn tool-btn-toggle ${propertiesPanelOpen ? 'active' : ''}`}
+          onClick={onTogglePropertiesPanel}
+        >
+          <span className="tool-icon">
+            <PanelRight size={18} />
+          </span>
+        </button>
+      </ToolTooltip>
     </div>
   );
 }

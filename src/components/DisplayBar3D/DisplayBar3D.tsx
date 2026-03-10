@@ -11,6 +11,7 @@ import {
 } from '../../store/simulationSlice';
 import type { SurfaceMode3D } from '../../store/simulationSlice';
 import type { FitMapMode } from '../../utils/cloth/fitMaps';
+import ToolTooltip from '../Toolbar3D/ToolTooltip';
 import './DisplayBar3D.css';
 
 interface ToggleItem {
@@ -59,40 +60,40 @@ export default function DisplayBar3D() {
   return (
     <div className="display-bar-3d">
       {toggles.map(t => (
-        <button
-          key={t.label}
-          className={`db-btn ${t.active ? 'active' : ''}`}
-          onClick={t.onClick}
-        >
-          {t.icon}
-          <span className="db-tooltip">{t.label}</span>
-        </button>
+        <ToolTooltip key={t.label} name={t.label} position="right">
+          <button
+            className={`db-btn ${t.active ? 'active' : ''}`}
+            onClick={t.onClick}
+          >
+            {t.icon}
+          </button>
+        </ToolTooltip>
       ))}
 
       <div className="db-separator" />
 
       {surfaceModes.map(m => (
-        <button
-          key={m.mode}
-          className={`db-btn ${sim.surfaceMode3D === m.mode ? 'mode-active' : ''}`}
-          onClick={() => dispatch(setSurfaceMode3D(m.mode))}
-        >
-          {m.icon}
-          <span className="db-tooltip">{m.label}</span>
-        </button>
+        <ToolTooltip key={m.mode} name={m.label} position="right">
+          <button
+            className={`db-btn ${sim.surfaceMode3D === m.mode ? 'mode-active' : ''}`}
+            onClick={() => dispatch(setSurfaceMode3D(m.mode))}
+          >
+            {m.icon}
+          </button>
+        </ToolTooltip>
       ))}
 
       <div className="db-separator" />
 
       {fitModes.map(f => (
-        <button
-          key={f.mode}
-          className={`db-btn ${sim.fitMapMode === f.mode ? 'mode-active' : ''}`}
-          onClick={() => dispatch(setFitMapMode(sim.fitMapMode === f.mode ? 'none' : f.mode))}
-        >
-          {f.icon}
-          <span className="db-tooltip">{f.label}</span>
-        </button>
+        <ToolTooltip key={f.mode} name={f.label} position="right">
+          <button
+            className={`db-btn ${sim.fitMapMode === f.mode ? 'mode-active' : ''}`}
+            onClick={() => dispatch(setFitMapMode(sim.fitMapMode === f.mode ? 'none' : f.mode))}
+          >
+            {f.icon}
+          </button>
+        </ToolTooltip>
       ))}
     </div>
   );

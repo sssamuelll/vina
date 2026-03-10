@@ -52,30 +52,6 @@
   color: var(--accent);
 }
 
-/* Tooltip to the right */
-.display-bar-3d .db-btn .db-tooltip {
-  position: absolute;
-  left: calc(100% + 8px);
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(20, 20, 20, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 11px;
-  font-family: 'Inter', sans-serif;
-  color: rgba(255, 255, 255, 0.85);
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 1200;
-}
-
-.display-bar-3d .db-btn:hover .db-tooltip {
-  opacity: 1;
-}
-
 /* Radio mode: highlight active surface mode */
 .display-bar-3d .db-btn.mode-active {
   background: rgba(74, 158, 255, 0.15);
