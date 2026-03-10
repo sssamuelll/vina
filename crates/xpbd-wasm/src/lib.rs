@@ -64,6 +64,9 @@ pub struct XpbdSolver {
 
     // Internal damping
     internal_damping: f32,
+
+    // Wind
+    wind: [f32; 3],
 }
 
 #[wasm_bindgen]
@@ -114,6 +117,7 @@ impl XpbdSolver {
             bend_compliance_weft: 1.0,
             bend_compliances: Vec::new(),
             internal_damping: 0.3,
+            wind: [0.0, 0.0, 0.0],
         }
     }
 
@@ -245,6 +249,11 @@ impl XpbdSolver {
         self.internal_damping = internal_damping;
     }
 
+    /// Set wind direction and strength (world-space force vector).
+    pub fn set_wind(&mut self, wx: f32, wy: f32, wz: f32) {
+        self.wind = [wx, wy, wz];
+    }
+
     /// Step the simulation forward one frame.
     pub fn step(&mut self, dt: f32) {
         let sdt = dt / self.substeps as f32;
@@ -343,6 +352,9 @@ impl XpbdSolver {
 
         // Apply air drag after gravity integration
         self.apply_air_drag(sdt);
+
+        // Apply wind force
+        self.apply_wind_force(sdt);
     }
 
     fn solve_stretch(&mut self, sdt: f32) {
@@ -578,6 +590,76 @@ impl XpbdSolver {
                 self.velocities[vi] += drag_force[0] * scale;
                 self.velocities[vi + 1] += drag_force[1] * scale;
                 self.velocities[vi + 2] += drag_force[2] * scale;
+            }
+        }
+    }
+
+    /// Apply wind force per triangle based on facing area.
+    fn apply_wind_force(&mut self, sdt: f32) {
+        let wind = self.wind;
+        if wind[0] == 0.0 && wind[1] == 0.0 && wind[2] == 0.0 {
+            return;
+        }
+        if self.tri_ids.is_empty() {
+            return;
+        }
+
+        let num_tris = self.tri_ids.len() / 3;
+
+        for t in 0..num_tris {
+            let i0 = self.tri_ids[t * 3] as usize;
+            let i1 = self.tri_ids[t * 3 + 1] as usize;
+            let i2 = self.tri_ids[t * 3 + 2] as usize;
+
+            // Skip if all pinned
+            if self.inv_mass[i0] == 0.0 && self.inv_mass[i1] == 0.0 && self.inv_mass[i2] == 0.0 {
+                continue;
+            }
+
+            let (p0, p1, p2) = (i0 * 3, i1 * 3, i2 * 3);
+
+            // Edge vectors
+            let e0 = [
+                self.positions[p1] - self.positions[p0],
+                self.positions[p1 + 1] - self.positions[p0 + 1],
+                self.positions[p1 + 2] - self.positions[p0 + 2],
+            ];
+            let e1 = [
+                self.positions[p2] - self.positions[p0],
+                self.positions[p2 + 1] - self.positions[p0 + 1],
+                self.positions[p2 + 2] - self.positions[p0 + 2],
+            ];
+
+            // Normal = cross(e0, e1)
+            let normal = [
+                e0[1] * e1[2] - e0[2] * e1[1],
+                e0[2] * e1[0] - e0[0] * e1[2],
+                e0[0] * e1[1] - e0[1] * e1[0],
+            ];
+
+            let normal_len = (normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]).sqrt();
+            if normal_len < 1e-8 {
+                continue;
+            }
+
+            let area = normal_len * 0.5;
+            let inv_len = 1.0 / normal_len;
+            let normal_normalized = [normal[0] * inv_len, normal[1] * inv_len, normal[2] * inv_len];
+
+            // Wind force projected onto triangle normal
+            let dot = wind[0] * normal_normalized[0] + wind[1] * normal_normalized[1] + wind[2] * normal_normalized[2];
+            let force_per_vertex = dot * area * self.drag_coefficient / 3.0;
+
+            // Distribute to vertices along the normal direction
+            for &idx in &[i0, i1, i2] {
+                if self.inv_mass[idx] == 0.0 {
+                    continue;
+                }
+                let vi = idx * 3;
+                let scale = force_per_vertex * self.inv_mass[idx] * sdt;
+                self.velocities[vi] += normal_normalized[0] * scale;
+                self.velocities[vi + 1] += normal_normalized[1] * scale;
+                self.velocities[vi + 2] += normal_normalized[2] * scale;
             }
         }
     }
