@@ -11,6 +11,8 @@
 
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
 import { extractStretchConstraints, extractBendConstraints, type SeamConstraintData } from './gpuBuffers';
+import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
+import type { StorageBufferAttribute } from 'three/webgpu';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,6 +37,13 @@ export class GpuSolverClient {
 
   /** Called each frame with updated positions */
   onFrame: ((positions: Float32Array) => void) | null = null;
+
+  /** Whether to skip CPU readback (zero-copy mode). Default true. */
+  private zeroCopy: boolean = true;
+
+  /** Cached StorageBufferAttributes for rendering. */
+  private positionAttr: StorageBufferAttribute | null = null;
+  private normalAttr: StorageBufferAttribute | null = null;
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.solver = new GpuClothSolver(device, config);
@@ -149,10 +158,56 @@ export class GpuSolverClient {
   }
 
   /**
+   * Enable or disable zero-copy mode.
+   * When enabled, the loop skips CPU readback and the renderer
+   * should consume StorageBufferAttributes directly.
+   */
+  setZeroCopy(enabled: boolean): void {
+    this.zeroCopy = enabled;
+  }
+
+  /**
+   * Get a StorageBufferAttribute wrapping the solver's GPU position buffer.
+   * Lazily created and cached.
+   */
+  getPositionStorageAttribute(): StorageBufferAttribute | null {
+    if (!this.positionAttr) {
+      this.positionAttr = createPositionStorageAttribute(
+        this.solver.getPositionBuffer(),
+        this.solver.numParticles,
+      );
+    }
+    return this.positionAttr;
+  }
+
+  /**
+   * Get a StorageBufferAttribute wrapping the solver's GPU normal buffer.
+   * Lazily created and cached.
+   */
+  getNormalStorageAttribute(): StorageBufferAttribute | null {
+    if (!this.normalAttr) {
+      this.normalAttr = createNormalStorageAttribute(
+        this.solver.getNormalBuffer(),
+        this.solver.numParticles,
+      );
+    }
+    return this.normalAttr;
+  }
+
+  /**
+   * Explicit CPU readback for export/fit-maps (bypasses zero-copy mode).
+   */
+  async readPositionsToCPU(): Promise<Float32Array | null> {
+    return this.solver.readPositions();
+  }
+
+  /**
    * Clean up all resources.
    */
   dispose(): void {
     this.stop();
+    this.positionAttr = null;
+    this.normalAttr = null;
     this.solver.destroy();
   }
 
@@ -175,16 +230,18 @@ export class GpuSolverClient {
   private loop = (): void => {
     if (!this.running) return;
 
-    // Step simulation
     this.solver.step();
 
-    // Readback positions for R3F rendering
-    // TODO: When migrating to WebGPURenderer, use getPositionBuffer() directly
-    this.solver.readPositions().then(positions => {
-      if (positions && this.onFrame) {
-        this.onFrame(positions);
-      }
-    });
+    if (this.zeroCopy) {
+      // Zero-copy: no readback. Signal frame for timing only.
+      this.onFrame?.(new Float32Array(0));
+    } else {
+      this.solver.readPositions().then(positions => {
+        if (positions && this.onFrame) {
+          this.onFrame(positions);
+        }
+      });
+    }
 
     this.animFrameId = requestAnimationFrame(this.loop);
   };
