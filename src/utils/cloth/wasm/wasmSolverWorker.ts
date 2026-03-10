@@ -34,6 +34,7 @@ interface WasmXpbdSolver {
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
   set_pins(indices: Uint32Array, positions: Float32Array): void;
   clear_pins(): void;
+  set_wind(x: number, y: number, z: number): void;
   configure(substeps: number, damping: number, gravityY: number,
             stretchCompliance: number, bendCompliance: number,
             selfCollision: boolean, thickness: number, collisionMargin: number,
@@ -432,6 +433,13 @@ self.onmessage = async (event: MessageEvent) => {
           solver.clear_pins();
         }
         break;
+
+      case 'setWind': {
+        if (solver) {
+          solver.set_wind(msg.wind[0], msg.wind[1], msg.wind[2]);
+        }
+        break;
+      }
 
       case 'saveSnapshot': {
         const positions = readPositions();

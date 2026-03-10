@@ -186,6 +186,14 @@ export class WasmSolverClient {
   }
 
   /**
+   * Set wind force vector applied to cloth triangles.
+   * @param force Wind force as [x, y, z] in world space (N/m^2)
+   */
+  setWind(force: [number, number, number]): void {
+    this.worker?.postMessage({ type: 'setWind', wind: force });
+  }
+
+  /**
    * Save current particle positions as a named snapshot in the worker.
    */
   saveSnapshot(id: string): void {
