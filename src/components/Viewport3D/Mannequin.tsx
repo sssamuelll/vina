@@ -108,7 +108,7 @@ export default function Mannequin() {
   }, []);
 
   return (
-    <group>
+    <group userData={{ opencloRole: 'avatar' }}>
       {/* Body */}
       <mesh geometry={bodyGeometry}>
         <meshStandardMaterial

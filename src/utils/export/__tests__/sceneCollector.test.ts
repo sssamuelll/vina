@@ -104,4 +104,34 @@ describe('collectExportScene', () => {
     group.traverse((obj: THREE.Object3D) => { if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true; });
     expect(hasSkinnedMesh).toBe(true);
   });
+
+  it('includes mannequin (plain mesh) with userData.opencloRole marker', () => {
+    const scene = new THREE.Scene();
+    const mannequinGroup = new THREE.Group();
+    mannequinGroup.userData = { opencloRole: 'avatar' };
+    const bodyMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2),
+      new THREE.MeshStandardMaterial(),
+    );
+    mannequinGroup.add(bodyMesh);
+    scene.add(mannequinGroup);
+
+    const group = collectExportScene(scene, { garmentMesh: null, includeAvatar: true });
+    let meshCount = 0;
+    group.traverse((obj: THREE.Object3D) => { if ((obj as THREE.Mesh).isMesh) meshCount++; });
+    expect(meshCount).toBe(1);
+  });
+
+  it('excludes mannequin when includeAvatar is false', () => {
+    const scene = new THREE.Scene();
+    const mannequinGroup = new THREE.Group();
+    mannequinGroup.userData = { opencloRole: 'avatar' };
+    mannequinGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshStandardMaterial()));
+    scene.add(mannequinGroup);
+
+    const group = collectExportScene(scene, { garmentMesh: null, includeAvatar: false });
+    let meshCount = 0;
+    group.traverse((obj: THREE.Object3D) => { if ((obj as THREE.Mesh).isMesh) meshCount++; });
+    expect(meshCount).toBe(0);
+  });
 });

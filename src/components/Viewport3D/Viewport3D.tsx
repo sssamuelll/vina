@@ -275,9 +275,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const sc = refs.__scene as THREE.Scene | undefined;
     if (!sc) return;
 
-    // Get garment mesh from window global (set by GarmentSimulation)
+    // Get garment mesh from window global (set by GarmentSimulation when simulation is active)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const garmentMesh = (window as any).__OPENCLO_CLOTH_MESH__ as THREE.Mesh | undefined;
+
+    if (!garmentMesh && !includeAvatar) {
+      console.warn('[3D Export] Nothing to export: simulation is not running and avatar is excluded.');
+      return;
+    }
+    if (!garmentMesh) {
+      console.warn('[3D Export] Garment mesh not available (simulation may not be running). Exporting avatar only.');
+    }
 
     const group = collectExportScene(sc, {
       garmentMesh: garmentMesh || null,
