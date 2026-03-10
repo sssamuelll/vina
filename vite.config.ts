@@ -17,6 +17,7 @@ export default defineConfig({
   ],
   define: {
     global: 'globalThis',
+    __BUILD_TIMESTAMP__: JSON.stringify(Date.now().toString(36)),
   },
   worker: {
     format: 'es',

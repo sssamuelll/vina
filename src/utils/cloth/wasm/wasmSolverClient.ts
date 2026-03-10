@@ -85,6 +85,8 @@ export class WasmSolverClient {
     });
 
     const baseUrl = import.meta.env.BASE_URL ?? '/';
+    // Cache-bust WASM files: use build timestamp so new deploys load fresh binaries
+    const wasmVersion = import.meta.env.VITE_WASM_VERSION ?? __BUILD_TIMESTAMP__;
 
     return new Promise<void>((resolve, reject) => {
       this.readyResolve = resolve;
@@ -92,6 +94,7 @@ export class WasmSolverClient {
       this.worker!.postMessage({
         type: 'init',
         baseUrl,
+        wasmVersion,
         pieces,
         seams,
         config,
@@ -295,7 +298,9 @@ export class WasmSolverClient {
 export async function isWasmSolverAvailable(): Promise<boolean> {
   try {
     const baseUrl = import.meta.env.BASE_URL ?? '/';
-    const resp = await fetch(`${baseUrl}wasm/xpbd_wasm_bg.wasm`, { method: 'HEAD' });
+    const v = import.meta.env.VITE_WASM_VERSION ?? __BUILD_TIMESTAMP__;
+    const qs = v ? `?v=${v}` : '';
+    const resp = await fetch(`${baseUrl}wasm/xpbd_wasm_bg.wasm${qs}`, { method: 'HEAD' });
     return resp.ok;
   } catch {
     return false;

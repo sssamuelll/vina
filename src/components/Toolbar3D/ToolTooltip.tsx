@@ -1,9 +1,11 @@
 /**
  * ToolTooltip — rich tooltip for toolbar buttons.
  * Shows tool name + shortcut badge + description.
- * 500ms hover delay, positioned right of toolbar.
+ * 500ms hover delay, positioned left of the button.
+ * Uses portal to escape overflow:hidden ancestors.
  */
-import { useState, useRef, useCallback, type ReactNode } from 'react';
+import { useState, useRef, useCallback, useLayoutEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import './ToolTooltip.css';
 
 interface ToolTooltipProps {
@@ -18,6 +20,7 @@ export default function ToolTooltip({ name, shortcut, description, hasSubTools, 
   const [visible, setVisible] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   const show = useCallback(() => {
     timerRef.current = setTimeout(() => setVisible(true), 500);
@@ -29,6 +32,15 @@ export default function ToolTooltip({ name, shortcut, description, hasSubTools, 
     setVisible(false);
   }, []);
 
+  useLayoutEffect(() => {
+    if (!visible || !wrapperRef.current) { setPos(null); return; }
+    const rect = wrapperRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.top + rect.height / 2,
+      left: rect.left - 12,
+    });
+  }, [visible]);
+
   return (
     <div
       ref={wrapperRef}
@@ -38,8 +50,12 @@ export default function ToolTooltip({ name, shortcut, description, hasSubTools, 
       onMouseDown={hide}
     >
       {children}
-      {visible && (
-        <div className="tool-tooltip" role="tooltip">
+      {visible && pos && createPortal(
+        <div
+          className="tool-tooltip"
+          role="tooltip"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <div className="tool-tooltip-header">
             <span className="tool-tooltip-name">{name}</span>
             {shortcut && (
@@ -52,7 +68,8 @@ export default function ToolTooltip({ name, shortcut, description, hasSubTools, 
           {hasSubTools && (
             <div className="tool-tooltip-hint">Hold to see variants</div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
