@@ -4,12 +4,17 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { RootState } from '../store';
+import type { AnimationTrack } from '../utils/animation/types';
 import { setCurrentFrame, setPlaybackState } from '../store/animationSlice';
 import { interpolate } from '../utils/animation/interpolation';
 
 /**
  * Drives animation playback: advances the timeline frame counter
  * and applies interpolated keyframe values to scene objects.
+ *
+ * All Redux state consumed inside the R3F useFrame callback is kept in refs
+ * so the callback always sees the latest values (Immer proxies from selectors
+ * can be revoked between renders, causing "not iterable" errors).
  */
 export function useAnimationPlayback() {
   const dispatch = useDispatch();
@@ -17,7 +22,14 @@ export function useAnimationPlayback() {
   const { playbackState, currentFrame, fps, duration, loop, tracks } = useSelector(
     (s: RootState) => s.animation,
   );
-  const totalFrames = Math.floor(duration * fps);
+
+  // Keep refs up-to-date so useFrame callback is never stale
+  const stateRef = useRef({ playbackState, currentFrame, fps, duration, loop });
+  stateRef.current = { playbackState, currentFrame, fps, duration, loop };
+
+  const frameRef = useRef(currentFrame);
+  frameRef.current = currentFrame;
+
   const accumulatorRef = useRef(0);
 
   // Snapshot of original camera state for restoration
@@ -26,8 +38,15 @@ export function useAnimationPlayback() {
     cameraFov: number;
   } | null>(null);
 
+  // Deep-copy tracks for safe iteration inside useFrame (avoids Immer proxy issues)
+  const tracksRef = useRef<AnimationTrack[]>([]);
+  tracksRef.current = JSON.parse(JSON.stringify(tracks));
+
   useFrame((_, delta) => {
-    if (playbackState !== 'playing') return;
+    const { playbackState: ps, fps: f, duration: d, loop: lp } = stateRef.current;
+    if (ps !== 'playing') return;
+
+    const totalFrames = Math.floor(d * f);
 
     // Take snapshot on first playing frame
     if (!snapshotRef.current) {
@@ -40,18 +59,17 @@ export function useAnimationPlayback() {
 
     // Advance frame based on delta time
     accumulatorRef.current += delta;
-    const frameDuration = 1 / fps;
+    const frameDuration = 1 / f;
     if (accumulatorRef.current >= frameDuration) {
       const framesToAdvance = Math.floor(accumulatorRef.current / frameDuration);
       accumulatorRef.current -= framesToAdvance * frameDuration;
-      let nextFrame = currentFrame + framesToAdvance;
+      let nextFrame = frameRef.current + framesToAdvance;
 
       if (nextFrame >= totalFrames) {
-        if (loop) {
+        if (lp) {
           nextFrame = nextFrame % totalFrames;
         } else {
           dispatch(setPlaybackState('stopped'));
-          // Restore camera
           if (snapshotRef.current) {
             const cam = camera as THREE.PerspectiveCamera;
             cam.position.set(...snapshotRef.current.cameraPos);
@@ -64,14 +82,16 @@ export function useAnimationPlayback() {
         }
       }
 
+      frameRef.current = nextFrame;
       dispatch(setCurrentFrame(nextFrame));
     }
 
-    // Apply interpolated values from tracks
-    for (const track of tracks) {
+    // Apply interpolated values from tracks (use plain-object copy)
+    for (const track of tracksRef.current) {
+      if (!track.properties) continue;
       for (const prop of track.properties) {
-        if (prop.keyframes.length === 0) continue;
-        const val = interpolate(prop.keyframes, currentFrame);
+        if (!prop.keyframes || prop.keyframes.length === 0) continue;
+        const val = interpolate(prop.keyframes, frameRef.current);
         if (val === undefined) continue;
 
         applyAnimatedValue(track.objectType, prop.path, val, camera);
@@ -99,6 +119,4 @@ function applyAnimatedValue(
         break;
     }
   }
-  // Avatar joints and wind are applied via Redux dispatches
-  // in the GarmentSimulation integration (Task 12)
 }
