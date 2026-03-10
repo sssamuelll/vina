@@ -149,6 +149,8 @@ export interface ClothSimConfig {
   bendComplianceWeft: number;
   /** Internal damping (0.0 = fluid/oscillates, 1.0 = heavy/settles quickly). Default: 0.3 */
   internalDamping: number;
+  /** Directional wind force [x, y, z] in N/m² (default [0,0,0] = no wind) */
+  windForce: [number, number, number];
 }
 
 /**
@@ -370,6 +372,7 @@ export class XPBDClothSolver {
       bendComplianceWarp: 1.0,
       bendComplianceWeft: 1.0,
       internalDamping: 0.3,
+      windForce: [0, 0, 0],
       ...config,
     };
 
@@ -653,6 +656,15 @@ export class XPBDClothSolver {
   }
 
   /**
+   * Set directional wind force.
+   *
+   * @param force - Wind force vector [x, y, z] in N/m²
+   */
+  setWind(force: [number, number, number]): void {
+    this.config.windForce = force;
+  }
+
+  /**
    * Pre-solve: integrate gravity, apply air drag, save previous positions, enforce ground plane.
    */
   private preSolve(sdt: number): void {
@@ -674,6 +686,9 @@ export class XPBDClothSolver {
 
     // Apply air drag after gravity integration but before position update
     this.applyAirDrag(sdt);
+
+    // Apply directional wind force
+    this.applyWindForce(sdt);
 
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
@@ -774,6 +789,72 @@ export class XPBDClothSolver {
         this.vel[vi] += dragForce[0] * scale;
         this.vel[vi + 1] += dragForce[1] * scale;
         this.vel[vi + 2] += dragForce[2] * scale;
+      }
+    }
+  }
+
+  /**
+   * Apply directional wind force per triangle.
+   *
+   * Projects the wind vector onto each triangle's face normal so that
+   * faces perpendicular to the wind receive maximum force while faces
+   * parallel to the wind receive none. Uses the drag coefficient as
+   * a scaling factor.
+   *
+   * @param sdt - Substep delta time
+   */
+  private applyWindForce(sdt: number): void {
+    const wind = this.config.windForce;
+    if (wind[0] === 0 && wind[1] === 0 && wind[2] === 0) return;
+
+    const numTris = this.triIds.length / 3;
+
+    for (let t = 0; t < numTris; t++) {
+      const i0 = this.triIds[t * 3];
+      const i1 = this.triIds[t * 3 + 1];
+      const i2 = this.triIds[t * 3 + 2];
+
+      // Skip if all pinned
+      if (this.invMass[i0] === 0 && this.invMass[i1] === 0 && this.invMass[i2] === 0) continue;
+
+      // Compute triangle edges
+      const p0 = i0 * 3, p1 = i1 * 3, p2 = i2 * 3;
+
+      const ax = this.pos[p1] - this.pos[p0];
+      const ay = this.pos[p1 + 1] - this.pos[p0 + 1];
+      const az = this.pos[p1 + 2] - this.pos[p0 + 2];
+
+      const bx = this.pos[p2] - this.pos[p0];
+      const by = this.pos[p2 + 1] - this.pos[p0 + 1];
+      const bz = this.pos[p2 + 2] - this.pos[p0 + 2];
+
+      // Cross product = normal (un-normalized, magnitude = 2 * area)
+      const nx = ay * bz - az * by;
+      const ny = az * bx - ax * bz;
+      const nz = ax * by - ay * bx;
+
+      const normalLen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (normalLen < 1e-8) continue;
+
+      const area = normalLen * 0.5;
+
+      // Normalize
+      const invLen = 1.0 / normalLen;
+      const nnx = nx * invLen;
+      const nny = ny * invLen;
+      const nnz = nz * invLen;
+
+      // Wind force projected onto face normal
+      const dot = wind[0] * nnx + wind[1] * nny + wind[2] * nnz;
+      const forcePerVertex = dot * area * this.config.dragCoefficient / 3;
+
+      for (const idx of [i0, i1, i2]) {
+        if (this.invMass[idx] === 0) continue;
+        const vi = idx * 3;
+        const scale = this.invMass[idx] * sdt;
+        this.vel[vi] += nnx * forcePerVertex * scale;
+        this.vel[vi + 1] += nny * forcePerVertex * scale;
+        this.vel[vi + 2] += nnz * forcePerVertex * scale;
       }
     }
   }
