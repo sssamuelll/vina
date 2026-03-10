@@ -48,10 +48,19 @@ fn preSolve(@builtin(global_invocation_id) gid: vec3u) {
   prevPos[idx + 1] = pos[idx + 1];
   prevPos[idx + 2] = pos[idx + 2];
 
-  // Apply gravity + damping
-  vel[idx]     = vel[idx]     * params.damping + params.gravityX * params.sdt;
-  vel[idx + 1] = vel[idx + 1] * params.damping + params.gravityY * params.sdt;
-  vel[idx + 2] = vel[idx + 2] * params.damping + params.gravityZ * params.sdt;
+  // Apply gravity first, then damp (matches WASM solver order)
+  vel[idx]     += params.gravityX * params.sdt;
+  vel[idx + 1] += params.gravityY * params.sdt;
+  vel[idx + 2] += params.gravityZ * params.sdt;
+
+  vel[idx]     *= params.damping;
+  vel[idx + 1] *= params.damping;
+  vel[idx + 2] *= params.damping;
+
+  // NaN guard — if velocity is NaN (from previous frame), zero it
+  if (vel[idx] != vel[idx]) { vel[idx] = 0.0; }
+  if (vel[idx + 1] != vel[idx + 1]) { vel[idx + 1] = 0.0; }
+  if (vel[idx + 2] != vel[idx + 2]) { vel[idx + 2] = 0.0; }
 
   // Integrate position
   pos[idx]     = pos[idx]     + vel[idx]     * params.sdt;
@@ -79,7 +88,32 @@ fn postSolve(@builtin(global_invocation_id) gid: vec3u) {
   let idx = i * 3u;
   let invDt = 1.0 / params.sdt;
 
-  vel[idx]     = (pos[idx]     - prevPos[idx])     * invDt;
-  vel[idx + 1] = (pos[idx + 1] - prevPos[idx + 1]) * invDt;
-  vel[idx + 2] = (pos[idx + 2] - prevPos[idx + 2]) * invDt;
+  var vx = (pos[idx]     - prevPos[idx])     * invDt;
+  var vy = (pos[idx + 1] - prevPos[idx + 1]) * invDt;
+  var vz = (pos[idx + 2] - prevPos[idx + 2]) * invDt;
+
+  // NaN guard — if any component is NaN, zero velocity and restore position
+  let speed2 = vx * vx + vy * vy + vz * vz;
+  if (speed2 != speed2) { // NaN check (NaN != NaN)
+    vel[idx]     = 0.0;
+    vel[idx + 1] = 0.0;
+    vel[idx + 2] = 0.0;
+    pos[idx]     = prevPos[idx];
+    pos[idx + 1] = prevPos[idx + 1];
+    pos[idx + 2] = prevPos[idx + 2];
+    return;
+  }
+
+  // Velocity magnitude clamp to prevent numerical explosion
+  let maxSpeed: f32 = 50.0;
+  if (speed2 > maxSpeed * maxSpeed) {
+    let scale = maxSpeed / sqrt(speed2);
+    vx *= scale;
+    vy *= scale;
+    vz *= scale;
+  }
+
+  vel[idx]     = vx;
+  vel[idx + 1] = vy;
+  vel[idx + 2] = vz;
 }

@@ -62,12 +62,61 @@ fn solveStretch(@builtin(global_invocation_id) gid: vec3u) {
   let dy = pos[idx0 + 1] - pos[idx1 + 1];
   let dz = pos[idx0 + 2] - pos[idx1 + 2];
 
-  let len = sqrt(dx * dx + dy * dy + dz * dz);
-  if (len < 1e-10) { return; }
+  let len2 = dx * dx + dy * dy + dz * dz;
+  if (len2 != len2 || len2 < 1e-20) { return; } // NaN or near-zero guard
+  let len = sqrt(len2);
 
   let restLen = stretchRestLen[i];
   let C = len - restLen;
   let alpha = params.stretchCompliance / (params.sdt * params.sdt);
+  let s = -C / (w + alpha);
+
+  let gx = dx / len;
+  let gy = dy / len;
+  let gz = dz / len;
+
+  pos[idx0]     += gx * s * w0;
+  pos[idx0 + 1] += gy * s * w0;
+  pos[idx0 + 2] += gz * s * w0;
+
+  pos[idx1]     -= gx * s * w1;
+  pos[idx1 + 1] -= gy * s * w1;
+  pos[idx1 + 2] -= gz * s * w1;
+}
+
+// ─── Bend (Distance) Constraints ────────────────────────────────────────────
+// Reuses group(1) bindings but interprets IDs as quads [a, b, c, d].
+// Applies distance constraint between opposite vertices c (index 2) and d (index 3).
+// Uses bendCompliance from SimParams for softer bending resistance.
+
+@compute @workgroup_size(256)
+fn solveBend(@builtin(global_invocation_id) gid: vec3u) {
+  let i = gid.x;
+  if (i >= dispatchParams.count) { return; }
+
+  // Quad layout: [a, b, c, d] — use c and d (opposite vertices)
+  let id0 = stretchIds[i * 4u + 2u];
+  let id1 = stretchIds[i * 4u + 3u];
+
+  let w0 = invMass[id0];
+  let w1 = invMass[id1];
+  let w = w0 + w1;
+  if (w == 0.0) { return; }
+
+  let idx0 = id0 * 3u;
+  let idx1 = id1 * 3u;
+
+  let dx = pos[idx0]     - pos[idx1];
+  let dy = pos[idx0 + 1] - pos[idx1 + 1];
+  let dz = pos[idx0 + 2] - pos[idx1 + 2];
+
+  let len2 = dx * dx + dy * dy + dz * dz;
+  if (len2 != len2 || len2 < 1e-20) { return; }
+  let len = sqrt(len2);
+
+  let restLen = stretchRestLen[i];
+  let C = len - restLen;
+  let alpha = params.bendCompliance / (params.sdt * params.sdt);
   let s = -C / (w + alpha);
 
   let gx = dx / len;
@@ -109,8 +158,9 @@ fn solveSeams(@builtin(global_invocation_id) gid: vec3u) {
   let dy = pos[idx0 + 1] - pos[idx1 + 1];
   let dz = pos[idx0 + 2] - pos[idx1 + 2];
 
-  let len = sqrt(dx * dx + dy * dy + dz * dz);
-  if (len < 1e-10) { return; }
+  let len2s = dx * dx + dy * dy + dz * dz;
+  if (len2s != len2s || len2s < 1e-20) { return; } // NaN or near-zero guard
+  let len = sqrt(len2s);
 
   let tgt = seamTargetDist[i];
   let C = len - tgt;

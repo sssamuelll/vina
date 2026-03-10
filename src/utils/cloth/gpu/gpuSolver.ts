@@ -5,8 +5,9 @@
  * Positions never leave the GPU during simulation — zero CPU↔GPU transfer.
  *
  * Key design decisions:
- * - Stretch constraints are graph-colored so each color group can dispatch
- *   in its own compute pass without race conditions on shared vertices.
+ * - Stretch constraints are graph-colored (capped at 16 colors) so each
+ *   color group dispatches in its own compute pass without race conditions.
+ * - Bend constraints use single Jacobi dispatch (soft constraints tolerate races).
  * - Body collision uses a brute-force point-vs-triangle shader dispatched
  *   per substep after constraint projection.
  * - SimParams uniform buffer uses DataView for correct u32/f32 bit packing.
@@ -14,8 +15,8 @@
  * @module gpuSolver
  */
 
-import type { GpuClothBuffers, SimParams, ClothMeshData, StretchConstraints, BendConstraints, SeamConstraintData } from './gpuBuffers';
-import { createClothBuffers, destroyClothBuffers, updateSimParams, readbackPositions, colorConstraints, type ColoredConstraints } from './gpuBuffers';
+import type { GpuClothBuffers, SimParams, ClothMeshData, StretchConstraints, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
+import { createClothBuffers, destroyClothBuffers, updateSimParams, readbackPositions, colorConstraints } from './gpuBuffers';
 
 // Import WGSL shaders as strings (Vite handles ?raw)
 import clothShaderSrc from './shaders/cloth.wgsl?raw';
@@ -43,9 +44,16 @@ export interface GpuSolverConfig {
 const DEFAULT_CONFIG: GpuSolverConfig = {
   substeps: 15,
   gravity: [0, -9.81, 0],
-  damping: 0.99,
-  stretchCompliance: 0.0,
-  bendCompliance: 0.01,
+  // Effective damping matching WASM: damping * (1 - internalDamping * 0.1)
+  // = 0.99 * (1 - 0.3 * 0.1) = 0.9603
+  damping: 0.9603,
+  // Without UVs, all edges are classified as SHEAR.
+  // WASM uses stretchComplianceShear=0.001 for SHEAR edges.
+  // Using 0.0 makes cloth infinitely stiff (rigid plate, bounces/spins off body).
+  stretchCompliance: 0.001,
+  // WASM uses per-constraint bend compliance: warp=1.0, weft=1.0.
+  // All edges without UVs → SHEAR → defaults to weft compliance = 1.0
+  bendCompliance: 1.0,
   seamStiffness: 0.0,
   groundY: 0.0,
   collisionMargin: 0.005,
@@ -108,9 +116,17 @@ export class GpuClothSolver {
   // Core bind group (params, pos, prevPos, vel, invMass)
   private coreBindGroup: GPUBindGroup | null = null;
 
-  // Per-color stretch bind groups (each with ids, restLengths, dispatchParams)
-  private stretchColorBindGroups: Array<{ bindGroup: GPUBindGroup; count: number }> = [];
+  // Per-color stretch groups (graph-colored for race-free dispatch)
+  private stretchColorBindGroups: GPUBindGroup[] = [];
+  private stretchColorCounts: number[] = [];
   private stretchColorBuffers: GPUBuffer[] = []; // for cleanup
+
+  // Bend constraints (single Jacobi dispatch — soft constraints tolerate races)
+  private bendPipeline: GPUComputePipeline | null = null;
+  private bendBindGroup: GPUBindGroup | null = null;
+  private bendDispatchBuffer: GPUBuffer | null = null;
+  private numBendConstraints: number = 0;
+  private bendBuffers: GPUBuffer[] = []; // for cleanup
 
   // Seam bind group + dispatch uniform
   private seamBindGroup: GPUBindGroup | null = null;
@@ -199,9 +215,8 @@ export class GpuClothSolver {
     new Uint32Array(this.normalParamsBuffer.getMappedRange()).set(npData);
     this.normalParamsBuffer.unmap();
 
-    // Graph-color stretch constraints for race-free parallel dispatch
     const numStretch = stretch.ids.length / 2;
-    const colored = colorConstraints(stretch.ids, stretch.restLengths, numStretch);
+    const numBend = bend.ids.length / 4;
 
     // Create seam dispatch uniform (needed before bind groups)
     const numSeam = seam ? seam.ids.length / 2 : 0;
@@ -212,8 +227,27 @@ export class GpuClothSolver {
     // Create pipelines (stores layouts for bind group creation)
     await this.createPipelines();
 
-    // Create per-color stretch bind groups
-    this.createColoredStretchGroups(colored);
+    // Graph-color stretch constraints for race-free parallel dispatch
+    this.createColoredStretchGroups(stretch);
+
+    // Create bend constraint bind group (single Jacobi — soft constraints tolerate races)
+    this.numBendConstraints = numBend;
+    if (this.stretchLayout && numBend > 0) {
+      const bendIdsBuffer = makeStorageBuffer(this.device, bend.ids, 'bendIds');
+      const bendRestBuffer = makeStorageBuffer(this.device, bend.restAngles, 'bendRestAngles');
+      this.bendDispatchBuffer = makeDispatchUniform(this.device, numBend, 'bendDispatch');
+      this.bendBuffers = [bendIdsBuffer, bendRestBuffer];
+
+      this.bendBindGroup = this.device.createBindGroup({
+        label: 'bend',
+        layout: this.stretchLayout,
+        entries: [
+          { binding: 0, resource: { buffer: bendIdsBuffer } },
+          { binding: 1, resource: { buffer: bendRestBuffer } },
+          { binding: 2, resource: { buffer: this.bendDispatchBuffer } },
+        ],
+      });
+    }
 
     // Create core, seam, and normal bind groups
     this.createBindGroups();
@@ -226,9 +260,11 @@ export class GpuClothSolver {
     console.log('[GpuSolver] Initialized:', {
       particles: this.buffers.numParticles,
       stretchConstraints: numStretch,
-      stretchColors: colored.colorRanges.length,
+      stretchColors: this.stretchColorBindGroups.length,
+      bendConstraints: numBend,
       seamConstraints: numSeam,
       triangles: this.numTriangles,
+      substeps: this.config.substeps,
       selfCollision: this.config.selfCollision,
     });
   }
@@ -237,7 +273,7 @@ export class GpuClothSolver {
    * Step the simulation forward one frame.
    * Dispatches all compute passes for N substeps.
    *
-   * Per substep: preSolve → stretch (per color) → seam → collision → postSolve
+   * Per substep: preSolve → stretch → seam → collision → postSolve
    */
   step(dt?: number): void {
     if (!this.buffers || !this.preSolvePipeline || !this.coreBindGroup) return;
@@ -258,25 +294,33 @@ export class GpuClothSolver {
       pre.dispatchWorkgroups(particleWG);
       pre.end();
 
-      // ─── Stretch constraints (one pass per color group) ─────────
-      for (const group of this.stretchColorBindGroups) {
-        const pass = encoder.beginComputePass({ label: 'stretch' });
+      // ─── Stretch constraints (per-color Gauss-Seidel dispatches) ───
+      for (let c = 0; c < this.stretchColorBindGroups.length; c++) {
+        const pass = encoder.beginComputePass({ label: `stretch-c${c}` });
         pass.setPipeline(this.stretchPipeline!);
         pass.setBindGroup(0, this.coreBindGroup!);
-        pass.setBindGroup(1, group.bindGroup);
-        pass.dispatchWorkgroups(Math.ceil(group.count / 256));
+        pass.setBindGroup(1, this.stretchColorBindGroups[c]);
+        pass.dispatchWorkgroups(Math.ceil(this.stretchColorCounts[c] / 256));
         pass.end();
       }
 
+      // ─── Bend constraints (single Jacobi — soft constraints tolerate races) ───
+      if (this.bendBindGroup && this.bendPipeline && this.numBendConstraints > 0) {
+        const bend = encoder.beginComputePass({ label: 'bend' });
+        bend.setPipeline(this.bendPipeline);
+        bend.setBindGroup(0, this.coreBindGroup!);
+        bend.setBindGroup(1, this.bendBindGroup);
+        bend.dispatchWorkgroups(Math.ceil(this.numBendConstraints / 256));
+        bend.end();
+      }
+
       // ─── Seam constraints ──────────────────────────────────────
-      if (this.seamBindGroup && this.seamPipeline && this.buffers.numSeamConstraints > 0) {
+      if (this.seamBindGroup && this.seamPipeline && this.buffers.numSeamConstraints > 0 && this.stretchColorBindGroups.length > 0) {
         const sm = encoder.beginComputePass({ label: 'seam' });
         sm.setPipeline(this.seamPipeline);
         sm.setBindGroup(0, this.coreBindGroup!);
         // Pipeline layout requires group(1) even though seam shader doesn't use it
-        if (this.stretchColorBindGroups.length > 0) {
-          sm.setBindGroup(1, this.stretchColorBindGroups[0].bindGroup);
-        }
+        sm.setBindGroup(1, this.stretchColorBindGroups[0]);
         sm.setBindGroup(2, this.seamBindGroup);
         sm.dispatchWorkgroups(Math.ceil(this.buffers.numSeamConstraints / 256));
         sm.end();
@@ -501,12 +545,19 @@ export class GpuClothSolver {
     this.normalsAtomicBuffer = null;
     this.normalParamsBuffer = null;
 
-    // Per-color stretch buffers
-    for (const buf of this.stretchColorBuffers) {
-      buf.destroy();
-    }
+    // Stretch color buffers
+    for (const buf of this.stretchColorBuffers) buf.destroy();
     this.stretchColorBuffers = [];
     this.stretchColorBindGroups = [];
+    this.stretchColorCounts = [];
+
+    // Bend buffers
+    for (const buf of this.bendBuffers) buf.destroy();
+    this.bendBuffers = [];
+    this.bendDispatchBuffer?.destroy();
+    this.bendDispatchBuffer = null;
+    this.bendBindGroup = null;
+    this.numBendConstraints = 0;
 
     // Seam dispatch
     this.seamDispatchBuffer?.destroy();
@@ -524,6 +575,7 @@ export class GpuClothSolver {
     // Pipelines and bind groups
     this.preSolvePipeline = null;
     this.stretchPipeline = null;
+    this.bendPipeline = null;
     this.seamPipeline = null;
     this.postSolvePipeline = null;
     this.normalAccumPipeline = null;
@@ -691,6 +743,12 @@ export class GpuClothSolver {
       compute: { module: constraintsModule, entryPoint: 'solveStretch' },
     });
 
+    this.bendPipeline = this.device.createComputePipeline({
+      label: 'bend',
+      layout: stretchPipelineLayout,
+      compute: { module: constraintsModule, entryPoint: 'solveBend' },
+    });
+
     this.seamPipeline = this.device.createComputePipeline({
       label: 'seam',
       layout: seamPipelineLayout,
@@ -730,48 +788,6 @@ export class GpuClothSolver {
       layout: normalPipelineLayout,
       compute: { module: normalsModule, entryPoint: 'normalizeNormals' },
     });
-  }
-
-  /**
-   * Create per-color stretch bind groups from graph-colored constraint data.
-   * Each color group gets its own ids/restLengths/dispatchParams buffers.
-   */
-  private createColoredStretchGroups(colored: ColoredConstraints): void {
-    if (!this.stretchLayout) return;
-
-    for (let c = 0; c < colored.colorRanges.length; c++) {
-      const range = colored.colorRanges[c];
-
-      // Extract this color's constraints
-      const groupIds = new Uint32Array(
-        colored.ids.buffer,
-        colored.ids.byteOffset + range.offset * 2 * 4,
-        range.count * 2,
-      );
-      const groupRest = new Float32Array(
-        colored.restLengths.buffer,
-        colored.restLengths.byteOffset + range.offset * 4,
-        range.count,
-      );
-
-      const idsBuffer = makeStorageBuffer(this.device, groupIds, `stretchIds-c${c}`);
-      const restBuffer = makeStorageBuffer(this.device, groupRest, `stretchRest-c${c}`);
-      const dispatchBuffer = makeDispatchUniform(this.device, range.count, `stretchDispatch-c${c}`);
-
-      this.stretchColorBuffers.push(idsBuffer, restBuffer, dispatchBuffer);
-
-      const bindGroup = this.device.createBindGroup({
-        label: `stretch-c${c}`,
-        layout: this.stretchLayout,
-        entries: [
-          { binding: 0, resource: { buffer: idsBuffer } },
-          { binding: 1, resource: { buffer: restBuffer } },
-          { binding: 2, resource: { buffer: dispatchBuffer } },
-        ],
-      });
-
-      this.stretchColorBindGroups.push({ bindGroup, count: range.count });
-    }
   }
 
   private createBindGroups(): void {
@@ -819,6 +835,91 @@ export class GpuClothSolver {
         ],
       });
     }
+  }
+
+  /**
+   * Graph-color stretch constraints and create per-color GPU bind groups.
+   * Caps at maxColors to bound dispatch count; excess colors are merged
+   * (introduces minor races but maintains mostly race-free behavior).
+   */
+  private createColoredStretchGroups(stretch: StretchConstraints): void {
+    const numStretch = stretch.ids.length / 2;
+    if (numStretch === 0 || !this.stretchLayout) return;
+
+    const maxColors = 16;
+    let colored = colorConstraints(stretch.ids, stretch.restLengths, numStretch);
+
+    // Cap at maxColors if needed
+    if (colored.colorRanges.length > maxColors) {
+      colored = this.capColorGroups(colored, maxColors);
+    }
+
+    // Create per-color bind groups
+    for (let ci = 0; ci < colored.colorRanges.length; ci++) {
+      const range = colored.colorRanges[ci];
+      const colorIds = colored.ids.slice(range.offset * 2, (range.offset + range.count) * 2);
+      const colorRest = colored.restLengths.slice(range.offset, range.offset + range.count);
+
+      const idsBuffer = makeStorageBuffer(this.device, colorIds, `stretch-ids-c${ci}`);
+      const restBuffer = makeStorageBuffer(this.device, colorRest, `stretch-rest-c${ci}`);
+      const dispatchBuffer = makeDispatchUniform(this.device, range.count, `stretch-dispatch-c${ci}`);
+
+      this.stretchColorBuffers.push(idsBuffer, restBuffer, dispatchBuffer);
+      this.stretchColorCounts.push(range.count);
+
+      this.stretchColorBindGroups.push(
+        this.device.createBindGroup({
+          label: `stretch-c${ci}`,
+          layout: this.stretchLayout!,
+          entries: [
+            { binding: 0, resource: { buffer: idsBuffer } },
+            { binding: 1, resource: { buffer: restBuffer } },
+            { binding: 2, resource: { buffer: dispatchBuffer } },
+          ],
+        }),
+      );
+    }
+
+    console.log(`[GpuSolver] Stretch coloring: ${colored.colorRanges.length} colors for ${numStretch} constraints`);
+  }
+
+  /**
+   * Cap the number of color groups by merging excess groups into the first maxColors.
+   */
+  private capColorGroups(colored: ColoredConstraints, maxColors: number): ColoredConstraints {
+    const ranges = colored.colorRanges;
+    if (ranges.length <= maxColors) return colored;
+
+    // Assign each existing color to a capped group (round-robin)
+    const newGroupIndices: number[][] = Array.from({ length: maxColors }, () => []);
+    for (let c = 0; c < ranges.length; c++) {
+      const target = c % maxColors;
+      const range = ranges[c];
+      for (let j = 0; j < range.count; j++) {
+        newGroupIndices[target].push(range.offset + j);
+      }
+    }
+
+    // Rebuild flat arrays
+    const total = colored.ids.length / 2;
+    const newIds = new Uint32Array(total * 2);
+    const newRest = new Float32Array(total);
+    const newRanges: Array<{ offset: number; count: number }> = [];
+    let offset = 0;
+
+    for (const group of newGroupIndices) {
+      newRanges.push({ offset, count: group.length });
+      for (let j = 0; j < group.length; j++) {
+        const srcIdx = group[j];
+        newIds[(offset + j) * 2] = colored.ids[srcIdx * 2];
+        newIds[(offset + j) * 2 + 1] = colored.ids[srcIdx * 2 + 1];
+        newRest[offset + j] = colored.restLengths[srcIdx];
+      }
+      offset += group.length;
+    }
+
+    console.log(`[GpuSolver] Capped ${ranges.length} colors → ${maxColors}`);
+    return { ids: newIds, restLengths: newRest, colorRanges: newRanges };
   }
 
   /**

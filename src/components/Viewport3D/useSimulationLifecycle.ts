@@ -14,7 +14,6 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { useThree } from '@react-three/fiber';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
@@ -165,7 +164,6 @@ export function useSimulationLifecycle({
   stretchingIdsRef,
 }: UseSimulationLifecycleProps): UseSimulationLifecycleResult {
   const dispatch = useDispatch();
-  const gl = useThree((s) => s.gl);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
@@ -180,6 +178,10 @@ export function useSimulationLifecycle({
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
   const neuralClientRef = useRef<NeuralDrapeClient | null>(null);
+
+  /** Cache the WebGPU device across effect re-runs to avoid re-requesting adapter/device */
+  const gpuDeviceRef = useRef<GPUDevice | null>(null);
+  const gpuDeviceLostRef = useRef(false);
 
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const collisionRebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -210,10 +212,21 @@ export function useSimulationLifecycle({
         // ─── WebGPU GPU solver ────────────────────────────────────────
         if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
           try {
-            const adapter = await navigator.gpu.requestAdapter();
-            if (adapter && !cancelled) {
-              const device = await adapter.requestDevice();
-              if (!cancelled) {
+            // Reuse cached device or create a new one
+            let device = gpuDeviceRef.current;
+            if (!device || gpuDeviceLostRef.current) {
+              const adapter = await navigator.gpu.requestAdapter();
+              if (!adapter || cancelled) throw new Error('No WebGPU adapter');
+              device = await adapter.requestDevice();
+              gpuDeviceRef.current = device;
+              gpuDeviceLostRef.current = false;
+              device.lost.then((info) => {
+                console.warn('[SimLifecycle] GPU device lost:', info.reason, info.message);
+                gpuDeviceLostRef.current = true;
+                gpuDeviceRef.current = null;
+              });
+            }
+            if (!cancelled) {
                 console.log('[SimLifecycle] 🟢 Using WebGPU GPU solver');
                 dispatch(setSolverTier('webgpu'));
                 const gpuClient = new GpuSolverClient(device);
@@ -243,7 +256,6 @@ export function useSimulationLifecycle({
 
                 if (!cancelled) gpuClient.start();
                 return;
-              }
             }
           } catch (e) {
             console.warn('[SimLifecycle] GPU solver failed, falling through to WASM:', e);
@@ -364,7 +376,7 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch, gl]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
   useEffect(() => {
