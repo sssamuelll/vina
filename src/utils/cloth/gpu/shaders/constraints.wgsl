@@ -105,8 +105,8 @@ fn solveSeams(@builtin(global_invocation_id) gid: vec3u) {
   let len = sqrt(dx * dx + dy * dy + dz * dz);
   if (len < 1e-10) { return; }
 
-  let target = seamTargetDist[i];
-  let C = len - target;
+  let tgt = seamTargetDist[i];
+  let C = len - tgt;
   let alpha = params.seamStiffness / (params.sdt * params.sdt);
   let s = -C / (w + alpha);
 

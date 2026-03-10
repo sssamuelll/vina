@@ -3,9 +3,10 @@ import type { AnimationTrack } from '../animation/types';
 import { interpolate } from '../animation/interpolation';
 import type { SimRecorderHandle } from '../../hooks/useSimulationRecorder';
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 
 export interface AnimationExportOptions {
-  renderer: THREE.WebGLRenderer;
+  renderer: AnyRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   tracks: AnimationTrack[];
@@ -42,7 +43,7 @@ export async function exportAnimation(opts: AnimationExportOptions): Promise<Blo
   const ctx = offscreen.getContext('2d')!;
 
   // Setup render target at export resolution
-  const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+  const renderTarget = new THREE.RenderTarget(width, height, {
     format: transparent ? THREE.RGBAFormat : THREE.RGBFormat,
   });
 
@@ -115,9 +116,16 @@ export async function exportAnimation(opts: AnimationExportOptions): Promise<Blo
     renderer.render(scene, camera);
     renderer.setRenderTarget(null);
 
-    // Read pixels to offscreen canvas
+    // Read pixels to offscreen canvas (async for WebGPU, sync fallback for WebGL)
     const buffer = new Uint8Array(width * height * 4);
-    renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, buffer);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = renderer as any;
+    if (typeof r.readRenderTargetPixelsAsync === 'function') {
+      const result = await r.readRenderTargetPixelsAsync(renderTarget, 0, 0, width, height);
+      buffer.set(new Uint8Array(result.buffer));
+    } else {
+      renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, buffer);
+    }
 
     const imageData = ctx.createImageData(width, height);
     // Flip Y (WebGL is bottom-up)

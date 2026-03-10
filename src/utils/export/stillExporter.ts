@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 
 export interface StillExportConfig {
   width: number;
@@ -7,12 +8,12 @@ export interface StillExportConfig {
   filename?: string;
 }
 
-export function exportStill(
-  renderer: THREE.WebGLRenderer,
+export async function exportStill(
+  renderer: AnyRenderer,
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   config: StillExportConfig,
-): void {
+): Promise<void> {
   const { width, height, transparent = false, filename } = config;
 
   // Save state
@@ -23,7 +24,7 @@ export function exportStill(
   const originalAspect = camera.aspect;
 
   // Create render target
-  const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+  const renderTarget = new THREE.RenderTarget(width, height, {
     format: THREE.RGBAFormat,
     type: THREE.UnsignedByteType,
   });
@@ -40,9 +41,16 @@ export function exportStill(
   renderer.setRenderTarget(renderTarget);
   renderer.render(scene, camera);
 
-  // Read pixels
+  // Read pixels (async for WebGPU, sync fallback for WebGL)
   const pixels = new Uint8Array(width * height * 4);
-  renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, pixels);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = renderer as any;
+  if (typeof r.readRenderTargetPixelsAsync === 'function') {
+    const result = await r.readRenderTargetPixelsAsync(renderTarget, 0, 0, width, height);
+    pixels.set(new Uint8Array(result.buffer));
+  } else {
+    renderer.readRenderTargetPixels(renderTarget, 0, 0, width, height, pixels);
+  }
 
   // Restore
   renderer.setRenderTarget(null);
@@ -80,19 +88,19 @@ const VIEW_POSITIONS: Record<ViewAngle, [number, number, number]> = {
   right: [2.8, 0.8, 0],
 };
 
-export function exportAllViews(
-  renderer: THREE.WebGLRenderer,
+export async function exportAllViews(
+  renderer: AnyRenderer,
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   config: Omit<StillExportConfig, 'filename'>,
-): void {
+): Promise<void> {
   const target = new THREE.Vector3(0, 0.75, 0);
   const originalPos = camera.position.clone();
 
   for (const [view, pos] of Object.entries(VIEW_POSITIONS) as [ViewAngle, [number, number, number]][]) {
     camera.position.set(...pos);
     camera.lookAt(target);
-    exportStill(renderer, scene, camera, {
+    await exportStill(renderer, scene, camera, {
       ...config,
       filename: `openclo-${view}-${config.width}x${config.height}.png`,
     });

@@ -2,6 +2,9 @@ import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCa
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
+import { WebGPURenderer } from 'three/webgpu';
+import type { AnyRenderer } from '../../types/renderer';
+import { isWebGPURendererActive } from '../../utils/cloth/gpu/webgpuDetect';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import DraggablePiece from './DraggablePiece';
@@ -70,6 +73,40 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
 }
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+
+/**
+ * Create a WebGPURenderer (with WebGL2 fallback when WebGPU is unavailable).
+ *
+ * R3F 8.x's `gl` factory must return synchronously, so we fire-and-forget
+ * `renderer.init()`.  Three.js buffers draw commands internally until the
+ * async initialisation resolves, so the first few frames are a no-op while
+ * the GPU backend spins up.
+ */
+/** Whether to use the native WebGPU backend (vs WebGL2 fallback). */
+const isWebGPUBackend = isWebGPURendererActive;
+/**
+ * WebGPURenderer is always used (with forceWebGL when WebGPU is off).
+ * Its NodeMaterial system rejects legacy materials (MeshDepthMaterial,
+ * ShaderMaterial, ShadowMaterial), so shadow features must stay disabled.
+ */
+const nodeMaterialActive = true;
+
+function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
+  const renderer = new WebGPURenderer({
+    canvas,
+    antialias: true,
+    alpha: true,
+    // Falls back to WebGL2 when WebGPU is unavailable or feature-flagged off
+    forceWebGL: !isWebGPUBackend,
+  });
+
+  // Fire-and-forget — Three.js queues commands until the backend is ready
+  renderer.init().catch((err) => {
+    console.warn('[Viewport3D] WebGPURenderer.init() failed, frames may not render:', err);
+  });
+
+  return renderer;
+}
 
 export { Viewport3DErrorBoundary };
 
@@ -203,58 +240,39 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const container = containerRef.current;
     if (!container) return;
     const store = container as unknown as Record<string, unknown>;
-    const renderer = store.__gl as THREE.WebGLRenderer | undefined;
+    const renderer = store.__gl as AnyRenderer | undefined;
     const scene = store.__scene as THREE.Scene | undefined;
     const camera = store.__camera as THREE.Camera | undefined;
     if (!renderer || !scene || !camera) return;
 
-    // Force a render so the framebuffer is fresh, then capture
+    // Force a render so the canvas content is current, then capture.
+    // canvas.toDataURL() works for both WebGL and WebGPU canvases,
+    // unlike readPixels which is WebGL-only.
     renderer.render(scene, camera);
     const canvas = renderer.domElement;
-    // After render(), the buffer is available for readPixels
-    const glCtx = canvas.getContext('webgl2') || canvas.getContext('webgl');
-    if (!glCtx) return;
-
-    const w = glCtx.drawingBufferWidth;
-    const h = glCtx.drawingBufferHeight;
-    const pixels = new Uint8Array(w * h * 4);
-    glCtx.readPixels(0, 0, w, h, glCtx.RGBA, glCtx.UNSIGNED_BYTE, pixels);
-
-    // Flip vertically (WebGL is bottom-up)
-    const offscreen = document.createElement('canvas');
-    offscreen.width = w;
-    offscreen.height = h;
-    const ctx = offscreen.getContext('2d')!;
-    const imageData = ctx.createImageData(w, h);
-    for (let y = 0; y < h; y++) {
-      const srcRow = (h - 1 - y) * w * 4;
-      const dstRow = y * w * 4;
-      imageData.data.set(pixels.subarray(srcRow, srcRow + w * 4), dstRow);
-    }
-    ctx.putImageData(imageData, 0, 0);
 
     const link = document.createElement('a');
     link.download = `openclo-fitmap-${Date.now()}.png`;
-    link.href = offscreen.toDataURL('image/png');
+    link.href = canvas.toDataURL('image/png');
     link.click();
   }, []);
 
-  const handleExportStill = useCallback((width: number, height: number, transparent: boolean) => {
+  const handleExportStill = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
-    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const gl = refs.__gl as AnyRenderer | undefined;
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    exportStill(gl, sc, cam, { width, height, transparent });
+    await exportStill(gl, sc, cam, { width, height, transparent });
   }, []);
 
   const handleExportTurntable = useCallback(async () => {
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
-    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const gl = refs.__gl as AnyRenderer | undefined;
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
@@ -268,15 +286,15 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     downloadBlob(blob, `openclo-turntable-${Date.now()}.webm`);
   }, []);
 
-  const handleExportAllViews = useCallback((width: number, height: number, transparent: boolean) => {
+  const handleExportAllViews = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
-    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const gl = refs.__gl as AnyRenderer | undefined;
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    exportAllViews(gl, sc, cam, { width, height, transparent });
+    await exportAllViews(gl, sc, cam, { width, height, transparent });
   }, []);
 
   const handleExport3D = useCallback(async (
@@ -414,10 +432,11 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       <SimulationStatusOverlay />
       <Canvas
         camera={{ position: [0, 0.8, 2.8], fov: 35 }}
-        shadows
+        shadows={!nodeMaterialActive}
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
-        gl={{ antialias: true }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        gl={createWebGPURenderer as any}
         onPointerMissed={() => dispatch(clearSelection())}
         onCreated={({ gl, scene, camera }) => {
           // Store refs for snapshot (readPixels needs a fresh render)
@@ -483,21 +502,27 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           })()
         ))}
 
-        <ContactShadows position={[0, 0, 0]} opacity={shadowOpacity} scale={3} blur={shadowBlur} far={2} />
+        {/* ContactShadows uses a custom ShaderMaterial incompatible with NodeMaterial */}
+        {!nodeMaterialActive && (
+          <ContactShadows position={[0, 0, 0]} opacity={shadowOpacity} scale={3} blur={shadowBlur} far={2} />
+        )}
 
         {groundVisible && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow={!nodeMaterialActive}>
             <planeGeometry args={[20, 20]} />
             <meshStandardMaterial color="#ffffff" />
           </mesh>
         )}
 
-        <Grid
-          args={[10, 10]}
-          cellSize={0.1} cellThickness={0.5} cellColor="#d0d0d0"
-          sectionSize={1} sectionThickness={1} sectionColor="#b0b0b0"
-          fadeDistance={8} position={[0, -0.001, 0]}
-        />
+        {/* drei Grid uses a custom ShaderMaterial incompatible with NodeMaterial */}
+        {!nodeMaterialActive && (
+          <Grid
+            args={[10, 10]}
+            cellSize={0.1} cellThickness={0.5} cellColor="#d0d0d0"
+            sectionSize={1} sectionThickness={1} sectionColor="#b0b0b0"
+            fadeDistance={8} position={[0, -0.001, 0]}
+          />
+        )}
 
         <OrbitControls
           ref={orbitRef}

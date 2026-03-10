@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 
 export interface TurntableConfig {
   frameCount: number;       // 12, 24, 36, 72
@@ -12,7 +13,7 @@ export interface TurntableConfig {
 }
 
 export async function renderTurntable(
-  renderer: THREE.WebGLRenderer,
+  renderer: AnyRenderer,
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   config: TurntableConfig,

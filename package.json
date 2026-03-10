@@ -40,7 +40,7 @@
     "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
     "react-zoom-pan-pinch": "^3.7.0",
-    "three": "^0.170.0",
+    "three": "^0.183.2",
     "three-mesh-bvh": "^0.9.9",
     "ws": "^8.19.0",
     "zod": "^4.3.6"
@@ -53,7 +53,7 @@
     "@types/node": "^22.19.11",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
-    "@types/three": "^0.170.0",
+    "@types/three": "^0.183.1",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^4.0.18",
