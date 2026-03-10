@@ -23,17 +23,25 @@ export function collectExportScene(
     group.add(garmentMesh.clone(true));
   }
 
-  // 2. Add avatar — find groups containing SkinnedMesh
+  // 2. Add avatar — find groups marked with userData.opencloRole === 'avatar'
+  //    or containing SkinnedMesh (fallback for unmarked avatar models)
   if (includeAvatar) {
     for (const child of scene.children) {
       if (child === garmentMesh) continue;
+      const isAvatar = child.userData?.opencloRole === 'avatar';
+      if (!isAvatar) {
+        let hasSkinnedMesh = false;
+        child.traverse(obj => {
+          if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true;
+        });
+        if (!hasSkinnedMesh) continue;
+      }
+      // Use SkeletonUtils.clone for groups with SkinnedMesh, plain clone otherwise
       let hasSkinnedMesh = false;
       child.traverse(obj => {
         if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true;
       });
-      if (hasSkinnedMesh) {
-        group.add(SkeletonUtils.clone(child));
-      }
+      group.add(hasSkinnedMesh ? SkeletonUtils.clone(child) : child.clone(true));
     }
   }
 

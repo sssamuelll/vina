@@ -628,5 +628,5 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     }
   });
 
-  return <group ref={groupRef} onPointerDown={onPointerDown} />;
+  return <group ref={groupRef} onPointerDown={onPointerDown} userData={{ opencloRole: 'avatar' }} />;
 }
