@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { HDRI_PRESETS } from '../../store/renderSettingsSlice';
+// WebGPURenderer always uses NodeMaterial — legacy MeshDepthMaterial (shadows) unsupported
+const nodeMaterialActive = true;
 
 const TONE_MAP: Record<string, THREE.ToneMapping> = {
   aces: THREE.ACESFilmicToneMapping,
@@ -50,7 +52,7 @@ export default function EnvironmentSetup() {
     <>
       <ambientLight intensity={0.3} />
       <hemisphereLight args={['#ffffff', '#b0c4de', 0.3]} />
-      <directionalLight position={[3, 5, 4]} intensity={0.5} castShadow shadow-mapSize={1024} />
+      <directionalLight position={[3, 5, 4]} intensity={0.5} castShadow={!nodeMaterialActive} shadow-mapSize={1024} />
       <directionalLight position={[-3, 4, -2]} intensity={0.25} />
       <directionalLight position={[0, 2, 5]} intensity={0.2} />
       <Environment

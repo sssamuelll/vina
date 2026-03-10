@@ -37,6 +37,19 @@ export function isWebGPUAvailable(): boolean {
 }
 
 /**
+ * Whether the WebGPU **rendering** backend is active.
+ *
+ * Returns `true` when the browser supports WebGPU AND the user has not
+ * explicitly opted out via `localStorage.setItem('webclo-use-webgpu', 'false')`.
+ * Used to disable features incompatible with WebGPU (e.g. shadow mapping with
+ * legacy MeshDepthMaterial).
+ */
+export const isWebGPURendererActive: boolean = isWebGPUAvailable() && (() => {
+  try { return localStorage.getItem('webclo-use-webgpu') !== 'false'; }
+  catch { return true; }
+})();
+
+/**
  * Request WebGPU adapter and device. Returns null if unavailable.
  */
 export async function initWebGPU(): Promise<GpuContext | null> {

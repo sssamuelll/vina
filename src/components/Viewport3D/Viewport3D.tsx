@@ -4,6 +4,7 @@ import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
+import { isWebGPURendererActive } from '../../utils/cloth/gpu/webgpuDetect';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import DraggablePiece from './DraggablePiece';
@@ -81,13 +82,22 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
  * async initialisation resolves, so the first few frames are a no-op while
  * the GPU backend spins up.
  */
+/** Whether to use the native WebGPU backend (vs WebGL2 fallback). */
+const isWebGPUBackend = isWebGPURendererActive;
+/**
+ * WebGPURenderer is always used (with forceWebGL when WebGPU is off).
+ * Its NodeMaterial system rejects legacy materials (MeshDepthMaterial,
+ * ShaderMaterial, ShadowMaterial), so shadow features must stay disabled.
+ */
+const nodeMaterialActive = true;
+
 function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
   const renderer = new WebGPURenderer({
     canvas,
     antialias: true,
     alpha: true,
-    // Falls back to WebGL2 on browsers without WebGPU support
-    forceWebGL: !navigator.gpu,
+    // Falls back to WebGL2 when WebGPU is unavailable or feature-flagged off
+    forceWebGL: !isWebGPUBackend,
   });
 
   // Fire-and-forget — Three.js queues commands until the backend is ready
@@ -422,7 +432,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       <SimulationStatusOverlay />
       <Canvas
         camera={{ position: [0, 0.8, 2.8], fov: 35 }}
-        shadows
+        shadows={!nodeMaterialActive}
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -492,21 +502,27 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           })()
         ))}
 
-        <ContactShadows position={[0, 0, 0]} opacity={shadowOpacity} scale={3} blur={shadowBlur} far={2} />
+        {/* ContactShadows uses a custom ShaderMaterial incompatible with NodeMaterial */}
+        {!nodeMaterialActive && (
+          <ContactShadows position={[0, 0, 0]} opacity={shadowOpacity} scale={3} blur={shadowBlur} far={2} />
+        )}
 
         {groundVisible && (
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow>
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow={!nodeMaterialActive}>
             <planeGeometry args={[20, 20]} />
             <meshStandardMaterial color="#ffffff" />
           </mesh>
         )}
 
-        <Grid
-          args={[10, 10]}
-          cellSize={0.1} cellThickness={0.5} cellColor="#d0d0d0"
-          sectionSize={1} sectionThickness={1} sectionColor="#b0b0b0"
-          fadeDistance={8} position={[0, -0.001, 0]}
-        />
+        {/* drei Grid uses a custom ShaderMaterial incompatible with NodeMaterial */}
+        {!nodeMaterialActive && (
+          <Grid
+            args={[10, 10]}
+            cellSize={0.1} cellThickness={0.5} cellColor="#d0d0d0"
+            sectionSize={1} sectionThickness={1} sectionColor="#b0b0b0"
+            fadeDistance={8} position={[0, -0.001, 0]}
+          />
+        )}
 
         <OrbitControls
           ref={orbitRef}

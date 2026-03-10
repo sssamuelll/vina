@@ -12,6 +12,8 @@ import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, cle
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
+// WebGPURenderer always uses NodeMaterial — legacy MeshDepthMaterial (shadows) unsupported
+const nodeMaterialActive = true;
 import type { VRM } from '@pixiv/three-vrm';
 
 // ─── Unit scale map (to meters for three.js scene) ─────────────────────────
@@ -354,8 +356,8 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
             mat.envMapIntensity = 0.5;
           }
         }
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
+        mesh.castShadow = !nodeMaterialActive;
+        mesh.receiveShadow = !nodeMaterialActive;
       }
     });
 
