@@ -2,6 +2,7 @@ import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCa
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import DraggablePiece from './DraggablePiece';
@@ -203,7 +204,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const container = containerRef.current;
     if (!container) return;
     const store = container as unknown as Record<string, unknown>;
-    const renderer = store.__gl as THREE.WebGLRenderer | undefined;
+    const renderer = store.__gl as AnyRenderer | undefined;
     const scene = store.__scene as THREE.Scene | undefined;
     const camera = store.__camera as THREE.Camera | undefined;
     if (!renderer || !scene || !camera) return;
@@ -243,7 +244,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
-    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const gl = refs.__gl as AnyRenderer | undefined;
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
@@ -254,7 +255,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
-    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const gl = refs.__gl as AnyRenderer | undefined;
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
@@ -272,7 +273,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const container = containerRef.current;
     if (!container) return;
     const refs = container as unknown as Record<string, unknown>;
-    const gl = refs.__gl as THREE.WebGLRenderer | undefined;
+    const gl = refs.__gl as AnyRenderer | undefined;
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;

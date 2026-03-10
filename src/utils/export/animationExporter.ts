@@ -3,9 +3,10 @@ import type { AnimationTrack } from '../animation/types';
 import { interpolate } from '../animation/interpolation';
 import type { SimRecorderHandle } from '../../hooks/useSimulationRecorder';
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 
 export interface AnimationExportOptions {
-  renderer: THREE.WebGLRenderer;
+  renderer: AnyRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
   tracks: AnimationTrack[];
@@ -42,7 +43,7 @@ export async function exportAnimation(opts: AnimationExportOptions): Promise<Blo
   const ctx = offscreen.getContext('2d')!;
 
   // Setup render target at export resolution
-  const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+  const renderTarget = new THREE.RenderTarget(width, height, {
     format: transparent ? THREE.RGBAFormat : THREE.RGBFormat,
   });
 

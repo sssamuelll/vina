@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 
 export interface StillExportConfig {
   width: number;
@@ -8,7 +9,7 @@ export interface StillExportConfig {
 }
 
 export function exportStill(
-  renderer: THREE.WebGLRenderer,
+  renderer: AnyRenderer,
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   config: StillExportConfig,
@@ -23,7 +24,7 @@ export function exportStill(
   const originalAspect = camera.aspect;
 
   // Create render target
-  const renderTarget = new THREE.WebGLRenderTarget(width, height, {
+  const renderTarget = new THREE.RenderTarget(width, height, {
     format: THREE.RGBAFormat,
     type: THREE.UnsignedByteType,
   });
@@ -81,7 +82,7 @@ const VIEW_POSITIONS: Record<ViewAngle, [number, number, number]> = {
 };
 
 export function exportAllViews(
-  renderer: THREE.WebGLRenderer,
+  renderer: AnyRenderer,
   scene: THREE.Scene,
   camera: THREE.PerspectiveCamera,
   config: Omit<StillExportConfig, 'filename'>,

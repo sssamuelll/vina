@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import { X } from 'lucide-react';
 import * as THREE from 'three';
+import type { AnyRenderer } from '../../types/renderer';
 import type { RootState } from '../../store';
 import type { SimRecorderHandle } from '../../hooks/useSimulationRecorder';
 import { exportAnimation } from '../../utils/export/animationExporter';
@@ -9,7 +10,7 @@ import { exportAnimation } from '../../utils/export/animationExporter';
 export interface ExportDialogProps {
   open: boolean;
   onClose: () => void;
-  renderer: THREE.WebGLRenderer | null;
+  renderer: AnyRenderer | null;
   scene: THREE.Scene | null;
   camera: THREE.PerspectiveCamera | null;
   clothMesh: THREE.Mesh | null;
