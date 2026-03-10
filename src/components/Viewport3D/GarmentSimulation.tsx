@@ -81,7 +81,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const stretchingIdsRef = useRef<Int32Array | null>(null);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
-  const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
@@ -214,14 +213,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     clientsRef.current = clients;
   });
 
-  // ─── GPU zero-copy: bind StorageBufferAttributes to geometry ─────────────
-  useEffect(() => {
-    if (!staticGeometry || solverTier !== 'webgpu' || !clients.gpu) return;
-    const posAttr = clients.gpu.getPositionStorageAttribute();
-    const normAttr = clients.gpu.getNormalStorageAttribute();
-    if (posAttr) staticGeometry.setAttribute('position', posAttr);
-    if (normAttr) staticGeometry.setAttribute('normal', normAttr);
-  }, [staticGeometry, solverTier, clients.gpu]);
+  // NOTE: GPU zero-copy via StorageBufferAttribute is disabled.
+  // Three.js WebGPURenderer creates its own internal GPU buffers for vertex
+  // attributes and ignores the patched gpuBuffer field. Until a proper TSL
+  // node material integration is built, we use CPU readback for all tiers.
 
   // ─── Pin sync ───────────────────────────────────────────────────────────────
 
@@ -267,11 +262,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // During playback, the playback hook handles position updates
     if (isPlayingBack) return;
 
-    // GPU zero-copy: positions/normals live on GPU via StorageBufferAttribute
-    // Only fit map colors need CPU update (handled below)
-    if (solverTier !== 'webgpu') {
+    // Update geometry positions from solver (all tiers, including WebGPU with CPU readback)
+    {
       const positions = positionsRef.current;
-      if (positions) {
+      if (positions && positions.length > 0) {
         const posAttr = staticGeometry.getAttribute('position') as THREE.BufferAttribute;
         if (posAttr && posAttr.array.length === positions.length) {
           (posAttr.array as Float32Array).set(positions);

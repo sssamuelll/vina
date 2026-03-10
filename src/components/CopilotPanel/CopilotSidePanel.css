@@ -100,30 +100,51 @@
   letter-spacing: 0.5px;
 }
 
-/* ===== PANEL HEADER ===== */
+/* ===== TAB BAR ===== */
 
-.copilot-side-header {
+.copilot-side-tabs {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
+  padding: 0 4px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
   height: 36px;
   flex-shrink: 0;
+  gap: 0;
 }
 
-.copilot-side-title {
+.copilot-side-tab {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 0.15s ease;
 }
 
-.copilot-side-title svg {
+.copilot-side-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.copilot-side-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.copilot-side-tab svg {
   flex-shrink: 0;
+}
+
+.copilot-side-tabs-spacer {
+  flex: 1;
 }
 
 .copilot-side-actions {
@@ -174,6 +195,17 @@
 
 .copilot-side-content .copilot-panel .copilot-header {
   display: none; /* Hide the internal header since we have our own */
+}
+
+/* Properties panel inside side panel */
+.side-panel-properties {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.side-panel-properties .properties-panel {
+  width: 100%;
+  border-left: none;
 }
 
 /* ===== SMOOTH ANIMATIONS ===== */

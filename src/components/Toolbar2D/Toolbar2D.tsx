@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { PanelRight } from 'lucide-react';
 import { RootState } from '../../store';
 import type { Tool2D } from '../../types/types';
 import { setActiveTool } from '../../store/editorSlice';
@@ -187,12 +186,7 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
   );
 }
 
-interface Toolbar2DProps {
-  propertiesPanelOpen?: boolean;
-  onTogglePropertiesPanel?: () => void;
-}
-
-export default function Toolbar2D({ propertiesPanelOpen, onTogglePropertiesPanel }: Toolbar2DProps) {
+export default function Toolbar2D() {
   const dispatch = useDispatch();
   const legacyActiveTool = useSelector((s: RootState) => s.editor.activeTool);
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
@@ -227,17 +221,6 @@ export default function Toolbar2D({ propertiesPanelOpen, onTogglePropertiesPanel
         </div>
       ))}
 
-      <div className="toolbar2d-spacer" />
-      <ToolTooltip name="Piece Properties" position="right">
-        <button
-          className={`tool-btn tool-btn-toggle ${propertiesPanelOpen ? 'active' : ''}`}
-          onClick={onTogglePropertiesPanel}
-        >
-          <span className="tool-icon">
-            <PanelRight size={18} />
-          </span>
-        </button>
-      </ToolTooltip>
     </div>
   );
 }

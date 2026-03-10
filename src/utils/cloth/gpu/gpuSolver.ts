@@ -4,15 +4,24 @@
  * Manages compute pipelines, bind groups, and the per-frame simulation loop.
  * Positions never leave the GPU during simulation — zero CPU↔GPU transfer.
  *
+ * Key design decisions:
+ * - Stretch constraints are graph-colored (capped at 16 colors) so each
+ *   color group dispatches in its own compute pass without race conditions.
+ * - Bend constraints use single Jacobi dispatch (soft constraints tolerate races).
+ * - Body collision uses a brute-force point-vs-triangle shader dispatched
+ *   per substep after constraint projection.
+ * - SimParams uniform buffer uses DataView for correct u32/f32 bit packing.
+ *
  * @module gpuSolver
  */
 
-import type { GpuClothBuffers, SimParams, ClothMeshData, StretchConstraints, BendConstraints, SeamConstraintData } from './gpuBuffers';
-import { createClothBuffers, destroyClothBuffers, updateSimParams, readbackPositions } from './gpuBuffers';
+import type { GpuClothBuffers, SimParams, ClothMeshData, StretchConstraints, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
+import { createClothBuffers, destroyClothBuffers, updateSimParams, readbackPositions, colorConstraints } from './gpuBuffers';
 
 // Import WGSL shaders as strings (Vite handles ?raw)
 import clothShaderSrc from './shaders/cloth.wgsl?raw';
 import constraintsShaderSrc from './shaders/constraints.wgsl?raw';
+import collisionShaderSrc from './shaders/collision.wgsl?raw';
 import normalsShaderSrc from './shaders/normals.wgsl?raw';
 import selfCollisionShaderSrc from './shaders/selfCollision.wgsl?raw';
 import { buildAdjacency } from '../selfCollision';
@@ -35,15 +44,58 @@ export interface GpuSolverConfig {
 const DEFAULT_CONFIG: GpuSolverConfig = {
   substeps: 15,
   gravity: [0, -9.81, 0],
-  damping: 0.99,
-  stretchCompliance: 0.0,
-  bendCompliance: 0.01,
+  // Effective damping matching WASM: damping * (1 - internalDamping * 0.1)
+  // = 0.99 * (1 - 0.3 * 0.1) = 0.9603
+  damping: 0.9603,
+  // Without UVs, all edges are classified as SHEAR.
+  // WASM uses stretchComplianceShear=0.001 for SHEAR edges.
+  // Using 0.0 makes cloth infinitely stiff (rigid plate, bounces/spins off body).
+  stretchCompliance: 0.001,
+  // WASM uses per-constraint bend compliance: warp=1.0, weft=1.0.
+  // All edges without UVs → SHEAR → defaults to weft compliance = 1.0
+  bendCompliance: 1.0,
   seamStiffness: 0.0,
   groundY: 0.0,
   collisionMargin: 0.005,
   clothThickness: 0.002,
   selfCollision: false,
 };
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function makeStorageBuffer(
+  device: GPUDevice,
+  data: Float32Array | Uint32Array,
+  label: string,
+  usage: GPUBufferUsageFlags = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+): GPUBuffer {
+  const buffer = device.createBuffer({
+    label,
+    size: Math.max(data.byteLength, 4), // minimum 4 bytes
+    usage,
+    mappedAtCreation: true,
+  });
+  if (data instanceof Float32Array) {
+    new Float32Array(buffer.getMappedRange()).set(data);
+  } else {
+    new Uint32Array(buffer.getMappedRange()).set(data);
+  }
+  buffer.unmap();
+  return buffer;
+}
+
+function makeDispatchUniform(device: GPUDevice, count: number, label: string): GPUBuffer {
+  const data = new Uint32Array([count, 0, 0, 0]); // pad to 16 bytes
+  const buffer = device.createBuffer({
+    label,
+    size: 16,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
+  });
+  new Uint32Array(buffer.getMappedRange()).set(data);
+  buffer.unmap();
+  return buffer;
+}
 
 // ─── Solver ─────────────────────────────────────────────────────────────────
 
@@ -60,17 +112,44 @@ export class GpuClothSolver {
   private postSolvePipeline: GPUComputePipeline | null = null;
   private normalAccumPipeline: GPUComputePipeline | null = null;
   private normalNormPipeline: GPUComputePipeline | null = null;
-  // Bind groups
-  private coreBindGroup: GPUBindGroup | null = null;
-  private stretchBindGroup: GPUBindGroup | null = null;
-  private seamBindGroup: GPUBindGroup | null = null;
-  private normalBindGroup: GPUBindGroup | null = null;
 
-  // Additional buffers for normals
+  // Core bind group (params, pos, prevPos, vel, invMass)
+  private coreBindGroup: GPUBindGroup | null = null;
+
+  // Per-color stretch groups (graph-colored for race-free dispatch)
+  private stretchColorBindGroups: GPUBindGroup[] = [];
+  private stretchColorCounts: number[] = [];
+  private stretchColorBuffers: GPUBuffer[] = []; // for cleanup
+
+  // Bend constraints (single Jacobi dispatch — soft constraints tolerate races)
+  private bendPipeline: GPUComputePipeline | null = null;
+  private bendBindGroup: GPUBindGroup | null = null;
+  private bendDispatchBuffer: GPUBuffer | null = null;
+  private numBendConstraints: number = 0;
+  private bendBuffers: GPUBuffer[] = []; // for cleanup
+
+  // Seam bind group + dispatch uniform
+  private seamBindGroup: GPUBindGroup | null = null;
+  private seamDispatchBuffer: GPUBuffer | null = null;
+
+  // Normal computation
+  private normalBindGroup: GPUBindGroup | null = null;
   private triIdsBuffer: GPUBuffer | null = null;
   private normalsAtomicBuffer: GPUBuffer | null = null;
   private normalParamsBuffer: GPUBuffer | null = null;
   private numTriangles: number = 0;
+
+  // Body collision
+  private collisionPipeline: GPUComputePipeline | null = null;
+  private collisionLayout: GPUBindGroupLayout | null = null;
+  private collisionBindGroup: GPUBindGroup | null = null;
+  private collisionVertsBuffer: GPUBuffer | null = null;
+  private collisionNormalsBuffer: GPUBuffer | null = null;
+  private collisionParamsBuffer: GPUBuffer | null = null;
+  private collisionTriCount: number = 0;
+
+  // Stored layouts for deferred bind group creation
+  private stretchLayout: GPUBindGroupLayout | null = null;
 
   // Self-collision spatial hash
   private scHashCountPipeline: GPUComputePipeline | null = null;
@@ -102,7 +181,6 @@ export class GpuClothSolver {
     seam: SeamConstraintData | null = null,
     triangles: Uint32Array,
   ): Promise<void> {
-    // Clean up previous
     this.destroy();
 
     const params = this.buildSimParams(mesh, stretch, bend, seam);
@@ -137,8 +215,41 @@ export class GpuClothSolver {
     new Uint32Array(this.normalParamsBuffer.getMappedRange()).set(npData);
     this.normalParamsBuffer.unmap();
 
-    // Create pipelines and bind groups
+    const numStretch = stretch.ids.length / 2;
+    const numBend = bend.ids.length / 4;
+
+    // Create seam dispatch uniform (needed before bind groups)
+    const numSeam = seam ? seam.ids.length / 2 : 0;
+    if (numSeam > 0) {
+      this.seamDispatchBuffer = makeDispatchUniform(this.device, numSeam, 'seamDispatch');
+    }
+
+    // Create pipelines (stores layouts for bind group creation)
     await this.createPipelines();
+
+    // Graph-color stretch constraints for race-free parallel dispatch
+    this.createColoredStretchGroups(stretch);
+
+    // Create bend constraint bind group (single Jacobi — soft constraints tolerate races)
+    this.numBendConstraints = numBend;
+    if (this.stretchLayout && numBend > 0) {
+      const bendIdsBuffer = makeStorageBuffer(this.device, bend.ids, 'bendIds');
+      const bendRestBuffer = makeStorageBuffer(this.device, bend.restAngles, 'bendRestAngles');
+      this.bendDispatchBuffer = makeDispatchUniform(this.device, numBend, 'bendDispatch');
+      this.bendBuffers = [bendIdsBuffer, bendRestBuffer];
+
+      this.bendBindGroup = this.device.createBindGroup({
+        label: 'bend',
+        layout: this.stretchLayout,
+        entries: [
+          { binding: 0, resource: { buffer: bendIdsBuffer } },
+          { binding: 1, resource: { buffer: bendRestBuffer } },
+          { binding: 2, resource: { buffer: this.bendDispatchBuffer } },
+        ],
+      });
+    }
+
+    // Create core, seam, and normal bind groups
     this.createBindGroups();
 
     // Self-collision setup
@@ -148,10 +259,12 @@ export class GpuClothSolver {
 
     console.log('[GpuSolver] Initialized:', {
       particles: this.buffers.numParticles,
-      stretchConstraints: this.buffers.numStretchConstraints,
-      bendConstraints: this.buffers.numBendConstraints,
-      seamConstraints: this.buffers.numSeamConstraints,
+      stretchConstraints: numStretch,
+      stretchColors: this.stretchColorBindGroups.length,
+      bendConstraints: numBend,
+      seamConstraints: numSeam,
       triangles: this.numTriangles,
+      substeps: this.config.substeps,
       selfCollision: this.config.selfCollision,
     });
   }
@@ -159,53 +272,71 @@ export class GpuClothSolver {
   /**
    * Step the simulation forward one frame.
    * Dispatches all compute passes for N substeps.
+   *
+   * Per substep: preSolve → stretch → seam → collision → postSolve
    */
   step(dt?: number): void {
     if (!this.buffers || !this.preSolvePipeline || !this.coreBindGroup) return;
 
     const framedt = dt ?? this.dt;
-    // Update sdt in params
     const sdt = framedt / this.config.substeps;
-    // Quick update: write sdt to params buffer offset 16 (5th float)
-    this.device.queue.writeBuffer(this.buffers.params, 4 * 4, new Float32Array([sdt]));
+    // Update sdt in params buffer (offset 16 = 5th field, f32)
+    this.device.queue.writeBuffer(this.buffers.params, 16, new Float32Array([sdt]));
 
     const encoder = this.device.createCommandEncoder({ label: 'cloth-step' });
-
     const particleWG = Math.ceil(this.buffers.numParticles / 256);
-    const stretchWG = Math.ceil(this.buffers.numStretchConstraints / 256);
-    const seamWG = this.buffers.numSeamConstraints > 0
-      ? Math.ceil(this.buffers.numSeamConstraints / 256)
-      : 0;
 
     for (let s = 0; s < this.config.substeps; s++) {
-      // Pre-solve: gravity + integration
+      // ─── Pre-solve: gravity + integration ───────────────────────
       const pre = encoder.beginComputePass({ label: 'preSolve' });
       pre.setPipeline(this.preSolvePipeline!);
       pre.setBindGroup(0, this.coreBindGroup!);
       pre.dispatchWorkgroups(particleWG);
       pre.end();
 
-      // Stretch constraints
-      const str = encoder.beginComputePass({ label: 'stretch' });
-      str.setPipeline(this.stretchPipeline!);
-      str.setBindGroup(0, this.coreBindGroup!);
-      str.setBindGroup(1, this.stretchBindGroup!);
-      str.dispatchWorkgroups(stretchWG);
-      str.end();
+      // ─── Stretch constraints (per-color Gauss-Seidel dispatches) ───
+      for (let c = 0; c < this.stretchColorBindGroups.length; c++) {
+        const pass = encoder.beginComputePass({ label: `stretch-c${c}` });
+        pass.setPipeline(this.stretchPipeline!);
+        pass.setBindGroup(0, this.coreBindGroup!);
+        pass.setBindGroup(1, this.stretchColorBindGroups[c]);
+        pass.dispatchWorkgroups(Math.ceil(this.stretchColorCounts[c] / 256));
+        pass.end();
+      }
 
-      // Seam constraints
-      if (seamWG > 0 && this.seamPipeline && this.seamBindGroup) {
+      // ─── Bend constraints (single Jacobi — soft constraints tolerate races) ───
+      if (this.bendBindGroup && this.bendPipeline && this.numBendConstraints > 0) {
+        const bend = encoder.beginComputePass({ label: 'bend' });
+        bend.setPipeline(this.bendPipeline);
+        bend.setBindGroup(0, this.coreBindGroup!);
+        bend.setBindGroup(1, this.bendBindGroup);
+        bend.dispatchWorkgroups(Math.ceil(this.numBendConstraints / 256));
+        bend.end();
+      }
+
+      // ─── Seam constraints ──────────────────────────────────────
+      if (this.seamBindGroup && this.seamPipeline && this.buffers.numSeamConstraints > 0 && this.stretchColorBindGroups.length > 0) {
         const sm = encoder.beginComputePass({ label: 'seam' });
         sm.setPipeline(this.seamPipeline);
         sm.setBindGroup(0, this.coreBindGroup!);
+        // Pipeline layout requires group(1) even though seam shader doesn't use it
+        sm.setBindGroup(1, this.stretchColorBindGroups[0]);
         sm.setBindGroup(2, this.seamBindGroup);
-        sm.dispatchWorkgroups(seamWG);
+        sm.dispatchWorkgroups(Math.ceil(this.buffers.numSeamConstraints / 256));
         sm.end();
       }
 
-      // Self-collision (4 passes: hash, prefix sum, scatter, resolve)
+      // ─── Body collision ─────────────────────────────────────────
+      if (this.collisionBindGroup && this.collisionPipeline && this.collisionTriCount > 0) {
+        const col = encoder.beginComputePass({ label: 'collision' });
+        col.setPipeline(this.collisionPipeline);
+        col.setBindGroup(0, this.collisionBindGroup);
+        col.dispatchWorkgroups(particleWG);
+        col.end();
+      }
+
+      // ─── Self-collision (4 passes) ─────────────────────────────
       if (this.config.selfCollision && this.scHashCountPipeline && this.scBindGroup && this.scAdjBindGroup) {
-        // Clear cellCount buffer
         encoder.clearBuffer(this.scCellCountBuffer!, 0, this.scTableSize * 4);
 
         const scWG = particleWG;
@@ -239,7 +370,7 @@ export class GpuClothSolver {
         res.end();
       }
 
-      // Post-solve: velocity update
+      // ─── Post-solve: velocity update ───────────────────────────
       const post = encoder.beginComputePass({ label: 'postSolve' });
       post.setPipeline(this.postSolvePipeline!);
       post.setBindGroup(0, this.coreBindGroup!);
@@ -295,17 +426,98 @@ export class GpuClothSolver {
   updateConfig(config: Partial<GpuSolverConfig>): void {
     this.config = { ...this.config, ...config };
     if (this.buffers) {
-      const params = this.buildSimParams(
-        { positions: new Float32Array(0), triangles: new Uint32Array(0), invMass: new Float32Array(0) },
-        { ids: new Uint32Array(0), restLengths: new Float32Array(0), edgeTypes: new Uint8Array(0) },
-        { ids: new Uint32Array(0), restAngles: new Float32Array(0), edgeTypes: new Uint8Array(0) },
-        null,
-      );
-      params.numParticles = this.buffers.numParticles;
-      params.numStretchConstraints = this.buffers.numStretchConstraints;
-      params.numBendConstraints = this.buffers.numBendConstraints;
-      params.numSeamConstraints = this.buffers.numSeamConstraints;
+      const params: SimParams = {
+        numParticles: this.buffers.numParticles,
+        numStretchConstraints: this.buffers.numStretchConstraints,
+        numBendConstraints: this.buffers.numBendConstraints,
+        numSeamConstraints: this.buffers.numSeamConstraints,
+        dt: this.dt,
+        substeps: this.config.substeps,
+        gravity: this.config.gravity,
+        damping: this.config.damping,
+        stretchCompliance: this.config.stretchCompliance,
+        bendCompliance: this.config.bendCompliance,
+        seamStiffness: this.config.seamStiffness,
+        groundY: this.config.groundY,
+        collisionMargin: this.config.collisionMargin,
+        clothThickness: this.config.clothThickness,
+        selfCollision: this.config.selfCollision,
+      };
       updateSimParams(this.device, this.buffers.params, params);
+    }
+  }
+
+  /**
+   * Set triangle collision mesh for body collision.
+   * Call after init(). Can be called multiple times to update the mesh.
+   *
+   * @param mesh.vertices - Expanded triangle vertices (9 floats per tri: 3 verts × 3 components)
+   * @param mesh.normals - Per-triangle normals (3 floats per tri)
+   * @param mesh.triCount - Number of collision triangles
+   */
+  setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+    if (!this.buffers || !this.collisionLayout) return;
+
+    // Clean up previous collision buffers
+    this.collisionVertsBuffer?.destroy();
+    this.collisionNormalsBuffer?.destroy();
+    this.collisionParamsBuffer?.destroy();
+    this.collisionBindGroup = null;
+
+    this.collisionTriCount = mesh.triCount;
+
+    if (mesh.triCount === 0) {
+      return;
+    }
+
+    // Create collision mesh buffers
+    this.collisionVertsBuffer = makeStorageBuffer(
+      this.device, mesh.vertices, 'collisionVerts',
+    );
+    this.collisionNormalsBuffer = makeStorageBuffer(
+      this.device, mesh.normals, 'collisionNormals',
+    );
+
+    // CollisionParams: { numParticles: u32, numTriangles: u32, margin: f32, friction: f32 }
+    const paramsData = new ArrayBuffer(16);
+    const view = new DataView(paramsData);
+    view.setUint32(0, this.buffers.numParticles, true);
+    view.setUint32(4, mesh.triCount, true);
+    view.setFloat32(8, this.config.collisionMargin, true);
+    view.setFloat32(12, 0.3, true); // default friction
+
+    this.collisionParamsBuffer = this.device.createBuffer({
+      label: 'collisionParams',
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+    new Uint8Array(this.collisionParamsBuffer.getMappedRange()).set(new Uint8Array(paramsData));
+    this.collisionParamsBuffer.unmap();
+
+    // Create collision bind group
+    this.collisionBindGroup = this.device.createBindGroup({
+      label: 'collision',
+      layout: this.collisionLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.buffers.positions } },
+        { binding: 1, resource: { buffer: this.collisionVertsBuffer } },
+        { binding: 2, resource: { buffer: this.collisionNormalsBuffer } },
+        { binding: 3, resource: { buffer: this.collisionParamsBuffer } },
+      ],
+    });
+
+    console.log('[GpuSolver] Collision mesh set:', { triCount: mesh.triCount });
+  }
+
+  /**
+   * Update collision mesh vertices and normals (same triangle count).
+   * More efficient than setCollisionMesh — reuses existing buffers.
+   */
+  updateCollisionMesh(vertices: Float32Array, normals: Float32Array): void {
+    if (this.collisionVertsBuffer && this.collisionNormalsBuffer) {
+      this.device.queue.writeBuffer(this.collisionVertsBuffer, 0, vertices);
+      this.device.queue.writeBuffer(this.collisionNormalsBuffer, 0, normals);
     }
   }
 
@@ -324,22 +536,58 @@ export class GpuClothSolver {
       destroyClothBuffers(this.buffers);
       this.buffers = null;
     }
+
+    // Normal buffers
     this.triIdsBuffer?.destroy();
     this.normalsAtomicBuffer?.destroy();
     this.normalParamsBuffer?.destroy();
     this.triIdsBuffer = null;
     this.normalsAtomicBuffer = null;
     this.normalParamsBuffer = null;
+
+    // Stretch color buffers
+    for (const buf of this.stretchColorBuffers) buf.destroy();
+    this.stretchColorBuffers = [];
+    this.stretchColorBindGroups = [];
+    this.stretchColorCounts = [];
+
+    // Bend buffers
+    for (const buf of this.bendBuffers) buf.destroy();
+    this.bendBuffers = [];
+    this.bendDispatchBuffer?.destroy();
+    this.bendDispatchBuffer = null;
+    this.bendBindGroup = null;
+    this.numBendConstraints = 0;
+
+    // Seam dispatch
+    this.seamDispatchBuffer?.destroy();
+    this.seamDispatchBuffer = null;
+
+    // Collision buffers
+    this.collisionVertsBuffer?.destroy();
+    this.collisionNormalsBuffer?.destroy();
+    this.collisionParamsBuffer?.destroy();
+    this.collisionVertsBuffer = null;
+    this.collisionNormalsBuffer = null;
+    this.collisionParamsBuffer = null;
+    this.collisionTriCount = 0;
+
+    // Pipelines and bind groups
     this.preSolvePipeline = null;
     this.stretchPipeline = null;
+    this.bendPipeline = null;
     this.seamPipeline = null;
     this.postSolvePipeline = null;
     this.normalAccumPipeline = null;
     this.normalNormPipeline = null;
+    this.collisionPipeline = null;
     this.coreBindGroup = null;
-    this.stretchBindGroup = null;
     this.seamBindGroup = null;
     this.normalBindGroup = null;
+    this.collisionBindGroup = null;
+    this.collisionLayout = null;
+    this.stretchLayout = null;
+
     // Self-collision cleanup
     this.scParamsBuffer?.destroy();
     this.scCellCountBuffer?.destroy();
@@ -402,13 +650,21 @@ export class GpuClothSolver {
       code: constraintsShaderSrc,
     });
 
+    // Collision shader module (solveBodyCollision)
+    const collisionModule = this.device.createShaderModule({
+      label: 'collision',
+      code: collisionShaderSrc,
+    });
+
     // Normals shader module
     const normalsModule = this.device.createShaderModule({
       label: 'normals',
       code: normalsShaderSrc,
     });
 
-    // Core bind group layout: params, pos, prevPos, vel, invMass
+    // ─── Bind group layouts ──────────────────────────────────────────
+
+    // Core layout: params(uniform), pos(rw), prevPos(rw), vel(rw), invMass(ro)
     const coreLayout = this.device.createBindGroupLayout({
       label: 'core',
       entries: [
@@ -420,34 +676,54 @@ export class GpuClothSolver {
       ],
     });
 
-    // Stretch bind group layout
-    const stretchLayout = this.device.createBindGroupLayout({
+    // Stretch layout: ids(ro), restLengths(ro), dispatchParams(uniform)
+    this.stretchLayout = this.device.createBindGroupLayout({
       label: 'stretch',
       entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
       ],
     });
 
-    // Seam bind group layout
+    // Seam layout: seamIds(ro), seamTargetDist(ro), seamDispatch(uniform)
     const seamLayout = this.device.createBindGroupLayout({
       label: 'seam',
       entries: [
         { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
       ],
     });
 
-    // Pipelines
+    // Collision layout: pos(rw), collisionVerts(ro), collisionNormals(ro), cparams(uniform)
+    this.collisionLayout = this.device.createBindGroupLayout({
+      label: 'collision',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+      ],
+    });
+
+    // ─── Pipeline layouts ────────────────────────────────────────────
+
     const corePipelineLayout = this.device.createPipelineLayout({
       bindGroupLayouts: [coreLayout],
     });
     const stretchPipelineLayout = this.device.createPipelineLayout({
-      bindGroupLayouts: [coreLayout, stretchLayout],
+      bindGroupLayouts: [coreLayout, this.stretchLayout],
     });
+    // Seam pipeline needs group(2), so layout must include [core, stretch, seam]
     const seamPipelineLayout = this.device.createPipelineLayout({
-      bindGroupLayouts: [coreLayout, stretchLayout, seamLayout],
+      bindGroupLayouts: [coreLayout, this.stretchLayout, seamLayout],
     });
+    const collisionPipelineLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: [this.collisionLayout],
+    });
+
+    // ─── Compute pipelines ───────────────────────────────────────────
 
     this.preSolvePipeline = this.device.createComputePipeline({
       label: 'preSolve',
@@ -467,13 +743,26 @@ export class GpuClothSolver {
       compute: { module: constraintsModule, entryPoint: 'solveStretch' },
     });
 
+    this.bendPipeline = this.device.createComputePipeline({
+      label: 'bend',
+      layout: stretchPipelineLayout,
+      compute: { module: constraintsModule, entryPoint: 'solveBend' },
+    });
+
     this.seamPipeline = this.device.createComputePipeline({
       label: 'seam',
       layout: seamPipelineLayout,
       compute: { module: constraintsModule, entryPoint: 'solveSeams' },
     });
 
-    // Normal pipelines
+    this.collisionPipeline = this.device.createComputePipeline({
+      label: 'collision',
+      layout: collisionPipelineLayout,
+      compute: { module: collisionModule, entryPoint: 'solveBodyCollision' },
+    });
+
+    // ─── Normal pipelines ────────────────────────────────────────────
+
     const normalLayout = this.device.createBindGroupLayout({
       label: 'normals',
       entries: [
@@ -499,17 +788,147 @@ export class GpuClothSolver {
       layout: normalPipelineLayout,
       compute: { module: normalsModule, entryPoint: 'normalizeNormals' },
     });
+  }
 
+  private createBindGroups(): void {
+    if (!this.buffers) return;
+
+    const b = this.buffers;
+
+    // Core bind group
+    this.coreBindGroup = this.device.createBindGroup({
+      label: 'core',
+      layout: this.preSolvePipeline!.getBindGroupLayout(0),
+      entries: [
+        { binding: 0, resource: { buffer: b.params } },
+        { binding: 1, resource: { buffer: b.positions } },
+        { binding: 2, resource: { buffer: b.prevPositions } },
+        { binding: 3, resource: { buffer: b.velocities } },
+        { binding: 4, resource: { buffer: b.invMass } },
+      ],
+    });
+
+    // Seam bind group (with dispatch uniform)
+    if (b.seamIds && b.seamTargetDist && this.seamDispatchBuffer) {
+      this.seamBindGroup = this.device.createBindGroup({
+        label: 'seam',
+        layout: this.seamPipeline!.getBindGroupLayout(2),
+        entries: [
+          { binding: 0, resource: { buffer: b.seamIds } },
+          { binding: 1, resource: { buffer: b.seamTargetDist } },
+          { binding: 2, resource: { buffer: this.seamDispatchBuffer } },
+        ],
+      });
+    }
+
+    // Normal bind group
+    if (this.normalParamsBuffer && this.triIdsBuffer && this.normalsAtomicBuffer) {
+      this.normalBindGroup = this.device.createBindGroup({
+        label: 'normals',
+        layout: this.normalAccumPipeline!.getBindGroupLayout(0),
+        entries: [
+          { binding: 0, resource: { buffer: this.normalParamsBuffer } },
+          { binding: 1, resource: { buffer: b.positions } },
+          { binding: 2, resource: { buffer: this.triIdsBuffer } },
+          { binding: 3, resource: { buffer: this.normalsAtomicBuffer } },
+          { binding: 4, resource: { buffer: b.normals } },
+        ],
+      });
+    }
+  }
+
+  /**
+   * Graph-color stretch constraints and create per-color GPU bind groups.
+   * Caps at maxColors to bound dispatch count; excess colors are merged
+   * (introduces minor races but maintains mostly race-free behavior).
+   */
+  private createColoredStretchGroups(stretch: StretchConstraints): void {
+    const numStretch = stretch.ids.length / 2;
+    if (numStretch === 0 || !this.stretchLayout) return;
+
+    const maxColors = 16;
+    let colored = colorConstraints(stretch.ids, stretch.restLengths, numStretch);
+
+    // Cap at maxColors if needed
+    if (colored.colorRanges.length > maxColors) {
+      colored = this.capColorGroups(colored, maxColors);
+    }
+
+    // Create per-color bind groups
+    for (let ci = 0; ci < colored.colorRanges.length; ci++) {
+      const range = colored.colorRanges[ci];
+      const colorIds = colored.ids.slice(range.offset * 2, (range.offset + range.count) * 2);
+      const colorRest = colored.restLengths.slice(range.offset, range.offset + range.count);
+
+      const idsBuffer = makeStorageBuffer(this.device, colorIds, `stretch-ids-c${ci}`);
+      const restBuffer = makeStorageBuffer(this.device, colorRest, `stretch-rest-c${ci}`);
+      const dispatchBuffer = makeDispatchUniform(this.device, range.count, `stretch-dispatch-c${ci}`);
+
+      this.stretchColorBuffers.push(idsBuffer, restBuffer, dispatchBuffer);
+      this.stretchColorCounts.push(range.count);
+
+      this.stretchColorBindGroups.push(
+        this.device.createBindGroup({
+          label: `stretch-c${ci}`,
+          layout: this.stretchLayout!,
+          entries: [
+            { binding: 0, resource: { buffer: idsBuffer } },
+            { binding: 1, resource: { buffer: restBuffer } },
+            { binding: 2, resource: { buffer: dispatchBuffer } },
+          ],
+        }),
+      );
+    }
+
+    console.log(`[GpuSolver] Stretch coloring: ${colored.colorRanges.length} colors for ${numStretch} constraints`);
+  }
+
+  /**
+   * Cap the number of color groups by merging excess groups into the first maxColors.
+   */
+  private capColorGroups(colored: ColoredConstraints, maxColors: number): ColoredConstraints {
+    const ranges = colored.colorRanges;
+    if (ranges.length <= maxColors) return colored;
+
+    // Assign each existing color to a capped group (round-robin)
+    const newGroupIndices: number[][] = Array.from({ length: maxColors }, () => []);
+    for (let c = 0; c < ranges.length; c++) {
+      const target = c % maxColors;
+      const range = ranges[c];
+      for (let j = 0; j < range.count; j++) {
+        newGroupIndices[target].push(range.offset + j);
+      }
+    }
+
+    // Rebuild flat arrays
+    const total = colored.ids.length / 2;
+    const newIds = new Uint32Array(total * 2);
+    const newRest = new Float32Array(total);
+    const newRanges: Array<{ offset: number; count: number }> = [];
+    let offset = 0;
+
+    for (const group of newGroupIndices) {
+      newRanges.push({ offset, count: group.length });
+      for (let j = 0; j < group.length; j++) {
+        const srcIdx = group[j];
+        newIds[(offset + j) * 2] = colored.ids[srcIdx * 2];
+        newIds[(offset + j) * 2 + 1] = colored.ids[srcIdx * 2 + 1];
+        newRest[offset + j] = colored.restLengths[srcIdx];
+      }
+      offset += group.length;
+    }
+
+    console.log(`[GpuSolver] Capped ${ranges.length} colors → ${maxColors}`);
+    return { ids: newIds, restLengths: newRest, colorRanges: newRanges };
   }
 
   /**
    * Initialize self-collision buffers, pipelines, and bind groups.
-   * Builds adjacency from triangle data (CSR format), allocates hash table buffers.
    */
   private initSelfCollision(triangles: Uint32Array, numParticles: number): void {
     if (!this.buffers) return;
 
-    // ─── Build adjacency in CSR format ──────────────────────────────
+    // Build adjacency in CSR format
     const adjSets = buildAdjacency(new Int32Array(triangles.buffer, triangles.byteOffset, triangles.length), numParticles);
     const offsets = new Uint32Array(numParticles + 1);
     let totalNeighbors = 0;
@@ -527,10 +946,8 @@ export class GpuClothSolver {
       }
     }
 
-    // ─── Hash table sizing ──────────────────────────────────────────
-    // Prime table size ~2× particles
+    // Hash table sizing (prime ~2× particles)
     let ts = numParticles * 2;
-    // Simple next-odd prime search
     if (ts % 2 === 0) ts++;
     outer: while (true) {
       const lim = Math.floor(Math.sqrt(ts));
@@ -541,14 +958,13 @@ export class GpuClothSolver {
     }
     this.scTableSize = ts;
 
-    // ─── Create buffers ─────────────────────────────────────────────
     // Params uniform
     const paramsData = new ArrayBuffer(16);
     const pView = new DataView(paramsData);
     pView.setUint32(0, numParticles, true);
     pView.setUint32(4, ts, true);
     pView.setFloat32(8, this.config.clothThickness, true);
-    pView.setUint32(12, 0, true); // pad
+    pView.setUint32(12, 0, true);
 
     this.scParamsBuffer = this.device.createBuffer({
       label: 'sc-params',
@@ -559,28 +975,24 @@ export class GpuClothSolver {
     new Uint8Array(this.scParamsBuffer.getMappedRange()).set(new Uint8Array(paramsData));
     this.scParamsBuffer.unmap();
 
-    // Cell count (atomic u32)
     this.scCellCountBuffer = this.device.createBuffer({
       label: 'sc-cellCount',
       size: ts * 4,
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
     });
 
-    // Cell start
     this.scCellStartBuffer = this.device.createBuffer({
       label: 'sc-cellStart',
       size: ts * 4,
       usage: GPUBufferUsage.STORAGE,
     });
 
-    // Cell entries
     this.scCellEntriesBuffer = this.device.createBuffer({
       label: 'sc-cellEntries',
       size: numParticles * 4,
       usage: GPUBufferUsage.STORAGE,
     });
 
-    // Adjacency offsets
     this.scAdjOffsetsBuffer = this.device.createBuffer({
       label: 'sc-adjOffsets',
       size: offsets.byteLength,
@@ -590,7 +1002,6 @@ export class GpuClothSolver {
     new Uint32Array(this.scAdjOffsetsBuffer.getMappedRange()).set(offsets);
     this.scAdjOffsetsBuffer.unmap();
 
-    // Adjacency neighbors
     this.scAdjNeighborsBuffer = this.device.createBuffer({
       label: 'sc-adjNeighbors',
       size: Math.max(neighbors.byteLength, 4),
@@ -600,7 +1011,7 @@ export class GpuClothSolver {
     new Uint32Array(this.scAdjNeighborsBuffer.getMappedRange()).set(neighbors);
     this.scAdjNeighborsBuffer.unmap();
 
-    // ─── Pipelines ──────────────────────────────────────────────────
+    // Pipelines
     const scModule = this.device.createShaderModule({
       label: 'selfCollision',
       code: selfCollisionShaderSrc,
@@ -651,7 +1062,7 @@ export class GpuClothSolver {
       compute: { module: scModule, entryPoint: 'resolveCollisions' },
     });
 
-    // ─── Bind groups ────────────────────────────────────────────────
+    // Bind groups
     this.scBindGroup = this.device.createBindGroup({
       label: 'sc-main',
       layout: scLayout,
@@ -678,61 +1089,5 @@ export class GpuClothSolver {
       tableSize: ts,
       adjNeighbors: totalNeighbors,
     });
-  }
-
-  private createBindGroups(): void {
-    if (!this.buffers) return;
-
-    const b = this.buffers;
-
-    // Core bind group
-    this.coreBindGroup = this.device.createBindGroup({
-      label: 'core',
-      layout: this.preSolvePipeline!.getBindGroupLayout(0),
-      entries: [
-        { binding: 0, resource: { buffer: b.params } },
-        { binding: 1, resource: { buffer: b.positions } },
-        { binding: 2, resource: { buffer: b.prevPositions } },
-        { binding: 3, resource: { buffer: b.velocities } },
-        { binding: 4, resource: { buffer: b.invMass } },
-      ],
-    });
-
-    // Stretch bind group
-    this.stretchBindGroup = this.device.createBindGroup({
-      label: 'stretch',
-      layout: this.stretchPipeline!.getBindGroupLayout(1),
-      entries: [
-        { binding: 0, resource: { buffer: b.stretchIds } },
-        { binding: 1, resource: { buffer: b.stretchRestLengths } },
-      ],
-    });
-
-    // Seam bind group
-    if (b.seamIds && b.seamTargetDist) {
-      this.seamBindGroup = this.device.createBindGroup({
-        label: 'seam',
-        layout: this.seamPipeline!.getBindGroupLayout(2),
-        entries: [
-          { binding: 0, resource: { buffer: b.seamIds } },
-          { binding: 1, resource: { buffer: b.seamTargetDist } },
-        ],
-      });
-    }
-
-    // Normal bind group
-    if (this.normalParamsBuffer && this.triIdsBuffer && this.normalsAtomicBuffer) {
-      this.normalBindGroup = this.device.createBindGroup({
-        label: 'normals',
-        layout: this.normalAccumPipeline!.getBindGroupLayout(0),
-        entries: [
-          { binding: 0, resource: { buffer: this.normalParamsBuffer } },
-          { binding: 1, resource: { buffer: b.positions } },
-          { binding: 2, resource: { buffer: this.triIdsBuffer } },
-          { binding: 3, resource: { buffer: this.normalsAtomicBuffer } },
-          { binding: 4, resource: { buffer: b.normals } },
-        ],
-      });
-    }
   }
 }

@@ -44,7 +44,8 @@ export class SimulationInitClient {
       );
       this.worker.addEventListener('message', this.handleMessage);
       this.worker.addEventListener('error', (e) => {
-        console.error('[SimInitClient] Worker error:', e);
+        e.preventDefault();
+        console.error('[SimInitClient] Worker error:', e.message || e);
         this.rejectAll(new Error('Worker crashed'));
       });
     } catch {

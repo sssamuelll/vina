@@ -77,7 +77,10 @@ export class WasmSolverClient {
 
     this.worker.addEventListener('message', this.handleMessage);
     this.worker.addEventListener('error', (e) => {
+      // Prevent the error from becoming an unhandled rejection in the console
+      e.preventDefault();
       const msg = e.message || 'Wasm worker crashed';
+      console.warn('[WasmSolver] Worker error event:', msg);
       this.readyReject?.(new Error(msg));
       this.readyReject = null;
       this.readyResolve = null;
@@ -301,15 +304,20 @@ export class WasmSolverClient {
 
 /**
  * Check if Wasm XPBD solver is available.
- * Uses a quick fetch HEAD check instead of loading the full module.
+ * Checks BOTH the JS bindings and the WASM binary — previously only the
+ * .wasm file was checked, so a 500 on the .js file would pass the check
+ * but fail during actual load (causing unhandled promise rejections).
  */
 export async function isWasmSolverAvailable(): Promise<boolean> {
   try {
     const baseUrl = import.meta.env.BASE_URL ?? '/';
     const v = import.meta.env.VITE_WASM_VERSION ?? __BUILD_TIMESTAMP__;
     const qs = v ? `?v=${v}` : '';
-    const resp = await fetch(`${baseUrl}wasm/xpbd_wasm_bg.wasm${qs}`, { method: 'HEAD' });
-    return resp.ok;
+    const [jsResp, wasmResp] = await Promise.all([
+      fetch(`${baseUrl}wasm/xpbd_wasm.js${qs}`, { method: 'HEAD' }),
+      fetch(`${baseUrl}wasm/xpbd_wasm_bg.wasm${qs}`, { method: 'HEAD' }),
+    ]);
+    return jsResp.ok && wasmResp.ok;
   } catch {
     return false;
   }

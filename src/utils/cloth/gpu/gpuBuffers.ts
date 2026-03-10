@@ -344,12 +344,16 @@ export function createClothBuffers(
     seamTargetDist = createStorageBuffer(device, seam.targetDist, 'seamTargetDist');
   }
 
-  // Uniform params buffer
+  // Uniform params buffer (uses DataView for proper u32/f32 packing)
   const paramsData = packSimParams(params);
-  const paramsBuffer = createStorageBuffer(
-    device, paramsData, 'simParams',
-    GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  );
+  const paramsBuffer = device.createBuffer({
+    label: 'simParams',
+    size: paramsData.byteLength,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: true,
+  });
+  new Uint8Array(paramsBuffer.getMappedRange()).set(new Uint8Array(paramsData));
+  paramsBuffer.unmap();
 
   // Readback buffer
   const readback = device.createBuffer({
@@ -380,26 +384,121 @@ export function createClothBuffers(
 }
 
 /**
- * Pack SimParams into a Float32Array for the uniform buffer.
- * Layout must match the WGSL struct exactly.
+ * Pack SimParams into an ArrayBuffer for the uniform buffer.
+ * Uses DataView to write u32 and f32 fields with correct bit representation.
+ *
+ * Previously used Float32Array for ALL fields, which caused the first 4 u32
+ * fields (numParticles, etc.) to be bit-reinterpreted: JS number 1000 stored
+ * as f32 bits 0x44740000, read by WGSL as u32 → 1,156,653,056 (garbage).
  */
-function packSimParams(p: SimParams): Float32Array {
-  return new Float32Array([
-    p.numParticles,
-    p.numStretchConstraints,
-    p.numBendConstraints,
-    p.numSeamConstraints,
-    p.dt / p.substeps,           // sdt (substep dt)
-    p.substeps,
-    p.gravity[0], p.gravity[1], p.gravity[2],
-    p.damping,
-    p.stretchCompliance,
-    p.bendCompliance,
-    p.seamStiffness,
-    p.groundY,
-    p.collisionMargin,
-    p.clothThickness,
-  ]);
+function packSimParams(p: SimParams): ArrayBuffer {
+  const buf = new ArrayBuffer(64); // 16 fields × 4 bytes
+  const view = new DataView(buf);
+
+  // u32 fields (offsets 0-12)
+  view.setUint32(0,  p.numParticles, true);
+  view.setUint32(4,  p.numStretchConstraints, true);
+  view.setUint32(8,  p.numBendConstraints, true);
+  view.setUint32(12, p.numSeamConstraints, true);
+
+  // f32 fields (offsets 16-60)
+  view.setFloat32(16, p.dt / p.substeps, true);  // sdt
+  view.setFloat32(20, p.substeps, true);
+  view.setFloat32(24, p.gravity[0], true);
+  view.setFloat32(28, p.gravity[1], true);
+  view.setFloat32(32, p.gravity[2], true);
+  view.setFloat32(36, p.damping, true);
+  view.setFloat32(40, p.stretchCompliance, true);
+  view.setFloat32(44, p.bendCompliance, true);
+  view.setFloat32(48, p.seamStiffness, true);
+  view.setFloat32(52, p.groundY, true);
+  view.setFloat32(56, p.collisionMargin, true);
+  view.setFloat32(60, p.clothThickness, true);
+
+  return buf;
+}
+
+/**
+ * Graph-color constraints so that no two constraints sharing a vertex
+ * get the same color. Returns constraints reordered by color group.
+ *
+ * This enables race-free parallel constraint solving: each color group
+ * can be dispatched as a separate compute pass, with all constraints in
+ * the group guaranteed to operate on independent vertices.
+ */
+export interface ColoredConstraints {
+  /** Constraint IDs reordered by color [color0..., color1..., ...] */
+  ids: Uint32Array;
+  /** Rest lengths reordered to match */
+  restLengths: Float32Array;
+  /** (offset, count) per color group */
+  colorRanges: Array<{ offset: number; count: number }>;
+}
+
+export function colorConstraints(
+  ids: Uint32Array,
+  restLengths: Float32Array,
+  numConstraints: number,
+): ColoredConstraints {
+  if (numConstraints === 0) {
+    return { ids: new Uint32Array(0), restLengths: new Float32Array(0), colorRanges: [] };
+  }
+
+  // Build vertex → constraint adjacency
+  const vertexConstraints = new Map<number, number[]>();
+  for (let i = 0; i < numConstraints; i++) {
+    const v0 = ids[i * 2];
+    const v1 = ids[i * 2 + 1];
+    if (!vertexConstraints.has(v0)) vertexConstraints.set(v0, []);
+    if (!vertexConstraints.has(v1)) vertexConstraints.set(v1, []);
+    vertexConstraints.get(v0)!.push(i);
+    vertexConstraints.get(v1)!.push(i);
+  }
+
+  // Greedy graph coloring
+  const constraintColors = new Int32Array(numConstraints).fill(-1);
+  let numColors = 0;
+
+  for (let i = 0; i < numConstraints; i++) {
+    const usedColors = new Set<number>();
+    const v0 = ids[i * 2];
+    const v1 = ids[i * 2 + 1];
+    for (const neighbor of vertexConstraints.get(v0)!) {
+      if (constraintColors[neighbor] >= 0) usedColors.add(constraintColors[neighbor]);
+    }
+    for (const neighbor of vertexConstraints.get(v1)!) {
+      if (constraintColors[neighbor] >= 0) usedColors.add(constraintColors[neighbor]);
+    }
+
+    let color = 0;
+    while (usedColors.has(color)) color++;
+    constraintColors[i] = color;
+    if (color + 1 > numColors) numColors = color + 1;
+  }
+
+  // Group by color and reorder
+  const colorGroups: number[][] = Array.from({ length: numColors }, () => []);
+  for (let i = 0; i < numConstraints; i++) {
+    colorGroups[constraintColors[i]].push(i);
+  }
+
+  const reorderedIds = new Uint32Array(numConstraints * 2);
+  const reorderedRest = new Float32Array(numConstraints);
+  const colorRanges: Array<{ offset: number; count: number }> = [];
+  let offset = 0;
+
+  for (const group of colorGroups) {
+    colorRanges.push({ offset, count: group.length });
+    for (let j = 0; j < group.length; j++) {
+      const srcIdx = group[j];
+      reorderedIds[(offset + j) * 2] = ids[srcIdx * 2];
+      reorderedIds[(offset + j) * 2 + 1] = ids[srcIdx * 2 + 1];
+      reorderedRest[offset + j] = restLengths[srcIdx];
+    }
+    offset += group.length;
+  }
+
+  return { ids: reorderedIds, restLengths: reorderedRest, colorRanges };
 }
 
 /**
@@ -410,7 +509,8 @@ export function updateSimParams(
   buffer: GPUBuffer,
   params: SimParams,
 ): void {
-  device.queue.writeBuffer(buffer, 0, packSimParams(params));
+  const data = packSimParams(params);
+  device.queue.writeBuffer(buffer, 0, new Uint8Array(data));
 }
 
 /**

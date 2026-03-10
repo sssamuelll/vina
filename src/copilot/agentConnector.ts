@@ -71,7 +71,7 @@ function connectWS(endpoint: string): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(endpoint);
     socket.onopen = () => resolve(socket);
-    socket.onerror = (e) => reject(e);
+    socket.onerror = () => reject(new Error('WebSocket connection failed'));
     socket.onmessage = (event) => {
       if (wsResolve) {
         try {
