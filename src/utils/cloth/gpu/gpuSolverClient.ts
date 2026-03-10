@@ -232,6 +232,22 @@ export class GpuSolverClient {
     return this.solver.getNormalBuffer();
   }
 
+  /**
+   * Set triangle collision mesh for body collision.
+   * Vertices should be expanded: 9 floats per triangle (3 verts × 3 components).
+   * Normals: 3 floats per triangle.
+   */
+  setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+    this.solver.setCollisionMesh(mesh);
+  }
+
+  /**
+   * Update collision mesh vertices/normals (same triangle count, reuses buffers).
+   */
+  updateCollisionMesh(vertices: Float32Array, normals: Float32Array): void {
+    this.solver.updateCollisionMesh(vertices, normals);
+  }
+
   // ─── Private ────────────────────────────────────────────────────────────
 
   private loop = (): void => {

@@ -1,8 +1,10 @@
 // ─── Constraint Solvers ─────────────────────────────────────────────────────
 //
-// Distance (stretch) and bending constraints for XPBD cloth.
-// Each constraint is solved independently per workgroup invocation.
-// Multiple substep iterations are dispatched from the CPU side.
+// Distance (stretch) and seam constraints for XPBD cloth.
+//
+// Constraints are graph-colored and dispatched per-color to avoid race
+// conditions on shared vertices. Each color group gets its own bind group
+// with a subset of constraints and a per-dispatch count uniform.
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct SimParams {
@@ -28,16 +30,22 @@ struct SimParams {
 @group(0) @binding(1) var<storage, read_write> pos: array<f32>;
 @group(0) @binding(4) var<storage, read> invMass: array<f32>;
 
-// Stretch constraint buffers
+// Per-color constraint buffers (swapped between dispatches)
 @group(1) @binding(0) var<storage, read> stretchIds: array<u32>;
 @group(1) @binding(1) var<storage, read> stretchRestLen: array<f32>;
+
+// Per-dispatch constraint count (set per color group)
+struct DispatchParams {
+  count: u32,
+};
+@group(1) @binding(2) var<uniform> dispatchParams: DispatchParams;
 
 // ─── Stretch (Distance) Constraints ─────────────────────────────────────────
 
 @compute @workgroup_size(256)
 fn solveStretch(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
-  if (i >= params.numStretchConstraints) { return; }
+  if (i >= dispatchParams.count) { return; }
 
   let id0 = stretchIds[i * 2u];
   let id1 = stretchIds[i * 2u + 1u];
@@ -76,16 +84,15 @@ fn solveStretch(@builtin(global_invocation_id) gid: vec3u) {
 }
 
 // ─── Seam Constraints ───────────────────────────────────────────────────────
-// Pull sewed vertices together. Same structure as stretch but with
-// higher stiffness and target distance = 0.
 
 @group(2) @binding(0) var<storage, read> seamIds: array<u32>;
 @group(2) @binding(1) var<storage, read> seamTargetDist: array<f32>;
+@group(2) @binding(2) var<uniform> seamDispatch: DispatchParams;
 
 @compute @workgroup_size(256)
 fn solveSeams(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
-  if (i >= params.numSeamConstraints) { return; }
+  if (i >= seamDispatch.count) { return; }
 
   let id0 = seamIds[i * 2u];
   let id1 = seamIds[i * 2u + 1u];

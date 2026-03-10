@@ -207,14 +207,49 @@ export function useSimulationLifecycle({
       const cancelFlag = { get value() { return cancelled; } };
 
       const startSim = async () => {
-        // ─── WebGPU GPU solver — DISABLED ───────────────────────────────
-        // The GPU compute solver has multiple issues that produce NaN:
-        //   1. packSimParams() packs u32 fields as f32 (bit reinterpretation)
-        //   2. Parallel constraint solving without atomics (race conditions)
-        //   3. No collision mesh loading (cloth falls through avatar)
-        // These need to be fixed before re-enabling. Use WASM/CPU instead.
+        // ─── WebGPU GPU solver ────────────────────────────────────────
         if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
-          console.log('[SimLifecycle] WebGPU renderer active, but GPU solver disabled (NaN issues). Using WASM/CPU solver.');
+          try {
+            const adapter = await navigator.gpu.requestAdapter();
+            if (adapter && !cancelled) {
+              const device = await adapter.requestDevice();
+              if (!cancelled) {
+                console.log('[SimLifecycle] 🟢 Using WebGPU GPU solver');
+                dispatch(setSolverTier('webgpu'));
+                const gpuClient = new GpuSolverClient(device);
+                gpuClientRef.current = gpuClient;
+                gpuClient.onFrame = onFrame;
+                // Note: seamInitData uses edge names (resolved by CPU worker).
+                // GPU client expects pre-computed vertex pairs — skip seams for now.
+                await withTimeout(gpuClient.initMultiPiece(placedMeshes), 12000, 'GPU solver init');
+
+                // Load avatar collision mesh
+                if (avatarModelUrl && !cancelled) {
+                  try {
+                    const collisionMesh = await withTimeout(
+                      extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
+                      5000,
+                      'GPU collision mesh',
+                    );
+                    if (collisionMesh && !cancelled) {
+                      gpuClient.setCollisionMesh(collisionMesh);
+                      dispatch(setBodyCollision(true));
+                    }
+                  } catch (e) {
+                    console.warn('[SimLifecycle] GPU collision mesh failed:', e);
+                    if (!cancelled) dispatch(setBodyCollision(false));
+                  }
+                }
+
+                if (!cancelled) gpuClient.start();
+                return;
+              }
+            }
+          } catch (e) {
+            console.warn('[SimLifecycle] GPU solver failed, falling through to WASM:', e);
+            gpuClientRef.current?.dispose();
+            gpuClientRef.current = null;
+          }
         }
 
         // ─── WASM XPBD ────────────────────────────────────────────────
@@ -334,7 +369,7 @@ export function useSimulationLifecycle({
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
   useEffect(() => {
     // Only rebuild if simulation is running and we have a solver client
-    const activeClient = wasmClientRef.current || clientRef.current;
+    const activeClient = gpuClientRef.current || wasmClientRef.current || clientRef.current;
     if (!activeClient || simulationState !== 'running' || !avatarModelUrl) return;
 
     // Debounce 200ms to batch rapid slider movements
@@ -348,7 +383,7 @@ export function useSimulationLifecycle({
         if (!collisionMesh) return;
 
         // Check client is still alive (user may have stopped sim)
-        const client = wasmClientRef.current || clientRef.current;
+        const client = gpuClientRef.current || wasmClientRef.current || clientRef.current;
         if (client) {
           console.log('[SimLifecycle] ♻️ Collision mesh rebuilt for measurement change:', collisionMesh.triCount, 'tris');
           client.setCollisionMesh(collisionMesh);
