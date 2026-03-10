@@ -14,10 +14,11 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useThree } from '@react-three/fiber';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { isWebGPUAvailable, initWebGPU } from '../../utils/cloth/gpu/webgpuDetect';
+import { isWebGPUAvailable } from '../../utils/cloth/gpu/webgpuDetect';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
@@ -64,6 +65,15 @@ interface UseSimulationLifecycleResult {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Check localStorage feature flag. Default: true (WebGPU enabled). */
+function isWebGPUFeatureEnabled(): boolean {
+  try {
+    return localStorage.getItem('webclo-use-webgpu') !== 'false';
+  } catch {
+    return true;
+  }
+}
 
 /** Race a promise against a timeout */
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
@@ -155,6 +165,7 @@ export function useSimulationLifecycle({
   stretchingIdsRef,
 }: UseSimulationLifecycleProps): UseSimulationLifecycleResult {
   const dispatch = useDispatch();
+  const gl = useThree((s) => s.gl);
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
   const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
@@ -196,19 +207,23 @@ export function useSimulationLifecycle({
       const cancelFlag = { get value() { return cancelled; } };
 
       const startSim = async () => {
-        // ─── WebGPU (DISABLED) ─────────────────────────────────────────
-        if (false as boolean && isWebGPUAvailable()) {
+        // ─── WebGPU (zero-copy) ─────────────────────────────────────────
+        if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
           try {
-            const gpuCtx = await withTimeout(initWebGPU(), 5000, 'WebGPU init');
-            if (gpuCtx && !cancelled) {
-              console.log('[SimLifecycle] 🟢 Using WebGPU solver');
+            // Get shared GPUDevice from the WebGPURenderer backend
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const device = (gl as any).backend?.device as GPUDevice | undefined;
+            if (device && !cancelled) {
+              console.log('[SimLifecycle] 🟢 Using WebGPU solver (zero-copy)');
               dispatch(setSolverTier('webgpu'));
-              const gpuClient = new GpuSolverClient(gpuCtx.device);
+              const gpuClient = new GpuSolverClient(device);
               gpuClientRef.current = gpuClient;
               gpuClient.onFrame = onFrame;
               await withTimeout(gpuClient.initMultiPiece(placedMeshes), 10000, 'GPU solver init');
               if (!cancelled) gpuClient.start();
               return;
+            } else if (!cancelled) {
+              console.warn('[SimLifecycle] WebGPU renderer device not available, falling back');
             }
           } catch (e) {
             console.warn('[SimLifecycle] WebGPU failed, falling back:', e);
@@ -324,7 +339,7 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.stop();
     }
     return undefined;
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch, gl]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
   useEffect(() => {
