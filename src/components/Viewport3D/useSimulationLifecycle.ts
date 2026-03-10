@@ -207,27 +207,14 @@ export function useSimulationLifecycle({
       const cancelFlag = { get value() { return cancelled; } };
 
       const startSim = async () => {
-        // ─── WebGPU (zero-copy) ─────────────────────────────────────────
+        // ─── WebGPU GPU solver — DISABLED ───────────────────────────────
+        // The GPU compute solver has multiple issues that produce NaN:
+        //   1. packSimParams() packs u32 fields as f32 (bit reinterpretation)
+        //   2. Parallel constraint solving without atomics (race conditions)
+        //   3. No collision mesh loading (cloth falls through avatar)
+        // These need to be fixed before re-enabling. Use WASM/CPU instead.
         if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
-          try {
-            // Get shared GPUDevice from the WebGPURenderer backend
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const device = (gl as any).backend?.device as GPUDevice | undefined;
-            if (device && !cancelled) {
-              console.log('[SimLifecycle] 🟢 Using WebGPU solver (zero-copy)');
-              dispatch(setSolverTier('webgpu'));
-              const gpuClient = new GpuSolverClient(device);
-              gpuClientRef.current = gpuClient;
-              gpuClient.onFrame = onFrame;
-              await withTimeout(gpuClient.initMultiPiece(placedMeshes), 10000, 'GPU solver init');
-              if (!cancelled) gpuClient.start();
-              return;
-            } else if (!cancelled) {
-              console.warn('[SimLifecycle] WebGPU renderer device not available, falling back');
-            }
-          } catch (e) {
-            console.warn('[SimLifecycle] WebGPU failed, falling back:', e);
-          }
+          console.log('[SimLifecycle] WebGPU renderer active, but GPU solver disabled (NaN issues). Using WASM/CPU solver.');
         }
 
         // ─── WASM XPBD ────────────────────────────────────────────────
