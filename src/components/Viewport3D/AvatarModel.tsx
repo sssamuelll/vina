@@ -176,6 +176,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
   const ikSolver = useRef<CCDIKSolver | null>(null);
   const ikTargetHelpers = useRef<Map<string, THREE.Object3D>>(new Map());
+  const ikPlaceholderIndices = useRef<number[]>([]);
   const ikSolvedRotations = useRef<Map<string, THREE.Quaternion>>(new Map());
   const morphMeshes = useRef<THREE.SkinnedMesh[]>([]);
 
@@ -297,6 +298,25 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
           boneMap.current.set(bone.name, bone);
           bindPoses.current.set(bone.name, bone.quaternion.clone());
         }
+
+        // Pre-allocate skeleton capacity for IK target bones.
+        // WebGPURenderer's SkinningNode captures bones.length at construction
+        // time to size the uniform buffer. If bones are pushed later (by IK
+        // init), the buffer is too small and the entire render pass is
+        // discarded with "Invalid CommandBuffer". Pre-padding here ensures the
+        // buffer is sized correctly from the first render frame.
+        const ikSlotCount = Object.keys(IK_END_EFFECTOR_BONES).length; // 4
+        const sk = skeleton as THREE.Skeleton;
+        ikPlaceholderIndices.current = [];
+        for (let i = 0; i < ikSlotCount; i++) {
+          const placeholder = new THREE.Bone();
+          placeholder.name = `__ik_placeholder_${i}`;
+          sk.bones.push(placeholder);
+          sk.boneInverses.push(new THREE.Matrix4());
+          ikPlaceholderIndices.current.push(sk.bones.length - 1);
+        }
+        // Rebuild boneMatrices with the padded bone count
+        sk.init();
       } else {
         // Fallback: traverse for bones
         scene.traverse((obj) => {
@@ -397,7 +417,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const initializeIK = (activeScene: THREE.Object3D) => {
     if (!activeScene || boneMap.current.size === 0) return;
 
-    // Clean up old target helpers and remove pushed entries from skeleton
+    // Clean up old target helpers (restore placeholder bones in their slots)
     if (ikTargetHelpers.current.size > 0) {
       let cleanupMesh: THREE.SkinnedMesh | null = null;
       activeScene.traverse((child) => {
@@ -409,12 +429,16 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
 
       ikTargetHelpers.current.forEach(helper => {
         helper.parent?.remove(helper);
-        // Remove from skeleton.bones/boneInverses to prevent array growth
+        // Restore placeholder bone in the slot instead of splicing.
+        // Splicing would change array length and break the pre-allocated
+        // uniform buffer size that the WebGPU pipeline compiled against.
         if (cleanupSkeleton) {
           const idx = cleanupSkeleton.bones.indexOf(helper as unknown as THREE.Bone);
           if (idx !== -1) {
-            cleanupSkeleton.bones.splice(idx, 1);
-            cleanupSkeleton.boneInverses.splice(idx, 1);
+            const placeholder = new THREE.Bone();
+            placeholder.name = `__ik_placeholder_${idx}`;
+            cleanupSkeleton.bones[idx] = placeholder;
+            cleanupSkeleton.boneInverses[idx] = new THREE.Matrix4();
           }
         }
       });
@@ -438,6 +462,11 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
         links: Array<{ index: number; rotationMin?: THREE.Vector3; rotationMax?: THREE.Vector3 }>;
       }> = [];
 
+      // Use pre-allocated placeholder slots for IK targets instead of
+      // pushing new bones (which would grow the array past the uniform
+      // buffer capacity that the WebGPU pipeline compiled against).
+      let nextPlaceholderSlot = 0;
+
       for (const chain of ikChains) {
         const endEffectorBoneName = IK_END_EFFECTOR_BONES[chain.name];
         if (!endEffectorBoneName) continue;
@@ -455,12 +484,20 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
         activeScene.add(target);
         ikTargetHelpers.current.set(chain.name, target);
 
-        // We need the target in the skeleton's bones array for CCDIKSolver
-        // Must also push a corresponding boneInverse matrix to keep arrays in sync,
-        // otherwise Skeleton.update() crashes accessing undefined boneInverses[i].elements
-        skeleton.bones.push(target as unknown as THREE.Bone);
-        skeleton.boneInverses.push(new THREE.Matrix4());
-        const targetIndex = skeleton.bones.length - 1;
+        // Replace a pre-allocated placeholder bone with this IK target.
+        // The placeholder slots were created during avatar load to ensure
+        // the uniform buffer is sized correctly from the first frame.
+        let targetIndex: number;
+        if (nextPlaceholderSlot < ikPlaceholderIndices.current.length) {
+          targetIndex = ikPlaceholderIndices.current[nextPlaceholderSlot++];
+          skeleton.bones[targetIndex] = target as unknown as THREE.Bone;
+          skeleton.boneInverses[targetIndex] = new THREE.Matrix4();
+        } else {
+          // Fallback: push if no placeholder available (shouldn't happen)
+          skeleton.bones.push(target as unknown as THREE.Bone);
+          skeleton.boneInverses.push(new THREE.Matrix4());
+          targetIndex = skeleton.bones.length - 1;
+        }
 
         // The effector is the end-effector bone (hand/foot), not the last link
         const effectorIndex = skeleton.bones.indexOf(endEffectorBone);

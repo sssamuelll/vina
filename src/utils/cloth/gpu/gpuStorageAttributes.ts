@@ -13,7 +13,7 @@ export function createPositionStorageAttribute(
   particleCount: number,
 ): StorageBufferAttribute | null {
   if (!buffer || particleCount <= 0) return null;
-  const attr = new StorageBufferAttribute(particleCount * 3, 3);
+  const attr = new StorageBufferAttribute(new Float32Array(particleCount * 3), 3);
   // Bind our solver's GPU buffer directly — this is the zero-copy trick.
   // StorageBufferAttribute lacks a typed gpuBuffer setter; we patch the internal field.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,7 +30,7 @@ export function createNormalStorageAttribute(
   particleCount: number,
 ): StorageBufferAttribute | null {
   if (!buffer || particleCount <= 0) return null;
-  const attr = new StorageBufferAttribute(particleCount * 3, 3);
+  const attr = new StorageBufferAttribute(new Float32Array(particleCount * 3), 3);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (attr as any).gpuBuffer = buffer;
   return attr;
