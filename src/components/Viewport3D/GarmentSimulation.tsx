@@ -37,6 +37,7 @@ import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
+import { beginBatchedCompute } from '../../utils/cloth/gpu/batchedCompute';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -263,28 +264,29 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (solver) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderer = gl as any;
-      const substeps = 15;
+      const substeps = 10;
+      const endBatch = beginBatchedCompute(renderer);
+      try {
+        for (let s = 0; s < substeps; s++) {
+          renderer.compute(solver.preSolve);
+          for (const stretchColor of solver.stretchColors) {
+            renderer.compute(stretchColor);
+          }
+          if (solver.bend) renderer.compute(solver.bend);
+          if (solver.seam) renderer.compute(solver.seam);
+          for (const body of solver.collisionBodies) {
+            renderer.compute(body.collisionNode);
+          }
+          renderer.compute(solver.groundClamp);
+          renderer.compute(solver.postSolve);
+        }
 
-      for (let s = 0; s < substeps; s++) {
-        renderer.compute(solver.preSolve);
-        for (const stretchColor of solver.stretchColors) {
-          renderer.compute(stretchColor);
-        }
-        if (solver.bend) renderer.compute(solver.bend);
-        if (solver.seam) renderer.compute(solver.seam);
-        // Body collision: BVH traversal per body per substep
-        for (const body of solver.collisionBodies) {
-          renderer.compute(body.collisionNode);
-        }
-        renderer.compute(solver.groundClamp);
-        renderer.compute(solver.postSolve);
+        renderer.compute(solver.normalZero);
+        renderer.compute(solver.normalAccum);
+        renderer.compute(solver.normalNormalize);
+      } finally {
+        endBatch();
       }
-
-      // Compute smooth vertex normals from final positions (once per frame)
-      renderer.compute(solver.normalZero);
-      renderer.compute(solver.normalAccum);
-      renderer.compute(solver.normalNormalize);
-
       return;
     }
 
