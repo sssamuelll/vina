@@ -279,6 +279,10 @@ import {
 - **Solver Selection**: WASM preferred, JS fallback if WASM fails
 - **Off-Thread**: Simulation runs in Web Worker
 - **Zero-Copy**: WASM memory accessed directly via `positions_ptr()`
+- **TSL Zero-Copy**: GPU solver uses TSL (Three Shading Language) for compute.
+  `renderer.compute()` writes positions to `StorageBufferAttribute`, which the
+  vertex shader reads via `material.positionNode` — no CPU readback per frame.
+  Body collision and GPU normals deferred to Phase 2.
 - **Edge Types**: 0 = WARP, 1 = WEFT, 2 = SHEAR
 
 ## References
