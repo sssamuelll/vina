@@ -59,6 +59,14 @@ export interface TslSolver {
   postSolve: ComputeNode;
   /** Position SBA — shared with vertex shader for zero-copy rendering */
   positionSBA: StorageBufferAttribute;
+  /**
+   * Position storage node — the SAME node used by compute kernels.
+   * Use `.toAttribute()` for material.positionNode to ensure the vertex
+   * shader reads from the same GPU buffer that compute writes to.
+   * Creating a separate storage() node would get its own UUID/binding
+   * and potentially read from a different GPU buffer.
+   */
+  positionBufNode: StorageBufferNode<'float'>;
   /** Number of particles */
   numParticles: number;
   /** Number of triangles */
@@ -413,6 +421,7 @@ export function createTslSolver(
     seam,
     postSolve,
     positionSBA: buffers.positionSBA,
+    positionBufNode: posBuf,
     numParticles: N,
     numTriangles: buffers.numTriangles,
     triangles: buffers.triangles,

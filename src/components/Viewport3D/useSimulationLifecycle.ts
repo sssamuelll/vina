@@ -12,7 +12,7 @@
  * Extracted from GarmentSimulation.tsx for separation of concerns.
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
@@ -186,6 +186,12 @@ export function useSimulationLifecycle({
   const gpuDeviceRef = useRef<GPUDevice | null>(null);
   const gpuDeviceLostRef = useRef(false);
 
+  // State counter to force re-render after async TSL solver init completes.
+  // Without this, tslSolverRef.current changes inside an async callback but
+  // no React state change occurs, so GarmentSimulation never re-renders to
+  // pick up the new solver and create the TSL material.
+  const [, setTslGeneration] = useState(0);
+
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const collisionRebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -235,7 +241,9 @@ export function useSimulationLifecycle({
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
                 await withTimeout(gpuClient.initMultiPieceTsl(placedMeshes), 12000, 'TSL solver init');
+                if (cancelled) return;
                 tslSolverRef.current = gpuClient.getTslSolver();
+                setTslGeneration(g => g + 1);
 
                 // Body collision deferred to Phase 2.
                 // Don't call gpuClient.start() — TSL compute is driven by useFrame.

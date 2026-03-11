@@ -17,7 +17,6 @@
 import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { storage } from 'three/tsl';
 import { useFrame } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -77,7 +76,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const pieceColorsRef = useRef<Float32Array | null>(null);
-  const tslMaterialRef = useRef<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
+  const [tslMaterial, setTslMaterial] = useState<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
 
   // Shared refs for breaking circular dependency between useMeshing and useSimulationLifecycle
   const clientsRef = useRef<SimulationClients>({ cpu: null, wasm: null, gpu: null, neural: null });
@@ -275,8 +274,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.postSolve);
       }
 
-      // CPU normal computation (Phase 1 fallback — GPU normals in Phase 2)
-      staticGeometry.computeVertexNormals();
+      // Normals: the geometry's position attribute is stale (initial positions),
+      // so computeVertexNormals() would produce wrong results. Skip for now —
+      // the initial normals from geometry creation are used. GPU normals in Phase 2.
       return;
     }
 
@@ -397,26 +397,30 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   }, [fabricId]);
 
-  // Create TSL node material when solver initializes
+  // Create TSL node material when solver initializes.
+  // tslSolverRef.current is used as a dep — it's a ref value that only changes
+  // when setTslGeneration triggers a re-render in useSimulationLifecycle.
   useEffect(() => {
     const solver = tslSolverRef.current;
     if (!solver || !staticGeometry) {
-      tslMaterialRef.current = null;
+      setTslMaterial(null);
       return;
     }
 
     const mat = new MeshStandardNodeMaterial();
-    mat.positionNode = storage(solver.positionSBA, 'vec3', solver.numParticles).toAttribute();
+    // Use the SAME storage node that compute kernels write to.
+    // Creating a new storage() node would get a separate GPU binding/buffer.
+    mat.positionNode = solver.positionBufNode.toAttribute();
     mat.side = THREE.DoubleSide;
     mat.transparent = true;
     mat.opacity = renderParams.opacity;
     mat.roughness = renderParams.roughness;
     mat.metalness = renderParams.metalness;
-    tslMaterialRef.current = mat;
+    setTslMaterial(mat);
 
     return () => {
       mat.dispose();
-      tslMaterialRef.current = null;
+      setTslMaterial(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tslSolverRef.current, staticGeometry]);
@@ -531,9 +535,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         ref={meshRef}
         geometry={staticGeometry}
         onClick={handleMeshClick}
-        material={tslMaterialRef.current || undefined}
+        material={tslMaterial || undefined}
       >
-        {!tslMaterialRef.current && (
+        {!tslMaterial && (
           <meshPhysicalMaterial
             vertexColors={fitMapMode !== 'none'}
             color={effectiveTint || '#ffffff'}

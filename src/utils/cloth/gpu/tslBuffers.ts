@@ -86,12 +86,25 @@ export function createTslBuffers(
   }
 
   // ─── Bend constraints ───────────────────────────────────────────────
+  // The TSL solver uses distance constraints between the two opposite vertices
+  // (c, d) of adjacent triangles sharing an edge (a, b). We need the rest
+  // DISTANCE between c and d, not the dihedral angle. The BendConstraints
+  // type stores dihedral angles, so we compute distances from positions here.
   const numBend = bend.ids.length / 4;
   let bendIdsSBA: StorageBufferAttribute | null = null;
   let bendRestSBA: StorageBufferAttribute | null = null;
   if (numBend > 0) {
+    const bendRestDist = new Float32Array(numBend);
+    for (let i = 0; i < numBend; i++) {
+      const c = bend.ids[i * 4 + 2]; // opposite vertex 0
+      const d = bend.ids[i * 4 + 3]; // opposite vertex 1
+      const dx = mesh.positions[d * 3] - mesh.positions[c * 3];
+      const dy = mesh.positions[d * 3 + 1] - mesh.positions[c * 3 + 1];
+      const dz = mesh.positions[d * 3 + 2] - mesh.positions[c * 3 + 2];
+      bendRestDist[i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
     bendIdsSBA = new StorageBufferAttribute(new Uint32Array(bend.ids), 4);
-    bendRestSBA = new StorageBufferAttribute(new Float32Array(bend.restAngles), 1);
+    bendRestSBA = new StorageBufferAttribute(bendRestDist, 1);
   }
 
   // ─── Seam constraints ──────────────────────────────────────────────
