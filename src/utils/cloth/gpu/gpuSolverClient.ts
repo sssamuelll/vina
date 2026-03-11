@@ -14,8 +14,11 @@ import { extractStretchConstraints, extractBendConstraints, colorConstraints, ty
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
 import { createTslBuffers, type TslBufferSet, type FabricComplianceConfig } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
+import { buildLinearBVH } from './bvh';
+import { createTslCollisionBody } from './tslCollision';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import { EdgeType } from './gpuBuffers';
+import { StorageBufferAttribute as SBAClass } from 'three/webgpu';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -442,6 +445,11 @@ export class GpuSolverClient {
    * Normals: 3 floats per triangle.
    */
   setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
+    if (this.tslSolver) {
+      // TSL mode: build BVH and create TSL collision body
+      this.setTslCollisionBody('__avatar__', mesh);
+      return;
+    }
     this.solver.setCollisionMesh(mesh);
   }
 
@@ -449,7 +457,89 @@ export class GpuSolverClient {
    * Update collision mesh vertices/normals (same triangle count, reuses buffers).
    */
   updateCollisionMesh(vertices: Float32Array, normals: Float32Array): void {
+    if (this.tslSolver) {
+      // TSL mode: rebuild BVH (topology may differ, so full rebuild)
+      const triCount = vertices.length / 9;
+      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount });
+      return;
+    }
     this.solver.updateCollisionMesh(vertices, normals);
+  }
+
+  /**
+   * Add/update a custom collision body (non-avatar props like mannequin stands).
+   */
+  updateCollisionBody(data: { id: string; mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }; friction: number; margin: number }): void {
+    if (this.tslSolver) {
+      this.setTslCollisionBody(data.id, data.mesh, data.friction, data.margin);
+      return;
+    }
+    // WGSL path — delegate to underlying solver
+    this.solver.setCollisionMesh(data.mesh);
+  }
+
+  /**
+   * Set a TSL collision body from collision mesh data.
+   * Builds a BVH on CPU, uploads to GPU as StorageBufferAttributes,
+   * creates a TSL collision compute node, and registers it on the solver.
+   */
+  setTslCollisionBody(
+    id: string,
+    mesh: { vertices: Float32Array; normals: Float32Array; triCount: number },
+    friction: number = 0.3,
+    margin: number = 0.005,
+  ): void {
+    if (!this.tslSolver || !this.tslBuffers) {
+      console.warn('[GpuSolverClient] setTslCollisionBody called but no TSL solver active');
+      return;
+    }
+    if (mesh.triCount === 0) return;
+
+    // Build BVH on CPU
+    const bvh = buildLinearBVH(mesh);
+    if (bvh.nodeCount === 0) return;
+
+    // Create StorageBufferAttributes for GPU upload
+    const bvhNodesSBA = new SBAClass(bvh.nodes, 1);
+    const triVertsSBA = new SBAClass(bvh.triVerts, 1);
+    const triNormalsSBA = new SBAClass(bvh.triNormals, 1);
+
+    // Use shared buffer nodes from the solver
+    const N = this.tslSolver.numParticles;
+    const posBuf = this.tslSolver.positionBufNode;
+    const prevPosBuf = this.tslSolver.prevPosBufNode;
+    const invMassBuf = this.tslSolver.invMassBufNode;
+
+    const body = createTslCollisionBody(
+      posBuf,
+      prevPosBuf,
+      invMassBuf,
+      bvhNodesSBA,
+      triVertsSBA,
+      triNormalsSBA,
+      N,
+      bvh.nodeCount,
+      bvh.triCount,
+      id,
+      margin,
+      friction,
+    );
+
+    this.tslSolver.setCollisionBody(body);
+
+    console.log(`[GpuSolverClient] TSL collision body '${id}':`, {
+      bvhNodes: bvh.nodeCount,
+      triangles: bvh.triCount,
+      margin,
+      friction,
+    });
+  }
+
+  /**
+   * Remove a TSL collision body by ID.
+   */
+  removeTslCollisionBody(id: string): void {
+    this.tslSolver?.removeCollisionBody(id);
   }
 
   // ─── Private ────────────────────────────────────────────────────────────

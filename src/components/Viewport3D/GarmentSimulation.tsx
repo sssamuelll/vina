@@ -272,6 +272,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
         if (solver.bend) renderer.compute(solver.bend);
         if (solver.seam) renderer.compute(solver.seam);
+        // Body collision: BVH traversal per body per substep
+        for (const body of solver.collisionBodies) {
+          renderer.compute(body.collisionNode);
+        }
         renderer.compute(solver.groundClamp);
         renderer.compute(solver.postSolve);
       }

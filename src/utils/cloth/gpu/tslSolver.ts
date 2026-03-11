@@ -41,6 +41,7 @@ import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.js';
 import type UniformNode from 'three/src/nodes/core/UniformNode.js';
 import type { TslBufferSet } from './tslBuffers';
+import type { TslCollisionBody } from './tslCollision';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,16 @@ export interface TslSolver {
   numTriangles: number;
   /** Triangle index buffer */
   triangles: Uint32Array;
+  /** Previous position storage node (for collision friction computation) */
+  prevPosBufNode: StorageBufferNode<'vec3'>;
+  /** Inverse mass storage node (for collision pinned-particle check) */
+  invMassBufNode: StorageBufferNode<'float'>;
+  /** Active collision bodies (BVH-accelerated) */
+  collisionBodies: TslCollisionBody[];
+  /** Add or replace a collision body */
+  setCollisionBody(body: TslCollisionBody): void;
+  /** Remove a collision body by ID */
+  removeCollisionBody(id: string): void;
   /** Update solver uniforms at runtime */
   updateConfig: (config: Partial<TslSolverConfig>) => void;
 }
@@ -568,6 +579,23 @@ export function createTslSolver(
   const normalNormalizeFn = makeNormalNormalizeFn(normalBuf, normalAccumBuf);
   const normalNormalize = compute(normalNormalizeFn, N);
 
+  // ─── Collision body management ──────────────────────────────────────
+  const collisionBodies: TslCollisionBody[] = [];
+
+  function setCollisionBody(body: TslCollisionBody): void {
+    const idx = collisionBodies.findIndex(b => b.id === body.id);
+    if (idx >= 0) {
+      collisionBodies[idx] = body;
+    } else {
+      collisionBodies.push(body);
+    }
+  }
+
+  function removeCollisionBody(id: string): void {
+    const idx = collisionBodies.findIndex(b => b.id === id);
+    if (idx >= 0) collisionBodies.splice(idx, 1);
+  }
+
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
     if (partial.dt !== undefined || partial.substeps !== undefined) {
@@ -610,6 +638,8 @@ export function createTslSolver(
     postSolve,
     positionSBA: buffers.positionSBA,
     positionBufNode: posBuf,
+    prevPosBufNode: prevPosBuf,
+    invMassBufNode: invMassBuf,
     normalBufNode: normalBuf,
     normalSBA: buffers.normalSBA,
     normalZero,
@@ -618,6 +648,9 @@ export function createTslSolver(
     numParticles: N,
     numTriangles: buffers.numTriangles,
     triangles: buffers.triangles,
+    collisionBodies,
+    setCollisionBody,
+    removeCollisionBody,
     updateConfig,
   };
 }
