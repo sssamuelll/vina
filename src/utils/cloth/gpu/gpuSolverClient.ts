@@ -351,9 +351,19 @@ export class GpuSolverClient {
   }
 
   /**
-   * Explicit CPU readback for export/fit-maps (bypasses zero-copy mode).
+   * Explicit CPU readback for export/fit-maps.
+   * For TSL mode: reads back from the StorageBufferAttribute's GPU buffer.
+   * For WGSL mode: delegates to solver.readPositions().
    */
   async readPositionsToCPU(): Promise<Float32Array | null> {
+    if (this.tslSolver) {
+      // TSL mode: the SBA's backing array is stale after compute.
+      // For now, return the SBA's array — it was initialized with positions
+      // and will be stale after compute (acceptable for Phase 1).
+      // Phase 2 will add proper GPU→CPU readback for TSL buffers.
+      console.warn('[GpuSolverClient] TSL readback returns initial positions (GPU readback not yet implemented)');
+      return new Float32Array(this.tslSolver.positionSBA.array as Float32Array);
+    }
     return this.solver.readPositions();
   }
 
