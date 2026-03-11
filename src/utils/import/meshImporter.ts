@@ -9,8 +9,6 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { loadVRM } from '../avatar/vrmLoader';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -132,6 +130,7 @@ function collectStats(scene: THREE.Group): { meshCount: number; vertexCount: num
 // ─── Loaders ────────────────────────────────────────────────────────────────
 
 async function loadOBJ(url: string): Promise<THREE.Group> {
+  const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js');
   const loader = new OBJLoader();
   return new Promise((resolve, reject) => {
     loader.load(url, resolve, undefined, reject);
@@ -139,6 +138,7 @@ async function loadOBJ(url: string): Promise<THREE.Group> {
 }
 
 async function loadFBX(url: string): Promise<THREE.Group> {
+  const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js');
   const loader = new FBXLoader();
   return new Promise((resolve, reject) => {
     loader.load(url, resolve, undefined, reject);

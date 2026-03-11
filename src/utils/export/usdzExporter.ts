@@ -8,7 +8,6 @@
  */
 
 import * as THREE from 'three';
-import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
 
 export interface USDZExportOptions {
   /** Filename without extension (default 'openclo-export') */
@@ -22,6 +21,7 @@ export interface USDZExportOptions {
 export async function exportToUSDZ(
   object: THREE.Object3D,
 ): Promise<Uint8Array> {
+  const { USDZExporter } = await import('three/examples/jsm/exporters/USDZExporter.js');
   const exporter = new USDZExporter();
   return await exporter.parseAsync(object);
 }
