@@ -16,6 +16,8 @@
 
 import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
+import { MeshStandardNodeMaterial } from 'three/webgpu';
+import { storage } from 'three/tsl';
 import { useFrame } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -75,6 +77,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const pieceColorsRef = useRef<Float32Array | null>(null);
+  const tslMaterialRef = useRef<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
 
   // Shared refs for breaking circular dependency between useMeshing and useSimulationLifecycle
   const clientsRef = useRef<SimulationClients>({ cpu: null, wasm: null, gpu: null, neural: null });
@@ -201,7 +204,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 
-  const { clients, positionsRef, edgeDataRef, onFrame } = useSimulationLifecycle({
+  const { clients, positionsRef, edgeDataRef, onFrame, tslSolverRef } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
     fabricId,
@@ -212,11 +215,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   useEffect(() => {
     clientsRef.current = clients;
   });
-
-  // NOTE: GPU zero-copy via StorageBufferAttribute is disabled.
-  // Three.js WebGPURenderer creates its own internal GPU buffers for vertex
-  // attributes and ignores the patched gpuBuffer field. Until a proper TSL
-  // node material integration is built, we use CPU readback for all tiers.
 
   // ─── Pin sync ───────────────────────────────────────────────────────────────
 
@@ -256,13 +254,33 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Per-frame geometry update ──────────────────────────────────────────────
 
-  useFrame(() => {
+  useFrame(({ gl }) => {
     if (!meshRef.current || !staticGeometry) return;
-
-    // During playback, the playback hook handles position updates
     if (isPlayingBack) return;
 
-    // Update geometry positions from solver (all tiers, including WebGPU with CPU readback)
+    const solver = tslSolverRef.current;
+
+    // ─── TSL zero-copy path ──────────────────────────────────────────
+    if (solver) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const renderer = gl as any;
+      const substeps = 15; // TODO: get from solver config
+      for (let s = 0; s < substeps; s++) {
+        renderer.compute(solver.preSolve);
+        for (const stretchColor of solver.stretchColors) {
+          renderer.compute(stretchColor);
+        }
+        if (solver.bend) renderer.compute(solver.bend);
+        if (solver.seam) renderer.compute(solver.seam);
+        renderer.compute(solver.postSolve);
+      }
+
+      // CPU normal computation (Phase 1 fallback — GPU normals in Phase 2)
+      staticGeometry.computeVertexNormals();
+      return;
+    }
+
+    // ─── CPU readback path (WASM/CPU solvers) ────────────────────────
     {
       const positions = positionsRef.current;
       if (positions && positions.length > 0) {
@@ -276,9 +294,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
     }
 
+    // Fit map overlay (CPU readback path only)
     const positions = positionsRef.current;
-
-    // Compute fit map overlay colors (requires CPU-side positions — skip in GPU zero-copy mode)
     const colorAttr = staticGeometry.getAttribute('color') as THREE.BufferAttribute;
     if (fitMapMode !== 'none' && edgeDataRef.current && colorAttr && positions && positions.length > 0) {
       if (!pieceColorsRef.current) {
@@ -379,6 +396,30 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       mapRepeat: [4, 4] as [number, number], mapRotation: 0,
     };
   }, [fabricId]);
+
+  // Create TSL node material when solver initializes
+  useEffect(() => {
+    const solver = tslSolverRef.current;
+    if (!solver || !staticGeometry) {
+      tslMaterialRef.current = null;
+      return;
+    }
+
+    const mat = new MeshStandardNodeMaterial();
+    mat.positionNode = storage(solver.positionSBA, 'vec3', solver.numParticles).toAttribute();
+    mat.side = THREE.DoubleSide;
+    mat.transparent = true;
+    mat.opacity = renderParams.opacity;
+    mat.roughness = renderParams.roughness;
+    mat.metalness = renderParams.metalness;
+    tslMaterialRef.current = mat;
+
+    return () => {
+      mat.dispose();
+      tslMaterialRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tslSolverRef.current, staticGeometry]);
 
   // Effective tint: first piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {
@@ -490,28 +531,31 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         ref={meshRef}
         geometry={staticGeometry}
         onClick={handleMeshClick}
+        material={tslMaterialRef.current || undefined}
       >
-        <meshPhysicalMaterial
-          vertexColors={fitMapMode !== 'none'}
-          color={effectiveTint || '#ffffff'}
-          side={THREE.DoubleSide}
-          transparent
-          opacity={renderParams.opacity}
-          roughness={renderParams.roughness}
-          metalness={renderParams.metalness}
-          sheen={renderParams.sheen}
-          sheenRoughness={renderParams.sheenRoughness}
-          sheenColor={renderParams.sheenColor}
-          clearcoat={renderParams.clearcoat}
-          clearcoatRoughness={renderParams.clearcoatRoughness}
-          transmission={renderParams.transmission}
-          thickness={renderParams.thickness}
-          ior={renderParams.ior}
-          map={fitMapMode === 'none' ? textures.map : null}
-          normalMap={textures.normalMap}
-          roughnessMap={fitMapMode === 'none' ? textures.roughnessMap : null}
-          aoMap={textures.aoMap}
-        />
+        {!tslMaterialRef.current && (
+          <meshPhysicalMaterial
+            vertexColors={fitMapMode !== 'none'}
+            color={effectiveTint || '#ffffff'}
+            side={THREE.DoubleSide}
+            transparent
+            opacity={renderParams.opacity}
+            roughness={renderParams.roughness}
+            metalness={renderParams.metalness}
+            sheen={renderParams.sheen}
+            sheenRoughness={renderParams.sheenRoughness}
+            sheenColor={renderParams.sheenColor}
+            clearcoat={renderParams.clearcoat}
+            clearcoatRoughness={renderParams.clearcoatRoughness}
+            transmission={renderParams.transmission}
+            thickness={renderParams.thickness}
+            ior={renderParams.ior}
+            map={fitMapMode === 'none' ? textures.map : null}
+            normalMap={textures.normalMap}
+            roughnessMap={fitMapMode === 'none' ? textures.roughnessMap : null}
+            aoMap={textures.aoMap}
+          />
+        )}
       </mesh>
       <PinRenderer livePositions={positionsRef.current || undefined} />
     </>

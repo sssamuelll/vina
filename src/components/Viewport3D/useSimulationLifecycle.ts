@@ -61,6 +61,8 @@ interface UseSimulationLifecycleResult {
   edgeDataRef: React.MutableRefObject<SolverEdgeData | null>;
   /** Stable onFrame callback for solver clients */
   onFrame: (positions: Float32Array) => void;
+  /** TSL solver ref for renderer.compute() dispatch */
+  tslSolverRef: React.MutableRefObject<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -173,6 +175,7 @@ export function useSimulationLifecycle({
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
+  const tslSolverRef = useRef<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>(null);
 
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
@@ -212,7 +215,6 @@ export function useSimulationLifecycle({
         // ─── WebGPU GPU solver ────────────────────────────────────────
         if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
           try {
-            // Reuse cached device or create a new one
             let device = gpuDeviceRef.current;
             if (!device || gpuDeviceLostRef.current) {
               const adapter = await navigator.gpu.requestAdapter();
@@ -227,38 +229,20 @@ export function useSimulationLifecycle({
               });
             }
             if (!cancelled) {
-                console.log('[SimLifecycle] 🟢 Using WebGPU GPU solver');
+                console.log('[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)');
                 dispatch(setSolverTier('webgpu'));
                 const gpuClient = new GpuSolverClient(device);
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
-                // Note: seamInitData uses edge names (resolved by CPU worker).
-                // GPU client expects pre-computed vertex pairs — skip seams for now.
-                await withTimeout(gpuClient.initMultiPiece(placedMeshes), 12000, 'GPU solver init');
+                await withTimeout(gpuClient.initMultiPieceTsl(placedMeshes), 12000, 'TSL solver init');
+                tslSolverRef.current = gpuClient.getTslSolver();
 
-                // Load avatar collision mesh
-                if (avatarModelUrl && !cancelled) {
-                  try {
-                    const collisionMesh = await withTimeout(
-                      extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
-                      5000,
-                      'GPU collision mesh',
-                    );
-                    if (collisionMesh && !cancelled) {
-                      gpuClient.setCollisionMesh(collisionMesh);
-                      dispatch(setBodyCollision(true));
-                    }
-                  } catch (e) {
-                    console.warn('[SimLifecycle] GPU collision mesh failed:', e);
-                    if (!cancelled) dispatch(setBodyCollision(false));
-                  }
-                }
-
-                if (!cancelled) gpuClient.start();
+                // Body collision deferred to Phase 2.
+                // Don't call gpuClient.start() — TSL compute is driven by useFrame.
                 return;
             }
           } catch (e) {
-            console.warn('[SimLifecycle] GPU solver failed, falling through to WASM:', e);
+            console.warn('[SimLifecycle] TSL solver failed, falling through to WASM:', e);
             gpuClientRef.current?.dispose();
             gpuClientRef.current = null;
           }
@@ -346,6 +330,7 @@ export function useSimulationLifecycle({
         clientRef.current = null;
         gpuClientRef.current?.dispose();
         gpuClientRef.current = null;
+        tslSolverRef.current = null;
         wasmClientRef.current?.dispose();
         wasmClientRef.current = null;
         neuralClientRef.current?.dispose();
@@ -362,6 +347,7 @@ export function useSimulationLifecycle({
       clientRef.current = null;
       gpuClientRef.current?.dispose();
       gpuClientRef.current = null;
+      tslSolverRef.current = null;
       wasmClientRef.current?.dispose();
       wasmClientRef.current = null;
       neuralClientRef.current?.dispose();
@@ -423,5 +409,6 @@ export function useSimulationLifecycle({
     positionsRef,
     edgeDataRef,
     onFrame,
+    tslSolverRef,
   };
 }
