@@ -282,7 +282,9 @@ import {
 - **TSL Zero-Copy**: GPU solver uses TSL (Three Shading Language) for compute.
   `renderer.compute()` writes positions to `StorageBufferAttribute`, which the
   vertex shader reads via `material.positionNode` — no CPU readback per frame.
-  Body collision and GPU normals deferred to Phase 2.
+  Body collision uses CPU-built linearized BVH uploaded as StorageBufferAttribute,
+  traversed by TSL collision kernel per particle per substep.
+  GPU normals via atomic i32 accumulation (scale 1M) written to `normalNode`.
 - **Edge Types**: 0 = WARP, 1 = WEFT, 2 = SHEAR
 
 ## References
