@@ -10,9 +10,12 @@
  */
 
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
-import { extractStretchConstraints, extractBendConstraints, type SeamConstraintData } from './gpuBuffers';
+import { extractStretchConstraints, extractBendConstraints, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
+import { createTslBuffers, type TslBufferSet, type FabricComplianceConfig } from './tslBuffers';
+import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import type { StorageBufferAttribute } from 'three/webgpu';
+import { EdgeType } from './gpuBuffers';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -20,6 +23,7 @@ export interface PieceMeshData {
   pieceId: string;
   vertices: Float32Array;
   triIds: Int32Array;
+  uvs?: Float32Array;
 }
 
 export interface GpuSolverClientCallbacks {
@@ -57,6 +61,10 @@ export class GpuSolverClient {
   /** Cached StorageBufferAttributes for rendering. */
   private positionAttr: StorageBufferAttribute | null = null;
   private normalAttr: StorageBufferAttribute | null = null;
+
+  /** TSL solver (when using renderer.compute() path) */
+  private tslSolver: TslSolver | null = null;
+  private tslBuffers: TslBufferSet | null = null;
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.solver = new GpuClothSolver(device, config);
@@ -183,6 +191,143 @@ export class GpuSolverClient {
   }
 
   /**
+   * Initialize with TSL solver (for zero-copy rendering via positionNode).
+   * Call this instead of initMultiPiece() when using MeshStandardNodeMaterial.
+   *
+   * @param fabricCompliance — per-edge-type compliance from toXPBDParams().
+   *   When provided, each stretch/bend constraint gets its own compliance
+   *   value based on UV-classified edge direction (warp/weft/shear).
+   */
+  async initMultiPieceTsl(
+    pieces: PieceMeshData[],
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    solverConfig?: Partial<TslSolverConfig>,
+    fabricCompliance?: FabricComplianceConfig,
+  ): Promise<void> {
+    // Merge pieces (same logic as initMultiPiece)
+    let totalVerts = 0;
+    let totalTris = 0;
+    const vertexOffsets = new Map<string, number>();
+
+    for (const p of pieces) {
+      vertexOffsets.set(p.pieceId, totalVerts);
+      totalVerts += p.vertices.length / 3;
+      totalTris += p.triIds.length;
+    }
+
+    const positions = new Float32Array(totalVerts * 3);
+    const invMass = new Float32Array(totalVerts);
+    const triangles = new Uint32Array(totalTris);
+    // Merge UVs for anisotropic edge classification
+    let mergedUvs: Float32Array | undefined;
+    let hasUvs = false;
+
+    let vOff = 0;
+    let tOff = 0;
+
+    for (const p of pieces) {
+      const numV = p.vertices.length / 3;
+      positions.set(p.vertices, vOff * 3);
+      for (let i = 0; i < numV; i++) invMass[vOff + i] = 1.0;
+      for (let i = 0; i < p.triIds.length; i++) triangles[tOff + i] = p.triIds[i] + vOff;
+
+      // Merge UVs
+      if (p.uvs && p.uvs.length >= numV * 2) {
+        if (!mergedUvs) {
+          mergedUvs = new Float32Array(totalVerts * 2);
+        }
+        mergedUvs.set(p.uvs.subarray(0, numV * 2), vOff * 2);
+        hasUvs = true;
+      }
+
+      vOff += numV;
+      tOff += p.triIds.length;
+    }
+
+    // Extract constraints with UV-based edge classification
+    const uvArg = hasUvs ? mergedUvs : undefined;
+    const stretch = extractStretchConstraints(positions, triangles, uvArg);
+    const bend = extractBendConstraints(positions, triangles, uvArg);
+
+    // Compute per-constraint compliance from edge types + fabric config
+    const fabric: FabricComplianceConfig = fabricCompliance ?? {
+      stretchComplianceWarp: 0.0,
+      stretchComplianceWeft: 0.0,
+      shearCompliance: 0.001,
+      bendComplianceWarp: 1.0,
+      bendComplianceWeft: 1.0,
+    };
+
+    const numStretch = stretch.ids.length / 2;
+    const stretchCompliance = new Float32Array(numStretch);
+    for (let i = 0; i < numStretch; i++) {
+      const et = stretch.edgeTypes[i];
+      if (et === EdgeType.WARP) stretchCompliance[i] = fabric.stretchComplianceWarp;
+      else if (et === EdgeType.WEFT) stretchCompliance[i] = fabric.stretchComplianceWeft;
+      else stretchCompliance[i] = fabric.shearCompliance;
+    }
+
+    const colored = colorConstraints(stretch.ids, stretch.restLengths, numStretch, stretchCompliance);
+
+    // Build seam constraints
+    let seam: SeamConstraintData | null = null;
+    if (seamPairs && seamPairs.length > 0) {
+      const seamIds: number[] = [];
+      const seamDist: number[] = [];
+      for (const sp of seamPairs) {
+        const offA = vertexOffsets.get(sp.pieceAId) ?? 0;
+        const offB = vertexOffsets.get(sp.pieceBId) ?? 0;
+        for (const [a, b] of sp.vertexPairs) {
+          seamIds.push(a + offA, b + offB);
+          seamDist.push(0);
+        }
+      }
+      if (seamIds.length > 0) {
+        seam = { ids: new Uint32Array(seamIds), targetDist: new Float32Array(seamDist) };
+      }
+    }
+
+    // Create TSL buffers with per-constraint compliance
+    this.tslBuffers = createTslBuffers(
+      { positions, triangles, invMass },
+      colored,
+      bend,
+      seam,
+      fabric,
+    );
+
+    const defaultConfig: TslSolverConfig = {
+      substeps: 15,
+      gravity: [0, -9.81, 0],
+      damping: 0.9603,
+      internalDamping: 0.3,
+      seamStiffness: 0.0,
+      groundY: 0.0,
+      dt: 1 / 60,
+      ...solverConfig,
+    };
+
+    this.tslSolver = createTslSolver(this.tslBuffers, defaultConfig);
+    this.zeroCopy = true; // TSL mode = zero-copy
+
+    console.log('[GpuSolverClient] TSL solver initialized:', {
+      particles: totalVerts,
+      stretchColors: colored.colorRanges.length,
+      bendConstraints: bend.ids.length / 4,
+      seamConstraints: seam ? seam.ids.length / 2 : 0,
+      hasUvs,
+      fabric: fabricCompliance ? 'custom' : 'defaults',
+    });
+  }
+
+  /**
+   * Get the TSL solver (for renderer.compute() dispatch in useFrame).
+   */
+  getTslSolver(): TslSolver | null {
+    return this.tslSolver;
+  }
+
+  /**
    * Update fabric properties.
    */
   setFabricConfig(config: Partial<GpuSolverConfig>): void {
@@ -248,9 +393,19 @@ export class GpuSolverClient {
   }
 
   /**
-   * Explicit CPU readback for export/fit-maps (bypasses zero-copy mode).
+   * Explicit CPU readback for export/fit-maps.
+   * For TSL mode: reads back from the StorageBufferAttribute's GPU buffer.
+   * For WGSL mode: delegates to solver.readPositions().
    */
   async readPositionsToCPU(): Promise<Float32Array | null> {
+    if (this.tslSolver) {
+      // TSL mode: the SBA's backing array is stale after compute.
+      // For now, return the SBA's array — it was initialized with positions
+      // and will be stale after compute (acceptable for Phase 1).
+      // Phase 2 will add proper GPU→CPU readback for TSL buffers.
+      console.warn('[GpuSolverClient] TSL readback returns initial positions (GPU readback not yet implemented)');
+      return new Float32Array(this.tslSolver.positionSBA.array as Float32Array);
+    }
     return this.solver.readPositions();
   }
 
@@ -262,6 +417,8 @@ export class GpuSolverClient {
     this.stop();
     this.positionAttr = null;
     this.normalAttr = null;
+    this.tslSolver = null;
+    this.tslBuffers = null;
     this.solver.destroy();
   }
 

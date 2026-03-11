@@ -12,7 +12,7 @@
  * Extracted from GarmentSimulation.tsx for separation of concerns.
  */
 
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
@@ -22,6 +22,7 @@ import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting } from '../../store/simulationSlice';
+import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
 import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
@@ -43,6 +44,7 @@ export interface PlacedMesh {
   triIds: Int32Array;
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
+  uvs?: Float32Array;
 }
 
 interface UseSimulationLifecycleProps {
@@ -61,6 +63,8 @@ interface UseSimulationLifecycleResult {
   edgeDataRef: React.MutableRefObject<SolverEdgeData | null>;
   /** Stable onFrame callback for solver clients */
   onFrame: (positions: Float32Array) => void;
+  /** TSL solver ref for renderer.compute() dispatch */
+  tslSolverRef: React.MutableRefObject<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -173,6 +177,7 @@ export function useSimulationLifecycle({
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
+  const tslSolverRef = useRef<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>(null);
 
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
@@ -182,6 +187,12 @@ export function useSimulationLifecycle({
   /** Cache the WebGPU device across effect re-runs to avoid re-requesting adapter/device */
   const gpuDeviceRef = useRef<GPUDevice | null>(null);
   const gpuDeviceLostRef = useRef(false);
+
+  // State counter to force re-render after async TSL solver init completes.
+  // Without this, tslSolverRef.current changes inside an async callback but
+  // no React state change occurs, so GarmentSimulation never re-renders to
+  // pick up the new solver and create the TSL material.
+  const [, setTslGeneration] = useState(0);
 
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const collisionRebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,7 +223,6 @@ export function useSimulationLifecycle({
         // ─── WebGPU GPU solver ────────────────────────────────────────
         if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
           try {
-            // Reuse cached device or create a new one
             let device = gpuDeviceRef.current;
             if (!device || gpuDeviceLostRef.current) {
               const adapter = await navigator.gpu.requestAdapter();
@@ -227,38 +237,39 @@ export function useSimulationLifecycle({
               });
             }
             if (!cancelled) {
-                console.log('[SimLifecycle] 🟢 Using WebGPU GPU solver');
+                console.log('[SimLifecycle] 🟢 Using WebGPU TSL solver (zero-copy)');
                 dispatch(setSolverTier('webgpu'));
                 const gpuClient = new GpuSolverClient(device);
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
-                // Note: seamInitData uses edge names (resolved by CPU worker).
-                // GPU client expects pre-computed vertex pairs — skip seams for now.
-                await withTimeout(gpuClient.initMultiPiece(placedMeshes), 12000, 'GPU solver init');
 
-                // Load avatar collision mesh
-                if (avatarModelUrl && !cancelled) {
-                  try {
-                    const collisionMesh = await withTimeout(
-                      extractAvatarCollisionMesh(avatarModelUrl, avatarHeight),
-                      5000,
-                      'GPU collision mesh',
-                    );
-                    if (collisionMesh && !cancelled) {
-                      gpuClient.setCollisionMesh(collisionMesh);
-                      dispatch(setBodyCollision(true));
-                    }
-                  } catch (e) {
-                    console.warn('[SimLifecycle] GPU collision mesh failed:', e);
-                    if (!cancelled) dispatch(setBodyCollision(false));
-                  }
-                }
+                // Use default compliance values that match the CPU solver:
+                // stretchWarp: 0.0, stretchWeft: 0.0, shear: 0.001,
+                // bendWarp: 1.0, bendWeft: 1.0
+                // The CPU solver builds per-edge compliance at init from these
+                // defaults and never rebuilds them when fabric changes.
+                // Passing fabricCompliance here is intentionally omitted to
+                // match the CPU solver's actual behavior.
+                const pf = getPhysicalFabric(fabricId);
+                const tslSolverConfig = pf ? {
+                  internalDamping: pf.internalDamping,
+                } : undefined;
 
-                if (!cancelled) gpuClient.start();
+                await withTimeout(
+                  gpuClient.initMultiPieceTsl(placedMeshes, undefined, tslSolverConfig),
+                  12000,
+                  'TSL solver init',
+                );
+                if (cancelled) return;
+                tslSolverRef.current = gpuClient.getTslSolver();
+                setTslGeneration(g => g + 1);
+
+                // Body collision deferred to Phase 2.
+                // Don't call gpuClient.start() — TSL compute is driven by useFrame.
                 return;
             }
           } catch (e) {
-            console.warn('[SimLifecycle] GPU solver failed, falling through to WASM:', e);
+            console.warn('[SimLifecycle] TSL solver failed, falling through to WASM:', e);
             gpuClientRef.current?.dispose();
             gpuClientRef.current = null;
           }
@@ -346,6 +357,7 @@ export function useSimulationLifecycle({
         clientRef.current = null;
         gpuClientRef.current?.dispose();
         gpuClientRef.current = null;
+        tslSolverRef.current = null;
         wasmClientRef.current?.dispose();
         wasmClientRef.current = null;
         neuralClientRef.current?.dispose();
@@ -362,6 +374,7 @@ export function useSimulationLifecycle({
       clientRef.current = null;
       gpuClientRef.current?.dispose();
       gpuClientRef.current = null;
+      tslSolverRef.current = null;
       wasmClientRef.current?.dispose();
       wasmClientRef.current = null;
       neuralClientRef.current?.dispose();
@@ -423,5 +436,6 @@ export function useSimulationLifecycle({
     positionsRef,
     edgeDataRef,
     onFrame,
+    tslSolverRef,
   };
 }
