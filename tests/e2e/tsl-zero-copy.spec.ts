@@ -188,6 +188,71 @@ test.describe('TSL Zero-Copy Rendering', () => {
     expect(tslErrors).toHaveLength(0);
   });
 
+  test('no errors from collision modules during simulation', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('console', msg => {
+      if (msg.type() === 'error') errors.push(msg.text());
+    });
+
+    await waitForApp(page);
+    await drawRectanglePiece(page);
+
+    // Switch to 3D view — triggers solver init + collision loading
+    await page.click('button:has-text("3D")');
+    await page.waitForTimeout(2000);
+
+    await openSimPanel(page);
+    await clickSimulate(page);
+
+    await expect(page.locator('text=SIMULATING').first()).toBeVisible({ timeout: 15000 });
+
+    // Let cloth drape for a few seconds
+    await page.waitForTimeout(5000);
+
+    // Should still be simulating (cloth didn't crash)
+    const stillSimulating = await page.locator('text=SIMULATING').first().isVisible();
+    const paused = await page.locator('text=PAUSED').first().isVisible();
+    expect(stillSimulating || paused).toBe(true);
+
+    // No BVH/collision errors
+    const collisionErrors = errors.filter(e =>
+      e.includes('buildLinearBVH') ||
+      e.includes('tslCollision') ||
+      e.includes('setTslCollisionBody') ||
+      e.includes('BVH')
+    );
+    expect(collisionErrors).toHaveLength(0);
+
+    // Canvas should still be rendering
+    await expect(page.locator('canvas')).toBeVisible();
+  });
+
+  test('no GPU validation errors from collision kernel', async ({ page }) => {
+    const consoleMessages: string[] = [];
+    page.on('console', msg => {
+      consoleMessages.push(`[${msg.type()}] ${msg.text()}`);
+    });
+
+    await waitForApp(page);
+    await drawRectanglePiece(page);
+
+    await page.click('button:has-text("3D")');
+    await page.waitForTimeout(2000);
+
+    await openSimPanel(page);
+    await clickSimulate(page);
+
+    await expect(page.locator('text=SIMULATING').first()).toBeVisible({ timeout: 15000 });
+    await page.waitForTimeout(3000);
+
+    // No GPU validation errors from collision kernel
+    const gpuErrors = consoleMessages.filter(msg =>
+      msg.includes('WebGPU uncaptured error') ||
+      msg.includes('GPUValidationError')
+    );
+    expect(gpuErrors).toHaveLength(0);
+  });
+
   test('cloth position changes during simulation (draping)', async ({ page }) => {
     await waitForApp(page);
     await drawRectanglePiece(page);
