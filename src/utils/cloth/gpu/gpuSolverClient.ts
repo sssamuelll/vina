@@ -10,8 +10,10 @@
  */
 
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
-import { extractStretchConstraints, extractBendConstraints, type SeamConstraintData } from './gpuBuffers';
+import { extractStretchConstraints, extractBendConstraints, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
+import { createTslBuffers, type TslBufferSet } from './tslBuffers';
+import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import type { StorageBufferAttribute } from 'three/webgpu';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -57,6 +59,10 @@ export class GpuSolverClient {
   /** Cached StorageBufferAttributes for rendering. */
   private positionAttr: StorageBufferAttribute | null = null;
   private normalAttr: StorageBufferAttribute | null = null;
+
+  /** TSL solver (when using renderer.compute() path) */
+  private tslSolver: TslSolver | null = null;
+  private tslBuffers: TslBufferSet | null = null;
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.solver = new GpuClothSolver(device, config);
@@ -183,6 +189,103 @@ export class GpuSolverClient {
   }
 
   /**
+   * Initialize with TSL solver (for zero-copy rendering via positionNode).
+   * Call this instead of initMultiPiece() when using MeshStandardNodeMaterial.
+   */
+  async initMultiPieceTsl(
+    pieces: PieceMeshData[],
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    solverConfig?: Partial<TslSolverConfig>,
+  ): Promise<void> {
+    // Merge pieces (same logic as initMultiPiece)
+    let totalVerts = 0;
+    let totalTris = 0;
+    const vertexOffsets = new Map<string, number>();
+
+    for (const p of pieces) {
+      vertexOffsets.set(p.pieceId, totalVerts);
+      totalVerts += p.vertices.length / 3;
+      totalTris += p.triIds.length;
+    }
+
+    const positions = new Float32Array(totalVerts * 3);
+    const invMass = new Float32Array(totalVerts);
+    const triangles = new Uint32Array(totalTris);
+
+    let vOff = 0;
+    let tOff = 0;
+
+    for (const p of pieces) {
+      const numV = p.vertices.length / 3;
+      positions.set(p.vertices, vOff * 3);
+      for (let i = 0; i < numV; i++) invMass[vOff + i] = 1.0;
+      for (let i = 0; i < p.triIds.length; i++) triangles[tOff + i] = p.triIds[i] + vOff;
+      vOff += numV;
+      tOff += p.triIds.length;
+    }
+
+    // Extract constraints
+    const stretch = extractStretchConstraints(positions, triangles);
+    const bend = extractBendConstraints(positions, triangles);
+    const colored = colorConstraints(stretch.ids, stretch.restLengths, stretch.ids.length / 2);
+
+    // Build seam constraints
+    let seam: SeamConstraintData | null = null;
+    if (seamPairs && seamPairs.length > 0) {
+      const seamIds: number[] = [];
+      const seamDist: number[] = [];
+      for (const sp of seamPairs) {
+        const offA = vertexOffsets.get(sp.pieceAId) ?? 0;
+        const offB = vertexOffsets.get(sp.pieceBId) ?? 0;
+        for (const [a, b] of sp.vertexPairs) {
+          seamIds.push(a + offA, b + offB);
+          seamDist.push(0);
+        }
+      }
+      if (seamIds.length > 0) {
+        seam = { ids: new Uint32Array(seamIds), targetDist: new Float32Array(seamDist) };
+      }
+    }
+
+    // Create TSL buffers and solver
+    this.tslBuffers = createTslBuffers(
+      { positions, triangles, invMass },
+      colored,
+      bend,
+      seam,
+    );
+
+    const defaultConfig: TslSolverConfig = {
+      substeps: 15,
+      gravity: [0, -9.81, 0],
+      damping: 0.9603,
+      stretchCompliance: 0.001,
+      bendCompliance: 1.0,
+      seamStiffness: 0.0,
+      groundY: 0.0,
+      dt: 1 / 60,
+      ...solverConfig,
+    };
+
+    this.tslSolver = createTslSolver(this.tslBuffers, defaultConfig);
+    this.zeroCopy = true; // TSL mode = zero-copy
+
+    console.log('[GpuSolverClient] TSL solver initialized:', {
+      particles: totalVerts,
+      stretchColors: colored.colorRanges.length,
+      bendConstraints: bend.ids.length / 4,
+      seamConstraints: seam ? seam.ids.length / 2 : 0,
+    });
+  }
+
+  /**
+   * Get the TSL solver (for renderer.compute() dispatch in useFrame).
+   */
+  getTslSolver(): TslSolver | null {
+    return this.tslSolver;
+  }
+
+  /**
    * Update fabric properties.
    */
   setFabricConfig(config: Partial<GpuSolverConfig>): void {
@@ -262,6 +365,8 @@ export class GpuSolverClient {
     this.stop();
     this.positionAttr = null;
     this.normalAttr = null;
+    this.tslSolver = null;
+    this.tslBuffers = null;
     this.solver.destroy();
   }
 
