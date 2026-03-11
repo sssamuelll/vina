@@ -3,8 +3,6 @@ import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { CustomLight } from '../../store/renderSettingsSlice';
-import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
-
 // Initialize RectAreaLight uniforms once globally
 let rectAreaLightInitialized = false;
 
@@ -12,10 +10,13 @@ function RectLight({ light }: { light: CustomLight }) {
   const ref = useRef<THREE.RectAreaLight>(null);
 
   useEffect(() => {
-    if (!rectAreaLightInitialized) {
-      RectAreaLightUniformsLib.init();
-      rectAreaLightInitialized = true;
-    }
+    if (rectAreaLightInitialized) return;
+    rectAreaLightInitialized = true;
+    import('three/examples/jsm/lights/RectAreaLightUniformsLib.js').then(
+      ({ RectAreaLightUniformsLib }) => {
+        RectAreaLightUniformsLib.init();
+      },
+    );
   }, []);
 
   return (

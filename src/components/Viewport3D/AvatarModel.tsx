@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLoader, useFrame, ThreeEvent } from "@react-three/fiber";
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { CCDIKSolver } from 'three/examples/jsm/animation/CCDIKSolver.js';
+
 import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
@@ -174,7 +172,8 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const [objFbxScene, setObjFbxScene] = useState<THREE.Group | null>(null);
   const boneMap = useRef<Map<string, THREE.Bone>>(new Map());
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
-  const ikSolver = useRef<CCDIKSolver | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ikSolver = useRef<any>(null);
   const ikTargetHelpers = useRef<Map<string, THREE.Object3D>>(new Map());
   const ikPlaceholderIndices = useRef<number[]>([]);
   const ikSolvedRotations = useRef<Map<string, THREE.Quaternion>>(new Map());
@@ -213,10 +212,16 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       return;
     }
     let cancelled = false;
-    const loader = format === 'fbx' ? new FBXLoader() : new OBJLoader();
-    loader.load(
-      url,
-      (result) => {
+    (async () => {
+      try {
+        let result: THREE.Group;
+        if (format === 'fbx') {
+          const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js');
+          result = await new FBXLoader().loadAsync(url);
+        } else {
+          const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js');
+          result = await new OBJLoader().loadAsync(url);
+        }
         if (cancelled) return;
         const group = result instanceof THREE.Group ? result : new THREE.Group().add(result);
 
@@ -255,12 +260,10 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
         });
 
         setObjFbxScene(group);
-      },
-      undefined,
-      (err) => {
+      } catch (err) {
         if (!cancelled) console.error(`[AvatarModel] Failed to load ${format}:`, err);
-      },
-    );
+      }
+    })();
     return () => { cancelled = true; };
   }, [url, isObjFbx, format, height]);
 
@@ -414,7 +417,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   }, [vrmScene, objFbxScene, gltf, autoScale, height, vrmInstance, isVrm, isObjFbx]);
 
   // Initialize IK solver and chains
-  const initializeIK = (activeScene: THREE.Object3D) => {
+  const initializeIK = async (activeScene: THREE.Object3D) => {
     if (!activeScene || boneMap.current.size === 0) return;
 
     // Clean up old target helpers (restore placeholder bones in their slots)
@@ -540,6 +543,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       }
 
       if (iks.length > 0) {
+        const { CCDIKSolver } = await import('three/examples/jsm/animation/CCDIKSolver.js');
         ikSolver.current = new CCDIKSolver(mesh, iks);
       }
     } catch (error) {

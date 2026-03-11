@@ -8,7 +8,6 @@
  */
 
 import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 
 export interface GLTFExportOptions {
   /** Export as binary .glb (default true) */
@@ -30,6 +29,7 @@ export async function exportToGLTF(
   options: GLTFExportOptions = {},
 ): Promise<ArrayBuffer | object> {
   const { binary = true, scale = 0.001 } = options;
+  const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
 
   // Clone and scale to meters (glTF standard)
   const clone = object.clone(true);

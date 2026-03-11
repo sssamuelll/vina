@@ -35,7 +35,19 @@ function serveWasmRaw(): import('vite').Plugin {
 export default defineConfig({
   base: '/',
   build: {
-    outDir: './dist'
+    outDir: './dist',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // GLTFLoader is always needed (default avatar) — keep in core
+          if (id.includes('three/examples/jsm/loaders/GLTFLoader')) return 'three-core';
+          // Other addons (exporters, FBX/OBJ loaders, IK, etc.) → deferred
+          if (id.includes('three/examples/jsm')) return 'three-addons';
+          if (id.includes('three/build/three.webgpu')) return 'three-webgpu';
+          if (id.includes('node_modules/three/')) return 'three-core';
+        },
+      },
+    },
   },
   plugins: [
     serveWasmRaw(),
