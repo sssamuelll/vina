@@ -4,22 +4,29 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('three/tsl', () => {
   const mockUniform = (val: number) => ({ value: val, mul: vi.fn(), div: vi.fn() });
 
+  const mockElement = () => ({
+    assign: vi.fn(),
+    addAssign: vi.fn(),
+    sub: vi.fn().mockReturnThis(),
+    mul: vi.fn().mockReturnThis(),
+    div: vi.fn().mockReturnThis(),
+    add: vi.fn().mockReturnThis(),
+    negate: vi.fn().mockReturnThis(),
+    sqrt: vi.fn().mockReturnThis(),
+    dot: vi.fn().mockReturnThis(),
+    x: { mul: vi.fn().mockReturnThis(), sub: vi.fn().mockReturnThis() },
+    y: { mul: vi.fn().mockReturnThis(), sub: vi.fn().mockReturnThis(), assign: vi.fn(), lessThan: vi.fn().mockReturnValue(false) },
+    z: { mul: vi.fn().mockReturnThis(), sub: vi.fn().mockReturnThis() },
+    greaterThan: vi.fn().mockReturnValue(true),
+    lessThan: vi.fn().mockReturnValue(false),
+    equal: vi.fn().mockReturnValue(true),
+    greaterThanEqual: vi.fn().mockReturnValue(true),
+  });
+
   return {
     storage: vi.fn(() => ({
-      element: vi.fn(() => ({
-        assign: vi.fn(),
-        addAssign: vi.fn(),
-        sub: vi.fn().mockReturnThis(),
-        mul: vi.fn().mockReturnThis(),
-        div: vi.fn().mockReturnThis(),
-        add: vi.fn().mockReturnThis(),
-        negate: vi.fn().mockReturnThis(),
-        sqrt: vi.fn().mockReturnThis(),
-        greaterThan: vi.fn().mockReturnValue(true),
-        lessThan: vi.fn().mockReturnValue(false),
-        equal: vi.fn().mockReturnValue(true),
-        greaterThanEqual: vi.fn().mockReturnValue(true),
-      })),
+      element: vi.fn(() => mockElement()),
+      toAttribute: vi.fn(() => ({ __tslAttribute: true })),
     })),
     Fn: vi.fn(() => {
       // Return a callable that returns a mock TSL node
@@ -34,23 +41,31 @@ vi.mock('three/tsl', () => {
     float: vi.fn((val: number) => ({
       value: val,
       mul: vi.fn().mockReturnThis(),
+      sub: vi.fn().mockReturnThis(),
     })),
     uint: vi.fn((val: number) => ({
       value: val,
       mul: vi.fn().mockReturnThis(),
       add: vi.fn().mockReturnThis(),
     })),
+    int: vi.fn((val: number) => ({
+      value: val,
+    })),
+    vec3: vi.fn(() => ({ __tslVec3: true })),
     instanceIndex: { __tslInstanceIndex: true },
+    atomicStore: vi.fn(),
+    atomicAdd: vi.fn(),
+    atomicLoad: vi.fn(() => ({ __atomicLoad: true })),
   };
 });
 
 // Mock three/webgpu (StorageBufferAttribute)
 vi.mock('three/webgpu', () => ({
   StorageBufferAttribute: class MockSBA {
-    array: Float32Array | Uint32Array;
+    array: Float32Array | Uint32Array | Int32Array;
     count: number;
     itemSize: number;
-    constructor(array: Float32Array | Uint32Array, itemSize: number) {
+    constructor(array: Float32Array | Uint32Array | Int32Array, itemSize: number) {
       this.array = array;
       this.count = array.length / itemSize;
       this.itemSize = itemSize;
@@ -87,6 +102,7 @@ function makeMockBufferSet(options?: {
     stretchColors.push({
       idsSBA: new StorageBufferAttribute(new Uint32Array(count * 2), 2),
       restLengthsSBA: new StorageBufferAttribute(new Float32Array(count), 1),
+      complianceSBA: new StorageBufferAttribute(new Float32Array(count), 1),
       count,
     });
   }
@@ -94,9 +110,11 @@ function makeMockBufferSet(options?: {
   // Bend
   let bendIdsSBA: StorageBufferAttribute | null = null;
   let bendRestSBA: StorageBufferAttribute | null = null;
+  let bendComplianceSBA: StorageBufferAttribute | null = null;
   if (numBend > 0) {
     bendIdsSBA = new StorageBufferAttribute(new Uint32Array(numBend * 4), 4);
     bendRestSBA = new StorageBufferAttribute(new Float32Array(numBend), 1);
+    bendComplianceSBA = new StorageBufferAttribute(new Float32Array(numBend), 1);
   }
 
   // Seam
@@ -107,6 +125,8 @@ function makeMockBufferSet(options?: {
     seamTargetDistSBA = new StorageBufferAttribute(new Float32Array(numSeam), 1);
   }
 
+  const triangles = new Uint32Array([0, 1, 2, 0, 2, 3]);
+
   return {
     positionSBA,
     prevPosSBA,
@@ -115,11 +135,15 @@ function makeMockBufferSet(options?: {
     stretchColors,
     bendIdsSBA,
     bendRestSBA,
+    bendComplianceSBA,
     numBendConstraints: numBend,
     seamIdsSBA,
     seamTargetDistSBA,
     numSeamConstraints: numSeam,
-    triangles: new Uint32Array([0, 1, 2, 0, 2, 3]),
+    triangles,
+    normalSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
+    normalAccumSBA: new StorageBufferAttribute(new Int32Array(numParticles * 3), 1),
+    triangleIdsSBA: new StorageBufferAttribute(new Uint32Array(triangles), 1),
     numParticles,
     numTriangles: 2,
   };
@@ -129,8 +153,7 @@ const defaultConfig: TslSolverConfig = {
   substeps: 15,
   gravity: [0, -9.81, 0],
   damping: 0.99,
-  stretchCompliance: 0.0,
-  bendCompliance: 1.0,
+  internalDamping: 0.3,
   seamStiffness: 0.0001,
   groundY: -10.0,
   dt: 1 / 60,
@@ -237,6 +260,21 @@ describe('createTslSolver', () => {
     expect(solver.preSolve).toHaveProperty('dispatchCount', 4);
   });
 
+  it('returns groundClamp compute node', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.groundClamp).toBeDefined();
+    expect(solver.groundClamp).toHaveProperty('__tslCompute', true);
+  });
+
+  it('groundClamp dispatch count matches numParticles', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.groundClamp).toHaveProperty('dispatchCount', 4);
+  });
+
   it('postSolve dispatch count matches numParticles', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, { ...defaultConfig });
@@ -264,6 +302,48 @@ describe('createTslSolver', () => {
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
     expect(solver.seam).toHaveProperty('dispatchCount', 7);
+  });
+
+  it('returns normalZero compute node with dispatch count matching numParticles', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.normalZero).toBeDefined();
+    expect(solver.normalZero).toHaveProperty('__tslCompute', true);
+    expect(solver.normalZero).toHaveProperty('dispatchCount', 4);
+  });
+
+  it('returns normalAccum compute node with dispatch count matching numTriangles', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.normalAccum).toBeDefined();
+    expect(solver.normalAccum).toHaveProperty('__tslCompute', true);
+    expect(solver.normalAccum).toHaveProperty('dispatchCount', 2);
+  });
+
+  it('returns normalNormalize compute node with dispatch count matching numParticles', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.normalNormalize).toBeDefined();
+    expect(solver.normalNormalize).toHaveProperty('__tslCompute', true);
+    expect(solver.normalNormalize).toHaveProperty('dispatchCount', 4);
+  });
+
+  it('exposes normalBufNode for material.normalNode', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.normalBufNode).toBeDefined();
+    expect(solver.normalBufNode).toHaveProperty('toAttribute');
+  });
+
+  it('exposes normalSBA from buffers', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.normalSBA).toBe(buffers.normalSBA);
   });
 });
 
@@ -302,8 +382,7 @@ describe('updateConfig', () => {
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
     solver.updateConfig({
-      stretchCompliance: 0.001,
-      bendCompliance: 0.5,
+      internalDamping: 0.5,
       seamStiffness: 0.01,
     });
   });

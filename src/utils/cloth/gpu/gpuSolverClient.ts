@@ -12,9 +12,10 @@
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
 import { extractStretchConstraints, extractBendConstraints, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
-import { createTslBuffers, type TslBufferSet } from './tslBuffers';
+import { createTslBuffers, type TslBufferSet, type FabricComplianceConfig } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import type { StorageBufferAttribute } from 'three/webgpu';
+import { EdgeType } from './gpuBuffers';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ export interface PieceMeshData {
   pieceId: string;
   vertices: Float32Array;
   triIds: Int32Array;
+  uvs?: Float32Array;
 }
 
 export interface GpuSolverClientCallbacks {
@@ -191,11 +193,16 @@ export class GpuSolverClient {
   /**
    * Initialize with TSL solver (for zero-copy rendering via positionNode).
    * Call this instead of initMultiPiece() when using MeshStandardNodeMaterial.
+   *
+   * @param fabricCompliance — per-edge-type compliance from toXPBDParams().
+   *   When provided, each stretch/bend constraint gets its own compliance
+   *   value based on UV-classified edge direction (warp/weft/shear).
    */
   async initMultiPieceTsl(
     pieces: PieceMeshData[],
     seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
     solverConfig?: Partial<TslSolverConfig>,
+    fabricCompliance?: FabricComplianceConfig,
   ): Promise<void> {
     // Merge pieces (same logic as initMultiPiece)
     let totalVerts = 0;
@@ -211,6 +218,9 @@ export class GpuSolverClient {
     const positions = new Float32Array(totalVerts * 3);
     const invMass = new Float32Array(totalVerts);
     const triangles = new Uint32Array(totalTris);
+    // Merge UVs for anisotropic edge classification
+    let mergedUvs: Float32Array | undefined;
+    let hasUvs = false;
 
     let vOff = 0;
     let tOff = 0;
@@ -220,14 +230,44 @@ export class GpuSolverClient {
       positions.set(p.vertices, vOff * 3);
       for (let i = 0; i < numV; i++) invMass[vOff + i] = 1.0;
       for (let i = 0; i < p.triIds.length; i++) triangles[tOff + i] = p.triIds[i] + vOff;
+
+      // Merge UVs
+      if (p.uvs && p.uvs.length >= numV * 2) {
+        if (!mergedUvs) {
+          mergedUvs = new Float32Array(totalVerts * 2);
+        }
+        mergedUvs.set(p.uvs.subarray(0, numV * 2), vOff * 2);
+        hasUvs = true;
+      }
+
       vOff += numV;
       tOff += p.triIds.length;
     }
 
-    // Extract constraints
-    const stretch = extractStretchConstraints(positions, triangles);
-    const bend = extractBendConstraints(positions, triangles);
-    const colored = colorConstraints(stretch.ids, stretch.restLengths, stretch.ids.length / 2);
+    // Extract constraints with UV-based edge classification
+    const uvArg = hasUvs ? mergedUvs : undefined;
+    const stretch = extractStretchConstraints(positions, triangles, uvArg);
+    const bend = extractBendConstraints(positions, triangles, uvArg);
+
+    // Compute per-constraint compliance from edge types + fabric config
+    const fabric: FabricComplianceConfig = fabricCompliance ?? {
+      stretchComplianceWarp: 0.0,
+      stretchComplianceWeft: 0.0,
+      shearCompliance: 0.001,
+      bendComplianceWarp: 1.0,
+      bendComplianceWeft: 1.0,
+    };
+
+    const numStretch = stretch.ids.length / 2;
+    const stretchCompliance = new Float32Array(numStretch);
+    for (let i = 0; i < numStretch; i++) {
+      const et = stretch.edgeTypes[i];
+      if (et === EdgeType.WARP) stretchCompliance[i] = fabric.stretchComplianceWarp;
+      else if (et === EdgeType.WEFT) stretchCompliance[i] = fabric.stretchComplianceWeft;
+      else stretchCompliance[i] = fabric.shearCompliance;
+    }
+
+    const colored = colorConstraints(stretch.ids, stretch.restLengths, numStretch, stretchCompliance);
 
     // Build seam constraints
     let seam: SeamConstraintData | null = null;
@@ -247,20 +287,20 @@ export class GpuSolverClient {
       }
     }
 
-    // Create TSL buffers and solver
+    // Create TSL buffers with per-constraint compliance
     this.tslBuffers = createTslBuffers(
       { positions, triangles, invMass },
       colored,
       bend,
       seam,
+      fabric,
     );
 
     const defaultConfig: TslSolverConfig = {
       substeps: 15,
       gravity: [0, -9.81, 0],
       damping: 0.9603,
-      stretchCompliance: 0.001,
-      bendCompliance: 1.0,
+      internalDamping: 0.3,
       seamStiffness: 0.0,
       groundY: 0.0,
       dt: 1 / 60,
@@ -275,6 +315,8 @@ export class GpuSolverClient {
       stretchColors: colored.colorRanges.length,
       bendConstraints: bend.ids.length / 4,
       seamConstraints: seam ? seam.ids.length / 2 : 0,
+      hasUvs,
+      fabric: fabricCompliance ? 'custom' : 'defaults',
     });
   }
 

@@ -263,7 +263,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (solver) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderer = gl as any;
-      const substeps = 15; // TODO: get from solver config
+      const substeps = 15;
+
       for (let s = 0; s < substeps; s++) {
         renderer.compute(solver.preSolve);
         for (const stretchColor of solver.stretchColors) {
@@ -271,12 +272,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
         if (solver.bend) renderer.compute(solver.bend);
         if (solver.seam) renderer.compute(solver.seam);
+        renderer.compute(solver.groundClamp);
         renderer.compute(solver.postSolve);
       }
 
-      // Normals: the geometry's position attribute is stale (initial positions),
-      // so computeVertexNormals() would produce wrong results. Skip for now —
-      // the initial normals from geometry creation are used. GPU normals in Phase 2.
+      // Compute smooth vertex normals from final positions (once per frame)
+      renderer.compute(solver.normalZero);
+      renderer.compute(solver.normalAccum);
+      renderer.compute(solver.normalNormalize);
+
       return;
     }
 
@@ -408,9 +412,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     }
 
     const mat = new MeshStandardNodeMaterial();
-    // Use the SAME storage node that compute kernels write to.
-    // Creating a new storage() node would get a separate GPU binding/buffer.
+    // Use the SAME storage nodes that compute kernels write to.
+    // Creating new storage() nodes would get separate GPU bindings/buffers.
     mat.positionNode = solver.positionBufNode.toAttribute();
+    mat.normalNode = solver.normalBufNode.toAttribute();
     mat.side = THREE.DoubleSide;
     mat.transparent = true;
     mat.opacity = renderParams.opacity;

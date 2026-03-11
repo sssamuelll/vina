@@ -22,6 +22,7 @@ import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting } from '../../store/simulationSlice';
+import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
 import { collisionMeshFromBuffers } from '../../utils/cloth/collisionMesh';
@@ -43,6 +44,7 @@ export interface PlacedMesh {
   triIds: Int32Array;
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
+  uvs?: Float32Array;
 }
 
 interface UseSimulationLifecycleProps {
@@ -240,7 +242,24 @@ export function useSimulationLifecycle({
                 const gpuClient = new GpuSolverClient(device);
                 gpuClientRef.current = gpuClient;
                 gpuClient.onFrame = onFrame;
-                await withTimeout(gpuClient.initMultiPieceTsl(placedMeshes), 12000, 'TSL solver init');
+
+                // Use default compliance values that match the CPU solver:
+                // stretchWarp: 0.0, stretchWeft: 0.0, shear: 0.001,
+                // bendWarp: 1.0, bendWeft: 1.0
+                // The CPU solver builds per-edge compliance at init from these
+                // defaults and never rebuilds them when fabric changes.
+                // Passing fabricCompliance here is intentionally omitted to
+                // match the CPU solver's actual behavior.
+                const pf = getPhysicalFabric(fabricId);
+                const tslSolverConfig = pf ? {
+                  internalDamping: pf.internalDamping,
+                } : undefined;
+
+                await withTimeout(
+                  gpuClient.initMultiPieceTsl(placedMeshes, undefined, tslSolverConfig),
+                  12000,
+                  'TSL solver init',
+                );
                 if (cancelled) return;
                 tslSolverRef.current = gpuClient.getTslSolver();
                 setTslGeneration(g => g + 1);

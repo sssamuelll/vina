@@ -431,6 +431,8 @@ export interface ColoredConstraints {
   ids: Uint32Array;
   /** Rest lengths reordered to match */
   restLengths: Float32Array;
+  /** Per-constraint compliance values reordered to match (optional) */
+  compliance?: Float32Array;
   /** (offset, count) per color group */
   colorRanges: Array<{ offset: number; count: number }>;
 }
@@ -439,6 +441,7 @@ export function colorConstraints(
   ids: Uint32Array,
   restLengths: Float32Array,
   numConstraints: number,
+  compliance?: Float32Array,
 ): ColoredConstraints {
   if (numConstraints === 0) {
     return { ids: new Uint32Array(0), restLengths: new Float32Array(0), colorRanges: [] };
@@ -484,6 +487,7 @@ export function colorConstraints(
 
   const reorderedIds = new Uint32Array(numConstraints * 2);
   const reorderedRest = new Float32Array(numConstraints);
+  const reorderedCompliance = compliance ? new Float32Array(numConstraints) : undefined;
   const colorRanges: Array<{ offset: number; count: number }> = [];
   let offset = 0;
 
@@ -494,11 +498,14 @@ export function colorConstraints(
       reorderedIds[(offset + j) * 2] = ids[srcIdx * 2];
       reorderedIds[(offset + j) * 2 + 1] = ids[srcIdx * 2 + 1];
       reorderedRest[offset + j] = restLengths[srcIdx];
+      if (compliance && reorderedCompliance) {
+        reorderedCompliance[offset + j] = compliance[srcIdx];
+      }
     }
     offset += group.length;
   }
 
-  return { ids: reorderedIds, restLengths: reorderedRest, colorRanges };
+  return { ids: reorderedIds, restLengths: reorderedRest, compliance: reorderedCompliance, colorRanges };
 }
 
 /**
