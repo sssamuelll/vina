@@ -1,12 +1,16 @@
 // ─── Self-Collision via Spatial Hash (GPU) ──────────────────────────────────
 //
-// 4-pass approach (Müller "Ten Minute Physics" adapted for GPU):
-//   1. hashCount:  each particle hashes to cell, atomicAdd to cellCount
-//   2. prefixSum:  parallel prefix sum to build cellStart
-//   3. scatter:    each particle writes its index to sorted entries array
-//   4. resolve:    each particle queries 27 neighbor cells, pushes apart
+// 5-pass approach (Müller "Ten Minute Physics" adapted for GPU):
+//   1. hashCount:         each particle hashes to cell, atomicAdd to cellCount
+//   2. prefixSum:         (external shader) parallel prefix sum to build cellStart
+//   3. scatter:           each particle writes its index to sorted entries array
+//   4. resolveCollisions: each particle queries 27 neighbor cells, atomicAdd corrections
+//   5. applyCorrections:  drain atomic deltas, average, add to positions, reset
 //
 // Adjacency is pre-uploaded (flat list + offsets) to skip connected neighbors.
+//
+// Race-free: resolveCollisions uses atomicAdd on i32 delta buffers (scaled by 1e6)
+// for BOTH particles in each pair. No direct position writes in resolve pass.
 // ─────────────────────────────────────────────────────────────────────────────
 
 struct SelfCollisionParams {
@@ -15,6 +19,9 @@ struct SelfCollisionParams {
   thickness: f32,       // cloth thickness (min separation)
   _pad0: u32,
 };
+
+// Fixed-point scale for atomic<i32> accumulation (WGSL has no atomic<f32>)
+const COLLISION_SCALE: f32 = 1000000.0;
 
 // ─── Bindings ───────────────────────────────────────────────────────────────
 
@@ -29,6 +36,10 @@ struct SelfCollisionParams {
 // Group 1: adjacency (read-only, uploaded once)
 @group(1) @binding(0) var<storage, read> adjOffsets: array<u32>;   // numParticles+1 (CSR format)
 @group(1) @binding(1) var<storage, read> adjNeighbors: array<u32>; // flat neighbor list
+
+// Group 2: atomic correction buffers (reset each substep by applyCorrections)
+@group(2) @binding(0) var<storage, read_write> scDelta: array<atomic<i32>>;     // 3 per particle (x,y,z)
+@group(2) @binding(1) var<storage, read_write> scCorrCount: array<atomic<u32>>; // 1 per particle
 
 // ─── Hash Function ──────────────────────────────────────────────────────────
 
@@ -62,22 +73,6 @@ fn hashCount(@builtin(global_invocation_id) gid: vec3u) {
   atomicAdd(&cellCount[h], 1u);
 }
 
-// ─── Pass 2: Prefix Sum (simple serial — run with 1 workgroup) ──────────────
-// For large meshes a parallel Blelloch scan would be better, but serial
-// on a single workgroup is fine up to ~256K cells (128K particles).
-
-@compute @workgroup_size(1)
-fn prefixSum(@builtin(global_invocation_id) gid: vec3u) {
-  var running: u32 = 0u;
-  for (var i: u32 = 0u; i < scParams.tableSize; i++) {
-    let count = atomicLoad(&cellCount[i]);
-    cellStart[i] = running;
-    running += count;
-    // Reset count for scatter pass reuse
-    atomicStore(&cellCount[i], 0u);
-  }
-}
-
 // ─── Pass 3: Scatter ────────────────────────────────────────────────────────
 
 @compute @workgroup_size(256)
@@ -108,7 +103,9 @@ fn isAdjacent(i: u32, j: u32) -> bool {
   return false;
 }
 
-// ─── Pass 4: Resolve Collisions ─────────────────────────────────────────────
+// ─── Pass 4: Resolve Collisions (atomic accumulation) ───────────────────────
+// For each pair (i, j) where j > i, compute the correction vector and
+// atomicAdd both particles' shares into scDelta. No direct position writes.
 
 @compute @workgroup_size(256)
 fn resolveCollisions(@builtin(global_invocation_id) gid: vec3u) {
@@ -128,12 +125,6 @@ fn resolveCollisions(@builtin(global_invocation_id) gid: vec3u) {
 
   let thickSq = scParams.thickness * scParams.thickness;
   let wi = invMass[i];
-
-  // Accumulate correction (Jacobi-style: average all corrections)
-  var corrX: f32 = 0.0;
-  var corrY: f32 = 0.0;
-  var corrZ: f32 = 0.0;
-  var corrCount: u32 = 0u;
 
   for (var dxi: i32 = 0; dxi <= 2; dxi++) {
     for (var dyi: i32 = 0; dyi <= 2; dyi++) {
@@ -167,24 +158,57 @@ fn resolveCollisions(@builtin(global_invocation_id) gid: vec3u) {
           let wSum = wi + wj;
           let corr = (scParams.thickness - dist) / wSum;
 
-          // Only apply this particle's share
-          corrX += nx * corr * wi;
-          corrY += ny * corr * wi;
-          corrZ += nz * corr * wi;
-          corrCount += 1u;
+          // Particle i: pushed in +n direction
+          let ciX = i32(nx * corr * wi * COLLISION_SCALE);
+          let ciY = i32(ny * corr * wi * COLLISION_SCALE);
+          let ciZ = i32(nz * corr * wi * COLLISION_SCALE);
 
-          // Also push j (Gauss-Seidel for j — slight asymmetry but fast)
-          positions[jdx]      -= nx * corr * wj;
-          positions[jdx + 1u] -= ny * corr * wj;
-          positions[jdx + 2u] -= nz * corr * wj;
+          atomicAdd(&scDelta[idx],      ciX);
+          atomicAdd(&scDelta[idx + 1u], ciY);
+          atomicAdd(&scDelta[idx + 2u], ciZ);
+          atomicAdd(&scCorrCount[i], 1u);
+
+          // Particle j: pushed in -n direction
+          let cjX = i32(-nx * corr * wj * COLLISION_SCALE);
+          let cjY = i32(-ny * corr * wj * COLLISION_SCALE);
+          let cjZ = i32(-nz * corr * wj * COLLISION_SCALE);
+
+          atomicAdd(&scDelta[jdx],      cjX);
+          atomicAdd(&scDelta[jdx + 1u], cjY);
+          atomicAdd(&scDelta[jdx + 2u], cjZ);
+          atomicAdd(&scCorrCount[j], 1u);
         }
       }
     }
   }
+}
 
-  if (corrCount > 0u) {
-    positions[idx]      += corrX;
-    positions[idx + 1u] += corrY;
-    positions[idx + 2u] += corrZ;
+// ─── Pass 5: Apply Corrections + Reset ──────────────────────────────────────
+// Drain atomic deltas, average by correction count, add to positions.
+// Always reset buffers (even if count == 0) so they're clean for next substep.
+
+@compute @workgroup_size(256)
+fn applyCorrections(@builtin(global_invocation_id) gid: vec3u) {
+  let i = gid.x;
+  if (i >= scParams.numParticles) { return; }
+
+  let idx = i * 3u;
+  let count = atomicLoad(&scCorrCount[i]);
+
+  if (count > 0u) {
+    let invScale = 1.0 / (f32(count) * COLLISION_SCALE);
+    let dx = f32(atomicLoad(&scDelta[idx]))      * invScale;
+    let dy = f32(atomicLoad(&scDelta[idx + 1u])) * invScale;
+    let dz = f32(atomicLoad(&scDelta[idx + 2u])) * invScale;
+
+    positions[idx]      += dx;
+    positions[idx + 1u] += dy;
+    positions[idx + 2u] += dz;
   }
+
+  // Reset for next substep
+  atomicStore(&scDelta[idx],      0);
+  atomicStore(&scDelta[idx + 1u], 0);
+  atomicStore(&scDelta[idx + 2u], 0);
+  atomicStore(&scCorrCount[i], 0u);
 }

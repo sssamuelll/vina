@@ -1,4 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// three/webgpu and three/tsl resolve to the same bundle; mock both.
+vi.mock('three/webgpu', () => ({
+  StorageBufferAttribute: class MockSBA {
+    array: Float32Array | Uint32Array | Int32Array;
+    count: number;
+    itemSize: number;
+    constructor(array: Float32Array | Uint32Array | Int32Array, itemSize: number) {
+      this.array = array;
+      this.count = array.length / itemSize;
+      this.itemSize = itemSize;
+    }
+  },
+}));
+
+vi.mock('three/tsl', () => ({
+  StorageBufferAttribute: class MockSBA {
+    array: Float32Array | Uint32Array | Int32Array;
+    count: number;
+    itemSize: number;
+    constructor(array: Float32Array | Uint32Array | Int32Array, itemSize: number) {
+      this.array = array;
+      this.count = array.length / itemSize;
+      this.itemSize = itemSize;
+    }
+  },
+}));
+
 import { createTslBuffers } from '../tslBuffers';
 import type { ClothMeshData, StretchConstraints, BendConstraints, SeamConstraintData } from '../gpuBuffers';
 import { colorConstraints } from '../gpuBuffers';

@@ -24,6 +24,7 @@ import constraintsShaderSrc from './shaders/constraints.wgsl?raw';
 import collisionShaderSrc from './shaders/collision.wgsl?raw';
 import normalsShaderSrc from './shaders/normals.wgsl?raw';
 import selfCollisionShaderSrc from './shaders/selfCollision.wgsl?raw';
+import prefixSumShaderSrc from './shaders/prefixSum.wgsl?raw';
 import { buildAdjacency } from '../selfCollision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -153,7 +154,6 @@ export class GpuClothSolver {
 
   // Self-collision spatial hash
   private scHashCountPipeline: GPUComputePipeline | null = null;
-  private scPrefixSumPipeline: GPUComputePipeline | null = null;
   private scScatterPipeline: GPUComputePipeline | null = null;
   private scResolvePipeline: GPUComputePipeline | null = null;
   private scBindGroup: GPUBindGroup | null = null;
@@ -165,6 +165,20 @@ export class GpuClothSolver {
   private scAdjOffsetsBuffer: GPUBuffer | null = null;
   private scAdjNeighborsBuffer: GPUBuffer | null = null;
   private scTableSize: number = 0;
+
+  // Self-collision atomic correction buffers
+  private scDeltaBuffer: GPUBuffer | null = null;
+  private scCorrCountBuffer: GPUBuffer | null = null;
+  private scDeltaBindGroup: GPUBindGroup | null = null;
+  private scApplyCorrectionsPipeline: GPUComputePipeline | null = null;
+
+  // Parallel prefix sum
+  private psPipeline_scanBlock: GPUComputePipeline | null = null;
+  private psPipeline_scanBlockSums: GPUComputePipeline | null = null;
+  private psPipeline_propagate: GPUComputePipeline | null = null;
+  private psBindGroup: GPUBindGroup | null = null;
+  private psParamsBuffer: GPUBuffer | null = null;
+  private psBlockSumsBuffer: GPUBuffer | null = null;
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.device = device;
@@ -335,39 +349,76 @@ export class GpuClothSolver {
         col.end();
       }
 
-      // ─── Self-collision (4 passes) ─────────────────────────────
-      if (this.config.selfCollision && this.scHashCountPipeline && this.scBindGroup && this.scAdjBindGroup) {
+      // ─── Self-collision (5 passes: hash → prefix sum → scatter → resolve → apply) ───
+      if (this.config.selfCollision && this.scHashCountPipeline && this.scBindGroup && this.scAdjBindGroup && this.scDeltaBindGroup) {
+        // Clear cellCount buffer for this substep
         encoder.clearBuffer(this.scCellCountBuffer!, 0, this.scTableSize * 4);
 
         const scWG = particleWG;
 
+        // Pass 1: hashCount — each particle hashes to cell, atomicAdd to cellCount
         const h = encoder.beginComputePass({ label: 'sc-hashCount' });
         h.setPipeline(this.scHashCountPipeline);
         h.setBindGroup(0, this.scBindGroup);
         h.setBindGroup(1, this.scAdjBindGroup);
+        h.setBindGroup(2, this.scDeltaBindGroup);
         h.dispatchWorkgroups(scWG);
         h.end();
 
-        const ps = encoder.beginComputePass({ label: 'sc-prefixSum' });
-        ps.setPipeline(this.scPrefixSumPipeline!);
-        ps.setBindGroup(0, this.scBindGroup);
-        ps.setBindGroup(1, this.scAdjBindGroup);
-        ps.dispatchWorkgroups(1);
-        ps.end();
+        // Pass 2: parallel prefix sum (3 sub-passes)
+        if (this.psPipeline_scanBlock && this.psPipeline_scanBlockSums && this.psBindGroup) {
+          const numBlocks = Math.ceil(this.scTableSize / 512);
 
+          // Sub-pass 2a: scanBlock — Blelloch scan within each block of 512
+          const ps1 = encoder.beginComputePass({ label: 'ps-scanBlock' });
+          ps1.setPipeline(this.psPipeline_scanBlock);
+          ps1.setBindGroup(0, this.psBindGroup);
+          ps1.dispatchWorkgroups(numBlocks);
+          ps1.end();
+
+          // Sub-pass 2b: scanBlockSums — serial scan of per-block totals
+          const ps2 = encoder.beginComputePass({ label: 'ps-scanBlockSums' });
+          ps2.setPipeline(this.psPipeline_scanBlockSums);
+          ps2.setBindGroup(0, this.psBindGroup);
+          ps2.dispatchWorkgroups(1);
+          ps2.end();
+
+          // Sub-pass 2c: propagate — add block offsets (only needed if >1 block)
+          if (numBlocks > 1 && this.psPipeline_propagate) {
+            const ps3 = encoder.beginComputePass({ label: 'ps-propagate' });
+            ps3.setPipeline(this.psPipeline_propagate);
+            ps3.setBindGroup(0, this.psBindGroup);
+            ps3.dispatchWorkgroups(numBlocks);
+            ps3.end();
+          }
+        }
+
+        // Pass 3: scatter — each particle writes its index to sorted entries
         const sc = encoder.beginComputePass({ label: 'sc-scatter' });
         sc.setPipeline(this.scScatterPipeline!);
         sc.setBindGroup(0, this.scBindGroup);
         sc.setBindGroup(1, this.scAdjBindGroup);
+        sc.setBindGroup(2, this.scDeltaBindGroup);
         sc.dispatchWorkgroups(scWG);
         sc.end();
 
+        // Pass 4: resolveCollisions — atomicAdd corrections into delta buffers
         const res = encoder.beginComputePass({ label: 'sc-resolve' });
         res.setPipeline(this.scResolvePipeline!);
         res.setBindGroup(0, this.scBindGroup);
         res.setBindGroup(1, this.scAdjBindGroup);
+        res.setBindGroup(2, this.scDeltaBindGroup);
         res.dispatchWorkgroups(scWG);
         res.end();
+
+        // Pass 5: applyCorrections — drain deltas, average, add to positions, reset
+        const apply = encoder.beginComputePass({ label: 'sc-applyCorrections' });
+        apply.setPipeline(this.scApplyCorrectionsPipeline!);
+        apply.setBindGroup(0, this.scBindGroup);
+        apply.setBindGroup(1, this.scAdjBindGroup);
+        apply.setBindGroup(2, this.scDeltaBindGroup);
+        apply.dispatchWorkgroups(scWG);
+        apply.end();
       }
 
       // ─── Post-solve: velocity update ───────────────────────────
@@ -595,19 +646,34 @@ export class GpuClothSolver {
     this.scCellEntriesBuffer?.destroy();
     this.scAdjOffsetsBuffer?.destroy();
     this.scAdjNeighborsBuffer?.destroy();
+    this.scDeltaBuffer?.destroy();
+    this.scCorrCountBuffer?.destroy();
     this.scParamsBuffer = null;
     this.scCellCountBuffer = null;
     this.scCellStartBuffer = null;
     this.scCellEntriesBuffer = null;
     this.scAdjOffsetsBuffer = null;
     this.scAdjNeighborsBuffer = null;
+    this.scDeltaBuffer = null;
+    this.scCorrCountBuffer = null;
     this.scHashCountPipeline = null;
-    this.scPrefixSumPipeline = null;
     this.scScatterPipeline = null;
     this.scResolvePipeline = null;
+    this.scApplyCorrectionsPipeline = null;
     this.scBindGroup = null;
     this.scAdjBindGroup = null;
+    this.scDeltaBindGroup = null;
     this.scTableSize = 0;
+
+    // Prefix sum cleanup
+    this.psParamsBuffer?.destroy();
+    this.psBlockSumsBuffer?.destroy();
+    this.psParamsBuffer = null;
+    this.psBlockSumsBuffer = null;
+    this.psPipeline_scanBlock = null;
+    this.psPipeline_scanBlockSums = null;
+    this.psPipeline_propagate = null;
+    this.psBindGroup = null;
   }
 
   // ─── Private ────────────────────────────────────────────────────────────
@@ -1011,12 +1077,30 @@ export class GpuClothSolver {
     new Uint32Array(this.scAdjNeighborsBuffer.getMappedRange()).set(neighbors);
     this.scAdjNeighborsBuffer.unmap();
 
-    // Pipelines
+    // ─── Atomic correction buffers (group 2) ──────────────────────────────
+
+    // scDelta: i32 × 3 per particle (fixed-point position corrections)
+    this.scDeltaBuffer = this.device.createBuffer({
+      label: 'sc-delta',
+      size: numParticles * 3 * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    // scCorrCount: u32 per particle (number of corrections accumulated)
+    this.scCorrCountBuffer = this.device.createBuffer({
+      label: 'sc-corrCount',
+      size: numParticles * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    // ─── Pipelines ─────────────────────────────────────────────────────────
+
     const scModule = this.device.createShaderModule({
       label: 'selfCollision',
       code: selfCollisionShaderSrc,
     });
 
+    // Group 0: main self-collision bindings
     const scLayout = this.device.createBindGroupLayout({
       label: 'sc-main',
       entries: [
@@ -1029,6 +1113,7 @@ export class GpuClothSolver {
       ],
     });
 
+    // Group 1: adjacency (read-only, uploaded once)
     const adjLayout = this.device.createBindGroupLayout({
       label: 'sc-adj',
       entries: [
@@ -1037,19 +1122,24 @@ export class GpuClothSolver {
       ],
     });
 
+    // Group 2: atomic delta buffers
+    const deltaLayout = this.device.createBindGroupLayout({
+      label: 'sc-delta',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    });
+
+    // Pipeline layout with all 3 bind group layouts
     const scPipelineLayout = this.device.createPipelineLayout({
-      bindGroupLayouts: [scLayout, adjLayout],
+      bindGroupLayouts: [scLayout, adjLayout, deltaLayout],
     });
 
     this.scHashCountPipeline = this.device.createComputePipeline({
       label: 'sc-hashCount',
       layout: scPipelineLayout,
       compute: { module: scModule, entryPoint: 'hashCount' },
-    });
-    this.scPrefixSumPipeline = this.device.createComputePipeline({
-      label: 'sc-prefixSum',
-      layout: scPipelineLayout,
-      compute: { module: scModule, entryPoint: 'prefixSum' },
     });
     this.scScatterPipeline = this.device.createComputePipeline({
       label: 'sc-scatter',
@@ -1061,8 +1151,14 @@ export class GpuClothSolver {
       layout: scPipelineLayout,
       compute: { module: scModule, entryPoint: 'resolveCollisions' },
     });
+    this.scApplyCorrectionsPipeline = this.device.createComputePipeline({
+      label: 'sc-applyCorrections',
+      layout: scPipelineLayout,
+      compute: { module: scModule, entryPoint: 'applyCorrections' },
+    });
 
-    // Bind groups
+    // ─── Bind groups ───────────────────────────────────────────────────────
+
     this.scBindGroup = this.device.createBindGroup({
       label: 'sc-main',
       layout: scLayout,
@@ -1085,9 +1181,88 @@ export class GpuClothSolver {
       ],
     });
 
+    this.scDeltaBindGroup = this.device.createBindGroup({
+      label: 'sc-delta',
+      layout: deltaLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.scDeltaBuffer } },
+        { binding: 1, resource: { buffer: this.scCorrCountBuffer } },
+      ],
+    });
+
+    // ─── Parallel prefix sum pipelines ─────────────────────────────────────
+
+    const psModule = this.device.createShaderModule({
+      label: 'prefixSum',
+      code: prefixSumShaderSrc,
+    });
+
+    const psLayout = this.device.createBindGroupLayout({
+      label: 'ps',
+      entries: [
+        { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+        { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+      ],
+    });
+
+    const psPipelineLayout = this.device.createPipelineLayout({
+      bindGroupLayouts: [psLayout],
+    });
+
+    this.psPipeline_scanBlock = this.device.createComputePipeline({
+      label: 'ps-scanBlock',
+      layout: psPipelineLayout,
+      compute: { module: psModule, entryPoint: 'scanBlock' },
+    });
+    this.psPipeline_scanBlockSums = this.device.createComputePipeline({
+      label: 'ps-scanBlockSums',
+      layout: psPipelineLayout,
+      compute: { module: psModule, entryPoint: 'scanBlockSums' },
+    });
+    this.psPipeline_propagate = this.device.createComputePipeline({
+      label: 'ps-propagate',
+      layout: psPipelineLayout,
+      compute: { module: psModule, entryPoint: 'propagate' },
+    });
+
+    // Prefix sum params uniform: { numElements: u32, blockSize: u32, _pad0, _pad1 }
+    const blockSize = 512;
+    const psParamsData = new Uint32Array([ts, blockSize, 0, 0]);
+    this.psParamsBuffer = this.device.createBuffer({
+      label: 'ps-params',
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      mappedAtCreation: true,
+    });
+    new Uint32Array(this.psParamsBuffer.getMappedRange()).set(psParamsData);
+    this.psParamsBuffer.unmap();
+
+    // Block sums buffer: ceil(tableSize / blockSize) entries
+    const numBlocks = Math.ceil(ts / blockSize);
+    this.psBlockSumsBuffer = this.device.createBuffer({
+      label: 'ps-blockSums',
+      size: Math.max(numBlocks * 4, 4),
+      usage: GPUBufferUsage.STORAGE,
+    });
+
+    // Prefix sum bind group
+    this.psBindGroup = this.device.createBindGroup({
+      label: 'ps',
+      layout: psLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.psParamsBuffer } },
+        { binding: 1, resource: { buffer: this.scCellCountBuffer } },
+        { binding: 2, resource: { buffer: this.scCellStartBuffer } },
+        { binding: 3, resource: { buffer: this.psBlockSumsBuffer } },
+      ],
+    });
+
     console.log('[GpuSolver] Self-collision initialized:', {
       tableSize: ts,
       adjNeighbors: totalNeighbors,
+      prefixSumBlocks: numBlocks,
     });
   }
 }
