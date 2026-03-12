@@ -411,7 +411,7 @@ export class GpuSolverClient {
    * brush relaxation, this method is a safe no-op.
    */
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  relaxParticles(indices: number[], strength: number): void {
+  relaxParticles(_indices: number[], _strength: number): void {
     // TODO: Implement as a TSL compute kernel that reads/writes velocity
     // on GPU, taking brush center + radius + strength as uniforms.
     // The current CPU-side approach cannot work because velocitySBA.array
