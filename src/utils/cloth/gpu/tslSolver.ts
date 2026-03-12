@@ -42,6 +42,8 @@ import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.
 import type UniformNode from 'three/src/nodes/core/UniformNode.js';
 import type { TslBufferSet } from './tslBuffers';
 import type { TslCollisionBody } from './tslCollision';
+import type { SelfCollisionComputeNodes } from './tslSelfCollision';
+import { makeSelfCollisionComputeNodes } from './tslSelfCollision';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -53,6 +55,8 @@ export interface TslSolverConfig {
   seamStiffness: number;
   groundY: number;
   dt: number;
+  selfCollision?: boolean;
+  thickness?: number;
 }
 
 // ─── Solver interface ────────────────────────────────────────────────────────
@@ -98,6 +102,8 @@ export interface TslSolver {
   prevPosBufNode: StorageBufferNode<'vec3'>;
   /** Inverse mass storage node (for collision pinned-particle check) */
   invMassBufNode: StorageBufferNode<'float'>;
+  /** Self-collision compute nodes (null if disabled) */
+  selfCollisionNodes: SelfCollisionComputeNodes | null;
   /** Active collision bodies (BVH-accelerated) */
   collisionBodies: TslCollisionBody[];
   /** Add or replace a collision body */
@@ -599,6 +605,17 @@ export function createTslSolver(
     if (idx >= 0) collisionBodies.splice(idx, 1);
   }
 
+  // ─── Self-collision (optional) ─────────────────────────────────────
+  let selfCollisionNodes: SelfCollisionComputeNodes | null = null;
+  if (config.selfCollision && buffers.scBuffers) {
+    selfCollisionNodes = makeSelfCollisionComputeNodes(
+      posBuf,
+      invMassBuf,
+      buffers.scBuffers,
+      config.thickness ?? 0.002,
+    );
+  }
+
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
     if (partial.dt !== undefined || partial.substeps !== undefined) {
@@ -651,6 +668,7 @@ export function createTslSolver(
     numParticles: N,
     numTriangles: buffers.numTriangles,
     triangles: buffers.triangles,
+    selfCollisionNodes,
     collisionBodies,
     setCollisionBody,
     removeCollisionBody,

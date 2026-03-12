@@ -9,6 +9,7 @@
 
 import { StorageBufferAttribute } from 'three/webgpu';
 import type { ClothMeshData, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
+import type { SelfCollisionBufferSet } from './tslSelfCollision';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +61,9 @@ export interface TslBufferSet {
   normalSBA: StorageBufferAttribute;        // vec3 float — final vertex normals
   normalAccumSBA: StorageBufferAttribute;   // flat int32 — atomic accumulation buffer
   triangleIdsSBA: StorageBufferAttribute;   // flat uint32 — triangle vertex indices
+
+  // Self-collision buffers (null if disabled)
+  scBuffers: SelfCollisionBufferSet | null;
 
   // Counts
   numParticles: number;
@@ -195,6 +199,7 @@ export function createTslBuffers(
     normalSBA,
     normalAccumSBA,
     triangleIdsSBA,
+    scBuffers: null,
     numParticles: N,
     numTriangles: numTri,
   };
