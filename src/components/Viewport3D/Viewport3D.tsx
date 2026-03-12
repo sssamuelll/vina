@@ -32,6 +32,7 @@ import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
+import { WindGizmo } from './WindGizmo';
 import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
 import CustomLights from './CustomLights';
@@ -471,6 +472,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         {collisionBodies.map(body => (
           <CollisionBodyMesh key={body.id} body={body} orbitRef={orbitRef} />
         ))}
+
+        {/* Wind direction indicator */}
+        <WindGizmo />
 
         {showGarment && (useClothSim ? (
           <SimulationErrorBoundary>
