@@ -302,7 +302,12 @@ export function useSimulationLifecycle({
               // Load collision BEFORE starting (prevents explosion)
               await loadCollision(wasmClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, true);
 
-              if (!cancelled) wasmClient.start();
+              if (!cancelled) {
+                wasmClient.start();
+                // Push pre-existing wind config — the separate wind useEffect
+                // fires on mount before wasmClientRef is set, so it's a no-op.
+                if (windEnabled) wasmClient.setWind(windForce);
+              }
               return;
             } else if (!cancelled) {
               console.warn('[SimLifecycle] Wasm solver not available');
@@ -448,7 +453,10 @@ export function useSimulationLifecycle({
     if (!wasmClient) return;
     const force: [number, number, number] = windEnabled ? windForce : [0, 0, 0];
     wasmClient.setWind(force);
-  }, [windForce, windEnabled]);
+  }, [windForce, windEnabled, dragCoefficient]);
+
+  // Note: CPU solver (ClothWorkerClient) does not support live wind updates yet.
+  // Wind is only available on GPU and WASM solver tiers.
 
   return {
     clients: {
