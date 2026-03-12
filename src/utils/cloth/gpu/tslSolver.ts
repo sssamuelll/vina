@@ -43,6 +43,7 @@ import type { SelfCollisionComputeNodes } from './tslSelfCollision';
 import { makeSelfCollisionComputeNodes } from './tslSelfCollision';
 import type { WindComputeNodes } from './tslWind';
 import { makeWindComputeNode, createWindBuffers } from './tslWind';
+import { makeBrushComputeNode, type BrushComputeNodes } from './tslBrush';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,8 @@ export interface TslSolver {
   selfCollisionNodes: SelfCollisionComputeNodes | null;
   /** Wind force compute nodes (always created; zero wind is a no-op) */
   windNodes: WindComputeNodes;
+  /** Steam brush velocity damping compute nodes (always created; zero strength is a no-op) */
+  brushNodes: BrushComputeNodes;
   /** Active collision bodies (BVH-accelerated) */
   collisionBodies: TslCollisionBody[];
   /** Add or replace a collision body */
@@ -653,6 +656,9 @@ export function createTslSolver(
     dragCoeff,
   );
 
+  // ─── Steam brush (per-particle velocity damping) ──────────────────
+  const brushNodes = makeBrushComputeNode(posBuf, velBuf, invMassBuf, N);
+
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
     if (partial.dt !== undefined || partial.substeps !== undefined) {
@@ -717,6 +723,7 @@ export function createTslSolver(
     triangles: buffers.triangles,
     selfCollisionNodes,
     windNodes,
+    brushNodes,
     collisionBodies,
     setCollisionBody,
     removeCollisionBody,
