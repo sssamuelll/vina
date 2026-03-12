@@ -103,6 +103,12 @@ interface SimulationSliceState {
   activeSnapshotId: string | null;
   /** Whether the simulation is warm-starting after a dimension edit */
   isWarmStarting: boolean;
+  /** Wind force direction vector [x, y, z] in N/m² */
+  windForce: [number, number, number];
+  /** Whether wind is enabled */
+  windEnabled: boolean;
+  /** Drag coefficient (scales wind and air drag) */
+  dragCoefficient: number;
   /** Latest fit map statistics (null when no fit map active) */
   fitMapStats: FitMapStats | null;
   /** Per-piece color tint (hex string, white = no tint) */
@@ -148,6 +154,9 @@ const initialState: SimulationSliceState = {
   snapshots: [],
   activeSnapshotId: null,
   isWarmStarting: false,
+  windForce: [0, 0, 0],
+  windEnabled: false,
+  dragCoefficient: 1.0,
   fitMapStats: null,
   pieceTints: {},
   pieceTextureOverrides: {},
@@ -336,6 +345,18 @@ const simulationSlice = createSlice({
     setIsWarmStarting(state, action: PayloadAction<boolean>) {
       state.isWarmStarting = action.payload;
     },
+    /** Set wind force direction vector. */
+    setWindForce(state, action: PayloadAction<[number, number, number]>) {
+      state.windForce = action.payload;
+    },
+    /** Enable or disable wind. */
+    setWindEnabled(state, action: PayloadAction<boolean>) {
+      state.windEnabled = action.payload;
+    },
+    /** Set drag coefficient. Clamped to [0, 5]. */
+    setDragCoefficient(state, action: PayloadAction<number>) {
+      state.dragCoefficient = Math.max(0, Math.min(5, action.payload));
+    },
     /** Set the latest fit map statistics (null to clear). */
     setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
       state.fitMapStats = action.payload;
@@ -419,6 +440,10 @@ export const {
   setActiveSnapshot,
   clearSnapshots,
   setIsWarmStarting,
+  // Wind
+  setWindForce,
+  setWindEnabled,
+  setDragCoefficient,
   setFitMapStats,
   // PBR material overrides
   setPieceTint,
