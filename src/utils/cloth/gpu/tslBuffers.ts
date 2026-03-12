@@ -10,6 +10,7 @@
 import { StorageBufferAttribute } from 'three/webgpu';
 import type { ClothMeshData, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
 import type { SelfCollisionBufferSet } from './tslSelfCollision';
+import type { WindBufferSet } from './tslWind';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,9 @@ export interface TslBufferSet {
 
   // Self-collision buffers (null if disabled)
   scBuffers: SelfCollisionBufferSet | null;
+
+  // Wind accumulation buffers (null if no wind)
+  windBuffers: WindBufferSet | null;
 
   // Counts
   numParticles: number;
@@ -200,6 +204,7 @@ export function createTslBuffers(
     normalAccumSBA,
     triangleIdsSBA,
     scBuffers: null,
+    windBuffers: null,
     numParticles: N,
     numTriangles: numTri,
   };

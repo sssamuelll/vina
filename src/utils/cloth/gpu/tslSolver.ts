@@ -41,6 +41,8 @@ import type { TslBufferSet } from './tslBuffers';
 import type { TslCollisionBody } from './tslCollision';
 import type { SelfCollisionComputeNodes } from './tslSelfCollision';
 import { makeSelfCollisionComputeNodes } from './tslSelfCollision';
+import type { WindComputeNodes } from './tslWind';
+import { makeWindComputeNode, createWindBuffers } from './tslWind';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +56,8 @@ export interface TslSolverConfig {
   dt: number;
   selfCollision?: boolean;
   thickness?: number;
+  windForce?: [number, number, number];
+  dragCoefficient?: number;
 }
 
 // ─── Solver interface ────────────────────────────────────────────────────────
@@ -101,6 +105,8 @@ export interface TslSolver {
   invMassBufNode: TslNode;
   /** Self-collision compute nodes (null if disabled) */
   selfCollisionNodes: SelfCollisionComputeNodes | null;
+  /** Wind force compute nodes (always created; zero wind is a no-op) */
+  windNodes: WindComputeNodes;
   /** Active collision bodies (BVH-accelerated) */
   collisionBodies: TslCollisionBody[];
   /** Add or replace a collision body */
@@ -627,6 +633,26 @@ export function createTslSolver(
     );
   }
 
+  // ─── Wind force ────────────────────────────────────────────────────────
+  // Always create wind nodes so wind can be toggled on mid-simulation.
+  // When windForce is [0,0,0] the compute is essentially a no-op.
+  const windForce = config.windForce ?? [0, 0, 0];
+  const dragCoeff = config.dragCoefficient ?? 1.0;
+  const wb = buffers.windBuffers ?? createWindBuffers(N);
+  if (!buffers.windBuffers) buffers.windBuffers = wb;
+  const windTriIdsBuf = storage(buffers.triangleIdsSBA, 'uint', buffers.numTriangles * 3);
+  const windNodes: WindComputeNodes = makeWindComputeNode(
+    posBuf,
+    velBuf,
+    invMassBuf,
+    uniforms.sdt,
+    windTriIdsBuf,
+    wb,
+    buffers.numTriangles,
+    windForce as [number, number, number],
+    dragCoeff,
+  );
+
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
     if (partial.dt !== undefined || partial.substeps !== undefined) {
@@ -658,6 +684,16 @@ export function createTslSolver(
       config.groundY = partial.groundY;
       uniforms.groundY.value = partial.groundY;
     }
+    if (partial.windForce !== undefined) {
+      config.windForce = partial.windForce;
+      windNodes.windX.value = partial.windForce[0];
+      windNodes.windY.value = partial.windForce[1];
+      windNodes.windZ.value = partial.windForce[2];
+    }
+    if (partial.dragCoefficient !== undefined) {
+      config.dragCoefficient = partial.dragCoefficient;
+      windNodes.dragCoeff.value = partial.dragCoefficient;
+    }
   }
 
   return {
@@ -680,6 +716,7 @@ export function createTslSolver(
     numTriangles: buffers.numTriangles,
     triangles: buffers.triangles,
     selfCollisionNodes,
+    windNodes,
     collisionBodies,
     setCollisionBody,
     removeCollisionBody,

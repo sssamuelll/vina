@@ -174,6 +174,9 @@ export function useSimulationLifecycle({
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);
+  const windForce = useSelector((s: RootState) => s.simulation.windForce);
+  const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
+  const dragCoefficient = useSelector((s: RootState) => s.simulation.dragCoefficient);
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
@@ -251,9 +254,11 @@ export function useSimulationLifecycle({
                 // Passing fabricCompliance here is intentionally omitted to
                 // match the CPU solver's actual behavior.
                 const pf = getPhysicalFabric(fabricId);
-                const tslSolverConfig = pf ? {
-                  internalDamping: pf.internalDamping,
-                } : undefined;
+                const tslSolverConfig: Partial<import('../../utils/cloth/gpu/tslSolver').TslSolverConfig> = {
+                  ...(pf ? { internalDamping: pf.internalDamping } : {}),
+                  windForce: windEnabled ? windForce : [0, 0, 0],
+                  dragCoefficient,
+                };
 
                 await withTimeout(
                   gpuClient.initMultiPieceTsl(placedMeshes, undefined, tslSolverConfig),
@@ -297,7 +302,12 @@ export function useSimulationLifecycle({
               // Load collision BEFORE starting (prevents explosion)
               await loadCollision(wasmClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, true);
 
-              if (!cancelled) wasmClient.start();
+              if (!cancelled) {
+                wasmClient.start();
+                // Push pre-existing wind config — the separate wind useEffect
+                // fires on mount before wasmClientRef is set, so it's a no-op.
+                if (windEnabled) wasmClient.setWind(windForce);
+              }
               return;
             } else if (!cancelled) {
               console.warn('[SimLifecycle] Wasm solver not available');
@@ -391,6 +401,7 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.stop();
     }
     return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- windEnabled/windForce/dragCoefficient are handled by separate live-update effects below, not sim restart
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
@@ -427,6 +438,25 @@ export function useSimulationLifecycle({
       }
     };
   }, [measurements, morphTargets, avatarModelUrl, avatarHeight, simulationState]);
+
+  // ─── Push wind config to GPU solver when it changes ───────────────────────
+  useEffect(() => {
+    const gpuClient = gpuClientRef.current;
+    if (!gpuClient) return;
+    const force: [number, number, number] = windEnabled ? windForce : [0, 0, 0];
+    gpuClient.setWind(force, dragCoefficient);
+  }, [windForce, windEnabled, dragCoefficient]);
+
+  // ─── Push wind config to WASM solver when it changes ──────────────────────
+  useEffect(() => {
+    const wasmClient = wasmClientRef.current;
+    if (!wasmClient) return;
+    const force: [number, number, number] = windEnabled ? windForce : [0, 0, 0];
+    wasmClient.setWind(force);
+  }, [windForce, windEnabled, dragCoefficient]);
+
+  // Note: CPU solver (ClothWorkerClient) does not support live wind updates yet.
+  // Wind is only available on GPU and WASM solver tiers.
 
   return {
     clients: {
