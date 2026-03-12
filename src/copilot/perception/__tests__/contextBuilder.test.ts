@@ -125,6 +125,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       windEnabled: false,
       dragCoefficient: 1.0,
       frozenPieceIds: [],
+      steamBrush: { active: false, radius: 0.05, strength: 0.3 },
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
