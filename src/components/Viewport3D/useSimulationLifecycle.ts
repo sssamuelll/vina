@@ -177,6 +177,7 @@ export function useSimulationLifecycle({
   const windForce = useSelector((s: RootState) => s.simulation.windForce);
   const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
   const dragCoefficient = useSelector((s: RootState) => s.simulation.dragCoefficient);
+  const frozenPieceIds = useSelector((s: RootState) => s.simulation.frozenPieceIds);
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
@@ -457,6 +458,12 @@ export function useSimulationLifecycle({
 
   // Note: CPU solver (ClothWorkerClient) does not support live wind updates yet.
   // Wind is only available on GPU and WASM solver tiers.
+
+  // ─── Sync frozen pieces to GPU solver — set invMass=0 for frozen vertices ──
+  useEffect(() => {
+    if (!gpuClientRef.current) return;
+    gpuClientRef.current.freezePieces(frozenPieceIds);
+  }, [frozenPieceIds]);
 
   return {
     clients: {
