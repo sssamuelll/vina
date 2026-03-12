@@ -3,6 +3,7 @@ import type { RootState } from '../../store';
 import {
   startSimulation, pauseSimulation, resetSimulation,
   setParticleDistance, setQualityLevel, setAutoQuality, setFabric, setDefaultFabric,
+  setWindForce, setWindEnabled, setDragCoefficient,
 } from '../../store/simulationSlice';
 import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
@@ -23,7 +24,9 @@ export default function SimulationView() {
   const dispatch = useDispatch();
   const simulation = useSelector((s: RootState) => s.simulation);
   const pieces = useSelector((s: RootState) => s.project.pieces);
-
+  const windForce = useSelector((s: RootState) => s.simulation.windForce);
+  const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
+  const dragCoefficient = useSelector((s: RootState) => s.simulation.dragCoefficient);
 
   const isRunning = simulation.simulationState === 'running';
   const isPaused = simulation.simulationState === 'paused';
@@ -146,6 +149,60 @@ export default function SimulationView() {
           />
           Auto-adjust quality (match framerate)
         </label>
+      </div>
+
+      {/* Wind */}
+      <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Wind
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '11px', color: '#aaa' }}>
+            <input
+              type="checkbox"
+              checked={windEnabled}
+              onChange={e => dispatch(setWindEnabled(e.target.checked))}
+              style={{ accentColor: '#4a88cc' }}
+            />
+            Enable
+          </label>
+        </div>
+        {windEnabled && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {(['X', 'Y', 'Z'] as const).map((axis, i) => (
+              <div key={axis} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '11px', color: '#888', minWidth: '12px' }}>{axis}</span>
+                <input
+                  type="range"
+                  min={-20} max={20} step={0.5}
+                  value={windForce[i]}
+                  onChange={e => {
+                    const next: [number, number, number] = [...windForce] as [number, number, number];
+                    next[i] = Number(e.target.value);
+                    dispatch(setWindForce(next));
+                  }}
+                  style={{ flex: 1, accentColor: '#4a88cc' }}
+                />
+                <span style={{ fontSize: '12px', color: '#ccc', minWidth: '36px', textAlign: 'right' }}>
+                  {windForce[i].toFixed(1)}
+                </span>
+              </div>
+            ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '11px', color: '#888', minWidth: '12px' }}>Cd</span>
+              <input
+                type="range"
+                min={0} max={5} step={0.1}
+                value={dragCoefficient}
+                onChange={e => dispatch(setDragCoefficient(Number(e.target.value)))}
+                style={{ flex: 1, accentColor: '#4a88cc' }}
+              />
+              <span style={{ fontSize: '12px', color: '#ccc', minWidth: '36px', textAlign: 'right' }}>
+                {dragCoefficient.toFixed(1)}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}
