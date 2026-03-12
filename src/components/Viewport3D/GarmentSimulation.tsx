@@ -561,7 +561,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
     }
     return result;
-  }, []);
+  }, [positionsRef]);
 
   const handleBrushStroke = useCallback((point: THREE.Vector3) => {
     const indices = findParticlesInRadius(point, steamBrush.radius);

@@ -402,23 +402,22 @@ export class GpuSolverClient {
    * Used by the steam brush tool to calm cloth movement.
    * @param indices - Particle indices to relax
    * @param strength - Damping factor 0-1 (1 = fully zero velocity)
+   *
+   * NOTE: In TSL zero-copy mode the GPU compute shader writes velocity
+   * directly on GPU each substep. The CPU-side velocitySBA.array is stale
+   * (initialized to zeros, never read back). Bumping version++ would
+   * upload this stale array and overwrite ALL particle velocities, freezing
+   * the entire cloth. Until a proper GPU compute kernel is added for
+   * brush relaxation, this method is a safe no-op.
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   relaxParticles(indices: number[], strength: number): void {
+    // TODO: Implement as a TSL compute kernel that reads/writes velocity
+    // on GPU, taking brush center + radius + strength as uniforms.
+    // The current CPU-side approach cannot work because velocitySBA.array
+    // is never read back from GPU — uploading it would corrupt all velocities.
     if (!this.tslBuffers) return;
-
-    const velArr = this.tslBuffers.velocitySBA.array as Float32Array;
-    const maxIdx = velArr.length / 3;
-    const factor = 1 - strength;
-
-    for (const idx of indices) {
-      if (idx < 0 || idx >= maxIdx) continue;
-      const base = idx * 3;
-      velArr[base] *= factor;
-      velArr[base + 1] *= factor;
-      velArr[base + 2] *= factor;
-    }
-
-    this.tslBuffers.velocitySBA.version++;
+    console.warn('[GpuSolverClient] relaxParticles is a no-op in TSL mode — GPU velocity buffer cannot be modified from CPU without readback');
   }
 
   /**
