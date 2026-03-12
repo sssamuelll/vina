@@ -273,6 +273,10 @@ export function useSimulationLifecycle({
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
                 await loadCollision(gpuClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, false);
 
+                // Push pre-existing freeze state — the separate freeze useEffect
+                // fires on mount before gpuClientRef is set, so it's a no-op.
+                if (frozenPieceIds.length > 0) gpuClient.freezePieces(frozenPieceIds);
+
                 // Don't call gpuClient.start() — TSL compute is driven by useFrame.
                 return;
             }
