@@ -74,6 +74,8 @@ interface GarmentSimulationProps {
 const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationProps>(function MergedSimulation({ pieces, seams, onFitMapStats }, ref) {
   const dispatch = useDispatch();
   const meshRef = useRef<THREE.Mesh>(null);
+  const brushDragging = useRef(false);
+  const brushCursorRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const pieceColorsRef = useRef<Float32Array | null>(null);
   const [tslMaterial, setTslMaterial] = useState<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
@@ -91,6 +93,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
+  const steamBrush = useSelector((s: RootState) => s.simulation.steamBrush);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 
@@ -540,6 +543,57 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     console.log(`[Pin Tool] Added pin at vertex ${nearestIdx}, position:`, pinPosition);
   }, [activeTool3D, dispatch, pinStrength, positionsRef]);
 
+  // ─── Steam brush interaction ──────────────────────────────────────────────
+
+  // Steam brush: find particles within radius and relax
+  const findParticlesInRadius = useCallback((point: THREE.Vector3, radius: number): number[] => {
+    const positions = positionsRef.current;
+    if (!positions) return [];
+    const numParticles = positions.length / 3;
+    const radiusSq = radius * radius;
+    const result: number[] = [];
+    for (let i = 0; i < numParticles; i++) {
+      const dx = positions[i * 3] - point.x;
+      const dy = positions[i * 3 + 1] - point.y;
+      const dz = positions[i * 3 + 2] - point.z;
+      if (dx * dx + dy * dy + dz * dz <= radiusSq) {
+        result.push(i);
+      }
+    }
+    return result;
+  }, []);
+
+  const handleBrushStroke = useCallback((point: THREE.Vector3) => {
+    const indices = findParticlesInRadius(point, steamBrush.radius);
+    if (indices.length === 0) return;
+    if (clients.gpu) {
+      clients.gpu.relaxParticles(indices, steamBrush.strength);
+    }
+  }, [findParticlesInRadius, steamBrush.radius, steamBrush.strength, clients.gpu]);
+
+  const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
+    if (activeTool3D !== 'steamBrush') return;
+    e.stopPropagation();
+    brushDragging.current = true;
+    handleBrushStroke(e.point);
+  }, [activeTool3D, handleBrushStroke]);
+
+  const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
+    if (activeTool3D !== 'steamBrush') return;
+    // Update brush cursor position
+    if (brushCursorRef.current) {
+      brushCursorRef.current.position.copy(e.point);
+      brushCursorRef.current.visible = true;
+    }
+    if (!brushDragging.current) return;
+    e.stopPropagation();
+    handleBrushStroke(e.point);
+  }, [activeTool3D, handleBrushStroke]);
+
+  const handlePointerUp = useCallback(() => {
+    brushDragging.current = false;
+  }, []);
+
   if (!staticGeometry) return null;
 
   return (
@@ -548,6 +602,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         ref={meshRef}
         geometry={staticGeometry}
         onClick={handleMeshClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
         material={tslMaterial || undefined}
       >
         {!tslMaterial && (
@@ -575,6 +632,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         )}
       </mesh>
       <PinRenderer livePositions={positionsRef.current || undefined} />
+      {/* Steam brush cursor */}
+      {activeTool3D === 'steamBrush' && (
+        <mesh ref={brushCursorRef} visible={false}>
+          <sphereGeometry args={[steamBrush.radius, 16, 16]} />
+          <meshBasicMaterial color="#88ccff" transparent opacity={0.2} depthWrite={false} />
+        </mesh>
+      )}
     </>
   );
 });
