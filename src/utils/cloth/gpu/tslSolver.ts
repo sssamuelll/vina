@@ -34,7 +34,6 @@ import {
   instanceIndex,
   atomicStore,
   atomicAdd,
-  atomicLoad,
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
@@ -475,10 +474,13 @@ function makeNormalNormalizeFn(
     const invScale = float(1.0 / NORMAL_SCALE);
     const base = uint(i).mul(uint(3));
 
-    // Read accumulated fixed-point values via atomicLoad
-    const nx = float(atomicLoad(normalAccumBuf.element(base))).mul(invScale);
-    const ny = float(atomicLoad(normalAccumBuf.element(base.add(uint(1))))).mul(invScale);
-    const nz = float(atomicLoad(normalAccumBuf.element(base.add(uint(2))))).mul(invScale);
+    // Read accumulated fixed-point i32 values. This runs in a separate pass
+    // after accumulation, so no concurrent writes — regular element access is safe.
+    // (Three.js TSL doesn't export atomicLoad; each Fn() compiles to its own
+    // shader, so this buffer won't be declared atomic in the normalize kernel.)
+    const nx = float(normalAccumBuf.element(base)).mul(invScale);
+    const ny = float(normalAccumBuf.element(base.add(uint(1)))).mul(invScale);
+    const nz = float(normalAccumBuf.element(base.add(uint(2)))).mul(invScale);
 
     const n = vec3(nx, ny, nz);
     const len2 = n.dot(n);

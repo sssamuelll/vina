@@ -68,7 +68,6 @@ const { MockSBA, tslExports } = vi.hoisted(() => {
     Loop: () => {},
     atomicStore: () => {},
     atomicAdd: () => mockElement(),
-    atomicLoad: () => ({ __atomicLoad: true }),
   };
 
   return { MockSBA, tslExports };

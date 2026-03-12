@@ -55,7 +55,6 @@ vi.mock('three/tsl', () => {
     If: () => proxy,
     Loop: () => proxy,
     atomicAdd: () => proxy,
-    atomicLoad: () => proxy,
     atomicStore: () => proxy,
   };
 });

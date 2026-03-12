@@ -34,7 +34,6 @@ const { sharedMock } = vi.hoisted(() => {
       instanceIndex: proxy,
       atomicStore: noop,
       atomicAdd: () => proxy,
-      atomicLoad: () => proxy,
     };
   };
   return { sharedMock };

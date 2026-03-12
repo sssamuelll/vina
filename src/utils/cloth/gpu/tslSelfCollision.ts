@@ -31,7 +31,6 @@ import {
   If,
   Loop,
   atomicAdd,
-  atomicLoad,
   atomicStore,
 } from 'three/tsl';
 import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.js';
@@ -206,7 +205,7 @@ export function makeSelfCollisionComputeNodes(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Loop(T, ({ i: cellIdx }: { i: any }) => {
-      const count = atomicLoad(cellCountBuf.element(cellIdx));
+      const count = cellCountBuf.element(cellIdx);
       cellStartBuf.element(cellIdx).assign(uint(runningSum));
       runningSum.addAssign(count);
       // Reset cellCount to 0 for scatter pass
@@ -302,7 +301,7 @@ export function makeSelfCollisionComputeNodes(
               });
 
               const cellStart = cellStartBuf.element(hVar);
-              const cellCount = uint(atomicLoad(cellCountBuf.element(hVar)));
+              const cellCount = uint(cellCountBuf.element(hVar));
 
               // Iterate entries in this cell
               // Use a fixed max bound; break early via flag
@@ -393,14 +392,18 @@ export function makeSelfCollisionComputeNodes(
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
       const idx3 = uint(i).mul(uint(3));
-      const count = atomicLoad(corrCountBuf.element(uint(i)));
+      // Read accumulated corrections. This runs in a separate pass after
+      // resolve, so no concurrent writes — regular element access is safe.
+      // (Three.js TSL doesn't export atomicLoad; each Fn() compiles to its
+      // own shader, so these buffers won't be declared atomic here.)
+      const count = corrCountBuf.element(uint(i));
 
       If(int(count).greaterThan(int(0)), () => {
         const invScale = float(1.0).div(float(count).mul(float(COLLISION_SCALE)));
 
-        const dx = float(atomicLoad(deltaBuf.element(idx3))).mul(invScale);
-        const dy = float(atomicLoad(deltaBuf.element(idx3.add(uint(1))))).mul(invScale);
-        const dz = float(atomicLoad(deltaBuf.element(idx3.add(uint(2))))).mul(invScale);
+        const dx = float(deltaBuf.element(idx3)).mul(invScale);
+        const dy = float(deltaBuf.element(idx3.add(uint(1)))).mul(invScale);
+        const dz = float(deltaBuf.element(idx3.add(uint(2)))).mul(invScale);
 
         positionBufNode.element(i).x.addAssign(dx);
         positionBufNode.element(i).y.addAssign(dy);
