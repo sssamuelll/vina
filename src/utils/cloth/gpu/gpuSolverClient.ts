@@ -12,13 +12,12 @@
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
 import { extractStretchConstraints, extractBendConstraints, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
-import { createTslBuffers, type TslBufferSet, type FabricComplianceConfig } from './tslBuffers';
+import { createTslBuffers, createSBA, type TslBufferSet, type FabricComplianceConfig } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import { EdgeType } from './gpuBuffers';
-import { StorageBufferAttribute as SBAClass } from 'three/webgpu';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -500,9 +499,9 @@ export class GpuSolverClient {
     if (bvh.nodeCount === 0) return;
 
     // Create StorageBufferAttributes for GPU upload
-    const bvhNodesSBA = new SBAClass(bvh.nodes, 1);
-    const triVertsSBA = new SBAClass(bvh.triVerts, 1);
-    const triNormalsSBA = new SBAClass(bvh.triNormals, 1);
+    const bvhNodesSBA = createSBA(bvh.nodes, 1);
+    const triVertsSBA = createSBA(bvh.triVerts, 1);
+    const triNormalsSBA = createSBA(bvh.triNormals, 1);
 
     // Use shared buffer nodes from the solver
     const N = this.tslSolver.numParticles;
