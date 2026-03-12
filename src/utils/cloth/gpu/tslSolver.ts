@@ -378,9 +378,12 @@ function makeNormalZeroFn(
   return Fn(() => {
     const i = instanceIndex;
     const base = uint(i).mul(uint(3));
-    atomicStore(normalAccumBuf.element(base), int(0));
-    atomicStore(normalAccumBuf.element(base.add(uint(1))), int(0));
-    atomicStore(normalAccumBuf.element(base.add(uint(2))), int(0));
+    // Use toVar() to force explicit i32 type in WGSL — bare int(0) emits AbstractInt
+    // which some WebGPU implementations reject for atomicStore
+    const zeroI32 = int(0).toVar();
+    atomicStore(normalAccumBuf.element(base), zeroI32);
+    atomicStore(normalAccumBuf.element(base.add(uint(1))), zeroI32);
+    atomicStore(normalAccumBuf.element(base.add(uint(2))), zeroI32);
   })();
 }
 
