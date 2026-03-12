@@ -264,7 +264,9 @@ export function useSimulationLifecycle({
                 tslSolverRef.current = gpuClient.getTslSolver();
                 setTslGeneration(g => g + 1);
 
-                // Body collision deferred to Phase 2.
+                // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
+                await loadCollision(gpuClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, false);
+
                 // Don't call gpuClient.start() — TSL compute is driven by useFrame.
                 return;
             }

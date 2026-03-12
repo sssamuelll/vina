@@ -403,4 +403,54 @@ describe('updateConfig', () => {
     solver.updateConfig({ gravity: [0, -20, 0] });
     solver.updateConfig({ groundY: 0 });
   });
+
+  // ─── Collision body management ──────────────────────────────────────
+  it('starts with empty collisionBodies', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    expect(solver.collisionBodies).toEqual([]);
+  });
+
+  it('setCollisionBody adds a body', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const body = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 };
+    solver.setCollisionBody(body);
+    expect(solver.collisionBodies).toHaveLength(1);
+    expect(solver.collisionBodies[0].id).toBe('test');
+  });
+
+  it('setCollisionBody replaces existing body with same id', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const body1 = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 };
+    const body2 = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.01, friction: 0.5, nodeCount: 20, triCount: 10 };
+    solver.setCollisionBody(body1);
+    solver.setCollisionBody(body2);
+    expect(solver.collisionBodies).toHaveLength(1);
+    expect(solver.collisionBodies[0].margin).toBe(0.01);
+  });
+
+  it('removeCollisionBody removes by id', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const body = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 };
+    solver.setCollisionBody(body);
+    solver.removeCollisionBody('test');
+    expect(solver.collisionBodies).toHaveLength(0);
+  });
+
+  it('removeCollisionBody is no-op for unknown id', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    solver.removeCollisionBody('nonexistent');
+    expect(solver.collisionBodies).toHaveLength(0);
+  });
+
+  it('exposes prevPosBufNode and invMassBufNode', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    expect(solver.prevPosBufNode).toBeDefined();
+    expect(solver.invMassBufNode).toBeDefined();
+  });
 });

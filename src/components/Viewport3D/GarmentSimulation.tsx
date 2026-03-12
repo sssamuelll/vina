@@ -263,20 +263,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (solver) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderer = gl as any;
-      const substeps = 15;
+      const substeps = 10;
 
       for (let s = 0; s < substeps; s++) {
         renderer.compute(solver.preSolve);
-        for (const stretchColor of solver.stretchColors) {
-          renderer.compute(stretchColor);
-        }
+        // Batch all stretch colors in one call — graph coloring guarantees
+        // no two colors share a vertex, so parallel dispatch is race-free.
+        // Reduces ~57 separate submit() calls to 1 per substep.
+        renderer.compute(solver.stretchColors);
         if (solver.bend) renderer.compute(solver.bend);
         if (solver.seam) renderer.compute(solver.seam);
+        for (const body of solver.collisionBodies) {
+          renderer.compute(body.collisionNode);
+        }
         renderer.compute(solver.groundClamp);
         renderer.compute(solver.postSolve);
       }
 
-      // Compute smooth vertex normals from final positions (once per frame)
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);

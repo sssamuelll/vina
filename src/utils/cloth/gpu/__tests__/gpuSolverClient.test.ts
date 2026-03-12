@@ -14,4 +14,16 @@ describe('GpuSolverClient', () => {
   it('has getTslSolver accessor', () => {
     expect(typeof GpuSolverClient.prototype.getTslSolver).toBe('function');
   });
+
+  it('has setTslCollisionBody method', () => {
+    expect(typeof GpuSolverClient.prototype.setTslCollisionBody).toBe('function');
+  });
+
+  it('has removeTslCollisionBody method', () => {
+    expect(typeof GpuSolverClient.prototype.removeTslCollisionBody).toBe('function');
+  });
+
+  it('has updateCollisionBody method', () => {
+    expect(typeof GpuSolverClient.prototype.updateCollisionBody).toBe('function');
+  });
 });
