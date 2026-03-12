@@ -62,8 +62,6 @@ vi.mock('three/tsl', () => {
 import {
   createSelfCollisionBuffers,
   makeSelfCollisionComputeNodes,
-  type SelfCollisionBufferSet,
-  type SelfCollisionComputeNodes,
 } from '../tslSelfCollision';
 
 describe('tslSelfCollision', () => {

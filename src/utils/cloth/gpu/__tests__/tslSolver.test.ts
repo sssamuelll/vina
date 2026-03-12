@@ -146,6 +146,7 @@ function makeMockBufferSet(options?: {
     triangleIdsSBA: new StorageBufferAttribute(new Uint32Array(triangles), 1),
     numParticles,
     numTriangles: 2,
+    scBuffers: null,
   };
 }
 
