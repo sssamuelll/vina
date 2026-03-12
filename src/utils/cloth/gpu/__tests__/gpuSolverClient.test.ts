@@ -82,9 +82,9 @@ describe('GpuSolverClient', () => {
     });
   });
 
-  describe('relaxParticles', () => {
+  describe('setBrushParams', () => {
     it('is a method on GpuSolverClient', () => {
-      expect(typeof GpuSolverClient.prototype.relaxParticles).toBe('function');
+      expect(typeof GpuSolverClient.prototype.setBrushParams).toBe('function');
     });
   });
 });
