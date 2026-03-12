@@ -396,6 +396,7 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.stop();
     }
     return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- windEnabled/windForce/dragCoefficient are handled by separate live-update effects below, not sim restart
   }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
