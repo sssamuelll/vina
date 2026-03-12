@@ -59,11 +59,17 @@ export interface SelfCollisionBufferSet {
 }
 
 export interface SelfCollisionComputeNodes {
-  hashCountNode: ReturnType<typeof Fn>;
-  prefixSumNode: ReturnType<typeof Fn>;
-  scatterNode: ReturnType<typeof Fn>;
-  resolveNode: ReturnType<typeof Fn>;
-  applyNode: ReturnType<typeof Fn>;
+  /** TSL node returned by Fn(...)() — typed loosely because Fn is cast to any for void-returning compute kernels */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  hashCountNode: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  prefixSumNode: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  scatterNode: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  resolveNode: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  applyNode: any;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -158,7 +164,8 @@ export function makeSelfCollisionComputeNodes(
   // ─── Pass 1: hashCount ───────────────────────────────────────────
   // Hash each particle position to a cell, atomicAdd cellCount.
   // Dispatch: N particles.
-  const hashCountNode = Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const hashCountNode = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
@@ -193,10 +200,12 @@ export function makeSelfCollisionComputeNodes(
   // ─── Pass 2: prefixSum ───────────────────────────────────────────
   // Serial exclusive prefix sum over cellCount → cellStart.
   // Dispatch: 1 thread. Resets cellCount for the scatter pass.
-  const prefixSumNode = Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const prefixSumNode = (Fn as any)(() => {
     const runningSum = int(0).toVar('runningSum');
 
-    Loop(T, ({ i: cellIdx }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Loop(T, ({ i: cellIdx }: { i: any }) => {
       const count = atomicLoad(cellCountBuf.element(cellIdx));
       cellStartBuf.element(cellIdx).assign(uint(runningSum));
       runningSum.addAssign(count);
@@ -208,7 +217,8 @@ export function makeSelfCollisionComputeNodes(
   // ─── Pass 3: scatter ─────────────────────────────────────────────
   // Each particle writes its index into cellEntries at the correct offset.
   // Dispatch: N particles.
-  const scatterNode = Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scatterNode = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
@@ -242,7 +252,8 @@ export function makeSelfCollisionComputeNodes(
   // For each particle, query 27 neighbor cells. For each pair (i<j),
   // compute correction and atomicAdd to delta buffers.
   // Dispatch: N particles.
-  const resolveNode = Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resolveNode = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
@@ -266,9 +277,12 @@ export function makeSelfCollisionComputeNodes(
         const iIdx3 = uint(i).mul(uint(3));
 
         // Triple nested loop: 3x3x3 = 27 neighbor cells
-        Loop({ start: int(0), end: int(3), type: 'int', condition: '<' }, ({ i: dxi }) => {
-          Loop({ start: int(0), end: int(3), type: 'int', condition: '<' }, ({ i: dyi }) => {
-            Loop({ start: int(0), end: int(3), type: 'int', condition: '<' }, ({ i: dzi }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Loop({ start: int(0), end: int(3), type: 'int', condition: '<' }, ({ i: dxi }: { i: any }) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          Loop({ start: int(0), end: int(3), type: 'int', condition: '<' }, ({ i: dyi }: { i: any }) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            Loop({ start: int(0), end: int(3), type: 'int', condition: '<' }, ({ i: dzi }: { i: any }) => {
               // Hash the neighbor cell
               const cxi = xi0.add(dxi);
               const cyi = yi0.add(dyi);
@@ -292,7 +306,8 @@ export function makeSelfCollisionComputeNodes(
 
               // Iterate entries in this cell
               // Use a fixed max bound; break early via flag
-              Loop({ start: uint(0), end: cellCount, type: 'uint', condition: '<' }, ({ i: ki }) => {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              Loop({ start: uint(0), end: cellCount, type: 'uint', condition: '<' }, ({ i: ki }: { i: any }) => {
                 const entryIdx = cellStart.add(ki);
                 const j = cellEntriesBuf.element(entryIdx);
 
@@ -309,7 +324,8 @@ export function makeSelfCollisionComputeNodes(
 
                     // Loop through adjacency list with fixed max bound
                     const adjCount = adjEnd.sub(adjStart);
-                    Loop({ start: uint(0), end: adjCount.min(uint(MAX_ADJ_NEIGHBORS)), type: 'uint', condition: '<' }, ({ i: ak }) => {
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    Loop({ start: uint(0), end: adjCount.min(uint(MAX_ADJ_NEIGHBORS)), type: 'uint', condition: '<' }, ({ i: ak }: { i: any }) => {
                       const neighbor = adjNeighborsBuf.element(adjStart.add(ak));
                       If(neighbor.equal(j), () => {
                         isAdj.assign(int(1));
@@ -371,7 +387,8 @@ export function makeSelfCollisionComputeNodes(
   // Drain atomic deltas, average by correction count, add to positions.
   // Always reset buffers for next substep.
   // Dispatch: N particles.
-  const applyNode = Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyNode = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {

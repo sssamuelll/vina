@@ -1,4 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+const { MockSBA } = vi.hoisted(() => ({
+  MockSBA: class MockSBA {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    array: any; count: number; itemSize: number;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(array: any, itemSize: number) {
+      this.array = array;
+      this.count = array.length / itemSize;
+      this.itemSize = itemSize;
+    }
+  },
+}));
+
+// three/webgpu and three/tsl resolve to the same bundle; mock to avoid browser-only globals.
+vi.mock('three/webgpu', () => ({ StorageBufferAttribute: MockSBA }));
+vi.mock('three/tsl', () => ({ StorageBufferAttribute: MockSBA }));
+
 import { createPositionStorageAttribute, createNormalStorageAttribute } from '../gpuStorageAttributes';
 
 describe('gpuStorageAttributes', () => {

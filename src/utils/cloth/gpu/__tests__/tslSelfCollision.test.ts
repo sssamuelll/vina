@@ -25,13 +25,14 @@ vi.mock('three/tsl', () => {
   // Deep proxy that returns itself for any property access or function call.
   // This allows arbitrarily chained TSL operations (.mul().add().bitXor() etc.)
   // without needing explicit stubs for every method.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const createChainProxy = (): any => {
-    const handler: ProxyHandler<Function> = {
-      get(_target, _prop) {
+    const handler: ProxyHandler<(...args: unknown[]) => unknown> = {
+      get() {
         // Return another proxy for any property access
         return createChainProxy();
       },
-      apply(_target, _thisArg, _args) {
+      apply() {
         // Return another proxy for any function call
         return createChainProxy();
       },
@@ -63,6 +64,7 @@ import {
   createSelfCollisionBuffers,
   makeSelfCollisionComputeNodes,
 } from '../tslSelfCollision';
+import type { SelfCollisionComputeNodes } from '../tslSelfCollision';
 
 describe('tslSelfCollision', () => {
   it('exports createSelfCollisionBuffers', () => {
@@ -126,12 +128,14 @@ describe('makeSelfCollisionComputeNodes', () => {
     // so the nodes will be functions. We only verify shape, not runtime.
     const mockNode = { element: () => mockNode, toAttribute: () => mockNode };
 
+    /* eslint-disable @typescript-eslint/no-explicit-any */
     const nodes: SelfCollisionComputeNodes = makeSelfCollisionComputeNodes(
       mockNode as any,
       mockNode as any,
       buffers,
       0.004,
     );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
 
     expect(nodes).toBeDefined();
     expect(nodes.hashCountNode).toBeDefined();

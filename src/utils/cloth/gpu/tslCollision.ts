@@ -67,9 +67,9 @@ const MAX_PUSH_DIST = 0.05;
  * @param friction - Friction coefficient (0-1)
  */
 export function createTslCollisionBody(
-  posBuf: StorageBufferNode<'vec3'>,
-  prevPosBuf: StorageBufferNode<'vec3'>,
-  invMassBuf: StorageBufferNode<'float'>,
+  posBuf: StorageBufferNode,
+  prevPosBuf: StorageBufferNode,
+  invMassBuf: StorageBufferNode,
   bvhNodesSBA: StorageBufferAttribute,
   triVertsSBA: StorageBufferAttribute,
   triNormalsSBA: StorageBufferAttribute,
@@ -88,7 +88,8 @@ export function createTslCollisionBody(
   const uMargin = uniform(margin);
   const uFriction = uniform(friction);
 
-  const collisionFn = Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const collisionFn = (Fn as any)(() => {
     const i = instanceIndex;
 
     // Skip pinned particles (invMass == 0)
@@ -110,7 +111,8 @@ export function createTslCollisionBody(
         const collided = int(0).toVar('collided');
 
         // Iterate all BVH nodes, test only leaves whose AABB overlaps particle
-        Loop(numNodes, ({ i: nodeIdx }) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        Loop(numNodes, ({ i: nodeIdx }: { i: any }) => {
           const nodeBase = uint(nodeIdx).mul(uint(8));
 
           // Read AABB bounds
@@ -137,7 +139,8 @@ export function createTslCollisionBody(
                 const triStart = bvhBuf.element(nodeBase.add(uint(6)));
                 const count = int(triCount);
 
-                Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: ti }) => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                Loop({ start: int(0), end: count, type: 'int', condition: '<' }, ({ i: ti }: { i: any }) => {
                   const triIdx = uint(int(triStart).add(ti));
 
                   // Read triangle vertices (9 floats per tri)
@@ -257,7 +260,7 @@ export function createTslCollisionBody(
     });
   })();
 
-  const collisionNode = compute(collisionFn, numParticles);
+  const collisionNode = compute(collisionFn, numParticles, [64]);
 
   return {
     id,

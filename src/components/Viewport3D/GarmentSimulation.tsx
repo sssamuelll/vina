@@ -417,7 +417,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     const mat = new MeshStandardNodeMaterial();
     // Use the SAME storage nodes that compute kernels write to.
     // Creating new storage() nodes would get separate GPU bindings/buffers.
+    // @ts-expect-error — toAttribute() exists at runtime but is missing from @types/three
     mat.positionNode = solver.positionBufNode.toAttribute();
+    // @ts-expect-error — toAttribute() exists at runtime but is missing from @types/three
     mat.normalNode = solver.normalBufNode.toAttribute();
     mat.side = THREE.DoubleSide;
     mat.transparent = true;

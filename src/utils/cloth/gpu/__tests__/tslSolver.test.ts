@@ -1,67 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 
-// Mock three/tsl (TSL functions)
-vi.mock('three/tsl', () => {
-  const mockUniform = (val: number) => ({ value: val, mul: vi.fn(), div: vi.fn() });
-
-  const mockElement = () => ({
-    assign: vi.fn(),
-    addAssign: vi.fn(),
-    sub: vi.fn().mockReturnThis(),
-    mul: vi.fn().mockReturnThis(),
-    div: vi.fn().mockReturnThis(),
-    add: vi.fn().mockReturnThis(),
-    negate: vi.fn().mockReturnThis(),
-    sqrt: vi.fn().mockReturnThis(),
-    dot: vi.fn().mockReturnThis(),
-    x: { mul: vi.fn().mockReturnThis(), sub: vi.fn().mockReturnThis() },
-    y: { mul: vi.fn().mockReturnThis(), sub: vi.fn().mockReturnThis(), assign: vi.fn(), lessThan: vi.fn().mockReturnValue(false) },
-    z: { mul: vi.fn().mockReturnThis(), sub: vi.fn().mockReturnThis() },
-    greaterThan: vi.fn().mockReturnValue(true),
-    lessThan: vi.fn().mockReturnValue(false),
-    equal: vi.fn().mockReturnValue(true),
-    greaterThanEqual: vi.fn().mockReturnValue(true),
-  });
-
-  return {
-    storage: vi.fn(() => ({
-      element: vi.fn(() => mockElement()),
-      toAttribute: vi.fn(() => ({ __tslAttribute: true })),
-    })),
-    Fn: vi.fn(() => {
-      // Return a callable that returns a mock TSL node
-      return () => ({ __tslFn: true });
-    }),
-    If: vi.fn(() => ({ Else: vi.fn() })),
-    compute: vi.fn((_fn: unknown, count: number) => ({
-      __tslCompute: true,
-      dispatchCount: count,
-    })),
-    uniform: vi.fn((val: number) => mockUniform(val)),
-    float: vi.fn((val: number) => ({
-      value: val,
-      mul: vi.fn().mockReturnThis(),
-      sub: vi.fn().mockReturnThis(),
-    })),
-    uint: vi.fn((val: number) => ({
-      value: val,
-      mul: vi.fn().mockReturnThis(),
-      add: vi.fn().mockReturnThis(),
-    })),
-    int: vi.fn((val: number) => ({
-      value: val,
-    })),
-    vec3: vi.fn(() => ({ __tslVec3: true })),
-    instanceIndex: { __tslInstanceIndex: true },
-    atomicStore: vi.fn(),
-    atomicAdd: vi.fn(),
-    atomicLoad: vi.fn(() => ({ __atomicLoad: true })),
-  };
-});
-
-// Mock three/webgpu (StorageBufferAttribute)
-vi.mock('three/webgpu', () => ({
-  StorageBufferAttribute: class MockSBA {
+// vi.hoisted runs before vi.mock hoisting, so shared mocks are available to both.
+const { MockSBA, tslExports } = vi.hoisted(() => {
+  const MockSBA = class MockSBA {
     array: Float32Array | Uint32Array | Int32Array;
     count: number;
     itemSize: number;
@@ -70,7 +11,79 @@ vi.mock('three/webgpu', () => ({
       this.count = array.length / itemSize;
       this.itemSize = itemSize;
     }
-  },
+  };
+
+  const mockUniform = (val: number) => ({ value: val, mul: () => mockUniform(0), div: () => mockUniform(0) });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mockElement = (): any => ({
+    assign: () => {},
+    addAssign: () => {},
+    sub: () => mockElement(),
+    mul: () => mockElement(),
+    div: () => mockElement(),
+    add: () => mockElement(),
+    negate: () => mockElement(),
+    sqrt: () => mockElement(),
+    dot: () => mockElement(),
+    toVar: () => mockElement(),
+    x: { mul: () => mockElement(), sub: () => mockElement() },
+    y: { mul: () => mockElement(), sub: () => mockElement(), assign: () => {}, lessThan: () => false },
+    z: { mul: () => mockElement(), sub: () => mockElement() },
+    greaterThan: () => true,
+    lessThan: () => false,
+    equal: () => true,
+    greaterThanEqual: () => true,
+  });
+
+  const tslExports = {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+    storage: (..._: any[]) => ({
+      element: () => mockElement(),
+      toAttribute: () => ({ __tslAttribute: true }),
+    }),
+    Fn: () => () => ({ __tslFn: true }),
+    If: () => ({ Else: () => {} }),
+    compute: (_fn: unknown, count: number) => ({
+      __tslCompute: true,
+      dispatchCount: count,
+    }),
+    uniform: (val: number) => mockUniform(val),
+    float: (val: number) => ({
+      value: val,
+      mul: () => mockElement(),
+      sub: () => mockElement(),
+    }),
+    uint: (val: number) => ({
+      value: val,
+      mul: () => mockElement(),
+      add: () => mockElement(),
+    }),
+    int: (val: number) => ({
+      value: val,
+      toVar: () => ({ value: val }),
+    }),
+    vec3: () => ({ __tslVec3: true }),
+    instanceIndex: { __tslInstanceIndex: true },
+    Loop: () => {},
+    atomicStore: () => {},
+    atomicAdd: () => mockElement(),
+    atomicLoad: () => ({ __atomicLoad: true }),
+  };
+
+  return { MockSBA, tslExports };
+});
+
+// Note: three/webgpu and three/tsl resolve to the same bundle (three.webgpu.js),
+// so both mocks must include ALL exports to avoid Vitest deduplication issues.
+vi.mock('three/webgpu', () => ({
+  StorageBufferAttribute: MockSBA,
+  ...tslExports,
+}));
+
+vi.mock('three/tsl', () => ({
+  StorageBufferAttribute: MockSBA,
+  ...tslExports,
 }));
 
 import { createTslSolver } from '../tslSolver';

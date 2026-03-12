@@ -40,6 +40,7 @@ import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.js';
 import type UniformNode from 'three/src/nodes/core/UniformNode.js';
+import type { ShaderNodeObject } from 'three/tsl';
 import type { TslBufferSet } from './tslBuffers';
 import type { TslCollisionBody } from './tslCollision';
 import type { SelfCollisionComputeNodes } from './tslSelfCollision';
@@ -81,9 +82,9 @@ export interface TslSolver {
    * Use `.toAttribute()` for material.positionNode to ensure the vertex
    * shader reads from the same GPU buffer that compute writes to.
    */
-  positionBufNode: StorageBufferNode<'vec3'>;
+  positionBufNode: ShaderNodeObject<StorageBufferNode>;
   /** Normal storage node for material.normalNode (GPU smooth normals) */
-  normalBufNode: StorageBufferNode<'vec3'>;
+  normalBufNode: ShaderNodeObject<StorageBufferNode>;
   /** Normal SBA (for potential CPU readback) */
   normalSBA: StorageBufferAttribute;
   /** Zero the normal accumulation buffer (dispatch: numParticles) */
@@ -99,9 +100,9 @@ export interface TslSolver {
   /** Triangle index buffer */
   triangles: Uint32Array;
   /** Previous position storage node (for collision friction computation) */
-  prevPosBufNode: StorageBufferNode<'vec3'>;
+  prevPosBufNode: ShaderNodeObject<StorageBufferNode>;
   /** Inverse mass storage node (for collision pinned-particle check) */
-  invMassBufNode: StorageBufferNode<'float'>;
+  invMassBufNode: ShaderNodeObject<StorageBufferNode>;
   /** Self-collision compute nodes (null if disabled) */
   selfCollisionNodes: SelfCollisionComputeNodes | null;
   /** Active collision bodies (BVH-accelerated) */
@@ -116,7 +117,7 @@ export interface TslSolver {
 
 // ─── Uniform nodes ───────────────────────────────────────────────────────────
 
-type FloatUniform = UniformNode<'float', number>;
+type FloatUniform = ShaderNodeObject<UniformNode<number>>;
 
 interface SolverUniforms {
   sdt: FloatUniform;
@@ -151,13 +152,14 @@ function createUniforms(config: TslSolverConfig): SolverUniforms {
  * that runs AFTER constraint solving (matching the CPU solver order).
  */
 function makePreSolveFn(
-  posBuf: StorageBufferNode<'vec3'>,
-  prevPosBuf: StorageBufferNode<'vec3'>,
-  velBuf: StorageBufferNode<'vec3'>,
-  invMassBuf: StorageBufferNode<'float'>,
+  posBuf: StorageBufferNode,
+  prevPosBuf: StorageBufferNode,
+  velBuf: StorageBufferNode,
+  invMassBuf: StorageBufferNode,
   uniforms: SolverUniforms,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const i = instanceIndex;
 
     // Read invMass — if zero, particle is pinned
@@ -193,11 +195,12 @@ function makePreSolveFn(
  * is free to move (friction is handled in postSolve).
  */
 function makeGroundClampFn(
-  posBuf: StorageBufferNode<'vec3'>,
-  invMassBuf: StorageBufferNode<'float'>,
+  posBuf: StorageBufferNode,
+  invMassBuf: StorageBufferNode,
   groundY: FloatUniform,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const i = instanceIndex;
     const w = invMassBuf.element(i);
 
@@ -218,18 +221,19 @@ function makeGroundClampFn(
  * Exactly one of complianceBuf/complianceUniform must be non-null.
  */
 function makeDistanceConstraintFn(
-  posBuf: StorageBufferNode<'vec3'>,
-  invMassBuf: StorageBufferNode<'float'>,
-  idsBuf: StorageBufferNode<'uint'>,
-  restLenBuf: StorageBufferNode<'float'>,
+  posBuf: StorageBufferNode,
+  invMassBuf: StorageBufferNode,
+  idsBuf: StorageBufferNode,
+  restLenBuf: StorageBufferNode,
   sdt: FloatUniform,
   idStride: number,
   idOffset0: number,
   idOffset1: number,
-  complianceBuf: StorageBufferNode<'float'> | null,
+  complianceBuf: StorageBufferNode | null,
   complianceUniform: FloatUniform | null,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const ci = instanceIndex; // constraint index
 
     // Read particle indices from flat ID buffer
@@ -290,13 +294,14 @@ function makeDistanceConstraintFn(
  * - Vertical velocity: zero out downward component when on ground
  */
 function makePostSolveFn(
-  posBuf: StorageBufferNode<'vec3'>,
-  prevPosBuf: StorageBufferNode<'vec3'>,
-  velBuf: StorageBufferNode<'vec3'>,
-  invMassBuf: StorageBufferNode<'float'>,
+  posBuf: StorageBufferNode,
+  prevPosBuf: StorageBufferNode,
+  velBuf: StorageBufferNode,
+  invMassBuf: StorageBufferNode,
   uniforms: SolverUniforms,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const i = instanceIndex;
     const w = invMassBuf.element(i);
 
@@ -379,9 +384,10 @@ const NORMAL_SCALE = 1000000.0;
  * Uses atomicStore since the buffer is declared atomic (for atomicAdd in accum pass).
  */
 function makeNormalZeroFn(
-  normalAccumBuf: StorageBufferNode<'float'>,
+  normalAccumBuf: StorageBufferNode,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const i = instanceIndex;
     const base = uint(i).mul(uint(3));
     // Use toVar() to force explicit i32 type in WGSL — bare int(0) emits AbstractInt
@@ -400,11 +406,12 @@ function makeNormalZeroFn(
  * product magnitude = 2× triangle area.
  */
 function makeNormalAccumFn(
-  posBuf: StorageBufferNode<'vec3'>,
-  triIdsBuf: StorageBufferNode<'uint'>,
-  normalAccumBuf: StorageBufferNode<'float'>,
+  posBuf: StorageBufferNode,
+  triIdsBuf: StorageBufferNode,
+  normalAccumBuf: StorageBufferNode,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const tri = instanceIndex;
     const triBase = uint(tri).mul(uint(3));
 
@@ -459,10 +466,11 @@ function makeNormalAccumFn(
  * normalizes, and writes to the vec3 normal buffer used by the vertex shader.
  */
 function makeNormalNormalizeFn(
-  normalBuf: StorageBufferNode<'vec3'>,
-  normalAccumBuf: StorageBufferNode<'float'>,
+  normalBuf: StorageBufferNode,
+  normalAccumBuf: StorageBufferNode,
 ) {
-  return Fn(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
     const i = instanceIndex;
     const invScale = float(1.0 / NORMAL_SCALE);
     const base = uint(i).mul(uint(3));
@@ -517,7 +525,7 @@ export function createTslSolver(
 
   // ─── Pre-solve ─────────────────────────────────────────────────────
   const preSolveFn = makePreSolveFn(posBuf, prevPosBuf, velBuf, invMassBuf, uniforms);
-  const preSolve = compute(preSolveFn, N);
+  const preSolve = compute(preSolveFn, N, [64]);
 
   // ─── Stretch constraints (per-color, per-constraint compliance) ────
   const stretchColors = buffers.stretchColors.map((color) => {
@@ -531,7 +539,7 @@ export function createTslSolver(
       2, 0, 1,
       compBuf, null,
     );
-    return compute(fn, color.count);
+    return compute(fn, color.count, [64]);
   });
 
   // ─── Bend constraints (per-constraint compliance) ──────────────────
@@ -547,7 +555,7 @@ export function createTslSolver(
       4, 2, 3, // quad stride, opposite vertex indices
       bendCompBuf, null,
     );
-    bend = compute(fn, buffers.numBendConstraints);
+    bend = compute(fn, buffers.numBendConstraints, [64]);
   }
 
   // ─── Seam constraints (uniform compliance) ─────────────────────────
@@ -562,16 +570,16 @@ export function createTslSolver(
       2, 0, 1,
       null, uniforms.seamStiffness,
     );
-    seam = compute(fn, buffers.numSeamConstraints);
+    seam = compute(fn, buffers.numSeamConstraints, [64]);
   }
 
   // ─── Ground clamp (AFTER constraints, BEFORE postSolve) ───────────
   const groundClampFn = makeGroundClampFn(posBuf, invMassBuf, uniforms.groundY);
-  const groundClamp = compute(groundClampFn, N);
+  const groundClamp = compute(groundClampFn, N, [64]);
 
   // ─── Post-solve (velocity update + ground friction + NaN guard) ────
   const postSolveFn = makePostSolveFn(posBuf, prevPosBuf, velBuf, invMassBuf, uniforms);
-  const postSolve = compute(postSolveFn, N);
+  const postSolve = compute(postSolveFn, N, [64]);
 
   // ─── GPU smooth normals (atomic accumulation) ─────────────────────
   const normalBuf = storage(buffers.normalSBA, 'vec3', N);
@@ -580,13 +588,13 @@ export function createTslSolver(
   const triIdsBuf = storage(buffers.triangleIdsSBA, 'uint', buffers.numTriangles * 3);
 
   const normalZeroFn = makeNormalZeroFn(normalAccumBuf);
-  const normalZero = compute(normalZeroFn, N);
+  const normalZero = compute(normalZeroFn, N, [64]);
 
   const normalAccumFn = makeNormalAccumFn(posBuf, triIdsBuf, normalAccumBuf);
-  const normalAccum = compute(normalAccumFn, buffers.numTriangles);
+  const normalAccum = compute(normalAccumFn, buffers.numTriangles, [64]);
 
   const normalNormalizeFn = makeNormalNormalizeFn(normalBuf, normalAccumBuf);
-  const normalNormalize = compute(normalNormalizeFn, N);
+  const normalNormalize = compute(normalNormalizeFn, N, [64]);
 
   // ─── Collision body management ──────────────────────────────────────
   const collisionBodies: TslCollisionBody[] = [];
