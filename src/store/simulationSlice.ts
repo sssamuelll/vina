@@ -124,6 +124,12 @@ interface SimulationSliceState {
   }>;
   /** Per-piece UV transform */
   pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number }>;
+  /** Steam brush tool state (relaxes bend constraints on hover) */
+  steamBrush: {
+    active: boolean;
+    radius: number;
+    strength: number;
+  };
 }
 
 const initialState: SimulationSliceState = {
@@ -164,6 +170,11 @@ const initialState: SimulationSliceState = {
   pieceTints: {},
   pieceTextureOverrides: {},
   pieceUVTransforms: {},
+  steamBrush: {
+    active: false,
+    radius: 0.05,
+    strength: 0.3,
+  },
 };
 
 const simulationSlice = createSlice({
@@ -413,6 +424,21 @@ const simulationSlice = createSlice({
         ...transform,
       };
     },
+
+    // ─── Steam Brush ──────────────────────────────────────────────────────────
+
+    /** Activate or deactivate the steam brush tool. */
+    setSteamBrushActive(state, action: PayloadAction<boolean>) {
+      state.steamBrush.active = action.payload;
+    },
+    /** Set steam brush radius (meters). Clamped to [0.01, 0.5]. */
+    setSteamBrushRadius(state, action: PayloadAction<number>) {
+      state.steamBrush.radius = Math.max(0.01, Math.min(0.5, action.payload));
+    },
+    /** Set steam brush strength (0–1). Clamped to [0, 1]. */
+    setSteamBrushStrength(state, action: PayloadAction<number>) {
+      state.steamBrush.strength = Math.max(0, Math.min(1, action.payload));
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -467,6 +493,10 @@ export const {
   setPieceTint,
   setPieceTextureOverride,
   setPieceUVTransform,
+  // Steam brush
+  setSteamBrushActive,
+  setSteamBrushRadius,
+  setSteamBrushStrength,
 } = simulationSlice.actions;
 
 export default simulationSlice.reducer;
