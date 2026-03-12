@@ -177,6 +177,7 @@ export function useSimulationLifecycle({
   const windForce = useSelector((s: RootState) => s.simulation.windForce);
   const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
   const dragCoefficient = useSelector((s: RootState) => s.simulation.dragCoefficient);
+  const frozenPieceIds = useSelector((s: RootState) => s.simulation.frozenPieceIds);
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
@@ -271,6 +272,10 @@ export function useSimulationLifecycle({
 
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
                 await loadCollision(gpuClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, false);
+
+                // Push pre-existing freeze state — the separate freeze useEffect
+                // fires on mount before gpuClientRef is set, so it's a no-op.
+                if (frozenPieceIds.length > 0) gpuClient.freezePieces(frozenPieceIds);
 
                 // Don't call gpuClient.start() — TSL compute is driven by useFrame.
                 return;
@@ -457,6 +462,14 @@ export function useSimulationLifecycle({
 
   // Note: CPU solver (ClothWorkerClient) does not support live wind updates yet.
   // Wind is only available on GPU and WASM solver tiers.
+
+  // ─── Sync frozen pieces to GPU solver — set invMass=0 for frozen vertices ──
+  // Note: WASM and CPU solvers do not support per-piece freeze yet.
+  // Freeze is only available on the GPU (TSL) solver tier.
+  useEffect(() => {
+    if (!gpuClientRef.current) return;
+    gpuClientRef.current.freezePieces(frozenPieceIds);
+  }, [frozenPieceIds]);
 
   return {
     clients: {

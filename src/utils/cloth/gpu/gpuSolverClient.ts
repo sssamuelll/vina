@@ -67,6 +67,8 @@ export class GpuSolverClient {
   /** TSL solver (when using renderer.compute() path) */
   private tslSolver: TslSolver | null = null;
   private tslBuffers: TslBufferSet | null = null;
+  private pieceVertexRanges: Map<string, { start: number; count: number }> | null = null;
+  private originalInvMass: Float32Array | null = null;
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.solver = new GpuClothSolver(device, config);
@@ -217,6 +219,14 @@ export class GpuSolverClient {
       totalTris += p.triIds.length;
     }
 
+    // Store piece vertex ranges for freeze/unfreeze support
+    this.pieceVertexRanges = new Map();
+    for (const p of pieces) {
+      const start = vertexOffsets.get(p.pieceId) ?? 0;
+      const count = p.vertices.length / 3;
+      this.pieceVertexRanges.set(p.pieceId, { start, count });
+    }
+
     const positions = new Float32Array(totalVerts * 3);
     const invMass = new Float32Array(totalVerts);
     const triangles = new Uint32Array(totalTris);
@@ -245,6 +255,11 @@ export class GpuSolverClient {
       vOff += numV;
       tOff += p.triIds.length;
     }
+
+    // Snapshot invMass for freeze/unfreeze restore. Currently all particles
+    // init at 1.0. If a GPU pin system is added that also mutates invMass,
+    // this snapshot must be taken AFTER pins are applied.
+    this.originalInvMass = new Float32Array(invMass);
 
     // Extract constraints with UV-based edge classification
     const uvArg = hasUvs ? mergedUvs : undefined;
@@ -330,6 +345,14 @@ export class GpuSolverClient {
   }
 
   /**
+   * Get vertex ranges for each piece in the merged mesh.
+   * Returns null if solver not initialized.
+   */
+  getPieceVertexRanges(): Map<string, { start: number; count: number }> | null {
+    return this.pieceVertexRanges;
+  }
+
+  /**
    * Update fabric properties.
    */
   setFabricConfig(config: Partial<GpuSolverConfig>): void {
@@ -346,6 +369,32 @@ export class GpuSolverClient {
         ...(dragCoefficient !== undefined ? { dragCoefficient } : {}),
       });
     }
+  }
+
+  /**
+   * Freeze/unfreeze pieces by setting invMass=0 for frozen vertices.
+   * Restores original invMass for unfrozen vertices.
+   * Bumps SBA version to trigger GPU buffer re-upload.
+   */
+  freezePieces(frozenPieceIds: string[]): void {
+    if (!this.tslBuffers || !this.originalInvMass || !this.pieceVertexRanges) return;
+
+    const invMassArr = this.tslBuffers.invMassSBA.array as Float32Array;
+    // Restore all to original values first
+    invMassArr.set(this.originalInvMass);
+
+    // Zero out invMass for frozen pieces
+    const frozenSet = new Set(frozenPieceIds);
+    for (const [pieceId, range] of this.pieceVertexRanges) {
+      if (frozenSet.has(pieceId)) {
+        for (let i = range.start; i < range.start + range.count; i++) {
+          invMassArr[i] = 0;
+        }
+      }
+    }
+
+    // Bump version to trigger GPU buffer re-upload on next render
+    this.tslBuffers.invMassSBA.version++;
   }
 
   /**
@@ -433,6 +482,8 @@ export class GpuSolverClient {
     this.normalAttr = null;
     this.tslSolver = null;
     this.tslBuffers = null;
+    this.pieceVertexRanges = null;
+    this.originalInvMass = null;
     this.solver.destroy();
   }
 

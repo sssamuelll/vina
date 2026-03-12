@@ -55,6 +55,7 @@ function createTestStore() {
         windForce: [0, 0, 0] as [number, number, number],
         windEnabled: false,
         dragCoefficient: 1.0,
+        frozenPieceIds: [],
       },
     },
   });

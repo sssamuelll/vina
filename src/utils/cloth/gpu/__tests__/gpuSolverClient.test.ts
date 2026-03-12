@@ -69,4 +69,16 @@ describe('GpuSolverClient', () => {
   it('has updateCollisionBody method', () => {
     expect(typeof GpuSolverClient.prototype.updateCollisionBody).toBe('function');
   });
+
+  describe('getPieceVertexRanges', () => {
+    it('is a method on GpuSolverClient', () => {
+      expect(typeof GpuSolverClient.prototype.getPieceVertexRanges).toBe('function');
+    });
+  });
+
+  describe('freezePieces', () => {
+    it('is a method on GpuSolverClient', () => {
+      expect(typeof GpuSolverClient.prototype.freezePieces).toBe('function');
+    });
+  });
 });

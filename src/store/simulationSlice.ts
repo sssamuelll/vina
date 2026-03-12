@@ -109,6 +109,8 @@ interface SimulationSliceState {
   windEnabled: boolean;
   /** Drag coefficient (scales wind and air drag) */
   dragCoefficient: number;
+  /** IDs of pieces whose particles are frozen (zero velocity, skip solver) */
+  frozenPieceIds: string[];
   /** Latest fit map statistics (null when no fit map active) */
   fitMapStats: FitMapStats | null;
   /** Per-piece color tint (hex string, white = no tint) */
@@ -157,6 +159,7 @@ const initialState: SimulationSliceState = {
   windForce: [0, 0, 0],
   windEnabled: false,
   dragCoefficient: 1.0,
+  frozenPieceIds: [],
   fitMapStats: null,
   pieceTints: {},
   pieceTextureOverrides: {},
@@ -357,6 +360,19 @@ const simulationSlice = createSlice({
     setDragCoefficient(state, action: PayloadAction<number>) {
       state.dragCoefficient = Math.max(0, Math.min(5, action.payload));
     },
+    /** Toggle freeze state for a single piece (add if absent, remove if present). */
+    toggleFreezePiece(state, action: PayloadAction<string>) {
+      const idx = state.frozenPieceIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.frozenPieceIds.splice(idx, 1);
+      } else {
+        state.frozenPieceIds.push(action.payload);
+      }
+    },
+    /** Clear all frozen pieces. */
+    unfreezeAllPieces(state) {
+      state.frozenPieceIds = [];
+    },
     /** Set the latest fit map statistics (null to clear). */
     setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
       state.fitMapStats = action.payload;
@@ -444,6 +460,8 @@ export const {
   setWindForce,
   setWindEnabled,
   setDragCoefficient,
+  toggleFreezePiece,
+  unfreezeAllPieces,
   setFitMapStats,
   // PBR material overrides
   setPieceTint,
