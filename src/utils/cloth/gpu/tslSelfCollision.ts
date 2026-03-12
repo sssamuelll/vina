@@ -33,8 +33,9 @@ import {
   atomicAdd,
   atomicStore,
 } from 'three/tsl';
-import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.js';
-import type { ShaderNodeObject } from 'three/tsl';
+// TSL node types vary across @types/three versions; use loose types for stability.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TslNode = any;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -133,8 +134,8 @@ export function createSelfCollisionBuffers(
  * @param thickness        - Cloth thickness in meters (cell size for spatial hash)
  */
 export function makeSelfCollisionComputeNodes(
-  positionBufNode: ShaderNodeObject<StorageBufferNode>,
-  invMassBufNode: ShaderNodeObject<StorageBufferNode>,
+  positionBufNode: TslNode,
+  invMassBufNode: TslNode,
   buffers: SelfCollisionBufferSet,
   thickness: number,
 ): SelfCollisionComputeNodes {
@@ -324,7 +325,7 @@ export function makeSelfCollisionComputeNodes(
                     // Loop through adjacency list with fixed max bound
                     const adjCount = adjEnd.sub(adjStart);
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    Loop({ start: uint(0), end: adjCount.min(uint(MAX_ADJ_NEIGHBORS)), type: 'uint', condition: '<' }, ({ i: ak }: { i: any }) => {
+                    Loop({ start: uint(0), end: (adjCount as any).min(uint(MAX_ADJ_NEIGHBORS)), type: 'uint', condition: '<' }, ({ i: ak }: { i: any }) => {
                       const neighbor = adjNeighborsBuf.element(adjStart.add(ak));
                       If(neighbor.equal(j), () => {
                         isAdj.assign(int(1));

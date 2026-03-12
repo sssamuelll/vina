@@ -37,9 +37,6 @@ import {
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
-import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.js';
-import type UniformNode from 'three/src/nodes/core/UniformNode.js';
-import type { ShaderNodeObject } from 'three/tsl';
 import type { TslBufferSet } from './tslBuffers';
 import type { TslCollisionBody } from './tslCollision';
 import type { SelfCollisionComputeNodes } from './tslSelfCollision';
@@ -81,9 +78,9 @@ export interface TslSolver {
    * Use `.toAttribute()` for material.positionNode to ensure the vertex
    * shader reads from the same GPU buffer that compute writes to.
    */
-  positionBufNode: ShaderNodeObject<StorageBufferNode>;
+  positionBufNode: TslNode;
   /** Normal storage node for material.normalNode (GPU smooth normals) */
-  normalBufNode: ShaderNodeObject<StorageBufferNode>;
+  normalBufNode: TslNode;
   /** Normal SBA (for potential CPU readback) */
   normalSBA: StorageBufferAttribute;
   /** Zero the normal accumulation buffer (dispatch: numParticles) */
@@ -99,9 +96,9 @@ export interface TslSolver {
   /** Triangle index buffer */
   triangles: Uint32Array;
   /** Previous position storage node (for collision friction computation) */
-  prevPosBufNode: ShaderNodeObject<StorageBufferNode>;
+  prevPosBufNode: TslNode;
   /** Inverse mass storage node (for collision pinned-particle check) */
-  invMassBufNode: ShaderNodeObject<StorageBufferNode>;
+  invMassBufNode: TslNode;
   /** Self-collision compute nodes (null if disabled) */
   selfCollisionNodes: SelfCollisionComputeNodes | null;
   /** Active collision bodies (BVH-accelerated) */
@@ -116,7 +113,11 @@ export interface TslSolver {
 
 // ─── Uniform nodes ───────────────────────────────────────────────────────────
 
-type FloatUniform = ShaderNodeObject<UniformNode<number>>;
+// TSL node types vary across @types/three versions; use loose types for stability.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TslNode = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type FloatUniform = any;
 
 interface SolverUniforms {
   sdt: FloatUniform;
@@ -151,10 +152,10 @@ function createUniforms(config: TslSolverConfig): SolverUniforms {
  * that runs AFTER constraint solving (matching the CPU solver order).
  */
 function makePreSolveFn(
-  posBuf: StorageBufferNode,
-  prevPosBuf: StorageBufferNode,
-  velBuf: StorageBufferNode,
-  invMassBuf: StorageBufferNode,
+  posBuf: TslNode,
+  prevPosBuf: TslNode,
+  velBuf: TslNode,
+  invMassBuf: TslNode,
   uniforms: SolverUniforms,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -194,8 +195,8 @@ function makePreSolveFn(
  * is free to move (friction is handled in postSolve).
  */
 function makeGroundClampFn(
-  posBuf: StorageBufferNode,
-  invMassBuf: StorageBufferNode,
+  posBuf: TslNode,
+  invMassBuf: TslNode,
   groundY: FloatUniform,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,15 +221,15 @@ function makeGroundClampFn(
  * Exactly one of complianceBuf/complianceUniform must be non-null.
  */
 function makeDistanceConstraintFn(
-  posBuf: StorageBufferNode,
-  invMassBuf: StorageBufferNode,
-  idsBuf: StorageBufferNode,
-  restLenBuf: StorageBufferNode,
+  posBuf: TslNode,
+  invMassBuf: TslNode,
+  idsBuf: TslNode,
+  restLenBuf: TslNode,
   sdt: FloatUniform,
   idStride: number,
   idOffset0: number,
   idOffset1: number,
-  complianceBuf: StorageBufferNode | null,
+  complianceBuf: TslNode | null,
   complianceUniform: FloatUniform | null,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -293,10 +294,10 @@ function makeDistanceConstraintFn(
  * - Vertical velocity: zero out downward component when on ground
  */
 function makePostSolveFn(
-  posBuf: StorageBufferNode,
-  prevPosBuf: StorageBufferNode,
-  velBuf: StorageBufferNode,
-  invMassBuf: StorageBufferNode,
+  posBuf: TslNode,
+  prevPosBuf: TslNode,
+  velBuf: TslNode,
+  invMassBuf: TslNode,
   uniforms: SolverUniforms,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -383,7 +384,7 @@ const NORMAL_SCALE = 1000000.0;
  * Uses atomicStore since the buffer is declared atomic (for atomicAdd in accum pass).
  */
 function makeNormalZeroFn(
-  normalAccumBuf: StorageBufferNode,
+  normalAccumBuf: TslNode,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
@@ -405,9 +406,9 @@ function makeNormalZeroFn(
  * product magnitude = 2× triangle area.
  */
 function makeNormalAccumFn(
-  posBuf: StorageBufferNode,
-  triIdsBuf: StorageBufferNode,
-  normalAccumBuf: StorageBufferNode,
+  posBuf: TslNode,
+  triIdsBuf: TslNode,
+  normalAccumBuf: TslNode,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
@@ -465,8 +466,8 @@ function makeNormalAccumFn(
  * normalizes, and writes to the vec3 normal buffer used by the vertex shader.
  */
 function makeNormalNormalizeFn(
-  normalBuf: StorageBufferNode,
-  normalAccumBuf: StorageBufferNode,
+  normalBuf: TslNode,
+  normalAccumBuf: TslNode,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {

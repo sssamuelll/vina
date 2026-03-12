@@ -30,7 +30,9 @@ import {
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
-import type StorageBufferNode from 'three/src/nodes/accessors/StorageBufferNode.js';
+// TSL node types vary across @types/three versions; use loose types for stability.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TslNode = any;
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -67,9 +69,9 @@ const MAX_PUSH_DIST = 0.05;
  * @param friction - Friction coefficient (0-1)
  */
 export function createTslCollisionBody(
-  posBuf: StorageBufferNode,
-  prevPosBuf: StorageBufferNode,
-  invMassBuf: StorageBufferNode,
+  posBuf: TslNode,
+  prevPosBuf: TslNode,
+  invMassBuf: TslNode,
   bvhNodesSBA: StorageBufferAttribute,
   triVertsSBA: StorageBufferAttribute,
   triNormalsSBA: StorageBufferAttribute,
@@ -196,10 +198,14 @@ export function createTslCollisionBody(
                       const v = d00.mul(d12).sub(d01.mul(d02)).mul(invD);
 
                       // Inside triangle?
+                      // greaterThanEqual/lessThanEqual exist at runtime but missing from @types/three
                       If(
-                        u.greaterThanEqual(float(0))
-                          .and(v.greaterThanEqual(float(0)))
-                          .and(u.add(v).lessThanEqual(float(1))),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (u as any).greaterThanEqual(float(0))
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          .and((v as any).greaterThanEqual(float(0)))
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          .and((u.add(v) as any).lessThanEqual(float(1))),
                         () => {
                           // Track closest collision
                           If(absDot.lessThan(bestDist), () => {
