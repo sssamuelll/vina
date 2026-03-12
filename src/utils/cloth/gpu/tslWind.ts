@@ -7,7 +7,8 @@
  *      * dragCoeff / 3, scale to int32 (x 1e6), atomicAdd to accumulation buffer
  *      for all 3 vertices.
  *   2. applyNode  (per-particle): read accumulated int32, convert to float (/ 1e6),
- *      add to velocity, reset accum to zero via atomicStore.
+ *      multiply by invMass * sdt (matching CPU solver), add to velocity,
+ *      reset accum to zero via atomicStore.
  *
  * Race-free: accumNode uses atomicAdd on i32 delta buffers (scaled by 1e6)
  * for all 3 vertices in each triangle. No direct velocity writes in accum pass.
@@ -84,6 +85,8 @@ export function createWindBuffers(numParticles: number): WindBufferSet {
  *
  * @param posBufNode      - Cloth particle positions (vec3 storage, shared with solver)
  * @param velBufNode      - Cloth particle velocities (vec3 storage, shared with solver)
+ * @param invMassBufNode  - Inverse mass per particle (float storage, shared with solver)
+ * @param sdtUniform      - Substep delta time uniform (shared with solver)
  * @param triIdsBufNode   - Triangle index buffer (uint storage, 3 indices per triangle)
  * @param windBuffers     - Wind buffer set from createWindBuffers()
  * @param numTriangles    - Number of triangles in the mesh
@@ -93,6 +96,8 @@ export function createWindBuffers(numParticles: number): WindBufferSet {
 export function makeWindComputeNode(
   posBufNode: TslNode,
   velBufNode: TslNode,
+  invMassBufNode: TslNode,
+  sdtUniform: TslNode,
   triIdsBufNode: TslNode,
   windBuffers: WindBufferSet,
   numTriangles: number,
@@ -205,10 +210,15 @@ export function makeWindComputeNode(
 
     const invScale = float(1.0 / WIND_SCALE);
 
+    // Scale by invMass * sdt to match CPU solver (xpbdSolver.ts:851-857):
+    //   vel += normal * forcePerVertex * invMass * sdt
+    // Pinned particles (invMass=0) receive zero wind force.
+    const scale = invMassBufNode.element(i).mul(sdtUniform).mul(invScale);
+
     // Add wind force to velocity
-    velBufNode.element(i).x.addAssign(fx.mul(invScale));
-    velBufNode.element(i).y.addAssign(fy.mul(invScale));
-    velBufNode.element(i).z.addAssign(fz.mul(invScale));
+    velBufNode.element(i).x.addAssign(fx.mul(scale));
+    velBufNode.element(i).y.addAssign(fy.mul(scale));
+    velBufNode.element(i).z.addAssign(fz.mul(scale));
 
     // Reset accumulation buffer for next frame
     const zeroI32 = int(0).toVar();

@@ -340,7 +340,7 @@ export class GpuSolverClient {
    * Update wind force on the TSL solver.
    */
   setWind(force: [number, number, number], dragCoefficient?: number): void {
-    if (this.tslSolver?.windNodes) {
+    if (this.tslSolver) {
       this.tslSolver.updateConfig({
         windForce: force,
         ...(dragCoefficient !== undefined ? { dragCoefficient } : {}),

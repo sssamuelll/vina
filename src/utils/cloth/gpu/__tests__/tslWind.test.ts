@@ -110,11 +110,15 @@ describe('makeWindComputeNode', () => {
 
     const mockNode = { element: () => mockNode, toAttribute: () => mockNode };
 
+    const mockSdtUniform = { value: 1 / 60 / 15 };
+
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const nodes: WindComputeNodes = makeWindComputeNode(
-      mockNode as any,
-      mockNode as any,
-      mockNode as any,
+      mockNode as any,  // posBufNode
+      mockNode as any,  // velBufNode
+      mockNode as any,  // invMassBufNode
+      mockSdtUniform as any,  // sdtUniform
+      mockNode as any,  // triIdsBufNode
       buffers,
       numTriangles,
       windForce,

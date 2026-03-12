@@ -360,13 +360,14 @@ describe('createTslSolver', () => {
     expect(solver.normalSBA).toBe(buffers.normalSBA);
   });
 
-  it('returns null windNodes when no wind configured', () => {
+  it('always creates windNodes even without explicit windForce config', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, { ...defaultConfig });
-    expect(solver.windNodes).toBeNull();
+    expect(solver.windNodes).toBeDefined();
+    expect(solver.windNodes).not.toBeNull();
   });
 
-  it('returns windNodes when windForce is provided', () => {
+  it('creates windNodes with explicit windForce config', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, {
       ...defaultConfig,

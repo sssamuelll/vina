@@ -256,7 +256,8 @@ export function useSimulationLifecycle({
                 const pf = getPhysicalFabric(fabricId);
                 const tslSolverConfig: Partial<import('../../utils/cloth/gpu/tslSolver').TslSolverConfig> = {
                   ...(pf ? { internalDamping: pf.internalDamping } : {}),
-                  ...(windEnabled ? { windForce, dragCoefficient } : {}),
+                  windForce: windEnabled ? windForce : [0, 0, 0],
+                  dragCoefficient,
                 };
 
                 await withTimeout(
