@@ -81,4 +81,10 @@ describe('GpuSolverClient', () => {
       expect(typeof GpuSolverClient.prototype.freezePieces).toBe('function');
     });
   });
+
+  describe('relaxParticles', () => {
+    it('is a method on GpuSolverClient', () => {
+      expect(typeof GpuSolverClient.prototype.relaxParticles).toBe('function');
+    });
+  });
 });
