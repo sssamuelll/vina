@@ -199,3 +199,19 @@ export function createTslBuffers(
     numTriangles: numTri,
   };
 }
+
+// ─── Standalone SBA factory ────────────────────────────────────────────────
+
+/**
+ * Create a StorageBufferAttribute without importing the class at the call site.
+ * Centralises the `three/webgpu` value import here so that other modules
+ * (e.g. gpuSolverClient) can use a type-only import and avoid the TDZ that
+ * Vite's chunk splitting creates when the same specifier is imported as both
+ * type and value from different chunks.
+ */
+export function createSBA(
+  array: Float32Array | Int32Array | Uint32Array,
+  itemSize: number,
+): StorageBufferAttribute {
+  return new StorageBufferAttribute(array, itemSize);
+}
