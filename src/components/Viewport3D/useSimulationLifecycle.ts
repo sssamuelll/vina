@@ -464,6 +464,8 @@ export function useSimulationLifecycle({
   // Wind is only available on GPU and WASM solver tiers.
 
   // ─── Sync frozen pieces to GPU solver — set invMass=0 for frozen vertices ──
+  // Note: WASM and CPU solvers do not support per-piece freeze yet.
+  // Freeze is only available on the GPU (TSL) solver tier.
   useEffect(() => {
     if (!gpuClientRef.current) return;
     gpuClientRef.current.freezePieces(frozenPieceIds);

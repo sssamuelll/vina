@@ -256,6 +256,9 @@ export class GpuSolverClient {
       tOff += p.triIds.length;
     }
 
+    // Snapshot invMass for freeze/unfreeze restore. Currently all particles
+    // init at 1.0. If a GPU pin system is added that also mutates invMass,
+    // this snapshot must be taken AFTER pins are applied.
     this.originalInvMass = new Float32Array(invMass);
 
     // Extract constraints with UV-based edge classification
