@@ -121,6 +121,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       pieceTints: {},
       pieceTextureOverrides: {},
       pieceUVTransforms: {},
+      windForce: [0, 0, 0] as [number, number, number],
+      windEnabled: false,
+      dragCoefficient: 1.0,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
