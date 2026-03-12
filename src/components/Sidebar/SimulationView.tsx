@@ -4,6 +4,7 @@ import {
   startSimulation, pauseSimulation, resetSimulation,
   setParticleDistance, setQualityLevel, setAutoQuality, setFabric, setDefaultFabric,
   setWindForce, setWindEnabled, setDragCoefficient,
+  toggleFreezePiece,
 } from '../../store/simulationSlice';
 import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
@@ -27,6 +28,7 @@ export default function SimulationView() {
   const windForce = useSelector((s: RootState) => s.simulation.windForce);
   const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
   const dragCoefficient = useSelector((s: RootState) => s.simulation.dragCoefficient);
+  const frozenPieceIds = useSelector((s: RootState) => s.simulation.frozenPieceIds);
 
   const isRunning = simulation.simulationState === 'running';
   const isPaused = simulation.simulationState === 'paused';
@@ -279,6 +281,34 @@ export default function SimulationView() {
                     ))}
                   </select>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Per-Piece Freeze */}
+      {pieces.length > 0 && (
+        <div style={{ marginTop: '12px' }}>
+          <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>
+            Freeze Pieces
+          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {pieces.map(p => {
+              const isFrozen = frozenPieceIds.includes(p.id);
+              return (
+                <label key={p.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  cursor: 'pointer', fontSize: '11px', color: isFrozen ? '#8ab4f8' : '#aaa',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={isFrozen}
+                    onChange={() => dispatch(toggleFreezePiece(p.id))}
+                  />
+                  <span>{p.name}</span>
+                  {isFrozen && <span style={{ fontSize: '10px', color: '#668' }}>frozen</span>}
+                </label>
               );
             })}
           </div>
