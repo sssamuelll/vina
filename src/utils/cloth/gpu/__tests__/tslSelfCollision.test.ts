@@ -22,27 +22,48 @@ vi.mock('three/webgpu', () => ({
 }));
 
 vi.mock('three/tsl', () => {
-  const mockNode = { toAttribute: () => mockNode, element: () => mockNode };
+  // Deep proxy that returns itself for any property access or function call.
+  // This allows arbitrarily chained TSL operations (.mul().add().bitXor() etc.)
+  // without needing explicit stubs for every method.
+  const createChainProxy = (): any => {
+    const handler: ProxyHandler<Function> = {
+      get(_target, _prop) {
+        // Return another proxy for any property access
+        return createChainProxy();
+      },
+      apply(_target, _thisArg, _args) {
+        // Return another proxy for any function call
+        return createChainProxy();
+      },
+    };
+    return new Proxy(function () {}, handler);
+  };
+
+  const proxy = createChainProxy();
   return {
     StorageBufferAttribute: MockSBA,
-    Fn: (fn: Function) => fn,
-    storage: () => mockNode,
-    uniform: () => mockNode,
-    instanceIndex: { toVar: () => mockNode },
-    uint: () => mockNode,
-    int: () => mockNode,
-    float: () => mockNode,
-    If: () => ({ Else: () => ({}) }),
-    Loop: () => ({}),
-    atomicAdd: () => mockNode,
-    atomicLoad: () => mockNode,
-    atomicStore: () => mockNode,
+    // Fn: returns a function that, when called (the () invocation), returns a proxy
+    Fn: () => () => proxy,
+    storage: () => proxy,
+    uniform: () => proxy,
+    instanceIndex: proxy,
+    uint: () => proxy,
+    int: () => proxy,
+    float: () => proxy,
+    vec3: () => proxy,
+    If: () => proxy,
+    Loop: () => proxy,
+    atomicAdd: () => proxy,
+    atomicLoad: () => proxy,
+    atomicStore: () => proxy,
   };
 });
 
 import {
   createSelfCollisionBuffers,
+  makeSelfCollisionComputeNodes,
   type SelfCollisionBufferSet,
+  type SelfCollisionComputeNodes,
 } from '../tslSelfCollision';
 
 describe('tslSelfCollision', () => {
@@ -85,5 +106,40 @@ describe('tslSelfCollision', () => {
     const buffers = createSelfCollisionBuffers(50, 101, new Uint32Array(51), new Uint32Array(100));
     expect(buffers.corrCountSBA.array).toBeInstanceOf(Uint32Array);
     expect(buffers.corrCountSBA.array.length).toBe(50);
+  });
+});
+
+describe('makeSelfCollisionComputeNodes', () => {
+  it('exports makeSelfCollisionComputeNodes', () => {
+    expect(makeSelfCollisionComputeNodes).toBeDefined();
+  });
+
+  it('returns an object with all 5 compute node keys', () => {
+    const numParticles = 20;
+    const tableSize = 41;
+    const buffers = createSelfCollisionBuffers(
+      numParticles,
+      tableSize,
+      new Uint32Array(numParticles + 1),
+      new Uint32Array(40),
+    );
+
+    // The mock TSL Fn returns the callback itself (Fn: (fn) => fn),
+    // so the nodes will be functions. We only verify shape, not runtime.
+    const mockNode = { element: () => mockNode, toAttribute: () => mockNode };
+
+    const nodes: SelfCollisionComputeNodes = makeSelfCollisionComputeNodes(
+      mockNode as any,
+      mockNode as any,
+      buffers,
+      0.004,
+    );
+
+    expect(nodes).toBeDefined();
+    expect(nodes.hashCountNode).toBeDefined();
+    expect(nodes.prefixSumNode).toBeDefined();
+    expect(nodes.scatterNode).toBeDefined();
+    expect(nodes.resolveNode).toBeDefined();
+    expect(nodes.applyNode).toBeDefined();
   });
 });
