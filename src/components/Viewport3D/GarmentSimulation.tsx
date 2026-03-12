@@ -288,8 +288,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.postSolve);
       }
 
-      // Steam brush (once per frame, after substeps settle)
-      renderer.compute(solver.brushNodes.brushNode);
+      // Steam brush (once per frame, after substeps settle; skip when inactive)
+      if (solver.brushNodes.strength.value > 0) {
+        renderer.compute(solver.brushNodes.brushNode);
+      }
 
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
@@ -593,10 +595,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // Global pointerup to handle drag release outside mesh
   useEffect(() => {
-    const handleGlobalUp = () => { brushDragging.current = false; };
+    const handleGlobalUp = () => {
+      brushDragging.current = false;
+      if (clients.gpu) {
+        clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+      }
+    };
     window.addEventListener('pointerup', handleGlobalUp);
     return () => window.removeEventListener('pointerup', handleGlobalUp);
-  }, []);
+  }, [clients.gpu]);
 
   if (!staticGeometry) return null;
 

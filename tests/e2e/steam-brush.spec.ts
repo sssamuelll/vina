@@ -11,7 +11,7 @@ import { test, expect, Page } from '@playwright/test';
  * 5. Steam brush Redux state updates via dispatch
  *
  * Note: Playwright headless Chromium uses SwiftShader (no WebGPU),
- * so the GPU-only relaxParticles() is a no-op. Tests verify UI
+ * so the GPU brush compute kernel is a no-op. Tests verify UI
  * controls, Redux wiring, and no-crash behavior.
  */
 
@@ -213,7 +213,7 @@ test.describe('Steam Brush Tool (issue #303)', () => {
     // No steam-brush-related errors
     const brushErrors = errors.filter(e =>
       e.includes('steamBrush') ||
-      e.includes('relaxParticles') ||
+      e.includes('setBrushParams') ||
       e.includes('brushDragging') ||
       e.includes('Failed to fetch dynamically imported module')
     );
