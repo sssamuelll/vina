@@ -159,6 +159,7 @@ function makeMockBufferSet(options?: {
     numParticles,
     numTriangles: 2,
     scBuffers: null,
+    windBuffers: null,
   };
 }
 
@@ -357,6 +358,23 @@ describe('createTslSolver', () => {
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
     expect(solver.normalSBA).toBe(buffers.normalSBA);
+  });
+
+  it('returns null windNodes when no wind configured', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    expect(solver.windNodes).toBeNull();
+  });
+
+  it('returns windNodes when windForce is provided', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, {
+      ...defaultConfig,
+      windForce: [5, 0, 0],
+      dragCoefficient: 1.0,
+    });
+    expect(solver.windNodes).toBeDefined();
+    expect(solver.windNodes).not.toBeNull();
   });
 });
 
