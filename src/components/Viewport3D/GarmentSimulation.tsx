@@ -267,6 +267,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
       for (let s = 0; s < substeps; s++) {
         renderer.compute(solver.preSolve);
+        // Wind force (two-pass: accumulate per-triangle, apply per-particle)
+        if (solver.windNodes) {
+          renderer.compute(solver.windNodes.accumNode);
+          renderer.compute(solver.windNodes.applyNode);
+        }
         // Batch all stretch colors in one call — graph coloring guarantees
         // no two colors share a vertex, so parallel dispatch is race-free.
         // Reduces ~57 separate submit() calls to 1 per substep.
