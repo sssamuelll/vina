@@ -594,6 +594,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     brushDragging.current = false;
   }, []);
 
+  const handlePointerLeave = useCallback(() => {
+    if (brushCursorRef.current) brushCursorRef.current.visible = false;
+  }, []);
+
+  // Global pointerup to handle drag release outside mesh
+  useEffect(() => {
+    const handleGlobalUp = () => { brushDragging.current = false; };
+    window.addEventListener('pointerup', handleGlobalUp);
+    return () => window.removeEventListener('pointerup', handleGlobalUp);
+  }, []);
+
   if (!staticGeometry) return null;
 
   return (
@@ -605,6 +616,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerLeave}
         material={tslMaterial || undefined}
       >
         {!tslMaterial && (
@@ -635,7 +647,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       {/* Steam brush cursor */}
       {activeTool3D === 'steamBrush' && (
         <mesh ref={brushCursorRef} visible={false}>
-          <sphereGeometry args={[steamBrush.radius, 16, 16]} />
+          <sphereGeometry key={steamBrush.radius} args={[steamBrush.radius, 16, 16]} />
           <meshBasicMaterial color="#88ccff" transparent opacity={0.2} depthWrite={false} />
         </mesh>
       )}

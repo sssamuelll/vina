@@ -124,7 +124,7 @@ interface SimulationSliceState {
   }>;
   /** Per-piece UV transform */
   pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number }>;
-  /** Steam brush tool state (relaxes bend constraints on hover) */
+  /** Steam brush tool state (damps particle velocity on brush stroke) */
   steamBrush: {
     active: boolean;
     radius: number;

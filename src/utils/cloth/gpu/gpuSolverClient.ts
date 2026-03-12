@@ -407,9 +407,11 @@ export class GpuSolverClient {
     if (!this.tslBuffers) return;
 
     const velArr = this.tslBuffers.velocitySBA.array as Float32Array;
+    const maxIdx = velArr.length / 3;
     const factor = 1 - strength;
 
     for (const idx of indices) {
+      if (idx < 0 || idx >= maxIdx) continue;
       const base = idx * 3;
       velArr[base] *= factor;
       velArr[base + 1] *= factor;
