@@ -398,6 +398,28 @@ export class GpuSolverClient {
   }
 
   /**
+   * Relax particles by damping their velocity.
+   * Used by the steam brush tool to calm cloth movement.
+   * @param indices - Particle indices to relax
+   * @param strength - Damping factor 0-1 (1 = fully zero velocity)
+   */
+  relaxParticles(indices: number[], strength: number): void {
+    if (!this.tslBuffers) return;
+
+    const velArr = this.tslBuffers.velocitySBA.array as Float32Array;
+    const factor = 1 - strength;
+
+    for (const idx of indices) {
+      const base = idx * 3;
+      velArr[base] *= factor;
+      velArr[base + 1] *= factor;
+      velArr[base + 2] *= factor;
+    }
+
+    this.tslBuffers.velocitySBA.version++;
+  }
+
+  /**
    * Start the simulation loop.
    */
   start(): void {
