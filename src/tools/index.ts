@@ -46,6 +46,7 @@ import { freeSewingTool } from './definitions/freeSewing';
 import { arrangementTool } from './definitions/arrangement';
 import { pinTool } from './definitions/pin';
 import { simulateTool } from './definitions/simulate';
+import { steamBrushTool } from './definitions/steamBrush';
 
 // Register all tools
 const allTools = [
@@ -115,6 +116,7 @@ const allTools = [
   
   // 3D Tools — Simulation
   simulateTool,
+  steamBrushTool,
 ];
 
 // Auto-register all tools
