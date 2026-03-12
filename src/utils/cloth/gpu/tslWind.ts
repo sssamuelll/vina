@@ -123,73 +123,78 @@ export function makeWindComputeNode(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const accumFn = (Fn as any)(() => {
     const tri = instanceIndex;
-    const triBase = uint(tri).mul(uint(3));
 
-    // Vertex indices for this triangle
-    const i0 = triIdsBufNode.element(triBase);
-    const i1 = triIdsBufNode.element(triBase.add(uint(1)));
-    const i2 = triIdsBufNode.element(triBase.add(uint(2)));
+    // Bounds guard: workgroup size (64) may exceed numTriangles in the last group.
+    // Ghost threads must be skipped to prevent out-of-bounds triIdsBufNode reads.
+    If(uint(tri).lessThan(uint(numTriangles)), () => {
+      const triBase = uint(tri).mul(uint(3));
 
-    // Vertex positions
-    const p0 = posBufNode.element(i0);
-    const p1 = posBufNode.element(i1);
-    const p2 = posBufNode.element(i2);
+      // Vertex indices for this triangle
+      const i0 = triIdsBufNode.element(triBase);
+      const i1 = triIdsBufNode.element(triBase.add(uint(1)));
+      const i2 = triIdsBufNode.element(triBase.add(uint(2)));
 
-    // Edge vectors
-    const e1x = p1.x.sub(p0.x);
-    const e1y = p1.y.sub(p0.y);
-    const e1z = p1.z.sub(p0.z);
+      // Vertex positions
+      const p0 = posBufNode.element(i0);
+      const p1 = posBufNode.element(i1);
+      const p2 = posBufNode.element(i2);
 
-    const e2x = p2.x.sub(p0.x);
-    const e2y = p2.y.sub(p0.y);
-    const e2z = p2.z.sub(p0.z);
+      // Edge vectors
+      const e1x = p1.x.sub(p0.x);
+      const e1y = p1.y.sub(p0.y);
+      const e1z = p1.z.sub(p0.z);
 
-    // Cross product = face normal (unnormalized, magnitude = 2 * area)
-    const nx = e1y.mul(e2z).sub(e1z.mul(e2y));
-    const ny = e1z.mul(e2x).sub(e1x.mul(e2z));
-    const nz = e1x.mul(e2y).sub(e1y.mul(e2x));
+      const e2x = p2.x.sub(p0.x);
+      const e2y = p2.y.sub(p0.y);
+      const e2z = p2.z.sub(p0.z);
 
-    // Normal length and area
-    const normalLen = nx.mul(nx).add(ny.mul(ny)).add(nz.mul(nz)).sqrt();
+      // Cross product = face normal (unnormalized, magnitude = 2 * area)
+      const nx = e1y.mul(e2z).sub(e1z.mul(e2y));
+      const ny = e1z.mul(e2x).sub(e1x.mul(e2z));
+      const nz = e1x.mul(e2y).sub(e1y.mul(e2x));
 
-    If(normalLen.greaterThan(float(1e-8)), () => {
-      const area = normalLen.mul(float(0.5));
+      // Normal length and area
+      const normalLen = nx.mul(nx).add(ny.mul(ny)).add(nz.mul(nz)).sqrt();
 
-      // Normalize
-      const invLen = float(1.0).div(normalLen);
-      const nnx = nx.mul(invLen);
-      const nny = ny.mul(invLen);
-      const nnz = nz.mul(invLen);
+      If(normalLen.greaterThan(float(1e-8)), () => {
+        const area = normalLen.mul(float(0.5));
 
-      // Wind force projected onto face normal: dot = wind . normal
-      const dot = uWindX.mul(nnx).add(uWindY.mul(nny)).add(uWindZ.mul(nnz));
+        // Normalize
+        const invLen = float(1.0).div(normalLen);
+        const nnx = nx.mul(invLen);
+        const nny = ny.mul(invLen);
+        const nnz = nz.mul(invLen);
 
-      // forcePerVertex = dot * area * dragCoeff / 3
-      const forcePerVert = dot.mul(area).mul(uDragCoeff).div(float(3.0));
+        // Wind force projected onto face normal: dot = wind . normal
+        const dot = uWindX.mul(nnx).add(uWindY.mul(nny)).add(uWindZ.mul(nnz));
 
-      // Scale force direction (normal) by forcePerVert and convert to int32
-      const scale = float(WIND_SCALE);
-      const fx = int(nnx.mul(forcePerVert).mul(scale));
-      const fy = int(nny.mul(forcePerVert).mul(scale));
-      const fz = int(nnz.mul(forcePerVert).mul(scale));
+        // forcePerVertex = dot * area * dragCoeff / 3
+        const forcePerVert = dot.mul(area).mul(uDragCoeff).div(float(3.0));
 
-      // Accumulate on vertex 0
-      const b0 = i0.mul(uint(3));
-      atomicAdd(windAccumBuf.element(b0), fx);
-      atomicAdd(windAccumBuf.element(b0.add(uint(1))), fy);
-      atomicAdd(windAccumBuf.element(b0.add(uint(2))), fz);
+        // Scale force direction (normal) by forcePerVert and convert to int32
+        const scale = float(WIND_SCALE);
+        const fx = int(nnx.mul(forcePerVert).mul(scale));
+        const fy = int(nny.mul(forcePerVert).mul(scale));
+        const fz = int(nnz.mul(forcePerVert).mul(scale));
 
-      // Accumulate on vertex 1
-      const b1 = i1.mul(uint(3));
-      atomicAdd(windAccumBuf.element(b1), fx);
-      atomicAdd(windAccumBuf.element(b1.add(uint(1))), fy);
-      atomicAdd(windAccumBuf.element(b1.add(uint(2))), fz);
+        // Accumulate on vertex 0
+        const b0 = i0.mul(uint(3));
+        atomicAdd(windAccumBuf.element(b0), fx);
+        atomicAdd(windAccumBuf.element(b0.add(uint(1))), fy);
+        atomicAdd(windAccumBuf.element(b0.add(uint(2))), fz);
 
-      // Accumulate on vertex 2
-      const b2 = i2.mul(uint(3));
-      atomicAdd(windAccumBuf.element(b2), fx);
-      atomicAdd(windAccumBuf.element(b2.add(uint(1))), fy);
-      atomicAdd(windAccumBuf.element(b2.add(uint(2))), fz);
+        // Accumulate on vertex 1
+        const b1 = i1.mul(uint(3));
+        atomicAdd(windAccumBuf.element(b1), fx);
+        atomicAdd(windAccumBuf.element(b1.add(uint(1))), fy);
+        atomicAdd(windAccumBuf.element(b1.add(uint(2))), fz);
+
+        // Accumulate on vertex 2
+        const b2 = i2.mul(uint(3));
+        atomicAdd(windAccumBuf.element(b2), fx);
+        atomicAdd(windAccumBuf.element(b2.add(uint(1))), fy);
+        atomicAdd(windAccumBuf.element(b2.add(uint(2))), fz);
+      });
     });
   })();
 
@@ -201,30 +206,34 @@ export function makeWindComputeNode(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyFn = (Fn as any)(() => {
     const i = instanceIndex;
-    const base = uint(i).mul(uint(3));
 
-    // Read accumulated force (separate pass — no concurrent writes, safe without atomicLoad)
-    const fx = float(windAccumBuf.element(base));
-    const fy = float(windAccumBuf.element(base.add(uint(1))));
-    const fz = float(windAccumBuf.element(base.add(uint(2))));
+    // Bounds guard: workgroup size (64) may exceed N in the last group.
+    If(uint(i).lessThan(uint(N)), () => {
+      const base = uint(i).mul(uint(3));
 
-    const invScale = float(1.0 / WIND_SCALE);
+      // Read accumulated force (separate pass — no concurrent writes, safe without atomicLoad)
+      const fx = float(windAccumBuf.element(base));
+      const fy = float(windAccumBuf.element(base.add(uint(1))));
+      const fz = float(windAccumBuf.element(base.add(uint(2))));
 
-    // Scale by invMass * sdt to match CPU solver (xpbdSolver.ts:851-857):
-    //   vel += normal * forcePerVertex * invMass * sdt
-    // Pinned particles (invMass=0) receive zero wind force.
-    const scale = invMassBufNode.element(i).mul(sdtUniform).mul(invScale);
+      const invScale = float(1.0 / WIND_SCALE);
 
-    // Add wind force to velocity
-    velBufNode.element(i).x.addAssign(fx.mul(scale));
-    velBufNode.element(i).y.addAssign(fy.mul(scale));
-    velBufNode.element(i).z.addAssign(fz.mul(scale));
+      // Scale by invMass * sdt to match CPU solver (xpbdSolver.ts:851-857):
+      //   vel += normal * forcePerVertex * invMass * sdt
+      // Pinned particles (invMass=0) receive zero wind force.
+      const scale = invMassBufNode.element(i).mul(sdtUniform).mul(invScale);
 
-    // Reset accumulation buffer for next frame
-    const zeroI32 = int(0).toVar();
-    atomicStore(windAccumBuf.element(base), zeroI32);
-    atomicStore(windAccumBuf.element(base.add(uint(1))), zeroI32);
-    atomicStore(windAccumBuf.element(base.add(uint(2))), zeroI32);
+      // Add wind force to velocity
+      velBufNode.element(i).x.addAssign(fx.mul(scale));
+      velBufNode.element(i).y.addAssign(fy.mul(scale));
+      velBufNode.element(i).z.addAssign(fz.mul(scale));
+
+      // Reset accumulation buffer for next frame
+      const zeroI32 = int(0).toVar();
+      atomicStore(windAccumBuf.element(base), zeroI32);
+      atomicStore(windAccumBuf.element(base.add(uint(1))), zeroI32);
+      atomicStore(windAccumBuf.element(base.add(uint(2))), zeroI32);
+    });
   })();
 
   const applyNode = compute(applyFn, N, [64]);
