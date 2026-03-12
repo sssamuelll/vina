@@ -288,6 +288,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.postSolve);
       }
 
+      // Steam brush (once per frame, after substeps settle)
+      renderer.compute(solver.brushNodes.brushNode);
+
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
@@ -545,31 +548,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Steam brush interaction ──────────────────────────────────────────────
 
-  // Steam brush: find particles within radius and relax
-  const findParticlesInRadius = useCallback((point: THREE.Vector3, radius: number): number[] => {
-    const positions = positionsRef.current;
-    if (!positions) return [];
-    const numParticles = positions.length / 3;
-    const radiusSq = radius * radius;
-    const result: number[] = [];
-    for (let i = 0; i < numParticles; i++) {
-      const dx = positions[i * 3] - point.x;
-      const dy = positions[i * 3 + 1] - point.y;
-      const dz = positions[i * 3 + 2] - point.z;
-      if (dx * dx + dy * dy + dz * dz <= radiusSq) {
-        result.push(i);
-      }
-    }
-    return result;
-  }, [positionsRef]);
-
   const handleBrushStroke = useCallback((point: THREE.Vector3) => {
-    const indices = findParticlesInRadius(point, steamBrush.radius);
-    if (indices.length === 0) return;
     if (clients.gpu) {
-      clients.gpu.relaxParticles(indices, steamBrush.strength);
+      clients.gpu.setBrushParams(
+        [point.x, point.y, point.z],
+        steamBrush.radius,
+        steamBrush.strength,
+      );
     }
-  }, [findParticlesInRadius, steamBrush.radius, steamBrush.strength, clients.gpu]);
+  }, [clients.gpu, steamBrush.radius, steamBrush.strength]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (activeTool3D !== 'steamBrush') return;
@@ -592,11 +579,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   const handlePointerUp = useCallback(() => {
     brushDragging.current = false;
-  }, []);
+    if (clients.gpu) {
+      clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+    }
+  }, [clients.gpu]);
 
   const handlePointerLeave = useCallback(() => {
     if (brushCursorRef.current) brushCursorRef.current.visible = false;
-  }, []);
+    if (!brushDragging.current && clients.gpu) {
+      clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+    }
+  }, [clients.gpu]);
 
   // Global pointerup to handle drag release outside mesh
   useEffect(() => {
