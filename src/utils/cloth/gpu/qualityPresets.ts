@@ -1,8 +1,8 @@
 /**
- * Quality presets and adaptive quality system for GPU cloth simulation.
+ * Simulation modes and adaptive quality system for GPU cloth simulation.
  *
- * Three preset levels: preview (fast), standard (balanced), production (CLO3D quality).
- * Auto-detect measures first N frames and selects the best sustainable quality.
+ * Two simulation modes: normal (interactive) and complete (full quality).
+ * Auto-detect measures first N frames and selects the best sustainable mode.
  *
  * @module qualityPresets
  */
@@ -11,7 +11,7 @@ import type { GpuSolverConfig } from './gpuSolver';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-export type QualityLevel = 'preview' | 'standard' | 'production';
+export type SimulationMode = 'normal' | 'complete';
 
 export interface QualityPreset {
   label: string;
@@ -29,35 +29,31 @@ export interface QualityPreset {
   targetFPS: number;
 }
 
-export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
-  preview: {
-    label: 'Preview',
-    particleDistance: 10,
+export const SIMULATION_MODES: Record<SimulationMode, QualityPreset> = {
+  normal: {
+    label: 'Normal',
+    particleDistance: 5,
     substeps: 5,
     selfCollision: false,
     collisionResolution: 32,
-    bendingEnabled: false,
-    targetFPS: 60,
-  },
-  standard: {
-    label: 'Standard',
-    particleDistance: 5,
-    substeps: 15,
-    selfCollision: true,
-    collisionResolution: 64,
     bendingEnabled: true,
     targetFPS: 60,
   },
-  production: {
-    label: 'Production',
+  complete: {
+    label: 'Complete',
     particleDistance: 3,
-    substeps: 30,
+    substeps: 20,
     selfCollision: true,
     collisionResolution: 128,
     bendingEnabled: true,
-    targetFPS: 30, // production allows lower FPS for quality
+    targetFPS: 30,
   },
 };
+
+/** @deprecated Use SimulationMode */
+export type QualityLevel = SimulationMode;
+/** @deprecated Use SIMULATION_MODES */
+export const QUALITY_PRESETS: Record<SimulationMode, QualityPreset> = SIMULATION_MODES;
 
 // ─── Solver config from preset ──────────────────────────────────────────────
 
@@ -77,7 +73,7 @@ export function presetToSolverConfig(preset: QualityPreset): Partial<GpuSolverCo
 // ─── Benchmark ──────────────────────────────────────────────────────────────
 
 export interface BenchmarkResult {
-  level: QualityLevel;
+  level: SimulationMode;
   particles: number;
   avgFrameTimeMs: number;
   fps: number;
@@ -167,27 +163,21 @@ export class FrameTimeTracker {
 // ─── Auto-detect ────────────────────────────────────────────────────────────
 
 /**
- * Select the best quality level that sustains the target FPS.
+ * Select the best simulation mode that sustains the target FPS.
  * Measures actual performance and downgrades if needed.
  *
  * @param currentFps Current measured FPS
- * @param currentLevel Current quality level
- * @returns Recommended quality level
+ * @param currentLevel Current simulation mode
+ * @returns Recommended simulation mode
  */
-export function autoSelectQuality(currentFps: number, currentLevel: QualityLevel): QualityLevel {
-  const levels: QualityLevel[] = ['preview', 'standard', 'production'];
-  const currentIdx = levels.indexOf(currentLevel);
-  const target = QUALITY_PRESETS[currentLevel].targetFPS;
+export function autoSelectQuality(currentFps: number, currentLevel: SimulationMode): SimulationMode {
+  const target = SIMULATION_MODES[currentLevel].targetFPS;
 
-  // If we're well below target, downgrade
-  if (currentFps < target * 0.7 && currentIdx > 0) {
-    return levels[currentIdx - 1];
-  }
+  // If running complete mode and well below target, downgrade to normal
+  if (currentLevel === 'complete' && currentFps < target * 0.7) return 'normal';
 
-  // If we're well above target and have headroom, try upgrading
-  if (currentFps > target * 1.5 && currentIdx < levels.length - 1) {
-    return levels[currentIdx + 1];
-  }
+  // If running normal mode and well above target, upgrade to complete
+  if (currentLevel === 'normal' && currentFps > target * 1.5) return 'complete';
 
   return currentLevel;
 }
@@ -222,12 +212,12 @@ export function estimateGPUMemoryMB(numParticles: number, preset: QualityPreset)
  * Build a full benchmark result.
  */
 export function buildBenchmarkResult(
-  level: QualityLevel,
+  level: SimulationMode,
   particles: number,
   tracker: FrameTimeTracker,
 ): BenchmarkResult {
   const stats = tracker.getStats();
-  const preset = QUALITY_PRESETS[level];
+  const preset = SIMULATION_MODES[level];
   return {
     level,
     particles,

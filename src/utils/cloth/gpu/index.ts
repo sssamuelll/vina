@@ -28,6 +28,7 @@ export type {
 } from './gpuBuffers';
 
 export {
+  SIMULATION_MODES,
   QUALITY_PRESETS,
   presetToSolverConfig,
   FrameTimeTracker,
@@ -37,6 +38,7 @@ export {
   logBenchmark,
 } from './qualityPresets';
 export type {
+  SimulationMode,
   QualityLevel,
   QualityPreset,
   BenchmarkResult,
