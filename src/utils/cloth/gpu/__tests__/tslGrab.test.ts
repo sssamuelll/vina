@@ -24,7 +24,7 @@ vi.mock('three/tsl', () => {
     Fn: () => () => proxy,
     storage: () => proxy,
     uniform: mockUniform,
-    compute: (_fn: unknown, count: number) => ({
+    compute: (_fn: unknown, count: number, _workgroupSize?: number[]) => ({
       __tslCompute: true,
       dispatchCount: count,
     }),
@@ -49,6 +49,7 @@ describe('makeGrabComputeNode', () => {
     /* eslint-disable @typescript-eslint/no-explicit-any */
     const nodes: GrabComputeNodes = makeGrabComputeNode(
       mockNode as any, // posBufNode
+      mockNode as any, // invMassBufNode
       mockNode as any, // grabMaskBufNode
       mockNode as any, // grabOffsetBufNode
       numParticles,

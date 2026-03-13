@@ -44,12 +44,14 @@ export interface GrabComputeNodes {
  * Create the TSL compute node for mesh grab position displacement.
  *
  * @param posBufNode        - Cloth particle positions (vec3 storage, shared with solver)
+ * @param invMassBufNode    - Inverse mass per particle (float storage, shared with solver)
  * @param grabMaskBufNode   - Per-particle falloff mask (float storage, 0 = free, >0 = falloff)
  * @param grabOffsetBufNode - Per-particle vec3 offset from grab center
  * @param numParticles      - Number of particles in the mesh
  */
 export function makeGrabComputeNode(
   posBufNode: TslNode,
+  invMassBufNode: TslNode,
   grabMaskBufNode: TslNode,
   grabOffsetBufNode: TslNode,
   numParticles: number,
@@ -71,6 +73,9 @@ export function makeGrabComputeNode(
     If(uint(i).lessThan(uint(N)), () => {
       // Skip if grab is inactive
       If(uGrabActive.greaterThan(float(0.0)), () => {
+        // Skip pinned/frozen particles (invMass == 0)
+        const invMass = invMassBufNode.element(i);
+        If(invMass.greaterThan(float(0.0)), () => {
         const mask = grabMaskBufNode.element(i);
 
         // Only affect grabbed particles (mask > 0)
@@ -87,6 +92,7 @@ export function makeGrabComputeNode(
           posBufNode.element(i).x.assign(mix(posBufNode.element(i).x, tx, mask));
           posBufNode.element(i).y.assign(mix(posBufNode.element(i).y, ty, mask));
           posBufNode.element(i).z.assign(mix(posBufNode.element(i).z, tz, mask));
+        });
         });
       });
     });

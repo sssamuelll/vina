@@ -665,7 +665,7 @@ export function createTslSolver(
   // ─── Mesh grab (per-particle position displacement) ───────────────
   const grabMaskBuf = storage(buffers.grabMaskSBA, 'float', N);
   const grabOffsetBuf = storage(buffers.grabOffsetSBA, 'vec3', N);
-  const grabNodes = makeGrabComputeNode(posBuf, grabMaskBuf, grabOffsetBuf, N);
+  const grabNodes = makeGrabComputeNode(posBuf, invMassBuf, grabMaskBuf, grabOffsetBuf, N);
 
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
