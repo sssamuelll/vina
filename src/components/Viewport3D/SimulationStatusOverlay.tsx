@@ -22,7 +22,7 @@ export function SimulationStatusOverlay() {
   const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
   const frameTimeMs = useSelector((s: RootState) => s.simulation.frameTimeMs);
   const particleCount = useSelector((s: RootState) => s.simulation.particleCount);
-  const qualityLevel = useSelector((s: RootState) => s.simulation.qualityLevel);
+  const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const bodyCollision = useSelector((s: RootState) => s.simulation.bodyCollision);
 
   if (simulationState === 'idle') return null;
@@ -53,7 +53,7 @@ export function SimulationStatusOverlay() {
         <div>{particleCount.toLocaleString()} particles</div>
       )}
       <div style={{ opacity: 0.6 }}>
-        Quality: {qualityLevel}{isMobile ? ' · Mobile' : ''}
+        Mode: {simulationMode}{isMobile ? ' · Mobile' : ''}
       </div>
       {solverTier !== 'none' && !bodyCollision && (
         <div style={{ color: '#fb923c', fontSize: 10 }}>

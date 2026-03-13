@@ -28,7 +28,7 @@ import {
   startSimulation,
   resetSimulation,
   setViewMode3D,
-  setQualityLevel,
+  setSimulationMode,
   setParticleDistance,
   saveArrangementSnapshot,
   clearArrangementSnapshot,
@@ -118,7 +118,7 @@ export function useKeyboardShortcuts() {
       // Simulation
       ['sim.hiRes', () => {
         if (viewMode3D === 'arrange') {
-          dispatch(setQualityLevel('production'));
+          dispatch(setSimulationMode('complete'));
           dispatch(setParticleDistance(3));
           const placements = placeGarmentPieces(pieces, avatar.measurements);
           const snapshot: Record<string, [number, number, number]> = {};

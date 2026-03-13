@@ -2,23 +2,21 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import {
   startSimulation, pauseSimulation, resetSimulation,
-  setParticleDistance, setQualityLevel, setAutoQuality, setFabric, setDefaultFabric,
+  setParticleDistance, setSimulationMode, setFabric, setDefaultFabric,
   setWindForce, setWindEnabled, setDragCoefficient,
   toggleFreezePiece,
 } from '../../store/simulationSlice';
-import { QUALITY_PRESETS, type QualityLevel } from '../../utils/cloth/gpu/qualityPresets';
+import { SIMULATION_MODES, type SimulationMode } from '../../utils/cloth/gpu/qualityPresets';
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 
-const PRESET_COLORS: Record<QualityLevel, string> = {
-  preview: '#888',
-  standard: '#4a88cc',
-  production: '#cc4a4a',
+const MODE_COLORS: Record<SimulationMode, string> = {
+  normal: '#4a88cc',
+  complete: '#cc4a4a',
 };
 
-const PRESET_ICONS: Record<QualityLevel, string> = {
-  preview: '⚡',
-  standard: '●',
-  production: '◆',
+const MODE_ICONS: Record<SimulationMode, string> = {
+  normal: '⚡',
+  complete: '◆',
 };
 
 export default function SimulationView() {
@@ -33,11 +31,11 @@ export default function SimulationView() {
   const isRunning = simulation.simulationState === 'running';
   const isPaused = simulation.simulationState === 'paused';
   const isIdle = simulation.simulationState === 'idle';
-  const activePreset = QUALITY_PRESETS[simulation.qualityLevel];
+  const activePreset = SIMULATION_MODES[simulation.simulationMode];
 
-  const handlePreset = (level: QualityLevel) => {
-    const preset = QUALITY_PRESETS[level];
-    dispatch(setQualityLevel(level));
+  const handleMode = (mode: SimulationMode) => {
+    const preset = SIMULATION_MODES[mode];
+    dispatch(setSimulationMode(mode));
     dispatch(setParticleDistance(preset.particleDistance));
   };
 
@@ -53,8 +51,8 @@ export default function SimulationView() {
         }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
-            background: isRunning ? PRESET_COLORS[simulation.qualityLevel] : isPaused ? '#8a8a4a' : '#555',
-            boxShadow: isRunning ? `0 0 6px ${PRESET_COLORS[simulation.qualityLevel]}` : 'none',
+            background: isRunning ? MODE_COLORS[simulation.simulationMode] : isPaused ? '#8a8a4a' : '#555',
+            boxShadow: isRunning ? `0 0 6px ${MODE_COLORS[simulation.simulationMode]}` : 'none',
           }} />
           <span style={{ fontSize: '12px', color: '#ccc' }}>
             {isRunning ? `SIMULATING — ${activePreset.label}` : isPaused ? 'PAUSED' : 'IDLE'}
@@ -88,30 +86,30 @@ export default function SimulationView() {
         </button>
       </div>
 
-      {/* Quality Presets */}
+      {/* Simulation Mode */}
       <div style={{ marginBottom: '16px' }}>
         <label style={{ fontSize: '11px', color: '#888', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '8px' }}>
-          Quality Preset
+          Simulation Mode
         </label>
         <div style={{ display: 'flex', gap: '4px' }}>
-          {(Object.keys(QUALITY_PRESETS) as QualityLevel[]).map(level => {
-            const preset = QUALITY_PRESETS[level];
-            const isActive = simulation.qualityLevel === level;
+          {(Object.keys(SIMULATION_MODES) as SimulationMode[]).map(mode => {
+            const preset = SIMULATION_MODES[mode];
+            const isActive = simulation.simulationMode === mode;
             return (
               <button
-                key={level}
-                onClick={() => handlePreset(level)}
+                key={mode}
+                onClick={() => handleMode(mode)}
                 disabled={isRunning || isPaused}
                 style={{
-                  flex: 1, padding: '8px 6px', border: `1px solid ${isActive ? PRESET_COLORS[level] : '#333'}`,
+                  flex: 1, padding: '8px 6px', border: `1px solid ${isActive ? MODE_COLORS[mode] : '#333'}`,
                   borderRadius: '6px', cursor: 'pointer', fontSize: '11px',
-                  background: isActive ? `${PRESET_COLORS[level]}22` : 'transparent',
-                  color: isActive ? PRESET_COLORS[level] : '#888',
+                  background: isActive ? `${MODE_COLORS[mode]}22` : 'transparent',
+                  color: isActive ? MODE_COLORS[mode] : '#888',
                   transition: 'all 0.15s',
                   opacity: (isRunning || isPaused) ? 0.5 : 1,
                 }}
               >
-                <div style={{ fontSize: '14px' }}>{PRESET_ICONS[level]}</div>
+                <div style={{ fontSize: '14px' }}>{MODE_ICONS[mode]}</div>
                 <div style={{ marginTop: '2px' }}>{preset.label}</div>
                 <div style={{ fontSize: '9px', opacity: 0.7 }}>{preset.particleDistance}mm</div>
               </button>
@@ -132,25 +130,12 @@ export default function SimulationView() {
             value={simulation.particleDistance}
             onChange={e => dispatch(setParticleDistance(Number(e.target.value)))}
             disabled={isRunning || isPaused}
-            style={{ flex: 1, accentColor: PRESET_COLORS[simulation.qualityLevel] }}
+            style={{ flex: 1, accentColor: MODE_COLORS[simulation.simulationMode] }}
           />
           <span style={{ fontSize: '12px', color: '#ccc', minWidth: '36px', textAlign: 'right' }}>
             {simulation.particleDistance}mm
           </span>
         </div>
-      </div>
-
-      {/* Auto Quality */}
-      <div style={{ marginBottom: '16px' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '12px', color: '#aaa' }}>
-          <input
-            type="checkbox"
-            checked={simulation.autoQuality}
-            onChange={e => dispatch(setAutoQuality(e.target.checked))}
-            style={{ accentColor: '#4a88cc' }}
-          />
-          Auto-adjust quality (match framerate)
-        </label>
       </div>
 
       {/* Wind */}
