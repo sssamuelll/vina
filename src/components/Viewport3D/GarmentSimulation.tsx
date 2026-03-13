@@ -236,7 +236,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     }
     // WASM / CPU-Worker paths
     clients.wasm?.setConfig({ substeps: mode.substeps });
-    clients.cpu?.setConfig({ substeps: mode.substeps });
+    clients.cpu?.setConfig({ numSubsteps: mode.substeps });
   }, [simulationMode, tslSolverRef, clients]);
 
   // ─── Animation recording + playback ────────────────────────────────────────
