@@ -299,10 +299,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const grabInitVal = solver.grabNodes.grabInitPending.value;
       const grabActive = grabActiveVal > 0;
       if (grabActive) {
-        console.log('[Grab:diag] useFrame sees grabActive=', grabActiveVal, 'initPending=', grabInitVal,
-          'solver===clientSolver:', solver === clientsRef.current.gpu?.getTslSolver());
         if (grabInitVal > 0) {
-          console.log('[Grab:diag] dispatching grabInitNode, center:', solver.grabNodes.grabCenterX.value.toFixed(3), solver.grabNodes.grabCenterY.value.toFixed(3), solver.grabNodes.grabCenterZ.value.toFixed(3));
           renderer.compute(solver.grabNodes.grabInitNode);
           solver.grabNodes.grabInitPending.value = 0;
         }
@@ -355,11 +352,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           tslReadbackPending.current = true;
           gpuClient.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
             tslReadbackPending.current = false;
-            if (tslFrameCounter.current <= 3) console.log('[Grab:diag] readback done, frame:', tslFrameCounter.current);
           });
         }
-      } else if (needsReadback && !gpuClient && tslFrameCounter.current === 1) {
-        console.log('[Grab:diag] readback skip: gpuClient=', !!gpuClient, 'pending=', tslReadbackPending.current, 'geo=', !!staticGeometry);
       }
 
       return;
@@ -790,20 +784,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       );
     };
 
-    let raycastLogCount = 0;
     const doRaycast = (e: PointerEvent): THREE.Vector3 | null => {
-      if (!meshRef.current || !staticGeometry) {
-        if (raycastLogCount < 3) { console.log('[Grab:diag] raycast skip: mesh=', !!meshRef.current, 'geo=', !!staticGeometry); raycastLogCount++; }
-        return null;
-      }
+      if (!meshRef.current || !staticGeometry) return null;
       const ndc = getNDC(e);
       manualRaycaster.setFromCamera(ndc, camera);
       const hits = manualRaycaster.intersectObject(meshRef.current, false);
-      if (raycastLogCount < 5) {
-        const posAttr = staticGeometry.getAttribute('position');
-        console.log('[Grab:diag] raycast:', hits.length, 'hits, posAttr.count=', posAttr?.count, 'sample[0]=', posAttr ? (posAttr.array as Float32Array)[0]?.toFixed(3) : 'n/a');
-        raycastLogCount++;
-      }
       return hits.length > 0 ? hits[0].point : null;
     };
 
@@ -855,8 +840,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     const onDown = (e: PointerEvent) => {
       if (grabDragging.current || brushDragging.current) return; // already active
       const hit = doRaycast(e);
-      if (!hit) { console.log('[Grab:diag] onDown: no hit'); return; }
-      console.log('[Grab:diag] onDown hit:', hit.x.toFixed(3), hit.y.toFixed(3), hit.z.toFixed(3), 'tool:', activeTool3D);
+      if (!hit) return;
       if (activeTool3D === 'steamBrush') {
         brushDragging.current = true;
         handleBrushStroke(hit);
@@ -866,7 +850,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         // Write grab uniforms directly to tslSolverRef (bypasses stale gpuClient ref)
         const solver = tslSolverRef.current;
         const wasmClient = clientsRef.current.wasm;
-        console.log('[Grab:diag] grabStart: solver=', !!solver, 'wasm=', !!wasmClient, 'r=', meshGrab.radius, 's=', meshGrab.strength);
         if (solver) {
           const g = solver.grabNodes;
           g.grabCenterX.value = center[0];
