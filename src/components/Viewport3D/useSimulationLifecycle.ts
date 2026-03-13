@@ -183,6 +183,19 @@ export function useSimulationLifecycle({
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
   const tslSolverRef = useRef<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>(null);
 
+  // ─── Refs for values used during init but NOT as effect deps ────────────────
+  // These prevent reinit cascades (#315): if collisionBodies/avatarModelUrl/avatarHeight
+  // are in the effect dep array, Redux actions dispatched during async init can trigger
+  // cleanup → reinit loops, leaving tslSolverRef.current permanently null.
+  // Live updates for these values are handled by separate effects (collision rebuild,
+  // useCollisionBodies hook).
+  const collisionBodiesRef = useRef(collisionBodies);
+  collisionBodiesRef.current = collisionBodies;
+  const avatarModelUrlRef = useRef(avatarModelUrl);
+  avatarModelUrlRef.current = avatarModelUrl;
+  const avatarHeightRef = useRef(avatarHeight);
+  avatarHeightRef.current = avatarHeight;
+
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
   const wasmClientRef = useRef<WasmSolverClient | null>(null);
@@ -271,7 +284,8 @@ export function useSimulationLifecycle({
                 setTslGeneration(g => g + 1);
 
                 // Load collision meshes — setCollisionMesh routes through BVH builder in TSL mode
-                await loadCollision(gpuClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, false);
+                // Read from refs (not closure) to avoid stale values and reinit cascades (#315)
+                await loadCollision(gpuClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
 
                 // Push pre-existing freeze state — the separate freeze useEffect
                 // fires on mount before gpuClientRef is set, so it's a no-op.
@@ -305,7 +319,7 @@ export function useSimulationLifecycle({
               wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
-              await loadCollision(wasmClient, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, true);
+              await loadCollision(wasmClient, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, true);
 
               if (!cancelled) {
                 wasmClient.start();
@@ -342,7 +356,7 @@ export function useSimulationLifecycle({
             client.requestEdgeData();
 
             // Load collision BEFORE starting (prevents explosion)
-            await loadCollision(client, avatarModelUrl, avatarHeight, collisionBodies, dispatch, cancelFlag, false);
+            await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
 
             if (!cancelled) client.start();
             return;
@@ -406,8 +420,8 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.stop();
     }
     return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- windEnabled/windForce/dragCoefficient are handled by separate live-update effects below, not sim restart
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, avatarModelUrl, avatarHeight, collisionBodies, stretchingIdsRef, dispatch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- collisionBodies/avatarModelUrl/avatarHeight read from refs to prevent reinit cascades (#315); live updates handled by separate effects. windEnabled/windForce/dragCoefficient also handled separately.
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
   useEffect(() => {

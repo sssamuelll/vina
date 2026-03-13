@@ -63,10 +63,10 @@ describe('makeGrabComputeNode', () => {
     expect(typeof makeGrabComputeNode).toBe('function');
   });
 
-  it('returns an object with grabNode', () => {
+  it('returns grabNode and grabInitNode', () => {
     const { nodes } = createTestNodes();
-    expect(nodes).toBeDefined();
     expect(nodes.grabNode).toBeDefined();
+    expect(nodes.grabInitNode).toBeDefined();
   });
 
   it('grabNode has dispatchCount matching numParticles', () => {
@@ -74,28 +74,36 @@ describe('makeGrabComputeNode', () => {
     expect(nodes.grabNode).toHaveProperty('dispatchCount', numParticles);
   });
 
-  it('exposes grabCenterX uniform with default value 0', () => {
+  it('grabInitNode has dispatchCount matching numParticles', () => {
+    const { nodes, numParticles } = createTestNodes();
+    expect(nodes.grabInitNode).toHaveProperty('dispatchCount', numParticles);
+  });
+
+  it('exposes grabCenter uniforms with default value 0', () => {
     const { nodes } = createTestNodes();
-    expect(nodes.grabCenterX).toBeDefined();
     expect(nodes.grabCenterX.value).toBe(0.0);
-  });
-
-  it('exposes grabCenterY uniform with default value 0', () => {
-    const { nodes } = createTestNodes();
-    expect(nodes.grabCenterY).toBeDefined();
     expect(nodes.grabCenterY.value).toBe(0.0);
-  });
-
-  it('exposes grabCenterZ uniform with default value 0', () => {
-    const { nodes } = createTestNodes();
-    expect(nodes.grabCenterZ).toBeDefined();
     expect(nodes.grabCenterZ.value).toBe(0.0);
   });
 
   it('exposes grabActive uniform with default value 0 (inactive)', () => {
     const { nodes } = createTestNodes();
-    expect(nodes.grabActive).toBeDefined();
     expect(nodes.grabActive.value).toBe(0.0);
+  });
+
+  it('exposes grabInitPending uniform with default value 0', () => {
+    const { nodes } = createTestNodes();
+    expect(nodes.grabInitPending.value).toBe(0.0);
+  });
+
+  it('exposes grabRadius uniform with default value 0.05', () => {
+    const { nodes } = createTestNodes();
+    expect(nodes.grabRadius.value).toBe(0.05);
+  });
+
+  it('exposes grabStrength uniform with default value 0.8', () => {
+    const { nodes } = createTestNodes();
+    expect(nodes.grabStrength.value).toBe(0.8);
   });
 
   it('uniforms are mutable at runtime', () => {
@@ -105,10 +113,16 @@ describe('makeGrabComputeNode', () => {
     nodes.grabCenterY.value = 2.0;
     nodes.grabCenterZ.value = -0.5;
     nodes.grabActive.value = 1;
+    nodes.grabInitPending.value = 1;
+    nodes.grabRadius.value = 0.1;
+    nodes.grabStrength.value = 0.5;
 
     expect(nodes.grabCenterX.value).toBe(1.5);
     expect(nodes.grabCenterY.value).toBe(2.0);
     expect(nodes.grabCenterZ.value).toBe(-0.5);
     expect(nodes.grabActive.value).toBe(1);
+    expect(nodes.grabInitPending.value).toBe(1);
+    expect(nodes.grabRadius.value).toBe(0.1);
+    expect(nodes.grabStrength.value).toBe(0.5);
   });
 });

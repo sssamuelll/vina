@@ -662,7 +662,7 @@ export function createTslSolver(
   // ─── Steam brush (per-particle velocity damping) ──────────────────
   const brushNodes = makeBrushComputeNode(posBuf, velBuf, invMassBuf, N);
 
-  // ─── Mesh grab (per-particle position displacement) ───────────────
+  // ─── Mesh grab (GPU-only init + per-substep position lerp) ────────
   const grabMaskBuf = storage(buffers.grabMaskSBA, 'float', N);
   const grabOffsetBuf = storage(buffers.grabOffsetSBA, 'vec3', N);
   const grabNodes = makeGrabComputeNode(posBuf, invMassBuf, grabMaskBuf, grabOffsetBuf, N);

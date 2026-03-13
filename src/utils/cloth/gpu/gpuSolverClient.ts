@@ -418,41 +418,20 @@ export class GpuSolverClient {
   }
 
   /**
-   * Start grab using pre-read positions (avoids stale SBA data in TSL mode).
-   * Call readbackPositionsToGeometry() first, then pass the geometry positions here.
+   * Start grab at the given center position.
+   * Sets uniforms and flags grabInitPending so the next useFrame dispatches
+   * the one-shot GPU init kernel (fills mask + offset on GPU, no CPU upload).
    */
-  grabStartWithPositions(center: [number, number, number], radius: number, strength: number, positions: Float32Array): void {
-    if (!this.tslSolver || !this.tslBuffers) return;
-    const N = this.tslBuffers.numParticles;
-    const maskArr = this.tslBuffers.grabMaskSBA.array as Float32Array;
-    const offsetArr = this.tslBuffers.grabOffsetSBA.array as Float32Array;
-
-    maskArr.fill(0);
-    offsetArr.fill(0);
-    const rSq = radius * radius;
-
-    for (let i = 0; i < N; i++) {
-      const dx = positions[i * 3] - center[0];
-      const dy = positions[i * 3 + 1] - center[1];
-      const dz = positions[i * 3 + 2] - center[2];
-      const dSq = dx * dx + dy * dy + dz * dz;
-      if (dSq < rSq) {
-        const dist = Math.sqrt(dSq);
-        maskArr[i] = (1 - dist / radius) * strength; // falloff * strength
-        offsetArr[i * 3] = dx;     // offset from center
-        offsetArr[i * 3 + 1] = dy;
-        offsetArr[i * 3 + 2] = dz;
-      }
-    }
-
-    this.tslBuffers.grabMaskSBA.version++;
-    this.tslBuffers.grabOffsetSBA.version++;
-
+  grabStart(center: [number, number, number], radius: number, strength: number): void {
+    if (!this.tslSolver) return;
     const g = this.tslSolver.grabNodes;
     g.grabCenterX.value = center[0];
     g.grabCenterY.value = center[1];
     g.grabCenterZ.value = center[2];
+    g.grabRadius.value = radius;
+    g.grabStrength.value = strength;
     g.grabActive.value = 1;
+    g.grabInitPending.value = 1; // triggers one-shot init kernel on next frame
   }
 
   /** Update grab center (called on pointer move). */
@@ -488,13 +467,27 @@ export class GpuSolverClient {
     try {
       const ab: ArrayBuffer = await renderer.getArrayBufferAsync(sba);
       const gpuPositions = new Float32Array(ab);
-      // Update geometry for raycasting
       const posAttr = geometry.getAttribute('position');
-      if (posAttr && posAttr.array.length === gpuPositions.length) {
-        (posAttr.array as Float32Array).set(gpuPositions);
-        posAttr.needsUpdate = true;
-        geometry.computeBoundingSphere();
+      if (!posAttr) return gpuPositions;
+      const dst = posAttr.array as Float32Array;
+      const vertCount = posAttr.count;
+
+      if (gpuPositions.length === dst.length) {
+        // vec3 → vec3: direct copy
+        dst.set(gpuPositions);
+      } else if (gpuPositions.length === vertCount * 4) {
+        // vec4 (XYZW) → vec3 (XYZ): strip W component
+        for (let i = 0; i < vertCount; i++) {
+          dst[i * 3] = gpuPositions[i * 4];
+          dst[i * 3 + 1] = gpuPositions[i * 4 + 1];
+          dst[i * 3 + 2] = gpuPositions[i * 4 + 2];
+        }
+      } else {
+        return gpuPositions;
       }
+
+      posAttr.needsUpdate = true;
+      geometry.computeBoundingSphere();
       return gpuPositions;
     } catch (e) {
       console.warn('[GpuSolverClient] Position readback failed:', e);

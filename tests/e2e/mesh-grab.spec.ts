@@ -5,7 +5,7 @@ import { test, expect, Page } from '@playwright/test';
  *
  * Verifies:
  * 1. Mesh grab Redux state has correct defaults
- * 2. Tool activates via keyboard shortcut ('m')
+ * 2. Tool activates via keyboard shortcut ('o')
  * 3. Redux state updates via dispatch
  * 4. Clamping on radius and strength
  * 5. Simulation runs with grab tool active — no errors
@@ -83,7 +83,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
 
     const state = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__REDUX_STORE__;
+      const store = (window as any).__OPENCLO_STORE__;
       if (!store) return null;
       return store.getState().simulation.meshGrab;
     });
@@ -109,7 +109,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
     // Check Redux state for active tool
     const activeTool = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__REDUX_STORE__;
+      const store = (window as any).__OPENCLO_STORE__;
       if (!store) return null;
       return store.getState().tools.activeTool3D;
     });
@@ -127,7 +127,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
 
     const updated = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__REDUX_STORE__;
+      const store = (window as any).__OPENCLO_STORE__;
       if (!store) return null;
 
       store.dispatch({ type: 'simulation/setMeshGrabRadius', payload: 0.1 });
@@ -152,7 +152,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
 
     const clamped = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__REDUX_STORE__;
+      const store = (window as any).__OPENCLO_STORE__;
       if (!store) return null;
 
       // Radius clamps to [0.01, 0.5]
@@ -198,7 +198,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
     // Switch to 3D and activate mesh grab
     await switchTo3D(page);
     await page.waitForTimeout(500);
-    await page.keyboard.press('r');
+    await page.keyboard.press('o');
     await page.waitForTimeout(500);
 
     // Let simulation run with grab tool active

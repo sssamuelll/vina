@@ -17,7 +17,7 @@
 import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam } from '../../types/types';
@@ -79,6 +79,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const brushCursorRef = useRef<THREE.Mesh>(null);
   const grabDragging = useRef(false);
   const grabCursorRef = useRef<THREE.Mesh>(null);
+  // CPU-side grab state for WASM/CPU solver fallback
+  const grabIndices = useRef<number[]>([]);
+  const grabBasePositions = useRef<Float32Array | null>(null);
+  const grabStartPoint = useRef<[number, number, number]>([0, 0, 0]);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
@@ -290,6 +294,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const renderer = gl as any;
       const substeps = substepsRef.current;
 
+      // Mesh grab: one-shot init kernel fills per-particle mask + offset on GPU
+      const grabActiveVal = solver.grabNodes.grabActive.value;
+      const grabInitVal = solver.grabNodes.grabInitPending.value;
+      const grabActive = grabActiveVal > 0;
+      if (grabActive) {
+        console.log('[Grab:diag] useFrame sees grabActive=', grabActiveVal, 'initPending=', grabInitVal,
+          'solver===clientSolver:', solver === clientsRef.current.gpu?.getTslSolver());
+        if (grabInitVal > 0) {
+          console.log('[Grab:diag] dispatching grabInitNode, center:', solver.grabNodes.grabCenterX.value.toFixed(3), solver.grabNodes.grabCenterY.value.toFixed(3), solver.grabNodes.grabCenterZ.value.toFixed(3));
+          renderer.compute(solver.grabNodes.grabInitNode);
+          solver.grabNodes.grabInitPending.value = 0;
+        }
+      }
+
       for (let s = 0; s < substeps; s++) {
         renderer.compute(solver.preSolve);
         // Wind force (two-pass: accumulate per-triangle, apply per-particle)
@@ -308,6 +326,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
         renderer.compute(solver.groundClamp);
         renderer.compute(solver.postSolve);
+        // Mesh grab: lerp grabbed particles toward target each substep
+        // (inside loop so it acts as a strong position constraint)
+        if (grabActive) {
+          renderer.compute(solver.grabNodes.grabNode);
+        }
       }
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
@@ -315,24 +338,28 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         renderer.compute(solver.brushNodes.brushNode);
       }
 
-      // Mesh grab (once per frame, after brush; skip when inactive)
-      if (solver.grabNodes.grabActive.value > 0) {
-        renderer.compute(solver.grabNodes.grabNode);
-      }
-
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
 
-      // Periodic GPU→CPU position readback for raycasting (pointer events).
-      // Only runs when interactive 3D tools are active and no readback is pending.
+      // GPU→CPU position readback for raycasting (manual raycaster needs updated CPU positions).
+      // Uses clientsRef (not closure `clients`) to avoid stale-ref race condition.
       tslFrameCounter.current++;
+      const gpuClient = clientsRef.current.gpu;
       const needsReadback = activeTool3D === 'meshGrab' || activeTool3D === 'steamBrush';
-      if (needsReadback && tslFrameCounter.current % 10 === 0 && !tslReadbackPending.current && staticGeometry) {
-        tslReadbackPending.current = true;
-        clients.gpu!.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
-          tslReadbackPending.current = false;
-        });
+      if (!needsReadback) tslFrameCounter.current = 0;
+      if (needsReadback && gpuClient && !tslReadbackPending.current && staticGeometry) {
+        // Every frame for first 10 frames after tool activates, then every 3rd frame
+        const isEarlyFrame = tslFrameCounter.current <= 10;
+        if (isEarlyFrame || tslFrameCounter.current % 3 === 0) {
+          tslReadbackPending.current = true;
+          gpuClient.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
+            tslReadbackPending.current = false;
+            if (tslFrameCounter.current <= 3) console.log('[Grab:diag] readback done, frame:', tslFrameCounter.current);
+          });
+        }
+      } else if (needsReadback && !gpuClient && tslFrameCounter.current === 1) {
+        console.log('[Grab:diag] readback skip: gpuClient=', !!gpuClient, 'pending=', tslReadbackPending.current, 'geo=', !!staticGeometry);
       }
 
       return;
@@ -589,16 +616,19 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // ─── Steam brush interaction ──────────────────────────────────────────────
 
   const handleBrushStroke = useCallback((point: THREE.Vector3) => {
-    if (clients.gpu) {
-      clients.gpu.setBrushParams(
+    const gpuClient = clientsRef.current.gpu;
+    if (gpuClient) {
+      gpuClient.setBrushParams(
         [point.x, point.y, point.z],
         steamBrush.radius,
         steamBrush.strength,
       );
     }
-  }, [clients.gpu, steamBrush.radius, steamBrush.strength]);
+  }, [steamBrush.radius, steamBrush.strength]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
+    // Skip if manual raycaster already started interaction (TSL mode)
+    if (grabDragging.current || brushDragging.current) return;
     if (activeTool3D === 'steamBrush') {
       e.stopPropagation();
       brushDragging.current = true;
@@ -606,20 +636,52 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     } else if (activeTool3D === 'meshGrab') {
       e.stopPropagation();
       grabDragging.current = true;
-      if (clients.gpu && staticGeometry) {
-        // Use geometry positions (synced from GPU by periodic readback)
-        const posAttr = staticGeometry.getAttribute('position');
-        if (posAttr) {
-          clients.gpu.grabStartWithPositions(
-            [e.point.x, e.point.y, e.point.z],
-            meshGrab.radius,
-            meshGrab.strength,
-            posAttr.array as Float32Array,
-          );
+      const center: [number, number, number] = [e.point.x, e.point.y, e.point.z];
+      // Write grab uniforms directly to tslSolverRef (bypasses stale gpuClient ref)
+      const solver = tslSolverRef.current;
+      const wasmClient = clientsRef.current.wasm;
+      if (solver) {
+        const g = solver.grabNodes;
+        g.grabCenterX.value = center[0];
+        g.grabCenterY.value = center[1];
+        g.grabCenterZ.value = center[2];
+        g.grabRadius.value = meshGrab.radius;
+        g.grabStrength.value = meshGrab.strength;
+        g.grabActive.value = 1;
+        g.grabInitPending.value = 1;
+      } else if (wasmClient && positionsRef.current) {
+        // WASM fallback: use setPins to grab particles near the click point
+        const positions = positionsRef.current;
+        const rSq = meshGrab.radius * meshGrab.radius;
+        const indices: number[] = [];
+        const N = positions.length / 3;
+        for (let i = 0; i < N; i++) {
+          const dx = positions[i * 3] - center[0];
+          const dy = positions[i * 3 + 1] - center[1];
+          const dz = positions[i * 3 + 2] - center[2];
+          if (dx * dx + dy * dy + dz * dz < rSq) {
+            indices.push(i);
+          }
+        }
+        if (indices.length > 0) {
+          grabIndices.current = indices;
+          grabStartPoint.current = center;
+          const base = new Float32Array(indices.length * 3);
+          for (let j = 0; j < indices.length; j++) {
+            const i = indices[j];
+            base[j * 3] = positions[i * 3];
+            base[j * 3 + 1] = positions[i * 3 + 1];
+            base[j * 3 + 2] = positions[i * 3 + 2];
+          }
+          grabBasePositions.current = base;
+          wasmClient.setPins(indices.map((idx, j) => ({
+            vertexIndex: idx,
+            position: [base[j * 3], base[j * 3 + 1], base[j * 3 + 2]] as [number, number, number],
+          })));
         }
       }
     }
-  }, [activeTool3D, handleBrushStroke, clients.gpu, meshGrab.radius, meshGrab.strength, staticGeometry]);
+  }, [activeTool3D, handleBrushStroke, meshGrab.radius, meshGrab.strength, staticGeometry, positionsRef]);
 
   const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (activeTool3D === 'steamBrush') {
@@ -637,56 +699,221 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
       if (!grabDragging.current) return;
       e.stopPropagation();
-      if (clients.gpu) {
-        clients.gpu.grabMove([e.point.x, e.point.y, e.point.z]);
+      // Write grab center directly to tslSolverRef (bypasses stale gpuClient ref)
+      const solver = tslSolverRef.current;
+      const wasmClient = clientsRef.current.wasm;
+      if (solver) {
+        solver.grabNodes.grabCenterX.value = e.point.x;
+        solver.grabNodes.grabCenterY.value = e.point.y;
+        solver.grabNodes.grabCenterZ.value = e.point.z;
+      } else if (wasmClient && grabIndices.current.length > 0 && grabBasePositions.current) {
+        const dx = e.point.x - grabStartPoint.current[0];
+        const dy = e.point.y - grabStartPoint.current[1];
+        const dz = e.point.z - grabStartPoint.current[2];
+        const base = grabBasePositions.current;
+        const indices = grabIndices.current;
+        wasmClient.setPins(indices.map((idx, j) => ({
+          vertexIndex: idx,
+          position: [base[j * 3] + dx, base[j * 3 + 1] + dy, base[j * 3 + 2] + dz] as [number, number, number],
+        })));
       }
     }
-  }, [activeTool3D, handleBrushStroke, clients.gpu]);
+  }, [activeTool3D, handleBrushStroke]);
+
+  const releaseGrab = useCallback(() => {
+    if (!grabDragging.current) return;
+    grabDragging.current = false;
+    // Write directly to tslSolverRef (bypasses stale gpuClient ref)
+    const solver = tslSolverRef.current;
+    const wasmClient = clientsRef.current.wasm;
+    if (solver) {
+      solver.grabNodes.grabActive.value = 0;
+    } else if (wasmClient && grabIndices.current.length > 0) {
+      wasmClient.clearPins();
+      grabIndices.current = [];
+      grabBasePositions.current = null;
+    }
+  }, []);
 
   const handlePointerUp = useCallback(() => {
     brushDragging.current = false;
-    if (clients.gpu) {
-      clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+    const gpuClient = clientsRef.current.gpu;
+    if (gpuClient) {
+      gpuClient.setBrushParams([0, 0, 0], 0, 0);
     }
-    if (grabDragging.current) {
-      grabDragging.current = false;
-      if (clients.gpu) {
-        clients.gpu.grabRelease();
-      }
-    }
-  }, [clients.gpu]);
+    releaseGrab();
+  }, [releaseGrab]);
 
   const handlePointerLeave = useCallback(() => {
     if (brushCursorRef.current) brushCursorRef.current.visible = false;
     if (grabCursorRef.current) grabCursorRef.current.visible = false;
-    if (!brushDragging.current && clients.gpu) {
-      clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+    const gpuClient = clientsRef.current.gpu;
+    if (!brushDragging.current && gpuClient) {
+      gpuClient.setBrushParams([0, 0, 0], 0, 0);
     }
-    if (grabDragging.current) {
-      grabDragging.current = false;
-      if (clients.gpu) {
-        clients.gpu.grabRelease();
-      }
-    }
-  }, [clients.gpu]);
+    releaseGrab();
+  }, [releaseGrab]);
 
   // Global pointerup to handle drag release outside mesh
   useEffect(() => {
     const handleGlobalUp = () => {
       brushDragging.current = false;
-      if (clients.gpu) {
-        clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+      const gpuClient = clientsRef.current.gpu;
+      if (gpuClient) {
+        gpuClient.setBrushParams([0, 0, 0], 0, 0);
       }
-      if (grabDragging.current) {
-        grabDragging.current = false;
-        if (clients.gpu) {
-          clients.gpu.grabRelease();
-        }
-      }
+      releaseGrab();
     };
     window.addEventListener('pointerup', handleGlobalUp);
     return () => window.removeEventListener('pointerup', handleGlobalUp);
-  }, [clients.gpu]);
+  }, [releaseGrab]);
+
+  // ─── Manual raycasting for TSL mode ───────────────────────────────────────
+  // R3F pointer events (onPointerMove/Down) depend on Three.js raycasting which
+  // reads geometry.attributes.position (CPU side). In TSL mode, the mesh is
+  // rendered at GPU-computed positions while the CPU geometry may lag behind.
+  // This manual raycaster listens directly on the Canvas DOM element and does
+  // its own raycast against the readback-updated geometry.
+  const { camera, gl: threeGl } = useThree();
+  const manualRaycaster = useMemo(() => new THREE.Raycaster(), []);
+
+  useEffect(() => {
+    if (activeTool3D !== 'meshGrab' && activeTool3D !== 'steamBrush') return;
+    const canvas = threeGl.domElement;
+    if (!canvas) return;
+
+    const getNDC = (e: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect();
+      return new THREE.Vector2(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+    };
+
+    let raycastLogCount = 0;
+    const doRaycast = (e: PointerEvent): THREE.Vector3 | null => {
+      if (!meshRef.current || !staticGeometry) {
+        if (raycastLogCount < 3) { console.log('[Grab:diag] raycast skip: mesh=', !!meshRef.current, 'geo=', !!staticGeometry); raycastLogCount++; }
+        return null;
+      }
+      const ndc = getNDC(e);
+      manualRaycaster.setFromCamera(ndc, camera);
+      const hits = manualRaycaster.intersectObject(meshRef.current, false);
+      if (raycastLogCount < 5) {
+        const posAttr = staticGeometry.getAttribute('position');
+        console.log('[Grab:diag] raycast:', hits.length, 'hits, posAttr.count=', posAttr?.count, 'sample[0]=', posAttr ? (posAttr.array as Float32Array)[0]?.toFixed(3) : 'n/a');
+        raycastLogCount++;
+      }
+      return hits.length > 0 ? hits[0].point : null;
+    };
+
+    const onMove = (e: PointerEvent) => {
+      const hit = doRaycast(e);
+      if (activeTool3D === 'meshGrab' && grabCursorRef.current) {
+        if (hit) {
+          grabCursorRef.current.position.copy(hit);
+          grabCursorRef.current.visible = true;
+        } else {
+          grabCursorRef.current.visible = false;
+        }
+      }
+      if (activeTool3D === 'steamBrush' && brushCursorRef.current) {
+        if (hit) {
+          brushCursorRef.current.position.copy(hit);
+          brushCursorRef.current.visible = true;
+        } else {
+          brushCursorRef.current.visible = false;
+        }
+      }
+      // Handle dragging
+      if (hit) {
+        if (activeTool3D === 'steamBrush' && brushDragging.current) {
+          handleBrushStroke(hit);
+        } else if (activeTool3D === 'meshGrab' && grabDragging.current) {
+          // Write grab center directly to tslSolverRef (bypasses stale gpuClient ref)
+          const solver = tslSolverRef.current;
+          const wasmClient = clientsRef.current.wasm;
+          if (solver) {
+            solver.grabNodes.grabCenterX.value = hit.x;
+            solver.grabNodes.grabCenterY.value = hit.y;
+            solver.grabNodes.grabCenterZ.value = hit.z;
+          } else if (wasmClient && grabIndices.current.length > 0 && grabBasePositions.current) {
+            const dx = hit.x - grabStartPoint.current[0];
+            const dy = hit.y - grabStartPoint.current[1];
+            const dz = hit.z - grabStartPoint.current[2];
+            const base = grabBasePositions.current;
+            const indices = grabIndices.current;
+            wasmClient.setPins(indices.map((idx, j) => ({
+              vertexIndex: idx,
+              position: [base[j * 3] + dx, base[j * 3 + 1] + dy, base[j * 3 + 2] + dz] as [number, number, number],
+            })));
+          }
+        }
+      }
+    };
+
+    const onDown = (e: PointerEvent) => {
+      if (grabDragging.current || brushDragging.current) return; // already active
+      const hit = doRaycast(e);
+      if (!hit) { console.log('[Grab:diag] onDown: no hit'); return; }
+      console.log('[Grab:diag] onDown hit:', hit.x.toFixed(3), hit.y.toFixed(3), hit.z.toFixed(3), 'tool:', activeTool3D);
+      if (activeTool3D === 'steamBrush') {
+        brushDragging.current = true;
+        handleBrushStroke(hit);
+      } else if (activeTool3D === 'meshGrab') {
+        grabDragging.current = true;
+        const center: [number, number, number] = [hit.x, hit.y, hit.z];
+        // Write grab uniforms directly to tslSolverRef (bypasses stale gpuClient ref)
+        const solver = tslSolverRef.current;
+        const wasmClient = clientsRef.current.wasm;
+        console.log('[Grab:diag] grabStart: solver=', !!solver, 'wasm=', !!wasmClient, 'r=', meshGrab.radius, 's=', meshGrab.strength);
+        if (solver) {
+          const g = solver.grabNodes;
+          g.grabCenterX.value = center[0];
+          g.grabCenterY.value = center[1];
+          g.grabCenterZ.value = center[2];
+          g.grabRadius.value = meshGrab.radius;
+          g.grabStrength.value = meshGrab.strength;
+          g.grabActive.value = 1;
+          g.grabInitPending.value = 1;
+        } else if (wasmClient && positionsRef.current) {
+          const positions = positionsRef.current;
+          const rSq = meshGrab.radius * meshGrab.radius;
+          const indices: number[] = [];
+          const N = positions.length / 3;
+          for (let i = 0; i < N; i++) {
+            const dx = positions[i * 3] - center[0];
+            const dy = positions[i * 3 + 1] - center[1];
+            const dz = positions[i * 3 + 2] - center[2];
+            if (dx * dx + dy * dy + dz * dz < rSq) indices.push(i);
+          }
+          if (indices.length > 0) {
+            grabIndices.current = indices;
+            grabStartPoint.current = center;
+            const base = new Float32Array(indices.length * 3);
+            for (let j = 0; j < indices.length; j++) {
+              const i = indices[j];
+              base[j * 3] = positions[i * 3];
+              base[j * 3 + 1] = positions[i * 3 + 1];
+              base[j * 3 + 2] = positions[i * 3 + 2];
+            }
+            grabBasePositions.current = base;
+            wasmClient.setPins(indices.map((idx, j) => ({
+              vertexIndex: idx,
+              position: [base[j * 3], base[j * 3 + 1], base[j * 3 + 2]] as [number, number, number],
+            })));
+          }
+        }
+      }
+    };
+
+    canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerdown', onDown);
+    return () => {
+      canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerdown', onDown);
+    };
+  }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, positionsRef]);
 
   if (!staticGeometry) return null;
 
