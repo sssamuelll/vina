@@ -9,7 +9,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
 import type { FitMapMode, FitMapConfig, FitMapStats } from '../utils/cloth/fitMaps';
-import type { QualityLevel } from '../utils/cloth/gpu/qualityPresets';
+import type { SimulationMode } from '../utils/cloth/gpu/qualityPresets';
 
 /** Simulation lifecycle state. */
 export type SimulationState = 'idle' | 'running' | 'paused';
@@ -69,10 +69,8 @@ interface SimulationSliceState {
   fitMapMode: FitMapMode;
   /** Fit map visualization configuration */
   fitMapConfig: FitMapConfig;
-  /** Quality preset level */
-  qualityLevel: QualityLevel;
-  /** Auto-quality detection enabled */
-  autoQuality: boolean;
+  /** Simulation mode: normal (fast) or complete (full quality) */
+  simulationMode: SimulationMode;
   /** Currently active solver tier */
   solverTier: SolverTier;
   /** Frame time in ms (rolling average) */
@@ -145,8 +143,7 @@ const initialState: SimulationSliceState = {
     fitThresholds: [0.8, 1.0],
     pressureDistance: 0.002,
   },
-  qualityLevel: 'standard' as QualityLevel,
-  autoQuality: true,
+  simulationMode: 'normal' as SimulationMode,
   solverTier: 'none' as SolverTier,
   frameTimeMs: 0,
   particleCount: 0,
@@ -217,13 +214,9 @@ const simulationSlice = createSlice({
     updateFitMapConfig(state, action: PayloadAction<Partial<FitMapConfig>>) {
       Object.assign(state.fitMapConfig, action.payload);
     },
-    /** Set quality preset level. */
-    setQualityLevel(state, action: PayloadAction<QualityLevel>) {
-      state.qualityLevel = action.payload;
-    },
-    /** Toggle auto-quality detection. */
-    setAutoQuality(state, action: PayloadAction<boolean>) {
-      state.autoQuality = action.payload;
+    /** Set simulation mode (normal or complete). */
+    setSimulationMode(state, action: PayloadAction<SimulationMode>) {
+      state.simulationMode = action.payload;
     },
     /** Set which solver tier is active. */
     setSolverTier(state, action: PayloadAction<SolverTier>) {
@@ -455,8 +448,7 @@ export const {
   setPieceParticleDistance,
   setFitMapMode,
   updateFitMapConfig,
-  setQualityLevel,
-  setAutoQuality,
+  setSimulationMode,
   setSolverTier,
   setFrameTime,
   setParticleCount,
@@ -498,5 +490,8 @@ export const {
   setSteamBrushRadius,
   setSteamBrushStrength,
 } = simulationSlice.actions;
+
+/** @deprecated Use setSimulationMode */
+export const setQualityLevel = setSimulationMode;
 
 export default simulationSlice.reducer;
