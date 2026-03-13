@@ -22,7 +22,7 @@ import {
   copyPieces,
   createPastedPieces,
 } from '../store/editorSlice';
-import { setActiveTool2D } from '../store/toolSlice';
+import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
 import { removePiece, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
@@ -186,6 +186,10 @@ export function useKeyboardShortcuts() {
       ['tool.freeSewingAlt', () => { dispatch(setActiveTool('freeSewing' as any)); dispatch(setActiveTool2D('freeSewing')); }],
       ['tool.notch', () => { dispatch(setActiveTool('notch' as any)); dispatch(setActiveTool2D('notch')); }],
       ['tool.line', () => { dispatch(setActiveTool('line' as any)); dispatch(setActiveTool2D('line')); }],
+
+      // 3D Tools
+      ['tool3d.steamBrush', () => dispatch(setActiveTool3D('steamBrush'))],
+      ['tool3d.meshGrab', () => dispatch(setActiveTool3D('meshGrab'))],
 
       // Fit Maps
       ['fitmap.stress', () => dispatch(setFitMapMode(fitMapMode === 'stress' ? 'none' : 'stress'))],

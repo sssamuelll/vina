@@ -63,6 +63,10 @@ export interface TslBufferSet {
   normalAccumSBA: StorageBufferAttribute;   // flat int32 — atomic accumulation buffer
   triangleIdsSBA: StorageBufferAttribute;   // flat uint32 — triangle vertex indices
 
+  // Grab tool buffers (GPU-only: written by grabInitNode, read by grabNode)
+  grabMaskSBA: StorageBufferAttribute;     // float — per-particle falloff mask
+  grabOffsetSBA: StorageBufferAttribute;   // vec3 — per-particle offset from grab center
+
   // Self-collision buffers (null if disabled)
   scBuffers: SelfCollisionBufferSet | null;
 
@@ -180,6 +184,10 @@ export function createTslBuffers(
     seamTargetDistSBA = new StorageBufferAttribute(new Float32Array(seam.targetDist), 1);
   }
 
+  // ─── Grab tool buffers (GPU-only: init kernel writes, grab kernel reads) ──
+  const grabMaskSBA = new StorageBufferAttribute(new Float32Array(N), 1);
+  const grabOffsetSBA = new StorageBufferAttribute(new Float32Array(N * 3), 3);
+
   // ─── Normal computation buffers ─────────────────────────────────────
   // GPU smooth normals via atomic accumulation (replaces flatShading).
   const normalSBA = new StorageBufferAttribute(new Float32Array(N * 3), 3);
@@ -200,6 +208,8 @@ export function createTslBuffers(
     seamTargetDistSBA,
     numSeamConstraints: numSeam,
     triangles: mesh.triangles,
+    grabMaskSBA,
+    grabOffsetSBA,
     normalSBA,
     normalAccumSBA,
     triangleIdsSBA,

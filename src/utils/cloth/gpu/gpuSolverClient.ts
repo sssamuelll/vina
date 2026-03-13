@@ -17,6 +17,7 @@ import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolv
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import type { StorageBufferAttribute } from 'three/webgpu';
+import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -414,6 +415,84 @@ export class GpuSolverClient {
     b.centerZ.value = center[2];
     b.radius.value = radius;
     b.strength.value = strength;
+  }
+
+  /**
+   * Start grab at the given center position.
+   * Sets uniforms and flags grabInitPending so the next useFrame dispatches
+   * the one-shot GPU init kernel (fills mask + offset on GPU, no CPU upload).
+   */
+  grabStart(center: [number, number, number], radius: number, strength: number): void {
+    if (!this.tslSolver) return;
+    const g = this.tslSolver.grabNodes;
+    g.grabCenterX.value = center[0];
+    g.grabCenterY.value = center[1];
+    g.grabCenterZ.value = center[2];
+    g.grabRadius.value = radius;
+    g.grabStrength.value = strength;
+    g.grabActive.value = 1;
+    g.grabInitPending.value = 1; // triggers one-shot init kernel on next frame
+  }
+
+  /** Update grab center (called on pointer move). */
+  grabMove(center: [number, number, number]): void {
+    if (!this.tslSolver) return;
+    const g = this.tslSolver.grabNodes;
+    g.grabCenterX.value = center[0];
+    g.grabCenterY.value = center[1];
+    g.grabCenterZ.value = center[2];
+  }
+
+  /** Release grab. */
+  grabRelease(): void {
+    if (!this.tslSolver) return;
+    this.tslSolver.grabNodes.grabActive.value = 0;
+  }
+
+  /**
+   * Read GPU positions back to CPU and update a BufferGeometry's position attribute.
+   * Uses renderer.getArrayBufferAsync() for GPU→CPU readback.
+   * Returns the position Float32Array for reuse (e.g. by grabStartWithPositions).
+   *
+   * @param renderer - Three.js WebGPURenderer (passed as `gl` from useFrame)
+   * @param geometry - The BufferGeometry whose position attribute should be updated
+   */
+  async readbackPositionsToGeometry(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    renderer: any,
+    geometry: THREE.BufferGeometry,
+  ): Promise<Float32Array | null> {
+    if (!this.tslSolver) return null;
+    const sba = this.tslSolver.positionSBA;
+    try {
+      const ab: ArrayBuffer = await renderer.getArrayBufferAsync(sba);
+      const gpuPositions = new Float32Array(ab);
+      const posAttr = geometry.getAttribute('position');
+      if (!posAttr) return gpuPositions;
+      const dst = posAttr.array as Float32Array;
+      const vertCount = posAttr.count;
+
+      if (gpuPositions.length === dst.length) {
+        // vec3 → vec3: direct copy
+        dst.set(gpuPositions);
+      } else if (gpuPositions.length === vertCount * 4) {
+        // vec4 (XYZW) → vec3 (XYZ): strip W component
+        for (let i = 0; i < vertCount; i++) {
+          dst[i * 3] = gpuPositions[i * 4];
+          dst[i * 3 + 1] = gpuPositions[i * 4 + 1];
+          dst[i * 3 + 2] = gpuPositions[i * 4 + 2];
+        }
+      } else {
+        return gpuPositions;
+      }
+
+      posAttr.needsUpdate = true;
+      geometry.computeBoundingSphere();
+      return gpuPositions;
+    } catch (e) {
+      console.warn('[GpuSolverClient] Position readback failed:', e);
+      return null;
+    }
   }
 
   /**

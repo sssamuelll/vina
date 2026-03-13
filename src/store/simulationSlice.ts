@@ -128,6 +128,12 @@ interface SimulationSliceState {
     radius: number;
     strength: number;
   };
+  /** Mesh grab tool state (grab and pull fabric during simulation) */
+  meshGrab: {
+    active: boolean;
+    radius: number;
+    strength: number;
+  };
 }
 
 const initialState: SimulationSliceState = {
@@ -171,6 +177,11 @@ const initialState: SimulationSliceState = {
     active: false,
     radius: 0.05,
     strength: 0.3,
+  },
+  meshGrab: {
+    active: false,
+    radius: 0.08,
+    strength: 0.6,
   },
 };
 
@@ -432,6 +443,21 @@ const simulationSlice = createSlice({
     setSteamBrushStrength(state, action: PayloadAction<number>) {
       state.steamBrush.strength = Math.max(0, Math.min(1, action.payload));
     },
+
+    // ─── Mesh Grab ─────────────────────────────────────────────────────────
+
+    /** Activate or deactivate the mesh grab tool. */
+    setMeshGrabActive(state, action: PayloadAction<boolean>) {
+      state.meshGrab.active = action.payload;
+    },
+    /** Set mesh grab radius (meters). Clamped to [0.01, 0.5]. */
+    setMeshGrabRadius(state, action: PayloadAction<number>) {
+      state.meshGrab.radius = Math.max(0.01, Math.min(0.5, action.payload));
+    },
+    /** Set mesh grab strength (0–1). Clamped to [0, 1]. */
+    setMeshGrabStrength(state, action: PayloadAction<number>) {
+      state.meshGrab.strength = Math.max(0, Math.min(1, action.payload));
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -489,6 +515,10 @@ export const {
   setSteamBrushActive,
   setSteamBrushRadius,
   setSteamBrushStrength,
+  // Mesh grab
+  setMeshGrabActive,
+  setMeshGrabRadius,
+  setMeshGrabStrength,
 } = simulationSlice.actions;
 
 /** @deprecated Use setSimulationMode */

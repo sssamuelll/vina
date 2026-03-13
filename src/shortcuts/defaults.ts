@@ -76,6 +76,8 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool3d.clearPins', key: 'w', ctrl: true, label: 'Clear All Pins', category: '3D Tools', context: '3d' },
   { id: 'tool3d.focusPiece', key: 'f', label: 'Focus Selected Piece', category: '3D Tools', context: '3d' },
   { id: 'tool3d.snapshot', key: 'F10', label: 'Snapshot 3D', category: '3D Tools', context: '3d' },
+  { id: 'tool3d.steamBrush', key: 'b', label: 'Steam Brush', category: '3D Tools', context: '3d' },
+  { id: 'tool3d.meshGrab', key: 'o', label: 'Mesh Grab', category: '3D Tools', context: '3d' },
 
   // ─── 3D Camera Presets (Numpad) ─────────────────────────────────────────────
   { id: 'camera.front', key: '2', label: 'Front View', category: '3D Tools', context: '3d' },
