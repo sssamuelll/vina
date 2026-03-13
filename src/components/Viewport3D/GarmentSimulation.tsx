@@ -339,16 +339,15 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
 
-      // GPU→CPU position readback for raycasting (manual raycaster needs updated CPU positions).
-      // Uses clientsRef (not closure `clients`) to avoid stale-ref race condition.
+      // GPU→CPU position readback — keeps CPU geometry in sync with GPU positions
+      // so raycasting (for grab/brush tools) works against actual cloth position.
+      // Always runs periodically; more frequent when an interaction tool is active.
       tslFrameCounter.current++;
       const gpuClient = clientsRef.current.gpu;
-      const needsReadback = activeTool3D === 'meshGrab' || activeTool3D === 'steamBrush';
-      if (!needsReadback) tslFrameCounter.current = 0;
-      if (needsReadback && gpuClient && !tslReadbackPending.current && staticGeometry) {
-        // Every frame for first 10 frames after tool activates, then every 3rd frame
-        const isEarlyFrame = tslFrameCounter.current <= 10;
-        if (isEarlyFrame || tslFrameCounter.current % 3 === 0) {
+      if (gpuClient && !tslReadbackPending.current && staticGeometry) {
+        const isToolActive = activeTool3D === 'meshGrab' || activeTool3D === 'steamBrush';
+        const interval = isToolActive ? 3 : 15;
+        if (tslFrameCounter.current % interval === 0) {
           tslReadbackPending.current = true;
           gpuClient.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
             tslReadbackPending.current = false;
