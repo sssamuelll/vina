@@ -88,7 +88,7 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'getSimulationState',
-    description: 'Get simulation status: running/paused/idle, solver tier, FPS, particle count, quality level, fabric assignments.',
+    description: 'Get simulation status: running/paused/idle, solver tier, FPS, particle count, simulation mode, fabric assignments.',
     parameters: { type: 'object', properties: {} },
     execute: async (_params, _dispatch, getState) => {
       const state = getState();
@@ -100,8 +100,7 @@ export const tools: ToolDefinition[] = [
         frameTimeMs: sim.frameTimeMs,
         fps: sim.frameTimeMs > 0 ? Math.round(1000 / sim.frameTimeMs) : 0,
         particleCount: sim.particleCount,
-        qualityLevel: sim.qualityLevel,
-        autoQuality: sim.autoQuality,
+        simulationMode: sim.simulationMode,
         pieceFabrics: sim.pieceFabrics,
       };
     },

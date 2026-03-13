@@ -335,7 +335,7 @@ export const tools: ToolDefinition[] = [
           solverTier: sim.solverTier,
           bodyCollision: sim.bodyCollision,
           particleDistance: sim.particleDistance,
-          qualityLevel: sim.qualityLevel,
+          simulationMode: sim.simulationMode,
           frameTimeMs: sim.frameTimeMs,
           particleCount: sim.particleCount,
           pieceCount: pieces.length,
