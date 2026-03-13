@@ -189,6 +189,13 @@ export class WasmSolverClient {
   }
 
   /**
+   * Update solver configuration at runtime (e.g. substeps on mode change).
+   */
+  setConfig(config: { substeps?: number }): void {
+    this.worker?.postMessage({ type: 'setConfig', config });
+  }
+
+  /**
    * Set wind force vector applied to cloth triangles.
    * @param force Wind force as [x, y, z] in world space (N/m^2)
    */

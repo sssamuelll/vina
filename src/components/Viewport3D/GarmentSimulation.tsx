@@ -228,13 +228,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // ─── Simulation mode → solver substeps sync ────────────────────────────────
 
   useEffect(() => {
-    const solver = tslSolverRef.current;
     const mode = SIMULATION_MODES[simulationMode];
     substepsRef.current = mode.substeps;
-    if (solver) {
-      solver.updateConfig({ substeps: mode.substeps });
+    // GPU/TSL path
+    if (tslSolverRef.current) {
+      tslSolverRef.current.updateConfig({ substeps: mode.substeps });
     }
-  }, [simulationMode, tslSolverRef]);
+    // WASM / CPU-Worker paths
+    clients.wasm?.setConfig({ substeps: mode.substeps });
+    clients.cpu?.setConfig({ substeps: mode.substeps });
+  }, [simulationMode, tslSolverRef, clients]);
 
   // ─── Animation recording + playback ────────────────────────────────────────
 

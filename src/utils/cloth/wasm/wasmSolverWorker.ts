@@ -434,6 +434,13 @@ self.onmessage = async (event: MessageEvent) => {
         }
         break;
 
+      case 'setConfig': {
+        if (msg.config.substeps !== undefined) {
+          jsSubsteps = msg.config.substeps;
+        }
+        break;
+      }
+
       case 'setWind': {
         if (solver) {
           solver.set_wind(msg.wind[0], msg.wind[1], msg.wind[2]);
