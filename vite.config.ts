@@ -39,8 +39,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // GLTFLoader is always needed (default avatar) — keep in core
+          // GLTFLoader + its transitive deps must stay in three-core to
+          // avoid a circular chunk dependency (three-core ↔ three-addons TDZ).
           if (id.includes('three/examples/jsm/loaders/GLTFLoader')) return 'three-core';
+          if (id.includes('three/examples/jsm/utils/BufferGeometryUtils')) return 'three-core';
           // Other addons (exporters, FBX/OBJ loaders, IK, etc.) → deferred
           if (id.includes('three/examples/jsm')) return 'three-addons';
           if (id.includes('three/build/three.webgpu')) return 'three-webgpu';
