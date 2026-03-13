@@ -39,11 +39,9 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          // All three/examples/jsm go into three-core to prevent circular
-          // chunk dependencies (addons ↔ core TDZ errors in production).
-          if (id.includes('three/examples/jsm')) return 'three-core';
-          if (id.includes('three/build/three.webgpu')) return 'three-webgpu';
-          if (id.includes('node_modules/three/')) return 'three-core';
+          // All of Three.js in one chunk — splitting into separate chunks
+          // (core/addons/webgpu) causes circular TDZ errors in production.
+          if (id.includes('node_modules/three/')) return 'three';
         },
       },
     },
