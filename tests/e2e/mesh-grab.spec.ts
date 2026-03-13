@@ -102,8 +102,8 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
     await switchTo3D(page);
     await page.waitForTimeout(500);
 
-    // Press 'r' = Mesh Grab shortcut
-    await page.keyboard.press('r');
+    // Press 'o' = Mesh Grab shortcut
+    await page.keyboard.press('o');
     await page.waitForTimeout(300);
 
     // Check Redux state for active tool
@@ -245,7 +245,7 @@ test.describe('Mesh Grab Tool (issue #135)', () => {
 
     expect(toolDef.id).toBe('meshGrab');
     expect(toolDef.name).toBe('Mesh Grab');
-    expect(toolDef.shortcut).toBe('r');
+    expect(toolDef.shortcut).toBe('o');
     expect(toolDef.context).toBe('3d');
     expect(toolDef.group).toBe('3d-simulation');
     expect(toolDef.cursor).toBe('grab');

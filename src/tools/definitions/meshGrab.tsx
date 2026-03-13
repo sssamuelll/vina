@@ -28,7 +28,7 @@ export const meshGrabTool: ToolDefinition = {
   name: 'Mesh Grab',
   description: 'Grab and pull fabric during simulation — drag cloth to reposition',
   context: '3d',
-  shortcut: 'r',
+  shortcut: 'o',
   icon: MeshGrabIcon,
   cursor: 'grab',
   group: '3d-simulation',
