@@ -14,7 +14,7 @@ describe('UI Bridge Tools (#82)', () => {
   const mockState = () => ({
     editor: { activeTool: 'select', viewMode: 'split', zoom2D: 1, pan2D: { x: 0, y: 0 }, selectedPieceIds: [] },
     project: { id: 'proj1', pieces, seams: [], fabrics: [] },
-    simulation: { simulationState: 'idle', solverTier: 'none', frameTimeMs: 0, particleCount: 0, qualityLevel: 'medium', autoQuality: true, pieceFabrics: {} },
+    simulation: { simulationState: 'idle', solverTier: 'none', frameTimeMs: 0, particleCount: 0, simulationMode: 'normal', pieceFabrics: {} },
   });
 
   const dispatch = vi.fn((action: any) => {

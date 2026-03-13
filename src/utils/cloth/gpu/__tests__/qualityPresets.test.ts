@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  QUALITY_PRESETS,
+  SIMULATION_MODES,
   presetToSolverConfig,
   FrameTimeTracker,
   autoSelectQuality,
@@ -8,45 +8,44 @@ import {
   buildBenchmarkResult,
 } from '../qualityPresets';
 
-describe('QUALITY_PRESETS', () => {
-  it('has three levels', () => {
-    expect(Object.keys(QUALITY_PRESETS)).toEqual(['preview', 'standard', 'production']);
+describe('SIMULATION_MODES', () => {
+  it('has two modes', () => {
+    expect(Object.keys(SIMULATION_MODES)).toEqual(['normal', 'complete']);
   });
 
-  it('preview is fastest (fewest substeps, no self-collision)', () => {
-    const p = QUALITY_PRESETS.preview;
-    expect(p.substeps).toBeLessThan(QUALITY_PRESETS.standard.substeps);
-    expect(p.selfCollision).toBe(false);
-    expect(p.bendingEnabled).toBe(false);
+  it('normal is faster (fewer substeps, no self-collision)', () => {
+    const n = SIMULATION_MODES.normal;
+    expect(n.substeps).toBeLessThan(SIMULATION_MODES.complete.substeps);
+    expect(n.selfCollision).toBe(false);
+    expect(n.bendingEnabled).toBe(true);
   });
 
-  it('production has highest quality', () => {
-    const p = QUALITY_PRESETS.production;
-    expect(p.substeps).toBeGreaterThanOrEqual(30);
-    expect(p.selfCollision).toBe(true);
-    expect(p.collisionResolution).toBe(128);
+  it('complete has highest quality', () => {
+    const c = SIMULATION_MODES.complete;
+    expect(c.substeps).toBeGreaterThanOrEqual(20);
+    expect(c.selfCollision).toBe(true);
+    expect(c.collisionResolution).toBe(128);
   });
 
-  it('particle distance decreases with quality', () => {
-    expect(QUALITY_PRESETS.preview.particleDistance).toBeGreaterThan(QUALITY_PRESETS.standard.particleDistance);
-    expect(QUALITY_PRESETS.standard.particleDistance).toBeGreaterThan(QUALITY_PRESETS.production.particleDistance);
+  it('particle distance decreases from normal to complete', () => {
+    expect(SIMULATION_MODES.normal.particleDistance).toBeGreaterThan(SIMULATION_MODES.complete.particleDistance);
   });
 });
 
 describe('presetToSolverConfig', () => {
-  it('maps preview to low substeps, no self-collision', () => {
-    const cfg = presetToSolverConfig(QUALITY_PRESETS.preview);
+  it('maps normal to moderate substeps', () => {
+    const cfg = presetToSolverConfig(SIMULATION_MODES.normal);
     expect(cfg.substeps).toBe(5);
     expect(cfg.selfCollision).toBe(false);
   });
 
-  it('disables bending via high compliance for preview', () => {
-    const cfg = presetToSolverConfig(QUALITY_PRESETS.preview);
-    expect(cfg.bendCompliance).toBeGreaterThan(100);
+  it('enables bending for normal', () => {
+    const cfg = presetToSolverConfig(SIMULATION_MODES.normal);
+    expect(cfg.bendCompliance).toBeLessThan(1);
   });
 
-  it('enables bending for standard', () => {
-    const cfg = presetToSolverConfig(QUALITY_PRESETS.standard);
+  it('enables bending for complete', () => {
+    const cfg = presetToSolverConfig(SIMULATION_MODES.complete);
     expect(cfg.bendCompliance).toBeLessThan(1);
   });
 });
@@ -87,42 +86,42 @@ describe('FrameTimeTracker', () => {
 });
 
 describe('autoSelectQuality', () => {
-  it('downgrades when FPS is too low', () => {
-    expect(autoSelectQuality(30, 'standard')).toBe('preview');
+  it('downgrades complete when FPS is too low', () => {
+    expect(autoSelectQuality(15, 'complete')).toBe('normal');
   });
 
-  it('upgrades when FPS is well above target', () => {
-    expect(autoSelectQuality(100, 'standard')).toBe('production');
+  it('upgrades normal when FPS is well above target', () => {
+    expect(autoSelectQuality(100, 'normal')).toBe('complete');
   });
 
   it('stays at current level when FPS is acceptable', () => {
-    expect(autoSelectQuality(55, 'standard')).toBe('standard');
+    expect(autoSelectQuality(55, 'normal')).toBe('normal');
   });
 
-  it('cannot downgrade below preview', () => {
-    expect(autoSelectQuality(10, 'preview')).toBe('preview');
+  it('cannot downgrade below normal', () => {
+    expect(autoSelectQuality(10, 'normal')).toBe('normal');
   });
 
-  it('cannot upgrade above production', () => {
-    expect(autoSelectQuality(200, 'production')).toBe('production');
+  it('cannot upgrade above complete', () => {
+    expect(autoSelectQuality(200, 'complete')).toBe('complete');
   });
 });
 
 describe('estimateGPUMemoryMB', () => {
   it('returns positive number', () => {
-    const mb = estimateGPUMemoryMB(10000, QUALITY_PRESETS.standard);
+    const mb = estimateGPUMemoryMB(10000, SIMULATION_MODES.normal);
     expect(mb).toBeGreaterThan(0);
   });
 
-  it('preview uses less memory than production', () => {
-    const prev = estimateGPUMemoryMB(10000, QUALITY_PRESETS.preview);
-    const prod = estimateGPUMemoryMB(10000, QUALITY_PRESETS.production);
-    expect(prev).toBeLessThan(prod);
+  it('normal uses less memory than complete', () => {
+    const norm = estimateGPUMemoryMB(10000, SIMULATION_MODES.normal);
+    const comp = estimateGPUMemoryMB(10000, SIMULATION_MODES.complete);
+    expect(norm).toBeLessThan(comp);
   });
 
   it('more particles = more memory', () => {
-    const small = estimateGPUMemoryMB(1000, QUALITY_PRESETS.standard);
-    const large = estimateGPUMemoryMB(100000, QUALITY_PRESETS.standard);
+    const small = estimateGPUMemoryMB(1000, SIMULATION_MODES.normal);
+    const large = estimateGPUMemoryMB(100000, SIMULATION_MODES.normal);
     expect(large).toBeGreaterThan(small);
   });
 });
@@ -131,8 +130,8 @@ describe('buildBenchmarkResult', () => {
   it('builds result from tracker', () => {
     const tracker = new FrameTimeTracker(10);
     for (let i = 0; i < 10; i++) tracker.record(16.67);
-    const result = buildBenchmarkResult('standard', 5000, tracker);
-    expect(result.level).toBe('standard');
+    const result = buildBenchmarkResult('normal', 5000, tracker);
+    expect(result.level).toBe('normal');
     expect(result.particles).toBe(5000);
     expect(result.fps).toBeCloseTo(60, 0);
     expect(result.gpuMemoryEstimateMB).toBeGreaterThan(0);
