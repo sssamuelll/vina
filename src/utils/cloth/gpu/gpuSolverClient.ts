@@ -417,6 +417,61 @@ export class GpuSolverClient {
   }
 
   /**
+   * Start grab: find particles within radius, compute falloff + offsets, upload to SBAs.
+   * Reads positions from the CPU-side SBA array (may be stale in TSL zero-copy path,
+   * but approximate positions are acceptable for determining grab region).
+   */
+  grabStart(center: [number, number, number], radius: number, strength: number): void {
+    if (!this.tslSolver || !this.tslBuffers) return;
+    const positions = this.tslBuffers.positionSBA.array as Float32Array;
+    const N = this.tslBuffers.numParticles;
+    const maskArr = this.tslBuffers.grabMaskSBA.array as Float32Array;
+    const offsetArr = this.tslBuffers.grabOffsetSBA.array as Float32Array;
+
+    maskArr.fill(0);
+    offsetArr.fill(0);
+    const rSq = radius * radius;
+
+    for (let i = 0; i < N; i++) {
+      const dx = positions[i * 3] - center[0];
+      const dy = positions[i * 3 + 1] - center[1];
+      const dz = positions[i * 3 + 2] - center[2];
+      const dSq = dx * dx + dy * dy + dz * dz;
+      if (dSq < rSq) {
+        const dist = Math.sqrt(dSq);
+        maskArr[i] = (1 - dist / radius) * strength; // falloff * strength
+        offsetArr[i * 3] = dx;     // offset from center
+        offsetArr[i * 3 + 1] = dy;
+        offsetArr[i * 3 + 2] = dz;
+      }
+    }
+
+    this.tslBuffers.grabMaskSBA.version++;
+    this.tslBuffers.grabOffsetSBA.version++;
+
+    const g = this.tslSolver.grabNodes;
+    g.grabCenterX.value = center[0];
+    g.grabCenterY.value = center[1];
+    g.grabCenterZ.value = center[2];
+    g.grabActive.value = 1;
+  }
+
+  /** Update grab center (called on pointer move). */
+  grabMove(center: [number, number, number]): void {
+    if (!this.tslSolver) return;
+    const g = this.tslSolver.grabNodes;
+    g.grabCenterX.value = center[0];
+    g.grabCenterY.value = center[1];
+    g.grabCenterZ.value = center[2];
+  }
+
+  /** Release grab. */
+  grabRelease(): void {
+    if (!this.tslSolver) return;
+    this.tslSolver.grabNodes.grabActive.value = 0;
+  }
+
+  /**
    * Start the simulation loop.
    */
   start(): void {

@@ -156,6 +156,8 @@ function makeMockBufferSet(options?: {
     normalSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     normalAccumSBA: new StorageBufferAttribute(new Int32Array(numParticles * 3), 1),
     triangleIdsSBA: new StorageBufferAttribute(new Uint32Array(triangles), 1),
+    grabMaskSBA: new StorageBufferAttribute(new Float32Array(numParticles), 1),
+    grabOffsetSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     numParticles,
     numTriangles: 2,
     scBuffers: null,

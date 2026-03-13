@@ -47,6 +47,7 @@ import { arrangementTool } from './definitions/arrangement';
 import { pinTool } from './definitions/pin';
 import { simulateTool } from './definitions/simulate';
 import { steamBrushTool } from './definitions/steamBrush';
+import { meshGrabTool } from './definitions/meshGrab';
 
 // Register all tools
 const allTools = [
@@ -117,6 +118,7 @@ const allTools = [
   // 3D Tools — Simulation
   simulateTool,
   steamBrushTool,
+  meshGrabTool,
 ];
 
 // Auto-register all tools

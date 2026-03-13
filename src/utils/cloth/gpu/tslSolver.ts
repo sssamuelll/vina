@@ -44,6 +44,7 @@ import { makeSelfCollisionComputeNodes } from './tslSelfCollision';
 import type { WindComputeNodes } from './tslWind';
 import { makeWindComputeNode, createWindBuffers } from './tslWind';
 import { makeBrushComputeNode, type BrushComputeNodes } from './tslBrush';
+import { makeGrabComputeNode, type GrabComputeNodes } from './tslGrab';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,8 @@ export interface TslSolver {
   windNodes: WindComputeNodes;
   /** Steam brush velocity damping compute nodes (always created; zero strength is a no-op) */
   brushNodes: BrushComputeNodes;
+  /** Mesh grab position displacement compute nodes (always created; grabActive=0 is a no-op) */
+  grabNodes: GrabComputeNodes;
   /** Active collision bodies (BVH-accelerated) */
   collisionBodies: TslCollisionBody[];
   /** Add or replace a collision body */
@@ -659,6 +662,11 @@ export function createTslSolver(
   // ─── Steam brush (per-particle velocity damping) ──────────────────
   const brushNodes = makeBrushComputeNode(posBuf, velBuf, invMassBuf, N);
 
+  // ─── Mesh grab (per-particle position displacement) ───────────────
+  const grabMaskBuf = storage(buffers.grabMaskSBA, 'float', N);
+  const grabOffsetBuf = storage(buffers.grabOffsetSBA, 'vec3', N);
+  const grabNodes = makeGrabComputeNode(posBuf, grabMaskBuf, grabOffsetBuf, N);
+
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
     if (partial.dt !== undefined || partial.substeps !== undefined) {
@@ -724,6 +732,7 @@ export function createTslSolver(
     selfCollisionNodes,
     windNodes,
     brushNodes,
+    grabNodes,
     collisionBodies,
     setCollisionBody,
     removeCollisionBody,

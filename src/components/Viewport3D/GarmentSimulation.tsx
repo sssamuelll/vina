@@ -77,6 +77,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshRef = useRef<THREE.Mesh>(null);
   const brushDragging = useRef(false);
   const brushCursorRef = useRef<THREE.Mesh>(null);
+  const grabDragging = useRef(false);
+  const grabCursorRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const pieceColorsRef = useRef<Float32Array | null>(null);
   const [tslMaterial, setTslMaterial] = useState<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
@@ -96,6 +98,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
   const steamBrush = useSelector((s: RootState) => s.simulation.steamBrush);
+  const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
@@ -308,6 +311,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // Steam brush (once per frame, after substeps settle; skip when inactive)
       if (solver.brushNodes.strength.value > 0) {
         renderer.compute(solver.brushNodes.brushNode);
+      }
+
+      // Mesh grab (once per frame, after brush; skip when inactive)
+      if (solver.grabNodes.grabActive.value > 0) {
+        renderer.compute(solver.grabNodes.grabNode);
       }
 
       renderer.compute(solver.normalZero);
@@ -578,35 +586,69 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   }, [clients.gpu, steamBrush.radius, steamBrush.strength]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
-    if (activeTool3D !== 'steamBrush') return;
-    e.stopPropagation();
-    brushDragging.current = true;
-    handleBrushStroke(e.point);
-  }, [activeTool3D, handleBrushStroke]);
+    if (activeTool3D === 'steamBrush') {
+      e.stopPropagation();
+      brushDragging.current = true;
+      handleBrushStroke(e.point);
+    } else if (activeTool3D === 'meshGrab') {
+      e.stopPropagation();
+      grabDragging.current = true;
+      if (clients.gpu) {
+        clients.gpu.grabStart(
+          [e.point.x, e.point.y, e.point.z],
+          meshGrab.radius,
+          meshGrab.strength,
+        );
+      }
+    }
+  }, [activeTool3D, handleBrushStroke, clients.gpu, meshGrab.radius, meshGrab.strength]);
 
   const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
-    if (activeTool3D !== 'steamBrush') return;
-    // Update brush cursor position
-    if (brushCursorRef.current) {
-      brushCursorRef.current.position.copy(e.point);
-      brushCursorRef.current.visible = true;
+    if (activeTool3D === 'steamBrush') {
+      if (brushCursorRef.current) {
+        brushCursorRef.current.position.copy(e.point);
+        brushCursorRef.current.visible = true;
+      }
+      if (!brushDragging.current) return;
+      e.stopPropagation();
+      handleBrushStroke(e.point);
+    } else if (activeTool3D === 'meshGrab') {
+      if (grabCursorRef.current) {
+        grabCursorRef.current.position.copy(e.point);
+        grabCursorRef.current.visible = true;
+      }
+      if (!grabDragging.current) return;
+      e.stopPropagation();
+      if (clients.gpu) {
+        clients.gpu.grabMove([e.point.x, e.point.y, e.point.z]);
+      }
     }
-    if (!brushDragging.current) return;
-    e.stopPropagation();
-    handleBrushStroke(e.point);
-  }, [activeTool3D, handleBrushStroke]);
+  }, [activeTool3D, handleBrushStroke, clients.gpu]);
 
   const handlePointerUp = useCallback(() => {
     brushDragging.current = false;
     if (clients.gpu) {
       clients.gpu.setBrushParams([0, 0, 0], 0, 0);
     }
+    if (grabDragging.current) {
+      grabDragging.current = false;
+      if (clients.gpu) {
+        clients.gpu.grabRelease();
+      }
+    }
   }, [clients.gpu]);
 
   const handlePointerLeave = useCallback(() => {
     if (brushCursorRef.current) brushCursorRef.current.visible = false;
+    if (grabCursorRef.current) grabCursorRef.current.visible = false;
     if (!brushDragging.current && clients.gpu) {
       clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+    }
+    if (grabDragging.current) {
+      grabDragging.current = false;
+      if (clients.gpu) {
+        clients.gpu.grabRelease();
+      }
     }
   }, [clients.gpu]);
 
@@ -616,6 +658,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       brushDragging.current = false;
       if (clients.gpu) {
         clients.gpu.setBrushParams([0, 0, 0], 0, 0);
+      }
+      if (grabDragging.current) {
+        grabDragging.current = false;
+        if (clients.gpu) {
+          clients.gpu.grabRelease();
+        }
       }
     };
     window.addEventListener('pointerup', handleGlobalUp);
@@ -666,6 +714,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         <mesh ref={brushCursorRef} visible={false}>
           <sphereGeometry key={steamBrush.radius} args={[steamBrush.radius, 16, 16]} />
           <meshBasicMaterial color="#88ccff" transparent opacity={0.2} depthWrite={false} />
+        </mesh>
+      )}
+      {/* Mesh grab cursor */}
+      {activeTool3D === 'meshGrab' && (
+        <mesh ref={grabCursorRef} visible={false}>
+          <sphereGeometry key={meshGrab.radius} args={[meshGrab.radius, 16, 16]} />
+          <meshBasicMaterial color="#ffcc88" transparent opacity={0.2} depthWrite={false} />
         </mesh>
       )}
     </>
