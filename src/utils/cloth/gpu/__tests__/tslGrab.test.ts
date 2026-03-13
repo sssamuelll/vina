@@ -96,14 +96,19 @@ describe('makeGrabComputeNode', () => {
     expect(nodes.grabInitPending.value).toBe(0.0);
   });
 
-  it('exposes grabRadius uniform with default value 0.05', () => {
+  it('exposes grabRadius uniform with default value 0.08', () => {
     const { nodes } = createTestNodes();
-    expect(nodes.grabRadius.value).toBe(0.05);
+    expect(nodes.grabRadius.value).toBe(0.08);
   });
 
-  it('exposes grabStrength uniform with default value 0.8', () => {
+  it('exposes grabStrength uniform with default value 0.6', () => {
     const { nodes } = createTestNodes();
-    expect(nodes.grabStrength.value).toBe(0.8);
+    expect(nodes.grabStrength.value).toBe(0.6);
+  });
+
+  it('exposes grabNumSubsteps uniform with default value 15', () => {
+    const { nodes } = createTestNodes();
+    expect(nodes.grabNumSubsteps.value).toBe(15);
   });
 
   it('uniforms are mutable at runtime', () => {

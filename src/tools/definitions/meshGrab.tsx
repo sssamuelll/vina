@@ -39,9 +39,9 @@ export const meshGrabTool: ToolDefinition = {
       type: 'select',
       value: 'medium',
       choices: [
-        { label: 'Small (2cm)', value: 'small' },
-        { label: 'Medium (5cm)', value: 'medium' },
-        { label: 'Large (10cm)', value: 'large' },
+        { label: 'Small (3cm)', value: 'small' },
+        { label: 'Medium (8cm)', value: 'medium' },
+        { label: 'Large (15cm)', value: 'large' },
       ],
     },
     {
@@ -50,9 +50,9 @@ export const meshGrabTool: ToolDefinition = {
       type: 'select',
       value: 'medium',
       choices: [
-        { label: 'Light', value: 'light' },
-        { label: 'Medium', value: 'medium' },
-        { label: 'Strong', value: 'strong' },
+        { label: 'Light (0.3)', value: 'light' },
+        { label: 'Medium (0.6)', value: 'medium' },
+        { label: 'Strong (0.9)', value: 'strong' },
       ],
     },
   ],

@@ -322,12 +322,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           renderer.compute(body.collisionNode);
         }
         renderer.compute(solver.groundClamp);
-        renderer.compute(solver.postSolve);
-        // Mesh grab: lerp grabbed particles toward target each substep
-        // (inside loop so it acts as a strong position constraint)
+        // Mesh grab: lerp grabbed particles BEFORE postSolve so velocity
+        // derivation (vel = (pos - prevPos) / sdt) captures grab displacement
+        // → natural momentum on release instead of dead drop
         if (grabActive) {
           renderer.compute(solver.grabNodes.grabNode);
         }
+        renderer.compute(solver.postSolve);
       }
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)

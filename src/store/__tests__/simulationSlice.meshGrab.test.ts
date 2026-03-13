@@ -14,7 +14,7 @@ describe('meshGrab state', () => {
   it('starts with meshGrab defaults', () => {
     const store = createStore();
     const { meshGrab } = store.getState().simulation;
-    expect(meshGrab).toEqual({ active: false, radius: 0.05, strength: 0.8 });
+    expect(meshGrab).toEqual({ active: false, radius: 0.08, strength: 0.6 });
   });
 
   it('setMeshGrabActive toggles active', () => {

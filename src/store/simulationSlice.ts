@@ -180,8 +180,8 @@ const initialState: SimulationSliceState = {
   },
   meshGrab: {
     active: false,
-    radius: 0.05,
-    strength: 0.8,
+    radius: 0.08,
+    strength: 0.6,
   },
 };
 

@@ -46,6 +46,8 @@ export interface GrabComputeNodes {
   grabActive: { value: number };
   /** Init pending flag (1 = dispatch grabInitNode, then set to 0) */
   grabInitPending: { value: number };
+  /** Number of substeps per frame — grab strength is divided by this to avoid compounding */
+  grabNumSubsteps: { value: number };
 }
 
 // ─── Compute Node Factory ───────────────────────────────────────────────────
@@ -72,10 +74,11 @@ export function makeGrabComputeNode(
   const uGrabCenterX = uniform(0.0);
   const uGrabCenterY = uniform(0.0);
   const uGrabCenterZ = uniform(0.0);
-  const uGrabRadius = uniform(0.05);
-  const uGrabStrength = uniform(0.8);
+  const uGrabRadius = uniform(0.08);
+  const uGrabStrength = uniform(0.6);
   const uGrabActive = uniform(0.0);      // 0 = inactive, 1 = active
   const uGrabInitPending = uniform(0.0); // 1 = needs init dispatch
+  const uNumSubsteps = uniform(15);      // divides strength per substep
 
   // ─── Init kernel: fill mask + offset on GPU ────────────────────────
   // Dispatched ONCE when grab starts. Writes per-particle data that the
@@ -105,8 +108,10 @@ export function makeGrabComputeNode(
 
         If(distSq.lessThan(radiusSq), () => {
           const dist = distSq.sqrt();
-          // Falloff: 1 at center, 0 at edge, scaled by strength
-          const mask = float(1.0).sub(dist.div(uGrabRadius)).mul(uGrabStrength);
+          // Smoothstep falloff: t²(3-2t) — smooth at both center and edge
+          const t = float(1.0).sub(dist.div(uGrabRadius));
+          const smooth = t.mul(t).mul(float(3.0).sub(t.mul(2.0)));
+          const mask = smooth.mul(uGrabStrength);
           grabMaskBufNode.element(i).assign(mask);
 
           // Offset = particle position - grab center
@@ -137,10 +142,14 @@ export function makeGrabComputeNode(
             const ty = uGrabCenterY.add(offset.y);
             const tz = uGrabCenterZ.add(offset.z);
 
-            // Lerp position toward target weighted by mask
-            posBufNode.element(i).x.assign(mix(posBufNode.element(i).x, tx, mask));
-            posBufNode.element(i).y.assign(mix(posBufNode.element(i).y, ty, mask));
-            posBufNode.element(i).z.assign(mix(posBufNode.element(i).z, tz, mask));
+            // Substep-aware strength: divide by substeps to prevent
+            // compounding convergence (e.g., 0.6 applied 15× would be ~99.9%)
+            const effectiveMask = mask.div(uNumSubsteps);
+
+            // Lerp position toward target weighted by effective mask
+            posBufNode.element(i).x.assign(mix(posBufNode.element(i).x, tx, effectiveMask));
+            posBufNode.element(i).y.assign(mix(posBufNode.element(i).y, ty, effectiveMask));
+            posBufNode.element(i).z.assign(mix(posBufNode.element(i).z, tz, effectiveMask));
           });
         });
       });
@@ -159,5 +168,6 @@ export function makeGrabComputeNode(
     grabStrength: uGrabStrength,
     grabActive: uGrabActive,
     grabInitPending: uGrabInitPending,
+    grabNumSubsteps: uNumSubsteps,
   };
 }

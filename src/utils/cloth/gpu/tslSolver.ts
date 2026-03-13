@@ -666,6 +666,7 @@ export function createTslSolver(
   const grabMaskBuf = storage(buffers.grabMaskSBA, 'float', N);
   const grabOffsetBuf = storage(buffers.grabOffsetSBA, 'vec3', N);
   const grabNodes = makeGrabComputeNode(posBuf, invMassBuf, grabMaskBuf, grabOffsetBuf, N);
+  grabNodes.grabNumSubsteps.value = config.substeps;
 
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
@@ -675,6 +676,7 @@ export function createTslSolver(
       config.dt = dt;
       config.substeps = substeps;
       uniforms.sdt.value = dt / substeps;
+      grabNodes.grabNumSubsteps.value = substeps;
     }
     if (partial.gravity !== undefined) {
       config.gravity = partial.gravity;
