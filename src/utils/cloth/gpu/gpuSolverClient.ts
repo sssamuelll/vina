@@ -17,6 +17,7 @@ import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolv
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import type { StorageBufferAttribute } from 'three/webgpu';
+import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -417,13 +418,11 @@ export class GpuSolverClient {
   }
 
   /**
-   * Start grab: find particles within radius, compute falloff + offsets, upload to SBAs.
-   * Reads positions from the CPU-side SBA array (may be stale in TSL zero-copy path,
-   * but approximate positions are acceptable for determining grab region).
+   * Start grab using pre-read positions (avoids stale SBA data in TSL mode).
+   * Call readbackPositionsToGeometry() first, then pass the geometry positions here.
    */
-  grabStart(center: [number, number, number], radius: number, strength: number): void {
+  grabStartWithPositions(center: [number, number, number], radius: number, strength: number, positions: Float32Array): void {
     if (!this.tslSolver || !this.tslBuffers) return;
-    const positions = this.tslBuffers.positionSBA.array as Float32Array;
     const N = this.tslBuffers.numParticles;
     const maskArr = this.tslBuffers.grabMaskSBA.array as Float32Array;
     const offsetArr = this.tslBuffers.grabOffsetSBA.array as Float32Array;
@@ -469,6 +468,38 @@ export class GpuSolverClient {
   grabRelease(): void {
     if (!this.tslSolver) return;
     this.tslSolver.grabNodes.grabActive.value = 0;
+  }
+
+  /**
+   * Read GPU positions back to CPU and update a BufferGeometry's position attribute.
+   * Uses renderer.getArrayBufferAsync() for GPU→CPU readback.
+   * Returns the position Float32Array for reuse (e.g. by grabStartWithPositions).
+   *
+   * @param renderer - Three.js WebGPURenderer (passed as `gl` from useFrame)
+   * @param geometry - The BufferGeometry whose position attribute should be updated
+   */
+  async readbackPositionsToGeometry(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    renderer: any,
+    geometry: THREE.BufferGeometry,
+  ): Promise<Float32Array | null> {
+    if (!this.tslSolver) return null;
+    const sba = this.tslSolver.positionSBA;
+    try {
+      const ab: ArrayBuffer = await renderer.getArrayBufferAsync(sba);
+      const gpuPositions = new Float32Array(ab);
+      // Update geometry for raycasting
+      const posAttr = geometry.getAttribute('position');
+      if (posAttr && posAttr.array.length === gpuPositions.length) {
+        (posAttr.array as Float32Array).set(gpuPositions);
+        posAttr.needsUpdate = true;
+        geometry.computeBoundingSphere();
+      }
+      return gpuPositions;
+    } catch (e) {
+      console.warn('[GpuSolverClient] Position readback failed:', e);
+      return null;
+    }
   }
 
   /**

@@ -80,6 +80,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const grabDragging = useRef(false);
   const grabCursorRef = useRef<THREE.Mesh>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const tslFrameCounter = useRef(0);
+  const tslReadbackPending = useRef(false);
   const pieceColorsRef = useRef<Float32Array | null>(null);
   const [tslMaterial, setTslMaterial] = useState<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
 
@@ -321,6 +323,17 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
+
+      // Periodic GPU→CPU position readback for raycasting (pointer events).
+      // Only runs when interactive 3D tools are active and no readback is pending.
+      tslFrameCounter.current++;
+      const needsReadback = activeTool3D === 'meshGrab' || activeTool3D === 'steamBrush';
+      if (needsReadback && tslFrameCounter.current % 10 === 0 && !tslReadbackPending.current && staticGeometry) {
+        tslReadbackPending.current = true;
+        clients.gpu!.readbackPositionsToGeometry(renderer, staticGeometry).then(() => {
+          tslReadbackPending.current = false;
+        });
+      }
 
       return;
     }
@@ -593,15 +606,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     } else if (activeTool3D === 'meshGrab') {
       e.stopPropagation();
       grabDragging.current = true;
-      if (clients.gpu) {
-        clients.gpu.grabStart(
-          [e.point.x, e.point.y, e.point.z],
-          meshGrab.radius,
-          meshGrab.strength,
-        );
+      if (clients.gpu && staticGeometry) {
+        // Use geometry positions (synced from GPU by periodic readback)
+        const posAttr = staticGeometry.getAttribute('position');
+        if (posAttr) {
+          clients.gpu.grabStartWithPositions(
+            [e.point.x, e.point.y, e.point.z],
+            meshGrab.radius,
+            meshGrab.strength,
+            posAttr.array as Float32Array,
+          );
+        }
       }
     }
-  }, [activeTool3D, handleBrushStroke, clients.gpu, meshGrab.radius, meshGrab.strength]);
+  }, [activeTool3D, handleBrushStroke, clients.gpu, meshGrab.radius, meshGrab.strength, staticGeometry]);
 
   const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (activeTool3D === 'steamBrush') {
