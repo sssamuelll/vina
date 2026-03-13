@@ -93,8 +93,8 @@ export interface CopilotViewState {
 export interface CopilotSimulationState {
   /** Current simulation state */
   state: 'idle' | 'running' | 'paused';
-  /** Quality preset */
-  qualityLevel: string;
+  /** Simulation mode (normal / complete) */
+  simulationMode: string;
   /** Whether fit map is visible */
   fitMapVisible: boolean;
   /** Active fit map mode */
@@ -328,7 +328,7 @@ export function generateCopilotContext(
 
     simulation: {
       state: simulation.simulationState,
-      qualityLevel: simulation.qualityLevel,
+      simulationMode: simulation.simulationMode,
       fitMapVisible: simulation.fitMapMode !== 'none',
       fitMapMode: simulation.fitMapMode,
       viewMode3D: simulation.viewMode3D,
@@ -403,7 +403,7 @@ export function serializeCopilotContext(context: CopilotContext): string {
   // Simulation
   if (context.simulation.state !== 'idle') {
     lines.push(`\n## Simulation: ${context.simulation.state}`);
-    lines.push(`Quality: ${context.simulation.qualityLevel} | Solver: ${context.simulation.solverTier}`);
+    lines.push(`Mode: ${context.simulation.simulationMode} | Solver: ${context.simulation.solverTier}`);
     if (context.simulation.fitMapVisible) {
       lines.push(`Fit Map: ${context.simulation.fitMapMode}`);
     }

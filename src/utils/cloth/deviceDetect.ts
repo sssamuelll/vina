@@ -7,14 +7,14 @@
  * @module deviceDetect
  */
 
-import type { QualityLevel } from './gpu/qualityPresets';
+import type { SimulationMode } from './gpu/qualityPresets';
 
 export interface DeviceProfile {
   isMobile: boolean;
   hasWebGPU: boolean;
   estimatedMemoryGB: number;
   hardwareConcurrency: number;
-  recommendedQuality: QualityLevel;
+  recommendedQuality: SimulationMode;
   maxParticles: number;
 }
 
@@ -38,20 +38,20 @@ export function detectDevice(): DeviceProfile {
     ? (navigator as { deviceMemory?: number }).deviceMemory ?? 4
     : 4;
 
-  let recommendedQuality: QualityLevel;
+  let recommendedQuality: SimulationMode;
   let maxParticles: number;
 
   if (isMobile) {
-    recommendedQuality = 'preview';
+    recommendedQuality = 'normal';
     maxParticles = 5000;
   } else if (estimatedMemoryGB <= 4 || hardwareConcurrency <= 4) {
-    recommendedQuality = 'preview';
+    recommendedQuality = 'normal';
     maxParticles = 20000;
   } else if (hasWebGPU && estimatedMemoryGB >= 8) {
-    recommendedQuality = 'production';
+    recommendedQuality = 'complete';
     maxParticles = 200000;
   } else {
-    recommendedQuality = 'standard';
+    recommendedQuality = 'normal';
     maxParticles = 50000;
   }
 

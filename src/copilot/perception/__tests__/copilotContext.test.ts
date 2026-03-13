@@ -106,8 +106,7 @@ function createMockState(overrides: Partial<any> = {}): RootState {
       pieceParticleDistance: {},
       fitMapMode: 'none',
       fitMapConfig: { stressRange: [0, 100], strainRange: [1.0, 1.2], fitThresholds: [0.8, 1.0], pressureDistance: 0.002 },
-      qualityLevel: 'standard',
-      autoQuality: true,
+      simulationMode: 'normal',
       solverTier: 'wasm',
       frameTimeMs: 0,
       particleCount: 0,
@@ -268,13 +267,13 @@ describe('serializeCopilotContext', () => {
 
   it('should include simulation state when running', () => {
     const state = createMockState({
-      simulation: { simulationState: 'running', qualityLevel: 'high', solverTier: 'webgpu' },
+      simulation: { simulationState: 'running', simulationMode: 'complete', solverTier: 'webgpu' },
     });
     const context = generateCopilotContext(state);
     const serialized = serializeCopilotContext(context);
 
     expect(serialized).toContain('## Simulation: running');
-    expect(serialized).toContain('Quality: high');
+    expect(serialized).toContain('Mode: complete');
   });
 
   it('should include recent actions', () => {

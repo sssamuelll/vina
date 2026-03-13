@@ -37,6 +37,7 @@ import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
+import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -83,6 +84,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // Shared refs for breaking circular dependency between useMeshing and useSimulationLifecycle
   const clientsRef = useRef<SimulationClients>({ cpu: null, wasm: null, gpu: null, neural: null });
   const stretchingIdsRef = useRef<Int32Array | null>(null);
+  const substepsRef = useRef(SIMULATION_MODES['normal'].substeps);
 
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
@@ -94,6 +96,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
   const steamBrush = useSelector((s: RootState) => s.simulation.steamBrush);
+  const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 
@@ -222,6 +225,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   useCollisionBodies({ clients });
 
+  // ─── Simulation mode → solver substeps sync ────────────────────────────────
+
+  useEffect(() => {
+    const mode = SIMULATION_MODES[simulationMode];
+    substepsRef.current = mode.substeps;
+    // GPU/TSL path
+    if (tslSolverRef.current) {
+      tslSolverRef.current.updateConfig({ substeps: mode.substeps });
+    }
+    // WASM / CPU-Worker paths
+    clients.wasm?.setConfig({ substeps: mode.substeps });
+    clients.cpu?.setConfig({ numSubsteps: mode.substeps });
+  }, [simulationMode, tslSolverRef, clients]);
+
   // ─── Animation recording + playback ────────────────────────────────────────
 
   const recorder = useSimulationRecorder({ positionsRef });
@@ -266,7 +283,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     if (solver) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderer = gl as any;
-      const substeps = 10;
+      const substeps = substepsRef.current;
 
       for (let s = 0; s < substeps; s++) {
         renderer.compute(solver.preSolve);

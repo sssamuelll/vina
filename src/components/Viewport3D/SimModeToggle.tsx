@@ -16,7 +16,7 @@ import {
   clearArrangementSnapshot,
 } from '../../store/simulationSlice';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
-import { QUALITY_PRESETS } from '../../utils/cloth/gpu/qualityPresets';
+import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { Move, Play, Square, RotateCcw } from 'lucide-react';
 
 export default function SimModeToggle() {
@@ -26,8 +26,8 @@ export default function SimModeToggle() {
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const hasSnapshot = useSelector((s: RootState) => s.simulation.arrangementSnapshot !== null);
-  const qualityLevel = useSelector((s: RootState) => s.simulation.qualityLevel);
-  const activePreset = QUALITY_PRESETS[qualityLevel];
+  const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
+  const activeMode = SIMULATION_MODES[simulationMode];
 
   const isSimulating = viewMode3D === 'simulate';
 
@@ -97,7 +97,7 @@ export default function SimModeToggle() {
         Arrange
       </button>
 
-      {/* Simulate button — color follows CLO3D convention: gray=off, blue=standard, red=production */}
+      {/* Simulate button — color follows CLO3D convention: blue=normal, red=complete */}
       <button
         onClick={() => { if (!isSimulating) handleToggle(); }}
         style={{
@@ -109,12 +109,12 @@ export default function SimModeToggle() {
           borderRadius: 6,
           background: isSimulating
             ? simulationState === 'running'
-              ? qualityLevel === 'production' ? '#5a2a2a' : qualityLevel === 'standard' ? '#2a3a5a' : '#3a3a3a'
+              ? simulationMode === 'complete' ? '#5a2a2a' : '#2a3a5a'
               : '#3a3a2a'
             : 'transparent',
           color: isSimulating
             ? simulationState === 'running'
-              ? qualityLevel === 'production' ? '#f88' : qualityLevel === 'standard' ? '#88c' : '#aaa'
+              ? simulationMode === 'complete' ? '#f88' : '#88c'
               : '#cc8'
             : '#888',
           cursor: 'pointer',
@@ -122,10 +122,10 @@ export default function SimModeToggle() {
           fontSize: 12,
           transition: 'all 0.15s',
         }}
-        title={`Simulate — ${activePreset.label} (${activePreset.particleDistance}mm) — Space`}
+        title={`Simulate — ${activeMode.label} (${activeMode.particleDistance}mm) — Space`}
       >
         {isSimulating && simulationState === 'running' ? <Square size={13} /> : <Play size={13} />}
-        {isSimulating && simulationState === 'running' ? activePreset.label : 'Simulate'}
+        {isSimulating && simulationState === 'running' ? activeMode.label : 'Simulate'}
       </button>
 
       {/* Reset button */}

@@ -25,8 +25,7 @@ describe('UI State Tools (#80)', () => {
       solverTier: 'none',
       frameTimeMs: 0,
       particleCount: 0,
-      qualityLevel: 'medium',
-      autoQuality: true,
+      simulationMode: 'normal',
       pieceFabrics: {},
     },
   };
