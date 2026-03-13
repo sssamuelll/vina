@@ -24,7 +24,7 @@ vi.mock('three/tsl', () => {
     Fn: () => () => proxy,
     storage: () => proxy,
     uniform: mockUniform,
-    compute: (_fn: unknown, count: number, _workgroupSize?: number[]) => ({
+    compute: (_fn: unknown, count: number) => ({
       __tslCompute: true,
       dispatchCount: count,
     }),
