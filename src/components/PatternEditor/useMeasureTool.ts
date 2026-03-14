@@ -272,7 +272,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
                 const worldA = { x: ptA.x + edgeA.piece.position.x, y: ptA.y + edgeA.piece.position.y };
                 const worldB = { x: ptB.x + info.piece.position.x, y: ptB.y + info.piece.position.y };
                 // Local-space divergence: compare shape geometry only, ignore piece positioning
-                const ld = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
+                const ld = Math.abs(dA - dB);
                 if (ld > maxLocalDelta) maxLocalDelta = ld;
                 divergenceSamples.push({ tA: frac, pointA: worldA, pointB: worldB, localDelta: ld });
               }
