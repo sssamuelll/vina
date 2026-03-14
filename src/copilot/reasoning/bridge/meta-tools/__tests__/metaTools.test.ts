@@ -4,6 +4,8 @@ import { getGarmentStateTool } from '../getGarmentState';
 import { getPieceDetailsTool } from '../getPieceDetails';
 import { measureEdgeTool } from '../measureEdge';
 import { searchPiecesTool } from '../searchPieces';
+import { measureAlongCurveTool } from '../measureAlongCurve';
+import { compareCurvesTool } from '../compareCurves';
 import { getAllMetaTools } from '../index';
 
 // Minimal mock state
@@ -121,6 +123,68 @@ describe('searchPieces', () => {
     expect(result.success).toBe(true);
     const matches = result.data?.matches as Array<{ pieceId: string }>;
     expect(matches.length).toBeGreaterThan(0);
+  });
+});
+
+describe('measureAlongCurve', () => {
+  it('returns arc-length of a named edge', async () => {
+    const result = await measureAlongCurveTool.execute(
+      { pieceId: 'front-bodice', edgeName: 'shoulder' },
+      mockState([mockPiece]),
+    );
+    expect(result.success).toBe(true);
+    expect(result.data?.length).toBeDefined();
+    expect(result.data?.unit).toBe('mm');
+    expect(result.data?.samplePoints).toBeDefined();
+  });
+
+  it('returns error for unknown piece', async () => {
+    const result = await measureAlongCurveTool.execute(
+      { pieceId: 'nonexistent', edgeName: 'shoulder' },
+      mockState([mockPiece]),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not found');
+  });
+
+  it('returns error for unknown edge', async () => {
+    const result = await measureAlongCurveTool.execute(
+      { pieceId: 'front-bodice', edgeName: 'nonexistent' },
+      mockState([mockPiece]),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not found');
+  });
+});
+
+describe('compareCurves', () => {
+  it('returns delta and ease for two edges', async () => {
+    const result = await compareCurvesTool.execute(
+      { pieceIdA: 'front-bodice', edgeNameA: 'neckline', pieceIdB: 'front-bodice', edgeNameB: 'shoulder' },
+      mockState([mockPiece]),
+    );
+    expect(result.success).toBe(true);
+    expect(result.data?.delta).toBeDefined();
+    expect(result.data?.easePercent).toBeDefined();
+    expect(result.data?.unit).toBe('mm');
+  });
+
+  it('returns error for unknown piece', async () => {
+    const result = await compareCurvesTool.execute(
+      { pieceIdA: 'nonexistent', edgeNameA: 'neckline', pieceIdB: 'front-bodice', edgeNameB: 'shoulder' },
+      mockState([mockPiece]),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not found');
+  });
+
+  it('returns error for unknown edge', async () => {
+    const result = await compareCurvesTool.execute(
+      { pieceIdA: 'front-bodice', edgeNameA: 'neckline', pieceIdB: 'front-bodice', edgeNameB: 'nonexistent' },
+      mockState([mockPiece]),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not found');
   });
 });
 
