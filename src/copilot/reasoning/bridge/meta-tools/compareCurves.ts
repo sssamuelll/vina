@@ -12,7 +12,7 @@ import type { MetaToolDefinition, MetaToolResult } from './types';
 import type { PathCommand } from '../../../../types/types';
 import { computePathArcLength, pointAtPathDistance } from '../../../../utils/geometry/arcLength';
 
-export const compareCurvesTool: MetaToolDefinition = {
+export const compareCurvesMetaTool: MetaToolDefinition = {
   name: 'compareCurves',
   description:
     'Compares the arc-lengths of two named edges across pattern pieces. Returns both lengths, their delta, and the ease percentage. Useful for verifying seam matching (e.g. armhole vs sleeve cap).',

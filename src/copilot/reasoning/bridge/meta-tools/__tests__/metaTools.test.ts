@@ -5,7 +5,7 @@ import { getPieceDetailsTool } from '../getPieceDetails';
 import { measureEdgeTool } from '../measureEdge';
 import { searchPiecesTool } from '../searchPieces';
 import { measureAlongCurveTool } from '../measureAlongCurve';
-import { compareCurvesTool } from '../compareCurves';
+import { compareCurvesMetaTool } from '../compareCurves';
 import { getAllMetaTools } from '../index';
 
 // Minimal mock state
@@ -159,7 +159,7 @@ describe('measureAlongCurve', () => {
 
 describe('compareCurves', () => {
   it('returns delta and ease for two edges', async () => {
-    const result = await compareCurvesTool.execute(
+    const result = await compareCurvesMetaTool.execute(
       { pieceIdA: 'front-bodice', edgeNameA: 'neckline', pieceIdB: 'front-bodice', edgeNameB: 'shoulder' },
       mockState([mockPiece]),
     );
@@ -170,7 +170,7 @@ describe('compareCurves', () => {
   });
 
   it('returns error for unknown piece', async () => {
-    const result = await compareCurvesTool.execute(
+    const result = await compareCurvesMetaTool.execute(
       { pieceIdA: 'nonexistent', edgeNameA: 'neckline', pieceIdB: 'front-bodice', edgeNameB: 'shoulder' },
       mockState([mockPiece]),
     );
@@ -179,7 +179,7 @@ describe('compareCurves', () => {
   });
 
   it('returns error for unknown edge', async () => {
-    const result = await compareCurvesTool.execute(
+    const result = await compareCurvesMetaTool.execute(
       { pieceIdA: 'front-bodice', edgeNameA: 'neckline', pieceIdB: 'front-bodice', edgeNameB: 'nonexistent' },
       mockState([mockPiece]),
     );
