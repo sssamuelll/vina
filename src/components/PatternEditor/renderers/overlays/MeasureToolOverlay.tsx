@@ -162,6 +162,27 @@ function CompareVisualization({ comparison, zoom2D, formatDistance }: {
   );
 }
 
+function HintLabel({ text, cursorPos, zoom2D }: { text: string; cursorPos: Point2D | null; zoom2D: number }) {
+  if (!cursorPos) return null;
+  return (
+    <g transform={`translate(${cursorPos.x}, ${cursorPos.y - 24 / zoom2D})`}>
+      <rect
+        x={-text.length * 3 / zoom2D} y={-7 / zoom2D}
+        width={text.length * 6 / zoom2D} height={14 / zoom2D}
+        rx={7 / zoom2D} fill="rgba(0,0,0,0.6)"
+      />
+      <text
+        textAnchor="middle" dominantBaseline="central"
+        fill="#fff" fontSize={9 / zoom2D}
+        fontFamily="Inter, sans-serif" pointerEvents="none"
+        fontStyle="italic"
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
+
 export default function MeasureToolOverlay({
   zoom2D, measurements, currentStart, cursorPos,
   hoveredSnapPoint, formatDistance, showAngle,
@@ -237,7 +258,10 @@ export default function MeasureToolOverlay({
         <CompareVisualization comparison={comparison} zoom2D={zoom2D} formatDistance={formatDistance} />
       )}
       {measureMode === 'compare' && !comparison && compareEdgeA && (
-        <EdgeHighlight edge={compareEdgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
+        <>
+          <EdgeHighlight edge={compareEdgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
+          <HintLabel text="Click second edge to compare" cursorPos={cursorPos} zoom2D={zoom2D} />
+        </>
       )}
     </g>
   );
