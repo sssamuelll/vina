@@ -8,6 +8,7 @@
  */
 
 import type { MetaToolDefinition, MetaToolResult } from './types';
+import type { PathCommand } from '../../../../types/types';
 import { computePathArcLength, samplePathAtIntervals } from '../../../../utils/geometry/arcLength';
 
 export const measureAlongCurveTool: MetaToolDefinition = {
@@ -35,7 +36,7 @@ export const measureAlongCurveTool: MetaToolDefinition = {
     const pieces = (state.project?.pieces ?? []) as Array<{
       id: string;
       name: string;
-      outline: Array<{ type: string; values: number[] }>;
+      outline: PathCommand[];
       edges?: Array<{ id: string; name: string; segmentRange: [number, number]; length?: number }>;
     }>;
 
@@ -57,9 +58,8 @@ export const measureAlongCurveTool: MetaToolDefinition = {
       };
     }
 
-    const outline = piece.outline as Array<{ type: string; values: number[] }>;
-    const length = computePathArcLength(outline, edge.segmentRange[0], edge.segmentRange[1]);
-    const samples = samplePathAtIntervals(outline, 50, edge.segmentRange[0], edge.segmentRange[1]);
+    const length = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
+    const samples = samplePathAtIntervals(piece.outline, 50, edge.segmentRange[0], edge.segmentRange[1]);
 
     return {
       success: true,

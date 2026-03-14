@@ -6,7 +6,7 @@ import {
   samplePathAtIntervals,
   distanceAlongPath,
 } from '../arcLength';
-import type { PathCommand, Point2D } from '../../../types/types';
+import type { PathCommand } from '../../../types/types';
 
 describe('gaussLegendreCubicBezierLength', () => {
   it('returns exact length for a straight line disguised as a Bezier', () => {

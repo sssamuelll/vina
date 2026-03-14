@@ -166,7 +166,7 @@ export default function MeasureToolOverlay({
   zoom2D, measurements, currentStart, cursorPos,
   hoveredSnapPoint, formatDistance, showAngle,
   measureMode, selectedEdge, hoverDistance,
-  compareEdgeA, compareEdgeB, comparison,
+  compareEdgeA, comparison,
 }: MeasureToolOverlayProps) {
   return (
     <g className="measure-lines">

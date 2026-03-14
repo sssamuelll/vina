@@ -125,11 +125,11 @@ describe('searchPieces', () => {
 });
 
 describe('getAllMetaTools', () => {
-  it('returns 6 meta-tools', () => {
+  it('returns 8 meta-tools', () => {
     const tools = getAllMetaTools();
-    expect(tools).toHaveLength(6);
+    expect(tools).toHaveLength(8);
     expect(tools.map((t: { name: string }) => t.name)).toEqual(
-      expect.arrayContaining(['getGarmentState', 'getPieceDetails', 'measureEdge', 'searchPieces', 'getFitMapStats', 'getFitMapByPiece']),
+      expect.arrayContaining(['getGarmentState', 'getPieceDetails', 'measureEdge', 'searchPieces', 'getFitMapStats', 'getFitMapByPiece', 'measureAlongCurve', 'compareCurves']),
     );
   });
 });

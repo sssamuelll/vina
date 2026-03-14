@@ -9,6 +9,7 @@
  */
 
 import type { MetaToolDefinition, MetaToolResult } from './types';
+import type { PathCommand } from '../../../../types/types';
 import { computePathArcLength } from '../../../../utils/geometry/arcLength';
 
 export const compareCurvesTool: MetaToolDefinition = {
@@ -30,7 +31,7 @@ export const compareCurvesTool: MetaToolDefinition = {
     const pieces = (state.project?.pieces ?? []) as Array<{
       id: string;
       name: string;
-      outline: Array<{ type: string; values: number[] }>;
+      outline: PathCommand[];
       edges?: Array<{ id: string; name: string; segmentRange: [number, number]; length?: number }>;
     }>;
 
