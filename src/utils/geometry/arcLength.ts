@@ -176,28 +176,31 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
   return segments;
 }
 
-// ─── Public API ─────────────────────────────────────────────────────────────
+// ─── Segment evaluation ─────────────────────────────────────────────────────
 
-export function computePathArcLength(
-  commands: PathCommand[],
-  startIdx?: number,
-  endIdx?: number,
-): number {
-  const segments = parseSegments(commands, startIdx, endIdx);
-  let total = 0;
-  for (const seg of segments) total += seg.length;
-  return total;
+function evaluateSegment(seg: PathSegment, t: number): Point2D {
+  switch (seg.type) {
+    case 'line':
+      return {
+        x: seg.from.x + t * (seg.to.x - seg.from.x),
+        y: seg.from.y + t * (seg.to.y - seg.from.y),
+      };
+    case 'cubic':
+      return evalCubic(seg.from, seg.cp1!, seg.cp2!, seg.to, t);
+    case 'quadratic':
+      return evalQuadratic(seg.from, seg.cp1!, seg.to, t);
+  }
 }
 
-export function pointAtPathDistance(
-  commands: PathCommand[],
-  distance: number,
-  startIdx?: number,
-  endIdx?: number,
-): Point2D | null {
-  const segments = parseSegments(commands, startIdx, endIdx);
-  if (segments.length === 0) return null;
+// ─── Internal segment-based helpers ─────────────────────────────────────────
 
+function totalLength(segments: PathSegment[]): number {
+  let sum = 0;
+  for (const seg of segments) sum += seg.length;
+  return sum;
+}
+
+function pointAtDistance(segments: PathSegment[], distance: number): Point2D | null {
   let remaining = distance;
   for (const seg of segments) {
     if (remaining <= seg.length + 1e-6) {
@@ -209,13 +212,25 @@ export function pointAtPathDistance(
   return null;
 }
 
+// ─── Public API ─────────────────────────────────────────────────────────────
+
+export function computePathArcLength(
+  commands: PathCommand[], startIdx?: number, endIdx?: number,
+): number {
+  return totalLength(parseSegments(commands, startIdx, endIdx));
+}
+
+export function pointAtPathDistance(
+  commands: PathCommand[], distance: number, startIdx?: number, endIdx?: number,
+): Point2D | null {
+  return pointAtDistance(parseSegments(commands, startIdx, endIdx), distance);
+}
+
 export function samplePathAtIntervals(
-  commands: PathCommand[],
-  interval: number,
-  startIdx?: number,
-  endIdx?: number,
+  commands: PathCommand[], interval: number, startIdx?: number, endIdx?: number,
 ): ArcLengthSample[] {
-  const total = computePathArcLength(commands, startIdx, endIdx);
+  const segments = parseSegments(commands, startIdx, endIdx);
+  const total = totalLength(segments);
   if (total === 0) return [];
 
   const samples: ArcLengthSample[] = [];
@@ -223,28 +238,21 @@ export function samplePathAtIntervals(
 
   for (let i = 0; i <= numIntervals; i++) {
     const d = i * interval;
-    const pt = pointAtPathDistance(commands, d, startIdx, endIdx);
-    if (pt) {
-      samples.push({ point: pt, distance: d, t: d / total });
-    }
+    const pt = pointAtDistance(segments, d);
+    if (pt) samples.push({ point: pt, distance: d, t: d / total });
   }
 
   const lastDist = numIntervals * interval;
   if (total - lastDist > 1e-6) {
-    const pt = pointAtPathDistance(commands, total, startIdx, endIdx);
-    if (pt) {
-      samples.push({ point: pt, distance: total, t: 1 });
-    }
+    const pt = pointAtDistance(segments, total);
+    if (pt) samples.push({ point: pt, distance: total, t: 1 });
   }
 
   return samples;
 }
 
 export function distanceAlongPath(
-  commands: PathCommand[],
-  point: Point2D,
-  startIdx?: number,
-  endIdx?: number,
+  commands: PathCommand[], point: Point2D, startIdx?: number, endIdx?: number,
 ): number {
   const segments = parseSegments(commands, startIdx, endIdx);
   if (segments.length === 0) return 0;
@@ -282,18 +290,4 @@ export function distanceAlongPath(
   }
 
   return bestTotalDist;
-}
-
-function evaluateSegment(seg: PathSegment, t: number): Point2D {
-  switch (seg.type) {
-    case 'line':
-      return {
-        x: seg.from.x + t * (seg.to.x - seg.from.x),
-        y: seg.from.y + t * (seg.to.y - seg.from.y),
-      };
-    case 'cubic':
-      return evalCubic(seg.from, seg.cp1!, seg.cp2!, seg.to, t);
-    case 'quadratic':
-      return evalQuadratic(seg.from, seg.cp1!, seg.to, t);
-  }
 }
