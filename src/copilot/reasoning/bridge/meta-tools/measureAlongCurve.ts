@@ -69,7 +69,7 @@ export const measureAlongCurveTool: MetaToolDefinition = {
         length,
         unit: 'mm',
         samplePoints: samples.map(s => ({ distance: s.distance, x: s.point.x, y: s.point.y })),
-      } as unknown as Record<string, unknown>,
+      },
     };
   },
 };

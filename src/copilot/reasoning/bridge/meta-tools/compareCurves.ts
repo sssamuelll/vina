@@ -77,7 +77,7 @@ export const compareCurvesTool: MetaToolDefinition = {
         easePercent,
         maxLocalDelta,
         unit: 'mm',
-      } as unknown as Record<string, unknown>,
+      },
     };
   },
 };
