@@ -3,24 +3,26 @@
 [![Build](https://img.shields.io/github/actions/workflow/status/sssamuelll/openclo/deploy.yml?branch=main)](https://github.com/sssamuelll/openclo/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
+[![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
 [![Rust](https://img.shields.io/badge/Rust-WASM-DEA584?logo=rust&logoColor=white)](crates/xpbd-wasm)
 [![codecov](https://codecov.io/gh/sssamuelll/openclo/graph/badge.svg)](https://codecov.io/gh/sssamuelll/openclo)
 
 **The Cognitive Design Engine for Professional Fashion Engineering.**
 
-> **Status (March 10, 2026):** Currently in **v0.7.0 "Precision & Professional Tools"**. We have successfully shipped Linked Editing, Agentic Copilot Loops, and Deterministic Geometry. Current focus: **BVH-Accelerated Collisions** and **2D-3D Live Link**. See our [Roadmap](ROADMAP.md).
+> **Status (March 14, 2026):** Currently finalizing **v0.7.0 "Precision & Professional Tools"**. We have successfully shipped **WebGPU Zero-copy Rendering**, **3D Mesh Grab (O-Key)**, **Steam Brush**, and **CLO-style Simulation Modes**. Final stretch for MVP: **Nesting Engine** and **Landing Page**. See our [Roadmap](ROADMAP.md).
 
-OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Deterministic XPBD Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
+OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Next-Gen WebGPU Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
 
 **[Launch Workspace](https://openclo.sdar.dev)**
 
 ![OpenClo.ai Interface](docs/screenshots/editor.png)
 
-## 🚀 Recent Milestones (v0.7.0)
-- **Agentic Copilot Loop**: Fully autonomous design iterations with meta-tool introspection.
-- **Linked Editing**: Symmetric pattern propagation with real-time partner sync.
-- **SkillBuilder API**: Modular skill authoring for community-driven fashion intelligence.
-- **Geometry Stability**: Deterministic edge-name referencing for stable production pipelines.
+## 🚀 Recent Milestones (v0.7.x)
+- **WebGPU / TSL Engine**: Massive 10–50x performance boost via **Zero-copy Rendering** and shared compute buffers.
+- **3D Interaction Suite**: Professional **Mesh Grab (O-Key)**, **Steam/Press Brush**, and **Per-piece Freeze** functionality.
+- **Simulation Modes**: Standard and High-Precision (Complete) modes for production-grade draping.
+- **Agentic Copilot Loop**: Fully autonomous design iterations with meta-tool introspection and design memory.
+- **Bundle Optimization**: Dynamic code-splitting of heavy 3D loaders and exporters for near-instant load times.
 
 ## Core Pillars
 
@@ -33,13 +35,11 @@ Our Copilot is a **Situated Fashion Agent** powered by a unified **Agentic Loop*
 - **Durable Design Memory**: Learns your aesthetic preferences, fit standards, and style history.
 - **Agentic Loop**: Unified tool-use loop with meta-tools (read-only) and action tools (mutations), LLM-driven iteration until completion.
 
-### Deterministic XPBD Physics
-Powered by a high-speed **Rust-based engine (WASM)**, OpenClo.ai provides real-time, physically accurate 3D draping.
-- **XPBD Solver**: Stable, deterministic simulation even under extreme stress.
-- **Universal Collision**: Any imported mesh (GLB/OBJ) acts as a physical body with custom friction and offset control.
-
-### Extensible Skill Marketplace
-A modular ecosystem where professional construction logic is packaged into **Skills**. Includes a `SkillBuilder` API for authoring, a configurable registry for discovery, and community skill validation.
+### Next-Gen WebGPU Physics
+Powered by **TSL (Three.js Shading Language)** and a **Rust-based WASM fallback**, OpenClo.ai provides real-time, physically accurate 3D draping.
+- **Zero-copy Rendering**: Simulated positions remain in GPU memory, eliminating CPU-GPU transfer overhead.
+- **Deterministic XPBD**: Stable, production-grade simulation even under extreme stress.
+- **Interactive Gizmos**: Wind force control with 3D UI gizmos and real-time visualization.
 
 ## Features
 
@@ -47,11 +47,11 @@ A modular ecosystem where professional construction logic is packaged into **Ski
 - **45 professional tools** including segment sewing, topstitch (4 modes), scissors/split, merge, mirror, and elastic.
 - Advanced notch management (7 types), grainline control, and automated dart manipulation.
 - **Linked editing**: Symmetric pattern propagation (instance and mirror modes).
-- **Display Bar 2D**: Quick toggles for seam allowance, piece names, line lengths, and sewing lines.
+- **Display Bar 2D**: Quick toggles for seam allowance, piece names, and line lengths.
 
 ### Industrial-Grade Simulation
 - **32+ Physical Fabric Profiles** — Denim, Silk, Wool, Jersey, etc., with real-world shear/stretch data.
-- **Simulation Snapshots**: Compare up to 3 draping states (A/B/C) side by side for fit analysis.
+- **Interactive Tools**: Grab and pull fabric during simulation, apply steam for local relaxation.
 - **Multi-Body Collision**: Avatar + imported meshes with per-body friction and offset controls.
 
 ### Production Engines
@@ -63,10 +63,10 @@ A modular ecosystem where professional construction logic is packaged into **Ski
 
 | Format | Status | Role |
 |--------|--------|------|
-| **DXF (AAMA/ASTM)** | Full (High-Fidelity) | Industrial Interop with spline support |
+| **DXF (AAMA/ASTM)** | Full (High-Fidelity) | Industrial Interop with spline and layer support |
 | **Seamly2D (.val/.vit)** | Auto-Ingest | Legacy Library Absorption |
 | **OBJ/FBX/GLB/GLTF** | Full Support | 3D Mesh & Animation Pipeline |
-| **PDF** | Export | Physical Production |
+| **PDF / SVG** | Export | Physical Production & Vector Assets |
 
 ## Quick Start
 
@@ -82,10 +82,10 @@ npx vitest run    # Run tests
 
 | Metric | Count |
 |--------|-------|
-| TypeScript Files | 461 |
-| Unit/E2E Tests | 186+ |
-| Total LOC | ~127,000 |
-| Development Days | 20 |
+| TypeScript Source Files | 496 |
+| Unit/E2E Test Files | 194+ |
+| Total LOC | ~142,000 |
+| Development Days | 24 |
 
 ---
 **OpenClo.ai** — Digitizing Fashion Intelligence. MIT Licensed.
