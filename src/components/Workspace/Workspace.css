@@ -203,7 +203,23 @@
   pointer-events: none;
 }
 
-.viewport-2d { background: var(--bg-canvas); }
+.viewport-2d {
+  background: var(--bg-canvas);
+  display: flex;
+  flex-direction: column;
+}
+
+.viewport2d-with-options {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.viewport2d-with-options > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
 .viewport-3d {
   background: var(--bg-primary);
   display: flex;
