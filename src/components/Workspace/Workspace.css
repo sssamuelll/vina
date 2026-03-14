@@ -273,6 +273,11 @@
   opacity: 0;
 }
 
+.toolbar2d-wrapper > .tool-options-bar {
+  border-left: none;
+  border-right: 1px solid var(--border);
+}
+
 /* ─── Viewports (VS Code pattern: always mounted, resize via width) ─── */
 .viewport {
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);

@@ -393,8 +393,8 @@ export default function Workspace() {
           <div className="editors-with-toolbar">
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
-              <Toolbar2D />
               <ToolOptionsBar2D />
+              <Toolbar2D />
             </div>
 
             {/* Viewports — ALWAYS mounted, sized via CSS width (VS Code pattern) */}
