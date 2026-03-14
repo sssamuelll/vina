@@ -28,6 +28,17 @@ export const measureTool: ToolDefinition = {
   group: 'annotation',
   options: [
     {
+      id: 'measureMode',
+      label: 'Mode',
+      type: 'select',
+      value: 'point-to-point',
+      choices: [
+        { label: 'Point to Point', value: 'point-to-point' },
+        { label: 'Along Curve', value: 'along-curve' },
+        { label: 'Compare Curves', value: 'compare' },
+      ],
+    },
+    {
       id: 'units',
       label: 'Display Units',
       type: 'select',
@@ -50,6 +61,17 @@ export const measureTool: ToolDefinition = {
       type: 'toggle',
       value: false,
     },
+    {
+      id: 'markerInterval',
+      label: 'Marker Interval',
+      type: 'select',
+      value: '50',
+      choices: [
+        { label: '25mm', value: '25' },
+        { label: '50mm', value: '50' },
+        { label: '100mm', value: '100' },
+      ],
+    },
   ],
   copilot: {
     description:
@@ -59,6 +81,8 @@ export const measureTool: ToolDefinition = {
       'What is the distance between these two points?',
       'Show me the waist measurement',
       'Measure the armhole circumference',
+      'Measure the armhole length along the curve',
+      'Compare the armhole and sleeve cap lengths',
     ],
     keywords: [
       'measure',
@@ -71,6 +95,13 @@ export const measureTool: ToolDefinition = {
       'angle',
       'circumference',
       'metric',
+      'curve',
+      'arc length',
+      'along',
+      'walk',
+      'compare',
+      'ease',
+      'seam length',
     ],
     requiresSelection: 'none',
     produces: 'measurement',
@@ -80,6 +111,8 @@ export const measureTool: ToolDefinition = {
       units: 'Display unit for measurements: millimeters, centimeters, or inches',
       showAngle: 'Whether to display angle measurements in addition to distances',
       cumulative: 'Add up multiple measurements to show total distance',
+      measureMode: 'Measurement mode: point-to-point for straight distances, along-curve for arc length, compare for two edges',
+      markerInterval: 'Distance between markers when measuring along a curve (mm)',
     },
   },
 };
