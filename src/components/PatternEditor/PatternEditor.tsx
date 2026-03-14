@@ -264,7 +264,7 @@ export default function PatternEditor() {
             cursorPos={measureTool.cursorPos}
             formatDistance={measureTool.formatDistance}
             measureHoveredSnapPoint={measureTool.hoveredSnapPoint}
-            measureShowAngle={toolOptions?.measure?.showAngle ?? false}
+            measureShowAngle={toolOptions?.[activeTool]?.showAngle ?? false}
             measureMode={measureTool.measureMode}
             measureSelectedEdge={measureTool.selectedEdge}
             measureHoverDistance={measureTool.hoverDistance}
