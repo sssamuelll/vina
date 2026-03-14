@@ -151,7 +151,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         <RectangleToolOverlay zoom2D={zoom2D} units={units} rectPreview={props.rectPreview} rectDimensions={props.rectDimensions} />
       )}
 
-      {activeTool === 'measure' && (
+      {(activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves') && (
         <MeasureToolOverlay
           zoom2D={zoom2D}
           measurements={props.measurements}
