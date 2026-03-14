@@ -42,7 +42,7 @@ interface EditorNode {
   ref: NodeRef;
 }
 
-import type { Measurement } from '../useMeasureTool';
+import type { Measurement, SelectedEdgeInfo, CurveComparison } from '../useMeasureTool';
 
 interface ToolOverlayProps {
   activeTool: Tool2D;
@@ -71,6 +71,11 @@ interface ToolOverlayProps {
   formatDistance: (d: number) => string;
   measureHoveredSnapPoint?: Point2D | null;
   measureShowAngle?: boolean;
+  measureMode?: 'point-to-point' | 'along-curve' | 'compare';
+  measureSelectedEdge?: SelectedEdgeInfo | null;
+  measureHoverDistance?: number | null;
+  measureCompareEdgeA?: SelectedEdgeInfo | null;
+  measureComparison?: CurveComparison | null;
   nodeEditorIsEditing: boolean;
   nodeEditorEditingPieceId: string | null;
   nodeEditorNodes: EditorNode[];
@@ -146,8 +151,21 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         <RectangleToolOverlay zoom2D={zoom2D} units={units} rectPreview={props.rectPreview} rectDimensions={props.rectDimensions} />
       )}
 
-      {activeTool === 'measure' && (
-        <MeasureToolOverlay zoom2D={zoom2D} measurements={props.measurements} currentStart={props.currentStart} cursorPos={props.cursorPos} hoveredSnapPoint={props.measureHoveredSnapPoint ?? null} formatDistance={props.formatDistance} showAngle={props.measureShowAngle} />
+      {(activeTool === 'measure' || activeTool === 'measureCurve' || activeTool === 'compareCurves') && (
+        <MeasureToolOverlay
+          zoom2D={zoom2D}
+          measurements={props.measurements}
+          currentStart={props.currentStart}
+          cursorPos={props.cursorPos}
+          hoveredSnapPoint={props.measureHoveredSnapPoint ?? null}
+          formatDistance={props.formatDistance}
+          showAngle={props.measureShowAngle}
+          measureMode={props.measureMode}
+          selectedEdge={props.measureSelectedEdge}
+          hoverDistance={props.measureHoverDistance}
+          compareEdgeA={props.measureCompareEdgeA}
+          comparison={props.measureComparison}
+        />
       )}
 
       {activeTool === 'transform' && props.transformBbox && (

@@ -12,6 +12,7 @@ import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
 import Toolbar3D, { type Tool3D } from '../Toolbar3D/Toolbar3D';
 import ToolOptionsBar from '../Toolbar3D/ToolOptionsBar';
+import ToolOptionsBar2D from '../Toolbar2D/ToolOptionsBar2D';
 import AvatarPanel from '../Viewport3D/AvatarPanel';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
@@ -392,6 +393,7 @@ export default function Workspace() {
           <div className="editors-with-toolbar">
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
+              <ToolOptionsBar2D />
               <Toolbar2D />
             </div>
 

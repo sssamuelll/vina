@@ -29,6 +29,8 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
 }
 import { extractNodes, NodeRef } from './nodeEditorUtils';
 
+const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
+
 /** Distance from point (px,py) to line segment (x1,y1)-(x2,y2) */
 function distToSegment(px: number, py: number, x1: number, y1: number, x2: number, y2: number): number {
   const dx = x2 - x1;
@@ -204,7 +206,7 @@ export function useEditorInteractions(
 
   // Clear measurements when switching away
   useEffect(() => {
-    if (activeTool !== 'measure') measureTool.clear();
+    if (!MEASURE_TOOL_IDS.has(activeTool)) measureTool.clear();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measureTool.clear is stable (useCallback with [])
   }, [activeTool, measureTool.clear]);
 
@@ -226,7 +228,7 @@ export function useEditorInteractions(
     if (activeTool === 'pen') handlers.push(pen.handleKeyDown);
     if (activeTool === 'line') handlers.push(lineTool.handleKeyDown);
     if (activeTool === 'seam') handlers.push(seamTool.handleKeyDown);
-    if (activeTool === 'measure') handlers.push(measureTool.handleKeyDown);
+    if (MEASURE_TOOL_IDS.has(activeTool)) handlers.push(measureTool.handleKeyDown);
     if (activeTool === 'transform') handlers.push(transformTool.handleKeyDown);
     if (nodeEditor.isEditing) handlers.push(nodeEditor.handleKeyDown);
     if (activeTool === 'editPattern') handlers.push(editPattern.handleKeyDown);
@@ -303,7 +305,7 @@ export function useEditorInteractions(
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
     if (activeTool === 'grainline') { grainlineTool.handleMouseDown(e); return; }
-    if (activeTool === 'measure') { measureTool.handleMouseDown(e); return; }
+    if (MEASURE_TOOL_IDS.has(activeTool)) { measureTool.handleMouseDown(e); return; }
     if (activeTool === 'scissors') { scissorsTool.handleMouseDown(e); return; }
     if (activeTool === 'merge') { mergeTool.handleMouseDown(e); return; }
     if (activeTool === 'segmentSewing') { segmentSewingTool.handleMouseDown(e); return; }
@@ -507,7 +509,7 @@ export function useEditorInteractions(
     if (activeTool === 'seam') seamTool.handleMouseMove(e);
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
     if (activeTool === 'grainline') grainlineTool.handleMouseMove(e);
-    if (activeTool === 'measure') measureTool.handleMouseMove(e);
+    if (MEASURE_TOOL_IDS.has(activeTool)) measureTool.handleMouseMove(e);
     if (activeTool === 'scissors') scissorsTool.handleMouseMove(e);
     if (activeTool === 'merge') mergeTool.handleMouseMove(e);
     if (activeTool === 'segmentSewing') segmentSewingTool.handleMouseMove(e);
@@ -547,7 +549,7 @@ export function useEditorInteractions(
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';
       case 'grainline': return 'crosshair';
-      case 'measure': return 'crosshair';
+      case 'measure': case 'measureCurve': case 'compareCurves': return 'crosshair';
       case 'scissors': return scissorsTool.getCursor();
       case 'merge': return mergeTool.getCursor();
       case 'segmentSewing': return segmentSewingTool.getCursor();

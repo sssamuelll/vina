@@ -29,6 +29,8 @@ import { addPieceTool } from './definitions/addPiece';
 import { fabricTextureTool } from './definitions/fabricTexture';
 import { flattenTool } from './definitions/flatten';
 import { measureTool } from './definitions/measure';
+import { measureCurveTool } from './definitions/measureCurve';
+import { compareCurvesTool } from './definitions/compareCurves';
 import { handTool } from './definitions/hand';
 import { zoomTool } from './definitions/zoom';
 import { cameraTool } from './definitions/camera';
@@ -95,7 +97,9 @@ const allTools = [
   gradingTool,
   textAnnotationTool,
   measureTool,
-  
+  measureCurveTool,
+  compareCurvesTool,
+
   // 2D Tools — Navigation
   handTool,
   zoomTool,

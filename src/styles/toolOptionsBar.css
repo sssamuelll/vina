@@ -1,4 +1,4 @@
-/* ─── Tool Options Panel (vertical sidebar, right of 3D toolbar) ─── */
+/* ─── Tool Options Panel — shared by 2D and 3D options bars ─── */
 .tool-options-bar {
   display: flex;
   flex-direction: column;

@@ -21,23 +21,13 @@ const MeasureIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
 export const measureTool: ToolDefinition = {
   id: 'measure',
   name: 'Measure',
+  description: 'Measure point-to-point distances on pattern pieces',
   context: '2d',
   icon: MeasureIcon,
   cursor: 'crosshair',
   shortcut: 'm',
   group: 'annotation',
   options: [
-    {
-      id: 'units',
-      label: 'Display Units',
-      type: 'select',
-      value: 'mm',
-      choices: [
-        { label: 'Millimeters', value: 'mm' },
-        { label: 'Centimeters', value: 'cm' },
-        { label: 'Inches', value: 'inches' },
-      ],
-    },
     {
       id: 'showAngle',
       label: 'Show Angle',
@@ -58,7 +48,6 @@ export const measureTool: ToolDefinition = {
       'Measure the length of this edge',
       'What is the distance between these two points?',
       'Show me the waist measurement',
-      'Measure the armhole circumference',
     ],
     keywords: [
       'measure',
@@ -69,7 +58,6 @@ export const measureTool: ToolDefinition = {
       'dimension',
       'size',
       'angle',
-      'circumference',
       'metric',
     ],
     requiresSelection: 'none',
@@ -77,7 +65,6 @@ export const measureTool: ToolDefinition = {
     undoable: false,
     dangerous: false,
     parameterHints: {
-      units: 'Display unit for measurements: millimeters, centimeters, or inches',
       showAngle: 'Whether to display angle measurements in addition to distances',
       cumulative: 'Add up multiple measurements to show total distance',
     },
