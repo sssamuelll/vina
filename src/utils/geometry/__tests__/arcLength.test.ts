@@ -182,4 +182,21 @@ describe('distanceAlongPath', () => {
     ];
     expect(distanceAlongPath(cmds, { x: 60, y: 0 })).toBeCloseTo(60, 0);
   });
+
+  it('returns accurate arc-length distance for a point on a curve', () => {
+    // Quarter circle: radius 100, length ≈ 157.08mm
+    const r = 100;
+    const k = 0.5522847498;
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [r, 0] },
+      { type: 'C', values: [r, r * k, r * k, r, 0, r] },
+    ];
+    // A point near the midpoint of the quarter circle: ~45°, at roughly (70.7, 70.7)
+    const midPt = { x: 70.7, y: 70.7 };
+    const dist = distanceAlongPath(cmds, midPt);
+    const fullLen = computePathArcLength(cmds);
+    // Should be approximately half the full arc-length (~78.5mm)
+    expect(dist).toBeGreaterThan(fullLen * 0.4);
+    expect(dist).toBeLessThan(fullLen * 0.6);
+  });
 });
