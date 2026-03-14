@@ -46,6 +46,7 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.scissors', key: 'x', label: 'Scissors', category: '2D Tools', context: '2d' },
   { id: 'tool.pin', key: 'w', label: 'Pin', category: '2D Tools', context: '2d' },
   { id: 'tool.measure', key: 'm', label: 'Measure', category: '2D Tools', context: '2d' },
+  { id: 'tool.walkSeam', key: 'm', shift: true, label: 'Walk Seam', category: '2D Tools', context: '2d' },
   { id: 'tool.merge', key: 'j', label: 'Merge Patterns', category: '2D Tools', context: '2d' },
   { id: 'tool.topstitchEdit', key: 't', label: 'Edit Topstitch', category: '2D Tools', context: '2d' },
   { id: 'tool.topstitchSegment', key: 'k', label: 'Segment Topstitch', category: '2D Tools', context: '2d' },
