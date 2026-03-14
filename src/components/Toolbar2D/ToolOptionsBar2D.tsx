@@ -51,14 +51,16 @@ function OptionControl({ option, value, onChange }: {
     case 'number':
       return (
         <div className="tool-option-item">
-          <label className="tool-option-label">{option.label}</label>
+          <label className="tool-option-label" htmlFor={`tool-opt-${option.id}`}>{option.label}</label>
           <input
+            id={`tool-opt-${option.id}`}
             type="range"
             className="tool-option-slider"
             min={option.min ?? 0}
             max={option.max ?? 100}
             step={option.step ?? 1}
             value={value}
+            aria-label={option.label}
             onChange={e => onChange(Number(e.target.value))}
           />
           <span className="tool-option-value">{value}</span>
@@ -70,6 +72,8 @@ function OptionControl({ option, value, onChange }: {
           <label className="tool-option-label">{option.label}</label>
           <button
             className={`tool-option-toggle ${value ? 'on' : ''}`}
+            aria-label={option.label}
+            aria-pressed={!!value}
             onClick={() => onChange(!value)}
           >
             {value ? 'ON' : 'OFF'}
@@ -79,10 +83,12 @@ function OptionControl({ option, value, onChange }: {
     case 'select':
       return (
         <div className="tool-option-item">
-          <label className="tool-option-label">{option.label}</label>
+          <label className="tool-option-label" htmlFor={`tool-opt-${option.id}`}>{option.label}</label>
           <select
+            id={`tool-opt-${option.id}`}
             className="tool-option-select"
             value={value}
+            aria-label={option.label}
             onChange={e => onChange(e.target.value)}
           >
             {option.choices?.map(c => (
@@ -94,11 +100,13 @@ function OptionControl({ option, value, onChange }: {
     case 'color':
       return (
         <div className="tool-option-item">
-          <label className="tool-option-label">{option.label}</label>
+          <label className="tool-option-label" htmlFor={`tool-opt-${option.id}`}>{option.label}</label>
           <input
+            id={`tool-opt-${option.id}`}
             type="color"
             className="tool-option-color"
             value={value}
+            aria-label={option.label}
             onChange={e => onChange(e.target.value)}
           />
         </div>
