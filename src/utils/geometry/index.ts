@@ -14,3 +14,11 @@ export { findSharedEdge, mergeOutlines } from './mergeOutline';
 export type { SharedEdge } from './mergeOutline';
 export { findOutlineIntersections, splitOutlineAtPoints } from './splitOutline';
 export type { OutlineHit } from './splitOutline';
+export {
+  gaussLegendreCubicBezierLength,
+  computePathArcLength,
+  pointAtPathDistance,
+  samplePathAtIntervals,
+  distanceAlongPath,
+} from './arcLength';
+export type { ArcLengthSample } from './arcLength';

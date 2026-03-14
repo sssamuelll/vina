@@ -131,6 +131,7 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
       }
       case 'Z':
         break;
+      // S, T, A commands are not used in garment patterns; skip silently.
     }
   }
   return segments;
