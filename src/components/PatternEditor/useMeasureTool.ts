@@ -248,46 +248,70 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
         const piece = pieces.find(p => p.id === snap.pieceId);
         if (piece) {
           const edge = findEdgeForSegment(piece, snap.segmentIndex);
+          let info: SelectedEdgeInfo;
           if (edge) {
-            const info = buildEdgeInfo(piece, edge, markerInterval);
-            if (!compareEdgeARef.current) {
-              setCompareEdgeA(info);
-              setCompareEdgeB(null);
-              setComparison(null);
-            } else {
-              setCompareEdgeB(info);
-              const edgeA = compareEdgeARef.current;
-              const delta = info.arcLength - edgeA.arcLength;
-              const easePercent = edgeA.arcLength > 0 ? (delta / edgeA.arcLength) * 100 : 0;
+            info = buildEdgeInfo(piece, edge, markerInterval);
+          } else {
+            // No semantic edge — compare full outline
+            const arcLength = computePathArcLength(piece.outline);
+            const markers = samplePathAtIntervals(piece.outline, markerInterval);
+            const pathPoints = markers.map(m => ({
+              x: m.point.x + piece.position.x,
+              y: m.point.y + piece.position.y,
+            }));
+            const rawWalk = samplePathDense(piece.outline, 3);
+            const walkPoints = rawWalk.map(p => ({
+              x: p.x + piece.position.x,
+              y: p.y + piece.position.y,
+            }));
+            info = {
+              pieceId: piece.id,
+              piece,
+              edge: { id: '__outline__', name: 'outline', segmentRange: [0, piece.outline.length], edgeType: 'unknown' } as SemanticEdge,
+              arcLength,
+              markers,
+              pathPoints,
+              walkPoints,
+            };
+          }
 
-              // Sample both edges at 10 equal arc-length fractions
-              const NUM_SAMPLES = 10;
-              const divergenceSamples: CurveDivergenceSample[] = [];
-              let maxLocalDelta = 0;
-              for (let si = 0; si <= NUM_SAMPLES; si++) {
-                const frac = si / NUM_SAMPLES;
-                const dA = frac * edgeA.arcLength;
-                const dB = frac * info.arcLength;
-                const ptA = pointAtPathDistance(
-                  edgeA.piece.outline, dA,
-                  edgeA.edge.segmentRange[0], edgeA.edge.segmentRange[1],
-                );
-                const ptB = pointAtPathDistance(
-                  info.piece.outline, dB,
-                  info.edge.segmentRange[0], info.edge.segmentRange[1],
-                );
-                if (ptA && ptB) {
-                  const worldA = { x: ptA.x + edgeA.piece.position.x, y: ptA.y + edgeA.piece.position.y };
-                  const worldB = { x: ptB.x + info.piece.position.x, y: ptB.y + info.piece.position.y };
-                  // Local-space divergence: compare shape geometry only, ignore piece positioning
-                  const ld = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
-                  if (ld > maxLocalDelta) maxLocalDelta = ld;
-                  divergenceSamples.push({ tA: frac, pointA: worldA, pointB: worldB, localDelta: ld });
-                }
+          if (!compareEdgeARef.current) {
+            setCompareEdgeA(info);
+            setCompareEdgeB(null);
+            setComparison(null);
+          } else {
+            setCompareEdgeB(info);
+            const edgeA = compareEdgeARef.current;
+            const delta = info.arcLength - edgeA.arcLength;
+            const easePercent = edgeA.arcLength > 0 ? (delta / edgeA.arcLength) * 100 : 0;
+
+            // Sample both edges at 10 equal arc-length fractions
+            const NUM_SAMPLES = 10;
+            const divergenceSamples: CurveDivergenceSample[] = [];
+            let maxLocalDelta = 0;
+            for (let si = 0; si <= NUM_SAMPLES; si++) {
+              const frac = si / NUM_SAMPLES;
+              const dA = frac * edgeA.arcLength;
+              const dB = frac * info.arcLength;
+              const ptA = pointAtPathDistance(
+                edgeA.piece.outline, dA,
+                edgeA.edge.segmentRange[0], edgeA.edge.segmentRange[1],
+              );
+              const ptB = pointAtPathDistance(
+                info.piece.outline, dB,
+                info.edge.segmentRange[0], info.edge.segmentRange[1],
+              );
+              if (ptA && ptB) {
+                const worldA = { x: ptA.x + edgeA.piece.position.x, y: ptA.y + edgeA.piece.position.y };
+                const worldB = { x: ptB.x + info.piece.position.x, y: ptB.y + info.piece.position.y };
+                // Local-space divergence: compare shape geometry only, ignore piece positioning
+                const ld = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
+                if (ld > maxLocalDelta) maxLocalDelta = ld;
+                divergenceSamples.push({ tA: frac, pointA: worldA, pointB: worldB, localDelta: ld });
               }
-
-              setComparison({ edgeA, edgeB: info, delta, easePercent, maxLocalDelta, samples: divergenceSamples });
             }
+
+            setComparison({ edgeA, edgeB: info, delta, easePercent, maxLocalDelta, samples: divergenceSamples });
           }
         }
       }
