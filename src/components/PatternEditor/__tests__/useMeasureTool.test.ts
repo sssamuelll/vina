@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { snapToOutline, calculatePathLength } from '../useMeasureTool';
-import type { PatternPiece } from '../../../types/types';
+import { snapToOutline, calculatePathLength, findEdgeForSegment, buildEdgeInfo } from '../useMeasureTool';
+import type { PatternPiece, SemanticEdge } from '../../../types/types';
 
 describe('snapToOutline', () => {
   const piece: PatternPiece = {
@@ -60,5 +60,98 @@ describe('calculatePathLength', () => {
 
   it('returns 0 for empty array', () => {
     expect(calculatePathLength([])).toBe(0);
+  });
+});
+
+// ─── Along-curve helpers ───
+
+const pieceWithEdges: PatternPiece = {
+  id: 'p1',
+  name: 'Test',
+  position: { x: 10, y: 20 },
+  outline: [
+    { type: 'M' as const, values: [0, 0] },
+    { type: 'L' as const, values: [100, 0] },   // segment 1
+    { type: 'L' as const, values: [100, 80] },  // segment 2
+    { type: 'L' as const, values: [0, 80] },    // segment 3
+    { type: 'Z' as const, values: [] },
+  ],
+  edges: [
+    { id: 'e1', name: 'top', segmentRange: [1, 2] as [number, number], edgeType: 'seam' },
+    { id: 'e2', name: 'right', segmentRange: [2, 3] as [number, number], edgeType: 'seam' },
+    { id: 'e3', name: 'bottom', segmentRange: [3, 4] as [number, number], edgeType: 'hem' },
+  ] as SemanticEdge[],
+  internals: [],
+  rotation: 0,
+  mirrored: false,
+  seamAllowance: 0,
+  createdAt: 0,
+  updatedAt: 0,
+};
+
+describe('findEdgeForSegment', () => {
+  it('returns the edge containing the segment index', () => {
+    const edge = findEdgeForSegment(pieceWithEdges, 1);
+    expect(edge).not.toBeNull();
+    expect(edge!.name).toBe('top');
+  });
+
+  it('returns the correct edge for segment 2', () => {
+    const edge = findEdgeForSegment(pieceWithEdges, 2);
+    expect(edge).not.toBeNull();
+    expect(edge!.name).toBe('right');
+  });
+
+  it('returns null for a segment with no edge', () => {
+    const edge = findEdgeForSegment(pieceWithEdges, 0); // M command, no edge
+    expect(edge).toBeNull();
+  });
+
+  it('returns null for piece without edges', () => {
+    const noEdgePiece = { ...pieceWithEdges, edges: undefined };
+    const edge = findEdgeForSegment(noEdgePiece as PatternPiece, 1);
+    expect(edge).toBeNull();
+  });
+});
+
+describe('buildEdgeInfo', () => {
+  const topEdge = pieceWithEdges.edges![0];
+
+  it('computes correct arc-length for straight edge', () => {
+    const info = buildEdgeInfo(pieceWithEdges, topEdge, 50);
+    // top edge: (0,0)→(100,0) = 100mm
+    expect(info.arcLength).toBeCloseTo(100, 1);
+  });
+
+  it('offsets path points by piece position', () => {
+    const info = buildEdgeInfo(pieceWithEdges, topEdge, 50);
+    // piece position is (10, 20), edge starts at local (0,0) → world (10,20)
+    expect(info.pathPoints[0].x).toBeCloseTo(10, 0);
+    expect(info.pathPoints[0].y).toBeCloseTo(20, 0);
+  });
+
+  it('offsets walk points by piece position', () => {
+    const info = buildEdgeInfo(pieceWithEdges, topEdge, 50);
+    expect(info.walkPoints[0].x).toBeCloseTo(10, 0);
+    expect(info.walkPoints[0].y).toBeCloseTo(20, 0);
+  });
+
+  it('returns markers at requested interval', () => {
+    const info = buildEdgeInfo(pieceWithEdges, topEdge, 25);
+    // 100mm edge at 25mm interval → 5 markers (0, 25, 50, 75, 100)
+    expect(info.markers.length).toBe(5);
+  });
+
+  it('walk points are denser than path points', () => {
+    const info = buildEdgeInfo(pieceWithEdges, topEdge, 50);
+    // walkPoints at 3mm resolution vs pathPoints at 50mm
+    expect(info.walkPoints.length).toBeGreaterThan(info.pathPoints.length);
+  });
+
+  it('preserves piece and edge references', () => {
+    const info = buildEdgeInfo(pieceWithEdges, topEdge, 50);
+    expect(info.pieceId).toBe('p1');
+    expect(info.piece).toBe(pieceWithEdges);
+    expect(info.edge).toBe(topEdge);
   });
 });

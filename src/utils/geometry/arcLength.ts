@@ -161,12 +161,21 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
         break;
       }
       case 'S':
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('arcLength: S command contributes zero arc-length (not fully supported)');
+        }
         cursor = { x: cmd.values[2], y: cmd.values[3] };
         break;
       case 'T':
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('arcLength: T command contributes zero arc-length (not fully supported)');
+        }
         cursor = { x: cmd.values[0], y: cmd.values[1] };
         break;
       case 'A':
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('arcLength: A command contributes zero arc-length (not fully supported)');
+        }
         cursor = { x: cmd.values[5], y: cmd.values[6] };
         break;
       case 'Z':

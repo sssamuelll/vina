@@ -110,14 +110,14 @@ export function calculatePathLength(points: Point2D[]): number {
 
 // ─── Along-curve helpers ───
 
-function findEdgeForSegment(piece: PatternPiece, segmentIndex: number): SemanticEdge | null {
+export function findEdgeForSegment(piece: PatternPiece, segmentIndex: number): SemanticEdge | null {
   if (!piece.edges) return null;
   return piece.edges.find(e =>
     segmentIndex >= e.segmentRange[0] && segmentIndex < e.segmentRange[1]
   ) ?? null;
 }
 
-function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInterval: number): SelectedEdgeInfo {
+export function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInterval: number): SelectedEdgeInfo {
   const arcLength = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
   const markers = samplePathAtIntervals(piece.outline, markerInterval, edge.segmentRange[0], edge.segmentRange[1]);
   const pathPoints = markers.map(m => ({
@@ -277,7 +277,8 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
                 if (ptA && ptB) {
                   const worldA = { x: ptA.x + edgeA.piece.position.x, y: ptA.y + edgeA.piece.position.y };
                   const worldB = { x: ptB.x + info.piece.position.x, y: ptB.y + info.piece.position.y };
-                  const ld = Math.hypot(worldA.x - worldB.x, worldA.y - worldB.y);
+                  // Local-space divergence: compare shape geometry only, ignore piece positioning
+                  const ld = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
                   if (ld > maxLocalDelta) maxLocalDelta = ld;
                   divergenceSamples.push({ tA: frac, pointA: worldA, pointB: worldB, localDelta: ld });
                 }
@@ -406,7 +407,6 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
     hoverDistance,
     // Compare
     compareEdgeA,
-    compareEdgeB,
     comparison,
   };
 }

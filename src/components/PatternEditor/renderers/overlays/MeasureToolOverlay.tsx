@@ -15,7 +15,6 @@ interface MeasureToolOverlayProps {
   hoverDistance?: number | null;
   // Compare mode
   compareEdgeA?: SelectedEdgeInfo | null;
-  compareEdgeB?: SelectedEdgeInfo | null;
   comparison?: CurveComparison | null;
 }
 
@@ -85,7 +84,7 @@ function AngleArc({ start, end, zoom2D }: { start: Point2D; end: Point2D; zoom2D
 function EdgeHighlight({ edge, zoom2D, formatDistance }: {
   edge: SelectedEdgeInfo; zoom2D: number; formatDistance: (d: number) => string;
 }) {
-  const points = edge.pathPoints;
+  const points = edge.walkPoints;
   if (points.length < 2) return null;
   const d = points.map(p => `${p.x},${p.y}`).join(' ');
 
@@ -128,7 +127,7 @@ function WalkDot({ edge, zoom2D }: { edge: SelectedEdgeInfo; zoom2D: number }) {
   return (
     <circle r={4 / zoom2D} fill="#9c27b0" opacity={0.9}>
       <animateMotion
-        dur="3s"
+        dur={`${Math.max(1, edge.arcLength / 100)}s`}
         repeatCount="indefinite"
         path={`M ${points.map(p => `${p.x} ${p.y}`).join(' L ')}`}
       />

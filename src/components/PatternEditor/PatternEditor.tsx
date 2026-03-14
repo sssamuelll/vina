@@ -269,7 +269,6 @@ export default function PatternEditor() {
             measureSelectedEdge={measureTool.selectedEdge}
             measureHoverDistance={measureTool.hoverDistance}
             measureCompareEdgeA={measureTool.compareEdgeA}
-            measureCompareEdgeB={measureTool.compareEdgeB}
             measureComparison={measureTool.comparison}
             nodeEditorIsEditing={nodeEditor.isEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}

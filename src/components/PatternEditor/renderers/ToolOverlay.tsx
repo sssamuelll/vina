@@ -75,7 +75,6 @@ interface ToolOverlayProps {
   measureSelectedEdge?: SelectedEdgeInfo | null;
   measureHoverDistance?: number | null;
   measureCompareEdgeA?: SelectedEdgeInfo | null;
-  measureCompareEdgeB?: SelectedEdgeInfo | null;
   measureComparison?: CurveComparison | null;
   nodeEditorIsEditing: boolean;
   nodeEditorEditingPieceId: string | null;
@@ -165,7 +164,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           selectedEdge={props.measureSelectedEdge}
           hoverDistance={props.measureHoverDistance}
           compareEdgeA={props.measureCompareEdgeA}
-          compareEdgeB={props.measureCompareEdgeB}
           comparison={props.measureComparison}
         />
       )}
