@@ -79,11 +79,42 @@ interface PathSegment {
   cmdIndex: number;
 }
 
+/** Advance cursor for a single command without producing a segment. */
+function advanceCursor(cmd: PathCommand, cursor: Point2D): Point2D {
+  switch (cmd.type) {
+    case 'M':
+      return { x: cmd.values[0], y: cmd.values[1] };
+    case 'L':
+      return { x: cmd.values[0], y: cmd.values[1] };
+    case 'H':
+      return { x: cmd.values[0], y: cursor.y };
+    case 'V':
+      return { x: cursor.x, y: cmd.values[0] };
+    case 'C':
+      return { x: cmd.values[4], y: cmd.values[5] };
+    case 'Q':
+      return { x: cmd.values[2], y: cmd.values[3] };
+    case 'S':
+      return { x: cmd.values[2], y: cmd.values[3] };
+    case 'T':
+      return { x: cmd.values[0], y: cmd.values[1] };
+    case 'A':
+      return { x: cmd.values[5], y: cmd.values[6] };
+    default:
+      return cursor;
+  }
+}
+
 function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: number): PathSegment[] {
   const segments: PathSegment[] = [];
   let cursor: Point2D = { x: 0, y: 0 };
   const start = startIdx ?? 0;
   const end = endIdx ?? commands.length;
+
+  // Pre-scan commands [0, start) to establish correct cursor position
+  for (let i = 0; i < start; i++) {
+    cursor = advanceCursor(commands[i], cursor);
+  }
 
   for (let i = start; i < end; i++) {
     const cmd = commands[i];
@@ -129,9 +160,17 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
         cursor = to;
         break;
       }
+      case 'S':
+        cursor = { x: cmd.values[2], y: cmd.values[3] };
+        break;
+      case 'T':
+        cursor = { x: cmd.values[0], y: cmd.values[1] };
+        break;
+      case 'A':
+        cursor = { x: cmd.values[5], y: cmd.values[6] };
+        break;
       case 'Z':
         break;
-      // S, T, A commands are not used in garment patterns; skip silently.
     }
   }
   return segments;

@@ -73,6 +73,36 @@ describe('computePathArcLength', () => {
   it('returns 0 for empty commands', () => {
     expect(computePathArcLength([])).toBe(0);
   });
+
+  it('computes correct subrange length when M is not at origin', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [50, 100] },
+      { type: 'L', values: [150, 100] },
+      { type: 'L', values: [150, 200] },
+      { type: 'L', values: [50, 200] },
+    ];
+    // Subrange [1, 3) = commands 1 and 2 = 100 + 100 = 200mm
+    expect(computePathArcLength(cmds, 1, 3)).toBeCloseTo(200, 1);
+  });
+
+  it('computes correct subrange length after a cubic Bezier', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [33, 0, 67, 0, 100, 0] },
+      { type: 'L', values: [100, 50] },
+    ];
+    // Subrange [2, 3) = L from (100,0) to (100,50) = 50mm
+    expect(computePathArcLength(cmds, 2, 3)).toBeCloseTo(50, 1);
+  });
+
+  it('handles S command cursor advancement in pre-scan', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'S' as PathCommand['type'], values: [50, 50, 100, 0] },
+      { type: 'L', values: [200, 0] },
+    ];
+    expect(computePathArcLength(cmds, 2, 3)).toBeCloseTo(100, 1);
+  });
 });
 
 describe('pointAtPathDistance', () => {
