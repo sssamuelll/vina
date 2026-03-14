@@ -135,6 +135,8 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
   const [hoveredSnapPoint, setHoveredSnapPoint] = useState<Point2D | null>(null);
   const [selectedEdge, setSelectedEdge] = useState<SelectedEdgeInfo | null>(null);
   const [compareEdgeA, setCompareEdgeA] = useState<SelectedEdgeInfo | null>(null);
+  const compareEdgeARef = useRef(compareEdgeA);
+  compareEdgeARef.current = compareEdgeA;
   const [compareEdgeB, setCompareEdgeB] = useState<SelectedEdgeInfo | null>(null);
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
   const [comparison, setComparison] = useState<CurveComparison | null>(null);
@@ -237,15 +239,15 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
           const edge = findEdgeForSegment(piece, snap.segmentIndex);
           if (edge) {
             const info = buildEdgeInfo(piece, edge, markerInterval);
-            if (!compareEdgeA) {
+            if (!compareEdgeARef.current) {
               setCompareEdgeA(info);
               setCompareEdgeB(null);
               setComparison(null);
             } else {
               setCompareEdgeB(info);
-              const delta = info.arcLength - compareEdgeA.arcLength;
-              const easePercent = compareEdgeA.arcLength > 0 ? (delta / compareEdgeA.arcLength) * 100 : 0;
-              setComparison({ edgeA: compareEdgeA, edgeB: info, delta, easePercent });
+              const delta = info.arcLength - compareEdgeARef.current.arcLength;
+              const easePercent = compareEdgeARef.current.arcLength > 0 ? (delta / compareEdgeARef.current.arcLength) * 100 : 0;
+              setComparison({ edgeA: compareEdgeARef.current, edgeB: info, delta, easePercent });
             }
           }
         }
@@ -275,7 +277,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
       setCurrentStart(null);
       setCursorPos(null);
     }
-  }, [toPattern, trySnap, measureMode, markerInterval, pieces, compareEdgeA]);
+  }, [toPattern, trySnap, measureMode, markerInterval, pieces]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const rawPt = toPattern(e);
