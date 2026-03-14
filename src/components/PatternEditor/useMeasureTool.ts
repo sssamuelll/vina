@@ -150,11 +150,13 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
   const [hoverDistance, setHoverDistance] = useState<number | null>(null);
   const [comparison, setComparison] = useState<CurveComparison | null>(null);
 
-  const measureMode: MeasureMode = useSelector(
-    (s: RootState) => (s.tools.toolOptions['measure']?.measureMode as MeasureMode) ?? 'point-to-point'
-  );
+  const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
+  const measureMode: MeasureMode =
+    activeTool2D === 'compareCurves' ? 'compare' :
+    activeTool2D === 'measureCurve' ? 'along-curve' :
+    'point-to-point';
   const markerInterval = useSelector(
-    (s: RootState) => Number(s.tools.toolOptions['measure']?.markerInterval ?? '50')
+    (s: RootState) => Number(s.tools.toolOptions[activeTool2D]?.markerInterval ?? '50')
   );
 
   // Clear mode-specific state when switching measure modes
