@@ -1,5 +1,5 @@
 import type { Point2D } from '../../../../types/types';
-import type { Measurement } from '../../useMeasureTool';
+import type { Measurement, SelectedEdgeInfo, CurveComparison } from '../../useMeasureTool';
 
 interface MeasureToolOverlayProps {
   zoom2D: number;
@@ -9,6 +9,14 @@ interface MeasureToolOverlayProps {
   hoveredSnapPoint: Point2D | null;
   formatDistance: (d: number) => string;
   showAngle?: boolean;
+  // Along-curve mode
+  measureMode?: 'point-to-point' | 'along-curve' | 'compare';
+  selectedEdge?: SelectedEdgeInfo | null;
+  hoverDistance?: number | null;
+  // Compare mode
+  compareEdgeA?: SelectedEdgeInfo | null;
+  compareEdgeB?: SelectedEdgeInfo | null;
+  comparison?: CurveComparison | null;
 }
 
 function MeasurementLabel({ x, y, label, zoom2D, bold }: { x: number; y: number; label: string; zoom2D: number; bold?: boolean }) {
@@ -74,9 +82,91 @@ function AngleArc({ start, end, zoom2D }: { start: Point2D; end: Point2D; zoom2D
   );
 }
 
+function EdgeHighlight({ edge, zoom2D, formatDistance }: {
+  edge: SelectedEdgeInfo; zoom2D: number; formatDistance: (d: number) => string;
+}) {
+  const points = edge.pathPoints;
+  if (points.length < 2) return null;
+  const d = points.map(p => `${p.x},${p.y}`).join(' ');
+
+  return (
+    <g>
+      <polyline points={d} fill="none" stroke="#9c27b0" strokeWidth={3 / zoom2D} opacity={0.7} />
+      {edge.markers.map((m, i) => {
+        const wx = m.point.x + edge.piece.position.x;
+        const wy = m.point.y + edge.piece.position.y;
+        return (
+          <g key={i} transform={`translate(${wx}, ${wy})`}>
+            <circle r={2.5 / zoom2D} fill="#9c27b0" />
+            {i > 0 && (
+              <MeasurementLabel
+                x={0} y={-10 / zoom2D}
+                label={formatDistance(m.distance)} zoom2D={zoom2D}
+              />
+            )}
+          </g>
+        );
+      })}
+      {points.length > 1 && (() => {
+        const mid = points[Math.floor(points.length / 2)];
+        return (
+          <MeasurementLabel
+            x={mid.x} y={mid.y - 16 / zoom2D}
+            label={`Total: ${formatDistance(edge.arcLength)}`}
+            zoom2D={zoom2D} bold
+          />
+        );
+      })()}
+    </g>
+  );
+}
+
+function WalkDot({ edge, zoom2D }: { edge: SelectedEdgeInfo; zoom2D: number }) {
+  const points = edge.pathPoints;
+  if (points.length < 2) return null;
+
+  return (
+    <circle r={4 / zoom2D} fill="#9c27b0" opacity={0.9}>
+      <animateMotion
+        dur="3s"
+        repeatCount="indefinite"
+        path={`M ${points.map(p => `${p.x} ${p.y}`).join(' L ')}`}
+      />
+    </circle>
+  );
+}
+
+function CompareVisualization({ comparison, zoom2D, formatDistance }: {
+  comparison: CurveComparison; zoom2D: number; formatDistance: (d: number) => string;
+}) {
+  const { edgeA, edgeB, delta, easePercent } = comparison;
+  return (
+    <g>
+      <EdgeHighlight edge={edgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
+      <EdgeHighlight edge={edgeB} zoom2D={zoom2D} formatDistance={formatDistance} />
+      {edgeA.pathPoints.length > 0 && edgeB.pathPoints.length > 0 && (() => {
+        const midA = edgeA.pathPoints[Math.floor(edgeA.pathPoints.length / 2)];
+        const midB = edgeB.pathPoints[Math.floor(edgeB.pathPoints.length / 2)];
+        const mx = (midA.x + midB.x) / 2;
+        const my = (midA.y + midB.y) / 2;
+        const sign = delta >= 0 ? '+' : '';
+        return (
+          <MeasurementLabel
+            x={mx} y={my}
+            label={`Δ ${sign}${formatDistance(delta)} (${easePercent.toFixed(1)}%)`}
+            zoom2D={zoom2D} bold
+          />
+        );
+      })()}
+    </g>
+  );
+}
+
 export default function MeasureToolOverlay({
   zoom2D, measurements, currentStart, cursorPos,
   hoveredSnapPoint, formatDistance, showAngle,
+  measureMode, selectedEdge, hoverDistance,
+  compareEdgeA, compareEdgeB, comparison,
 }: MeasureToolOverlayProps) {
   return (
     <g className="measure-lines">
@@ -127,6 +217,28 @@ export default function MeasureToolOverlay({
           </>
         );
       })()}
+
+      {/* Along-curve mode */}
+      {measureMode === 'along-curve' && selectedEdge && (
+        <>
+          <EdgeHighlight edge={selectedEdge} zoom2D={zoom2D} formatDistance={formatDistance} />
+          <WalkDot edge={selectedEdge} zoom2D={zoom2D} />
+          {hoverDistance != null && cursorPos && (
+            <MeasurementLabel
+              x={cursorPos.x} y={cursorPos.y - 14 / zoom2D}
+              label={formatDistance(hoverDistance)} zoom2D={zoom2D}
+            />
+          )}
+        </>
+      )}
+
+      {/* Compare mode */}
+      {measureMode === 'compare' && comparison && (
+        <CompareVisualization comparison={comparison} zoom2D={zoom2D} formatDistance={formatDistance} />
+      )}
+      {measureMode === 'compare' && !comparison && compareEdgeA && (
+        <EdgeHighlight edge={compareEdgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
+      )}
     </g>
   );
 }
