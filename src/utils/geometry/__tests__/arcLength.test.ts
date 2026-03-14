@@ -140,12 +140,28 @@ describe('pointAtPathDistance', () => {
     expect(pt!.x).toBeCloseTo(100, 1);
   });
 
-  it('returns null for distance beyond path length', () => {
+  it('returns endpoint for distance beyond path length (fallback tolerance)', () => {
     const cmds: PathCommand[] = [
       { type: 'M', values: [0, 0] },
       { type: 'L', values: [100, 0] },
     ];
-    expect(pointAtPathDistance(cmds, 200)).toBeNull();
+    const pt = pointAtPathDistance(cmds, 200);
+    expect(pt).not.toBeNull();
+    expect(pt!.x).toBeCloseTo(100, 1);
+    expect(pt!.y).toBeCloseTo(0, 1);
+  });
+
+  it('returns endpoint for multi-segment path at exact total distance', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+    ];
+    const total = computePathArcLength(cmds);
+    const pt = pointAtPathDistance(cmds, total);
+    expect(pt).not.toBeNull();
+    expect(pt!.x).toBeCloseTo(100, 1);
+    expect(pt!.y).toBeCloseTo(100, 1);
   });
 });
 
@@ -164,6 +180,22 @@ describe('samplePathAtIntervals', () => {
 
   it('returns empty for empty path', () => {
     expect(samplePathAtIntervals([], 10)).toEqual([]);
+  });
+
+  it('returns empty array when interval is 0', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+    ];
+    expect(samplePathAtIntervals(cmds, 0)).toEqual([]);
+  });
+
+  it('returns empty array when interval is negative', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+    ];
+    expect(samplePathAtIntervals(cmds, -10)).toEqual([]);
   });
 });
 
@@ -233,4 +265,33 @@ describe('distanceAlongPath', () => {
     expect(dist).toBeGreaterThan(fullLen * 0.4);
     expect(dist).toBeLessThan(fullLen * 0.6);
   });
+});
+
+describe('S and T command support', () => {
+  it('computes arc-length for S (smooth cubic) command', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [33, 0, 67, 0, 100, 0] },
+      { type: 'S' as PathCommand['type'], values: [167, 0, 200, 0] },
+    ];
+    expect(computePathArcLength(cmds)).toBeCloseTo(200, 0);
+  });
+
+  it('computes arc-length for T (smooth quadratic) command', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'Q', values: [50, 0, 100, 0] },
+      { type: 'T' as PathCommand['type'], values: [200, 0] },
+    ];
+    expect(computePathArcLength(cmds)).toBeCloseTo(200, 0);
+  });
+});
+
+it('handles A command cursor advancement in pre-scan', () => {
+  const cmds: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'A' as PathCommand['type'], values: [50, 50, 0, 0, 1, 100, 0] },
+    { type: 'L', values: [200, 0] },
+  ];
+  expect(computePathArcLength(cmds, 2, 3)).toBeCloseTo(100, 1);
 });

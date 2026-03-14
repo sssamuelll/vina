@@ -160,18 +160,35 @@ function parseSegments(commands: PathCommand[], startIdx?: number, endIdx?: numb
         cursor = to;
         break;
       }
-      case 'S':
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('arcLength: S command contributes zero arc-length (not fully supported)');
+      case 'S': {
+        const cp2 = { x: cmd.values[0], y: cmd.values[1] };
+        const to = { x: cmd.values[2], y: cmd.values[3] };
+        let cp1: Point2D;
+        const prevSeg = segments[segments.length - 1];
+        if (prevSeg && prevSeg.type === 'cubic' && prevSeg.cp2) {
+          cp1 = { x: 2 * cursor.x - prevSeg.cp2.x, y: 2 * cursor.y - prevSeg.cp2.y };
+        } else {
+          cp1 = { ...cursor };
         }
-        cursor = { x: cmd.values[2], y: cmd.values[3] };
+        const length = gaussLegendreCubicBezierLength(cursor, cp1, cp2, to);
+        segments.push({ type: 'cubic', from: cursor, to, cp1, cp2, length, cmdIndex: i });
+        cursor = to;
         break;
-      case 'T':
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn('arcLength: T command contributes zero arc-length (not fully supported)');
+      }
+      case 'T': {
+        const to = { x: cmd.values[0], y: cmd.values[1] };
+        let cp1: Point2D;
+        const prevSeg = segments[segments.length - 1];
+        if (prevSeg && prevSeg.type === 'quadratic' && prevSeg.cp1) {
+          cp1 = { x: 2 * cursor.x - prevSeg.cp1.x, y: 2 * cursor.y - prevSeg.cp1.y };
+        } else {
+          cp1 = { ...cursor };
         }
-        cursor = { x: cmd.values[0], y: cmd.values[1] };
+        const length = gaussLegendreQuadBezierLength(cursor, cp1, to);
+        segments.push({ type: 'quadratic', from: cursor, to, cp1, length, cmdIndex: i });
+        cursor = to;
         break;
+      }
       case 'A':
         if (process.env.NODE_ENV !== 'production') {
           console.warn('arcLength: A command contributes zero arc-length (not fully supported)');
@@ -210,6 +227,7 @@ function totalLength(segments: PathSegment[]): number {
 }
 
 function pointAtDistance(segments: PathSegment[], distance: number): Point2D | null {
+  if (segments.length === 0) return null;
   let remaining = distance;
   for (const seg of segments) {
     if (remaining <= seg.length + 1e-6) {
@@ -218,7 +236,9 @@ function pointAtDistance(segments: PathSegment[], distance: number): Point2D | n
     }
     remaining -= seg.length;
   }
-  return null;
+  // Fallback: return the endpoint of the last segment (float accumulation tolerance)
+  const last = segments[segments.length - 1];
+  return evaluateSegment(last, 1);
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -240,7 +260,7 @@ export function samplePathAtIntervals(
 ): ArcLengthSample[] {
   const segments = parseSegments(commands, startIdx, endIdx);
   const total = totalLength(segments);
-  if (total === 0) return [];
+  if (total === 0 || interval <= 0) return [];
 
   const samples: ArcLengthSample[] = [];
   const numIntervals = Math.floor(total / interval);
