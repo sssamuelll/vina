@@ -31,6 +31,7 @@ import { flattenTool } from './definitions/flatten';
 import { measureTool } from './definitions/measure';
 import { measureCurveTool } from './definitions/measureCurve';
 import { compareCurvesTool } from './definitions/compareCurves';
+import { walkSeamTool } from './definitions/walkSeam';
 import { handTool } from './definitions/hand';
 import { zoomTool } from './definitions/zoom';
 import { cameraTool } from './definitions/camera';
@@ -99,6 +100,7 @@ const allTools = [
   measureTool,
   measureCurveTool,
   compareCurvesTool,
+  walkSeamTool,
 
   // 2D Tools — Navigation
   handTool,
