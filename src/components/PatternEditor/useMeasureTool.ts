@@ -1,9 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import type { Point2D, PatternPiece } from '../../types/types';
+import type { Point2D, PatternPiece, SemanticEdge } from '../../types/types';
 import { formatDimension } from '../../utils/units';
 import { flattenPath } from '../../utils/seam/index';
+import { computePathArcLength, samplePathAtIntervals, distanceAlongPath } from '../../utils/geometry/arcLength';
+import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 
 // ─── Types ───
 
@@ -21,6 +23,24 @@ export interface SnapResult {
   point: Point2D;
   pieceId: string;
   segmentIndex: number;
+}
+
+export type MeasureMode = 'point-to-point' | 'along-curve' | 'compare';
+
+export interface SelectedEdgeInfo {
+  pieceId: string;
+  piece: PatternPiece;
+  edge: SemanticEdge;
+  arcLength: number;
+  markers: ArcLengthSample[];
+  pathPoints: Point2D[];
+}
+
+export interface CurveComparison {
+  edgeA: SelectedEdgeInfo;
+  edgeB: SelectedEdgeInfo;
+  delta: number;
+  easePercent: number;
 }
 
 // ─── Exported helpers (pure functions for testability) ───
@@ -78,6 +98,25 @@ export function calculatePathLength(points: Point2D[]): number {
   return total;
 }
 
+// ─── Along-curve helpers ───
+
+function findEdgeForSegment(piece: PatternPiece, segmentIndex: number): SemanticEdge | null {
+  if (!piece.edges) return null;
+  return piece.edges.find(e =>
+    segmentIndex >= e.segmentRange[0] && segmentIndex < e.segmentRange[1]
+  ) ?? null;
+}
+
+function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInterval: number): SelectedEdgeInfo {
+  const arcLength = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
+  const markers = samplePathAtIntervals(piece.outline, markerInterval, edge.segmentRange[0], edge.segmentRange[1]);
+  const pathPoints = markers.map(m => ({
+    x: m.point.x + piece.position.x,
+    y: m.point.y + piece.position.y,
+  }));
+  return { pieceId: piece.id, piece, edge, arcLength, markers, pathPoints };
+}
+
 // ─── Hook ───
 
 export function useMeasureTool(zoom: number, pan: Point2D) {
@@ -88,6 +127,18 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
   const [currentStart, setCurrentStart] = useState<Point2D | null>(null);
   const [cursorPos, setCursorPos] = useState<Point2D | null>(null);
   const [hoveredSnapPoint, setHoveredSnapPoint] = useState<Point2D | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<SelectedEdgeInfo | null>(null);
+  const [compareEdgeA, setCompareEdgeA] = useState<SelectedEdgeInfo | null>(null);
+  const [compareEdgeB, setCompareEdgeB] = useState<SelectedEdgeInfo | null>(null);
+  const [hoverDistance, setHoverDistance] = useState<number | null>(null);
+  const [comparison, setComparison] = useState<CurveComparison | null>(null);
+
+  const measureMode: MeasureMode = useSelector(
+    (s: RootState) => (s.tools.toolOptions['measure']?.measureMode as MeasureMode) ?? 'point-to-point'
+  );
+  const markerInterval = useSelector(
+    (s: RootState) => Number(s.tools.toolOptions['measure']?.markerInterval ?? '50')
+  );
 
   const currentStartRef = useRef(currentStart);
   currentStartRef.current = currentStart;
@@ -128,6 +179,60 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
     const snap = trySnap(rawPt);
     const pt = snap ? snap.point : rawPt;
 
+    if (measureMode === 'along-curve') {
+      // Find which piece and edge was clicked
+      if (snap) {
+        const piece = pieces.find(p => p.id === snap.pieceId);
+        if (piece) {
+          const edge = findEdgeForSegment(piece, snap.segmentIndex);
+          if (edge) {
+            setSelectedEdge(buildEdgeInfo(piece, edge, markerInterval));
+          } else {
+            // No semantic edge — measure full outline
+            const arcLength = computePathArcLength(piece.outline);
+            const markers = samplePathAtIntervals(piece.outline, markerInterval);
+            const pathPoints = markers.map(m => ({
+              x: m.point.x + piece.position.x,
+              y: m.point.y + piece.position.y,
+            }));
+            setSelectedEdge({
+              pieceId: piece.id,
+              piece,
+              edge: { id: '__outline__', name: 'outline', segmentRange: [0, piece.outline.length], edgeType: 'unknown' } as SemanticEdge,
+              arcLength,
+              markers,
+              pathPoints,
+            });
+          }
+        }
+      }
+      return;
+    }
+
+    if (measureMode === 'compare') {
+      if (snap) {
+        const piece = pieces.find(p => p.id === snap.pieceId);
+        if (piece) {
+          const edge = findEdgeForSegment(piece, snap.segmentIndex);
+          if (edge) {
+            const info = buildEdgeInfo(piece, edge, markerInterval);
+            if (!compareEdgeA) {
+              setCompareEdgeA(info);
+              setCompareEdgeB(null);
+              setComparison(null);
+            } else {
+              setCompareEdgeB(info);
+              const delta = info.arcLength - compareEdgeA.arcLength;
+              const easePercent = compareEdgeA.arcLength > 0 ? (delta / compareEdgeA.arcLength) * 100 : 0;
+              setComparison({ edgeA: compareEdgeA, edgeB: info, delta, easePercent });
+            }
+          }
+        }
+      }
+      return;
+    }
+
+    // point-to-point mode (existing behavior)
     if (!currentStartRef.current) {
       setCurrentStart(pt);
       setCursorPos(pt);
@@ -149,17 +254,34 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
       setCurrentStart(null);
       setCursorPos(null);
     }
-  }, [toPattern, trySnap]);
+  }, [toPattern, trySnap, measureMode, markerInterval, pieces, compareEdgeA]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const rawPt = toPattern(e);
     const snap = trySnap(rawPt);
     setHoveredSnapPoint(snap ? snap.point : null);
 
-    if (currentStartRef.current) {
-      setCursorPos(snap ? snap.point : rawPt);
+    if (measureMode === 'along-curve' && selectedEdge) {
+      // Compute hover distance along the selected edge
+      const localPt = {
+        x: rawPt.x - selectedEdge.piece.position.x,
+        y: rawPt.y - selectedEdge.piece.position.y,
+      };
+      const d = distanceAlongPath(
+        selectedEdge.piece.outline,
+        localPt,
+        selectedEdge.edge.segmentRange[0],
+        selectedEdge.edge.segmentRange[1],
+      );
+      setHoverDistance(d);
+      setCursorPos(rawPt);
+    } else {
+      setHoverDistance(null);
+      if (currentStartRef.current) {
+        setCursorPos(snap ? snap.point : rawPt);
+      }
     }
-  }, [toPattern, trySnap]);
+  }, [toPattern, trySnap, measureMode, selectedEdge]);
 
   const handleMouseUp = useCallback(() => {
     // no-op — measure uses clicks, not drag
@@ -167,7 +289,14 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape') {
-      if (currentStartRef.current) {
+      if (selectedEdge) {
+        setSelectedEdge(null);
+        setHoverDistance(null);
+      } else if (compareEdgeA || compareEdgeB || comparison) {
+        setCompareEdgeA(null);
+        setCompareEdgeB(null);
+        setComparison(null);
+      } else if (currentStartRef.current) {
         setCurrentStart(null);
         setCursorPos(null);
       } else {
@@ -177,7 +306,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       setMeasurements(prev => prev.slice(0, -1));
     }
-  }, []);
+  }, [selectedEdge, compareEdgeA, compareEdgeB, comparison]);
 
   const getCursor = useCallback((): string => {
     return 'crosshair';
@@ -188,6 +317,11 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
     setCurrentStart(null);
     setCursorPos(null);
     setHoveredSnapPoint(null);
+    setSelectedEdge(null);
+    setCompareEdgeA(null);
+    setCompareEdgeB(null);
+    setHoverDistance(null);
+    setComparison(null);
   }, []);
 
   // Keep clear as alias for backward compatibility with useEditorInteractions
@@ -206,5 +340,14 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
     reset,
     clear,
     formatDistance,
+    // Along-curve
+    measureMode,
+    markerInterval,
+    selectedEdge,
+    hoverDistance,
+    // Compare
+    compareEdgeA,
+    compareEdgeB,
+    comparison,
   };
 }
