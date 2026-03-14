@@ -139,11 +139,26 @@ function WalkDot({ edge, zoom2D }: { edge: SelectedEdgeInfo; zoom2D: number }) {
 function CompareVisualization({ comparison, zoom2D, formatDistance }: {
   comparison: CurveComparison; zoom2D: number; formatDistance: (d: number) => string;
 }) {
-  const { edgeA, edgeB, delta, easePercent } = comparison;
+  const { edgeA, edgeB, delta, easePercent, maxLocalDelta, samples } = comparison;
+
+  const dotColor = (ld: number) => ld < 2 ? '#4caf50' : ld < 5 ? '#ff9800' : '#f44336';
+
   return (
     <g>
       <EdgeHighlight edge={edgeA} zoom2D={zoom2D} formatDistance={formatDistance} />
       <EdgeHighlight edge={edgeB} zoom2D={zoom2D} formatDistance={formatDistance} />
+      {samples.map((s, i) => (
+        <g key={i}>
+          <line
+            x1={s.pointA.x} y1={s.pointA.y}
+            x2={s.pointB.x} y2={s.pointB.y}
+            stroke={dotColor(s.localDelta)} strokeWidth={1 / zoom2D}
+            strokeDasharray={`${2 / zoom2D}`} opacity={0.6}
+          />
+          <circle cx={s.pointA.x} cy={s.pointA.y} r={2 / zoom2D} fill={dotColor(s.localDelta)} />
+          <circle cx={s.pointB.x} cy={s.pointB.y} r={2 / zoom2D} fill={dotColor(s.localDelta)} />
+        </g>
+      ))}
       {edgeA.pathPoints.length > 0 && edgeB.pathPoints.length > 0 && (() => {
         const midA = edgeA.pathPoints[Math.floor(edgeA.pathPoints.length / 2)];
         const midB = edgeB.pathPoints[Math.floor(edgeB.pathPoints.length / 2)];
@@ -153,7 +168,7 @@ function CompareVisualization({ comparison, zoom2D, formatDistance }: {
         return (
           <MeasurementLabel
             x={mx} y={my}
-            label={`Δ ${sign}${formatDistance(delta)} (${easePercent.toFixed(1)}%)`}
+            label={`Δ ${sign}${formatDistance(delta)} (${easePercent.toFixed(1)}%) max: ${formatDistance(maxLocalDelta)}`}
             zoom2D={zoom2D} bold
           />
         );

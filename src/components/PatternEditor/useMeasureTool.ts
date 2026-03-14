@@ -4,7 +4,7 @@ import type { RootState } from '../../store';
 import type { Point2D, PatternPiece, SemanticEdge } from '../../types/types';
 import { formatDimension } from '../../utils/units';
 import { flattenPath } from '../../utils/seam/index';
-import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath } from '../../utils/geometry/arcLength';
+import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath, pointAtPathDistance } from '../../utils/geometry/arcLength';
 import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 
 // ─── Types ───
@@ -37,11 +37,20 @@ export interface SelectedEdgeInfo {
   walkPoints: Point2D[];    // dense (3mm) — for smooth walk animation
 }
 
+export interface CurveDivergenceSample {
+  tA: number;
+  pointA: Point2D;
+  pointB: Point2D;
+  localDelta: number;
+}
+
 export interface CurveComparison {
   edgeA: SelectedEdgeInfo;
   edgeB: SelectedEdgeInfo;
   delta: number;
   easePercent: number;
+  maxLocalDelta: number;
+  samples: CurveDivergenceSample[];
 }
 
 // ─── Exported helpers (pure functions for testability) ───
@@ -245,9 +254,36 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
               setComparison(null);
             } else {
               setCompareEdgeB(info);
-              const delta = info.arcLength - compareEdgeARef.current.arcLength;
-              const easePercent = compareEdgeARef.current.arcLength > 0 ? (delta / compareEdgeARef.current.arcLength) * 100 : 0;
-              setComparison({ edgeA: compareEdgeARef.current, edgeB: info, delta, easePercent });
+              const edgeA = compareEdgeARef.current;
+              const delta = info.arcLength - edgeA.arcLength;
+              const easePercent = edgeA.arcLength > 0 ? (delta / edgeA.arcLength) * 100 : 0;
+
+              // Sample both edges at 10 equal arc-length fractions
+              const NUM_SAMPLES = 10;
+              const divergenceSamples: CurveDivergenceSample[] = [];
+              let maxLocalDelta = 0;
+              for (let si = 0; si <= NUM_SAMPLES; si++) {
+                const frac = si / NUM_SAMPLES;
+                const dA = frac * edgeA.arcLength;
+                const dB = frac * info.arcLength;
+                const ptA = pointAtPathDistance(
+                  edgeA.piece.outline, dA,
+                  edgeA.edge.segmentRange[0], edgeA.edge.segmentRange[1],
+                );
+                const ptB = pointAtPathDistance(
+                  info.piece.outline, dB,
+                  info.edge.segmentRange[0], info.edge.segmentRange[1],
+                );
+                if (ptA && ptB) {
+                  const worldA = { x: ptA.x + edgeA.piece.position.x, y: ptA.y + edgeA.piece.position.y };
+                  const worldB = { x: ptB.x + info.piece.position.x, y: ptB.y + info.piece.position.y };
+                  const ld = Math.hypot(worldA.x - worldB.x, worldA.y - worldB.y);
+                  if (ld > maxLocalDelta) maxLocalDelta = ld;
+                  divergenceSamples.push({ tA: frac, pointA: worldA, pointB: worldB, localDelta: ld });
+                }
+              }
+
+              setComparison({ edgeA, edgeB: info, delta, easePercent, maxLocalDelta, samples: divergenceSamples });
             }
           }
         }

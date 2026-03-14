@@ -10,7 +10,7 @@
 
 import type { MetaToolDefinition, MetaToolResult } from './types';
 import type { PathCommand } from '../../../../types/types';
-import { computePathArcLength } from '../../../../utils/geometry/arcLength';
+import { computePathArcLength, pointAtPathDistance } from '../../../../utils/geometry/arcLength';
 
 export const compareCurvesTool: MetaToolDefinition = {
   name: 'compareCurves',
@@ -52,6 +52,18 @@ export const compareCurvesTool: MetaToolDefinition = {
     const delta = b.length - a.length;
     const easePercent = a.length > 0 ? (delta / a.length) * 100 : 0;
 
+    const NUM_SAMPLES = 10;
+    let maxLocalDelta = 0;
+    for (let i = 0; i <= NUM_SAMPLES; i++) {
+      const frac = i / NUM_SAMPLES;
+      const ptA = pointAtPathDistance(a.piece.outline, frac * a.length, a.edge.segmentRange[0], a.edge.segmentRange[1]);
+      const ptB = pointAtPathDistance(b.piece.outline, frac * b.length, b.edge.segmentRange[0], b.edge.segmentRange[1]);
+      if (ptA && ptB) {
+        const ld = Math.hypot(ptA.x - ptB.x, ptA.y - ptB.y);
+        if (ld > maxLocalDelta) maxLocalDelta = ld;
+      }
+    }
+
     return {
       success: true,
       data: {
@@ -63,6 +75,7 @@ export const compareCurvesTool: MetaToolDefinition = {
         pieceIdB: params.pieceIdB,
         delta,
         easePercent,
+        maxLocalDelta,
         unit: 'mm',
       } as unknown as Record<string, unknown>,
     };
