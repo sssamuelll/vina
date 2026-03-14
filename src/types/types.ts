@@ -310,6 +310,8 @@ export type Tool2D =
   | 'fabricTexture' // fabric/texture assignment
   | 'flatten'      // flatten/iron
   | 'measure'      // distance / angle measurement
+  | 'measureCurve'  // arc-length along a curve
+  | 'compareCurves' // compare two curve lengths
   | 'scissors'     // split pattern pieces
   | 'merge'        // merge adjacent pattern pieces
   | 'hand'         // pan

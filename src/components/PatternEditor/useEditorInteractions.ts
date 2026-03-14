@@ -305,7 +305,7 @@ export function useEditorInteractions(
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
     if (activeTool === 'grainline') { grainlineTool.handleMouseDown(e); return; }
-    if (activeTool === 'measure') { measureTool.handleMouseDown(e); return; }
+    if (MEASURE_TOOL_IDS.has(activeTool)) { measureTool.handleMouseDown(e); return; }
     if (activeTool === 'scissors') { scissorsTool.handleMouseDown(e); return; }
     if (activeTool === 'merge') { mergeTool.handleMouseDown(e); return; }
     if (activeTool === 'segmentSewing') { segmentSewingTool.handleMouseDown(e); return; }
@@ -509,7 +509,7 @@ export function useEditorInteractions(
     if (activeTool === 'seam') seamTool.handleMouseMove(e);
     if (activeTool === 'notch') notchTool.handleMouseMove(e);
     if (activeTool === 'grainline') grainlineTool.handleMouseMove(e);
-    if (activeTool === 'measure') measureTool.handleMouseMove(e);
+    if (MEASURE_TOOL_IDS.has(activeTool)) measureTool.handleMouseMove(e);
     if (activeTool === 'scissors') scissorsTool.handleMouseMove(e);
     if (activeTool === 'merge') mergeTool.handleMouseMove(e);
     if (activeTool === 'segmentSewing') segmentSewingTool.handleMouseMove(e);
