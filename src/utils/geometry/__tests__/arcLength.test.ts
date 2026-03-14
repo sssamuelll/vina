@@ -4,6 +4,7 @@ import {
   computePathArcLength,
   pointAtPathDistance,
   samplePathAtIntervals,
+  samplePathDense,
   distanceAlongPath,
 } from '../arcLength';
 import type { PathCommand } from '../../../types/types';
@@ -163,6 +164,39 @@ describe('samplePathAtIntervals', () => {
 
   it('returns empty for empty path', () => {
     expect(samplePathAtIntervals([], 10)).toEqual([]);
+  });
+});
+
+describe('samplePathDense', () => {
+  it('returns dense points at specified resolution', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+    ];
+    const points = samplePathDense(cmds, 10);
+    // 100mm / 10mm = 10 intervals → 11 points
+    expect(points.length).toBe(11);
+    expect(points[0].x).toBeCloseTo(0, 1);
+    expect(points[10].x).toBeCloseTo(100, 1);
+  });
+
+  it('returns empty for empty path', () => {
+    expect(samplePathDense([], 3)).toEqual([]);
+  });
+
+  it('works with subrange', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 60] },
+    ];
+    // Subrange [2,3) = L from (100,0) to (100,60) = 60mm
+    const points = samplePathDense(cmds, 10, 2, 3);
+    // 60mm / 10mm = 6 intervals → 7 points
+    expect(points.length).toBe(7);
+    expect(points[0].x).toBeCloseTo(100, 1);
+    expect(points[0].y).toBeCloseTo(0, 1);
+    expect(points[6].y).toBeCloseTo(60, 1);
   });
 });
 
