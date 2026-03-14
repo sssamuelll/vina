@@ -19,6 +19,7 @@ export {
   computePathArcLength,
   pointAtPathDistance,
   samplePathAtIntervals,
+  samplePathDense,
   distanceAlongPath,
 } from './arcLength';
 export type { ArcLengthSample } from './arcLength';

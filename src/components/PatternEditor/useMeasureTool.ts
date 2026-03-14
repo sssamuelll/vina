@@ -4,7 +4,7 @@ import type { RootState } from '../../store';
 import type { Point2D, PatternPiece, SemanticEdge } from '../../types/types';
 import { formatDimension } from '../../utils/units';
 import { flattenPath } from '../../utils/seam/index';
-import { computePathArcLength, samplePathAtIntervals, distanceAlongPath } from '../../utils/geometry/arcLength';
+import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath } from '../../utils/geometry/arcLength';
 import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 
 // ─── Types ───
@@ -33,7 +33,8 @@ export interface SelectedEdgeInfo {
   edge: SemanticEdge;
   arcLength: number;
   markers: ArcLengthSample[];
-  pathPoints: Point2D[];
+  pathPoints: Point2D[];    // coarse (marker interval) — for overlay dots
+  walkPoints: Point2D[];    // dense (3mm) — for smooth walk animation
 }
 
 export interface CurveComparison {
@@ -114,7 +115,12 @@ function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInterval: 
     x: m.point.x + piece.position.x,
     y: m.point.y + piece.position.y,
   }));
-  return { pieceId: piece.id, piece, edge, arcLength, markers, pathPoints };
+  const rawWalk = samplePathDense(piece.outline, 3, edge.segmentRange[0], edge.segmentRange[1]);
+  const walkPoints = rawWalk.map(p => ({
+    x: p.x + piece.position.x,
+    y: p.y + piece.position.y,
+  }));
+  return { pieceId: piece.id, piece, edge, arcLength, markers, pathPoints, walkPoints };
 }
 
 // ─── Hook ───
@@ -195,6 +201,11 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
               x: m.point.x + piece.position.x,
               y: m.point.y + piece.position.y,
             }));
+            const rawWalk = samplePathDense(piece.outline, 3);
+            const walkPoints = rawWalk.map(p => ({
+              x: p.x + piece.position.x,
+              y: p.y + piece.position.y,
+            }));
             setSelectedEdge({
               pieceId: piece.id,
               piece,
@@ -202,6 +213,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
               arcLength,
               markers,
               pathPoints,
+              walkPoints,
             });
           }
         }

@@ -122,7 +122,7 @@ function EdgeHighlight({ edge, zoom2D, formatDistance }: {
 }
 
 function WalkDot({ edge, zoom2D }: { edge: SelectedEdgeInfo; zoom2D: number }) {
-  const points = edge.pathPoints;
+  const points = edge.walkPoints;
   if (points.length < 2) return null;
 
   return (

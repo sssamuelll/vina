@@ -251,6 +251,28 @@ export function samplePathAtIntervals(
   return samples;
 }
 
+/**
+ * Sample a path at a fixed small interval for smooth SVG animation.
+ * Returns just the points (no distance/t metadata) for efficiency.
+ */
+export function samplePathDense(
+  commands: PathCommand[], resolution: number = 3,
+  startIdx?: number, endIdx?: number,
+): Point2D[] {
+  const segments = parseSegments(commands, startIdx, endIdx);
+  const total = totalLength(segments);
+  if (total === 0) return [];
+
+  const numSamples = Math.max(2, Math.ceil(total / resolution));
+  const points: Point2D[] = [];
+  for (let i = 0; i <= numSamples; i++) {
+    const d = (i / numSamples) * total;
+    const pt = pointAtDistance(segments, d);
+    if (pt) points.push(pt);
+  }
+  return points;
+}
+
 export function distanceAlongPath(
   commands: PathCommand[], point: Point2D, startIdx?: number, endIdx?: number,
 ): number {
