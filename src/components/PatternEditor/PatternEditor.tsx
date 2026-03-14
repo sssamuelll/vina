@@ -265,6 +265,12 @@ export default function PatternEditor() {
             formatDistance={measureTool.formatDistance}
             measureHoveredSnapPoint={measureTool.hoveredSnapPoint}
             measureShowAngle={toolOptions?.measure?.showAngle ?? false}
+            measureMode={measureTool.measureMode}
+            measureSelectedEdge={measureTool.selectedEdge}
+            measureHoverDistance={measureTool.hoverDistance}
+            measureCompareEdgeA={measureTool.compareEdgeA}
+            measureCompareEdgeB={measureTool.compareEdgeB}
+            measureComparison={measureTool.comparison}
             nodeEditorIsEditing={nodeEditor.isEditing}
             nodeEditorEditingPieceId={nodeEditor.editingPieceId}
             nodeEditorNodes={nodeEditor.nodes}
