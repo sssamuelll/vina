@@ -26,12 +26,19 @@ export const measureAlongCurveTool: MetaToolDefinition = {
         type: 'string',
         description: 'The name of the edge to measure along (case-insensitive). E.g. "armhole", "neckline".',
       },
+      markerInterval: {
+        type: 'number',
+        description: 'Marker interval in mm (default: 50).',
+      },
     },
     required: ['pieceId', 'edgeName'],
   },
   execute: async (params, getState): Promise<MetaToolResult> => {
     const pieceId = params.pieceId as string;
     const edgeName = params.edgeName as string;
+    const markerInterval = typeof (params as Record<string, unknown>).markerInterval === 'number'
+      ? (params as Record<string, unknown>).markerInterval as number
+      : 50;
     const state = getState();
     const pieces = (state.project?.pieces ?? []) as Array<{
       id: string;
@@ -59,7 +66,7 @@ export const measureAlongCurveTool: MetaToolDefinition = {
     }
 
     const length = computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
-    const samples = samplePathAtIntervals(piece.outline, 50, edge.segmentRange[0], edge.segmentRange[1]);
+    const samples = samplePathAtIntervals(piece.outline, markerInterval, edge.segmentRange[0], edge.segmentRange[1]);
 
     return {
       success: true,
