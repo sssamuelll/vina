@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { Point2D, PatternPiece, SemanticEdge } from '../../types/types';
@@ -145,6 +145,15 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
   const markerInterval = useSelector(
     (s: RootState) => Number(s.tools.toolOptions['measure']?.markerInterval ?? '50')
   );
+
+  // Clear mode-specific state when switching measure modes
+  useEffect(() => {
+    setSelectedEdge(null);
+    setHoverDistance(null);
+    setCompareEdgeA(null);
+    setCompareEdgeB(null);
+    setComparison(null);
+  }, [measureMode]);
 
   const currentStartRef = useRef(currentStart);
   currentStartRef.current = currentStart;
