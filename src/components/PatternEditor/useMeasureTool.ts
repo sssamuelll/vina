@@ -132,6 +132,16 @@ export function buildEdgeInfo(piece: PatternPiece, edge: SemanticEdge, markerInt
   return { pieceId: piece.id, piece, edge, arcLength, markers, pathPoints, walkPoints };
 }
 
+export function buildOutlineInfo(piece: PatternPiece, markerInterval: number): SelectedEdgeInfo {
+  const syntheticEdge: SemanticEdge = {
+    id: '__outline__',
+    name: 'outline',
+    segmentRange: [0, piece.outline.length],
+    edgeType: 'unknown',
+  };
+  return buildEdgeInfo(piece, syntheticEdge, markerInterval);
+}
+
 // ─── Hook ───
 
 export function useMeasureTool(zoom: number, pan: Point2D) {
@@ -216,27 +226,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
           if (edge) {
             setSelectedEdge(buildEdgeInfo(piece, edge, markerInterval));
           } else {
-            // No semantic edge — measure full outline
-            const arcLength = computePathArcLength(piece.outline);
-            const markers = samplePathAtIntervals(piece.outline, markerInterval);
-            const pathPoints = markers.map(m => ({
-              x: m.point.x + piece.position.x,
-              y: m.point.y + piece.position.y,
-            }));
-            const rawWalk = samplePathDense(piece.outline, 3);
-            const walkPoints = rawWalk.map(p => ({
-              x: p.x + piece.position.x,
-              y: p.y + piece.position.y,
-            }));
-            setSelectedEdge({
-              pieceId: piece.id,
-              piece,
-              edge: { id: '__outline__', name: 'outline', segmentRange: [0, piece.outline.length], edgeType: 'unknown' } as SemanticEdge,
-              arcLength,
-              markers,
-              pathPoints,
-              walkPoints,
-            });
+            setSelectedEdge(buildOutlineInfo(piece, markerInterval));
           }
         }
       }
@@ -248,32 +238,9 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
         const piece = pieces.find(p => p.id === snap.pieceId);
         if (piece) {
           const edge = findEdgeForSegment(piece, snap.segmentIndex);
-          let info: SelectedEdgeInfo;
-          if (edge) {
-            info = buildEdgeInfo(piece, edge, markerInterval);
-          } else {
-            // No semantic edge — compare full outline
-            const arcLength = computePathArcLength(piece.outline);
-            const markers = samplePathAtIntervals(piece.outline, markerInterval);
-            const pathPoints = markers.map(m => ({
-              x: m.point.x + piece.position.x,
-              y: m.point.y + piece.position.y,
-            }));
-            const rawWalk = samplePathDense(piece.outline, 3);
-            const walkPoints = rawWalk.map(p => ({
-              x: p.x + piece.position.x,
-              y: p.y + piece.position.y,
-            }));
-            info = {
-              pieceId: piece.id,
-              piece,
-              edge: { id: '__outline__', name: 'outline', segmentRange: [0, piece.outline.length], edgeType: 'unknown' } as SemanticEdge,
-              arcLength,
-              markers,
-              pathPoints,
-              walkPoints,
-            };
-          }
+          const info = edge
+            ? buildEdgeInfo(piece, edge, markerInterval)
+            : buildOutlineInfo(piece, markerInterval);
 
           if (!compareEdgeARef.current) {
             setCompareEdgeA(info);

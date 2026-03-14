@@ -27,7 +27,6 @@ export const compareCurvesTool: ToolDefinition = {
   context: '2d',
   icon: CompareCurvesIcon,
   cursor: 'crosshair',
-  shortcut: 'm',
   group: 'annotation',
   options: [
     {

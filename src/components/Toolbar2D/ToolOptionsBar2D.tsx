@@ -8,7 +8,7 @@ import type { RootState } from '../../store';
 import { setToolOption } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
 import type { ToolOption } from '../../tools/types';
-import '../Toolbar3D/ToolOptionsBar.css';
+import '../../styles/toolOptionsBar.css';
 
 export default function ToolOptionsBar2D() {
   const dispatch = useDispatch();

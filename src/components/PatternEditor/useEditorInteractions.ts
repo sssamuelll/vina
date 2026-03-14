@@ -549,7 +549,7 @@ export function useEditorInteractions(
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';
       case 'grainline': return 'crosshair';
-      case 'measure': return 'crosshair';
+      case 'measure': case 'measureCurve': case 'compareCurves': return 'crosshair';
       case 'scissors': return scissorsTool.getCursor();
       case 'merge': return mergeTool.getCursor();
       case 'segmentSewing': return segmentSewingTool.getCursor();

@@ -294,11 +294,13 @@ export function distanceAlongPath(
   let cumDist = 0;
   for (const seg of segments) {
     const SAMPLES = seg.type === 'line' ? 1 : 20;
-    const subArcLen = seg.length / SAMPLES;
     let prev = evaluateSegment(seg, 0);
     for (let i = 1; i <= SAMPLES; i++) {
       const t = i / SAMPLES;
       const curr = evaluateSegment(seg, t);
+
+      // Compute actual chord length of this sub-interval
+      const chordLen = Math.hypot(curr.x - prev.x, curr.y - prev.y);
 
       const abx = curr.x - prev.x;
       const aby = curr.y - prev.y;
@@ -311,11 +313,11 @@ export function distanceAlongPath(
         const perpDist = Math.hypot(point.x - px, point.y - py);
         if (perpDist < bestPerpDist) {
           bestPerpDist = perpDist;
-          bestTotalDist = cumDist + proj * subArcLen;
+          bestTotalDist = cumDist + proj * chordLen;
         }
       }
 
-      cumDist += subArcLen;
+      cumDist += chordLen;
       prev = curr;
     }
   }

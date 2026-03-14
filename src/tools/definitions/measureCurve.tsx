@@ -31,7 +31,6 @@ export const measureCurveTool: ToolDefinition = {
   context: '2d',
   icon: MeasureCurveIcon,
   cursor: 'crosshair',
-  shortcut: 'm',
   group: 'annotation',
   options: [
     {

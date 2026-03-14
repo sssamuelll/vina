@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { snapToOutline, calculatePathLength, findEdgeForSegment, buildEdgeInfo } from '../useMeasureTool';
+import { snapToOutline, calculatePathLength, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } from '../useMeasureTool';
 import type { PatternPiece, SemanticEdge } from '../../../types/types';
 
 describe('snapToOutline', () => {
@@ -153,5 +153,26 @@ describe('buildEdgeInfo', () => {
     expect(info.pieceId).toBe('p1');
     expect(info.piece).toBe(pieceWithEdges);
     expect(info.edge).toBe(topEdge);
+  });
+});
+
+describe('buildOutlineInfo', () => {
+  it('uses full outline length', () => {
+    const info = buildOutlineInfo(pieceWithEdges, 50);
+    // Full outline: (0,0)→(100,0)→(100,80)→(0,80) = 100+80+100 = 280mm (Z is 0-length)
+    expect(info.arcLength).toBeCloseTo(280, 0);
+  });
+
+  it('creates synthetic edge with __outline__ id', () => {
+    const info = buildOutlineInfo(pieceWithEdges, 50);
+    expect(info.edge.id).toBe('__outline__');
+    expect(info.edge.name).toBe('outline');
+    expect(info.edge.edgeType).toBe('unknown');
+  });
+
+  it('synthetic edge segmentRange spans full outline', () => {
+    const info = buildOutlineInfo(pieceWithEdges, 50);
+    expect(info.edge.segmentRange[0]).toBe(0);
+    expect(info.edge.segmentRange[1]).toBe(pieceWithEdges.outline.length);
   });
 });
