@@ -417,7 +417,6 @@ export default function Workspace() {
                 <div className="viewport-label">3D VIEW</div>
                 <DisplayBar3D />
                 <div className="viewport3d-with-toolbar">
-                  <ToolOptionsBar />
                   <Viewport3DErrorBoundary>
                     <Viewport3D activeTool3D={activeTool3D as Tool3D} />
                   </Viewport3DErrorBoundary>
@@ -428,6 +427,7 @@ export default function Workspace() {
                       onToggleAvatarPanel={() => setAvatarPanelOpen(v => !v)}
                     />
                   </div>
+                  <ToolOptionsBar />
                 </div>
               </div>
             </div>
