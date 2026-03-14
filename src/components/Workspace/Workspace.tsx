@@ -394,6 +394,7 @@ export default function Workspace() {
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
               <Toolbar2D />
+              <ToolOptionsBar2D />
             </div>
 
             {/* Viewports — ALWAYS mounted, sized via CSS width (VS Code pattern) */}
@@ -403,10 +404,7 @@ export default function Workspace() {
                 style={{ width: get2dWidth() }}
               >
                 <div className="viewport-label">PATTERN</div>
-                <div className="viewport2d-with-options">
-                  <PatternEditor />
-                  <ToolOptionsBar2D />
-                </div>
+                <PatternEditor />
                 <DisplayBar2D />
               </div>
 
