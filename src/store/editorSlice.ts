@@ -14,7 +14,7 @@ const initialState: EditorState = {
   defaultSeamAllowanceWidth: 10,
   showGrainlines: true,
   showAnchorPoints: false,
-  showPieceNames: true,
+  showPieceNames: false,
   showLineLengths: false,
   showSewingLines: true,
   renderMode2D: 'textured' as const,
