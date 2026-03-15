@@ -16,7 +16,7 @@ import {
   pointAtPathDistance,
   distanceAlongPath,
 } from '../../utils/geometry/arcLength';
-import { snapToOutline, findEdgeForSegment, buildEdgeInfo } from './useMeasureTool';
+import { snapToOutline, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } from './useMeasureTool';
 import { formatDimension } from '../../utils/units';
 
 // ─── Exported Types ─────────────────────────────────────────────────────────
@@ -387,12 +387,13 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     const piece = pieces.find(p => p.id === snap.pieceId);
     if (!piece) return null;
     const edge = findEdgeForSegment(piece, snap.segmentIndex);
-    if (!edge) return null;
-    const info = buildEdgeInfo(piece, edge, 50); // marker interval not critical for walk
+    const info = edge
+      ? buildEdgeInfo(piece, edge, 50)
+      : buildOutlineInfo(piece, 50);
     return {
       pieceId: piece.id,
       piece,
-      edge,
+      edge: info.edge,
       arcLength: info.arcLength,
     };
   }, [pieces]);
