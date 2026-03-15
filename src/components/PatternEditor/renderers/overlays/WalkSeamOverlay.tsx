@@ -218,6 +218,7 @@ function WalkIndicator({
       cx={wx} cy={wy}
       r={5 / zoom2D}
       fill={COLORS.walkIndicator}
+      stroke="#fff" strokeWidth={1.5 / zoom2D}
       opacity={0.9}
       pointerEvents="none"
     />
