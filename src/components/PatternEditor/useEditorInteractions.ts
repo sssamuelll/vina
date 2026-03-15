@@ -155,6 +155,13 @@ interface ToolHooks {
     getCursor: () => string;
     reset: () => void;
   };
+  walkSeamTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    getCursor: () => string;
+    reset: () => void;
+  };
 }
 
 export function useEditorInteractions(
@@ -174,7 +181,7 @@ export function useEditorInteractions(
     startMouse: Point2D; startPos: Point2D;
   } | null>(null);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, mergeTool, segmentSewingTool, topstitchTool } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool } = tools;
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -210,6 +217,12 @@ export function useEditorInteractions(
     // eslint-disable-next-line react-hooks/exhaustive-deps -- measureTool.clear is stable (useCallback with [])
   }, [activeTool, measureTool.clear]);
 
+  // Clear walk seam when switching away
+  useEffect(() => {
+    if (activeTool !== 'walkSeam') walkSeamTool.reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTool, walkSeamTool.reset]);
+
   // Delete/Backspace handler for selected internal line
   const handleInternalLineKeyDown = useCallback((e: KeyboardEvent) => {
     if (selectedInternalLine && (e.key === 'Delete' || e.key === 'Backspace')) {
@@ -236,12 +249,13 @@ export function useEditorInteractions(
     if (activeTool === 'merge') handlers.push(mergeTool.handleKeyDown);
     if (activeTool === 'segmentSewing') handlers.push(segmentSewingTool.handleKeyDown);
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') handlers.push(topstitchTool.handleKeyDown);
+    if (activeTool === 'walkSeam') handlers.push(walkSeamTool.handleKeyDown);
     if (activeTool === 'select' && selectedInternalLine) handlers.push(handleInternalLineKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown]);
+  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -310,6 +324,7 @@ export function useEditorInteractions(
     if (activeTool === 'merge') { mergeTool.handleMouseDown(e); return; }
     if (activeTool === 'segmentSewing') { segmentSewingTool.handleMouseDown(e); return; }
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') { topstitchTool.handleMouseDown(e); return; }
+    if (activeTool === 'walkSeam') { walkSeamTool.handleMouseDown(e); return; }
     if (activeTool === 'transform') {
       const handled = transformTool.handleMouseDown(e);
       if (handled) return;
@@ -420,7 +435,7 @@ export function useEditorInteractions(
         dispatch(clearSelection());
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -514,7 +529,8 @@ export function useEditorInteractions(
     if (activeTool === 'merge') mergeTool.handleMouseMove(e);
     if (activeTool === 'segmentSewing') segmentSewingTool.handleMouseMove(e);
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') topstitchTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, transformTool, editPattern, nodeEditor, pieces, dispatch]);
+    if (activeTool === 'walkSeam') walkSeamTool.handleMouseMove(e);
+  }, [activeTool, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch]);
 
   const handleMouseUp = useCallback(() => {
     // Commit pan position to Redux on mouseUp
@@ -554,6 +570,7 @@ export function useEditorInteractions(
       case 'merge': return mergeTool.getCursor();
       case 'segmentSewing': return segmentSewingTool.getCursor();
       case 'topstitchSeamline': case 'topstitchSegment': case 'topstitchFree': return topstitchTool.getCursor();
+      case 'walkSeam': return walkSeamTool.getCursor();
       case 'topstitchEdit': return 'default';
       default: return 'crosshair';
     }
