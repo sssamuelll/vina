@@ -9,7 +9,7 @@ import { clearCameraRequest, type ViewPreset } from '../../store/cameraSlice';
 const ANIMATION_DURATION_MS = 250;
 
 export const DEFAULT_TARGET: [number, number, number] = [0, 0.75, 0];
-const DEFAULT_DISTANCE = 2.0;
+const DEFAULT_DISTANCE = 3.0;
 
 export const VIEW_PRESETS: Record<ViewPreset, { position: [number, number, number]; target: [number, number, number] }> = {
   front:             { position: [0, 0.75, DEFAULT_DISTANCE],  target: DEFAULT_TARGET },
@@ -18,8 +18,8 @@ export const VIEW_PRESETS: Record<ViewPreset, { position: [number, number, numbe
   left:              { position: [-DEFAULT_DISTANCE, 0.75, 0], target: DEFAULT_TARGET },
   top:               { position: [0, DEFAULT_TARGET[1] + DEFAULT_DISTANCE, 0.001], target: DEFAULT_TARGET },
   bottom:            { position: [0, DEFAULT_TARGET[1] - DEFAULT_DISTANCE, 0.001], target: DEFAULT_TARGET },
-  threeQuarterRight: { position: [2.0, 0.75, 2.0],  target: DEFAULT_TARGET },
-  threeQuarterLeft:  { position: [-2.0, 0.75, 2.0], target: DEFAULT_TARGET },
+  threeQuarterRight: { position: [2.1, 0.75, 2.1],  target: DEFAULT_TARGET },
+  threeQuarterLeft:  { position: [-2.1, 0.75, 2.1], target: DEFAULT_TARGET },
 };
 
 // ─── Types ───
