@@ -7,6 +7,7 @@ interface ToolState {
   activeTool3D: string;     // tool id
   toolOptions: Record<string, Record<string, any>>; // toolId → optionId → value
   recentTools: string[];    // last 5 used tools
+  optionsPanelCollapsed: boolean; // true = tool options bar hidden (toggle via re-click)
 }
 
 const initialState: ToolState = {
@@ -14,6 +15,7 @@ const initialState: ToolState = {
   activeTool3D: 'camera',
   toolOptions: {},
   recentTools: [],
+  optionsPanelCollapsed: false,
 };
 
 const toolSlice = createSlice({
@@ -23,21 +25,25 @@ const toolSlice = createSlice({
     setActiveTool2D(state, action: PayloadAction<string>) {
       const toolId = action.payload;
       const prevTool = state.activeTool2D;
-      state.activeTool2D = toolId;
-      
-      // Update recent tools list
-      if (prevTool !== toolId) {
+      if (prevTool === toolId) {
+        // Re-click same tool → toggle options panel
+        state.optionsPanelCollapsed = !state.optionsPanelCollapsed;
+      } else {
+        state.activeTool2D = toolId;
+        state.optionsPanelCollapsed = false; // always show when switching tools
         state.recentTools = [toolId, ...state.recentTools.filter(id => id !== toolId)].slice(0, 5);
       }
     },
-    
+
     setActiveTool3D(state, action: PayloadAction<string>) {
       const toolId = action.payload;
       const prevTool = state.activeTool3D;
-      state.activeTool3D = toolId;
-      
-      // Update recent tools list
-      if (prevTool !== toolId) {
+      if (prevTool === toolId) {
+        // Re-click same tool → toggle options panel
+        state.optionsPanelCollapsed = !state.optionsPanelCollapsed;
+      } else {
+        state.activeTool3D = toolId;
+        state.optionsPanelCollapsed = false; // always show when switching tools
         state.recentTools = [toolId, ...state.recentTools.filter(id => id !== toolId)].slice(0, 5);
       }
     },
