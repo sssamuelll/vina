@@ -5,7 +5,6 @@ import { pointAtPathDistance, computePathArcLength } from '../../../../utils/geo
 
 interface WalkSeamOverlayProps {
   zoom2D: number;
-  pieces: PatternPiece[];
   stationaryEdge: WalkSeamEdge | null;
   mobileEdge: WalkSeamEdge | null;
   walkDistance: number;
@@ -229,7 +228,6 @@ function WalkIndicator({
 
 export default function WalkSeamOverlay({
   zoom2D,
-  pieces,
   stationaryEdge,
   mobileEdge,
   walkDistance,

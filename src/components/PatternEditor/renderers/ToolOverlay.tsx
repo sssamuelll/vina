@@ -261,7 +261,6 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       {activeTool === 'walkSeam' && (
         <WalkSeamOverlay
           zoom2D={zoom2D}
-          pieces={pieces}
           stationaryEdge={props.walkSeamStationaryEdge}
           mobileEdge={props.walkSeamMobileEdge}
           walkDistance={props.walkSeamWalkDistance}

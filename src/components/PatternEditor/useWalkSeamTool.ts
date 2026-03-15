@@ -7,7 +7,7 @@
  * two physical pattern pieces together on a table.
  */
 
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import type { Point2D, PathCommand, PatternPiece, Seam, SemanticEdge } from '../../types/types';
