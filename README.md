@@ -5,11 +5,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
 [![Rust](https://img.shields.io/badge/Rust-WASM-DEA584?logo=rust&logoColor=white)](crates/xpbd-wasm)
-[![codecov](https://codecov.io/gh/sssamuelll/openclo/graph/badge.svg)](https://codecov.io/gh/sssamuelll/openclo)
+[![Tests](https://img.shields.io/badge/Tests-3133_passing-success?logo=vitest&logoColor=white)](tests/)
 
 **The Cognitive Design Engine for Professional Fashion Engineering.**
 
-> **Status (March 14, 2026):** Currently finalizing **v0.7.0 "Precision & Professional Tools"**. We have successfully shipped **WebGPU Zero-copy Rendering**, **3D Mesh Grab (O-Key)**, **Steam Brush**, and **CLO-style Simulation Modes**. Final stretch for MVP: **Nesting Engine** and **Landing Page**. See our [Roadmap](ROADMAP.md).
+> **Status (March 14, 2026):** Currently finalizing **v0.7.0 "Precision & Professional Tools"**. We have successfully shipped **WebGPU Zero-copy Rendering**, **3D Mesh Grab (O-Key)**, **High-Precision Measure & Walk Seam Tools**, and **CLO-style Simulation Modes**. Final stretch for MVP: **Nesting Engine** and **Landing Page**. See our [Roadmap](ROADMAP.md).
 
 OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Next-Gen WebGPU Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
 
@@ -18,11 +18,11 @@ OpenClo.ai is a high-performance, browser-based ecosystem that transcends tradit
 ![OpenClo.ai Interface](docs/screenshots/editor.png)
 
 ## 🚀 Recent Milestones (v0.7.x)
+- **Walk Seam Verification**: Interactive tool for verifying seam length matching and ease distribution with <0.1mm Gauss-Legendre precision.
+- **High-Precision Measurement**: Gauss-Legendre quadrature engine for arc-length and ease comparison tools.
 - **WebGPU / TSL Engine**: Massive 10–50x performance boost via **Zero-copy Rendering** and shared compute buffers.
 - **3D Interaction Suite**: Professional **Mesh Grab (O-Key)**, **Steam/Press Brush**, and **Per-piece Freeze** functionality.
-- **Simulation Modes**: Standard and High-Precision (Complete) modes for production-grade draping.
-- **Agentic Copilot Loop**: Fully autonomous design iterations with meta-tool introspection and design memory.
-- **Bundle Optimization**: Dynamic code-splitting of heavy 3D loaders and exporters for near-instant load times.
+- **Agentic Copilot Loop**: Fully autonomous design iterations with 3,100+ automated test cases.
 
 ## Core Pillars
 
@@ -33,7 +33,7 @@ Unlike legacy tools that treat patterns as static vectors, OpenClo.ai operates o
 Our Copilot is a **Situated Fashion Agent** powered by a unified **Agentic Loop** architecture:
 - **Semantic Pattern Recognition**: Understands garment anatomy as deeply as a master tailor.
 - **Durable Design Memory**: Learns your aesthetic preferences, fit standards, and style history.
-- **Agentic Loop**: Unified tool-use loop with meta-tools (read-only) and action tools (mutations), LLM-driven iteration until completion.
+- **Agentic Loop**: Unified tool-use loop with meta-tools (read-only) and action tools (mutations).
 
 ### Next-Gen WebGPU Physics
 Powered by **TSL (Three.js Shading Language)** and a **Rust-based WASM fallback**, OpenClo.ai provides real-time, physically accurate 3D draping.
@@ -45,9 +45,9 @@ Powered by **TSL (Three.js Shading Language)** and a **Rust-based WASM fallback*
 
 ### Professional 2D Drafting
 - **45 professional tools** including segment sewing, topstitch (4 modes), scissors/split, merge, mirror, and elastic.
+- **Advanced Measurement**: Walk-seam verification with ghost piece preview, markers, and curve delta/ease comparison.
 - Advanced notch management (7 types), grainline control, and automated dart manipulation.
 - **Linked editing**: Symmetric pattern propagation (instance and mirror modes).
-- **Display Bar 2D**: Quick toggles for seam allowance, piece names, and line lengths.
 
 ### Industrial-Grade Simulation
 - **32+ Physical Fabric Profiles** — Denim, Silk, Wool, Jersey, etc., with real-world shear/stretch data.
@@ -75,16 +75,17 @@ git clone https://github.com/sssamuelll/openclo.git
 cd openclo
 npm install
 npm run dev       # Workspace at http://localhost:5180
-npx vitest run    # Run tests
+npx vitest run    # Run 3,100+ tests
 ```
 
 ## Project Stats
 
 | Metric | Count |
 |--------|-------|
-| TypeScript Source Files | 496 |
-| Unit/E2E Test Files | 194+ |
-| Total LOC | ~142,000 |
+| TypeScript Source Files | 512 |
+| Unit/E2E Test Files | 210+ |
+| Total Automated Tests | 3,133 |
+| Total LOC | ~148,000 |
 | Development Days | 24 |
 
 ---
