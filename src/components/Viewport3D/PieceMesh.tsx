@@ -140,18 +140,18 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
   // Color priority: selected=gold > fabric > category
   const meshColor = isSelected ? '#ffd700' : (fabricColor || getCategoryColor(piece.category));
   const roughness = fabricRoughness ?? 0.7;
-  const wireColor = isSelected ? '#ffd700' : '#4a9eff';
-
   if (!geometry) return null;
 
   const solidOpacity = surfaceMode === 'translucent'
     ? (isSelected ? 0.4 : 0.2)
+    : surfaceMode === 'textured'
+    ? 1.0
     : surfaceMode === 'thick'
     ? (isSelected ? 0.95 : 0.85)
     : (isSelected ? 0.85 : 0.6);
 
   const showSolid = surfaceMode !== 'mesh';
-  const showWireframe = surfaceMode === 'mesh' || surfaceMode === 'textured';
+  const showWireframe = surfaceMode === 'mesh';
 
   return (
     <group position={position} rotation={finalRotation}>
@@ -161,7 +161,7 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
           <meshStandardMaterial
             color={meshColor}
             side={THREE.DoubleSide}
-            transparent
+            transparent={solidOpacity < 1}
             opacity={solidOpacity}
             roughness={roughness}
             metalness={0}
@@ -172,10 +172,10 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
       {showWireframe && (
         <mesh geometry={geometry}>
           <meshBasicMaterial
-            color={surfaceMode === 'mesh' ? meshColor : wireColor}
+            color={meshColor}
             wireframe
             transparent
-            opacity={surfaceMode === 'mesh' ? 0.8 : 0.3}
+            opacity={0.8}
           />
         </mesh>
       )}
@@ -190,7 +190,7 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
             userSelect: 'none',
             fontSize: '10px',
             fontFamily: "'Inter', sans-serif",
-            color: isSelected ? '#ffd700' : '#ddd',
+            color: isSelected ? '#ffd700' : '#555',
             textShadow: '0 1px 3px rgba(0,0,0,0.8)',
             whiteSpace: 'nowrap',
             fontWeight: isSelected ? 600 : 400,
