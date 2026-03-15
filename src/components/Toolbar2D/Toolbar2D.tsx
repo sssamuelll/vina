@@ -40,7 +40,7 @@ const TOOL_GROUPS: string[][] = [
   // ─── Annotation ───
   ['notch'],
   ['grainline'],
-  ['measure', 'measureCurve', 'compareCurves', 'grading'],
+  ['measure', 'measureCurve', 'compareCurves', 'walkSeam', 'grading'],
   ['textAnnotation'],
   // ─── Misc ───
   ['addPiece', 'fabricTexture'],

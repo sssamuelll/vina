@@ -170,6 +170,7 @@ export function useKeyboardShortcuts() {
       ['tool.scissors', () => { dispatch(setActiveTool('scissors' as any)); dispatch(setActiveTool2D('scissors')); }],
       ['tool.pin', () => { dispatch(setActiveTool('pin' as any)); dispatch(setActiveTool2D('pin')); }],
       ['tool.measure', () => { dispatch(setActiveTool('measure' as any)); dispatch(setActiveTool2D('measure')); }],
+      ['tool.walkSeam', () => { dispatch(setActiveTool('walkSeam' as any)); dispatch(setActiveTool2D('walkSeam')); }],
       ['tool.merge', () => { dispatch(setActiveTool('merge' as any)); dispatch(setActiveTool2D('merge')); }],
       ['tool.topstitchEdit', () => { dispatch(setActiveTool('topstitchEdit' as any)); dispatch(setActiveTool2D('topstitchEdit')); }],
       ['tool.topstitchSegment', () => { dispatch(setActiveTool('topstitchSegment' as any)); dispatch(setActiveTool2D('topstitchSegment')); }],
