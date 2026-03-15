@@ -19,6 +19,7 @@ import { useScissorsTool } from './useScissorsTool';
 import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useTopstitchTool } from './useTopstitchTool';
+import { useWalkSeamTool } from './useWalkSeamTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -92,6 +93,7 @@ export default function PatternEditor() {
   const measureTool = useMeasureTool(zoom2D, pan2D);
   const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
   const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
+  const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -182,7 +184,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool,
     });
 
   const handleZoomToFit = useCallback(() => {
@@ -309,6 +311,15 @@ export default function PatternEditor() {
             topstitchFreePoints={topstitchTool.freePoints}
             topstitchFreeCursor={topstitchTool.freeCursor}
             topstitchHoveredSnapPoint={topstitchTool.hoveredSnapPoint}
+            walkSeamStationaryEdge={walkSeamTool.stationaryEdge}
+            walkSeamMobileEdge={walkSeamTool.mobileEdge}
+            walkSeamWalkDistance={walkSeamTool.walkDistance}
+            walkSeamGhostTransform={walkSeamTool.ghostTransform}
+            walkSeamGhostOpacity={walkSeamTool.ghostOpacity}
+            walkSeamMismatchSamples={walkSeamTool.mismatchSamples}
+            walkSeamMetrics={walkSeamTool.metrics}
+            walkSeamFormatDistance={walkSeamTool.formatDistance}
+            walkSeamHoveredSnapPoint={walkSeamTool.hoveredSnapPoint}
           />
         </g>
 
@@ -319,6 +330,7 @@ export default function PatternEditor() {
           nodeEditorIsEditing={nodeEditor.isEditing}
           segmentSewingPhase={segmentSewingTool.phase}
           topstitchMode={topstitchTool.mode}
+          walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
         />
       </svg>
       <ContextMenu

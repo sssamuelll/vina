@@ -312,6 +312,7 @@ export type Tool2D =
   | 'measure'      // distance / angle measurement
   | 'measureCurve'  // arc-length along a curve
   | 'compareCurves' // compare two curve lengths
+  | 'walkSeam'      // walk seam verification
   | 'scissors'     // split pattern pieces
   | 'merge'        // merge adjacent pattern pieces
   | 'hand'         // pan

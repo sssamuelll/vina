@@ -15,7 +15,9 @@ import ScissorsOverlay from './overlays/ScissorsOverlay';
 import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
+import WalkSeamOverlay from './overlays/WalkSeamOverlay';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
+import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 
@@ -120,6 +122,16 @@ interface ToolOverlayProps {
   topstitchFreePoints: Point2D[];
   topstitchFreeCursor: Point2D | null;
   topstitchHoveredSnapPoint: Point2D | null;
+  // Walk Seam
+  walkSeamStationaryEdge: WalkSeamEdge | null;
+  walkSeamMobileEdge: WalkSeamEdge | null;
+  walkSeamWalkDistance: number;
+  walkSeamGhostTransform: GhostTransform | null;
+  walkSeamGhostOpacity: number;
+  walkSeamMismatchSamples: MismatchSample[];
+  walkSeamMetrics: WalkSeamMetrics | null;
+  walkSeamFormatDistance: (d: number) => string;
+  walkSeamHoveredSnapPoint: Point2D | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -243,6 +255,21 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           freePoints={props.topstitchFreePoints}
           freeCursor={props.topstitchFreeCursor}
           hoveredSnapPoint={props.topstitchHoveredSnapPoint}
+        />
+      )}
+
+      {activeTool === 'walkSeam' && (
+        <WalkSeamOverlay
+          zoom2D={zoom2D}
+          stationaryEdge={props.walkSeamStationaryEdge}
+          mobileEdge={props.walkSeamMobileEdge}
+          walkDistance={props.walkSeamWalkDistance}
+          ghostTransform={props.walkSeamGhostTransform}
+          ghostOpacity={props.walkSeamGhostOpacity}
+          mismatchSamples={props.walkSeamMismatchSamples}
+          metrics={props.walkSeamMetrics}
+          formatDistance={props.walkSeamFormatDistance}
+          hoveredSnapPoint={props.walkSeamHoveredSnapPoint}
         />
       )}
     </>
