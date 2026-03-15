@@ -175,6 +175,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       activeTool3D: 'camera',
       toolOptions: {},
       recentTools: [],
+      optionsPanelCollapsed: false,
     },
     parametric: {
       activePattern: null,

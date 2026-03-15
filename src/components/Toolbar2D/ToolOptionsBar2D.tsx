@@ -14,6 +14,7 @@ export default function ToolOptionsBar2D() {
   const dispatch = useDispatch();
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions[activeTool2D] ?? {});
+  const collapsed = useSelector((s: RootState) => s.tools.optionsPanelCollapsed);
 
   const toolDef = toolRegistry.getTool(activeTool2D);
   const options = toolDef?.options;
@@ -23,7 +24,7 @@ export default function ToolOptionsBar2D() {
     dispatch(setToolOption({ toolId: activeTool2D, optionId, value }));
   }, [dispatch, activeTool2D]);
 
-  if (!options || options.length === 0) return null;
+  if (!options || options.length === 0 || collapsed) return null;
 
   return (
     <div className="tool-options-bar">

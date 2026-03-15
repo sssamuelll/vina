@@ -14,6 +14,7 @@ export default function ToolOptionsBar() {
   const dispatch = useDispatch();
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions[activeTool3D] ?? {});
+  const collapsed = useSelector((s: RootState) => s.tools.optionsPanelCollapsed);
 
   const toolDef = toolRegistry.getTool(activeTool3D);
   const options = toolDef?.options;
@@ -23,7 +24,7 @@ export default function ToolOptionsBar() {
     dispatch(setToolOption({ toolId: activeTool3D, optionId, value }));
   }, [dispatch, activeTool3D]);
 
-  if (!options || options.length === 0) return null;
+  if (!options || options.length === 0 || collapsed) return null;
 
   return (
     <div className="tool-options-bar">
