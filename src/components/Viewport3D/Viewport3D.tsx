@@ -428,7 +428,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       <SimModeToggle />
       <SimulationStatusOverlay />
       <Canvas
-        camera={{ position: [0, 0.8, 2.8], fov: 35 }}
+        camera={{ position: [0, 0.85, 2.0], fov: 50 }}
         shadows={!nodeMaterialActive}
         resize={{ scroll: false, debounce: { scroll: 0, resize: 0 } }}
         style={{ width: containerSize.width || '100%', height: containerSize.height || '100%' }}
@@ -509,7 +509,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
         {groundVisible && (
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.002, 0]} receiveShadow={!nodeMaterialActive}>
-            <planeGeometry args={[20, 20]} />
+            <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="#ffffff" />
           </mesh>
         )}
