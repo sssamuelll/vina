@@ -330,6 +330,7 @@ export default function PatternEditor() {
           nodeEditorIsEditing={nodeEditor.isEditing}
           segmentSewingPhase={segmentSewingTool.phase}
           topstitchMode={topstitchTool.mode}
+          walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
         />
       </svg>
       <ContextMenu

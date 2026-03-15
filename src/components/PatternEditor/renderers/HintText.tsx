@@ -7,11 +7,12 @@ interface HintTextProps {
   nodeEditorIsEditing: boolean;
   segmentSewingPhase?: string;
   topstitchMode?: string;
+  walkSeamPhase?: string;
 }
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
-  nodeEditorIsEditing, segmentSewingPhase, topstitchMode,
+  nodeEditorIsEditing, segmentSewingPhase, topstitchMode, walkSeamPhase,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -72,6 +73,20 @@ export default function HintText({
           <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
             fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
             {msgs[topstitchMode ?? 'seamline'] ?? msgs.seamline}
+          </text>
+        );
+      })()}
+
+      {activeTool === 'walkSeam' && (() => {
+        const msgs: Record<string, string> = {
+          idle: 'Click an edge to start walk verification · Shift+click for manual pair',
+          stationary: 'Shift+click another edge for manual pair · or auto-paired via seam data',
+          walking: 'Hover along edge to walk · Click to reset · Esc to clear',
+        };
+        return (
+          <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
+            fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+            {msgs[walkSeamPhase ?? 'idle'] ?? msgs.idle}
           </text>
         );
       })()}
