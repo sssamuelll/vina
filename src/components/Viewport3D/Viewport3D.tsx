@@ -145,17 +145,21 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   // Get cursor from active tool definition
   const toolCursor = toolRegistry.getTool(activeTool3D)?.cursor || 'default';
 
-  // Sync OrbitControls mouse mapping (same in all modes):
-  // LEFT = tool/select (never camera), RIGHT = orbit, MIDDLE = pan, SCROLL = zoom
-  useEffect(() => {
+  // Force-apply mouse mapping every frame via onChange, because OrbitControls
+  // from drei can reinitialise its internal mouseButtons after mount.
+  const patchMouseButtons = useCallback(() => {
     const controls = orbitRef.current;
     if (!controls) return;
-    controls.enabled = true;
-    controls.mouseButtons = {
-      LEFT: -1 as unknown as THREE.MOUSE,
-      MIDDLE: THREE.MOUSE.PAN,
-      RIGHT: THREE.MOUSE.ROTATE,
-    };
+    const mb = controls.mouseButtons;
+    if (mb.LEFT !== (-1 as unknown as THREE.MOUSE) ||
+        mb.MIDDLE !== THREE.MOUSE.PAN ||
+        mb.RIGHT !== THREE.MOUSE.ROTATE) {
+      controls.mouseButtons = {
+        LEFT: -1 as unknown as THREE.MOUSE,
+        MIDDLE: THREE.MOUSE.PAN,
+        RIGHT: THREE.MOUSE.ROTATE,
+      };
+    }
   }, []);
 
   // Disable OrbitControls during animation playback
@@ -532,6 +536,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           minDistance={0.6}
           maxDistance={5}
           target={[0, 0.75, 0]}
+          mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }}
+          onChange={patchMouseButtons}
         />
       </Canvas>
 
