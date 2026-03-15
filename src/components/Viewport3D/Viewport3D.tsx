@@ -145,22 +145,18 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   // Get cursor from active tool definition
   const toolCursor = toolRegistry.getTool(activeTool3D)?.cursor || 'default';
 
-  // Sync OrbitControls with active tool
+  // Sync OrbitControls mouse mapping (same in all modes):
+  // LEFT = tool/select (never camera), RIGHT = orbit, MIDDLE = pan, SCROLL = zoom
   useEffect(() => {
     const controls = orbitRef.current;
     if (!controls) return;
-    // CLO3D-standard mouse mapping (all modes):
-    // LEFT = select (handled by tools, not OrbitControls)
-    // MIDDLE = pan
-    // RIGHT = orbit/rotate
-    // SCROLL = zoom (handled by OrbitControls enableZoom)
     controls.enabled = true;
     controls.mouseButtons = {
-      LEFT: cameraMode ? THREE.MOUSE.ROTATE : -1 as unknown as THREE.MOUSE,
+      LEFT: -1 as unknown as THREE.MOUSE,
       MIDDLE: THREE.MOUSE.PAN,
       RIGHT: THREE.MOUSE.ROTATE,
     };
-  }, [cameraMode]);
+  }, []);
 
   // Disable OrbitControls during animation playback
   useEffect(() => {
