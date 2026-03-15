@@ -1,6 +1,7 @@
 import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
+import { OrbitControls, ContactShadows } from '@react-three/drei';
+import FloorGrid from './FloorGrid';
 import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
@@ -518,15 +519,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           </mesh>
         )}
 
-        {/* drei Grid uses a custom ShaderMaterial incompatible with NodeMaterial */}
-        {!nodeMaterialActive && (
-          <Grid
-            args={[10, 10]}
-            cellSize={0.1} cellThickness={0.5} cellColor="#d0d0d0"
-            sectionSize={1} sectionThickness={1} sectionColor="#b0b0b0"
-            fadeDistance={8} position={[0, -0.001, 0]}
-          />
-        )}
+        {/* Geometry-based grid — works with NodeMaterial/WebGPU renderer */}
+        {groundVisible && <FloorGrid y={-0.001} />}
 
         <OrbitControls
           ref={orbitRef}
