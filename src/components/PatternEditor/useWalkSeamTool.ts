@@ -17,6 +17,7 @@ import {
   distanceAlongPath,
 } from '../../utils/geometry/arcLength';
 import { snapToOutline, findEdgeForSegment, buildEdgeInfo } from './useMeasureTool';
+import { formatDimension } from '../../utils/units';
 
 // ─── Exported Types ─────────────────────────────────────────────────────────
 
@@ -521,6 +522,10 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
 
   const clear = reset;
 
+  const formatDistance = useCallback((mm: number): string => {
+    return formatDimension(mm, units);
+  }, [units]);
+
   return {
     // State
     stationaryEdge,
@@ -533,6 +538,7 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     ghostOpacity,
     tolerance,
     units,
+    formatDistance,
     // Handlers
     handleMouseDown,
     handleMouseMove,
