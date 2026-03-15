@@ -10,7 +10,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import type { Point2D, PathCommand, PatternPiece, Seam } from '../../types/types';
+import type { Point2D, PathCommand, PatternPiece, Seam, SemanticEdge } from '../../types/types';
 import {
   computePathArcLength,
   pointAtPathDistance,
@@ -23,7 +23,7 @@ import { snapToOutline, findEdgeForSegment, buildEdgeInfo } from './useMeasureTo
 export interface WalkSeamEdge {
   pieceId: string;
   piece: PatternPiece;
-  edge: { id: string; name: string; segmentRange: [number, number]; edgeType: string };
+  edge: SemanticEdge;
   arcLength: number;
 }
 
@@ -168,16 +168,16 @@ export function computeGhostTransform(
   // Angle difference: rotate mobile tangent to match stationary tangent
   const angleS = Math.atan2(tS.y, tS.x);
   const angleM = Math.atan2(tM.y, tM.x);
-  const angleDeg = (angleS - angleM) * (180 / Math.PI);
+  const angleDiff = angleS - angleM; // radians
+  const angleDeg = angleDiff * (180 / Math.PI); // for SVG transform
 
   // World-space stationary point
   const worldSx = localStatPt.x + stationaryPos.x;
   const worldSy = localStatPt.y + stationaryPos.y;
 
   // Rotate the mobile local point around origin by the angle, then translate
-  const angleRad = (angleDeg * Math.PI) / 180;
-  const cosA = Math.cos(angleRad);
-  const sinA = Math.sin(angleRad);
+  const cosA = Math.cos(angleDiff);
+  const sinA = Math.sin(angleDiff);
   const rotMx = localMobPt.x * cosA - localMobPt.y * sinA;
   const rotMy = localMobPt.x * sinA + localMobPt.y * cosA;
 
@@ -351,9 +351,9 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
       lengthB: lenB,
       delta,
       easePercent,
-      walkPosition: walkDistance,
+      walkPosition: 0,
     });
-  }, [stationaryEdge, mobileEdge, tolerance, walkDistance]);
+  }, [stationaryEdge, mobileEdge, tolerance]);
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -396,6 +396,24 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
     };
   }, [pieces]);
 
+  /** Try to auto-discover the paired mobile edge via seam data */
+  const tryAutoDiscover = useCallback((edge: WalkSeamEdge, shiftKey: boolean) => {
+    if (shiftKey) return;
+    const seamResult = findSeamForEdge(edge.pieceId, edge.edge.name, seams);
+    if (!seamResult) return;
+    const pairedPiece = pieces.find(p => p.id === seamResult.pairedPieceId);
+    if (!pairedPiece) return;
+    const pairedEdge = pairedPiece.edges?.find(ed => ed.name === seamResult.pairedEdgeName);
+    if (!pairedEdge) return;
+    const pairedInfo = buildEdgeInfo(pairedPiece, pairedEdge, 50);
+    setMobileEdge({
+      pieceId: pairedPiece.id,
+      piece: pairedPiece,
+      edge: pairedEdge,
+      arcLength: pairedInfo.arcLength,
+    });
+  }, [seams, pieces]);
+
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     const rawPt = toPattern(e);
@@ -414,25 +432,7 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
       setMobileEdge(null);
       setGhostTransform(null);
       setWalkDistance(0);
-
-      if (!e.shiftKey) {
-        const seamResult = findSeamForEdge(clickedEdge.pieceId, clickedEdge.edge.name, seams);
-        if (seamResult) {
-          const pairedPiece = pieces.find(p => p.id === seamResult.pairedPieceId);
-          if (pairedPiece) {
-            const pairedEdge = pairedPiece.edges?.find(ed => ed.name === seamResult.pairedEdgeName);
-            if (pairedEdge) {
-              const pairedInfo = buildEdgeInfo(pairedPiece, pairedEdge, 50);
-              setMobileEdge({
-                pieceId: pairedPiece.id,
-                piece: pairedPiece,
-                edge: pairedEdge,
-                arcLength: pairedInfo.arcLength,
-              });
-            }
-          }
-        }
-      }
+      tryAutoDiscover(clickedEdge, e.shiftKey);
       // If no auto or shiftKey held → wait for second click
     } else if (!mobile) {
       // Second click: set mobile edge
@@ -445,27 +445,9 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
       setMobileEdge(null);
       setGhostTransform(null);
       setWalkDistance(0);
-
-      if (!e.shiftKey) {
-        const seamResult = findSeamForEdge(clickedEdge.pieceId, clickedEdge.edge.name, seams);
-        if (seamResult) {
-          const pairedPiece = pieces.find(p => p.id === seamResult.pairedPieceId);
-          if (pairedPiece) {
-            const pairedEdge = pairedPiece.edges?.find(ed => ed.name === seamResult.pairedEdgeName);
-            if (pairedEdge) {
-              const pairedInfo = buildEdgeInfo(pairedPiece, pairedEdge, 50);
-              setMobileEdge({
-                pieceId: pairedPiece.id,
-                piece: pairedPiece,
-                edge: pairedEdge,
-                arcLength: pairedInfo.arcLength,
-              });
-            }
-          }
-        }
-      }
+      tryAutoDiscover(clickedEdge, e.shiftKey);
     }
-  }, [toPattern, trySnap, resolveEdge, seams, pieces]);
+  }, [toPattern, trySnap, resolveEdge, tryAutoDiscover]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const rawPt = toPattern(e);
