@@ -102,7 +102,7 @@ interface PieceMeshProps {
   fabricRoughness?: number;
 }
 
-export default function PieceMesh({ piece, isSelected, position, placementRotation, showLabel = true, fabricColor, fabricRoughness }: PieceMeshProps) {
+export default function PieceMesh({ piece, isSelected, position, placementRotation, showLabel = false, fabricColor, fabricRoughness }: PieceMeshProps) {
   const surfaceMode = useSelector((s: RootState) => s.simulation.surfaceMode3D);
   const geometry = useMemo(() => {
     const shape = commandsToShape(piece.outline);
