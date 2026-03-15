@@ -90,7 +90,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       defaultSeamAllowanceWidth: 10,
       showGrainlines: true,
       showAnchorPoints: true,
-      showPieceNames: true,
+      showPieceNames: false,
       showLineLengths: false,
       showSewingLines: true,
       renderMode2D: 'textured' as const,
