@@ -37,8 +37,8 @@ describe('renderSettingsSlice', () => {
     expect(state.hdriCustomUrl).toBeNull();
     expect(state.toneMapping).toBe('aces');
     expect(state.exposure).toBe(1.0);
-    expect(state.backgroundMode).toBe('hdri');
-    expect(state.backgroundColor).toBe('#f0f0f0');
+    expect(state.backgroundMode).toBe('solid');
+    expect(state.backgroundColor).toBe('#e0e0e0');
     expect(state.lights).toEqual([]);
     expect(state.groundVisible).toBe(true);
     expect(state.shadowOpacity).toBe(0.4);
