@@ -101,6 +101,10 @@ const projectSlice = createSlice({
         s => s.pieceA.pieceId !== action.payload && s.pieceB.pieceId !== action.payload
       );
       delete state.arrangementOverrides[action.payload];
+      // Auto-remove from all groups
+      for (const group of state.groups) {
+        group.pieceIds = group.pieceIds.filter(id => id !== action.payload);
+      }
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
@@ -397,6 +401,63 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Groups ───
+    createGroup(state, action: PayloadAction<{ name: string; pieceIds: string[]; color?: string }>) {
+      const { name, pieceIds, color } = action.payload;
+      const GROUP_COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#fcc419', '#cc5de8', '#ff922b', '#20c997', '#845ef7'];
+      state.groups.push({
+        id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name,
+        pieceIds: pieceIds.filter(id => state.pieces.some(p => p.id === id)),
+        color: color ?? GROUP_COLORS[state.groups.length % GROUP_COLORS.length],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      state.isDirty = true;
+    },
+    renameGroup(state, action: PayloadAction<{ groupId: string; name: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        group.name = action.payload.name;
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    deleteGroup(state, action: PayloadAction<{ groupId: string }>) {
+      state.groups = state.groups.filter(g => g.id !== action.payload.groupId);
+      state.isDirty = true;
+    },
+    setGroupColor(state, action: PayloadAction<{ groupId: string; color: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        group.color = action.payload.color;
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    addPiecesToGroup(state, action: PayloadAction<{ groupId: string; pieceIds: string[] }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const existing = new Set(group.pieceIds);
+        for (const id of action.payload.pieceIds) {
+          if (!existing.has(id) && state.pieces.some(p => p.id === id)) {
+            group.pieceIds.push(id);
+          }
+        }
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    removePiecesFromGroup(state, action: PayloadAction<{ groupId: string; pieceIds: string[] }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const removeSet = new Set(action.payload.pieceIds);
+        group.pieceIds = group.pieceIds.filter(id => !removeSet.has(id));
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+
     // ─── Fabrics ───
     addFabric(state, action: PayloadAction<Fabric>) {
       state.fabrics.push(action.payload);
@@ -439,6 +500,9 @@ export const {
   linkPieces, unlinkPieces, cloneAsLinked,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece,
+  // Groups
+  createGroup, renameGroup, deleteGroup, setGroupColor,
+  addPiecesToGroup, removePiecesFromGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;
