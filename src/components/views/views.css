@@ -772,3 +772,112 @@ input[type="number"].sidebar-input::-webkit-outer-spin-button {
   color: #555555;
   font-size: 13px;
 }
+
+/* ─── Group Rows ──────────────────────────────────────────────────────────── */
+
+.group-row {
+  margin-bottom: 1px;
+}
+
+.group-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.group-piece-count {
+  font-size: 10px;
+  color: #888;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.group-rename-input {
+  flex: 1;
+  padding: 1px 4px;
+  background: #3c3c3c;
+  border: 1px solid #4a9eff;
+  color: #ccc;
+  font-size: 13px;
+  font-family: inherit;
+  border-radius: 2px;
+  outline: none;
+  min-width: 0;
+}
+
+.group-color-picker {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #4a4a4a;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+}
+
+.group-color-picker::-webkit-color-swatch-wrapper {
+  padding: 1px;
+}
+
+.group-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.group-members {
+  background: #1e1e1e;
+  border-radius: 0 0 3px 3px;
+  padding: 2px 0;
+}
+
+.group-member-row {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px 2px 24px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.group-member-row:hover {
+  background: #2a2d2e;
+}
+
+.group-member-name {
+  flex: 1;
+  color: #aaa;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-member-name:hover {
+  color: #fff;
+}
+
+.group-member-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0;
+  opacity: 0;
+}
+
+.group-member-row:hover .group-member-remove {
+  opacity: 1;
+}
+
+.group-member-remove:hover {
+  background: #3a3a3a;
+  color: #ff6b6b;
+}
