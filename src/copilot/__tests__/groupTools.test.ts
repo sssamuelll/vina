@@ -172,8 +172,9 @@ describe('listGroups tool', () => {
     const tool = registry.get('listGroups')!;
     const result = await executeTool(store, tool, {});
     expect(result.success).toBe(true);
-    expect(result.data.groups).toHaveLength(0);
-    expect(result.data.total).toBe(0);
+    const data = result.data as { groups: { name: string; pieces: { name: string }[] }[]; total: number };
+    expect(data.groups).toHaveLength(0);
+    expect(data.total).toBe(0);
   });
 
   it('returns groups with piece names', async () => {
@@ -186,9 +187,10 @@ describe('listGroups tool', () => {
     const tool = registry.get('listGroups')!;
     const result = await executeTool(store, tool, {});
     expect(result.success).toBe(true);
-    expect(result.data.groups).toHaveLength(1);
-    expect(result.data.groups[0].name).toBe('Arms');
-    expect(result.data.groups[0].pieces[0].name).toBe('Sleeve');
+    const data = result.data as { groups: { name: string; pieces: { name: string }[] }[]; total: number };
+    expect(data.groups).toHaveLength(1);
+    expect(data.groups[0].name).toBe('Arms');
+    expect(data.groups[0].pieces[0].name).toBe('Sleeve');
   });
 });
 
