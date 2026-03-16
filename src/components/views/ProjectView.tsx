@@ -9,6 +9,11 @@ import {
   updateAvatar,
   updateMeasurements,
   setProjectName,
+  createGroup,
+  renameGroup,
+  deleteGroup,
+  setGroupColor,
+  removePiecesFromGroup,
 } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
 import type { DXFDocument } from '../../utils/dxf/types';
@@ -27,7 +32,7 @@ import type { PaperSize, CuttingLayoutConfig } from '../../utils/export/cuttingL
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
 import { PAPER_SIZES } from '../../utils/export/cuttingLayout';
 import { openMarker } from '../../store/markerSlice';
-import type { OpenCloProject, PatternPiece } from '../../types/types';
+import type { OpenCloProject, PatternPiece, PieceGroup } from '../../types/types';
 import './views.css';
 
 // ─── Collapsible Section ───
@@ -80,6 +85,7 @@ export default function ProjectView() {
   const projectName = useSelector((s: RootState) => s.project.name);
   const projectId = useSelector((s: RootState) => s.project.id);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
+  const groups = useSelector((s: RootState) => s.project.groups);
   const construction = useSelector((s: RootState) => s.construction);
 
   // Check if construction has data for skill export
@@ -101,6 +107,11 @@ export default function ProjectView() {
 
   // Piece visibility/lock (local UI state)
   const [pieceUI, setPieceUI] = useState<Record<string, PieceUIState>>({});
+
+  // Group state
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
   // Cutting Layout state
   const [clPaperSize, setClPaperSize] = useState<PaperSize>('A0');
@@ -131,6 +142,41 @@ export default function ProjectView() {
 
   const handleSelectPiece = useCallback((id: string) => {
     dispatch(selectPiece(id));
+  }, [dispatch]);
+
+  // ─── Group Handlers ───
+
+  const handleCreateGroup = useCallback(() => {
+    const name = `Group ${groups.length + 1}`;
+    dispatch(createGroup({ name, pieceIds: selectedPieceIds }));
+  }, [dispatch, groups.length, selectedPieceIds]);
+
+  const handleDeleteGroup = useCallback((groupId: string) => {
+    dispatch(deleteGroup({ groupId }));
+  }, [dispatch]);
+
+  const handleStartRename = useCallback((group: PieceGroup) => {
+    setRenamingGroupId(group.id);
+    setRenameValue(group.name);
+  }, []);
+
+  const handleFinishRename = useCallback((groupId: string) => {
+    if (renameValue.trim()) {
+      dispatch(renameGroup({ groupId, name: renameValue.trim() }));
+    }
+    setRenamingGroupId(null);
+  }, [dispatch, renameValue]);
+
+  const handleGroupColorChange = useCallback((groupId: string, color: string) => {
+    dispatch(setGroupColor({ groupId, color }));
+  }, [dispatch]);
+
+  const handleToggleGroupExpand = useCallback((id: string) => {
+    setExpandedGroupId(prev => prev === id ? null : id);
+  }, []);
+
+  const handleRemoveFromGroup = useCallback((groupId: string, pieceId: string) => {
+    dispatch(removePiecesFromGroup({ groupId, pieceIds: [pieceId] }));
   }, [dispatch]);
 
   const handleAddPiece = useCallback(() => {
@@ -386,6 +432,7 @@ export default function ProjectView() {
       seams,
       fabrics,
       avatar,
+      groups,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -401,7 +448,7 @@ export default function ProjectView() {
       filename: `${projectName || 'project'}.openclo.json`,
       date: new Date().toLocaleString(),
     });
-  }, [projectId, projectName, pieces, seams, fabrics, avatar]);
+  }, [projectId, projectName, pieces, seams, fabrics, avatar, groups]);
 
   const handleLoadProject = useCallback(() => {
     projectInputRef.current?.click();
@@ -577,6 +624,101 @@ export default function ProjectView() {
                 </div>
               );
             })
+          )}
+        </Section>
+
+        {/* ─── Groups Section ─── */}
+        <Section title="Groups" badge={groups.length} defaultOpen={true}>
+          <div style={{ marginBottom: 4 }}>
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={handleCreateGroup}
+              title={selectedPieceIds.length > 0 ? `Create group from ${selectedPieceIds.length} selected` : 'Create empty group'}
+            >
+              + New Group{selectedPieceIds.length > 0 ? ` (${selectedPieceIds.length} pieces)` : ''}
+            </button>
+          </div>
+          {groups.length === 0 ? (
+            <div className="sidebar-info">No groups yet. Select pieces and create a group.</div>
+          ) : (
+            groups.map(group => (
+              <div key={group.id} className="group-row">
+                <div
+                  className="sidebar-list-item"
+                  onClick={() => handleToggleGroupExpand(group.id)}
+                >
+                  <span className="group-color-dot" style={{ background: group.color }} />
+                  {renamingGroupId === group.id ? (
+                    <input
+                      className="group-rename-input"
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onBlur={() => handleFinishRename(group.id)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleFinishRename(group.id);
+                        if (e.key === 'Escape') setRenamingGroupId(null);
+                      }}
+                      autoFocus
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="sidebar-list-item-label">{group.name}</span>
+                  )}
+                  <span className="group-piece-count">{group.pieceIds.length}</span>
+                  <div className="sidebar-list-item-actions" style={{ opacity: 1 }}>
+                    <input
+                      type="color"
+                      className="group-color-picker"
+                      value={group.color}
+                      onChange={e => { e.stopPropagation(); handleGroupColorChange(group.id, e.target.value); }}
+                      onClick={e => e.stopPropagation()}
+                      title="Group color"
+                    />
+                    <button
+                      onClick={e => { e.stopPropagation(); handleStartRename(group); }}
+                      title="Rename"
+                    >
+                      \u270E
+                    </button>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleDeleteGroup(group.id); }}
+                      title="Delete group"
+                    >
+                      \u2715
+                    </button>
+                  </div>
+                </div>
+                {expandedGroupId === group.id && (
+                  <div className="group-members">
+                    {group.pieceIds.length === 0 ? (
+                      <div className="sidebar-info" style={{ paddingLeft: 20 }}>No pieces in this group.</div>
+                    ) : (
+                      group.pieceIds.map(pid => {
+                        const piece = pieces.find(p => p.id === pid);
+                        if (!piece) return null;
+                        return (
+                          <div key={pid} className="group-member-row">
+                            <span
+                              className="group-member-name"
+                              onClick={() => handleSelectPiece(pid)}
+                            >
+                              {piece.name}
+                            </span>
+                            <button
+                              className="group-member-remove"
+                              onClick={() => handleRemoveFromGroup(group.id, pid)}
+                              title="Remove from group"
+                            >
+                              \u2715
+                            </button>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+            ))
           )}
         </Section>
 

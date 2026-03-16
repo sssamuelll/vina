@@ -40,6 +40,7 @@ import { tools as memoryToolDefs } from './definitions/memoryTools';
 import { tools as uiBridgeToolDefs } from './definitions/uiBridgeTools';
 import { tools as modifyDimensionToolDefs } from './definitions/modifyDimensionTools';
 import { tools as threeDInteractionToolDefs } from './definitions/3dInteractionTools';
+import { tools as groupToolDefs } from './definitions/groupTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -357,6 +358,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   uiBridgeToolDefs,
   modifyDimensionToolDefs,
   threeDInteractionToolDefs,
+  groupToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

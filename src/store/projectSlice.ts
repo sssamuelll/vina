@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand } from '../types/types';
+import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup } from '../types/types';
 import { NEW_PROJECT } from './actions';
 
 const defaultAvatar: Avatar = {
@@ -40,6 +40,8 @@ interface ProjectState {
   avatarMode: AvatarMode;
   avatarModelUrl: string | null;
   isDirty: boolean;
+  /** Named piece groups for batch operations */
+  groups: PieceGroup[];
   /** Per-piece 3D arrangement position overrides (piece ID → [x,y,z]) */
   arrangementOverrides: Record<string, [number, number, number]>;
 }
@@ -54,6 +56,7 @@ const initialState: ProjectState = {
   avatarMode: 'model',
   avatarModelUrl: '/default-avatar.glb',
   isDirty: false,
+  groups: [],
   arrangementOverrides: {},
 };
 
@@ -72,6 +75,7 @@ const projectSlice = createSlice({
       state.seams = p.seams;
       state.fabrics = p.fabrics;
       state.avatar = p.avatar;
+      state.groups = p.groups ?? [];
       state.isDirty = false;
     },
     setProjectName(state, action: PayloadAction<string>) {
@@ -97,6 +101,10 @@ const projectSlice = createSlice({
         s => s.pieceA.pieceId !== action.payload && s.pieceB.pieceId !== action.payload
       );
       delete state.arrangementOverrides[action.payload];
+      // Auto-remove from all groups
+      for (const group of state.groups) {
+        group.pieceIds = group.pieceIds.filter(id => id !== action.payload);
+      }
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
@@ -393,6 +401,118 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Groups ───
+    createGroup(state, action: PayloadAction<{ name: string; pieceIds: string[]; color?: string }>) {
+      const { name, pieceIds, color } = action.payload;
+      const GROUP_COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#fcc419', '#cc5de8', '#ff922b', '#20c997', '#845ef7'];
+      state.groups.push({
+        id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        name,
+        pieceIds: pieceIds.filter(id => state.pieces.some(p => p.id === id)),
+        color: color ?? GROUP_COLORS[state.groups.length % GROUP_COLORS.length],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      state.isDirty = true;
+    },
+    renameGroup(state, action: PayloadAction<{ groupId: string; name: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        group.name = action.payload.name;
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    deleteGroup(state, action: PayloadAction<{ groupId: string }>) {
+      state.groups = state.groups.filter(g => g.id !== action.payload.groupId);
+      state.isDirty = true;
+    },
+    setGroupColor(state, action: PayloadAction<{ groupId: string; color: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        group.color = action.payload.color;
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    addPiecesToGroup(state, action: PayloadAction<{ groupId: string; pieceIds: string[] }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const existing = new Set(group.pieceIds);
+        for (const id of action.payload.pieceIds) {
+          if (!existing.has(id) && state.pieces.some(p => p.id === id)) {
+            group.pieceIds.push(id);
+          }
+        }
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    removePiecesFromGroup(state, action: PayloadAction<{ groupId: string; pieceIds: string[] }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const removeSet = new Set(action.payload.pieceIds);
+        group.pieceIds = group.pieceIds.filter(id => !removeSet.has(id));
+        group.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    moveGroup(state, action: PayloadAction<{ groupId: string; dx: number; dy: number }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.position = {
+              x: (piece.position?.x ?? 0) + action.payload.dx,
+              y: (piece.position?.y ?? 0) + action.payload.dy,
+            };
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    setGroupFabric(state, action: PayloadAction<{ groupId: string; fabricId: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.fabricId = action.payload.fabricId;
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    setGroupSeamAllowance(state, action: PayloadAction<{ groupId: string; width: number }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.seamAllowance = action.payload.width;
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    mirrorGroup(state, action: PayloadAction<{ groupId: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.mirrored = !piece.mirrored;
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+
     // ─── Fabrics ───
     addFabric(state, action: PayloadAction<Fabric>) {
       state.fabrics.push(action.payload);
@@ -435,6 +555,10 @@ export const {
   linkPieces, unlinkPieces, cloneAsLinked,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece,
+  // Groups
+  createGroup, renameGroup, deleteGroup, setGroupColor,
+  addPiecesToGroup, removePiecesFromGroup,
+  moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;

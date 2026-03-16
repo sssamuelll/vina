@@ -7,6 +7,7 @@
  * @module projectIO
  */
 
+import type { PieceGroup } from '../types/types';
 import { OpenCloProject } from '../types/types';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 
@@ -20,6 +21,7 @@ interface ProjectState {
   avatarMode?: string;
   avatarModelUrl?: string | null;
   isDirty?: boolean;
+  groups?: PieceGroup[];
 }
 
 // ─── Serialization ──────────────────────────────────────────────────────────
@@ -59,6 +61,7 @@ function stateToProject(state: ProjectState): Record<string, unknown> {
     seams: state.seams,
     fabrics: state.fabrics,
     avatar: state.avatar,
+    groups: state.groups ?? [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

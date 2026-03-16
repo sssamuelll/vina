@@ -44,6 +44,8 @@ interface SinglePieceProps {
   isInternalLineSelected: boolean;
   selectedLineId?: string;
   isEditingName: boolean;
+  /** Group color for visual indicator (first group the piece belongs to) */
+  groupColor?: string;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
   onPieceNameCancel?: () => void;
@@ -61,6 +63,7 @@ const SinglePiece = memo(function SinglePiece({
   isInternalLineSelected,
   selectedLineId,
   isEditingName,
+  groupColor,
   onPieceNameDoubleClick,
   onPieceNameSave,
   onPieceNameCancel,
@@ -96,6 +99,18 @@ const SinglePiece = memo(function SinglePiece({
           stroke="rgba(74, 158, 255, 0.4)"
           strokeWidth={0.8 / zoom2D}
           strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
+        />
+      )}
+
+      {groupColor && (
+        <path
+          d={pathToSVG(piece.outline)}
+          fill="none"
+          stroke={groupColor}
+          strokeWidth={2.5 / zoom2D}
+          strokeDasharray={`${6 / zoom2D} ${4 / zoom2D}`}
+          opacity={0.7}
+          pointerEvents="none"
         />
       )}
 
@@ -293,6 +308,8 @@ interface PieceRendererProps {
   showGrainlines: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
+  /** Map of piece ID to group color for visual indicators */
+  groupColors?: Record<string, string>;
   selectedInternalLine?: { pieceId: string; lineId: string } | null;
   editingPieceNameId?: string | null;
   onPieceNameDoubleClick?: (pieceId: string) => void;
@@ -309,6 +326,7 @@ export default function PieceRenderer({
   showGrainlines,
   showPieceNames,
   renderMode2D,
+  groupColors,
   selectedInternalLine,
   editingPieceNameId,
   onPieceNameDoubleClick,
@@ -333,6 +351,7 @@ export default function PieceRenderer({
           showGrainlines={showGrainlines}
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
+          groupColor={groupColors?.[piece.id]}
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}
