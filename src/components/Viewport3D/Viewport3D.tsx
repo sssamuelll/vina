@@ -38,7 +38,7 @@ import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
 import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
-import { useCameraPresets } from './useCameraPresets';
+import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
@@ -75,6 +75,10 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
 }
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+
+// Scratch vectors for custom pan — avoids allocations in pointermove hot path
+const _panRight = new THREE.Vector3();
+const _panUp = new THREE.Vector3();
 
 /**
  * Create a WebGPURenderer (with WebGL2 fallback when WebGPU is unavailable).
@@ -148,19 +152,63 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
   // Force-apply mouse mapping every frame via onChange, because OrbitControls
   // from drei can reinitialise its internal mouseButtons after mount.
+  // Pan is disabled here — we implement custom pan below to keep orbit target
+  // locked on the avatar center.
   const patchMouseButtons = useCallback(() => {
     const controls = orbitRef.current;
     if (!controls) return;
     const mb = controls.mouseButtons;
     if (mb.LEFT !== (-1 as unknown as THREE.MOUSE) ||
-        mb.MIDDLE !== THREE.MOUSE.PAN ||
+        mb.MIDDLE !== (-1 as unknown as THREE.MOUSE) ||
         mb.RIGHT !== THREE.MOUSE.ROTATE) {
       controls.mouseButtons = {
         LEFT: -1 as unknown as THREE.MOUSE,
-        MIDDLE: THREE.MOUSE.PAN,
+        MIDDLE: -1 as unknown as THREE.MOUSE,
         RIGHT: THREE.MOUSE.ROTATE,
       };
     }
+  }, []);
+
+  // Custom pan: middle-click drag translates camera only, keeping orbit target
+  // locked on the avatar so right-click orbit always rotates around the avatar.
+  const panState = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
+
+  const onPanPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 1) return; // middle click only
+    if (playbackState === 'playing') return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    panState.current = { active: true, lastX: e.clientX, lastY: e.clientY };
+  }, [playbackState]);
+
+  const onPanPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!panState.current.active) return;
+    const controls = orbitRef.current;
+    if (!controls) return;
+    const camera = controls.object;
+
+    const dx = e.clientX - panState.current.lastX;
+    const dy = e.clientY - panState.current.lastY;
+    panState.current.lastX = e.clientX;
+    panState.current.lastY = e.clientY;
+
+    // Scale pan speed based on camera distance to target
+    const distance = camera.position.distanceTo(controls.target);
+    const panSpeed = distance * 0.001;
+
+    // Get camera-local right and up vectors
+    _panRight.setFromMatrixColumn(camera.matrix, 0); // camera X axis
+    _panUp.setFromMatrixColumn(camera.matrix, 1);     // camera Y axis
+
+    // Move camera only — target stays fixed on avatar
+    camera.position.addScaledVector(_panRight, -dx * panSpeed);
+    camera.position.addScaledVector(_panUp, dy * panSpeed);
+    controls.update();
+  }, []);
+
+  const onPanPointerUp = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 1) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    panState.current.active = false;
   }, []);
 
   // Disable OrbitControls during animation playback
@@ -235,7 +283,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const handleResetCamera = useCallback(() => {
     const controls = orbitRef.current;
     if (!controls) return;
-    controls.reset();
+    controls.object.position.set(...DEFAULT_POSITION);
+    controls.target.set(...DEFAULT_TARGET);
+    controls.update();
   }, []);
 
   const snapshot3D = useCallback(() => {
@@ -427,7 +477,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       className="viewport3d"
       ref={containerRef}
       style={{ position: 'relative', cursor: toolCursor }}
-      onPointerDown={handlePointerDown}
+      onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
+      onPointerMove={onPanPointerMove}
+      onPointerUp={onPanPointerUp}
       onContextMenu={handleContextMenu}
     >
       <SimModeToggle />
@@ -530,7 +582,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           minDistance={0.6}
           maxDistance={5}
           target={[0, 0.75, 0]}
-          mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }}
+          enablePan={false}
+          mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: -1 as unknown as THREE.MOUSE, RIGHT: THREE.MOUSE.ROTATE }}
           onChange={patchMouseButtons}
         />
       </Canvas>

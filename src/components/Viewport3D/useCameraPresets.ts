@@ -10,6 +10,7 @@ const ANIMATION_DURATION_MS = 250;
 
 export const DEFAULT_TARGET: [number, number, number] = [0, 0.75, 0];
 const DEFAULT_DISTANCE = 3.0;
+export const DEFAULT_POSITION: [number, number, number] = [0, 0.85, DEFAULT_DISTANCE];
 
 export const VIEW_PRESETS: Record<ViewPreset, { position: [number, number, number]; target: [number, number, number] }> = {
   front:             { position: [0, 0.75, DEFAULT_DISTANCE],  target: DEFAULT_TARGET },
