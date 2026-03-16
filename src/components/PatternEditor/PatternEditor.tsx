@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
 import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
+import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
@@ -38,6 +39,18 @@ export default function PatternEditor() {
   const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, renderMode2D, gridSize, units } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
+  const groups = useSelector((s: RootState) => s.project.groups);
+
+  // Compute piece ID -> group color mapping for 2D visual indicators
+  const groupColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const group of groups) {
+      for (const pid of group.pieceIds) {
+        if (!map[pid]) map[pid] = group.color; // first group wins
+      }
+    }
+    return map;
+  }, [groups]);
   
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
@@ -225,6 +238,7 @@ export default function PatternEditor() {
             showGrainlines={showGrainlines}
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
+            groupColors={groupColors}
             selectedInternalLine={editor.selectedInternalLine}
             editingPieceNameId={editingPieceNameId}
             onPieceNameDoubleClick={handlePieceNameDoubleClick}
