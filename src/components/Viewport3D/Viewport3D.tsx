@@ -148,19 +148,64 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
   // Force-apply mouse mapping every frame via onChange, because OrbitControls
   // from drei can reinitialise its internal mouseButtons after mount.
+  // Pan is disabled here — we implement custom pan below to keep orbit target
+  // locked on the avatar center.
   const patchMouseButtons = useCallback(() => {
     const controls = orbitRef.current;
     if (!controls) return;
     const mb = controls.mouseButtons;
     if (mb.LEFT !== (-1 as unknown as THREE.MOUSE) ||
-        mb.MIDDLE !== THREE.MOUSE.PAN ||
+        mb.MIDDLE !== (-1 as unknown as THREE.MOUSE) ||
         mb.RIGHT !== THREE.MOUSE.ROTATE) {
       controls.mouseButtons = {
         LEFT: -1 as unknown as THREE.MOUSE,
-        MIDDLE: THREE.MOUSE.PAN,
+        MIDDLE: -1 as unknown as THREE.MOUSE,
         RIGHT: THREE.MOUSE.ROTATE,
       };
     }
+  }, []);
+
+  // Custom pan: middle-click drag translates camera only, keeping orbit target
+  // locked on the avatar so right-click orbit always rotates around the avatar.
+  const panState = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
+
+  const onPanPointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 1) return; // middle click only
+    e.currentTarget.setPointerCapture(e.pointerId);
+    panState.current = { active: true, lastX: e.clientX, lastY: e.clientY };
+  }, []);
+
+  const onPanPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!panState.current.active) return;
+    const controls = orbitRef.current;
+    if (!controls) return;
+    const camera = controls.object;
+
+    const dx = e.clientX - panState.current.lastX;
+    const dy = e.clientY - panState.current.lastY;
+    panState.current.lastX = e.clientX;
+    panState.current.lastY = e.clientY;
+
+    // Scale pan speed based on camera distance to target
+    const distance = camera.position.distanceTo(controls.target);
+    const panSpeed = distance * 0.001;
+
+    // Get camera-local right and up vectors
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    camera.getWorldDirection(up); // temp
+    right.setFromMatrixColumn(camera.matrix, 0); // camera X axis
+    up.setFromMatrixColumn(camera.matrix, 1);     // camera Y axis
+
+    // Move camera only — target stays fixed on avatar
+    camera.position.addScaledVector(right, -dx * panSpeed);
+    camera.position.addScaledVector(up, dy * panSpeed);
+    controls.update();
+  }, []);
+
+  const onPanPointerUp = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 1) return;
+    panState.current.active = false;
   }, []);
 
   // Disable OrbitControls during animation playback
@@ -235,7 +280,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const handleResetCamera = useCallback(() => {
     const controls = orbitRef.current;
     if (!controls) return;
-    controls.reset();
+    controls.object.position.set(0, 0.85, 3.0);
+    controls.target.set(0, 0.75, 0);
+    controls.update();
   }, []);
 
   const snapshot3D = useCallback(() => {
@@ -427,7 +474,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       className="viewport3d"
       ref={containerRef}
       style={{ position: 'relative', cursor: toolCursor }}
-      onPointerDown={handlePointerDown}
+      onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
+      onPointerMove={onPanPointerMove}
+      onPointerUp={onPanPointerUp}
       onContextMenu={handleContextMenu}
     >
       <SimModeToggle />
@@ -530,7 +579,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           minDistance={0.6}
           maxDistance={5}
           target={[0, 0.75, 0]}
-          mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE }}
+          enablePan={false}
+          mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: -1 as unknown as THREE.MOUSE, RIGHT: THREE.MOUSE.ROTATE }}
           onChange={patchMouseButtons}
         />
       </Canvas>
