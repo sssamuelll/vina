@@ -61,14 +61,10 @@ const groupPiecesTool: ToolDefinition = {
       };
     }
 
-    dispatch(createGroup({ name, pieceIds }));
+    dispatch(createGroup({ name, pieceIds, color }));
 
-    // Set color if provided
     const groups = getState().project.groups as PieceGroup[];
     const created = groups[groups.length - 1];
-    if (color && created) {
-      dispatch(setGroupColor({ groupId: created.id, color }));
-    }
 
     return {
       success: true,
@@ -77,7 +73,7 @@ const groupPiecesTool: ToolDefinition = {
         name,
         pieceCount: pieceIds.length,
         pieceIds,
-        color: color ?? created?.color,
+        color: created?.color,
       },
     };
   },
