@@ -457,6 +457,61 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    moveGroup(state, action: PayloadAction<{ groupId: string; dx: number; dy: number }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.position = {
+              x: (piece.position?.x ?? 0) + action.payload.dx,
+              y: (piece.position?.y ?? 0) + action.payload.dy,
+            };
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    setGroupFabric(state, action: PayloadAction<{ groupId: string; fabricId: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.fabricId = action.payload.fabricId;
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    setGroupSeamAllowance(state, action: PayloadAction<{ groupId: string; width: number }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.seamAllowance = action.payload.width;
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
+    mirrorGroup(state, action: PayloadAction<{ groupId: string }>) {
+      const group = state.groups.find(g => g.id === action.payload.groupId);
+      if (group) {
+        const memberSet = new Set(group.pieceIds);
+        for (const piece of state.pieces) {
+          if (memberSet.has(piece.id)) {
+            piece.mirrored = !piece.mirrored;
+            piece.updatedAt = Date.now();
+          }
+        }
+        state.isDirty = true;
+      }
+    },
 
     // ─── Fabrics ───
     addFabric(state, action: PayloadAction<Fabric>) {
@@ -503,6 +558,7 @@ export const {
   // Groups
   createGroup, renameGroup, deleteGroup, setGroupColor,
   addPiecesToGroup, removePiecesFromGroup,
+  moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;

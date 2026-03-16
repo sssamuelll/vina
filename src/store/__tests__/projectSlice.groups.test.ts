@@ -3,6 +3,7 @@ import reducer, {
   createGroup, renameGroup, deleteGroup, setGroupColor,
   addPiecesToGroup, removePiecesFromGroup,
   removePiece,
+  moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
 } from '../projectSlice';
 
 function stateWith(pieces: { id: string }[], groups: { id: string; name: string; pieceIds: string[]; color: string }[] = []) {
@@ -82,5 +83,52 @@ describe('projectSlice — groups CRUD', () => {
     expect(state.groups).toHaveLength(2);
     expect(state.groups[0].pieceIds).toContain('p1');
     expect(state.groups[1].pieceIds).toContain('p1');
+  });
+});
+
+describe('projectSlice — group batch operations', () => {
+  it('moveGroup translates all member pieces', () => {
+    const state = stateWith(
+      [
+        { id: 'p1', position: { x: 0, y: 0 } },
+        { id: 'p2', position: { x: 100, y: 50 } },
+        { id: 'p3', position: { x: 200, y: 200 } },
+      ] as any,
+      [{ id: 'g1', name: 'G', pieceIds: ['p1', 'p2'], color: '#ff0000' }],
+    );
+    const next = reducer(state, moveGroup({ groupId: 'g1', dx: 10, dy: -5 }));
+    expect(next.pieces[0].position).toEqual({ x: 10, y: -5 });
+    expect(next.pieces[1].position).toEqual({ x: 110, y: 45 });
+    expect(next.pieces[2].position).toEqual({ x: 200, y: 200 }); // not in group
+  });
+
+  it('setGroupFabric sets fabricId on all members', () => {
+    const state = stateWith(
+      [{ id: 'p1', fabricId: undefined }, { id: 'p2', fabricId: 'old' }] as any,
+      [{ id: 'g1', name: 'G', pieceIds: ['p1', 'p2'], color: '#ff0000' }],
+    );
+    const next = reducer(state, setGroupFabric({ groupId: 'g1', fabricId: 'silk-charmeuse' }));
+    expect(next.pieces[0].fabricId).toBe('silk-charmeuse');
+    expect(next.pieces[1].fabricId).toBe('silk-charmeuse');
+  });
+
+  it('setGroupSeamAllowance sets SA on all members', () => {
+    const state = stateWith(
+      [{ id: 'p1', seamAllowance: 10 }, { id: 'p2', seamAllowance: 5 }] as any,
+      [{ id: 'g1', name: 'G', pieceIds: ['p1', 'p2'], color: '#ff0000' }],
+    );
+    const next = reducer(state, setGroupSeamAllowance({ groupId: 'g1', width: 15 }));
+    expect(next.pieces[0].seamAllowance).toBe(15);
+    expect(next.pieces[1].seamAllowance).toBe(15);
+  });
+
+  it('mirrorGroup toggles mirrored on all members', () => {
+    const state = stateWith(
+      [{ id: 'p1', mirrored: false }, { id: 'p2', mirrored: true }] as any,
+      [{ id: 'g1', name: 'G', pieceIds: ['p1', 'p2'], color: '#ff0000' }],
+    );
+    const next = reducer(state, mirrorGroup({ groupId: 'g1' }));
+    expect(next.pieces[0].mirrored).toBe(true);
+    expect(next.pieces[1].mirrored).toBe(false);
   });
 });
