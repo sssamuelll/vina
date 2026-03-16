@@ -28,6 +28,8 @@ import {
   lockPiece,
   unlockPiece,
   addPiece,
+  createGroup,
+  addPiecesToGroup,
 } from '../../store/projectSlice';
 import { selectPiece, clearSelection, copyPieces, createPastedPieces } from '../../store/editorSlice';
 
@@ -74,6 +76,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
+  const groups = useSelector((s: RootState) => s.project.groups);
   const ref = useRef<HTMLDivElement>(null);
 
   // Close on click outside or Escape
@@ -281,6 +284,33 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
         separator: true,
       });
     }
+
+    // ─── Groups ───
+    items.push({
+      label: 'Create Group from Selection',
+      icon: '📁',
+      action: () => act(() => {
+        const ids = selectedPieceIds.length > 0 ? selectedPieceIds : [pid];
+        dispatch(createGroup({ name: `Group ${groups.length + 1}`, pieceIds: ids }));
+      }),
+    });
+    if (groups.length > 0) {
+      for (const group of groups) {
+        if (!group.pieceIds.includes(pid)) {
+          items.push({
+            label: `Add to "${group.name}"`,
+            icon: '+',
+            action: () => act(() => dispatch(addPiecesToGroup({ groupId: group.id, pieceIds: [pid] }))),
+          });
+        }
+      }
+    }
+    items.push({
+      label: '',
+      icon: '',
+      action: () => {},
+      separator: true,
+    });
 
     items.push({
       label: 'Select',
