@@ -7,6 +7,7 @@
  * @module projectIO
  */
 
+import type { PieceGroup } from '../types/types';
 import { OpenCloProject } from '../types/types';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 
@@ -20,7 +21,7 @@ interface ProjectState {
   avatarMode?: string;
   avatarModelUrl?: string | null;
   isDirty?: boolean;
-  groups?: unknown[];
+  groups?: PieceGroup[];
 }
 
 // ─── Serialization ──────────────────────────────────────────────────────────
