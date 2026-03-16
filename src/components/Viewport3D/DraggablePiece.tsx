@@ -26,7 +26,7 @@ interface DraggablePieceProps {
   rotation?: [number, number, number];
   arrangementOverride?: [number, number, number];
   canDrag: boolean;
-  onSelect: (pieceId: string) => void;
+  onSelect: (pieceId: string, shiftKey: boolean) => void;
   onDragEnd: (pieceId: string, position: [number, number, number]) => void;
   setOrbitEnabled: (enabled: boolean) => void;
   fabricColor?: string;
@@ -52,7 +52,7 @@ export default function DraggablePiece({
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
-    onSelect(piece.id);
+    onSelect(piece.id, e.nativeEvent.shiftKey);
   }, [piece.id, onSelect]);
 
   const handleMouseDown = useCallback(() => {
