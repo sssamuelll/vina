@@ -30,6 +30,7 @@ import {
   addPiece,
   createGroup,
   addPiecesToGroup,
+  removePiecesFromGroup,
 } from '../../store/projectSlice';
 import { selectPiece, clearSelection, copyPieces, createPastedPieces } from '../../store/editorSlice';
 
@@ -301,6 +302,16 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
             label: `Add to "${group.name}"`,
             icon: '+',
             action: () => act(() => dispatch(addPiecesToGroup({ groupId: group.id, pieceIds: [pid] }))),
+          });
+        }
+      }
+      // "Remove from group" for groups the piece belongs to
+      for (const group of groups) {
+        if (group.pieceIds.includes(pid)) {
+          items.push({
+            label: `Remove from "${group.name}"`,
+            icon: '−',
+            action: () => act(() => dispatch(removePiecesFromGroup({ groupId: group.id, pieceIds: [pid] }))),
           });
         }
       }
