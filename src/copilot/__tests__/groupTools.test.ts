@@ -100,3 +100,142 @@ describe('groupPieces tool', () => {
     expect(result.error).toContain('not found');
   });
 });
+
+describe('applyToGroup tool', () => {
+  let store: TestStore;
+  let registry: ReturnType<typeof getDefaultRegistry>;
+  let groupId: string;
+
+  beforeEach(async () => {
+    resetDefaultRegistry();
+    registry = getDefaultRegistry();
+    store = createTestStore();
+    const createPiece = registry.get('createPiece')!;
+    await executeTool(store, createPiece, { name: 'Front', outline: RECT_OUTLINE });
+    await executeTool(store, createPiece, { name: 'Back', outline: RECT_OUTLINE });
+    const pieces = store.getState().project.pieces;
+    const groupTool = registry.get('groupPieces')!;
+    await executeTool(store, groupTool, { name: 'Bodice', pieceIds: [pieces[0].id, pieces[1].id] });
+    groupId = store.getState().project.groups[0].id;
+  });
+
+  it('setFabric applies to all members', async () => {
+    const tool = registry.get('applyToGroup')!;
+    const result = await executeTool(store, tool, { groupId, operation: 'setFabric', value: 'silk' });
+    expect(result.success).toBe(true);
+    const pieces = store.getState().project.pieces;
+    expect(pieces[0].fabricId).toBe('silk');
+    expect(pieces[1].fabricId).toBe('silk');
+  });
+
+  it('setSeamAllowance applies to all members', async () => {
+    const tool = registry.get('applyToGroup')!;
+    const result = await executeTool(store, tool, { groupId, operation: 'setSeamAllowance', value: '15' });
+    expect(result.success).toBe(true);
+    const pieces = store.getState().project.pieces;
+    expect(pieces[0].seamAllowance).toBe(15);
+    expect(pieces[1].seamAllowance).toBe(15);
+  });
+
+  it('rename changes group name', async () => {
+    const tool = registry.get('applyToGroup')!;
+    const result = await executeTool(store, tool, { groupId, operation: 'rename', value: 'New Name' });
+    expect(result.success).toBe(true);
+    expect(store.getState().project.groups[0].name).toBe('New Name');
+  });
+
+  it('rejects unknown group', async () => {
+    const tool = registry.get('applyToGroup')!;
+    const result = await executeTool(store, tool, { groupId: 'fake', operation: 'setFabric', value: 'silk' });
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('not found');
+  });
+
+  it('rejects unknown operation', async () => {
+    const tool = registry.get('applyToGroup')!;
+    const result = await executeTool(store, tool, { groupId, operation: 'invalidOp', value: 'x' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('listGroups tool', () => {
+  let store: TestStore;
+  let registry: ReturnType<typeof getDefaultRegistry>;
+
+  beforeEach(async () => {
+    resetDefaultRegistry();
+    registry = getDefaultRegistry();
+    store = createTestStore();
+  });
+
+  it('returns empty list when no groups', async () => {
+    const tool = registry.get('listGroups')!;
+    const result = await executeTool(store, tool, {});
+    expect(result.success).toBe(true);
+    expect(result.data.groups).toHaveLength(0);
+    expect(result.data.total).toBe(0);
+  });
+
+  it('returns groups with piece names', async () => {
+    const createPiece = registry.get('createPiece')!;
+    await executeTool(store, createPiece, { name: 'Sleeve', outline: RECT_OUTLINE });
+    const pieces = store.getState().project.pieces;
+    const groupTool = registry.get('groupPieces')!;
+    await executeTool(store, groupTool, { name: 'Arms', pieceIds: [pieces[0].id] });
+
+    const tool = registry.get('listGroups')!;
+    const result = await executeTool(store, tool, {});
+    expect(result.success).toBe(true);
+    expect(result.data.groups).toHaveLength(1);
+    expect(result.data.groups[0].name).toBe('Arms');
+    expect(result.data.groups[0].pieces[0].name).toBe('Sleeve');
+  });
+});
+
+describe('modifyGroup tool', () => {
+  let store: TestStore;
+  let registry: ReturnType<typeof getDefaultRegistry>;
+  let groupId: string;
+
+  beforeEach(async () => {
+    resetDefaultRegistry();
+    registry = getDefaultRegistry();
+    store = createTestStore();
+    const createPiece = registry.get('createPiece')!;
+    await executeTool(store, createPiece, { name: 'Front', outline: RECT_OUTLINE });
+    await executeTool(store, createPiece, { name: 'Back', outline: RECT_OUTLINE });
+    const pieces = store.getState().project.pieces;
+    const groupTool = registry.get('groupPieces')!;
+    await executeTool(store, groupTool, { name: 'Bodice', pieceIds: [pieces[0].id] });
+    groupId = store.getState().project.groups[0].id;
+  });
+
+  it('addPieces adds new members', async () => {
+    const tool = registry.get('modifyGroup')!;
+    const pieces = store.getState().project.pieces;
+    const result = await executeTool(store, tool, { groupId, action: 'addPieces', pieceIds: [pieces[1].id] });
+    expect(result.success).toBe(true);
+    expect(store.getState().project.groups[0].pieceIds).toHaveLength(2);
+  });
+
+  it('removePieces removes members', async () => {
+    const tool = registry.get('modifyGroup')!;
+    const pieces = store.getState().project.pieces;
+    const result = await executeTool(store, tool, { groupId, action: 'removePieces', pieceIds: [pieces[0].id] });
+    expect(result.success).toBe(true);
+    expect(store.getState().project.groups[0].pieceIds).toHaveLength(0);
+  });
+
+  it('delete removes group entirely', async () => {
+    const tool = registry.get('modifyGroup')!;
+    const result = await executeTool(store, tool, { groupId, action: 'delete' });
+    expect(result.success).toBe(true);
+    expect(store.getState().project.groups).toHaveLength(0);
+  });
+
+  it('rejects unknown group', async () => {
+    const tool = registry.get('modifyGroup')!;
+    const result = await executeTool(store, tool, { groupId: 'fake', action: 'delete' });
+    expect(result.success).toBe(false);
+  });
+});
