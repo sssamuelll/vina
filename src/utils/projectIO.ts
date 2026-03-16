@@ -20,6 +20,7 @@ interface ProjectState {
   avatarMode?: string;
   avatarModelUrl?: string | null;
   isDirty?: boolean;
+  groups?: unknown[];
 }
 
 // ─── Serialization ──────────────────────────────────────────────────────────
@@ -59,6 +60,7 @@ function stateToProject(state: ProjectState): Record<string, unknown> {
     seams: state.seams,
     fabrics: state.fabrics,
     avatar: state.avatar,
+    groups: state.groups ?? [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

@@ -433,6 +433,7 @@ export default function ProjectView() {
       seams,
       fabrics,
       avatar,
+      groups,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -448,7 +449,7 @@ export default function ProjectView() {
       filename: `${projectName || 'project'}.openclo.json`,
       date: new Date().toLocaleString(),
     });
-  }, [projectId, projectName, pieces, seams, fabrics, avatar]);
+  }, [projectId, projectName, pieces, seams, fabrics, avatar, groups]);
 
   const handleLoadProject = useCallback(() => {
     projectInputRef.current?.click();
