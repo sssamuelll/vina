@@ -13,7 +13,6 @@ import {
   renameGroup,
   deleteGroup,
   setGroupColor,
-  addPiecesToGroup,
   removePiecesFromGroup,
 } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
@@ -634,9 +633,9 @@ export default function ProjectView() {
             <button
               className="sidebar-btn sidebar-btn-full"
               onClick={handleCreateGroup}
-              title={selectedPieceIds.length > 0 ? \`Create group from \${selectedPieceIds.length} selected\` : 'Create empty group'}
+              title={selectedPieceIds.length > 0 ? `Create group from ${selectedPieceIds.length} selected` : 'Create empty group'}
             >
-              + New Group{selectedPieceIds.length > 0 ? \` (\${selectedPieceIds.length} pieces)\` : ''}
+              + New Group{selectedPieceIds.length > 0 ? ` (${selectedPieceIds.length} pieces)` : ''}
             </button>
           </div>
           {groups.length === 0 ? (

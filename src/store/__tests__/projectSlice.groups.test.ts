@@ -77,7 +77,7 @@ describe('projectSlice — groups CRUD', () => {
   });
 
   it('piece can belong to multiple groups', () => {
-    let state = stateWith([{ id: 'p1' }]);
+    let state: any = stateWith([{ id: 'p1' }]);
     state = reducer(state, createGroup({ name: 'A', pieceIds: ['p1'] }));
     state = reducer(state, createGroup({ name: 'B', pieceIds: ['p1'] }));
     expect(state.groups).toHaveLength(2);

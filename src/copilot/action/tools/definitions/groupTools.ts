@@ -101,7 +101,7 @@ const applyToGroupTool: ToolDefinition = {
         description: 'Operation to apply / Operación a aplicar',
       },
       value: {
-        type: ['string', 'number'],
+        type: 'string',
         description:
           'Value for the operation: fabric ID for setFabric, mm for setSeamAllowance, ' +
           'new name for rename, hex color for setColor / Valor de la operación',
@@ -130,7 +130,7 @@ const applyToGroupTool: ToolDefinition = {
         dispatch(setGroupFabric({ groupId, fabricId: value as string }));
         break;
       case 'setSeamAllowance':
-        dispatch(setGroupSeamAllowance({ groupId, seamAllowance: Number(value) }));
+        dispatch(setGroupSeamAllowance({ groupId, width: Number(value) }));
         break;
       case 'rename':
         dispatch(renameGroup({ groupId, name: value as string }));
