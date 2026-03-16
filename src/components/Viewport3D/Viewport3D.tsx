@@ -38,7 +38,7 @@ import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
 import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
-import { useCameraPresets } from './useCameraPresets';
+import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection } from '../../store/editorSlice';
@@ -75,6 +75,10 @@ class Viewport3DErrorBoundary extends Component<{ children: ReactNode }, { hasEr
 }
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
+
+// Scratch vectors for custom pan — avoids allocations in pointermove hot path
+const _panRight = new THREE.Vector3();
+const _panUp = new THREE.Vector3();
 
 /**
  * Create a WebGPURenderer (with WebGL2 fallback when WebGPU is unavailable).
@@ -171,9 +175,10 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
 
   const onPanPointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 1) return; // middle click only
+    if (playbackState === 'playing') return;
     e.currentTarget.setPointerCapture(e.pointerId);
     panState.current = { active: true, lastX: e.clientX, lastY: e.clientY };
-  }, []);
+  }, [playbackState]);
 
   const onPanPointerMove = useCallback((e: React.PointerEvent) => {
     if (!panState.current.active) return;
@@ -191,20 +196,18 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const panSpeed = distance * 0.001;
 
     // Get camera-local right and up vectors
-    const right = new THREE.Vector3();
-    const up = new THREE.Vector3();
-    camera.getWorldDirection(up); // temp
-    right.setFromMatrixColumn(camera.matrix, 0); // camera X axis
-    up.setFromMatrixColumn(camera.matrix, 1);     // camera Y axis
+    _panRight.setFromMatrixColumn(camera.matrix, 0); // camera X axis
+    _panUp.setFromMatrixColumn(camera.matrix, 1);     // camera Y axis
 
     // Move camera only — target stays fixed on avatar
-    camera.position.addScaledVector(right, -dx * panSpeed);
-    camera.position.addScaledVector(up, dy * panSpeed);
+    camera.position.addScaledVector(_panRight, -dx * panSpeed);
+    camera.position.addScaledVector(_panUp, dy * panSpeed);
     controls.update();
   }, []);
 
   const onPanPointerUp = useCallback((e: React.PointerEvent) => {
     if (e.button !== 1) return;
+    e.currentTarget.releasePointerCapture(e.pointerId);
     panState.current.active = false;
   }, []);
 
@@ -280,8 +283,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const handleResetCamera = useCallback(() => {
     const controls = orbitRef.current;
     if (!controls) return;
-    controls.object.position.set(0, 0.85, 3.0);
-    controls.target.set(0, 0.75, 0);
+    controls.object.position.set(...DEFAULT_POSITION);
+    controls.target.set(...DEFAULT_TARGET);
     controls.update();
   }, []);
 
