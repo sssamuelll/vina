@@ -273,6 +273,22 @@ export interface OpenCloProject {
   seams: Seam[];
   fabrics: Fabric[];
   avatar: Avatar;
+  /** Named piece groups (optional for backward compat) */
+  groups?: PieceGroup[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+// ─── Piece Groups ───
+
+/** A named group of pattern pieces for batch operations. */
+export interface PieceGroup {
+  id: string;
+  name: string;
+  /** Ordered array of member piece IDs */
+  pieceIds: string[];
+  /** Display color for UI indicators (hex) */
+  color: string;
   createdAt: number;
   updatedAt: number;
 }

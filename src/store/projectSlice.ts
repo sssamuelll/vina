@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand } from '../types/types';
+import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup } from '../types/types';
 import { NEW_PROJECT } from './actions';
 
 const defaultAvatar: Avatar = {
@@ -40,6 +40,8 @@ interface ProjectState {
   avatarMode: AvatarMode;
   avatarModelUrl: string | null;
   isDirty: boolean;
+  /** Named piece groups for batch operations */
+  groups: PieceGroup[];
   /** Per-piece 3D arrangement position overrides (piece ID → [x,y,z]) */
   arrangementOverrides: Record<string, [number, number, number]>;
 }
@@ -54,6 +56,7 @@ const initialState: ProjectState = {
   avatarMode: 'model',
   avatarModelUrl: '/default-avatar.glb',
   isDirty: false,
+  groups: [],
   arrangementOverrides: {},
 };
 
@@ -72,6 +75,7 @@ const projectSlice = createSlice({
       state.seams = p.seams;
       state.fabrics = p.fabrics;
       state.avatar = p.avatar;
+      state.groups = p.groups ?? [];
       state.isDirty = false;
     },
     setProjectName(state, action: PayloadAction<string>) {
