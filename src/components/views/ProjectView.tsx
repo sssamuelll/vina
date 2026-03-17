@@ -15,10 +15,11 @@ import {
   setGroupColor,
   removePiecesFromGroup,
 } from '../../store/projectSlice';
-import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
+import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF } from '../../utils/dxf';
 import type { DXFDocument } from '../../utils/dxf/types';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
+import { downloadBOM } from '../../utils/export/bomExport';
 import ImportDXFDialog from '../ImportDXFDialog/ImportDXFDialog';
 import type { ImportDXFOptions } from '../ImportDXFDialog/ImportDXFDialog';
 import ExportSkillModal from '../ExportSkillModal/ExportSkillModal';
@@ -368,6 +369,13 @@ export default function ProjectView() {
     setLastExport({ filename, date: new Date().toLocaleString() });
   }, [pieces, projectName]);
 
+  const handleExportMultiSizeDXF = useCallback(() => {
+    downloadMultiSizeDXF(
+      [{ size: 'BASE', pieces }],
+      `${projectName || 'pattern'}-multisize.dxf`,
+    );
+  }, [pieces, projectName]);
+
   const handleExportPDF = useCallback(() => {
     const filename = `${projectName || 'pattern'}.pdf`;
     downloadPDF(pieces, filename);
@@ -379,6 +387,14 @@ export default function ProjectView() {
     downloadOBJ(pieces, filename);
     setLastExport({ filename, date: new Date().toLocaleString() });
   }, [pieces, projectName]);
+
+  const handleExportBOM = useCallback(() => {
+    downloadBOM(pieces, seams, fabrics, `${projectName || 'project'}-bom.csv`);
+    setLastExport({
+      filename: `${projectName || 'project'}-bom.csv`,
+      date: new Date().toLocaleString(),
+    });
+  }, [pieces, seams, fabrics, projectName]);
 
   // ─── Cutting Layout ───
 
@@ -752,6 +768,13 @@ export default function ProjectView() {
             </button>
             <button
               className="sidebar-btn sidebar-btn-full"
+              onClick={handleExportMultiSizeDXF}
+              disabled={pieces.length === 0}
+            >
+              Export Multi-Size DXF
+            </button>
+            <button
+              className="sidebar-btn sidebar-btn-full"
               onClick={handleExportPDF}
               disabled={pieces.length === 0}
             >
@@ -777,6 +800,13 @@ export default function ProjectView() {
               disabled={pieces.length === 0}
             >
               Export Gerber AccuMark
+            </button>
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={handleExportBOM}
+              disabled={pieces.length === 0}
+            >
+              Export BOM (CSV)
             </button>
             <hr style={{ border: 'none', borderTop: '1px solid #333', margin: '8px 0' }} />
             <button

@@ -220,6 +220,140 @@ const saveProjectTool: ToolDefinition = {
   },
 };
 
+// ─── exportBOM ──────────────────────────────────────────────────────────────
+
+const exportBOMTool: ToolDefinition = {
+  name: 'exportBOM',
+  description:
+    'Export a Bill of Materials (BOM) as CSV. Lists all pieces with fabric, area, seam allowance, dimensions. ' +
+    '/ Exportar lista de materiales (BOM) como CSV.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename / Nombre del archivo' },
+    },
+  },
+  execute: async (params, _dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const pieces = state.project.pieces;
+    const seams = state.project.seams;
+    const fabrics = state.project.fabrics;
+
+    if (pieces.length === 0) {
+      return { success: false, error: 'No pieces to export' };
+    }
+
+    const filename = (params.filename as string) || 'bom.csv';
+
+    try {
+      const { downloadBOM } = await import('../../../../utils/export/bomExport');
+      downloadBOM(pieces, seams, fabrics, filename);
+      return {
+        success: true,
+        data: { filename, piecesExported: pieces.length },
+      };
+    } catch (e: unknown) {
+      return { success: false, error: (e as Error).message };
+    }
+  },
+};
+
+// ─── exportMultiSizeDXF ─────────────────────────────────────────────────────
+
+const exportMultiSizeDXFTool: ToolDefinition = {
+  name: 'exportMultiSizeDXF',
+  description:
+    'Export all graded sizes into a single AAMA DXF file. Each size pieces become separate BLOCKs. ' +
+    '/ Exportar todas las tallas graduadas en un solo archivo DXF AAMA.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename / Nombre del archivo' },
+    },
+  },
+  execute: async (params, _dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const pieces = state.project.pieces;
+
+    if (pieces.length === 0) {
+      return { success: false, error: 'No pieces to export' };
+    }
+
+    const filename = (params.filename as string) || 'pattern-multisize.dxf';
+
+    try {
+      const { downloadMultiSizeDXF } = await import('../../../../utils/dxf/exportAAMA');
+      downloadMultiSizeDXF([{ size: 'BASE', pieces }], filename);
+      return {
+        success: true,
+        data: { filename, piecesExported: pieces.length, sizes: ['BASE'] },
+      };
+    } catch (e: unknown) {
+      return { success: false, error: (e as Error).message };
+    }
+  },
+};
+
+// ─── export3DFBX ────────────────────────────────────────────────────────────
+
+const export3DFBXTool: ToolDefinition = {
+  name: 'export3DFBX',
+  description:
+    'Export simulated 3D garment mesh to FBX binary format for Unity/Unreal/Blender/Maya. ' +
+    '/ Exportar malla 3D de prenda simulada a FBX binario.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename (without .fbx)' },
+      scale: { type: 'number', description: 'Scale: mm->target (0.1=cm, 0.001=m). Default: 0.1' },
+    },
+  },
+  execute: async (params): Promise<ToolResult> => {
+    const filename = (params.filename as string) || 'garment-3d';
+    const scale = (params.scale as number) || 0.1;
+    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+      detail: { format: 'fbx', filename, scale },
+    }));
+    return { success: true, data: { filename: `${filename}.fbx`, format: 'FBX' } };
+  },
+};
+
+// ─── exportOBJSequence ──────────────────────────────────────────────────────
+
+const exportOBJSequenceTool: ToolDefinition = {
+  name: 'exportOBJSequence',
+  description:
+    'Export cloth simulation as OBJ sequence (ZIP) for VFX pipelines. One OBJ per frame. ' +
+    '/ Exportar simulación como secuencia OBJ (ZIP) para pipelines VFX.',
+  parameters: {
+    type: 'object',
+    properties: {
+      frameCount: { type: 'number', description: 'Number of frames to capture (default: 100)' },
+      fps: { type: 'number', description: 'Frames per second for metadata (default: 24)' },
+      filename: { type: 'string', description: 'Output ZIP filename' },
+    },
+  },
+  execute: async (params): Promise<ToolResult> => {
+    const frameCount = (params.frameCount as number) || 100;
+    const fps = (params.fps as number) || 24;
+    const filename = (params.filename as string) || 'simulation-sequence';
+
+    window.dispatchEvent(new CustomEvent('openclo:exportObjSequence', {
+      detail: { frameCount, fps, filename },
+    }));
+
+    return {
+      success: true,
+      data: {
+        filename: `${filename}.zip`,
+        frameCount,
+        fps,
+        note: 'Export triggered — capture begins in 3D viewport',
+      },
+    };
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -229,4 +363,8 @@ export const tools: ToolDefinition[] = [
   export3DOBJTool,
   export3DGLTFTool,
   saveProjectTool,
+  exportBOMTool,
+  exportMultiSizeDXFTool,
+  export3DFBXTool,
+  exportOBJSequenceTool,
 ];

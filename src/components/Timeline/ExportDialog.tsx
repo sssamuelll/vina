@@ -6,6 +6,8 @@ import type { AnyRenderer } from '../../types/renderer';
 import type { RootState } from '../../store';
 import type { SimRecorderHandle } from '../../hooks/useSimulationRecorder';
 import { exportAnimation } from '../../utils/export/animationExporter';
+import { generateOBJSequence, downloadOBJSequence } from '../../utils/export/objSequenceExporter';
+import { exportToOBJ } from '../../utils/export/objExporter';
 
 export interface ExportDialogProps {
   open: boolean;
@@ -18,6 +20,7 @@ export interface ExportDialogProps {
 }
 
 type Resolution = '720p' | '1080p' | '4k';
+type ExportFormat = 'webm' | 'obj-sequence';
 
 const RESOLUTION_MAP: Record<Resolution, { width: number; height: number; label: string }> = {
   '720p': { width: 1280, height: 720, label: '720p (1280 x 720)' },
@@ -35,61 +38,97 @@ export default function ExportDialog({
   recorder,
 }: ExportDialogProps) {
   const { tracks, fps, duration } = useSelector((s: RootState) => s.animation);
+  const [format, setFormat] = useState<ExportFormat>('webm');
   const [resolution, setResolution] = useState<Resolution>('1080p');
   const [transparent, setTransparent] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState({ frame: 0, total: 0 });
   const abortRef = useRef<AbortController | null>(null);
 
-  const canExport = renderer && scene && camera;
+  const isObjSequence = format === 'obj-sequence';
+  const canExport = isObjSequence ? !!clothMesh : !!(renderer && scene && camera);
 
   const handleExport = useCallback(async () => {
-    if (!renderer || !scene || !camera) return;
+    if (isObjSequence) {
+      // ── OBJ Sequence export ──────────────────────────────────────
+      if (!clothMesh) return;
 
-    const abort = new AbortController();
-    abortRef.current = abort;
-    setExporting(true);
-    setProgress({ frame: 0, total: 0 });
+      const abort = new AbortController();
+      abortRef.current = abort;
+      setExporting(true);
+      setProgress({ frame: 0, total: 0 });
 
-    const { width, height } = RESOLUTION_MAP[resolution];
+      const totalFrames = Math.floor(duration * fps);
 
-    try {
-      const blob = await exportAnimation({
-        renderer,
-        scene,
-        camera,
-        tracks,
-        fps,
-        duration,
-        width,
-        height,
-        transparent,
-        recorder,
-        clothMesh,
-        onProgress: (frame, total) => setProgress({ frame, total }),
-        abortSignal: abort.signal,
-      });
+      try {
+        const zip = await generateOBJSequence({
+          captureFrame: () => exportToOBJ(clothMesh),
+          frameCount: totalFrames,
+          fps,
+          onProgress: (frame, total) => setProgress({ frame, total }),
+          abortSignal: abort.signal,
+        });
 
-      if (!abort.signal.aborted) {
-        // Trigger download
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `animation-${Date.now()}.webm`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        if (!abort.signal.aborted) {
+          downloadOBJSequence(zip, `animation-${Date.now()}.zip`);
+        }
+      } catch (err) {
+        if (!abort.signal.aborted) {
+          console.error('OBJ sequence export failed:', err);
+        }
+      } finally {
+        setExporting(false);
+        abortRef.current = null;
       }
-    } catch (err) {
-      if (!abort.signal.aborted) {
-        console.error('Export failed:', err);
+    } else {
+      // ── WebM video export ────────────────────────────────────────
+      if (!renderer || !scene || !camera) return;
+
+      const abort = new AbortController();
+      abortRef.current = abort;
+      setExporting(true);
+      setProgress({ frame: 0, total: 0 });
+
+      const { width, height } = RESOLUTION_MAP[resolution];
+
+      try {
+        const blob = await exportAnimation({
+          renderer,
+          scene,
+          camera,
+          tracks,
+          fps,
+          duration,
+          width,
+          height,
+          transparent,
+          recorder,
+          clothMesh,
+          onProgress: (frame, total) => setProgress({ frame, total }),
+          abortSignal: abort.signal,
+        });
+
+        if (!abort.signal.aborted) {
+          // Trigger download
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `animation-${Date.now()}.webm`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        }
+      } catch (err) {
+        if (!abort.signal.aborted) {
+          console.error('Export failed:', err);
+        }
+      } finally {
+        setExporting(false);
+        abortRef.current = null;
       }
-    } finally {
-      setExporting(false);
-      abortRef.current = null;
     }
-  }, [renderer, scene, camera, tracks, fps, duration, resolution, transparent, recorder, clothMesh]);
+  }, [isObjSequence, clothMesh, renderer, scene, camera, tracks, fps, duration, resolution, transparent, recorder]);
 
   const handleCancel = useCallback(() => {
     if (exporting) {
@@ -120,14 +159,45 @@ export default function ExportDialog({
 
         {/* Body */}
         <div style={styles.body}>
-          {/* Resolution */}
+          {/* Format selector */}
           <label style={styles.label}>
+            Format
+            <div style={styles.radioGroup}>
+              <label style={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="exportFormat"
+                  value="webm"
+                  checked={format === 'webm'}
+                  onChange={() => setFormat('webm')}
+                  disabled={exporting}
+                  style={styles.radio}
+                />
+                WebM Video
+              </label>
+              <label style={styles.radioLabel}>
+                <input
+                  type="radio"
+                  name="exportFormat"
+                  value="obj-sequence"
+                  checked={format === 'obj-sequence'}
+                  onChange={() => setFormat('obj-sequence')}
+                  disabled={exporting}
+                  style={styles.radio}
+                />
+                OBJ Sequence (ZIP)
+              </label>
+            </div>
+          </label>
+
+          {/* Resolution — only for WebM */}
+          <label style={{ ...styles.label, ...(isObjSequence ? styles.disabledGroup : {}) }}>
             Resolution
             <select
               style={styles.select}
               value={resolution}
               onChange={(e) => setResolution(e.target.value as Resolution)}
-              disabled={exporting}
+              disabled={exporting || isObjSequence}
             >
               {(Object.keys(RESOLUTION_MAP) as Resolution[]).map((key) => (
                 <option key={key} value={key}>
@@ -137,13 +207,13 @@ export default function ExportDialog({
             </select>
           </label>
 
-          {/* Transparent background */}
-          <label style={styles.checkboxLabel}>
+          {/* Transparent background — only for WebM */}
+          <label style={{ ...styles.checkboxLabel, ...(isObjSequence ? styles.disabledGroup : {}) }}>
             <input
               type="checkbox"
               checked={transparent}
               onChange={(e) => setTransparent(e.target.checked)}
-              disabled={exporting}
+              disabled={exporting || isObjSequence}
               style={styles.checkbox}
             />
             Transparent background
@@ -152,13 +222,14 @@ export default function ExportDialog({
           {/* Info */}
           <div style={styles.info}>
             {totalFrames} frames at {fps} fps ({duration}s)
+            {isObjSequence && ' — one OBJ per frame'}
           </div>
 
           {/* Progress bar */}
           {exporting && (
             <div style={styles.progressSection}>
               <div style={styles.progressText}>
-                Rendering frame {progress.frame} / {progress.total}
+                {isObjSequence ? 'Capturing' : 'Rendering'} frame {progress.frame} / {progress.total}
               </div>
               <div style={styles.progressTrack}>
                 <div
@@ -264,6 +335,23 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
     cursor: 'pointer',
   },
+  radioGroup: {
+    display: 'flex',
+    gap: 16,
+    marginTop: 4,
+  },
+  radioLabel: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    fontSize: 12,
+    color: 'var(--text-primary, #eee)',
+    cursor: 'pointer',
+  },
+  radio: {
+    accentColor: 'var(--accent, #4a9eff)',
+    cursor: 'pointer',
+  },
   checkboxLabel: {
     display: 'flex',
     alignItems: 'center',
@@ -275,6 +363,10 @@ const styles: Record<string, React.CSSProperties> = {
   checkbox: {
     accentColor: 'var(--accent, #4a9eff)',
     cursor: 'pointer',
+  },
+  disabledGroup: {
+    opacity: 0.4,
+    pointerEvents: 'none' as const,
   },
   info: {
     fontSize: 11,

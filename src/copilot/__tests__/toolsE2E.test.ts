@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 123 tools registered', () => {
-      expect(registry.size).toBe(127); // +7 3D interaction tools (#142, #138) + 4 snapshot tools + assignFabric (#222)
+      expect(registry.size).toBe(131); // +4 export tools (#120: exportBOM, exportMultiSizeDXF, export3DFBX, exportOBJSequence)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(127); // +7 3D interaction tools (#142, #138) + 4 snapshot tools + assignFabric (#222)
+      expect(names.length).toBe(131); // +4 export tools (#120: exportBOM, exportMultiSizeDXF, export3DFBX, exportOBJSequence)
 
       // Key tools from every category
       const expected = [
@@ -418,6 +418,7 @@ describe('Tools E2E', () => {
         'createSeam',
         'setViewMode',
         'exportDXF', 'exportPDF', 'export3DOBJ', 'export3DGLTF',
+        'exportBOM', 'exportMultiSizeDXF', 'export3DFBX', 'exportOBJSequence',
         'setMeasurements',
         'autoDetectSeams',
         'searchFabrics', 'getFabricDetails', 'compareFabrics',

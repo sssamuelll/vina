@@ -496,6 +496,272 @@ function sanitizeBlockName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 31);
 }
 
+/** Gap between size groups on Y axis (mm) */
+const SIZE_GAP = 100;
+
+// ─── Multi-Size Types ───
+
+/** A set of pattern pieces for a single graded size. */
+export interface GradedSizeSet {
+  size: string;
+  pieces: PatternPiece[];
+}
+
+// ─── Multi-Size Helpers ───
+
+/**
+ * Build a size-qualified block name: `<PIECE_NAME>_<SIZE>`.
+ * Sanitized and truncated to 31 chars per DXF spec.
+ */
+function sizeBlockName(pieceName: string, size: string): string {
+  return sanitizeBlockName(`${pieceName}_${size}`);
+}
+
+/**
+ * Collect all size-qualified block names across every graded set.
+ */
+function collectMultiSizeBlockNames(gradedSets: GradedSizeSet[]): string[] {
+  const names: string[] = [];
+  for (const gs of gradedSets) {
+    for (const piece of gs.pieces) {
+      names.push(sizeBlockName(piece.name, gs.size));
+    }
+  }
+  return names;
+}
+
+/**
+ * TABLES section for multi-size DXF.
+ * Creates BLOCK_RECORD entries for every `<PIECE>_<SIZE>` block.
+ */
+function dxfTablesMultiSize(blockNames: string[], opts: DXFExportOptions): string {
+  let s = `0
+SECTION
+2
+TABLES
+`;
+  // LAYER table (identical to single-size)
+  s += `0
+TABLE
+2
+LAYER
+5
+${nextHandle()}
+`;
+  const layers = [
+    { name: AAMA_LAYERS.CUT, color: 7, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.NOTCH, color: 1, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.GRAINLINE, color: 3, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.DRAW, color: 4, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.INTCUT, color: 6, lt: 'DASHED' },
+  ];
+  for (const l of layers) {
+    s += `0
+LAYER
+5
+${nextHandle()}
+2
+${l.name}
+70
+0
+62
+${l.color}
+6
+${l.lt}
+`;
+  }
+  s += `0
+ENDTAB
+`;
+
+  // BLOCK_RECORD table (R2000+)
+  if (opts.version === 'R2000') {
+    s += `0
+TABLE
+2
+BLOCK_RECORD
+5
+${nextHandle()}
+`;
+    for (const brName of ['*MODEL_SPACE', '*PAPER_SPACE']) {
+      s += `0
+BLOCK_RECORD
+5
+${nextHandle()}
+2
+${brName}
+`;
+    }
+    for (const bn of blockNames) {
+      s += `0
+BLOCK_RECORD
+5
+${nextHandle()}
+2
+${bn}
+`;
+    }
+    s += `0
+ENDTAB
+`;
+  }
+
+  s += `0
+ENDSEC
+`;
+  return s;
+}
+
+/**
+ * BLOCKS section for multi-size DXF.
+ * Creates one block per piece per size, reusing `pieceEntities()`.
+ */
+function dxfBlocksMultiSize(gradedSets: GradedSizeSet[], opts: DXFExportOptions): string {
+  let s = `0
+SECTION
+2
+BLOCKS
+`;
+
+  // Model space block
+  s += `0
+BLOCK
+5
+${nextHandle()}
+8
+0
+2
+*MODEL_SPACE
+70
+0
+10
+0.0
+20
+0.0
+0
+ENDBLK
+5
+${nextHandle()}
+8
+0
+`;
+
+  // Paper space block
+  s += `0
+BLOCK
+5
+${nextHandle()}
+8
+0
+2
+*PAPER_SPACE
+70
+0
+10
+0.0
+20
+0.0
+0
+ENDBLK
+5
+${nextHandle()}
+8
+0
+`;
+
+  // One block per piece per size
+  for (const gs of gradedSets) {
+    const prepared = preparePieces(gs.pieces, { spacing: 30 });
+    for (const pp of prepared) {
+      const blockName = sizeBlockName(pp.piece.name, gs.size);
+      s += `0
+BLOCK
+5
+${nextHandle()}
+8
+${AAMA_LAYERS.CUT}
+2
+${blockName}
+70
+0
+10
+0.0
+20
+0.0
+`;
+      s += pieceEntities(pp.piece, pp.seamOutline, opts);
+      s += `0
+ENDBLK
+5
+${nextHandle()}
+8
+0
+`;
+    }
+  }
+
+  s += `0
+ENDSEC
+`;
+  return s;
+}
+
+/**
+ * ENTITIES section for multi-size DXF.
+ * Each size group is offset on the Y axis by SIZE_GAP plus the max height
+ * of the previous group, so sizes don't overlap.
+ */
+function dxfEntitiesMultiSize(gradedSets: GradedSizeSet[]): string {
+  let s = `0
+SECTION
+2
+ENTITIES
+`;
+
+  let currentY = 0;
+
+  for (const gs of gradedSets) {
+    const prepared = preparePieces(gs.pieces, { spacing: 30 });
+
+    let maxHeight = 0;
+    for (const pp of prepared) {
+      const h = pp.boundingBox.height;
+      if (h > maxHeight) maxHeight = h;
+    }
+
+    for (const pp of prepared) {
+      s += `0
+INSERT
+5
+${nextHandle()}
+8
+${AAMA_LAYERS.CUT}
+2
+${sizeBlockName(pp.piece.name, gs.size)}
+10
+${pp.offsetX.toFixed(4)}
+20
+${(pp.offsetY - currentY).toFixed(4)}
+30
+0.0
+41
+1.0
+42
+1.0
+50
+0.0
+`;
+    }
+
+    currentY += maxHeight + SIZE_GAP;
+  }
+
+  s += `0
+ENDSEC
+`;
+  return s;
+}
+
 // ─── Public API ───
 
 /**
@@ -535,6 +801,55 @@ EOF
  */
 export function downloadDXFAAMA(pieces: PatternPiece[], filename = 'pattern-aama.dxf', options?: Partial<DXFExportOptions>) {
   const dxf = generateDXFAAMA(pieces, options);
+  const blob = new Blob([dxf], { type: 'application/dxf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Multi-Size Public API ───
+
+/**
+ * Generate an AAMA/ASTM D6673 compliant DXF containing multiple graded sizes.
+ *
+ * Each piece in each size becomes a separate BLOCK named `<PIECE_NAME>_<SIZE>`.
+ * Size groups are offset vertically by SIZE_GAP (100 mm) so they don't overlap
+ * in the ENTITIES section. Reuses all single-size infrastructure (SA, layers,
+ * entity generators) via the shared export pipeline.
+ *
+ * @param gradedSets - Array of { size, pieces } objects, one per graded size
+ * @param options - Optional DXF export settings
+ * @returns Complete DXF file content as a string
+ */
+export function generateMultiSizeDXF(gradedSets: GradedSizeSet[], options?: Partial<DXFExportOptions>): string {
+  const opts = { ...DEFAULT_OPTIONS, ...options };
+  resetHandles();
+
+  const blockNames = collectMultiSizeBlockNames(gradedSets);
+
+  let dxf = '';
+  dxf += dxfHeader();
+  dxf += dxfTablesMultiSize(blockNames, opts);
+  dxf += dxfBlocksMultiSize(gradedSets, opts);
+  dxf += dxfEntitiesMultiSize(gradedSets);
+  dxf += `0
+EOF
+`;
+  return dxf;
+}
+
+/**
+ * Generate a multi-size AAMA DXF and trigger a browser file download.
+ *
+ * @param gradedSets - Array of { size, pieces } objects
+ * @param filename - Download filename (default: `'pattern-multisize.dxf'`)
+ * @param options - Optional DXF export settings
+ */
+export function downloadMultiSizeDXF(gradedSets: GradedSizeSet[], filename = 'pattern-multisize.dxf', options?: Partial<DXFExportOptions>) {
+  const dxf = generateMultiSizeDXF(gradedSets, options);
   const blob = new Blob([dxf], { type: 'application/dxf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
