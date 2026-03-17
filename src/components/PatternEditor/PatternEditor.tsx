@@ -195,7 +195,7 @@ export default function PatternEditor() {
     setEditingPieceNameId(null);
   }, []);
 
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool,
     });
@@ -334,6 +334,7 @@ export default function PatternEditor() {
             walkSeamMetrics={walkSeamTool.metrics}
             walkSeamFormatDistance={walkSeamTool.formatDistance}
             walkSeamHoveredSnapPoint={walkSeamTool.hoveredSnapPoint}
+            selectMarquee={selectMarquee}
           />
         </g>
 
