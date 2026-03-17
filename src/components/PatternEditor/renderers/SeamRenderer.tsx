@@ -9,7 +9,7 @@
  */
 
 import { PatternPiece, Seam } from '../../../types/types';
-import { getEdgeEndpoints, getEdgeLength } from '../useSeamTool';
+import { getEdgeEndpoints, getEdgeLength } from '../../../utils/geometry/path';
 
 interface SeamRendererProps {
   seams: Seam[];

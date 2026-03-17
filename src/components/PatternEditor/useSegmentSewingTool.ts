@@ -4,7 +4,8 @@ import { RootState } from '../../store';
 import { addSeam } from '../../store/projectSlice';
 import { selectSeam } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
-import { getEdgeEndpoints } from './useSeamTool';
+import { getEdgeEndpoints } from '../../utils/geometry/path';
+import { screenToPattern, resolveEdgeName } from './sewingUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -145,12 +146,8 @@ export function useSegmentSewingTool(
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );
@@ -312,17 +309,12 @@ export function useSegmentSewingTool(
         return;
       }
       if (e.key === 'Enter' && state.phase === 'b_end' && state.segmentA && state.segmentB) {
-        // Resolve semantic edge names from edge indices
         const segA = state.segmentA;
         const segB = state.segmentB;
         const pieceAObj = pieces.find(p => p.id === segA.pieceId);
         const pieceBObj = pieces.find(p => p.id === segB.pieceId);
-        const edgeAName = pieceAObj?.edges?.find(
-          e => segA.edgeIndex >= e.segmentRange[0] && segA.edgeIndex < e.segmentRange[1]
-        )?.name ?? `edge-${segA.edgeIndex}`;
-        const edgeBName = pieceBObj?.edges?.find(
-          e => segB.edgeIndex >= e.segmentRange[0] && segB.edgeIndex < e.segmentRange[1]
-        )?.name ?? `edge-${segB.edgeIndex}`;
+        const edgeAName = pieceAObj ? resolveEdgeName(pieceAObj, segA.edgeIndex) : `edge-${segA.edgeIndex}`;
+        const edgeBName = pieceBObj ? resolveEdgeName(pieceBObj, segB.edgeIndex) : `edge-${segB.edgeIndex}`;
 
         const seam: Omit<Seam, 'id'> = {
           pieceA: {
@@ -341,7 +333,7 @@ export function useSegmentSewingTool(
         reset();
       }
     },
-    [state.phase, state.segmentA, state.segmentB, seamType, dispatch, reset],
+    [state.phase, state.segmentA, state.segmentB, seamType, dispatch, reset, pieces],
   );
 
   const getCursor = useCallback((): string => {

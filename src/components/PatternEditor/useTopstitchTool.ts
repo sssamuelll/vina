@@ -6,6 +6,7 @@ import { selectInternalLine } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, PathCommand, InternalLine, TopstitchOptions, Tool2D } from '../../types/types';
 import { getEdgeEndpoints, computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
 import { snapToEdge } from './useSegmentSewingTool';
+import { screenToPattern } from './sewingUtils';
 
 // Re-export pure functions for backward compatibility
 export { computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
@@ -83,12 +84,8 @@ export function useTopstitchTool(
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );

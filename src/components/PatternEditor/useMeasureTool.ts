@@ -6,6 +6,7 @@ import { formatDimension } from '../../utils/units';
 import { flattenPath } from '../../utils/seam/index';
 import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath, pointAtPathDistance } from '../../utils/geometry/arcLength';
 import type { ArcLengthSample } from '../../utils/geometry/arcLength';
+import { screenToPattern } from './sewingUtils';
 
 // ─── Types ───
 
@@ -187,10 +188,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
     const rect = e.currentTarget.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left - pan.x) / zoom,
-      y: (e.clientY - rect.top - pan.y) / zoom,
-    };
+    return screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
   }, [zoom, pan]);
 
   /** Try to snap to nearest piece outline */
