@@ -21,6 +21,7 @@ import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useTopstitchTool } from './useTopstitchTool';
 import { useWalkSeamTool } from './useWalkSeamTool';
+import { useFreeSewingTool } from './useFreeSewingTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -107,6 +108,8 @@ export default function PatternEditor() {
   const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
   const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
   const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
+  const freeSewingMode = (toolOptions?.freesewing?.sewingType as 'free' | 'point') ?? 'free';
+  const freeSewingTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete, freeSewingMode);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -236,7 +239,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool,
     });
 
   const handleZoomToFit = useCallback(() => {
@@ -373,6 +376,9 @@ export default function PatternEditor() {
             walkSeamMetrics={walkSeamTool.metrics}
             walkSeamFormatDistance={walkSeamTool.formatDistance}
             walkSeamHoveredSnapPoint={walkSeamTool.hoveredSnapPoint}
+            freeSewingFirstEdge={freeSewingTool.firstEdge}
+            freeSewingHoveredEdge={freeSewingTool.hoveredEdge}
+            freeSewingMode={freeSewingTool.mode}
             selectMarquee={selectMarquee}
           />
         </g>

@@ -331,6 +331,7 @@ export type Tool2D =
   | 'walkSeam'      // walk seam verification
   | 'scissors'     // split pattern pieces
   | 'merge'        // merge adjacent pattern pieces
+  | 'freesewing'   // free sewing between edges
   | 'hand'         // pan
   | 'zoom';
 

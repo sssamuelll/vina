@@ -22,7 +22,7 @@ export default function StatusBar() {
     dart: 'Dart (D)',
     // Sewing
     seam: 'Edit Sewing (B)',
-    freeSewing: 'Free Sewing (M)',
+    freesewing: 'Free Sewing (F)',
     // Displaced (Shift+Key)
     measure: 'Measure (Shift+M)',
     notch: 'Notch (Shift+N)',

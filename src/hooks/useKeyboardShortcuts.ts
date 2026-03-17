@@ -179,12 +179,12 @@ export function useKeyboardShortcuts() {
 
       // Sewing
       ['tool.seam', () => { dispatch(setActiveTool('seam' as any)); dispatch(setActiveTool2D('seam')); }],
-      ['tool.freeSewing', () => { dispatch(setActiveTool('freeSewing' as any)); dispatch(setActiveTool2D('freeSewing')); }],
+      ['tool.freeSewing', () => { dispatch(setActiveTool('freesewing' as any)); dispatch(setActiveTool2D('freesewing')); }],
       ['tool.segmentSewing', () => { dispatch(setActiveTool('segmentSewing' as any)); dispatch(setActiveTool2D('segmentSewing')); }],
 
       // Shift+Key tools
       ['tool.grainline', () => { dispatch(setActiveTool('grainline' as any)); dispatch(setActiveTool2D('grainline')); }],
-      ['tool.freeSewingAlt', () => { dispatch(setActiveTool('freeSewing' as any)); dispatch(setActiveTool2D('freeSewing')); }],
+      ['tool.freeSewingAlt', () => { dispatch(setActiveTool('freesewing' as any)); dispatch(setActiveTool2D('freesewing')); }],
       ['tool.notch', () => { dispatch(setActiveTool('notch' as any)); dispatch(setActiveTool2D('notch')); }],
       ['tool.line', () => { dispatch(setActiveTool('line' as any)); dispatch(setActiveTool2D('line')); }],
 

@@ -41,9 +41,7 @@ export const freeSewingTool: ToolDefinition = {
       ],
     },
   ],
-  onActivate: () => {
-    console.log('Free Sewing tool - Coming soon!');
-  },
+  onActivate: () => {},
   copilot: {
     description: 'Create free-form sewing connections between pattern pieces without strict edge alignment. Free mode allows drawing arbitrary sewing lines across pieces. Point-to-point mode connects specific anchor points between pieces. Useful for complex construction details like gathers, pleats, or unconventional seam placements.',
     examples: [
