@@ -52,7 +52,7 @@ export default function ToolTooltip({ name, shortcut, description, hasSubTools, 
       className="tool-tooltip-wrapper"
       onMouseEnter={show}
       onMouseLeave={hide}
-      onMouseDown={hide}
+      onPointerDown={hide}
     >
       {children}
       {visible && pos && createPortal(
