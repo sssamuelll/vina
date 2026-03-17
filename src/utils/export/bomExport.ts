@@ -114,7 +114,7 @@ const CSV_HEADER = [
  */
 export function generateBOM(
   pieces: BOMPiece[],
-  seams: Seam[],
+  _seams: Seam[],
   fabrics: BOMFabric[],
 ): string {
   const fabricMap = new Map<string, string>();
@@ -196,7 +196,7 @@ export function generateBOM(
  */
 export function downloadBOM(
   pieces: BOMPiece[],
-  seams: Seam[],
+  _seams: Seam[],
   fabrics: BOMFabric[],
   filename = 'bill-of-materials.csv',
 ): void {
