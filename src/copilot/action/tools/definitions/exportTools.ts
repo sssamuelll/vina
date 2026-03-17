@@ -220,6 +220,44 @@ const saveProjectTool: ToolDefinition = {
   },
 };
 
+// ─── exportBOM ──────────────────────────────────────────────────────────────
+
+const exportBOMTool: ToolDefinition = {
+  name: 'exportBOM',
+  description:
+    'Export a Bill of Materials (BOM) as CSV. Lists all pieces with fabric, area, seam allowance, dimensions. ' +
+    '/ Exportar lista de materiales (BOM) como CSV.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename / Nombre del archivo' },
+    },
+  },
+  execute: async (params, _dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const pieces = state.project.pieces;
+    const seams = state.project.seams;
+    const fabrics = state.project.fabrics;
+
+    if (pieces.length === 0) {
+      return { success: false, error: 'No pieces to export' };
+    }
+
+    const filename = (params.filename as string) || 'bom.csv';
+
+    try {
+      const { downloadBOM } = await import('../../../../utils/export/bomExport');
+      downloadBOM(pieces, seams, fabrics, filename);
+      return {
+        success: true,
+        data: { filename, piecesExported: pieces.length },
+      };
+    } catch (e: unknown) {
+      return { success: false, error: (e as Error).message };
+    }
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -229,4 +267,5 @@ export const tools: ToolDefinition[] = [
   export3DOBJTool,
   export3DGLTFTool,
   saveProjectTool,
+  exportBOMTool,
 ];
