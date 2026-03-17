@@ -318,6 +318,42 @@ const export3DFBXTool: ToolDefinition = {
   },
 };
 
+// ─── exportOBJSequence ──────────────────────────────────────────────────────
+
+const exportOBJSequenceTool: ToolDefinition = {
+  name: 'exportOBJSequence',
+  description:
+    'Export cloth simulation as OBJ sequence (ZIP) for VFX pipelines. One OBJ per frame. ' +
+    '/ Exportar simulación como secuencia OBJ (ZIP) para pipelines VFX.',
+  parameters: {
+    type: 'object',
+    properties: {
+      frameCount: { type: 'number', description: 'Number of frames to capture (default: 100)' },
+      fps: { type: 'number', description: 'Frames per second for metadata (default: 24)' },
+      filename: { type: 'string', description: 'Output ZIP filename' },
+    },
+  },
+  execute: async (params): Promise<ToolResult> => {
+    const frameCount = (params.frameCount as number) || 100;
+    const fps = (params.fps as number) || 24;
+    const filename = (params.filename as string) || 'simulation-sequence';
+
+    window.dispatchEvent(new CustomEvent('openclo:exportObjSequence', {
+      detail: { frameCount, fps, filename },
+    }));
+
+    return {
+      success: true,
+      data: {
+        filename: `${filename}.zip`,
+        frameCount,
+        fps,
+        note: 'Export triggered — capture begins in 3D viewport',
+      },
+    };
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -330,4 +366,5 @@ export const tools: ToolDefinition[] = [
   exportBOMTool,
   exportMultiSizeDXFTool,
   export3DFBXTool,
+  exportOBJSequenceTool,
 ];
