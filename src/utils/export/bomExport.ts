@@ -200,7 +200,7 @@ export function downloadBOM(
   fabrics: BOMFabric[],
   filename = 'bill-of-materials.csv',
 ): void {
-  const csv = generateBOM(pieces, seams, fabrics);
+  const csv = generateBOM(pieces, _seams, fabrics);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
