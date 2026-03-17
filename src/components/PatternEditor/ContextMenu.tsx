@@ -14,6 +14,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import {
   removePiece,
+  removeSeam,
+  reverseSeam,
   rotatePiece,
   duplicatePiece,
   flipPieceH,
@@ -43,6 +45,8 @@ export interface ContextMenuState {
   /** ID of piece under cursor, or null for empty canvas */
   pieceId: string | null;
   pieceName?: string;
+  /** ID of seam under cursor, or null */
+  seamId?: string | null;
   /** Segment command index for convert options (set when right-clicking in edit pattern mode) */
   segmentIndex?: number;
   /** Whether the segment is currently a curve */
@@ -75,6 +79,7 @@ interface MenuItem {
 export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
+  const seams = useSelector((s: RootState) => s.project.seams);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
   const groups = useSelector((s: RootState) => s.project.groups);
@@ -115,7 +120,48 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     });
   }
 
-  if (menu.pieceId) {
+  if (menu.seamId) {
+    // ── Seam context ──
+    const sid = menu.seamId;
+    const seam = seams.find(s => s.id === sid);
+    const connectedA = seam?.pieceA.pieceId;
+    const connectedB = seam?.pieceB.pieceId;
+
+    items.push({
+      label: 'Reverse Sewing Direction',
+      icon: '↔',
+      shortcut: 'Ctrl+B',
+      action: () => act(() => dispatch(reverseSeam(sid))),
+    });
+
+    // Select connected pieces
+    if (connectedA && connectedB) {
+      const nameA = pieces.find(p => p.id === connectedA)?.name || 'Piece A';
+      const nameB = pieces.find(p => p.id === connectedB)?.name || 'Piece B';
+      items.push({
+        label: `Select "${nameA}"`,
+        icon: '☐',
+        action: () => act(() => dispatch(selectPiece(connectedA))),
+      });
+      items.push({
+        label: `Select "${nameB}"`,
+        icon: '☐',
+        action: () => act(() => dispatch(selectPiece(connectedB))),
+        separator: true,
+      });
+    }
+
+    items.push({
+      label: 'Delete Seam',
+      icon: '🗑',
+      shortcut: 'Del',
+      action: () => act(() => {
+        dispatch(removeSeam(sid));
+        dispatch(clearSelection());
+      }),
+      danger: true,
+    });
+  } else if (menu.pieceId) {
     // ── Piece context ──
     const pid = menu.pieceId;
     const piece = pieces.find(p => p.id === pid);
@@ -391,7 +437,18 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
         userSelect: 'none',
       }}
     >
-      {menu.pieceId && (
+      {menu.seamId && (
+        <div style={{
+          padding: '6px 12px 4px',
+          fontSize: 11,
+          color: '#e74c3c',
+          borderBottom: '1px solid #333',
+          marginBottom: 2,
+        }}>
+          Seam
+        </div>
+      )}
+      {menu.pieceId && !menu.seamId && (
         <div style={{
           padding: '6px 12px 4px',
           fontSize: 11,
