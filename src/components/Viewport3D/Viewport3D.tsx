@@ -41,7 +41,7 @@ import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import type { ViewPreset } from '../../store/cameraSlice';
-import { selectPiece, clearSelection } from '../../store/editorSlice';
+import { selectPiece, clearSelection, togglePieceSelection } from '../../store/editorSlice';
 import { toggleIK } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
@@ -549,7 +549,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 rotation={placements[i].rotation}
                 arrangementOverride={arrangementOverrides[piece.id]}
                 canDrag={isArrangeMode}
-                onSelect={(id) => dispatch(selectPiece(id))}
+                onSelect={(id, shift) => dispatch(shift ? togglePieceSelection(id) : selectPiece(id))}
                 onDragEnd={(id, pos) => dispatch(setArrangement3D({ pieceId: id, position: pos }))}
                 setOrbitEnabled={setOrbitEnabled}
                 fabricColor={fabric?.color}
