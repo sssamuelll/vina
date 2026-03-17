@@ -1,7 +1,7 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { selectPiece, togglePieceSelection, clearSelection, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
+import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
 
@@ -180,6 +180,9 @@ export function useEditorInteractions(
     pieceId: string; lineId: string; endpointIndex: 0 | 1;
     startMouse: Point2D; startPos: Point2D;
   } | null>(null);
+  const marqueeRef = useRef<{ startPattern: Point2D; currentPattern: Point2D; shiftKey: boolean } | null>(null);
+  const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
+  const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
   const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool } = tools;
 
@@ -432,7 +435,15 @@ export function useEditorInteractions(
           }
         }
       } else {
-        dispatch(clearSelection());
+        // Empty area: start marquee selection
+        if (!e.shiftKey) {
+          dispatch(clearSelection());
+        }
+        marqueeRef.current = {
+          startPattern: { x: clickX, y: clickY },
+          currentPattern: { x: clickX, y: clickY },
+          shiftKey: e.shiftKey,
+        };
       }
     }
   }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine]);
@@ -510,6 +521,17 @@ export function useEditorInteractions(
       dragRef.current.lastPos = { x: newX, y: newY };
       return;
     }
+    if (marqueeRef.current && activeTool === 'select') {
+      const svg = svgRef.current;
+      if (svg) {
+        const svgRect = svg.getBoundingClientRect();
+        const patternX = (e.clientX - svgRect.left - pan2D.x) / zoom2D;
+        const patternY = (e.clientY - svgRect.top - pan2D.y) / zoom2D;
+        marqueeRef.current.currentPattern = { x: patternX, y: patternY };
+        setSelectMarquee({ start: marqueeRef.current.startPattern, current: { x: patternX, y: patternY } });
+      }
+      return;
+    }
     if (nodeEditor.isEditing && activeTool === 'select') {
       const handled = nodeEditor.handleMouseMove(e);
       if (handled) return;
@@ -530,9 +552,58 @@ export function useEditorInteractions(
     if (activeTool === 'segmentSewing') segmentSewingTool.handleMouseMove(e);
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') topstitchTool.handleMouseMove(e);
     if (activeTool === 'walkSeam') walkSeamTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch]);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee]);
 
   const handleMouseUp = useCallback(() => {
+    // Resolve marquee selection
+    if (marqueeRef.current) {
+      const mq = marqueeRef.current;
+      const mx1 = Math.min(mq.startPattern.x, mq.currentPattern.x);
+      const my1 = Math.min(mq.startPattern.y, mq.currentPattern.y);
+      const mx2 = Math.max(mq.startPattern.x, mq.currentPattern.x);
+      const my2 = Math.max(mq.startPattern.y, mq.currentPattern.y);
+      const MIN_DRAG = 3 / zoom2D;
+      if (mx2 - mx1 > MIN_DRAG || my2 - my1 > MIN_DRAG) {
+        const hitIds: string[] = [];
+        for (const piece of pieces) {
+          if (!piece.outline?.length) continue;
+          let pMinX = Infinity, pMaxX = -Infinity, pMinY = Infinity, pMaxY = -Infinity;
+          for (const cmd of piece.outline) {
+            const v = cmd.values;
+            if (cmd.type === 'M' || cmd.type === 'L') {
+              const px = v[0] + piece.position.x, py = v[1] + piece.position.y;
+              if (px < pMinX) pMinX = px; if (px > pMaxX) pMaxX = px;
+              if (py < pMinY) pMinY = py; if (py > pMaxY) pMaxY = py;
+            } else if (cmd.type === 'C') {
+              for (let i = 0; i < 6; i += 2) {
+                const px = v[i] + piece.position.x, py = v[i + 1] + piece.position.y;
+                if (px < pMinX) pMinX = px; if (px > pMaxX) pMaxX = px;
+                if (py < pMinY) pMinY = py; if (py > pMaxY) pMaxY = py;
+              }
+            } else if (cmd.type === 'Q') {
+              for (let i = 0; i < 4; i += 2) {
+                const px = v[i] + piece.position.x, py = v[i + 1] + piece.position.y;
+                if (px < pMinX) pMinX = px; if (px > pMaxX) pMaxX = px;
+                if (py < pMinY) pMinY = py; if (py > pMaxY) pMaxY = py;
+              }
+            }
+          }
+          if (pMaxX >= mx1 && pMinX <= mx2 && pMaxY >= my1 && pMinY <= my2) {
+            hitIds.push(piece.id);
+          }
+        }
+        if (hitIds.length > 0) {
+          if (mq.shiftKey) {
+            const merged = new Set([...selectedPieceIds, ...hitIds]);
+            dispatch(selectAllPieces(Array.from(merged)));
+          } else {
+            dispatch(selectAllPieces(hitIds));
+          }
+        }
+      }
+      marqueeRef.current = null;
+      setSelectMarquee(null);
+    }
     // Commit pan position to Redux on mouseUp
     if (panRef.current?.lastPos) {
       dispatch(setPan2D(panRef.current.lastPos));
@@ -552,14 +623,14 @@ export function useEditorInteractions(
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
     if (activeTool === 'merge') mergeTool.handleMouseUp();
-  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, mergeTool, dispatch]);
+  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
     switch (activeTool) {
       case 'pen': return 'crosshair';
       case 'hand': return panRef.current ? 'grabbing' : 'grab';
-      case 'select': return dragRef.current ? 'grabbing' : 'default';
+      case 'select': return marqueeRef.current ? 'crosshair' : dragRef.current ? 'grabbing' : 'default';
       case 'transform': return 'default';
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';
@@ -576,5 +647,5 @@ export function useEditorInteractions(
     }
   };
 
-  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor };
+  return { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee };
 }

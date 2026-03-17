@@ -96,6 +96,8 @@ interface ToolOverlayProps {
   editPatternHoveredSegment: number | null;
   editPatternAddPointPreview: Point2D | null;
   editPatternMarquee: { start: Point2D; current: Point2D } | null;
+  // Select marquee (piece box-select)
+  selectMarquee: { start: Point2D; current: Point2D } | null;
   // Scissors
   scissorsTargetPieceId: string | null;
   scissorsStartPoint: Point2D | null;
@@ -270,6 +272,21 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           metrics={props.walkSeamMetrics}
           formatDistance={props.walkSeamFormatDistance}
           hoveredSnapPoint={props.walkSeamHoveredSnapPoint}
+        />
+      )}
+
+      {/* Select tool marquee rectangle */}
+      {props.selectMarquee && (
+        <rect
+          x={Math.min(props.selectMarquee.start.x, props.selectMarquee.current.x)}
+          y={Math.min(props.selectMarquee.start.y, props.selectMarquee.current.y)}
+          width={Math.abs(props.selectMarquee.current.x - props.selectMarquee.start.x)}
+          height={Math.abs(props.selectMarquee.current.y - props.selectMarquee.start.y)}
+          fill="rgba(74, 158, 255, 0.1)"
+          stroke="#4A9EFF"
+          strokeWidth={1 / zoom2D}
+          strokeDasharray={`${4 / zoom2D}`}
+          pointerEvents="none"
         />
       )}
     </>
