@@ -17,26 +17,26 @@ export interface LayoutState {
 
 const STORAGE_KEY = 'openclo-layout';
 
-// Load from localStorage
+const LAYOUT_DEFAULTS: LayoutState = {
+  copilotPosition: 'right',
+  copilotOpen: false,
+  copilotSize: 340,
+  sidebarTab: 'chat',
+  primaryView: '2d',
+  splitRatio: 0.5,
+};
+
+// Load from localStorage, merging with defaults to handle new fields
 function loadLayoutFromStorage(): LayoutState {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      return { ...LAYOUT_DEFAULTS, ...JSON.parse(stored) };
     }
   } catch {
     // Ignore errors
   }
-  
-  // Default layout
-  return {
-    copilotPosition: 'right',
-    copilotOpen: false,
-    copilotSize: 340,
-    sidebarTab: 'chat',
-    primaryView: '2d',
-    splitRatio: 0.5,
-  };
+  return { ...LAYOUT_DEFAULTS };
 }
 
 // Save to localStorage
@@ -130,14 +130,7 @@ const layoutSlice = createSlice({
     },
 
     resetLayout(state) {
-      Object.assign(state, {
-        copilotPosition: 'right',
-        copilotOpen: false,
-        copilotSize: 340,
-        sidebarTab: 'chat',
-        primaryView: '2d',
-        splitRatio: 0.5,
-      });
+      Object.assign(state, LAYOUT_DEFAULTS);
       saveLayoutToStorage(state);
     },
   },
