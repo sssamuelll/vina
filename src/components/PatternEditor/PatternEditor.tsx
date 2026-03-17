@@ -8,7 +8,7 @@ import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
-import { useSeamTool } from './useSeamTool';
+import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
@@ -138,6 +138,44 @@ export default function PatternEditor() {
       }
     }
 
+    // Hit-test seams: check proximity to seam connection lines and edge highlights
+    let hitSeamId: string | null = null;
+    const SEAM_THRESHOLD = 8 / zoom2D;
+    for (const seam of seams) {
+      const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
+      const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
+      if (!pieceA || !pieceB) continue;
+      const semEdgeA = pieceA.edges?.find(e => e.name === seam.pieceA.edgeName);
+      const semEdgeB = pieceB.edges?.find(e => e.name === seam.pieceB.edgeName);
+      const segIdxA = semEdgeA?.segmentRange[0] ?? 1;
+      const segIdxB = semEdgeB?.segmentRange[0] ?? 1;
+      const epA = getEdgeEndpoints(pieceA.outline, segIdxA);
+      const epB = getEdgeEndpoints(pieceB.outline, segIdxB);
+      if (!epA || !epB) continue;
+      const offA = pieceA.position;
+      const offB = pieceB.position;
+      const midA = { x: (epA.start.x + epA.end.x) / 2 + offA.x, y: (epA.start.y + epA.end.y) / 2 + offA.y };
+      const midB = { x: (epB.start.x + epB.end.x) / 2 + offB.x, y: (epB.start.y + epB.end.y) / 2 + offB.y };
+      // Check proximity to connection line (midA to midB)
+      const dx = midB.x - midA.x, dy = midB.y - midA.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq > 0) {
+        let t = ((canvasX - midA.x) * dx + (canvasY - midA.y) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+        const closestX = midA.x + t * dx, closestY = midA.y + t * dy;
+        if (Math.hypot(canvasX - closestX, canvasY - closestY) <= SEAM_THRESHOLD) {
+          hitSeamId = seam.id;
+          break;
+        }
+      }
+      // Check proximity to midpoint dots
+      if (Math.hypot(canvasX - midA.x, canvasY - midA.y) <= SEAM_THRESHOLD ||
+          Math.hypot(canvasX - midB.x, canvasY - midB.y) <= SEAM_THRESHOLD) {
+        hitSeamId = seam.id;
+        break;
+      }
+    }
+
     let segmentIndex: number | undefined;
     let segmentIsCurve: boolean | undefined;
     if (editPatternTool.isEditing && editPatternTool.editingPieceId && hitPiece?.id === editPatternTool.editingPieceId) {
@@ -154,13 +192,14 @@ export default function PatternEditor() {
       visible: true,
       x: e.clientX,
       y: e.clientY,
-      pieceId: hitPiece?.id ?? null,
-      pieceName: hitPiece?.name,
+      pieceId: hitSeamId ? null : (hitPiece?.id ?? null),
+      pieceName: hitSeamId ? undefined : hitPiece?.name,
+      seamId: hitSeamId,
       segmentIndex,
       segmentIsCurve,
       activeTool,
     });
-  }, [pieces, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
+  }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
   const handleTransform = useCallback((updates: Array<{ id: string; outline: PatternPiece['outline']; position: Point2D }>) => {
     for (const u of updates) {
