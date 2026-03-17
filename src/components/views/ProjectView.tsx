@@ -15,7 +15,7 @@ import {
   setGroupColor,
   removePiecesFromGroup,
 } from '../../store/projectSlice';
-import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
+import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF } from '../../utils/dxf';
 import type { DXFDocument } from '../../utils/dxf/types';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
@@ -367,6 +367,13 @@ export default function ProjectView() {
     const filename = `${projectName || 'pattern'}-aama.dxf`;
     downloadDXFAAMA(pieces, filename);
     setLastExport({ filename, date: new Date().toLocaleString() });
+  }, [pieces, projectName]);
+
+  const handleExportMultiSizeDXF = useCallback(() => {
+    downloadMultiSizeDXF(
+      [{ size: 'BASE', pieces }],
+      `${projectName || 'pattern'}-multisize.dxf`,
+    );
   }, [pieces, projectName]);
 
   const handleExportPDF = useCallback(() => {
@@ -758,6 +765,13 @@ export default function ProjectView() {
               disabled={pieces.length === 0}
             >
               Export DXF (AAMA)
+            </button>
+            <button
+              className="sidebar-btn sidebar-btn-full"
+              onClick={handleExportMultiSizeDXF}
+              disabled={pieces.length === 0}
+            >
+              Export Multi-Size DXF
             </button>
             <button
               className="sidebar-btn sidebar-btn-full"

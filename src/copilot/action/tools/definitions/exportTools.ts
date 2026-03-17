@@ -258,6 +258,42 @@ const exportBOMTool: ToolDefinition = {
   },
 };
 
+// ─── exportMultiSizeDXF ─────────────────────────────────────────────────────
+
+const exportMultiSizeDXFTool: ToolDefinition = {
+  name: 'exportMultiSizeDXF',
+  description:
+    'Export all graded sizes into a single AAMA DXF file. Each size pieces become separate BLOCKs. ' +
+    '/ Exportar todas las tallas graduadas en un solo archivo DXF AAMA.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename / Nombre del archivo' },
+    },
+  },
+  execute: async (params, _dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const pieces = state.project.pieces;
+
+    if (pieces.length === 0) {
+      return { success: false, error: 'No pieces to export' };
+    }
+
+    const filename = (params.filename as string) || 'pattern-multisize.dxf';
+
+    try {
+      const { downloadMultiSizeDXF } = await import('../../../../utils/dxf/exportAAMA');
+      downloadMultiSizeDXF([{ size: 'BASE', pieces }], filename);
+      return {
+        success: true,
+        data: { filename, piecesExported: pieces.length, sizes: ['BASE'] },
+      };
+    } catch (e: unknown) {
+      return { success: false, error: (e as Error).message };
+    }
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -268,4 +304,5 @@ export const tools: ToolDefinition[] = [
   export3DGLTFTool,
   saveProjectTool,
   exportBOMTool,
+  exportMultiSizeDXFTool,
 ];
