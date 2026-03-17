@@ -294,6 +294,30 @@ const exportMultiSizeDXFTool: ToolDefinition = {
   },
 };
 
+// ─── export3DFBX ────────────────────────────────────────────────────────────
+
+const export3DFBXTool: ToolDefinition = {
+  name: 'export3DFBX',
+  description:
+    'Export simulated 3D garment mesh to FBX binary format for Unity/Unreal/Blender/Maya. ' +
+    '/ Exportar malla 3D de prenda simulada a FBX binario.',
+  parameters: {
+    type: 'object',
+    properties: {
+      filename: { type: 'string', description: 'Output filename (without .fbx)' },
+      scale: { type: 'number', description: 'Scale: mm->target (0.1=cm, 0.001=m). Default: 0.1' },
+    },
+  },
+  execute: async (params): Promise<ToolResult> => {
+    const filename = (params.filename as string) || 'garment-3d';
+    const scale = (params.scale as number) || 0.1;
+    window.dispatchEvent(new CustomEvent('openclo:export3d', {
+      detail: { format: 'fbx', filename, scale },
+    }));
+    return { success: true, data: { filename: `${filename}.fbx`, format: 'FBX' } };
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -305,4 +329,5 @@ export const tools: ToolDefinition[] = [
   saveProjectTool,
   exportBOMTool,
   exportMultiSizeDXFTool,
+  export3DFBXTool,
 ];

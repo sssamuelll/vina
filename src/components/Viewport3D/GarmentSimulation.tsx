@@ -454,6 +454,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         } else if (format === 'glb' || format === 'gltf') {
           const { downloadGLTF } = await import('../../utils/export/gltfExporter');
           await downloadGLTF(group, { filename, binary: binary ?? true });
+        } else if (format === 'fbx') {
+          const { downloadFBX } = await import('../../utils/export/fbxExporter');
+          downloadFBX(group, { scale: scale || 0.1, filename });
         }
       } catch (err) {
         console.error('[GarmentSimulation] 3D export failed:', err);
