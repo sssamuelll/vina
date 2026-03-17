@@ -1,7 +1,7 @@
 import { PatternPiece, Point2D, Tool2D } from '../../../types/types';
 import { NodeRef } from '../nodeEditorUtils';
 import type { EditableNode } from '../nodeEditorUtils';
-import SeamToolOverlay from './overlays/SeamToolOverlay';
+import EdgePairOverlay from './overlays/EdgePairOverlay';
 import NotchToolOverlay from './overlays/NotchToolOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';
 import PenToolOverlay from './overlays/PenToolOverlay';
@@ -16,10 +16,9 @@ import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import WalkSeamOverlay from './overlays/WalkSeamOverlay';
-import FreeSewingOverlay from './overlays/FreeSewingOverlay';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
-import type { FreeEdgeSelection } from '../useFreeSewingTool';
+import type { FreeEdgeSelection } from '../sewingUtils';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 
@@ -29,11 +28,6 @@ interface PenNode {
   handleOut: Point2D | null;
 }
 
-interface SeamEdge {
-  pieceId: string;
-  edgeIndex: number;
-  midpoint: Point2D;
-}
 
 interface NotchHover {
   point: Point2D;
@@ -62,8 +56,9 @@ interface ToolOverlayProps {
   lineStart: Point2D | null;
   lineCursor: Point2D | null;
   lineLength: { length: number; midpoint: Point2D } | null;
-  firstEdge: SeamEdge | null;
-  hoveredEdge: SeamEdge | null;
+  seamFirstEdge: FreeEdgeSelection | null;
+  seamHoveredEdge: FreeEdgeSelection | null;
+  seamMode: 'free' | 'point';
   notchHoveredPoint: NotchHover | null;
   grainlineIsDragging: boolean;
   grainlineStartPoint: Point2D | null;
@@ -148,7 +143,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
   return (
     <>
       {activeTool === 'seam' && (
-        <SeamToolOverlay zoom2D={zoom2D} pieces={pieces} firstEdge={props.firstEdge} hoveredEdge={props.hoveredEdge} />
+        <EdgePairOverlay zoom2D={zoom2D} firstEdge={props.seamFirstEdge} hoveredEdge={props.seamHoveredEdge} mode={props.seamMode} />
       )}
 
       {activeTool === 'notch' && props.notchHoveredPoint && (
@@ -282,7 +277,7 @@ export default function ToolOverlay(props: ToolOverlayProps) {
       )}
 
       {activeTool === 'freesewing' && (
-        <FreeSewingOverlay
+        <EdgePairOverlay
           zoom2D={zoom2D}
           firstEdge={props.freeSewingFirstEdge}
           hoveredEdge={props.freeSewingHoveredEdge}

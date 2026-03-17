@@ -1,90 +1,18 @@
 import { useState, useCallback } from 'react';
-import { PatternPiece, Point2D, Seam } from '../../types/types';
-import { distToSegment } from '../../utils/geometry/distance';
-import { getEdgeEndpoints } from '../../utils/geometry/path';
+import type { PatternPiece, Point2D, Seam } from '../../types/types';
+import {
+  screenToPattern,
+  resolveEdgeName,
+  findClosestEdge,
+  type FreeEdgeSelection,
+} from './sewingUtils';
 
-/**
- * A selected edge segment for free sewing — includes start/end points
- * for rendering snap dots and highlighted segments.
- */
-export interface FreeEdgeSelection {
-  pieceId: string;
-  edgeIndex: number;
-  /** Segment start in world space */
-  start: Point2D;
-  /** Segment end in world space */
-  end: Point2D;
-  /** Midpoint in world space */
-  midpoint: Point2D;
-}
+// Re-export for consumers
+export type { FreeEdgeSelection } from './sewingUtils';
 
 interface FreeSewingToolState {
   firstEdge: FreeEdgeSelection | null;
   hoveredEdge: FreeEdgeSelection | null;
-}
-
-const EDGE_HIT_THRESHOLD = 15; // px in screen space
-const VERTEX_SNAP_THRESHOLD = 10; // px in screen space
-
-/** Build a FreeEdgeSelection from a piece + edge index */
-function buildSelection(piece: PatternPiece, edgeIndex: number): FreeEdgeSelection | null {
-  const ep = getEdgeEndpoints(piece.outline, edgeIndex);
-  if (!ep) return null;
-  const start = { x: ep.start.x + piece.position.x, y: ep.start.y + piece.position.y };
-  const end = { x: ep.end.x + piece.position.x, y: ep.end.y + piece.position.y };
-  return {
-    pieceId: piece.id,
-    edgeIndex,
-    start,
-    end,
-    midpoint: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 },
-  };
-}
-
-/**
- * Find closest edge segment to a point. In 'point' mode, only matches
- * if close to a vertex (segment endpoint). In 'free' mode, matches
- * anywhere along the segment.
- */
-function findClosestEdge(
-  pt: Point2D,
-  pieces: PatternPiece[],
-  zoom: number,
-  mode: 'free' | 'point',
-  excludePieceId?: string,
-): FreeEdgeSelection | null {
-  let best: FreeEdgeSelection | null = null;
-  let bestDist = Infinity;
-
-  for (const piece of pieces) {
-    if (excludePieceId && piece.id === excludePieceId) continue;
-
-    const cmds = piece.outline;
-    for (let i = 1; i < cmds.length; i++) {
-      const sel = buildSelection(piece, i);
-      if (!sel) continue;
-
-      if (mode === 'point') {
-        // Point-to-point: snap to vertices (endpoints) only
-        const dStart = Math.hypot(pt.x - sel.start.x, pt.y - sel.start.y) * zoom;
-        const dEnd = Math.hypot(pt.x - sel.end.x, pt.y - sel.end.y) * zoom;
-        const d = Math.min(dStart, dEnd);
-        if (d < VERTEX_SNAP_THRESHOLD && d < bestDist) {
-          bestDist = d;
-          best = sel;
-        }
-      } else {
-        // Free mode: match anywhere along the segment
-        const d = distToSegment(pt, sel.start, sel.end) * zoom;
-        if (d < EDGE_HIT_THRESHOLD && d < bestDist) {
-          bestDist = d;
-          best = sel;
-        }
-      }
-    }
-  }
-
-  return best;
 }
 
 export function useFreeSewingTool(
@@ -99,10 +27,9 @@ export function useFreeSewingTool(
     hoveredEdge: null,
   });
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => ({
-    x: (screenX - svgRect.left - pan.x) / zoom,
-    y: (screenY - svgRect.top - pan.y) / zoom,
-  }), [zoom, pan]);
+  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+    screenToPattern(screenX, screenY, svgRect, zoom, pan),
+  [zoom, pan]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
@@ -121,15 +48,10 @@ export function useFreeSewingTool(
     } else {
       if (edge.pieceId === state.firstEdge.pieceId) return;
 
-      // Resolve semantic edge names from segment indices
       const pieceAObj = pieces.find(p => p.id === state.firstEdge!.pieceId);
       const pieceBObj = pieces.find(p => p.id === edge.pieceId);
-      const edgeAName = pieceAObj?.edges?.find(
-        e => state.firstEdge!.edgeIndex >= e.segmentRange[0] && state.firstEdge!.edgeIndex < e.segmentRange[1]
-      )?.name ?? `edge-${state.firstEdge.edgeIndex}`;
-      const edgeBName = pieceBObj?.edges?.find(
-        e => edge.edgeIndex >= e.segmentRange[0] && edge.edgeIndex < e.segmentRange[1]
-      )?.name ?? `edge-${edge.edgeIndex}`;
+      const edgeAName = pieceAObj ? resolveEdgeName(pieceAObj, state.firstEdge.edgeIndex) : `edge-${state.firstEdge.edgeIndex}`;
+      const edgeBName = pieceBObj ? resolveEdgeName(pieceBObj, edge.edgeIndex) : `edge-${edge.edgeIndex}`;
 
       onComplete({
         pieceA: { pieceId: state.firstEdge.pieceId, edgeName: edgeAName },

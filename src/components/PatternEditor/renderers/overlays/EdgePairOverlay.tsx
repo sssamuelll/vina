@@ -1,18 +1,17 @@
-import type { FreeEdgeSelection } from '../../useFreeSewingTool';
+import type { FreeEdgeSelection } from '../../sewingUtils';
 
-interface FreeSewingOverlayProps {
+interface EdgePairOverlayProps {
   zoom2D: number;
   firstEdge: FreeEdgeSelection | null;
   hoveredEdge: FreeEdgeSelection | null;
-  mode: 'free' | 'point';
+  mode?: 'free' | 'point';
 }
 
-export default function FreeSewingOverlay({ zoom2D, firstEdge, hoveredEdge, mode }: FreeSewingOverlayProps) {
+export default function EdgePairOverlay({ zoom2D, firstEdge, hoveredEdge, mode = 'free' }: EdgePairOverlayProps) {
   const dotR = 4 / zoom2D;
 
   return (
-    <g className="free-sewing-tool-wip">
-      {/* First selected edge: highlighted green segment + endpoint dots */}
+    <g className="edge-pair-overlay">
       {firstEdge && (
         <>
           <line
@@ -27,7 +26,6 @@ export default function FreeSewingOverlay({ zoom2D, firstEdge, hoveredEdge, mode
         </>
       )}
 
-      {/* Hovered edge: blue if first exists, green otherwise */}
       {hoveredEdge && (
         <>
           <line
@@ -47,7 +45,6 @@ export default function FreeSewingOverlay({ zoom2D, firstEdge, hoveredEdge, mode
         </>
       )}
 
-      {/* Connection line between midpoints when hovering different piece */}
       {firstEdge && hoveredEdge && firstEdge.pieceId !== hoveredEdge.pieceId && (
         <line
           x1={firstEdge.midpoint.x} y1={firstEdge.midpoint.y}

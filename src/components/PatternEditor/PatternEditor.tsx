@@ -8,7 +8,8 @@ import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
-import { useSeamTool, getEdgeEndpoints } from './useSeamTool';
+import { useFreeSewingTool } from './useFreeSewingTool';
+import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { useNotchTool } from './useNotchTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
@@ -21,7 +22,6 @@ import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useTopstitchTool } from './useTopstitchTool';
 import { useWalkSeamTool } from './useWalkSeamTool';
-import { useFreeSewingTool } from './useFreeSewingTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -87,7 +87,7 @@ export default function PatternEditor() {
     dispatch(selectSeam(fullSeam.id));
   }, [dispatch]);
 
-  const seamTool = useSeamTool(zoom2D, pan2D, pieces, handleSeamComplete);
+  const seamTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete, 'free');
 
   const handleNotchAdd = useCallback((pieceId: string, notch: InternalLine) => {
     dispatch(addInternalLine({ pieceId, line: notch }));
@@ -307,8 +307,9 @@ export default function PatternEditor() {
             penDistance={pen.lastPointDistance}
             rectPreview={rectTool.previewRect}
             rectDimensions={rectTool.rectDimensions}
-            firstEdge={seamTool.firstEdge}
-            hoveredEdge={seamTool.hoveredEdge}
+            seamFirstEdge={seamTool.firstEdge}
+            seamHoveredEdge={seamTool.hoveredEdge}
+            seamMode={seamTool.mode}
             lineStart={lineTool.startPoint}
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}

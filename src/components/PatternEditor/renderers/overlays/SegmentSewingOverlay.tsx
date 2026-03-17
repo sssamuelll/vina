@@ -1,6 +1,6 @@
 import type { PatternPiece } from '../../../../types/types';
 import type { SegmentSelection, SnapResult } from '../../useSegmentSewingTool';
-import { getEdgeEndpoints } from '../../useSeamTool';
+import { getEdgeEndpoints } from '../../../../utils/geometry/path';
 
 interface SegmentSewingOverlayProps {
   zoom2D: number;

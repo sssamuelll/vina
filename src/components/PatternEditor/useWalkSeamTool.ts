@@ -18,6 +18,7 @@ import {
 } from '../../utils/geometry/arcLength';
 import { snapToOutline, findEdgeForSegment, buildEdgeInfo, buildOutlineInfo } from './useMeasureTool';
 import { formatDimension } from '../../utils/units';
+import { screenToPattern } from './sewingUtils';
 
 // ─── Exported Types ─────────────────────────────────────────────────────────
 
@@ -358,10 +359,7 @@ export function useWalkSeamTool(zoom: number, pan: Point2D) {
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
     const rect = e.currentTarget.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left - pan.x) / zoom,
-      y: (e.clientY - rect.top - pan.y) / zoom,
-    };
+    return screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
   }, [zoom, pan]);
 
   /** Try to snap to nearest piece outline */
