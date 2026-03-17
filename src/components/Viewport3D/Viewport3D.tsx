@@ -42,12 +42,13 @@ import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraP
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection } from '../../store/editorSlice';
-import { toggleIK } from '../../store/avatarSlice';
+import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
+import { setCopilotOpen, setSidebarTab } from '../../store/layoutSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
 import './Viewport3D.css';
@@ -677,6 +678,13 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onToggleAvatar={() => setAvatarHidden(h => !h)}
         onSnapshot={snapshot3D}
         onSelectPiece={(id) => dispatch(selectPiece(id))}
+        onResetPieceArrangement={(id) => dispatch(setArrangement3D({ pieceId: id, position: [0, 0, 0] }))}
+        onResetPose={() => dispatch(resetPose())}
+        onShowProperties={(id) => {
+          dispatch(selectPiece(id));
+          dispatch(setCopilotOpen(true));
+          dispatch(setSidebarTab('properties'));
+        }}
         onResetArrangement={() => {
           dispatch(resetSimulation());
           dispatch(setViewMode3D('arrange'));

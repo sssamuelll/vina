@@ -7,6 +7,8 @@ export interface LayoutState {
   copilotOpen: boolean;
   /** Copilot panel size (height for bottom, width for left/right) in px */
   copilotSize: number;
+  /** Active tab in the sidebar panel */
+  sidebarTab: 'chat' | 'properties';
   /** 2D/3D view order — which is on the left in split mode */
   primaryView: '2d' | '3d';
   /** Split ratio when in split mode */
@@ -15,25 +17,26 @@ export interface LayoutState {
 
 const STORAGE_KEY = 'openclo-layout';
 
-// Load from localStorage
+const LAYOUT_DEFAULTS: LayoutState = {
+  copilotPosition: 'right',
+  copilotOpen: false,
+  copilotSize: 340,
+  sidebarTab: 'chat',
+  primaryView: '2d',
+  splitRatio: 0.5,
+};
+
+// Load from localStorage, merging with defaults to handle new fields
 function loadLayoutFromStorage(): LayoutState {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      return JSON.parse(stored);
+      return { ...LAYOUT_DEFAULTS, ...JSON.parse(stored) };
     }
   } catch {
     // Ignore errors
   }
-  
-  // Default layout
-  return {
-    copilotPosition: 'right',
-    copilotOpen: false,
-    copilotSize: 340,
-    primaryView: '2d',
-    splitRatio: 0.5,
-  };
+  return { ...LAYOUT_DEFAULTS };
 }
 
 // Save to localStorage
@@ -121,14 +124,13 @@ const layoutSlice = createSlice({
       saveLayoutToStorage(state);
     },
     
+    setSidebarTab(state, action: PayloadAction<'chat' | 'properties'>) {
+      state.sidebarTab = action.payload;
+      saveLayoutToStorage(state);
+    },
+
     resetLayout(state) {
-      Object.assign(state, {
-        copilotPosition: 'right',
-        copilotOpen: false,
-        copilotSize: 340,
-        primaryView: '2d',
-        splitRatio: 0.5,
-      });
+      Object.assign(state, LAYOUT_DEFAULTS);
       saveLayoutToStorage(state);
     },
   },
@@ -143,6 +145,7 @@ export const {
   swapViews,
   setSplitRatio,
   cycleCopilotPosition,
+  setSidebarTab,
   resetLayout,
 } = layoutSlice.actions;
 

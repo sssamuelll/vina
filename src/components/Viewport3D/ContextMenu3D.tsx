@@ -36,6 +36,9 @@ interface ContextMenu3DProps {
   onSnapshot?: () => void;
   onSelectPiece?: (pieceId: string) => void;
   onResetArrangement?: () => void;
+  onResetPieceArrangement?: (pieceId: string) => void;
+  onResetPose?: () => void;
+  onShowProperties?: (pieceId: string) => void;
   onZoomToFit?: () => void;
   onCameraPreset?: (preset: string) => void;
 }
@@ -48,6 +51,9 @@ export default function ContextMenu3D({
   onSnapshot,
   onSelectPiece,
   onResetArrangement,
+  onResetPieceArrangement,
+  onResetPose,
+  onShowProperties,
   onZoomToFit,
   onCameraPreset,
 }: ContextMenu3DProps) {
@@ -88,13 +94,13 @@ export default function ContextMenu3D({
     items.push({
       label: 'Reset 3D Arrangement',
       icon: '↩',
-      action: () => act(() => {/* TODO: reset piece 3D position */}),
+      action: () => act(() => onResetPieceArrangement?.(pid)),
       separator: true,
     });
     items.push({
       label: 'Properties…',
       icon: 'ℹ',
-      action: () => act(() => {/* TODO: open piece properties panel */}),
+      action: () => act(() => onShowProperties?.(pid)),
     });
   } else if (menu.target === 'avatar') {
     items.push({
@@ -106,7 +112,7 @@ export default function ContextMenu3D({
     items.push({
       label: 'Reset Pose',
       icon: '↩',
-      action: () => act(() => {/* TODO: reset pose */}),
+      action: () => act(() => onResetPose?.()),
     });
   } else {
     // Background — camera presets section

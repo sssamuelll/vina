@@ -20,7 +20,7 @@ describe('layoutSlice', () => {
   });
 
   it('resetLayout sets copilotOpen to false', () => {
-    const state = layoutReducer({ copilotOpen: true, copilotPosition: 'right', copilotSize: 340, primaryView: '2d', splitRatio: 0.5 }, resetLayout());
+    const state = layoutReducer({ copilotOpen: true, copilotPosition: 'right', copilotSize: 340, sidebarTab: 'chat', primaryView: '2d', splitRatio: 0.5 }, resetLayout());
     expect(state.copilotOpen).toBe(false);
   });
 });
