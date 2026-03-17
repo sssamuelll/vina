@@ -7,6 +7,8 @@ export interface LayoutState {
   copilotOpen: boolean;
   /** Copilot panel size (height for bottom, width for left/right) in px */
   copilotSize: number;
+  /** Active tab in the sidebar panel */
+  sidebarTab: 'chat' | 'properties';
   /** 2D/3D view order — which is on the left in split mode */
   primaryView: '2d' | '3d';
   /** Split ratio when in split mode */
@@ -31,6 +33,7 @@ function loadLayoutFromStorage(): LayoutState {
     copilotPosition: 'right',
     copilotOpen: false,
     copilotSize: 340,
+    sidebarTab: 'chat',
     primaryView: '2d',
     splitRatio: 0.5,
   };
@@ -121,11 +124,17 @@ const layoutSlice = createSlice({
       saveLayoutToStorage(state);
     },
     
+    setSidebarTab(state, action: PayloadAction<'chat' | 'properties'>) {
+      state.sidebarTab = action.payload;
+      saveLayoutToStorage(state);
+    },
+
     resetLayout(state) {
       Object.assign(state, {
         copilotPosition: 'right',
         copilotOpen: false,
         copilotSize: 340,
+        sidebarTab: 'chat',
         primaryView: '2d',
         splitRatio: 0.5,
       });
@@ -143,6 +152,7 @@ export const {
   swapViews,
   setSplitRatio,
   cycleCopilotPosition,
+  setSidebarTab,
   resetLayout,
 } = layoutSlice.actions;
 

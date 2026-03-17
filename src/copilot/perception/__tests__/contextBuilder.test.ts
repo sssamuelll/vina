@@ -137,6 +137,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       copilotPosition: 'right',
       copilotOpen: true,
       copilotSize: 340,
+      sidebarTab: 'chat' as const,
       primaryView: '2d',
       splitRatio: 0.5,
     },

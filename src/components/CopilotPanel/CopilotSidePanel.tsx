@@ -1,13 +1,12 @@
 import { MessageSquare, PanelLeftClose, PanelRightClose, ChevronLeft, ChevronRight, Settings, SlidersHorizontal } from 'lucide-react';
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { setCopilotSize, toggleCopilot, cycleCopilotPosition } from '../../store/layoutSlice';
+import { setCopilotSize, toggleCopilot, cycleCopilotPosition, setSidebarTab } from '../../store/layoutSlice';
 import CopilotPanel from './CopilotPanel';
 import PropertiesPanel from '../PropertiesPanel/PropertiesPanel';
 import './CopilotSidePanel.css';
 
-type SidePanelTab = 'chat' | 'properties';
 
 interface CopilotSidePanelProps {
   position: 'left' | 'right';
@@ -16,7 +15,7 @@ interface CopilotSidePanelProps {
 export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
   const dispatch = useDispatch();
   const { copilotOpen, copilotSize } = useSelector((state: RootState) => state.layout);
-  const [activeTab, setActiveTab] = useState<SidePanelTab>('chat');
+  const activeTab = useSelector((state: RootState) => state.layout.sidebarTab);
 
   const isDragging = useRef(false);
   const startX = useRef(0);
@@ -74,8 +73,8 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
     dispatch(cycleCopilotPosition());
   }, [dispatch]);
 
-  const handleCollapsedTabClick = useCallback((tab: SidePanelTab) => {
-    setActiveTab(tab);
+  const handleCollapsedTabClick = useCallback((tab: 'chat' | 'properties') => {
+    dispatch(setSidebarTab(tab));
     dispatch(toggleCopilot());
   }, [dispatch]);
 
@@ -109,14 +108,14 @@ export default function CopilotSidePanel({ position }: CopilotSidePanelProps) {
       <div className="copilot-side-tabs">
         <button
           className={`copilot-side-tab ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveTab('chat')}
+          onClick={() => dispatch(setSidebarTab('chat'))}
         >
           <MessageSquare size={14} />
           <span>Chat</span>
         </button>
         <button
           className={`copilot-side-tab ${activeTab === 'properties' ? 'active' : ''}`}
-          onClick={() => setActiveTab('properties')}
+          onClick={() => dispatch(setSidebarTab('properties'))}
         >
           <SlidersHorizontal size={14} />
           <span>Properties</span>
