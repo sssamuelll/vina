@@ -16,8 +16,10 @@ import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import WalkSeamOverlay from './overlays/WalkSeamOverlay';
+import FreeSewingOverlay from './overlays/FreeSewingOverlay';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
+import type { FreeEdgeSelection } from '../useFreeSewingTool';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
 
@@ -134,6 +136,10 @@ interface ToolOverlayProps {
   walkSeamMetrics: WalkSeamMetrics | null;
   walkSeamFormatDistance: (d: number) => string;
   walkSeamHoveredSnapPoint: Point2D | null;
+  // Free Sewing
+  freeSewingFirstEdge: FreeEdgeSelection | null;
+  freeSewingHoveredEdge: FreeEdgeSelection | null;
+  freeSewingMode: 'free' | 'point';
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -272,6 +278,15 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           metrics={props.walkSeamMetrics}
           formatDistance={props.walkSeamFormatDistance}
           hoveredSnapPoint={props.walkSeamHoveredSnapPoint}
+        />
+      )}
+
+      {activeTool === 'freesewing' && (
+        <FreeSewingOverlay
+          zoom2D={zoom2D}
+          firstEdge={props.freeSewingFirstEdge}
+          hoveredEdge={props.freeSewingHoveredEdge}
+          mode={props.freeSewingMode}
         />
       )}
 
