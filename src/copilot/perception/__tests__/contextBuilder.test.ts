@@ -177,6 +177,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       toolOptions: {},
       recentTools: [],
       optionsPanelCollapsed: false,
+      expertShowOverride: false,
     },
     parametric: {
       activePattern: null,

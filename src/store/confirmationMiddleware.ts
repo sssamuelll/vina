@@ -86,6 +86,29 @@ export function createConfirmationMiddleware(): Middleware {
   return (storeApi) => (next) => (rawAction: unknown) => {
     const action = rawAction as ActionLike;
 
+    // ── 0. Auto-apply tool memory on tool activation in expert mode ───────────
+
+    if (action.type === 'tools/setActiveTool2D' || action.type === 'tools/setActiveTool3D') {
+      const result = next(action);
+      const state = storeApi.getState() as StoreState & {
+        workflow?: { expertMode: boolean; toolMemory: Record<string, Record<string, unknown>> };
+      };
+      if (state.workflow?.expertMode) {
+        const toolId = action.payload as string;
+        const memory = state.workflow.toolMemory[toolId];
+        if (memory) {
+          for (const [optionId, value] of Object.entries(memory)) {
+            storeApi.dispatch({
+              type: 'tools/setToolOption',
+              payload: { toolId, optionId, value },
+              meta: { fromToolMemory: true },
+            });
+          }
+        }
+      }
+      return result;
+    }
+
     // ── 1. Destructive action gating ─────────────────────────────────────────
 
     const opName = DESTRUCTIVE_ACTIONS[action.type];
