@@ -13,6 +13,10 @@ export interface LayoutState {
   primaryView: '2d' | '3d';
   /** Split ratio when in split mode */
   splitRatio: number;
+  /** Whether the bottom panel is open */
+  bottomPanelOpen: boolean;
+  /** Active tab in the bottom panel */
+  bottomPanelTab: string;
 }
 
 const STORAGE_KEY = 'openclo-layout';
@@ -24,6 +28,8 @@ const LAYOUT_DEFAULTS: LayoutState = {
   sidebarTab: 'chat',
   primaryView: '2d',
   splitRatio: 0.5,
+  bottomPanelOpen: false,
+  bottomPanelTab: 'problems',
 };
 
 // Load from localStorage, merging with defaults to handle new fields
@@ -129,6 +135,19 @@ const layoutSlice = createSlice({
       saveLayoutToStorage(state);
     },
 
+    setBottomPanelOpen(state, action: PayloadAction<boolean>) {
+      state.bottomPanelOpen = action.payload;
+      saveLayoutToStorage(state);
+    },
+
+    setBottomPanelTab(state, action: PayloadAction<string>) {
+      state.bottomPanelTab = action.payload;
+      if (!state.bottomPanelOpen) {
+        state.bottomPanelOpen = true;
+      }
+      saveLayoutToStorage(state);
+    },
+
     resetLayout(state) {
       Object.assign(state, LAYOUT_DEFAULTS);
       saveLayoutToStorage(state);
@@ -146,6 +165,8 @@ export const {
   setSplitRatio,
   cycleCopilotPosition,
   setSidebarTab,
+  setBottomPanelOpen,
+  setBottomPanelTab,
   resetLayout,
 } = layoutSlice.actions;
 

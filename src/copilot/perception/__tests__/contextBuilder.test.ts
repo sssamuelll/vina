@@ -140,6 +140,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       sidebarTab: 'chat' as const,
       primaryView: '2d',
       splitRatio: 0.5,
+      bottomPanelOpen: false,
+      bottomPanelTab: 'problems',
     },
     marker: {
       isOpen: false,

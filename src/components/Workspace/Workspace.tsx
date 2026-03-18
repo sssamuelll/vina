@@ -5,7 +5,7 @@ import { RootState } from '../../store';
 import type { Tool2D } from '../../types/types';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../../store/toolSlice';
-import { cycleCopilotPosition, setSplitRatio } from '../../store/layoutSlice';
+import { cycleCopilotPosition, setSplitRatio, setBottomPanelOpen, setBottomPanelTab } from '../../store/layoutSlice';
 import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
@@ -109,7 +109,8 @@ export default function Workspace() {
   const [activeView, setActiveView] = useState<SidebarView | null>(null);
 
   // ─── Bottom Panel ───
-  const [bottomPanelOpen, setBottomPanelOpen] = useState(false);
+  const bottomPanelOpen = useSelector((s: RootState) => s.layout.bottomPanelOpen);
+  const bottomPanelTab = useSelector((s: RootState) => s.layout.bottomPanelTab);
 
   // ─── Command Palette ───
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
@@ -210,7 +211,7 @@ export default function Workspace() {
       onFocusInput: () => {
         // Open bottom panel and set to copilot tab if not already open
         if (!bottomPanelOpen) {
-          setBottomPanelOpen(true);
+          dispatch(setBottomPanelOpen(true));
         }
         // Focus the copilot input after a short delay to ensure DOM is ready
         setTimeout(() => {
@@ -221,7 +222,7 @@ export default function Workspace() {
         }, 100);
       },
       onTogglePanel: () => {
-        setBottomPanelOpen(prev => !prev);
+        dispatch(setBottomPanelOpen(!bottomPanelOpen));
       },
       onBlurInput: () => {
         const copilotInput = document.querySelector('.copilot-input') as HTMLInputElement;
@@ -233,7 +234,7 @@ export default function Workspace() {
 
     document.addEventListener('keydown', copilotHandler);
     return () => document.removeEventListener('keydown', copilotHandler);
-  }, [bottomPanelOpen]);
+  }, [bottomPanelOpen, dispatch]);
 
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
   const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
@@ -281,7 +282,7 @@ export default function Workspace() {
     { id: 'view-split', name: 'Switch to Split View', category: 'View', action: () => handleViewModeChange('split') },
     { id: 'view-3d', name: 'Switch to 3D View', category: 'View', action: () => handleViewModeChange('3d') },
     { id: 'view-sidebar', name: 'Toggle Sidebar', category: 'View', shortcut: '⌘B', action: () => setActiveView(v => v ? null : 'explorer') },
-    { id: 'view-panel', name: 'Toggle Bottom Panel', category: 'View', shortcut: '⌘J', action: () => setBottomPanelOpen(v => !v) },
+    { id: 'view-panel', name: 'Toggle Bottom Panel', category: 'View', shortcut: '⌘J', action: () => dispatch(setBottomPanelOpen(!bottomPanelOpen)) },
     { id: 'view-copilot-position', name: 'Cycle Copilot Position', category: 'View', action: () => dispatch(cycleCopilotPosition()) },
 
     // File
@@ -299,9 +300,9 @@ export default function Workspace() {
     { id: 'pattern-grid-toggle', name: 'Toggle Snap to Grid', category: 'Pattern', action: () => dispatch(toggleSnapToGrid()) },
 
     // Copilot
-    { id: 'copilot-open', name: 'Open Copilot Panel', category: 'Copilot', action: () => { setBottomPanelOpen(true); } },
+    { id: 'copilot-open', name: 'Open Copilot Panel', category: 'Copilot', action: () => { dispatch(setBottomPanelOpen(true)); } },
     ];
-  }, [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces]);
+  }, [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces, bottomPanelOpen]);
 
   if (isMobile) {
     return (
@@ -438,7 +439,9 @@ export default function Workspace() {
 
           <BottomPanel
             isOpen={bottomPanelOpen}
-            onToggle={() => setBottomPanelOpen(v => !v)}
+            onToggle={() => dispatch(setBottomPanelOpen(!bottomPanelOpen))}
+            activeTab={bottomPanelTab}
+            onTabChange={(tab: string) => dispatch(setBottomPanelTab(tab))}
           />
         </div>
         
