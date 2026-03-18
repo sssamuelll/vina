@@ -16,6 +16,8 @@ import cameraReducer from './cameraSlice';
 import collisionBodyReducer from './collisionBodySlice';
 import renderSettingsReducer from './renderSettingsSlice';
 import animationReducer from './animationSlice';
+import workflowReducer, { loadWorkflow, rehydrateWorkflow } from './workflowSlice';
+import { createConfirmationMiddleware } from './confirmationMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { createReactiveSolverMiddleware } from './reactiveSolverMiddleware';
@@ -40,18 +42,24 @@ export const store = configureStore({
     collisionBody: collisionBodyReducer,
     renderSettings: renderSettingsReducer,
     animation: animationReducer,
+    workflow: workflowReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {
-        ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies'],
-        ignoredActions: ['project/loadProject', 'project/restoreState'],
+        ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
+        ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(undoMiddleware, linkedEditingMiddleware, createReactiveSolverMiddleware()),
+    }).concat(createConfirmationMiddleware(), undoMiddleware, linkedEditingMiddleware, createReactiveSolverMiddleware()),
 });
 
 // Load builtin recipes synchronously — must be available before first copilot turn
 store.dispatch(loadBlueprints(BUILTIN_BLUEPRINTS));
+
+const savedWorkflow = loadWorkflow();
+if (savedWorkflow) {
+  store.dispatch(rehydrateWorkflow(savedWorkflow));
+}
 
 // Expose store for debugging (remove in production)
 (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ = store;

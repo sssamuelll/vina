@@ -247,6 +247,11 @@ function mockState(overrides?: Partial<RootState>): RootState {
       recordedFrameCount: 0,
       recordedVertexCount: 0,
     },
+    workflow: {
+      expertMode: false,
+      confirmOverrides: {},
+      toolMemory: {},
+    },
   };
 
   if (overrides) {
