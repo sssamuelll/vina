@@ -2,19 +2,18 @@ import { X } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import type { BottomTab } from '../../store/layoutSlice';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reasoning/proactiveAnalysis';
 import Timeline from '../Timeline/Timeline';
 import InspectorTab from './InspectorTab';
 import './BottomPanel.css';
 
-type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector';
-
 interface BottomPanelProps {
   isOpen: boolean;
   onToggle: () => void;
-  activeTab?: string;
-  onTabChange?: (tab: string) => void;
+  activeTab?: BottomTab;
+  onTabChange?: (tab: BottomTab) => void;
   defaultTab?: BottomTab;
 }
 
@@ -80,7 +79,7 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
 
   const [localActiveTab, setLocalActiveTab] = useState<BottomTab>(getInitialTab());
   // Use prop-driven tab if provided, otherwise fall back to local state
-  const activeTab = (propActiveTab as BottomTab | undefined) ?? localActiveTab;
+  const activeTab = propActiveTab ?? localActiveTab;
   const [height, setHeight] = useState(280);
   const isDragging = useRef(false);
   const startY = useRef(0);

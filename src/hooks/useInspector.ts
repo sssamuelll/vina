@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, useStore } from 'react-redux';
 import type { RootState } from '../store';
-import { store } from '../store';
 import {
   setInspectionData,
   setDiagnostics,
@@ -15,6 +14,7 @@ import { analyzeInspection } from '../diagnostics/agentAnalyzer';
 
 export function useInspector() {
   const dispatch = useDispatch();
+  const reduxStore = useStore<RootState>();
   const target = useSelector((s: RootState) => s.inspector.target);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -24,8 +24,8 @@ export function useInspector() {
     // Abort previous analysis
     abortRef.current?.abort();
 
-    // 1. Collect data (sync) — use store.getState() for fresh snapshot
-    const state = store.getState();
+    // 1. Collect data (sync) — fresh snapshot via useStore
+    const state = reduxStore.getState();
     const data = collectInspectionData(target, state);
     dispatch(setInspectionData(data));
 
@@ -63,6 +63,7 @@ export function useInspector() {
 
     return () => {
       controller.abort();
+      dispatch(setAgentStreaming(false));
     };
-  }, [target, dispatch]);
+  }, [target, dispatch, reduxStore]);
 }

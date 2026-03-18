@@ -5,7 +5,7 @@ import { RootState } from '../../store';
 import type { Tool2D } from '../../types/types';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../../store/toolSlice';
-import { cycleCopilotPosition, setSplitRatio, setBottomPanelOpen, setBottomPanelTab } from '../../store/layoutSlice';
+import { cycleCopilotPosition, setSplitRatio, setBottomPanelOpen, toggleBottomPanel, setBottomPanelTab } from '../../store/layoutSlice';
 import { loadProject } from '../../store/projectSlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
@@ -209,10 +209,8 @@ export default function Workspace() {
   useEffect(() => {
     const copilotHandler = createCopilotKeyHandler({
       onFocusInput: () => {
-        // Open bottom panel and set to copilot tab if not already open
-        if (!bottomPanelOpen) {
-          dispatch(setBottomPanelOpen(true));
-        }
+        // Ensure bottom panel is open
+        dispatch(setBottomPanelOpen(true));
         // Focus the copilot input after a short delay to ensure DOM is ready
         setTimeout(() => {
           const copilotInput = document.querySelector('.copilot-input') as HTMLInputElement;
@@ -222,7 +220,7 @@ export default function Workspace() {
         }, 100);
       },
       onTogglePanel: () => {
-        dispatch(setBottomPanelOpen(!bottomPanelOpen));
+        dispatch(toggleBottomPanel());
       },
       onBlurInput: () => {
         const copilotInput = document.querySelector('.copilot-input') as HTMLInputElement;
@@ -234,7 +232,7 @@ export default function Workspace() {
 
     document.addEventListener('keydown', copilotHandler);
     return () => document.removeEventListener('keydown', copilotHandler);
-  }, [bottomPanelOpen, dispatch]);
+  }, [dispatch]);
 
   const handleUndo = useCallback(() => { dispatch(undo()); forceUpdate(n => n + 1); }, [dispatch]);
   const handleRedo = useCallback(() => { dispatch(redo()); forceUpdate(n => n + 1); }, [dispatch]);
@@ -282,7 +280,7 @@ export default function Workspace() {
     { id: 'view-split', name: 'Switch to Split View', category: 'View', action: () => handleViewModeChange('split') },
     { id: 'view-3d', name: 'Switch to 3D View', category: 'View', action: () => handleViewModeChange('3d') },
     { id: 'view-sidebar', name: 'Toggle Sidebar', category: 'View', shortcut: '⌘B', action: () => setActiveView(v => v ? null : 'explorer') },
-    { id: 'view-panel', name: 'Toggle Bottom Panel', category: 'View', shortcut: '⌘J', action: () => dispatch(setBottomPanelOpen(!bottomPanelOpen)) },
+    { id: 'view-panel', name: 'Toggle Bottom Panel', category: 'View', shortcut: '⌘J', action: () => dispatch(toggleBottomPanel()) },
     { id: 'view-copilot-position', name: 'Cycle Copilot Position', category: 'View', action: () => dispatch(cycleCopilotPosition()) },
 
     // File
@@ -302,7 +300,7 @@ export default function Workspace() {
     // Copilot
     { id: 'copilot-open', name: 'Open Copilot Panel', category: 'Copilot', action: () => { dispatch(setBottomPanelOpen(true)); } },
     ];
-  }, [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces, bottomPanelOpen]);
+  }, [dispatch, handleViewModeChange, handleUndo, handleRedo, pieces]);
 
   if (isMobile) {
     return (
@@ -439,9 +437,9 @@ export default function Workspace() {
 
           <BottomPanel
             isOpen={bottomPanelOpen}
-            onToggle={() => dispatch(setBottomPanelOpen(!bottomPanelOpen))}
+            onToggle={() => dispatch(toggleBottomPanel())}
             activeTab={bottomPanelTab}
-            onTabChange={(tab: string) => dispatch(setBottomPanelTab(tab))}
+            onTabChange={(tab) => dispatch(setBottomPanelTab(tab))}
           />
         </div>
         

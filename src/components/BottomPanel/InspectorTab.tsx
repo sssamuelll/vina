@@ -28,7 +28,8 @@ function SuggestionCard({ suggestion }: { suggestion: AgentSuggestion }) {
       {suggestion.toolCall && (
         <button
           className="inspector-suggestion-apply"
-          onClick={() => console.log('Apply suggestion:', suggestion.toolCall)}
+          disabled
+          title="Coming soon — will auto-apply via copilot bridge"
         >
           Apply
         </button>

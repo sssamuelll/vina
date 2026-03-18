@@ -1,5 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
+export type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector';
+
 export interface LayoutState {
   /** Where the copilot panel lives */
   copilotPosition: 'bottom' | 'right' | 'left';
@@ -16,7 +18,7 @@ export interface LayoutState {
   /** Whether the bottom panel is open */
   bottomPanelOpen: boolean;
   /** Active tab in the bottom panel */
-  bottomPanelTab: string;
+  bottomPanelTab: BottomTab;
 }
 
 const STORAGE_KEY = 'openclo-layout';
@@ -140,7 +142,12 @@ const layoutSlice = createSlice({
       saveLayoutToStorage(state);
     },
 
-    setBottomPanelTab(state, action: PayloadAction<string>) {
+    toggleBottomPanel(state) {
+      state.bottomPanelOpen = !state.bottomPanelOpen;
+      saveLayoutToStorage(state);
+    },
+
+    setBottomPanelTab(state, action: PayloadAction<BottomTab>) {
       state.bottomPanelTab = action.payload;
       if (!state.bottomPanelOpen) {
         state.bottomPanelOpen = true;
@@ -166,6 +173,7 @@ export const {
   cycleCopilotPosition,
   setSidebarTab,
   setBottomPanelOpen,
+  toggleBottomPanel,
   setBottomPanelTab,
   resetLayout,
 } = layoutSlice.actions;

@@ -1,21 +1,5 @@
 import type { InspectionData, Diagnostic, AgentAnalysis, AgentSuggestion } from './types';
 
-function buildSystemPrompt(): string {
-  return `You are an expert pattern engineer analyzing a garment piece.
-You receive inspection data and diagnostic results. Provide:
-1. A concise summary of the overall state
-2. Explanations for each diagnostic finding
-3. Actionable suggestions with tool calls
-
-Respond in JSON: { "summary": "...", "explanations": ["..."], "suggestions": [{ "description": "...", "impact": "...", "toolCall": { "name": "...", "params": {...} } }] }
-
-Available tools: adjustFit, setFabric, setSeamAllowance, addNotch, addGrainline, createSeam.`;
-}
-
-function buildUserPrompt(data: InspectionData, diagnostics: Diagnostic[]): string {
-  return JSON.stringify({ inspectionData: data, diagnostics }, null, 2);
-}
-
 // Generate suggestions based on diagnostic category
 function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): AgentSuggestion[] {
   const suggestions: AgentSuggestion[] = [];
@@ -109,6 +93,3 @@ export async function analyzeInspection(
 
   return analysis;
 }
-
-// Export prompt builders for future LLM integration
-export { buildSystemPrompt, buildUserPrompt };
