@@ -99,3 +99,36 @@
   cursor: pointer;
   background: none;
 }
+
+.tool-context-menu {
+  background: var(--panel-bg, #252542);
+  border: 1px solid var(--border-color, #3a3a5a);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 160px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.tool-context-menu-title {
+  padding: 4px 12px;
+  font-size: 11px;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.tool-context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: none;
+  color: #ccc;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.tool-context-menu-item:hover {
+  background: rgba(99,102,241,0.15);
+}
+.tool-context-menu-item.active {
+  color: #6366f1;
+}

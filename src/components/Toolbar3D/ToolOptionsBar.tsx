@@ -15,6 +15,9 @@ export default function ToolOptionsBar() {
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions[activeTool3D] ?? {});
   const collapsed = useSelector((s: RootState) => s.tools.optionsPanelCollapsed);
+  const expertMode = useSelector((s: RootState) => s.workflow.expertMode);
+  const toolMemory = useSelector((s: RootState) => s.workflow.toolMemory[activeTool3D]);
+  const expertShowOverride = useSelector((s: RootState) => s.tools.expertShowOverride);
 
   const toolDef = toolRegistry.getTool(activeTool3D);
   const options = toolDef?.options;
@@ -25,6 +28,9 @@ export default function ToolOptionsBar() {
   }, [dispatch, activeTool3D]);
 
   if (!options || options.length === 0 || collapsed) return null;
+
+  const expertHide = expertMode && toolMemory && Object.keys(toolMemory).length > 0;
+  if (expertHide && !expertShowOverride) return null;
 
   return (
     <div className="tool-options-bar">

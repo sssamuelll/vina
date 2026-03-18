@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
 
@@ -8,6 +8,7 @@ interface ToolState {
   toolOptions: Record<string, Record<string, any>>; // toolId → optionId → value
   recentTools: string[];    // last 5 used tools
   optionsPanelCollapsed: boolean; // true = tool options bar hidden (toggle via re-click)
+  expertShowOverride: boolean; // true = force-show options bar even in expert mode (right-click)
 }
 
 const initialState: ToolState = {
@@ -16,6 +17,7 @@ const initialState: ToolState = {
   toolOptions: {},
   recentTools: [],
   optionsPanelCollapsed: false,
+  expertShowOverride: false,
 };
 
 const toolSlice = createSlice({
@@ -31,6 +33,7 @@ const toolSlice = createSlice({
       } else {
         state.activeTool2D = toolId;
         state.optionsPanelCollapsed = false; // always show when switching tools
+        state.expertShowOverride = false; // reset override when switching to a different tool
         state.recentTools = [toolId, ...state.recentTools.filter(id => id !== toolId)].slice(0, 5);
       }
     },
@@ -44,6 +47,7 @@ const toolSlice = createSlice({
       } else {
         state.activeTool3D = toolId;
         state.optionsPanelCollapsed = false; // always show when switching tools
+        state.expertShowOverride = false; // reset override when switching to a different tool
         state.recentTools = [toolId, ...state.recentTools.filter(id => id !== toolId)].slice(0, 5);
       }
     },
@@ -64,6 +68,10 @@ const toolSlice = createSlice({
     resetAllToolOptions(state) {
       state.toolOptions = {};
     },
+
+    setExpertShowOverride(state, action: PayloadAction<boolean>) {
+      state.expertShowOverride = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
@@ -76,6 +84,7 @@ export const {
   setToolOption,
   resetToolOptions,
   resetAllToolOptions,
+  setExpertShowOverride,
 } = toolSlice.actions;
 
 export default toolSlice.reducer;

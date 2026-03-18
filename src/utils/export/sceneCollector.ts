@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 export interface CollectExportSceneOptions {
   garmentMesh: THREE.Mesh | null;
@@ -23,25 +22,22 @@ export function collectExportScene(
     group.add(garmentMesh.clone(true));
   }
 
-  // 2. Add avatar — find groups marked with userData.opencloRole === 'avatar'
-  //    or containing SkinnedMesh (fallback for unmarked avatar models)
+  // 2. Add avatar — find groups containing SkinnedMesh or opencloRole marker
   if (includeAvatar) {
     for (const child of scene.children) {
       if (child === garmentMesh) continue;
-      const isAvatar = child.userData?.opencloRole === 'avatar';
-      if (!isAvatar) {
-        let hasSkinnedMesh = false;
-        child.traverse(obj => {
-          if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true;
-        });
-        if (!hasSkinnedMesh) continue;
-      }
-      // Use SkeletonUtils.clone for groups with SkinnedMesh, plain clone otherwise
-      let hasSkinnedMesh = false;
+      let isAvatar = false;
+      // Check for SkinnedMesh (rigged avatar)
       child.traverse(obj => {
-        if ((obj as THREE.SkinnedMesh).isSkinnedMesh) hasSkinnedMesh = true;
+        if ((obj as THREE.SkinnedMesh).isSkinnedMesh) isAvatar = true;
       });
-      group.add(hasSkinnedMesh ? SkeletonUtils.clone(child) : child.clone(true));
+      // Check for opencloRole marker (mannequin / dress form)
+      if (!isAvatar && child.userData?.opencloRole === 'avatar') {
+        isAvatar = true;
+      }
+      if (isAvatar) {
+        group.add(child.clone(true));
+      }
     }
   }
 

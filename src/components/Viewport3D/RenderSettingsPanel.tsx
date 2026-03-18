@@ -73,7 +73,7 @@ export default function RenderSettingsPanel({
   const [exportTransparent, setExportTransparent] = useState(false);
   const [export3DFormat, setExport3DFormat] = useState<'3d-glb' | '3d-gltf' | '3d-usdz'>('3d-glb');
   const [export3DIncludeAvatar, setExport3DIncludeAvatar] = useState(true);
-  const [export3DScale, setExport3DScale] = useState(1.0); // scene is in meters
+  const [export3DScale, setExport3DScale] = useState(0.001); // mm → m
 
   // HDRI file input ref
   const hdriInputRef = useRef<HTMLInputElement>(null);
@@ -493,10 +493,10 @@ export default function RenderSettingsPanel({
                     value={export3DScale}
                     onChange={e => setExport3DScale(Number(e.target.value))}
                   >
-                    <option value={1.0}>m</option>
-                    <option value={100}>cm</option>
-                    <option value={1000}>mm</option>
-                    <option value={39.3701}>inches</option>
+                    <option value={1.0}>mm</option>
+                    <option value={0.1}>cm</option>
+                    <option value={0.001}>m</option>
+                    <option value={0.03937}>inches</option>
                   </select>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>

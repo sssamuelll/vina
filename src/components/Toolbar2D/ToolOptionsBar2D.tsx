@@ -15,6 +15,9 @@ export default function ToolOptionsBar2D() {
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions[activeTool2D] ?? {});
   const collapsed = useSelector((s: RootState) => s.tools.optionsPanelCollapsed);
+  const expertMode = useSelector((s: RootState) => s.workflow.expertMode);
+  const toolMemory = useSelector((s: RootState) => s.workflow.toolMemory[activeTool2D]);
+  const expertShowOverride = useSelector((s: RootState) => s.tools.expertShowOverride);
 
   const toolDef = toolRegistry.getTool(activeTool2D);
   const options = toolDef?.options;
@@ -25,6 +28,9 @@ export default function ToolOptionsBar2D() {
   }, [dispatch, activeTool2D]);
 
   if (!options || options.length === 0 || collapsed) return null;
+
+  const expertHide = expertMode && toolMemory && Object.keys(toolMemory).length > 0;
+  if (expertHide && !expertShowOverride) return null;
 
   return (
     <div className="tool-options-bar">

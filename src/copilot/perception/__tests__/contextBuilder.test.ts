@@ -177,6 +177,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       toolOptions: {},
       recentTools: [],
       optionsPanelCollapsed: false,
+      expertShowOverride: false,
     },
     parametric: {
       activePattern: null,
@@ -246,6 +247,11 @@ function mockState(overrides?: Partial<RootState>): RootState {
       recording: false,
       recordedFrameCount: 0,
       recordedVertexCount: 0,
+    },
+    workflow: {
+      expertMode: false,
+      confirmOverrides: {},
+      toolMemory: {},
     },
   };
 

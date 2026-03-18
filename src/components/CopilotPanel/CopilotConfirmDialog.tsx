@@ -12,22 +12,25 @@ import './CopilotConfirmDialog.css';
 
 interface CopilotConfirmDialogProps {
   /** Callback when user confirms the action */
-  onConfirm?: (action: unknown) => void;
+  onConfirm?: () => void;
+  /** Callback when user cancels/dismisses — used to clean up pending callbacks */
+  onDismiss?: () => void;
 }
 
-export default function CopilotConfirmDialog({ onConfirm }: CopilotConfirmDialogProps) {
+export default function CopilotConfirmDialog({ onConfirm, onDismiss }: CopilotConfirmDialogProps) {
   const dispatch = useDispatch<AppDispatch>();
   const confirmation = useSelector((state: RootState) => state.copilotUI.pendingConfirmation);
 
   if (!confirmation) return null;
 
   const handleCancel = () => {
+    onDismiss?.();
     dispatch(dismissConfirmation());
   };
 
   const handleConfirm = () => {
     if (onConfirm) {
-      onConfirm(confirmation.action);
+      onConfirm();
     }
     dispatch(dismissConfirmation());
   };

@@ -5,6 +5,7 @@ import { addPiece, removePiece, removeSeam } from '../../store/projectSlice';
 import type { Point2D, PatternPiece } from '../../types/types';
 import { mergePieces } from '../../utils/patternOps';
 import { findSharedEdge } from '../../utils/geometry/mergeOutline';
+import { useGuardedAction } from '../../hooks/useGuardedAction';
 
 export interface MergeState {
   pieceIdA: string | null;
@@ -24,6 +25,7 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
+  const guardAction = useGuardedAction();
 
   const [state, setState] = useState<MergeState>(INITIAL_STATE);
   const stateRef = useRef(state);
@@ -122,30 +124,32 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
       }));
 
       // Execute merge
-      try {
-        const merged = mergePieces(pieceA, clickedPiece, 2);
+      guardAction('mergePieces', () => {
+        try {
+          const merged = mergePieces(pieceA, clickedPiece, 2);
 
-        // Remove seams between the two pieces before removing pieces
-        // (removePiece also cleans up seams, but we do it explicitly for clarity)
-        for (const seam of seams) {
-          if (
-            (seam.pieceA.pieceId === pieceA.id && seam.pieceB.pieceId === clickedPiece.id) ||
-            (seam.pieceA.pieceId === clickedPiece.id && seam.pieceB.pieceId === pieceA.id)
-          ) {
-            dispatch(removeSeam(seam.id));
+          // Remove seams between the two pieces before removing pieces
+          // (removePiece also cleans up seams, but we do it explicitly for clarity)
+          for (const seam of seams) {
+            if (
+              (seam.pieceA.pieceId === pieceA.id && seam.pieceB.pieceId === clickedPiece.id) ||
+              (seam.pieceA.pieceId === clickedPiece.id && seam.pieceB.pieceId === pieceA.id)
+            ) {
+              dispatch({ ...removeSeam(seam.id), meta: { skipConfirmation: true } });
+            }
           }
+
+          dispatch({ ...removePiece(pieceA.id), meta: { skipConfirmation: true } });
+          dispatch({ ...removePiece(clickedPiece.id), meta: { skipConfirmation: true } });
+          dispatch(addPiece(merged));
+
+          reset();
+        } catch {
+          setState(prev => ({ ...prev, error: 'Failed to merge pieces' }));
         }
-
-        dispatch(removePiece(pieceA.id));
-        dispatch(removePiece(clickedPiece.id));
-        dispatch(addPiece(merged));
-
-        reset();
-      } catch {
-        setState(prev => ({ ...prev, error: 'Failed to merge pieces' }));
-      }
+      });
     },
-    [toPattern, hitTestPiece, pieces, seams, dispatch, reset],
+    [toPattern, hitTestPiece, pieces, seams, dispatch, reset, guardAction],
   );
 
   const handleMouseMove = useCallback(

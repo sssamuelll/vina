@@ -24,6 +24,7 @@ import {
   setSurfaceMode3D, toggleGarment,
   toggleSeamlines3D, toggleInternalLines3D,
 } from '../../store/simulationSlice';
+import { setExpertMode, clearToolMemory } from '../../store/workflowSlice';
 import type { UnitSystem } from '../../types/types';
 import type { BackgroundMode, ToneMapping } from '../../store/renderSettingsSlice';
 import type { SurfaceMode3D } from '../../store/simulationSlice';
@@ -36,7 +37,8 @@ interface SettingDef {
   category: string;
   label: string;
   description: string;
-  type: 'toggle' | 'select' | 'number' | 'color';
+  type: 'toggle' | 'select' | 'number' | 'color' | 'button';
+  buttonLabel?: string;
   choices?: { value: string; label: string }[];
   min?: number;
   max?: number;
@@ -51,6 +53,27 @@ interface SettingDef {
 // ─── Setting Definitions ────────────────────────────────────────────────────
 
 const SETTINGS: SettingDef[] = [
+  // ── Workflow ──
+  {
+    id: 'expertMode',
+    category: 'Workflow',
+    label: 'Expert Mode',
+    description: 'Skip confirmation dialogs for non-destructive operations. Tools auto-apply last-used settings.',
+    type: 'toggle',
+    selector: (s) => s.workflow.expertMode,
+    action: (v: boolean) => setExpertMode(v),
+  },
+  {
+    id: 'clearToolMemory',
+    category: 'Workflow',
+    label: 'Clear Tool Memory',
+    description: 'Reset all remembered tool settings to defaults.',
+    type: 'button',
+    buttonLabel: 'Clear All',
+    selector: () => false,
+    action: () => clearToolMemory(),
+  },
+
   // ── General ──
   {
     id: 'units',
@@ -400,6 +423,14 @@ function SettingRow({ def }: { def: SettingDef }) {
             value={value as string}
             onChange={(e) => handleChange(e.target.value)}
           />
+        )}
+        {def.type === 'button' && (
+          <button
+            className="sidebar-btn sidebar-btn-secondary"
+            onClick={() => handleChange(true)}
+          >
+            {def.buttonLabel ?? 'Execute'}
+          </button>
         )}
       </div>
     </div>

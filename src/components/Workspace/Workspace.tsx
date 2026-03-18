@@ -33,6 +33,7 @@ import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
 import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
+import CopilotUIOverlay from '../CopilotPanel/CopilotUIOverlay';
 import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
 import DisplayBar3D from '../DisplayBar3D/DisplayBar3D';
 import './Workspace.css';
@@ -459,6 +460,7 @@ export default function Workspace() {
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
       <MarkerEditor />
       <ShortcutHelp />
+      <CopilotUIOverlay />
     </div>
   );
 }

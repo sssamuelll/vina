@@ -6,6 +6,7 @@ import type { Point2D, PatternPiece } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
 import { splitPieceAtLine } from '../../utils/patternOps';
+import { useGuardedAction } from '../../hooks/useGuardedAction';
 
 export interface ScissorsState {
   targetPieceId: string | null;
@@ -31,6 +32,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
+  const guardAction = useGuardedAction();
 
   const [state, setState] = useState<ScissorsState>(INITIAL_STATE);
   const stateRef = useRef(state);
@@ -141,22 +143,26 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
       const snap = snapToOutline(pt, piece);
       if (!snap) return;
 
-      if (!validateCut(piece, s.startPoint, snap)) return;
+      const startPoint = s.startPoint;
+      if (!startPoint || !validateCut(piece, startPoint, snap)) return;
 
-      try {
-        const [pieceA, pieceB] = splitPieceAtLine(piece, s.startPoint, snap);
-        dispatch(removePiece(piece.id));
-        dispatch(addPiece(pieceA));
-        dispatch(addPiece(pieceB));
-        reset();
-      } catch (err) {
-        setState(prev => ({
-          ...prev,
-          error: err instanceof Error ? err.message : 'Split failed',
-        }));
-      }
+      guardAction('splitPiece', () => {
+        try {
+          const [pieceA, pieceB] = splitPieceAtLine(piece, startPoint, snap);
+          // Use meta.skipConfirmation to bypass confirmationMiddleware
+          dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
+          dispatch(addPiece(pieceA));
+          dispatch(addPiece(pieceB));
+          reset();
+        } catch (err) {
+          setState(prev => ({
+            ...prev,
+            error: err instanceof Error ? err.message : 'Split failed',
+          }));
+        }
+      });
     },
-    [toPattern, pieces, selectedPieceIds, snapToOutline, validateCut, dispatch, reset],
+    [toPattern, pieces, selectedPieceIds, snapToOutline, validateCut, dispatch, reset, guardAction],
   );
 
   const handleMouseMove = useCallback(
