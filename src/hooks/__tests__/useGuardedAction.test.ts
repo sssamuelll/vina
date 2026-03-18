@@ -40,4 +40,16 @@ describe('useGuardedAction callback store', () => {
     _resetCallbacksForTest();
     expect(resolveCallback(key)).toBeUndefined();
   });
+
+  it('resolveCallback on dismiss cleans up without executing', () => {
+    const fn = vi.fn();
+    const key = registerCallback(fn);
+    // Simulate cancel/dismiss: resolve removes callback but caller discards it
+    const cb = resolveCallback(key);
+    expect(cb).toBe(fn);
+    // Callback was removed — second resolve returns undefined
+    expect(resolveCallback(key)).toBeUndefined();
+    // The callback was NOT called (dismiss scenario — caller just doesn't invoke it)
+    expect(fn).not.toHaveBeenCalled();
+  });
 });

@@ -20,6 +20,7 @@ import { useCopilotKeyboardShortcuts } from './useCopilotKeyboardShortcuts';
 import { CopilotActionExecutor } from '../../copilot/actions/actionExecutor';
 import { store } from '../../store';
 import type { CopilotAction } from '../../copilot/actions/actionTypes';
+import { resolveCallback } from '../../hooks/useGuardedAction';
 
 /**
  * Props for CopilotUIOverlay.
@@ -38,6 +39,13 @@ export default function CopilotUIOverlay({ keyboardShortcuts = true }: CopilotUI
 
   // Register keyboard shortcuts
   useCopilotKeyboardShortcuts({ enabled: keyboardShortcuts });
+
+  // Clean up leaked callback when user cancels a hook-source confirmation
+  const handleDismiss = useCallback(() => {
+    if (confirmation?.source === 'hook' && confirmation.callbackKey) {
+      resolveCallback(confirmation.callbackKey); // removes from map, discards callback
+    }
+  }, [confirmation]);
 
   // Handle confirmation dialog actions — branch on source
   const handleConfirm = useCallback(async () => {
@@ -63,18 +71,8 @@ export default function CopilotUIOverlay({ keyboardShortcuts = true }: CopilotUI
       }
       case 'hook': {
         if (confirmation.callbackKey) {
-          // Dynamic import to avoid circular dependency — resolveCallback will exist after Task 6.
-          // Use a variable for the module path so TypeScript does not fail at compile time when
-          // the file does not yet exist.
-          try {
-            const modulePath = '../../hooks/useGuardedAction';
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const mod = await (import(/* @vite-ignore */ modulePath) as Promise<any>);
-            const cb = mod.resolveCallback?.(confirmation.callbackKey);
-            cb?.();
-          } catch {
-            console.error('Failed to resolve callback for hook confirmation');
-          }
+          const cb = resolveCallback(confirmation.callbackKey);
+          cb?.();
         }
         break;
       }
@@ -84,7 +82,7 @@ export default function CopilotUIOverlay({ keyboardShortcuts = true }: CopilotUI
   return (
     <>
       <CopilotToastContainer />
-      <CopilotConfirmDialog onConfirm={handleConfirm} />
+      <CopilotConfirmDialog onConfirm={handleConfirm} onDismiss={handleDismiss} />
       <CopilotActionLog />
     </>
   );
