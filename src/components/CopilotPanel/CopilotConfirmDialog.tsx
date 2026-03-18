@@ -12,7 +12,7 @@ import './CopilotConfirmDialog.css';
 
 interface CopilotConfirmDialogProps {
   /** Callback when user confirms the action */
-  onConfirm?: (action: unknown) => void;
+  onConfirm?: () => void;
 }
 
 export default function CopilotConfirmDialog({ onConfirm }: CopilotConfirmDialogProps) {
@@ -27,7 +27,7 @@ export default function CopilotConfirmDialog({ onConfirm }: CopilotConfirmDialog
 
   const handleConfirm = () => {
     if (onConfirm) {
-      onConfirm(confirmation.action);
+      onConfirm();
     }
     dispatch(dismissConfirmation());
   };
