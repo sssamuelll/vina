@@ -75,3 +75,14 @@
 .status-dot.inactive {
   background: #6b6b6b;
 }
+
+.status-expert-badge {
+  background: #6366f1;
+  color: white;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  line-height: 16px;
+}

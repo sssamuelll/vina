@@ -6,6 +6,7 @@ export default function StatusBar() {
   const editor = useSelector((s: RootState) => s.editor);
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const simulation = useSelector((s: RootState) => s.simulation);
+  const expertMode = useSelector((s: RootState) => s.workflow.expertMode);
 
   const toolLabels: Record<string, string> = {
     // CLO3D 2D Tools
@@ -105,6 +106,12 @@ export default function StatusBar() {
             <span className="status-item" title="Body collision enabled">
               Collision ✓
             </span>
+            <span className="status-separator" />
+          </>
+        )}
+        {expertMode && (
+          <>
+            <span className="status-expert-badge">EXPERT</span>
             <span className="status-separator" />
           </>
         )}
