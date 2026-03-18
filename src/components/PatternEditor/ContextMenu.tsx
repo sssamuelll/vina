@@ -35,6 +35,8 @@ import {
   removePiecesFromGroup,
 } from '../../store/projectSlice';
 import { selectPiece, clearSelection, copyPieces, createPastedPieces } from '../../store/editorSlice';
+import { setInspectionTarget } from '../../store/inspectorSlice';
+import { setBottomPanelTab } from '../../store/layoutSlice';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -373,6 +375,15 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       label: 'Select',
       icon: '☐',
       action: () => act(() => dispatch(selectPiece(pid))),
+    });
+    items.push({
+      label: 'Inspect',
+      icon: '🔍',
+      action: () => act(() => {
+        dispatch(setInspectionTarget({ type: 'piece', pieceId: pid }));
+        dispatch(setBottomPanelTab('inspector'));
+      }),
+      separator: true,
     });
     items.push({
       label: 'Delete',

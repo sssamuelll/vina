@@ -5,6 +5,7 @@ import { RootState } from '../../store';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reasoning/proactiveAnalysis';
 import Timeline from '../Timeline/Timeline';
+import InspectorTab from './InspectorTab';
 import './BottomPanel.css';
 
 type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector';
@@ -193,11 +194,7 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
             </div>
           )}
           {activeTab === 'timeline' && <Timeline />}
-          {activeTab === 'inspector' && (
-            <div className="bottom-panel-pane bottom-panel-placeholder">
-              <span>Inspector — select an element to inspect</span>
-            </div>
-          )}
+          {activeTab === 'inspector' && <InspectorTab />}
         </div>
       </div>
     </div>
