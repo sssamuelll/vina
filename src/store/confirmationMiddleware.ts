@@ -10,7 +10,7 @@
 
 import type { Middleware } from '@reduxjs/toolkit';
 import { showConfirmation } from './copilotUISlice';
-import { updateToolMemory } from './workflowSlice';
+import { persistWorkflow, updateToolMemory, type WorkflowState } from './workflowSlice';
 
 // ─── Destructive action registry ─────────────────────────────────────────────
 
@@ -58,12 +58,6 @@ interface ActionLike {
   };
 }
 
-interface WorkflowState {
-  expertMode: boolean;
-  confirmOverrides: Record<string, 'default' | 'always' | 'never'>;
-  toolMemory: Record<string, Record<string, unknown>>;
-}
-
 interface StoreState {
   workflow?: WorkflowState;
 }
@@ -72,6 +66,21 @@ interface SetToolOptionPayload {
   toolId: string;
   optionId: string;
   value: unknown;
+}
+
+// ─── Debounced persistence ────────────────────────────────────────────────────
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
+function debouncedPersist(getState: () => unknown) {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    const state = getState() as { workflow?: WorkflowState };
+    if (state.workflow) {
+      persistWorkflow(state.workflow);
+    }
+    persistTimer = null;
+  }, 500);
 }
 
 // ─── Middleware factory ───────────────────────────────────────────────────────
@@ -153,6 +162,12 @@ export function createConfirmationMiddleware(): Middleware {
       storeApi.dispatch(
         updateToolMemory({ tool: toolId, values: { [optionId]: value } })
       );
+    }
+
+    // ── 4. Persist workflow state changes ─────────────────────────────────────
+
+    if (action.type.startsWith('workflow/')) {
+      debouncedPersist(storeApi.getState);
     }
 
     return result;
