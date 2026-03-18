@@ -253,6 +253,14 @@ function mockState(overrides?: Partial<RootState>): RootState {
       confirmOverrides: {},
       toolMemory: {},
     },
+    inspector: {
+      target: null,
+      data: null,
+      diagnostics: [],
+      agentAnalysis: null,
+      agentStreaming: false,
+      agentError: null,
+    },
   };
 
   if (overrides) {
