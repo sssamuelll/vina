@@ -8,6 +8,7 @@ import { setActiveTool2D } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
 import type { ToolDefinition } from '../../tools';
 import ToolTooltip from '../Toolbar3D/ToolTooltip';
+import ToolButtonContextMenu from './ToolButtonContextMenu';
 import './Toolbar2D.css';
 
 /**
@@ -58,9 +59,10 @@ interface ToolGroupButtonProps {
   visibleToolId: string;
   groupIndex: number;
   onToolSelect: (toolId: string, groupIndex: number) => void;
+  onContextMenu?: (e: React.MouseEvent, toolId: string) => void;
 }
 
-function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToolSelect }: ToolGroupButtonProps) {
+function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToolSelect, onContextMenu }: ToolGroupButtonProps) {
   const [stripOpen, setStripOpen] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [stripPos, setStripPos] = useState({ top: 0, left: 0 });
@@ -174,6 +176,12 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
           onPointerDown={handlePointerDown}
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerLeave}
+          onContextMenu={(e) => {
+            if (e.shiftKey) {
+              e.preventDefault();
+              onContextMenu?.(e, visibleTool.id);
+            }
+          }}
         >
           <span className="tool-icon">
             <IconComponent size={18} />
@@ -191,6 +199,10 @@ export default function Toolbar2D() {
   const legacyActiveTool = useSelector((s: RootState) => s.editor.activeTool);
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
   const [selectedPerGroup, setSelectedPerGroup] = useState<Record<number, string>>({});
+  const [contextMenu, setContextMenu] = useState<{
+    operationName: string;
+    position: { top: number; left: number };
+  } | null>(null);
 
   const currentActiveTool = activeTool2D || legacyActiveTool;
 
@@ -216,11 +228,29 @@ export default function Toolbar2D() {
             visibleToolId={selectedPerGroup[idx] || tools[0].id}
             groupIndex={idx}
             onToolSelect={handleToolSelect}
+            onContextMenu={(e: React.MouseEvent, toolId: string) => {
+              setContextMenu({
+                operationName: toolId,
+                position: { top: e.clientY, left: e.clientX },
+              });
+            }}
           />
           {SEPARATORS_AFTER.includes(idx) && <div className="tool-separator" />}
         </div>
       ))}
-
+      {contextMenu && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            onClick={() => setContextMenu(null)}
+          />
+          <ToolButtonContextMenu
+            operationName={contextMenu.operationName}
+            position={contextMenu.position}
+            onClose={() => setContextMenu(null)}
+          />
+        </>
+      )}
     </div>
   );
 }
