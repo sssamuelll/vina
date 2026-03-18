@@ -43,7 +43,15 @@ src/
 │   ├── import/          # Mesh import (OBJ/FBX/GLB/GLTF)
 │   └── mesh/            # Meshing utilities
 ├── workers/             # Web Worker pool for reactive solver
+├── diagnostics/         # Diagnostic inspector system
+│   ├── types.ts               # InspectionTarget, InspectionData, Diagnostic, AgentAnalysis
+│   ├── dataCollector.ts       # Pure sync: (target, state) → InspectionData
+│   ├── ruleEngine.ts          # 13 deterministic diagnostic rules
+│   └── agentAnalyzer.ts       # LLM-powered streaming analysis + suggestions
 ├── store/               # Redux slices + middleware
+│   ├── workflowSlice.ts             # Expert mode, confirm overrides, tool memory
+│   ├── confirmationMiddleware.ts    # Destructive action gating + tool memory mirroring
+│   ├── inspectorSlice.ts            # Diagnostic inspector state
 │   └── reactiveSolverMiddleware.ts  # Parametric rebuild pipeline
 └── stores/              # Zustand state management
 
@@ -274,6 +282,79 @@ import {
 - `src/workers/workerProtocol.ts` — Serialization + transfer strategy
 - `src/store/__tests__/reactiveSolverMiddleware.test.ts` — Integration tests
 
+## Expert Mode (Click'n'Go)
+
+Expert mode reduces confirmation dialogs and remembers tool settings for power users.
+
+### State — workflowSlice
+
+```typescript
+interface WorkflowState {
+  expertMode: boolean;
+  confirmOverrides: Record<string, 'default' | 'always' | 'never'>;
+  toolMemory: Record<string, Record<string, unknown>>;
+}
+```
+
+- All fields persisted to `localStorage` key `'openclo-workflow'` with versioned envelope
+- `confirmOverrides` keyed by operation name: `removePiece`, `removeSeam`, `removePoint`, `splitPiece`, `mergePieces`
+
+### Confirmation Middleware
+
+Sits first in custom middleware chain (before undoMiddleware). Intercepts destructive Redux actions (`project/removePiece`, `project/removeSeam`, `construction/removePoint`).
+
+- `meta.skipConfirmation` flag bypasses the middleware (used by `useGuardedAction` for inner dispatches)
+- `meta.fromToolMemory` flag prevents re-mirroring during auto-apply
+- Also mirrors `tools/setToolOption` into `workflow.toolMemory` and auto-applies memory on tool activation
+
+### useGuardedAction Hook
+
+Guards non-Redux destructive operations (split, merge). Module-level `Map<string, () => void>` stores callbacks outside Redux for serializability. `resolveCallback(key)` retrieves and deletes in one call.
+
+### Key Files
+
+- `src/store/workflowSlice.ts` — State, reducers, localStorage persistence
+- `src/store/confirmationMiddleware.ts` — Action interception + tool memory mirroring
+- `src/hooks/useGuardedAction.ts` — Hook + callback store for non-Redux destructive ops
+- `src/components/Toolbar2D/ToolButtonContextMenu.tsx` — Shift+right-click confirmation overrides
+
+## Diagnostic Inspector
+
+Right-click any piece → "Inspect" → instant data collection, rule-based diagnostics, and AI agent analysis in the bottom panel Inspector tab.
+
+### Three-Layer Architecture
+
+```
+Right-click → "Inspect" → dispatch(setInspectionTarget)
+  → useInspector hook:
+      1. collectInspectionData (sync, from Redux)
+      2. evaluateRules (sync, 13 checks)
+      3. analyzeInspection (async, streams analysis)
+  → InspectorTab renders results
+```
+
+### Data Collector
+
+`collectInspectionData(target, state)` — pure sync function. Collects piece metadata, fabric properties, edge data, seam connections, internal lines, construction points, simulation metadata.
+
+### Rule Engine
+
+`evaluateRules(data)` — 13 deterministic checks. Severity levels: `error`, `critical`, `warning`, `info`. Checks: missing fabric, SA=0, no seams, body penetration, pressure points, missing grainline, etc.
+
+### Agent Analyzer
+
+`analyzeInspection(data, diagnostics, onChunk, signal)` — v1 uses rule-based analysis (LLM prompt scaffolding ready). Generates summary, explanations, and executable suggestions with `toolCall` objects.
+
+### Key Files
+
+- `src/diagnostics/types.ts` — InspectionTarget, InspectionData, Diagnostic, AgentAnalysis
+- `src/diagnostics/dataCollector.ts` — Pure sync data collection
+- `src/diagnostics/ruleEngine.ts` — Rule evaluation
+- `src/diagnostics/agentAnalyzer.ts` — Agent analysis + prompt builders
+- `src/store/inspectorSlice.ts` — Redux state
+- `src/hooks/useInspector.ts` — Pipeline orchestration
+- `src/components/BottomPanel/InspectorTab.tsx` — Inspector tab UI
+
 ## Architecture Notes
 
 - **Solver Selection**: WASM preferred, JS fallback if WASM fails
@@ -294,3 +375,5 @@ import {
 - [Copilot Bridge Architecture](docs/plans/2026-03-02-copilot-bridge-architecture-design.md)
 - [Architecture Spec](docs/specs/ARCHITECTURE.md)
 - [Reactive Solver Middleware Design](docs/plans/2026-02-27-reactive-solver-middleware-design.md)
+- [Click'n'Go Design](docs/superpowers/specs/2026-03-18-click-n-go-design.md)
+- [Diagnostic Inspector Design](docs/superpowers/specs/2026-03-18-diagnostic-inspector-design.md)
