@@ -140,6 +140,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       sidebarTab: 'chat' as const,
       primaryView: '2d',
       splitRatio: 0.5,
+      bottomPanelOpen: false,
+      bottomPanelTab: 'problems',
     },
     marker: {
       isOpen: false,
@@ -252,6 +254,14 @@ function mockState(overrides?: Partial<RootState>): RootState {
       expertMode: false,
       confirmOverrides: {},
       toolMemory: {},
+    },
+    inspector: {
+      target: null,
+      data: null,
+      diagnostics: [],
+      agentAnalysis: null,
+      agentStreaming: false,
+      agentError: null,
     },
   };
 

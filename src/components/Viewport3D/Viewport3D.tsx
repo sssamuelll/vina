@@ -49,6 +49,7 @@ import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D } from '../../store/projectSlice';
 import { setCopilotOpen, setSidebarTab } from '../../store/layoutSlice';
+import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
 import './Viewport3D.css';
@@ -692,6 +693,9 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         }}
         onZoomToFit={() => handleResetCamera()}
         onCameraPreset={(preset) => cameraPresets.setCameraView(preset as ViewPreset)}
+        onInspect={(pieceId) => {
+          dispatchInspectPiece(dispatch, pieceId);
+        }}
       />
     </div>
   );

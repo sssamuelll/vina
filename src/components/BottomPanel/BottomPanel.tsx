@@ -2,16 +2,18 @@ import { X } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import type { BottomTab } from '../../store/layoutSlice';
 import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reasoning/proactiveAnalysis';
 import Timeline from '../Timeline/Timeline';
+import InspectorTab from './InspectorTab';
 import './BottomPanel.css';
-
-type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline';
 
 interface BottomPanelProps {
   isOpen: boolean;
   onToggle: () => void;
+  activeTab?: BottomTab;
+  onTabChange?: (tab: BottomTab) => void;
   defaultTab?: BottomTab;
 }
 
@@ -22,6 +24,7 @@ function buildTabs(problemCount: number): { id: BottomTab; label: string }[] {
     { id: 'output', label: 'Output' },
     { id: 'nesting-preview', label: 'Nesting Preview' },
     { id: 'timeline', label: 'Timeline' },
+    { id: 'inspector', label: 'Inspector' },
   ];
 }
 
@@ -53,17 +56,17 @@ function ProblemsView({ warnings }: { warnings: ProactiveWarning[] }) {
   );
 }
 
-export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }: BottomPanelProps) {
+export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab, onTabChange, defaultTab = 'copilot' }: BottomPanelProps) {
   const { copilotPosition } = useSelector((state: RootState) => state.layout);
   const pieces = useSelector((state: RootState) => state.project.pieces);
   const seams = useSelector((state: RootState) => state.project.seams);
 
   // Reactive proactive analysis — runs when pieces/seams change
   const warnings = useMemo(() => runProactiveAnalysis(pieces, seams), [pieces, seams]);
-  
+
   // Filter tabs based on copilot position
   const allTabs = buildTabs(warnings.length);
-  const tabs = allTabs.filter(tab => 
+  const tabs = allTabs.filter(tab =>
     tab.id !== 'copilot' || copilotPosition === 'bottom'
   );
   // Determine the initial active tab based on what's available
@@ -73,8 +76,10 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
     }
     return tabs.length > 0 ? tabs[0].id : 'problems';
   };
-  
-  const [activeTab, setActiveTab] = useState<BottomTab>(getInitialTab());
+
+  const [localActiveTab, setLocalActiveTab] = useState<BottomTab>(getInitialTab());
+  // Use prop-driven tab if provided, otherwise fall back to local state
+  const activeTab = propActiveTab ?? localActiveTab;
   const [height, setHeight] = useState(280);
   const isDragging = useRef(false);
   const startY = useRef(0);
@@ -85,19 +90,27 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
     if (activeTab === 'copilot' && copilotPosition !== 'bottom') {
       const firstAvailableTab = tabs.find(t => t.id !== 'copilot');
       if (firstAvailableTab) {
-        setActiveTab(firstAvailableTab.id);
+        if (onTabChange) {
+          onTabChange(firstAvailableTab.id);
+        } else {
+          setLocalActiveTab(firstAvailableTab.id);
+        }
       }
     }
-  }, [copilotPosition, activeTab, tabs]);
+  }, [copilotPosition, activeTab, tabs, onTabChange]);
 
   const handleTabClick = useCallback((tabId: BottomTab) => {
     if (activeTab === tabId && isOpen) {
       onToggle(); // collapse
     } else {
-      setActiveTab(tabId);
+      if (onTabChange) {
+        onTabChange(tabId);
+      } else {
+        setLocalActiveTab(tabId);
+      }
       if (!isOpen) onToggle(); // expand
     }
-  }, [activeTab, isOpen, onToggle]);
+  }, [activeTab, isOpen, onToggle, onTabChange]);
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -180,6 +193,7 @@ export default function BottomPanel({ isOpen, onToggle, defaultTab = 'copilot' }
             </div>
           )}
           {activeTab === 'timeline' && <Timeline />}
+          {activeTab === 'inspector' && <InspectorTab />}
         </div>
       </div>
     </div>

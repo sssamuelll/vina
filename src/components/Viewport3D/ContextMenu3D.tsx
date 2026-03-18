@@ -41,6 +41,7 @@ interface ContextMenu3DProps {
   onShowProperties?: (pieceId: string) => void;
   onZoomToFit?: () => void;
   onCameraPreset?: (preset: string) => void;
+  onInspect?: (pieceId: string) => void;
 }
 
 export default function ContextMenu3D({
@@ -56,6 +57,7 @@ export default function ContextMenu3D({
   onShowProperties,
   onZoomToFit,
   onCameraPreset,
+  onInspect,
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -96,6 +98,11 @@ export default function ContextMenu3D({
       icon: '↩',
       action: () => act(() => onResetPieceArrangement?.(pid)),
       separator: true,
+    });
+    items.push({
+      label: 'Inspect',
+      icon: '🔍',
+      action: () => act(() => onInspect?.(pid)),
     });
     items.push({
       label: 'Properties…',
