@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import type { Tool2D } from '../../types/types';
 import { setActiveTool } from '../../store/editorSlice';
-import { setActiveTool2D } from '../../store/toolSlice';
+import { setActiveTool2D, setExpertShowOverride } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
 import type { ToolDefinition } from '../../tools';
 import ToolTooltip from '../Toolbar3D/ToolTooltip';
@@ -60,9 +60,10 @@ interface ToolGroupButtonProps {
   groupIndex: number;
   onToolSelect: (toolId: string, groupIndex: number) => void;
   onContextMenu?: (e: React.MouseEvent, toolId: string) => void;
+  onRightClick?: () => void;
 }
 
-function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToolSelect, onContextMenu }: ToolGroupButtonProps) {
+function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToolSelect, onContextMenu, onRightClick }: ToolGroupButtonProps) {
   const [stripOpen, setStripOpen] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [stripPos, setStripPos] = useState({ top: 0, left: 0 });
@@ -177,9 +178,13 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
           onPointerUp={handlePointerUp}
           onPointerLeave={handlePointerLeave}
           onContextMenu={(e) => {
+            e.preventDefault();
             if (e.shiftKey) {
-              e.preventDefault();
+              // Shift+right-click: confirmation override menu (Task 11)
               onContextMenu?.(e, visibleTool.id);
+            } else {
+              // Plain right-click in expert mode: reveal options bar
+              onRightClick?.();
             }
           }}
         >
@@ -198,6 +203,8 @@ export default function Toolbar2D() {
   const dispatch = useDispatch();
   const legacyActiveTool = useSelector((s: RootState) => s.editor.activeTool);
   const activeTool2D = useSelector((s: RootState) => s.tools.activeTool2D);
+  const expertMode = useSelector((s: RootState) => s.workflow.expertMode);
+  const expertShowOverride = useSelector((s: RootState) => s.tools.expertShowOverride);
   const [selectedPerGroup, setSelectedPerGroup] = useState<Record<number, string>>({});
   const [contextMenu, setContextMenu] = useState<{
     operationName: string;
@@ -218,6 +225,26 @@ export default function Toolbar2D() {
     setSelectedPerGroup(prev => ({ ...prev, [groupIndex]: toolId }));
   }, [dispatch]);
 
+  const handleRightClick = useCallback(() => {
+    if (expertMode) {
+      dispatch(setExpertShowOverride(true));
+    }
+  }, [expertMode, dispatch]);
+
+  // Click-away handler: auto-reset expertShowOverride after 100ms delay
+  // (delay prevents the right-click itself from immediately dismissing the override)
+  useEffect(() => {
+    if (!expertShowOverride) return;
+    const handleClickAway = () => dispatch(setExpertShowOverride(false));
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handleClickAway, { once: true });
+    }, 100);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handleClickAway);
+    };
+  }, [expertShowOverride, dispatch]);
+
   return (
     <div className="toolbar2d">
       {resolvedGroups.map((tools, idx) => (
@@ -234,6 +261,7 @@ export default function Toolbar2D() {
                 position: { top: e.clientY, left: e.clientX },
               });
             }}
+            onRightClick={handleRightClick}
           />
           {SEPARATORS_AFTER.includes(idx) && <div className="tool-separator" />}
         </div>
