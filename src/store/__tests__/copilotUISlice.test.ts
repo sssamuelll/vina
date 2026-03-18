@@ -348,6 +348,48 @@ describe('copilotUISlice', () => {
     });
   });
 
+  describe('confirmation source discriminator', () => {
+    it('should store middleware source with reduxAction', () => {
+      const state = reducer(initialState, showConfirmation({
+        source: 'middleware',
+        title: 'Delete piece?',
+        description: 'This will remove the piece.',
+        consequences: ['3 seams removed'],
+        destructive: true,
+        reduxAction: { type: 'project/removePiece', payload: 'piece-1' },
+      }));
+      expect(state.pendingConfirmation).not.toBeNull();
+      expect(state.pendingConfirmation!.source).toBe('middleware');
+      expect(state.pendingConfirmation!.reduxAction).toEqual({
+        type: 'project/removePiece', payload: 'piece-1',
+      });
+    });
+
+    it('should store hook source with callbackKey', () => {
+      const state = reducer(initialState, showConfirmation({
+        source: 'hook',
+        title: 'Split piece?',
+        description: 'This will split the piece.',
+        consequences: [],
+        destructive: true,
+        callbackKey: 'abc-123',
+      }));
+      expect(state.pendingConfirmation!.source).toBe('hook');
+      expect(state.pendingConfirmation!.callbackKey).toBe('abc-123');
+    });
+
+    it('should default source to copilot for backward compatibility', () => {
+      const state = reducer(initialState, showConfirmation({
+        title: 'Do something?',
+        description: 'Something will happen.',
+        consequences: [],
+        destructive: false,
+        action: { type: 'createPiece' },
+      }));
+      expect(state.pendingConfirmation!.source).toBe('copilot');
+    });
+  });
+
   describe('ghostPreview', () => {
     it('should show a ghost preview', () => {
       const state = reducer(initialState, showGhostPreview({

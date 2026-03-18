@@ -80,6 +80,8 @@ export interface CopilotActionLogEntry {
  */
 export interface CopilotConfirmation {
   id: string;
+  /** Who triggered the confirmation */
+  source: 'copilot' | 'middleware' | 'hook';
   /** Title for the dialog */
   title: string;
   /** Description of what will happen */
@@ -88,8 +90,12 @@ export interface CopilotConfirmation {
   consequences: string[];
   /** Whether the action is destructive */
   destructive: boolean;
-  /** Action to execute if confirmed */
-  action: unknown;
+  /** Action to execute if confirmed (copilot source) */
+  action?: unknown;
+  /** Redux action to dispatch if confirmed (middleware source) */
+  reduxAction?: unknown;
+  /** Callback registry key to invoke if confirmed (hook source) */
+  callbackKey?: string;
   /** Timestamp */
   timestamp: number;
 }
@@ -298,8 +304,9 @@ const copilotUISlice = createSlice({
     /**
      * Show a confirmation dialog.
      */
-    showConfirmation(state, action: PayloadAction<Omit<CopilotConfirmation, 'id' | 'timestamp'>>) {
+    showConfirmation(state, action: PayloadAction<Omit<CopilotConfirmation, 'id' | 'timestamp' | 'source'> & { source?: 'copilot' | 'middleware' | 'hook' }>) {
       state.pendingConfirmation = {
+        source: 'copilot',
         ...action.payload,
         id: generateId('confirm'),
         timestamp: Date.now(),
