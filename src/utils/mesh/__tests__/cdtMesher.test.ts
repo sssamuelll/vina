@@ -32,6 +32,7 @@ function createRectanglePiece(width: number = 100, height: number = 50): Pattern
     seamAllowance: 0,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -60,6 +61,7 @@ function createLShapePiece(): PatternPiece {
     seamAllowance: 0,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -105,6 +107,7 @@ function createCurvedPiece(): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -342,6 +345,7 @@ describe('CDT Mesher', () => {
         seamAllowance: 0,
         layer: 1,
         sublayer: 0,
+        active: true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -367,6 +371,7 @@ describe('CDT Mesher', () => {
         seamAllowance: 0,
         layer: 1,
         sublayer: 0,
+        active: true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -672,6 +677,7 @@ describe('CDT Mesher', () => {
         seamAllowance: 0,
         layer: 1,
         sublayer: 0,
+        active: true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };

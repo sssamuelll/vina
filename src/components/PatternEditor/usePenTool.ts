@@ -137,6 +137,7 @@ export function usePenTool(
           seamAllowance: 10,
           layer: 1,
           sublayer: 0,
+          active: true,
         });
         setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
         return;
@@ -198,6 +199,7 @@ export function usePenTool(
         seamAllowance: 10,
         layer: 1,
         sublayer: 0,
+        active: true,
       });
       setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
     }

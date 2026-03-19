@@ -211,6 +211,50 @@ const ruleNoEdgesDefined: Rule = (data) => {
   return [];
 };
 
+// ─── Seam tension / deactivation rules ────────────────────────────────────
+
+const ruleSeamTension: Rule = (data) => {
+  const diags: Diagnostic[] = [];
+  for (const seam of data.seams) {
+    if (seam.tension !== undefined && seam.tension < 50) {
+      diags.push({
+        severity: 'warning',
+        category: 'seam',
+        message: `Seam "${seam.edgeName}" → ${seam.partnerPieceName}: extreme gathering (${seam.tension}%)`,
+        detail:
+          'Tension below 50% causes heavy gathering. This may distort the garment shape or cause simulation instability.',
+      });
+    }
+    if (seam.tension !== undefined && seam.tension > 150) {
+      diags.push({
+        severity: 'warning',
+        category: 'seam',
+        message: `Seam "${seam.edgeName}" → ${seam.partnerPieceName}: extreme easing (${seam.tension}%)`,
+        detail:
+          'Tension above 150% causes heavy easing. The seam may pucker or pull adjacent fabric.',
+      });
+    }
+  }
+  return diags;
+};
+
+const ruleInactivePieceWithActiveSeams: Rule = (data) => {
+  if (data.pieceActive === false) {
+    const activeSeams = data.seams.filter((s) => s.active !== false);
+    if (activeSeams.length > 0) {
+      return [
+        {
+          severity: 'info',
+          category: 'seam',
+          message: 'Inactive piece has active seam connections',
+          detail: `This piece is inactive but has ${activeSeams.length} active seam connection(s). Consider deactivating the seams or reactivating the piece.`,
+        },
+      ];
+    }
+  }
+  return [];
+};
+
 // ─── Layer rules ──────────────────────────────────────────────────────────────
 
 const ruleLayerOverlap: Rule = (data) => {
@@ -242,6 +286,8 @@ const RULES: Rule[] = [
   ruleSeamAllowanceTooSmall,
   // seam
   ruleNoSeamConnections,
+  ruleSeamTension,
+  ruleInactivePieceWithActiveSeams,
   // internals
   ruleNoGrainline,
   ruleNoNotches,

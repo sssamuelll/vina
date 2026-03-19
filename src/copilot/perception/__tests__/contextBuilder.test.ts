@@ -29,6 +29,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
           seamAllowance: 10,
           layer: 1,
           sublayer: 0,
+          active: true,
           createdAt: 1000,
           updatedAt: 1000,
         },
@@ -49,6 +50,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
           seamAllowance: 10,
           layer: 1,
           sublayer: 0,
+          active: true,
           createdAt: 1000,
           updatedAt: 1000,
         },
@@ -59,6 +61,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
           pieceA: { pieceId: 'piece-1', edgeName: 'sideSeam' },
           pieceB: { pieceId: 'piece-2', edgeName: 'sideSeam' },
           type: 'standard',
+          tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
         },
       ],
       fabrics: [
@@ -80,7 +83,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       },
       avatarMode: 'model',
       avatarModelUrl: null,
-      isDirty: false, groups: [], arrangementOverrides: {},
+      isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {},
     },
     editor: {
       viewMode: 'split',
@@ -340,7 +343,7 @@ describe('buildAgentContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false, groups: [], arrangementOverrides: {},
+        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {},
       },
     });
     const context = buildAgentContext(state);
@@ -375,7 +378,7 @@ describe('serializeContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false, groups: [], arrangementOverrides: {},
+        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {},
       },
     });
     const context = buildAgentContext(state);
@@ -403,6 +406,7 @@ describe('Context Builder - Piece Semantics', () => {
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -451,6 +455,7 @@ describe('Context Builder - Spatial Relationships', () => {
       seamAllowance: 10,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -471,6 +476,7 @@ describe('Context Builder - Spatial Relationships', () => {
       seamAllowance: 10,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -577,6 +583,7 @@ describe('Context Builder - Cerebral Context', () => {
         seamAllowance: 10,
         layer: 1,
         sublayer: 0,
+        active: true,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       },

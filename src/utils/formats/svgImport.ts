@@ -70,6 +70,7 @@ export function importSVG(svgString: string): SvgImportResult {
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: now,
     updatedAt: now,
   }));

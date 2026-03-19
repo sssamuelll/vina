@@ -20,7 +20,7 @@ import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
-import { PatternPiece, Seam } from '../../types/types';
+import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
@@ -43,16 +43,62 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
 /**
  * Convert Seam[] to SeamInitData[] for the worker.
+ * Filters out inactive seams and passes extended fields (tension, strength, etc.).
  */
-function seamsToInitData(seams: Seam[]): SeamInitData[] {
-  return seams.map(s => ({
-    id: s.id,
-    pieceAId: s.pieceA.pieceId,
-    pieceAEdgeName: s.pieceA.edgeName,
-    pieceBId: s.pieceB.pieceId,
-    pieceBEdgeName: s.pieceB.edgeName,
-    type: s.type,
-  }));
+function seamsToInitData(seams: Seam[], seamGroups?: SeamGroup[]): SeamInitData[] {
+  // Convert regular seams, filtering out inactive ones
+  const seamEntries: SeamInitData[] = seams
+    .filter(s => s.active !== false)
+    .map(s => ({
+      id: s.id,
+      pieceAId: s.pieceA.pieceId,
+      pieceAEdgeName: s.pieceA.edgeName,
+      pieceBId: s.pieceB.pieceId,
+      pieceBEdgeName: s.pieceB.edgeName,
+      type: s.type,
+      pieceARange: s.pieceA.tStart != null && s.pieceA.tEnd != null
+        ? [s.pieceA.tStart, s.pieceA.tEnd] as [number, number]
+        : undefined,
+      pieceBRange: s.pieceB.tStart != null && s.pieceB.tEnd != null
+        ? [s.pieceB.tStart, s.pieceB.tEnd] as [number, number]
+        : undefined,
+      tension: s.tension ?? 100,
+      strength: s.strength ?? 1.0,
+      active: true,
+      taped: s.taped ?? false,
+    }));
+
+  // Flatten SeamGroups into additional SeamInitData entries
+  if (seamGroups) {
+    for (const group of seamGroups) {
+      if (!group.active) continue;
+      const count = Math.min(group.edgesA.length, group.edgesB.length);
+      for (let i = 0; i < count; i++) {
+        const edgeA = group.edgesA[i];
+        const edgeB = group.edgesB[i];
+        seamEntries.push({
+          id: `${group.id}_${i}`,
+          pieceAId: edgeA.pieceId,
+          pieceAEdgeName: edgeA.edgeName,
+          pieceBId: edgeB.pieceId,
+          pieceBEdgeName: edgeB.edgeName,
+          type: group.type,
+          pieceARange: edgeA.tStart != null && edgeA.tEnd != null
+            ? [edgeA.tStart, edgeA.tEnd] as [number, number]
+            : undefined,
+          pieceBRange: edgeB.tStart != null && edgeB.tEnd != null
+            ? [edgeB.tStart, edgeB.tEnd] as [number, number]
+            : undefined,
+          tension: group.tension ?? 100,
+          strength: group.strength ?? 1.0,
+          active: true,
+          taped: group.taped ?? false,
+        });
+      }
+    }
+  }
+
+  return seamEntries;
 }
 
 export interface GarmentSimulationHandle {
@@ -106,17 +152,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const steamBrush = useSelector((s: RootState) => s.simulation.steamBrush);
   const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
+  const seamGroups = useSelector((s: RootState) => s.project.seamGroups);
+
+  // Filter inactive pieces — only active pieces participate in simulation
+  const activePieces = useMemo(() => pieces.filter(p => p.active !== false), [pieces]);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 
-  const pieceMeshes = useMeshing({ pieces, clientsRef, stretchingIdsRef });
+  const pieceMeshes = useMeshing({ pieces: activePieces, clientsRef, stretchingIdsRef });
 
   // ─── Geometry building ──────────────────────────────────────────────────────
 
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    const placements = placeGarmentPieces(pieces, avatarMeasurements);
+    const placements = placeGarmentPieces(activePieces, avatarMeasurements);
 
     let totalVerts = 0;
     for (const p of pieceMeshes) {
@@ -182,16 +232,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     geo.computeVertexNormals();
 
     return { staticGeometry: geo };
-  }, [pieceMeshes, pieces, avatarMeasurements]);
+  }, [pieceMeshes, activePieces, avatarMeasurements]);
 
-  const seamInitData = useMemo(() => seamsToInitData(seams), [seams]);
+  const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
 
   // ─── Placed meshes for solver init ──────────────────────────────────────────
 
   const placedMeshes = useMemo(() => {
     if (pieceMeshes.length === 0) return [];
 
-    const placements = placeGarmentPieces(pieces, avatarMeasurements);
+    const placements = placeGarmentPieces(activePieces, avatarMeasurements);
 
     return pieceMeshes.map((pm, i) => {
       const placement = placements[i] || { position: [0, 1.0, -0.2], rotation: [0, 0, 0] };
@@ -214,7 +264,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
       return { ...pm, vertices: transformed };
     });
-  }, [pieceMeshes, pieces, avatarMeasurements]);
+  }, [pieceMeshes, activePieces, avatarMeasurements]);
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 
@@ -272,7 +322,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // Geometric preview: instant vertex displacement on dimension edits
   useGeometricPreview({
-    pieces,
+    pieces: activePieces,
     simulationState,
     positionsRef,
     onPreviewFrame: onFrame ? (positions) => {
@@ -508,22 +558,22 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tslSolverRef.current, staticGeometry]);
 
-  // Effective tint: first piece with a custom tint, or fallback to fabric color
+  // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {
-    for (const p of pieces) {
+    for (const p of activePieces) {
       if (pieceTints[p.id]) return pieceTints[p.id];
     }
     return renderParams.color;
-  }, [pieces, pieceTints, renderParams.color]);
+  }, [activePieces, pieceTints, renderParams.color]);
 
-  // Effective UV transform: first piece with custom UV, or fallback to fabric defaults
+  // Effective UV transform: first active piece with custom UV, or fallback to fabric defaults
   const effectiveUV = useMemo(() => {
-    for (const p of pieces) {
+    for (const p of activePieces) {
       const uv = pieceUVTransforms[p.id];
       if (uv) return uv;
     }
     return { repeatX: renderParams.mapRepeat[0], repeatY: renderParams.mapRepeat[1], rotation: renderParams.mapRotation };
-  }, [pieces, pieceUVTransforms, renderParams.mapRepeat, renderParams.mapRotation]);
+  }, [activePieces, pieceUVTransforms, renderParams.mapRepeat, renderParams.mapRotation]);
 
   // ─── Texture loading ───────────────────────────────────────────────────────
 
@@ -678,7 +728,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
       }
     }
-  }, [activeTool3D, handleBrushStroke, meshGrab.radius, meshGrab.strength, staticGeometry, positionsRef]);
+  }, [activeTool3D, handleBrushStroke, meshGrab.radius, meshGrab.strength, positionsRef, tslSolverRef]);
 
   const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (activeTool3D === 'steamBrush') {
@@ -715,7 +765,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         })));
       }
     }
-  }, [activeTool3D, handleBrushStroke]);
+  }, [activeTool3D, handleBrushStroke, tslSolverRef]);
 
   const releaseGrab = useCallback(() => {
     if (!grabDragging.current) return;
@@ -730,7 +780,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       grabIndices.current = [];
       grabBasePositions.current = null;
     }
-  }, []);
+  }, [tslSolverRef]);
 
   const handlePointerUp = useCallback(() => {
     brushDragging.current = false;
@@ -899,7 +949,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerdown', onDown);
     };
-  }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, positionsRef]);
+  }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, positionsRef, tslSolverRef]);
 
   if (!staticGeometry) return null;
 

@@ -17,6 +17,7 @@ interface NewPieceData {
   seamAllowance: number;
   layer: number;
   sublayer: number;
+  active: boolean;
 }
 
 const MIN_SIZE = 5;
@@ -89,6 +90,7 @@ export function useRectangleTool(
         seamAllowance: 10,
         layer: 1,
         sublayer: 0,
+        active: true,
       });
     }
 

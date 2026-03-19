@@ -33,6 +33,7 @@ const pieceA: PatternPiece = {
   seamAllowance: 0,
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 };
@@ -59,6 +60,7 @@ const pieceB: PatternPiece = {
   seamAllowance: 0,
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 };
@@ -86,6 +88,7 @@ const pieceC: PatternPiece = {
   seamAllowance: 0,
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 };
@@ -96,12 +99,14 @@ const seams: Seam[] = [
     pieceA: { pieceId: 'pA', edgeName: 'top' },
     pieceB: { pieceId: 'pB', edgeName: 'top' },
     type: 'standard',
+    tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
   },
   {
     id: 's2',
     pieceA: { pieceId: 'pA', edgeName: 'right' },
     pieceB: { pieceId: 'pC', edgeName: 'left' },
     type: 'standard',
+    tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
   },
 ];
 

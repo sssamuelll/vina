@@ -20,6 +20,7 @@ function makePiece(overrides: Partial<PatternPiece> = {}): PatternPiece {
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     ...overrides,

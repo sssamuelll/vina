@@ -20,6 +20,7 @@ const squarePiece: PatternPiece = {
   internals: [],
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 };

@@ -28,6 +28,7 @@ function makePiece(id: string, w: number, h: number, sa = 0): PatternPiece {
     seamAllowance: sa,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

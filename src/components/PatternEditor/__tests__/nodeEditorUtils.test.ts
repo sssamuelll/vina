@@ -30,6 +30,7 @@ const makeSquarePiece = (): PatternPiece => ({
   internals: [],
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 });
@@ -51,6 +52,7 @@ const makeCurvePiece = (): PatternPiece => ({
   internals: [],
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 });

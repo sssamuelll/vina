@@ -143,6 +143,11 @@ const createSeamTool: ToolDefinition = {
       pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName },
       pieceB: { pieceId: params.pieceBId as string, edgeName: edgeBName },
       type: (params.seamType as Seam['type']) || 'standard',
+      tension: 100,
+      strength: 1.0,
+      active: true,
+      taped: false,
+      tapeWidth: 10,
     };
 
     dispatch(addSeam(seam));

@@ -42,6 +42,8 @@ interface ContextMenu3DProps {
   onZoomToFit?: () => void;
   onCameraPreset?: (preset: string) => void;
   onInspect?: (pieceId: string) => void;
+  onDeactivatePiece?: (pieceId: string, active: boolean) => void;
+  isPieceActive?: boolean;
 }
 
 export default function ContextMenu3D({
@@ -58,6 +60,8 @@ export default function ContextMenu3D({
   onZoomToFit,
   onCameraPreset,
   onInspect,
+  onDeactivatePiece,
+  isPieceActive,
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -103,6 +107,11 @@ export default function ContextMenu3D({
       label: 'Inspect',
       icon: '🔍',
       action: () => act(() => onInspect?.(pid)),
+    });
+    items.push({
+      label: isPieceActive === false ? 'Activate Piece' : 'Deactivate Piece',
+      icon: isPieceActive === false ? '▶' : '⏸',
+      action: () => act(() => onDeactivatePiece?.(pid, isPieceActive === false)),
     });
     items.push({
       label: 'Properties…',

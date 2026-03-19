@@ -21,6 +21,7 @@ function makePiece(id: string, x: number, y: number, size: number): PatternPiece
     seamAllowance: 0,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: 0,
     updatedAt: 0,
   };

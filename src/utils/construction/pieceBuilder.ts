@@ -146,6 +146,7 @@ export function buildPieceWithOffset(
       constructionPieceId: cPiece.id,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: now,
       updatedAt: now,
     },

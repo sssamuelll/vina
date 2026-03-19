@@ -90,6 +90,10 @@ export function collectInspectionData(
         partnerPieceName: partnerPiece?.name ?? 'Unknown',
         edgeName: seam.pieceA.edgeName,
         type: seam.type,
+        tension: seam.tension,
+        strength: seam.strength,
+        active: seam.active,
+        taped: seam.taped,
       });
     } else if (isB) {
       const partnerPiece = state.project.pieces.find(p => p.id === seam.pieceA.pieceId);
@@ -99,6 +103,10 @@ export function collectInspectionData(
         partnerPieceName: partnerPiece?.name ?? 'Unknown',
         edgeName: seam.pieceB.edgeName,
         type: seam.type,
+        tension: seam.tension,
+        strength: seam.strength,
+        active: seam.active,
+        taped: seam.taped,
       });
     }
   }
@@ -149,5 +157,6 @@ export function collectInspectionData(
     piecesOnSameLayer: pieces
       .filter(p => p.id !== piece.id && (p.layer ?? 1) === (piece.layer ?? 1))
       .map(p => ({ id: p.id, name: p.name, bodyRegion: p.bodyRegion })),
+    pieceActive: piece.active,
   };
 }

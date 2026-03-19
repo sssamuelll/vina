@@ -78,6 +78,8 @@ const SinglePiece = memo(function SinglePiece({
       data-piece-id={piece.id}
       transform={`translate(${piece.position.x}, ${piece.position.y}) rotate(${piece.rotation}, ${cx}, ${cy})`}
       className={`pattern-piece ${isSelected ? 'selected' : ''}`}
+      opacity={piece.active === false ? 0.3 : 1}
+      style={piece.active === false ? { filter: 'grayscale(100%)' } : undefined}
     >
       <path
         d={pathToSVG(piece.outline)}

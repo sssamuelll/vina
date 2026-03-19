@@ -198,6 +198,7 @@ export default function ProjectView() {
       seamAllowance: 10,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
