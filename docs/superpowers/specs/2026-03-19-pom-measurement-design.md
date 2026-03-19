@@ -22,7 +22,7 @@ interface POMPoint {
   pieceId: string;
   edgeName?: string;       // semantic edge name (if snapped to edge)
   t?: number;              // parametric position on edge (0-1)
-  position: Point2D;       // absolute 2D position (fallback if edge deleted)
+  localPosition: Point2D;  // piece-local coordinates (stable across piece moves)
 }
 
 /** Persistent named measurement */
@@ -48,9 +48,13 @@ interface PointOfMeasure {
 }
 ```
 
-**Storage:** `poms: PointOfMeasure[]` in `ProjectState`, alongside `seams` and `seamGroups`.
+**Storage:** `poms: PointOfMeasure[]` in `ProjectState`, alongside `seams` and `seamGroups`. Also add `poms?: PointOfMeasure[]` to `OpenCloProject` interface for serialization.
 
 **Phase 1 methods:** `'straight'` (point-to-point Euclidean) and `'alongEdge'` (arc-length along a semantic edge). Other methods are type-safe placeholders for Phase 2-3.
+
+**Along-edge semantics:** For `alongEdge` POMs, `pointA` and `pointB` both reference the same piece and edge. `pointA.t = 0` (edge start), `pointB.t = 1` (edge end) for full-edge measurements. Partial edges are not in Phase 1 scope.
+
+**Coordinate space:** `POMPoint.localPosition` is in **piece-local** coordinates (relative to piece origin, not world). This ensures POM positions remain stable when pieces are moved. To resolve to world coordinates: add `piece.position.x/y`.
 
 ## Redux Actions
 
@@ -67,9 +71,13 @@ interface PointOfMeasure {
 
 **`removePiece`** cleans up POMs referencing the deleted piece — removes POMs where either `pointA.pieceId` or `pointB.pieceId` matches.
 
+**`removePOM`** is a lightweight deletion — no confirmation middleware needed (POMs are non-destructive annotations, unlike piece/seam deletion).
+
 ### Recomputation
 
-POM values recompute via a `useEffect` in the POM panel that watches `pieces`. When pieces change, all POM values are recalculated from current geometry and dispatched via `recomputePOMValues`. This avoids middleware complexity while keeping values fresh when the user views them.
+POM values recompute via a `useEffect` in the POM panel that watches `pieces`. When pieces change, all POM values are recalculated from current geometry and dispatched via `recomputePOMValues`.
+
+**Stale-data prevention:** The copilot `getPOMs` tool and CSV export function must also call `recomputeAllPOMs()` on-demand before returning values, to avoid stale data when the panel is not visible. The pure `recomputeAllPOMs()` function takes `(poms, pieces)` and returns fresh values without dispatching — callers decide whether to dispatch or just use the values.
 
 ## POM Compute Functions
 
@@ -82,8 +90,8 @@ function computePOMValue(pom: PointOfMeasure, pieces: PatternPiece[]): number | 
 /** Compute straight-line distance between two POM points */
 function computeStraightDistance(pointA: POMPoint, pointB: POMPoint, pieces: PatternPiece[]): number | null;
 
-/** Compute arc-length along an edge for an along-edge POM */
-function computeAlongEdgeDistance(pointA: POMPoint, pieces: PatternPiece[]): number | null;
+/** Compute arc-length along an edge for an along-edge POM (full edge, pointA.edgeName) */
+function computeAlongEdgeDistance(pom: PointOfMeasure, pieces: PatternPiece[]): number | null;
 
 /** Recompute all POM values, returning update pairs */
 function recomputeAllPOMs(poms: PointOfMeasure[], pieces: PatternPiece[]): { id: string; value: number }[];
@@ -126,7 +134,14 @@ Returns `null` if referenced piece/edge no longer exists (orphaned POM).
 
 ### Snap Behavior
 
-Reuse `snapToOutline` from the existing measure tool. Snap threshold: 8px / zoom. Returns piece ID, edge name, parametric t, and canvas-space position.
+The existing `snapToOutline` returns `{ point, pieceId, segmentIndex }` but POM creation needs `edgeName` and `t`. The hook must bridge this gap:
+
+1. Call `snapToOutline(pt, pieces, zoom)` → get `{ point, pieceId, segmentIndex }`
+2. Call `findEdgeForSegment(piece, segmentIndex)` → get `SemanticEdge` with `name`
+3. Call `distanceAlongPath(commands, point, edge.segmentRange)` / `computePathArcLength(...)` → compute parametric `t` as `distanceToPoint / totalEdgeLength`
+4. Convert `point` to piece-local coordinates: `{ x: point.x - piece.position.x, y: point.y - piece.position.y }`
+
+This produces the `POMPoint` with all required fields. The bridging logic lives in `usePOMMeasureTool.ts` as a `snapToPOMPoint()` helper.
 
 ### State Machine
 
@@ -186,9 +201,9 @@ New "POMs" tab in `BottomPanel`, alongside the existing Inspector tab.
 ### CSV Export Format
 
 ```csv
-Name,Category,Method,Value (mm),Tolerance (mm)
-Chest Width,width,straight,482.3,5
-Side Seam,length,alongEdge,410.1,3
+Name,Category,Method,Piece A,Piece B,Value (mm),Tolerance (mm)
+Chest Width,width,straight,Front Bodice,Back Bodice,482.3,5
+Side Seam,length,alongEdge,Front Bodice,Front Bodice,410.1,3
 ```
 
 ## Copilot Tools
@@ -209,9 +224,11 @@ When given edge names, the tool resolves piece geometry and computes the value a
 - `method: 'alongEdge'` with one edge name → computes full edge arc-length
 - If `positionA`/`positionB` are given as `{x, y}`, uses those directly
 
-The tool validates that referenced pieces and edges exist before creating.
+The tool validates that referenced pieces and edges exist before creating. It must call `computePOMValue()` to compute the initial value before dispatching `addPOM`, and return `success: false` if computation returns `null` (missing piece/edge).
 
 All tools return `ToolResult` with rollback functions (dispatch `removePOM` or restore previous state).
+
+The `getPOMs` tool must call `recomputeAllPOMs()` on-demand to ensure fresh values.
 
 ### Copilot Examples
 
@@ -244,8 +261,10 @@ One new info-level rule in `ruleEngine.ts`:
 
 | File | Change |
 |------|--------|
-| `src/types/types.ts` | Add `PointOfMeasure`, `POMPoint`, `POMMethod`, `POMCategory` |
+| `src/types/types.ts` | Add `PointOfMeasure`, `POMPoint`, `POMMethod`, `POMCategory`, add `'pomMeasure'` to `Tool2D` union, add `poms?: PointOfMeasure[]` to `OpenCloProject` |
 | `src/store/projectSlice.ts` | Add `poms` to state, 4 reducers, removePiece cleanup, loadProject backfill |
+| `src/store/layoutSlice.ts` | Add `'poms'` to `BottomTab` union type |
+| `src/store/undoMiddleware.ts` | Add undo labels: `'project/addPOM': 'Add Measurement'`, `'project/updatePOM': 'Update Measurement'`, `'project/removePOM': 'Remove Measurement'` |
 | `src/tools/index.ts` | Register `pomMeasureTool` |
 | `src/components/PatternEditor/PatternEditor.tsx` | Instantiate hook, pass overlay props |
 | `src/components/PatternEditor/renderers/ToolOverlay.tsx` | Add POMOverlay rendering |
@@ -258,8 +277,7 @@ One new info-level rule in `ruleEngine.ts`:
 
 - 3D viewport (Phase 2-3)
 - Simulation / WASM
-- Undo middleware (standard Redux actions)
-- Confirmation middleware
+- Confirmation middleware (removePOM is lightweight, no confirmation needed)
 - Layer system
 
 ## Testing
