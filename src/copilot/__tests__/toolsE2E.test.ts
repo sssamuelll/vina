@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 123 tools registered', () => {
-      expect(registry.size).toBe(131); // +4 export tools (#120: exportBOM, exportMultiSizeDXF, export3DFBX, exportOBJSequence)
+      expect(registry.size).toBe(135); // +4 layer tools (#372: setLayer, cloneToLayer, superimpose, getLayerInfo)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(131); // +4 export tools (#120: exportBOM, exportMultiSizeDXF, export3DFBX, exportOBJSequence)
+      expect(names.length).toBe(135); // +4 layer tools (#372: setLayer, cloneToLayer, superimpose, getLayerInfo)
 
       // Key tools from every category
       const expected = [
@@ -426,6 +426,7 @@ describe('Tools E2E', () => {
         'adjustFit', 'adjustLength', 'adjustSleeve', 'adjustProportions',
         'runGarmentPipeline',
         'modifyDimension',
+        'setLayer', 'cloneToLayer', 'superimpose', 'getLayerInfo',
       ];
       for (const name of expected) {
         expect(names).toContain(name);
