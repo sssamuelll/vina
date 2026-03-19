@@ -37,9 +37,11 @@ const editorSlice = createSlice({
     },
     selectPiece(state, action: PayloadAction<string>) {
       state.selectedPieceIds = [action.payload];
+      state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
     togglePieceSelection(state, action: PayloadAction<string>) {
+      state.selectedPOMId = null;
       const idx = state.selectedPieceIds.indexOf(action.payload);
       if (idx === -1) {
         state.selectedPieceIds.push(action.payload);
@@ -67,6 +69,7 @@ const editorSlice = createSlice({
     },
     selectPOM(state, action: PayloadAction<string | null>) {
       state.selectedPOMId = action.payload;
+      state.selectedPieceIds = [];
       state.selectedSeamId = null;
       state.selectedInternalLine = null;
     },
@@ -74,6 +77,7 @@ const editorSlice = createSlice({
       state.selectedInternalLine = action.payload;
       state.selectedPieceIds = [action.payload.pieceId];
       state.selectedSeamId = null;
+      state.selectedPOMId = null;
     },
     setZoom2D(state, action: PayloadAction<number>) {
       state.zoom2D = Math.max(0.1, Math.min(10, action.payload));
