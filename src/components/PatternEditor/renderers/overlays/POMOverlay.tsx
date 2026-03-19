@@ -187,24 +187,33 @@ function AlongEdgePOM({
     const ep = getEdgeEndpoints(piece.outline, i);
     if (!ep) continue;
 
+    const cmd = piece.outline[i];
     const sx = ep.start.x + piece.position.x;
     const sy = ep.start.y + piece.position.y;
     const ex = ep.end.x + piece.position.x;
     const ey = ep.end.y + piece.position.y;
 
-    segments.push(
-      <line
-        key={i}
-        x1={sx}
-        y1={sy}
-        x2={ex}
-        y2={ey}
-        stroke={color}
-        strokeWidth={strokeW}
-        strokeLinecap="round"
-        opacity={isSelected ? 1 : 0.75}
-      />,
-    );
+    const commonProps = {
+      stroke: color,
+      strokeWidth: strokeW,
+      strokeLinecap: 'round' as const,
+      fill: 'none',
+      opacity: isSelected ? 1 : 0.75,
+    };
+
+    if (cmd.type === 'C' && cmd.values.length >= 6) {
+      const ox = piece.position.x;
+      const oy = piece.position.y;
+      const d = `M ${sx} ${sy} C ${cmd.values[0] + ox} ${cmd.values[1] + oy} ${cmd.values[2] + ox} ${cmd.values[3] + oy} ${ex} ${ey}`;
+      segments.push(<path key={i} d={d} {...commonProps} />);
+    } else if (cmd.type === 'Q' && cmd.values.length >= 4) {
+      const ox = piece.position.x;
+      const oy = piece.position.y;
+      const d = `M ${sx} ${sy} Q ${cmd.values[0] + ox} ${cmd.values[1] + oy} ${ex} ${ey}`;
+      segments.push(<path key={i} d={d} {...commonProps} />);
+    } else {
+      segments.push(<line key={i} x1={sx} y1={sy} x2={ex} y2={ey} {...commonProps} />);
+    }
 
     midX += (sx + ex) / 2;
     midY += (sy + ey) / 2;
