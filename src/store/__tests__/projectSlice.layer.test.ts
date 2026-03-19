@@ -33,6 +33,7 @@ function emptyState() {
     avatarModelUrl: null,
     isDirty: false,
     groups: [],
+    seamGroups: [],
     arrangementOverrides: {},
   };
 }

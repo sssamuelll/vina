@@ -12,7 +12,7 @@ function stateWith(pieces: { id: string }[], groups: { id: string; name: string;
     id: 'test', name: 'Test', pieces: pieces as any, seams: [], fabrics: [],
     avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} } as any,
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
-    arrangementOverrides: {}, groups: groups.map(g => ({ ...g, createdAt: 0, updatedAt: 0 })),
+    arrangementOverrides: {}, seamGroups: [], groups: groups.map(g => ({ ...g, createdAt: 0, updatedAt: 0 })),
   };
 }
 
