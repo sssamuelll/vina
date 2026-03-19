@@ -6,6 +6,7 @@ import { removeSeam } from '../../store/projectSlice';
 import { selectSeam } from '../../store/editorSlice';
 import PropertySection from './PropertySection';
 import PieceProperties from './PieceProperties';
+import SeamPropertiesPanel from './SeamPropertiesPanel';
 import MaterialTab from './MaterialTab';
 import './PropertiesPanel.css';
 
@@ -37,6 +38,23 @@ export default function PropertiesPanel() {
         ) : (
           <>
             <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />
+
+            {/* Selected seam properties */}
+            {editor.selectedSeamId && (() => {
+              const seam = seams.find(s => s.id === editor.selectedSeamId);
+              if (!seam) return null;
+              const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
+              const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
+              return (
+                <SeamPropertiesPanel
+                  seam={seam}
+                  pieceAName={pA?.name || '?'}
+                  pieceBName={pB?.name || '?'}
+                  collapsed={!!collapsedSections['seam-props']}
+                  onToggle={toggleSection}
+                />
+              );
+            })()}
 
             <PropertySection id="material" title="MATERIAL" collapsed={!!collapsedSections.material} onToggle={toggleSection}>
               <MaterialTab />
