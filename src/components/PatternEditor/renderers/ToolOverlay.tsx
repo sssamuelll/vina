@@ -1,6 +1,9 @@
 import { PatternPiece, Point2D, Tool2D } from '../../../types/types';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../../store';
 import { NodeRef } from '../nodeEditorUtils';
 import type { EditableNode } from '../nodeEditorUtils';
+import POMOverlay from './overlays/POMOverlay';
 import EdgePairOverlay from './overlays/EdgePairOverlay';
 import NotchToolOverlay from './overlays/NotchToolOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';
@@ -140,8 +143,14 @@ interface ToolOverlayProps {
 export default function ToolOverlay(props: ToolOverlayProps) {
   const { activeTool, zoom2D, pieces, units } = props;
 
+  const poms = useSelector((s: RootState) => s.project.poms);
+  const selectedPOMId = useSelector((s: RootState) => s.editor.selectedPOMId);
+
   return (
     <>
+      {/* POM dimension annotations — always visible */}
+      <POMOverlay poms={poms} pieces={pieces} zoom2D={zoom2D} selectedPOMId={selectedPOMId} />
+
       {activeTool === 'seam' && (
         <EdgePairOverlay zoom2D={zoom2D} firstEdge={props.seamFirstEdge} hoveredEdge={props.seamHoveredEdge} mode={props.seamMode} />
       )}
