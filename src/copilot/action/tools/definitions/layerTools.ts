@@ -9,7 +9,7 @@
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
-import { setLayer, setSublayer, cloneToLayer, superimposePiece } from '../../../../store/projectSlice';
+import { setLayer, setSublayer, cloneToLayer, superimposePiece, setArrangement3D } from '../../../../store/projectSlice';
 
 // ─── setLayer ────────────────────────────────────────────────────────────────
 
@@ -165,9 +165,9 @@ const superimposeTool: ToolDefinition = {
         if (previousLayer !== undefined) {
           dispatch(setLayer({ pieceId: params.pieceId as string, layer: previousLayer }));
         }
-        // Note: full position rollback would require setArrangement3D — skipping for simplicity
-        // as arrangementOverrides restoration is non-trivial without importing that action here
-        void previousPos;
+        if (previousPos) {
+          dispatch(setArrangement3D({ pieceId: params.pieceId as string, position: [...previousPos] as [number, number, number] }));
+        }
       },
     };
   },
