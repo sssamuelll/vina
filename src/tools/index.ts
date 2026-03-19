@@ -51,6 +51,7 @@ import { pinTool } from './definitions/pin';
 import { simulateTool } from './definitions/simulate';
 import { steamBrushTool } from './definitions/steamBrush';
 import { meshGrabTool } from './definitions/meshGrab';
+import { pomMeasureTool } from './definitions/pomMeasure';
 
 // Register all tools
 const allTools = [
@@ -101,6 +102,7 @@ const allTools = [
   measureCurveTool,
   compareCurvesTool,
   walkSeamTool,
+  pomMeasureTool,
 
   // 2D Tools — Navigation
   handTool,
