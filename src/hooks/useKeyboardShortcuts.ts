@@ -177,6 +177,8 @@ export function useKeyboardShortcuts() {
       ['tool.topstitchFree', () => { dispatch(setActiveTool('topstitchFree' as any)); dispatch(setActiveTool2D('topstitchFree')); }],
       ['tool.topstitchSeamline', () => { dispatch(setActiveTool('topstitchSeamline' as any)); dispatch(setActiveTool2D('topstitchSeamline')); }],
 
+      ['tool.pomMeasure', () => { dispatch(setActiveTool('pomMeasure' as any)); dispatch(setActiveTool2D('pomMeasure')); }],
+
       // Sewing
       ['tool.seam', () => { dispatch(setActiveTool('seam' as any)); dispatch(setActiveTool2D('seam')); }],
       ['tool.freeSewing', () => { dispatch(setActiveTool('freesewing' as any)); dispatch(setActiveTool2D('freesewing')); }],

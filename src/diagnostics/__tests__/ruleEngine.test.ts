@@ -68,6 +68,19 @@ function makeData(overrides: Partial<InspectionData> = {}): InspectionData {
       collisionDistance: 5,
       particleCount: 100,
     },
+    poms: [
+      {
+        id: 'pom1',
+        name: 'Chest Width',
+        category: 'width',
+        method: 'straight',
+        pointA: { pieceId: 'p1', localPosition: { x: 0, y: 0 } },
+        pointB: { pieceId: 'p2', localPosition: { x: 100, y: 0 } },
+        value: 100,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ],
     ...overrides,
   };
 }

@@ -149,5 +149,6 @@ export function collectInspectionData(
     piecesOnSameLayer: pieces
       .filter(p => p.id !== piece.id && (p.layer ?? 1) === (piece.layer ?? 1))
       .map(p => ({ id: p.id, name: p.name, bodyRegion: p.bodyRegion })),
+    poms: state.project.poms,
   };
 }
