@@ -381,6 +381,7 @@ export interface EditorState {
   activeTool: Tool2D;
   selectedPieceIds: string[];
   selectedSeamId: string | null;
+  selectedPOMId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;

@@ -69,10 +69,7 @@ export function computeAlongEdgeDistance(
   const edge = piece.edges?.find((e) => e.name === edgeName);
   if (!edge) return null;
 
-  // Use cached length when available
-  if (edge.length != null) return edge.length;
-
-  // Fall back to arc-length computation over the edge's segment range
+  // Always compute from geometry for correctness (edge.length may be stale after edits)
   const [start, end] = edge.segmentRange;
   return computePathArcLength(piece.outline, start, end);
 }

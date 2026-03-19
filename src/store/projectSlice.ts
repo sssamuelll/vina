@@ -93,7 +93,7 @@ const projectSlice = createSlice({
       state.fabrics = p.fabrics;
       state.avatar = p.avatar;
       state.groups = p.groups ?? [];
-      state.poms = (p as any).poms ?? [];
+      state.poms = p.poms ?? [];
       state.isDirty = false;
       // Backfill layer/sublayer for pieces loaded from older project files
       for (const piece of state.pieces) {
