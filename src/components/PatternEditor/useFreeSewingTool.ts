@@ -57,6 +57,11 @@ export function useFreeSewingTool(
         pieceA: { pieceId: state.firstEdge.pieceId, edgeName: edgeAName },
         pieceB: { pieceId: edge.pieceId, edgeName: edgeBName },
         type: 'standard',
+        tension: 100,
+        strength: 1.0,
+        active: true,
+        taped: false,
+        tapeWidth: 10,
       });
       setState({ firstEdge: null, hoveredEdge: null });
     }

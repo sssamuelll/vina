@@ -88,6 +88,7 @@ export default function PatternExplorerView() {
       seamAllowance: 10,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };

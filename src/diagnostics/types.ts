@@ -36,6 +36,14 @@ export interface InspectionSeamData {
   partnerPieceName: string;
   edgeName: string;
   type: string;
+  /** Seam tension (0-200, default 100). Values < 50 = gathering, > 150 = easing. */
+  tension?: number;
+  /** Seam bond strength (0-1, default 1.0). */
+  strength?: number;
+  /** Whether the seam participates in simulation. */
+  active?: boolean;
+  /** Whether seam tape is applied. */
+  taped?: boolean;
 }
 
 export interface InspectionInternalData {
@@ -76,6 +84,8 @@ export interface InspectionData {
   piecesOnSameLayer?: { id: string; name: string; bodyRegion?: string }[];
   /** Points of measure referencing any piece */
   poms?: PointOfMeasure[];
+  /** Whether the inspected piece is active (participates in simulation). */
+  pieceActive?: boolean;
 }
 
 // ─── Diagnostics ─────────────────────────────────────────────────────────────

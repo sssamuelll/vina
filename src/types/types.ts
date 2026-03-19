@@ -64,6 +64,8 @@ export interface PatternPiece {
   bodyRegion?: string;
   /** When true, piece cannot be moved/edited interactively */
   locked?: boolean;
+  /** Whether this piece participates in simulation. Default true. */
+  active: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -168,11 +170,34 @@ export interface SemanticEdge {
 export interface Seam {
   id: string;
   /** First piece + semantic edge name */
-  pieceA: { pieceId: string; edgeName: string };
+  pieceA: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number };
   /** Second piece + semantic edge name */
-  pieceB: { pieceId: string; edgeName: string };
+  pieceB: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number };
   /** Seam type affects 3D simulation */
   type: 'standard' | 'french' | 'flat-felled' | 'overlock';
+  /** Tension applied to seam (0-200, default 100) */
+  tension: number;
+  /** Strength of the seam bond (0-1, default 1.0) */
+  strength: number;
+  /** Whether this seam participates in simulation. Default true. */
+  active: boolean;
+  /** Whether seam tape is applied */
+  taped: boolean;
+  /** Width of tape in mm (default 10) */
+  tapeWidth: number;
+}
+
+/** A seam group connects multiple edge segments between two sets of edges */
+export interface SeamGroup {
+  id: string;
+  edgesA: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number }[];
+  edgesB: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number }[];
+  type: Seam['type'];
+  tension: number;
+  strength: number;
+  active: boolean;
+  taped: boolean;
+  tapeWidth: number;
 }
 
 // ─── Points of Measure (POM) ────────────────────────────────────────────────
@@ -313,6 +338,8 @@ export interface OpenCloProject {
   groups?: PieceGroup[];
   /** Points of measure (optional for backward compat) */
   poms?: PointOfMeasure[];
+  /** Named seam groups (optional for backward compat) */
+  seamGroups?: SeamGroup[];
   createdAt: number;
   updatedAt: number;
 }

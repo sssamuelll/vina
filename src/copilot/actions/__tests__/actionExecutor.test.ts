@@ -66,6 +66,7 @@ function createMockState(overrides: Partial<RootState['project']> = {}): () => R
           pieceA: { pieceId: 'piece-1', edgeName: 'sideSeam' },
           pieceB: { pieceId: 'piece-2', edgeName: 'sideSeam' },
           type: 'standard',
+          tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
         },
       ],
       fabrics: [],

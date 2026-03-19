@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
 import { NEW_PROJECT } from './actions';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
@@ -56,6 +56,8 @@ interface ProjectState {
   isDirty: boolean;
   /** Named piece groups for batch operations */
   groups: PieceGroup[];
+  /** M:N seam groups connecting multiple edges */
+  seamGroups: SeamGroup[];
   /** Per-piece 3D arrangement position overrides (piece ID → [x,y,z]) */
   arrangementOverrides: Record<string, [number, number, number]>;
   /** Points of measure */
@@ -73,6 +75,7 @@ const initialState: ProjectState = {
   avatarModelUrl: '/default-avatar.glb',
   isDirty: false,
   groups: [],
+  seamGroups: [],
   arrangementOverrides: {},
   poms: [],
 };
@@ -94,6 +97,7 @@ const projectSlice = createSlice({
       state.avatar = p.avatar;
       state.groups = p.groups ?? [];
       state.poms = p.poms ?? [];
+      state.seamGroups = (p as any).seamGroups ?? [];
       state.isDirty = false;
       // Backfill layer/sublayer for pieces loaded from older project files
       for (const piece of state.pieces) {
@@ -103,6 +107,17 @@ const projectSlice = createSlice({
         if ((piece as any).sublayer === undefined) {
           piece.sublayer = 0;
         }
+        if ((piece as any).active === undefined) {
+          piece.active = true;
+        }
+      }
+      // Backfill sewing enhancement fields for seams from older projects
+      for (const seam of state.seams) {
+        if ((seam as any).tension === undefined) seam.tension = 100;
+        if ((seam as any).strength === undefined) seam.strength = 1.0;
+        if ((seam as any).active === undefined) seam.active = true;
+        if ((seam as any).taped === undefined) seam.taped = false;
+        if ((seam as any).tapeWidth === undefined) seam.tapeWidth = 10;
       }
     },
     setProjectName(state, action: PayloadAction<string>) {
@@ -331,12 +346,43 @@ const projectSlice = createSlice({
 
     // ─── Seams ───
     addSeam(state, action: PayloadAction<Seam>) {
-      state.seams.push(action.payload);
+      const s = action.payload;
+      const seam: Seam = {
+        ...s,
+        tension: s.tension ?? 100,
+        strength: s.strength ?? 1.0,
+        active: s.active ?? true,
+        taped: s.taped ?? false,
+        tapeWidth: s.tapeWidth ?? 10,
+      };
+      state.seams.push(seam);
       state.isDirty = true;
     },
     removeSeam(state, action: PayloadAction<string>) {
       state.seams = state.seams.filter(s => s.id !== action.payload);
       state.isDirty = true;
+    },
+    updateSeam(state, action: PayloadAction<Seam>) {
+      const idx = state.seams.findIndex(s => s.id === action.payload.id);
+      if (idx !== -1) { state.seams[idx] = action.payload; state.isDirty = true; }
+    },
+    setSeamTension(state, action: PayloadAction<{ seamId: string; tension: number; strength?: number }>) {
+      const seam = state.seams.find(s => s.id === action.payload.seamId);
+      if (seam) {
+        seam.tension = Math.max(10, Math.min(200, action.payload.tension));
+        if (action.payload.strength !== undefined) {
+          seam.strength = Math.max(0.01, Math.min(1.0, action.payload.strength));
+        }
+        state.isDirty = true;
+      }
+    },
+    deactivateSeam(state, action: PayloadAction<{ seamId: string; active: boolean }>) {
+      const seam = state.seams.find(s => s.id === action.payload.seamId);
+      if (seam) { seam.active = action.payload.active; state.isDirty = true; }
+    },
+    deactivatePiece(state, action: PayloadAction<{ pieceId: string; active: boolean }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) { piece.active = action.payload.active; state.isDirty = true; }
     },
     /** Reverse sewing direction — swap pieceA and pieceB */
     reverseSeam(state, action: PayloadAction<string>) {
@@ -370,6 +416,16 @@ const projectSlice = createSlice({
         const pom = state.poms.find(p => p.id === id);
         if (pom) pom.value = value;
       }
+    },
+
+    // ─── Seam Groups (M:N sewing) ───
+    addSeamGroup(state, action: PayloadAction<SeamGroup>) {
+      state.seamGroups.push(action.payload);
+      state.isDirty = true;
+    },
+    removeSeamGroup(state, action: PayloadAction<string>) {
+      state.seamGroups = state.seamGroups.filter(g => g.id !== action.payload);
+      state.isDirty = true;
     },
 
     // ─── Linked Editing ───
@@ -677,7 +733,8 @@ export const {
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,
-  addSeam, removeSeam, reverseSeam,
+  addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
+  addSeamGroup, removeSeamGroup,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,

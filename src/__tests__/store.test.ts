@@ -21,7 +21,7 @@ function makePiece(id: string): PatternPiece {
   return {
     id, name: 'Test', outline: [{ type: 'M', values: [0, 0] }, { type: 'Z', values: [] }],
     internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10,
-    layer: 1, sublayer: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 
@@ -54,6 +54,7 @@ describe('projectSlice', () => {
     store.dispatch(addSeam({
       id: 's1', pieceA: { pieceId: 'p1', edgeName: 'sideSeam' },
       pieceB: { pieceId: 'p2', edgeName: 'sideSeam' }, type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
     }));
     store.dispatch(removePiece('p1'));
     expect(store.getState().project.pieces).toHaveLength(1);

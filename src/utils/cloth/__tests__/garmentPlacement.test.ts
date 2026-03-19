@@ -23,7 +23,7 @@ function makePiece(name: string, category?: string, side?: string): PatternPiece
     internals: [],
     position: { x: 0, y: 0 },
     rotation: 0, mirrored: false, seamAllowance: 0,
-    layer: 1, sublayer: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 

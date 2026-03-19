@@ -90,6 +90,11 @@ export async function importZprj(file: File | ArrayBuffer): Promise<ZprjImportRe
               pieceA: { pieceId: pieceA.id, edgeName: edgeName1 },
               pieceB: { pieceId: pieceB.id, edgeName: edgeName2 },
               type: (s.type === 'french' || s.type === 'flat-felled' || s.type === 'overlock') ? s.type : 'standard',
+              tension: 100,
+              strength: 1.0,
+              active: true,
+              taped: false,
+              tapeWidth: 10,
             });
           }
         }

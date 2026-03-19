@@ -46,7 +46,7 @@ describe('Grading System', () => {
         { type: 'Z', values: [] },
       ],
       internals: [], position: { x: 0, y: 0 }, rotation: 0,
-      mirrored: false, seamAllowance: 0, layer: 1, sublayer: 0, createdAt: Date.now(), updatedAt: Date.now(),
+      mirrored: false, seamAllowance: 0, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
     };
     const graded = gradePiece(piece, { chest: 88 }, { chest: 96 });
     const ratio = 96 / 88;

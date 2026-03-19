@@ -35,6 +35,7 @@ function createMockState(overrides: Partial<any> = {}): RootState {
           position: { x: 0, y: 0 },
           rotation: 0,
           mirrored: false,
+          active: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         },
@@ -54,6 +55,7 @@ function createMockState(overrides: Partial<any> = {}): RootState {
           position: { x: 250, y: 0 },
           rotation: 0,
           mirrored: false,
+          active: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         },
@@ -64,6 +66,7 @@ function createMockState(overrides: Partial<any> = {}): RootState {
           pieceA: { pieceId: 'piece-1', edgeName: 'sideSeam' },
           pieceB: { pieceId: 'piece-2', edgeName: 'sideSeam' },
           type: 'standard',
+          tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
         },
       ],
       fabrics: [

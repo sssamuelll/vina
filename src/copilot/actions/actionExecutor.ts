@@ -286,6 +286,7 @@ export class CopilotActionExecutor {
           mirrored: false,
           layer: 1,
           sublayer: 0,
+          active: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
@@ -675,6 +676,11 @@ export class CopilotActionExecutor {
           pieceA: { pieceId: action.pieceA, edgeName: action.edgeAName },
           pieceB: { pieceId: action.pieceB, edgeName: action.edgeBName },
           type: action.type || 'standard',
+          tension: 100,
+          strength: 1.0,
+          active: true,
+          taped: false,
+          tapeWidth: 10,
         };
 
         this.dispatch(addSeam(seam));

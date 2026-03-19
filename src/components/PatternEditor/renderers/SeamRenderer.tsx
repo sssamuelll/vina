@@ -79,29 +79,34 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const hasMismatch = mismatch > 0.05; // >5% difference
 
         const isSelected = selectedSeamId === seam.id;
-        const baseColor = hasMismatch ? '#ff9944' : isSelected ? '#ff6b6b' : '#e74c3c';
+        const isInactive = seam.active === false;
+        const baseColor = isInactive ? '#666' : hasMismatch ? '#ff9944' : isSelected ? '#ff6b6b' : '#e74c3c';
+        const edgeDash = isInactive ? `${4 / zoom2D} ${3 / zoom2D}` : undefined;
+        const edgeWidth = (seam.taped ? 4 : 2.5) / zoom2D;
 
         // Direction arrows
         const arrowA = directionArrow(epA.start, epA.end, offA, zoom2D);
         const arrowB = directionArrow(epB.start, epB.end, offB, zoom2D);
 
         return (
-          <g key={seam.id} className="seam-connection">
+          <g key={seam.id} className="seam-connection" opacity={isInactive ? 0.5 : 1}>
             {/* Edge A highlight */}
             <line
               x1={epA.start.x + offA.x} y1={epA.start.y + offA.y}
               x2={epA.end.x + offA.x} y2={epA.end.y + offA.y}
               stroke={baseColor}
-              strokeWidth={2.5 / zoom2D}
+              strokeWidth={edgeWidth}
               strokeLinecap="round"
+              strokeDasharray={edgeDash}
             />
             {/* Edge B highlight */}
             <line
               x1={epB.start.x + offB.x} y1={epB.start.y + offB.y}
               x2={epB.end.x + offB.x} y2={epB.end.y + offB.y}
               stroke={baseColor}
-              strokeWidth={2.5 / zoom2D}
+              strokeWidth={edgeWidth}
               strokeLinecap="round"
+              strokeDasharray={edgeDash}
             />
             {/* Connection line (dotted) */}
             <line
@@ -132,6 +137,21 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 fontWeight={600}
               >
                 ⚠ {Math.round(mismatch * 100)}% mismatch
+              </text>
+            )}
+
+            {/* Tension label */}
+            {seam.tension !== 100 && !isInactive && (
+              <text
+                x={(midA.x + midB.x) / 2}
+                y={(midA.y + midB.y) / 2 + (hasMismatch ? 14 : -8) / zoom2D}
+                fontSize={8 / zoom2D}
+                fill={seam.tension < 100 ? '#e67e22' : '#3498db'}
+                textAnchor="middle"
+                fontFamily="Inter, sans-serif"
+                fontWeight={600}
+              >
+                {seam.tension}%{seam.tension < 100 ? ' gather' : ' ease'}
               </text>
             )}
 

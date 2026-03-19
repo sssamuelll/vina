@@ -82,6 +82,7 @@ const createPieceTool: ToolDefinition = {
           seamAllowance: (params.seamAllowance as number) ?? 10,
           layer: 1,
           sublayer: 0,
+          active: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
