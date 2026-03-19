@@ -228,6 +228,7 @@ export function solveTriangleCollision(
   collisionMargin: number,
   friction: number = 0,
   prevPos?: Float32Array,
+  marginPerVertex?: Float32Array,
 ): void {
   for (let p = 0; p < numParticles; p++) {
     if (invMass[p] === 0) continue;
@@ -262,10 +263,11 @@ export function solveTriangleCollision(
       }
     }
 
-    if (bestSide < 0 || minDist < collisionMargin) {
+    const margin = marginPerVertex ? marginPerVertex[p] : collisionMargin;
+    if (bestSide < 0 || minDist < margin) {
       let pushDist = bestSide < 0
-        ? collisionMargin + minDist
-        : collisionMargin - minDist;
+        ? margin + minDist
+        : margin - minDist;
 
       // Clamp to prevent extreme displacements that cause NaN cascade
       if (pushDist > MAX_PUSH_DIST) pushDist = MAX_PUSH_DIST;

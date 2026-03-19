@@ -65,6 +65,14 @@ export interface InspectionData {
   internals: InspectionInternalData[];
   constructionPoint?: InspectionConstructionPointData;
   simulation?: InspectionSimulationData;
+  /** Piece layer */
+  layer?: number;
+  /** Piece sublayer */
+  sublayer?: number;
+  /** Cached body region */
+  bodyRegion?: string;
+  /** Other pieces on the same layer (for overlap detection) */
+  piecesOnSameLayer?: { id: string; name: string; bodyRegion?: string }[];
 }
 
 // ─── Diagnostics ─────────────────────────────────────────────────────────────

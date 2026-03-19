@@ -131,6 +131,8 @@ export function collectInspectionData(
     particleCount: state.simulation.particleCount,
   };
 
+  const pieces = state.project.pieces;
+
   return {
     target,
     timestamp: Date.now(),
@@ -141,5 +143,11 @@ export function collectInspectionData(
     internals,
     constructionPoint,
     simulation,
+    layer: piece.layer,
+    sublayer: piece.sublayer,
+    bodyRegion: piece.bodyRegion,
+    piecesOnSameLayer: pieces
+      .filter(p => p.id !== piece.id && (p.layer ?? 1) === (piece.layer ?? 1))
+      .map(p => ({ id: p.id, name: p.name, bodyRegion: p.bodyRegion })),
   };
 }
