@@ -398,6 +398,51 @@ const projectSlice = createSlice({
       }
     },
 
+    cloneToLayer(state, action: PayloadAction<{ pieceId: string; direction: 'over' | 'under' }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const clone: PatternPiece = {
+        ...JSON.parse(JSON.stringify(piece)),
+        id: `${piece.id}-clone-${Date.now()}`,
+        name: `${piece.name} (clone)`,
+        layer: action.payload.direction === 'over'
+          ? (piece.layer ?? 1) + 1
+          : Math.max(0, (piece.layer ?? 1) - 1),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      state.pieces.push(clone);
+      const arrangement = state.arrangementOverrides[piece.id];
+      if (arrangement) {
+        state.arrangementOverrides[clone.id] = [...arrangement] as [number, number, number];
+      }
+    },
+
+    superimposePiece(state, action: PayloadAction<{
+      pieceId: string;
+      targetPieceId: string;
+      mode: 'over' | 'under' | 'side';
+    }>) {
+      const { pieceId, targetPieceId, mode } = action.payload;
+      const piece = state.pieces.find(p => p.id === pieceId);
+      const target = state.pieces.find(p => p.id === targetPieceId);
+      if (!piece || !target) return;
+      const targetPos = state.arrangementOverrides[targetPieceId];
+      if (targetPos) {
+        if (mode === 'side') {
+          state.arrangementOverrides[pieceId] = [targetPos[0] + 0.1, targetPos[1], targetPos[2]];
+        } else {
+          state.arrangementOverrides[pieceId] = [...targetPos] as [number, number, number];
+        }
+      }
+      if (mode === 'over') {
+        piece.layer = (target.layer ?? 1) + 1;
+      } else if (mode === 'under') {
+        piece.layer = Math.max(0, (target.layer ?? 1) - 1);
+      }
+      piece.updatedAt = Date.now();
+    },
+
     // ─── Z-Order ───
     bringToFront(state, action: PayloadAction<string>) {
       const piece = state.pieces.find(p => p.id === action.payload);
@@ -599,7 +644,7 @@ export const {
   addSeam, removeSeam, reverseSeam,
   linkPieces, unlinkPieces, cloneAsLinked,
   // Layers
-  setLayer, setSublayer,
+  setLayer, setSublayer, cloneToLayer, superimposePiece,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece,
   // Groups
