@@ -21,6 +21,7 @@ describe('PatternPiece linked editing fields', () => {
       seamAllowance: 10,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       linkedPieceId: 'p2',
@@ -42,6 +43,7 @@ describe('PatternPiece linked editing fields', () => {
       seamAllowance: 10,
       layer: 1,
       sublayer: 0,
+      active: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -67,6 +69,7 @@ function makePiece(id: string, name: string): PatternPiece {
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

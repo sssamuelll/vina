@@ -215,6 +215,7 @@ describe('buildSeamConstraints', () => {
       pieceA: { pieceId: 'a', edgeName: 'rightEdge' },
       pieceB: { pieceId: 'b', edgeName: 'leftEdge' },
       type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
     };
 
     const merged = mergeMeshes([
@@ -246,6 +247,7 @@ describe('buildSeamConstraints', () => {
       pieceA: { pieceId: 'missing', edgeName: 'edge1' },
       pieceB: { pieceId: 'b', edgeName: 'edge2' },
       type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
     };
     const merged = mergeMeshes([]);
     const result = buildSeamConstraints([seam], new Map(), merged);

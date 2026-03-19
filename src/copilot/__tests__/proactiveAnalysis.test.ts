@@ -25,6 +25,7 @@ function makePiece(overrides: Partial<PatternPiece> & { id: string; name: string
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     ...overrides,
@@ -136,6 +137,7 @@ describe('auditNotches', () => {
       pieceA: { pieceId: '1', edgeName: 'sideSeam' },
       pieceB: { pieceId: '2', edgeName: 'sideSeam' },
       type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
     }];
     const warnings = auditNotches(pieces, seams);
     expect(warnings.length).toBe(1);
@@ -155,6 +157,7 @@ describe('auditNotches', () => {
       pieceA: { pieceId: '1', edgeName: 'sideSeam' },
       pieceB: { pieceId: '2', edgeName: 'sideSeam' },
       type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
     }];
     const warnings = auditNotches(pieces, seams);
     expect(warnings.length).toBe(1);

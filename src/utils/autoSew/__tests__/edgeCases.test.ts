@@ -21,6 +21,7 @@ function makePiece(id: string, name: string, outline: PathCommand[]): PatternPie
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

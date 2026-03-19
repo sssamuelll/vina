@@ -20,6 +20,7 @@ describe('snapToOutline', () => {
     seamAllowance: 0,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: 0,
     updatedAt: 0,
   };
@@ -89,6 +90,7 @@ const pieceWithEdges: PatternPiece = {
   seamAllowance: 0,
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 };

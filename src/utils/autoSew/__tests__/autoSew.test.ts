@@ -31,6 +31,7 @@ function makeRect(id: string, name: string, x: number, y: number, w: number, h: 
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -56,6 +57,7 @@ function makePieceWithCurve(id: string, name: string, w: number, h: number, curv
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

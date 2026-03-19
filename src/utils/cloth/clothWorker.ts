@@ -169,6 +169,11 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
             pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName },
             pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName },
             type: s.type,
+            tension: 100,
+            strength: 1.0,
+            active: true,
+            taped: false,
+            tapeWidth: 10,
           }));
           const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
           for (const [id, cmds] of outlines) {
@@ -190,6 +195,11 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
             pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName },
             pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName },
             type: s.type,
+            tension: 100,
+            strength: 1.0,
+            active: true,
+            taped: false,
+            tapeWidth: 10,
           }));
           const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
           for (const [id, cmds] of cachedOutlines) {

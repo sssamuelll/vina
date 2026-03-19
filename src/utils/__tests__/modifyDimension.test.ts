@@ -29,6 +29,7 @@ function makeSkirt(): PatternPiece {
     seamAllowance: 0,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

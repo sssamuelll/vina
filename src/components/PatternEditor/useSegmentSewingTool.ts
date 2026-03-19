@@ -326,6 +326,11 @@ export function useSegmentSewingTool(
             edgeName: edgeBName,
           },
           type: seamType as Seam['type'],
+          tension: 100,
+          strength: 1.0,
+          active: true,
+          taped: false,
+          tapeWidth: 10,
         };
         const fullSeam: Seam = { ...seam, id: `seam-${Date.now()}` };
         dispatch(addSeam(fullSeam));

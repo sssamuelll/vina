@@ -26,6 +26,7 @@ const makePiece = (id: string, outline: PathCommand[], pos = { x: 0, y: 0 }): Pa
   seamAllowance: 10,
   layer: 1,
   sublayer: 0,
+  active: true,
   createdAt: 0,
   updatedAt: 0,
 });

@@ -17,7 +17,7 @@ function makePiece(grainlinePath?: { type: string; values: number[] }[]): Patter
       path: grainlinePath as PatternPiece['internals'][0]['path'],
     }] : [],
     position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
-    seamAllowance: 10, layer: 1, sublayer: 0, createdAt: Date.now(), updatedAt: Date.now(),
+    seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 

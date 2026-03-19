@@ -184,6 +184,7 @@ describe('Intent Predictor - Sandbox Simulation', () => {
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -310,6 +311,7 @@ describe('Intent Predictor - Full Prediction', () => {
     seamAllowance: 10,
     layer: 1,
     sublayer: 0,
+    active: true,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
