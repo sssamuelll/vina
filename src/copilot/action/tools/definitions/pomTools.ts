@@ -14,6 +14,14 @@ import { addPOM, updatePOM, removePOM } from '../../../../store/projectSlice';
 import { computePOMValue, recomputeAllPOMs } from '../../../../utils/pom/pomCompute';
 import { uid } from '../../../../utils/pathHelpers';
 
+/** Validate that a param is a finite number. Returns error string or null. */
+function requireFiniteNumber(value: unknown, name: string): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return `${name} must be a valid number`;
+  }
+  return null;
+}
+
 // ─── createPOM ──────────────────────────────────────────────────────────────
 
 const createPOMTool: ToolDefinition = {
@@ -68,6 +76,31 @@ const createPOMTool: ToolDefinition = {
   ): Promise<ToolResult> => {
     const state = getState();
     const pieces = state.project.pieces;
+
+    // Validate name
+    const name = (params.name as string)?.trim();
+    if (!name) return { success: false, error: 'POM name must not be empty' };
+
+    // Validate numeric params
+    if (params.tolerance !== undefined) {
+      const err = requireFiniteNumber(params.tolerance, 'tolerance');
+      if (err) return { success: false, error: err };
+      if ((params.tolerance as number) < 0) return { success: false, error: 'tolerance must be non-negative' };
+    }
+    if (params.positionA) {
+      const pos = params.positionA as Point2D;
+      const xErr = requireFiniteNumber(pos.x, 'positionA.x');
+      if (xErr) return { success: false, error: xErr };
+      const yErr = requireFiniteNumber(pos.y, 'positionA.y');
+      if (yErr) return { success: false, error: yErr };
+    }
+    if (params.positionB) {
+      const pos = params.positionB as Point2D;
+      const xErr = requireFiniteNumber(pos.x, 'positionB.x');
+      if (xErr) return { success: false, error: xErr };
+      const yErr = requireFiniteNumber(pos.y, 'positionB.y');
+      if (yErr) return { success: false, error: yErr };
+    }
 
     // Validate piece A
     const pieceA = pieces.find(p => p.id === params.pieceAId);
@@ -154,7 +187,7 @@ const createPOMTool: ToolDefinition = {
     const pomId = uid();
     const pom: PointOfMeasure = {
       id: pomId,
-      name: params.name as string,
+      name,
       category,
       method,
       pointA,
@@ -291,12 +324,22 @@ const updatePOMTool: ToolDefinition = {
     const pom = (state.project.poms ?? []).find(p => p.id === params.pomId);
     if (!pom) return { success: false, error: `POM "${params.pomId}" not found` };
 
+    if (params.name !== undefined) {
+      const trimmed = (params.name as string).trim();
+      if (!trimmed) return { success: false, error: 'POM name must not be empty' };
+    }
+    if (params.tolerance !== undefined) {
+      const err = requireFiniteNumber(params.tolerance, 'tolerance');
+      if (err) return { success: false, error: err };
+      if ((params.tolerance as number) < 0) return { success: false, error: 'tolerance must be non-negative' };
+    }
+
     // Save previous state for rollback
-    const previousPOM = { ...pom };
+    const previousPOM: PointOfMeasure = JSON.parse(JSON.stringify(pom));
 
     const updated: PointOfMeasure = {
       ...pom,
-      name: (params.name as string) ?? pom.name,
+      name: params.name !== undefined ? (params.name as string).trim() : pom.name,
       category: (params.category as POMCategory) ?? pom.category,
       tolerance: params.tolerance !== undefined ? (params.tolerance as number) : pom.tolerance,
       updatedAt: Date.now(),
@@ -343,7 +386,7 @@ const removePOMTool: ToolDefinition = {
     if (!pom) return { success: false, error: `POM "${params.pomId}" not found` };
 
     // Save copy for rollback
-    const savedPOM = { ...pom };
+    const savedPOM: PointOfMeasure = JSON.parse(JSON.stringify(pom));
 
     dispatch(removePOM(pom.id));
 
