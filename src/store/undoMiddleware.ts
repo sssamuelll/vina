@@ -119,6 +119,9 @@ const ACTION_LABELS: Record<string, string> = {
   'project/setSeamAllowance': 'Set Seam Allowance',
   'project/updateGrainLine': 'Set Grain Line',
   'project/applyGrading': 'Apply Grading',
+  'project/addPOM': 'Add Measurement',
+  'project/updatePOM': 'Update Measurement',
+  'project/removePOM': 'Remove Measurement',
 };
 
 function getActionLabel(actionType: string): string {
