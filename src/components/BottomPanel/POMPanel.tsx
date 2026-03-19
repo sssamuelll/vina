@@ -168,12 +168,18 @@ export default function POMPanel() {
   const poms = useSelector((s: RootState) => s.project.poms);
   const selectedPOMId = useSelector((s: RootState) => s.editor.selectedPOMId);
 
-  // Recompute POM values when pieces change
+  // Recompute POM values when pieces change (use ref to avoid loop)
+  const pomsRef = useRef(poms);
+  pomsRef.current = poms;
   useEffect(() => {
-    if (poms.length === 0) return;
-    const updates = recomputeAllPOMs(poms, pieces);
-    if (updates.length > 0) dispatch(recomputePOMValues(updates));
-  }, [pieces, poms, dispatch]);
+    if (pomsRef.current.length === 0) return;
+    const updates = recomputeAllPOMs(pomsRef.current, pieces);
+    const changed = updates.filter(u => {
+      const existing = pomsRef.current.find(p => p.id === u.id);
+      return existing && Math.abs(existing.value - u.value) > 0.001;
+    });
+    if (changed.length > 0) dispatch(recomputePOMValues(changed));
+  }, [pieces, dispatch]);
 
   // Sort state
   const [sortField, setSortField] = useState<SortField>('name');
