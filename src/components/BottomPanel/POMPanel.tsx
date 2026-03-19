@@ -28,6 +28,14 @@ type SortDir = 'asc' | 'desc';
 
 // ─── CSV Export ─────────────────────────────────────────────────────────────
 
+/** Escape a string for CSV: quote if it contains special chars or formula prefixes. */
+function csvEscape(val: string): string {
+  if (/[,"\n\r]/.test(val) || /^[=+\-@]/.test(val)) {
+    return `"${val.replace(/"/g, '""')}"`;
+  }
+  return val;
+}
+
 function exportCSV(poms: PointOfMeasure[], pieces: PatternPiece[]) {
   const fresh = recomputeAllPOMs(poms, pieces);
   const valueMap = new Map(fresh.map(u => [u.id, u.value]));
@@ -35,7 +43,7 @@ function exportCSV(poms: PointOfMeasure[], pieces: PatternPiece[]) {
     const pieceA = pieces.find(pc => pc.id === p.pointA.pieceId)?.name ?? '?';
     const pieceB = pieces.find(pc => pc.id === p.pointB.pieceId)?.name ?? '?';
     const val = valueMap.get(p.id) ?? p.value;
-    return `${p.name},${p.category},${p.method},${pieceA},${pieceB},${val.toFixed(1)},${p.tolerance ?? ''}`;
+    return `${csvEscape(p.name)},${csvEscape(p.category)},${p.method},${csvEscape(pieceA)},${csvEscape(pieceB)},${val.toFixed(1)},${p.tolerance ?? ''}`;
   });
   const csv = `Name,Category,Method,Piece A,Piece B,Value (mm),Tolerance (mm)\n${rows.join('\n')}`;
   const blob = new Blob([csv], { type: 'text/csv' });
