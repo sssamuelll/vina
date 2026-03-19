@@ -33,6 +33,7 @@ import {
   createGroup,
   addPiecesToGroup,
   removePiecesFromGroup,
+  deactivatePiece,
 } from '../../store/projectSlice';
 import { selectPiece, clearSelection, copyPieces, createPastedPieces } from '../../store/editorSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
@@ -280,6 +281,13 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       label: piece?.locked ? 'Unlock' : 'Lock',
       icon: piece?.locked ? '🔓' : '🔒',
       action: () => act(() => dispatch(piece?.locked ? unlockPiece(pid) : lockPiece(pid))),
+    });
+
+    // Activate / Deactivate
+    items.push({
+      label: piece?.active === false ? 'Activate Piece' : 'Deactivate Piece',
+      icon: piece?.active === false ? '▶' : '⏸',
+      action: () => act(() => dispatch(deactivatePiece({ pieceId: pid, active: piece?.active === false }))),
     });
 
     // Rename
