@@ -21,6 +21,18 @@ export interface SeamInitData {
   pieceBId: string;
   pieceBEdgeName: string;
   type: 'standard' | 'french' | 'flat-felled' | 'overlock';
+  /** t-parameter range on piece A side (partial-edge sewing) */
+  pieceARange?: [number, number];
+  /** t-parameter range on piece B side (partial-edge sewing) */
+  pieceBRange?: [number, number];
+  /** Tension applied to seam (0-200, default 100) */
+  tension: number;
+  /** Strength of the seam bond (0-1, default 1.0) */
+  strength: number;
+  /** Whether this seam participates in simulation */
+  active: boolean;
+  /** Whether seam tape is applied */
+  taped: boolean;
 }
 
 /** Messages sent from main thread → worker */
@@ -162,17 +174,19 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
         solver = new XPBDClothSolver(mergedMeshData, msg.config);
 
         // Build and set seam constraints
-        if (msg.seams.length > 0) {
+        // Filter to only active seams
+        const activeSeams = msg.seams.filter(s => s.active !== false);
+        if (activeSeams.length > 0) {
           progress('Building seam constraints...');
-          const seams: import('../../types/types').Seam[] = msg.seams.map(s => ({
+          const seams: import('../../types/types').Seam[] = activeSeams.map(s => ({
             id: s.id,
-            pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName },
-            pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName },
+            pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName, tStart: s.pieceARange?.[0], tEnd: s.pieceARange?.[1] },
+            pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName, tStart: s.pieceBRange?.[0], tEnd: s.pieceBRange?.[1] },
             type: s.type,
-            tension: 100,
-            strength: 1.0,
+            tension: s.tension ?? 100,
+            strength: s.strength ?? 1.0,
             active: true,
-            taped: false,
+            taped: s.taped ?? false,
             tapeWidth: 10,
           }));
           const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
@@ -190,15 +204,17 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
 
       case 'setSeams': {
         if (solver && cachedMergedMesh && cachedOutlines) {
-          const seams: import('../../types/types').Seam[] = msg.seams.map(s => ({
+          // Filter to only active seams
+          const activeSeams = msg.seams.filter(s => s.active !== false);
+          const seams: import('../../types/types').Seam[] = activeSeams.map(s => ({
             id: s.id,
-            pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName },
-            pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName },
+            pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName, tStart: s.pieceARange?.[0], tEnd: s.pieceARange?.[1] },
+            pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName, tStart: s.pieceBRange?.[0], tEnd: s.pieceBRange?.[1] },
             type: s.type,
-            tension: 100,
-            strength: 1.0,
+            tension: s.tension ?? 100,
+            strength: s.strength ?? 1.0,
             active: true,
-            taped: false,
+            taped: s.taped ?? false,
             tapeWidth: 10,
           }));
           const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
