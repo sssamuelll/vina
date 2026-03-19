@@ -14,6 +14,9 @@ function autoDetectLayer(category?: string): number {
   return CATEGORY_DEFAULT_LAYER[category ?? 'other'] ?? 1;
 }
 
+/** Lateral offset in metres when superimposing a piece in 'side' mode. */
+const SUPERIMPOSE_SIDE_OFFSET_M = 0.1;
+
 const defaultAvatar: Avatar = {
   id: 'default',
   name: 'Default Avatar',
@@ -431,7 +434,7 @@ const projectSlice = createSlice({
       const targetPos = state.arrangementOverrides[targetPieceId];
       if (targetPos) {
         if (mode === 'side') {
-          state.arrangementOverrides[pieceId] = [targetPos[0] + 0.1, targetPos[1], targetPos[2]];
+          state.arrangementOverrides[pieceId] = [targetPos[0] + SUPERIMPOSE_SIDE_OFFSET_M, targetPos[1], targetPos[2]];
         } else {
           state.arrangementOverrides[pieceId] = [...targetPos] as [number, number, number];
         }
