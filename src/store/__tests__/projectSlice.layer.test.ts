@@ -178,4 +178,69 @@ describe('superimposePiece reducer', () => {
     const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'over' }));
     expect(next.isDirty).toBe(true);
   });
+
+  it('copies target position and sets layer above for mode=over', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 1 }), basePiece({ id: 'p2', layer: 2 })],
+      arrangementOverrides: { p2: [1, 2, 3] as [number, number, number] },
+    };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'over' }));
+    expect(next.pieces[0].layer).toBe(3);
+    expect(next.arrangementOverrides.p1).toEqual([1, 2, 3]);
+  });
+
+  it('copies target position and sets layer below for mode=under', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 3 }), basePiece({ id: 'p2', layer: 2 })],
+      arrangementOverrides: { p2: [1, 2, 3] as [number, number, number] },
+    };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'under' }));
+    expect(next.pieces[0].layer).toBe(1);
+    expect(next.arrangementOverrides.p1).toEqual([1, 2, 3]);
+  });
+
+  it('applies side offset for mode=side without changing layer', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 1 }), basePiece({ id: 'p2', layer: 2 })],
+      arrangementOverrides: { p2: [1, 2, 3] as [number, number, number] },
+    };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'side' }));
+    expect(next.pieces[0].layer).toBe(1); // unchanged
+    expect(next.arrangementOverrides.p1).toEqual([1.1, 2, 3]);
+  });
+
+  it('clamps layer to 0 when superimposing under target at layer 0', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 2 }), basePiece({ id: 'p2', layer: 0 })],
+      arrangementOverrides: { p2: [0, 0, 0] as [number, number, number] },
+    };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'under' }));
+    expect(next.pieces[0].layer).toBe(0);
+  });
+
+  it('does not copy position when target has no arrangement override', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 1 }), basePiece({ id: 'p2', layer: 2 })],
+    };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'over' }));
+    expect(next.pieces[0].layer).toBe(3); // layer still updated
+    expect(next.arrangementOverrides.p1).toBeUndefined(); // no position set
+  });
+
+  it('does nothing if piece not found', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 1 })] };
+    const next = reducer(state, superimposePiece({ pieceId: 'ghost', targetPieceId: 'p1', mode: 'over' }));
+    expect(next.pieces[0].layer).toBe(1);
+  });
+
+  it('does nothing if target not found', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 1 })] };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'ghost', mode: 'over' }));
+    expect(next.pieces[0].layer).toBe(1);
+  });
 });
