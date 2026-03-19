@@ -5,11 +5,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
 [![Rust](https://img.shields.io/badge/Rust-WASM-DEA584?logo=rust&logoColor=white)](crates/xpbd-wasm)
-[![Tests](https://img.shields.io/badge/Tests-3133_passing-success?logo=vitest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-3354_passing-success?logo=vitest&logoColor=white)](tests/)
 
 **The Cognitive Design Engine for Professional Fashion Engineering.**
 
-> **Status (March 14, 2026):** Currently finalizing **v0.7.0 "Precision & Professional Tools"**. We have successfully shipped **WebGPU Zero-copy Rendering**, **3D Mesh Grab (O-Key)**, **High-Precision Measure & Walk Seam Tools**, and **CLO-style Simulation Modes**. Final stretch for MVP: **Nesting Engine** and **Landing Page**. See our [Roadmap](ROADMAP.md).
+> **Status (March 18, 2026):** Shipped **Click'n'Go Expert Mode** (#268) and **Diagnostic Inspector** (#32). Power users can now skip confirmations and auto-apply remembered tool settings. Right-click any piece to get instant diagnostics, AI-powered analysis, and one-click fixes. See our [Roadmap](ROADMAP.md).
 
 OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Next-Gen WebGPU Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
 
@@ -18,11 +18,13 @@ OpenClo.ai is a high-performance, browser-based ecosystem that transcends tradit
 ![OpenClo.ai Interface](docs/screenshots/editor.png)
 
 ## 🚀 Recent Milestones (v0.7.x)
+- **Diagnostic Inspector** (#32): Right-click any piece to get instant data, 13 deterministic diagnostic checks, and AI-powered analysis with one-click fix suggestions.
+- **Click'n'Go Expert Mode** (#268): Expert mode toggle reduces confirmations, auto-applies last-used tool settings, per-tool overrides via Shift+right-click.
 - **Walk Seam Verification**: Interactive tool for verifying seam length matching and ease distribution with <0.1mm Gauss-Legendre precision.
 - **High-Precision Measurement**: Gauss-Legendre quadrature engine for arc-length and ease comparison tools.
 - **WebGPU / TSL Engine**: Massive 10–50x performance boost via **Zero-copy Rendering** and shared compute buffers.
 - **3D Interaction Suite**: Professional **Mesh Grab (O-Key)**, **Steam/Press Brush**, and **Per-piece Freeze** functionality.
-- **Agentic Copilot Loop**: Fully autonomous design iterations with 3,100+ automated test cases.
+- **Agentic Copilot Loop**: Fully autonomous design iterations with 3,350+ automated test cases.
 
 ## Core Pillars
 
@@ -82,11 +84,11 @@ npx vitest run    # Run 3,100+ tests
 
 | Metric | Count |
 |--------|-------|
-| TypeScript Source Files | 512 |
-| Unit/E2E Test Files | 210+ |
-| Total Automated Tests | 3,133 |
-| Total LOC | ~148,000 |
-| Development Days | 24 |
+| TypeScript Source Files | 530+ |
+| Unit/E2E Test Files | 230+ |
+| Total Automated Tests | 3,354 |
+| Total LOC | ~155,000 |
+| Development Days | 25 |
 
 ---
 **OpenClo.ai** — Digitizing Fashion Intelligence. MIT Licensed.
