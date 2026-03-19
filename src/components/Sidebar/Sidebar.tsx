@@ -10,6 +10,7 @@ import PluginManager from '../PluginManager/PluginManager';
 import SimulationView from './SimulationView';
 import ParametricView from './ParametricView';
 import HistoryView from '../views/HistoryView';
+import LayerPanel from '../LayerPanel/LayerPanel';
 import '../views/views.css';
 import './Sidebar.css';
 
@@ -22,6 +23,7 @@ const viewTitles: Record<SidebarView, string> = {
   explorer: 'Project',
   avatar: 'Avatar & Body',
   grading: 'Grading',
+  layers: 'Layers',
   plugins: 'Plugins',
   settings: 'Settings',
   simulation: 'Simulation',
@@ -51,6 +53,7 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             {activeView === 'simulation' && <SimulationView />}
             {activeView === 'parametric' && <ParametricView />}
             {activeView === 'history' && <HistoryView />}
+            {activeView === 'layers' && <LayerPanel />}
           </div>
         </>
       )}

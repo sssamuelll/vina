@@ -41,6 +41,7 @@ import { tools as uiBridgeToolDefs } from './definitions/uiBridgeTools';
 import { tools as modifyDimensionToolDefs } from './definitions/modifyDimensionTools';
 import { tools as threeDInteractionToolDefs } from './definitions/3dInteractionTools';
 import { tools as groupToolDefs } from './definitions/groupTools';
+import { tools as layerToolDefs } from './definitions/layerTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -359,6 +360,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   modifyDimensionToolDefs,
   threeDInteractionToolDefs,
   groupToolDefs,
+  layerToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

@@ -24,6 +24,8 @@ const makePiece = (id: string, outline: PathCommand[], pos = { x: 0, y: 0 }): Pa
   rotation: 0,
   mirrored: false,
   seamAllowance: 10,
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 });

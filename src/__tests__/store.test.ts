@@ -21,7 +21,7 @@ function makePiece(id: string): PatternPiece {
   return {
     id, name: 'Test', outline: [{ type: 'M', values: [0, 0] }, { type: 'Z', values: [] }],
     internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10,
-    createdAt: Date.now(), updatedAt: Date.now(),
+    layer: 1, sublayer: 0, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 

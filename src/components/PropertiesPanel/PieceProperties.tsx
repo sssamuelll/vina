@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, unlinkPieces } from '../../store/projectSlice';
+import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer } from '../../store/projectSlice';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions } from '../../types/types';
 import type { PatternPiece } from '../../types/types';
@@ -27,6 +27,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
   };
 
   return (
+    <>
     <PropertySection id="piece" title="PIECE" collapsed={collapsed} onToggle={onToggle}>
       <div className="panel-field">
         <label>Name</label>
@@ -154,5 +155,31 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         </div>
       </div>
     </PropertySection>
+
+    <PropertySection id="layer" title="LAYER" collapsed={collapsed} onToggle={onToggle}>
+      <div className="panel-field">
+        <label>Layer</label>
+        <input
+          type="number"
+          className="panel-input narrow"
+          value={piece.layer ?? 1}
+          min={0}
+          max={9}
+          onChange={e => dispatch(setLayer({ pieceId: piece.id, layer: Number(e.target.value) }))}
+        />
+      </div>
+      <div className="panel-field">
+        <label>Sublayer</label>
+        <input
+          type="number"
+          className="panel-input narrow"
+          value={piece.sublayer ?? 0}
+          min={0}
+          max={9}
+          onChange={e => dispatch(setSublayer({ pieceId: piece.id, sublayer: Number(e.target.value) }))}
+        />
+      </div>
+    </PropertySection>
+    </>
   );
 }

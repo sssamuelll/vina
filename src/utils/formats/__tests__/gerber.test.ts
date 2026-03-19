@@ -175,6 +175,8 @@ describe('gerber export', () => {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
+    layer: 1,
+    sublayer: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -215,7 +217,7 @@ describe('gerber round-trip', () => {
           { type: 'L', values: [50, 80] }, { type: 'L', values: [0, 80] },
           { type: 'Z', values: [] },
         ], internals: [], position: { x: 0, y: 0 }, rotation: 0,
-        mirrored: false, seamAllowance: 0, createdAt: 0, updatedAt: 0,
+        mirrored: false, seamAllowance: 0, layer: 1, sublayer: 0, createdAt: 0, updatedAt: 0,
       },
       {
         id: 'p2', name: 'BACK', outline: [
@@ -223,7 +225,7 @@ describe('gerber round-trip', () => {
           { type: 'L', values: [60, 90] }, { type: 'L', values: [0, 90] },
           { type: 'Z', values: [] },
         ], internals: [], position: { x: 0, y: 0 }, rotation: 0,
-        mirrored: false, seamAllowance: 0, createdAt: 0, updatedAt: 0,
+        mirrored: false, seamAllowance: 0, layer: 1, sublayer: 0, createdAt: 0, updatedAt: 0,
       },
     ];
 

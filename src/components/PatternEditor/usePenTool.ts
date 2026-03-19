@@ -135,6 +135,8 @@ export function usePenTool(
           rotation: 0,
           mirrored: false,
           seamAllowance: 10,
+          layer: 1,
+          sublayer: 0,
         });
         setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
         return;
@@ -194,6 +196,8 @@ export function usePenTool(
         rotation: 0,
         mirrored: false,
         seamAllowance: 10,
+        layer: 1,
+        sublayer: 0,
       });
       setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
     }

@@ -284,6 +284,8 @@ export class CopilotActionExecutor {
           position: action.params.position || { x: 0, y: 0 },
           rotation: 0,
           mirrored: false,
+          layer: 1,
+          sublayer: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };

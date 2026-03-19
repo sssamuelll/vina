@@ -28,6 +28,8 @@ const makeSquarePiece = (): PatternPiece => ({
     { type: 'Z', values: [] },
   ],
   internals: [],
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 });
@@ -47,6 +49,8 @@ const makeCurvePiece = (): PatternPiece => ({
     { type: 'Z', values: [] },
   ],
   internals: [],
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 });

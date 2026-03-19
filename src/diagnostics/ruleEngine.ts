@@ -211,6 +211,26 @@ const ruleNoEdgesDefined: Rule = (data) => {
   return [];
 };
 
+// ─── Layer rules ──────────────────────────────────────────────────────────────
+
+const ruleLayerOverlap: Rule = (data) => {
+  const diags: Diagnostic[] = [];
+  // ── Layer overlap check
+  if (data.piecesOnSameLayer && data.piecesOnSameLayer.length > 0 && data.bodyRegion) {
+    const sameRegion = data.piecesOnSameLayer.filter(p => p.bodyRegion === data.bodyRegion);
+    if (sameRegion.length > 0) {
+      const names = sameRegion.map(p => p.name).join(', ');
+      diags.push({
+        severity: 'warning',
+        category: 'layer',
+        message: `Same layer and body region as: ${names}`,
+        detail: 'Pieces on the same layer in the same body region may overlap. Consider assigning different layers.',
+      });
+    }
+  }
+  return diags;
+};
+
 // ─── Rule registry ────────────────────────────────────────────────────────────
 
 const RULES: Rule[] = [
@@ -232,6 +252,8 @@ const RULES: Rule[] = [
   ruleNotSimulated,
   // construction
   ruleNoEdgesDefined,
+  // layer
+  ruleLayerOverlap,
 ];
 
 // ─── Public API ───────────────────────────────────────────────────────────────

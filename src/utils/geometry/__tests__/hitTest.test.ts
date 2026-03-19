@@ -19,6 +19,8 @@ function makePiece(id: string, x: number, y: number, size: number): PatternPiece
     mirrored: false,
     internals: [],
     seamAllowance: 0,
+    layer: 1,
+    sublayer: 0,
     createdAt: 0,
     updatedAt: 0,
   };

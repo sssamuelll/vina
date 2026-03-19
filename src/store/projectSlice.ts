@@ -3,6 +3,20 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup } from '../types/types';
 import { NEW_PROJECT } from './actions';
 
+const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
+  lining: 0, facing: 0,
+  bodice: 1, skirt: 1, trouser: 1, waistband: 1, sleeve: 1,
+  collar: 2, cuff: 2, pocket: 2, yoke: 2, hood: 2,
+  other: 1,
+};
+
+function autoDetectLayer(category?: string): number {
+  return CATEGORY_DEFAULT_LAYER[category ?? 'other'] ?? 1;
+}
+
+/** Lateral offset in metres when superimposing a piece in 'side' mode. */
+const SUPERIMPOSE_SIDE_OFFSET_M = 0.1;
+
 const defaultAvatar: Avatar = {
   id: 'default',
   name: 'Default Avatar',
@@ -77,6 +91,15 @@ const projectSlice = createSlice({
       state.avatar = p.avatar;
       state.groups = p.groups ?? [];
       state.isDirty = false;
+      // Backfill layer/sublayer for pieces loaded from older project files
+      for (const piece of state.pieces) {
+        if ((piece as any).layer === undefined) {
+          piece.layer = autoDetectLayer(piece.category);
+        }
+        if ((piece as any).sublayer === undefined) {
+          piece.sublayer = 0;
+        }
+      }
     },
     setProjectName(state, action: PayloadAction<string>) {
       state.name = action.payload;
@@ -85,7 +108,14 @@ const projectSlice = createSlice({
 
     // ─── Pieces ───
     addPiece(state, action: PayloadAction<PatternPiece>) {
-      state.pieces.push(action.payload);
+      const piece = { ...action.payload };
+      if (piece.layer === undefined || piece.layer === null) {
+        piece.layer = autoDetectLayer(piece.category);
+      }
+      if (piece.sublayer === undefined || piece.sublayer === null) {
+        piece.sublayer = 0;
+      }
+      state.pieces.push(piece);
       state.isDirty = true;
     },
     updatePiece(state, action: PayloadAction<PatternPiece>) {
@@ -353,6 +383,71 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Layers ───
+    setLayer(state, action: PayloadAction<{ pieceId: string; layer: number }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        piece.layer = Math.max(0, action.payload.layer);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    setSublayer(state, action: PayloadAction<{ pieceId: string; sublayer: number }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        piece.sublayer = Math.max(0, action.payload.sublayer);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+
+    cloneToLayer(state, action: PayloadAction<{ pieceId: string; direction: 'over' | 'under' }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const clone: PatternPiece = {
+        ...JSON.parse(JSON.stringify(piece)),
+        id: `${piece.id}-clone-${Date.now()}`,
+        name: `${piece.name} (clone)`,
+        layer: action.payload.direction === 'over'
+          ? (piece.layer ?? 1) + 1
+          : Math.max(0, (piece.layer ?? 1) - 1),
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      state.pieces.push(clone);
+      const arrangement = state.arrangementOverrides[piece.id];
+      if (arrangement) {
+        state.arrangementOverrides[clone.id] = [...arrangement] as [number, number, number];
+      }
+      state.isDirty = true;
+    },
+
+    superimposePiece(state, action: PayloadAction<{
+      pieceId: string;
+      targetPieceId: string;
+      mode: 'over' | 'under' | 'side';
+    }>) {
+      const { pieceId, targetPieceId, mode } = action.payload;
+      const piece = state.pieces.find(p => p.id === pieceId);
+      const target = state.pieces.find(p => p.id === targetPieceId);
+      if (!piece || !target) return;
+      const targetPos = state.arrangementOverrides[targetPieceId];
+      if (targetPos) {
+        if (mode === 'side') {
+          state.arrangementOverrides[pieceId] = [targetPos[0] + SUPERIMPOSE_SIDE_OFFSET_M, targetPos[1], targetPos[2]];
+        } else {
+          state.arrangementOverrides[pieceId] = [...targetPos] as [number, number, number];
+        }
+      }
+      if (mode === 'over') {
+        piece.layer = (target.layer ?? 1) + 1;
+      } else if (mode === 'under') {
+        piece.layer = Math.max(0, (target.layer ?? 1) - 1);
+      }
+      piece.updatedAt = Date.now();
+      state.isDirty = true;
+    },
+
     // ─── Z-Order ───
     bringToFront(state, action: PayloadAction<string>) {
       const piece = state.pieces.find(p => p.id === action.payload);
@@ -553,6 +648,8 @@ export const {
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, reverseSeam,
   linkPieces, unlinkPieces, cloneAsLinked,
+  // Layers
+  setLayer, setSublayer, cloneToLayer, superimposePiece,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece,
   // Groups

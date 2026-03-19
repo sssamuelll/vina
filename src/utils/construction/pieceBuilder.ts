@@ -144,6 +144,8 @@ export function buildPieceWithOffset(
       mirrored: false,
       seamAllowance: cPiece.seamAllowance,
       constructionPieceId: cPiece.id,
+      layer: 1,
+      sublayer: 0,
       createdAt: now,
       updatedAt: now,
     },

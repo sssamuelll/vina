@@ -22,6 +22,8 @@ function makePiece(name: string): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 0,
+    layer: 1,
+    sublayer: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

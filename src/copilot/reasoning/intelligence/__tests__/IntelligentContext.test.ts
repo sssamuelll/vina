@@ -123,9 +123,11 @@ describe('IntelligentContext', () => {
               mirrored: false,
               seamAllowance: 10,
               internals: [],
+              layer: 1,
+              sublayer: 0,
               createdAt: Date.now(),
               updatedAt: Date.now(),
-            } as PatternPiece,
+            } as unknown as PatternPiece,
           ],
           avatar: {
             measurements: {
