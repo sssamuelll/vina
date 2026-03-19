@@ -1,0 +1,162 @@
+.pom-panel {
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-size: 12px;
+  height: 100%;
+}
+
+.pom-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #888);
+  height: 100%;
+  padding: 20px;
+}
+
+/* ─── Header row ─────────────────────────────────────────────────────── */
+
+.pom-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.pom-panel-title {
+  color: #e0e0e0;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.pom-panel-export {
+  background: #3a3a5a;
+  color: #e0e0e0;
+  border: 1px solid #4a4a6a;
+  border-radius: 4px;
+  padding: 3px 10px;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pom-panel-export:hover {
+  background: #4a4a6a;
+}
+
+/* ─── Table ──────────────────────────────────────────────────────────── */
+
+.pom-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pom-table th {
+  text-align: left;
+  color: #999;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 6px;
+  border-bottom: 1px solid #2a2a4a;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.pom-table th:hover {
+  color: #ccc;
+}
+
+.pom-table th .pom-sort-arrow {
+  margin-left: 2px;
+  font-size: 8px;
+  color: #6366f1;
+}
+
+.pom-table td {
+  padding: 4px 6px;
+  color: #ccc;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(42, 42, 74, 0.5);
+  white-space: nowrap;
+}
+
+.pom-table tr.pom-row {
+  cursor: pointer;
+}
+
+.pom-table tr.pom-row:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.pom-table tr.pom-row.pom-row--selected {
+  background: rgba(99, 102, 241, 0.18);
+}
+
+/* ─── Inline edit inputs ─────────────────────────────────────────────── */
+
+.pom-inline-input {
+  background: #1e1e3a;
+  color: #e0e0e0;
+  border: 1px solid #6366f1;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-family: Inter, sans-serif;
+  outline: none;
+  width: 100%;
+  min-width: 40px;
+}
+
+.pom-inline-input:focus {
+  border-color: #818cf8;
+}
+
+/* ─── Category dropdown ──────────────────────────────────────────────── */
+
+.pom-category-select {
+  background: transparent;
+  color: #ccc;
+  border: none;
+  font-size: 11px;
+  font-family: Inter, sans-serif;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pom-category-select:hover {
+  color: #e0e0e0;
+}
+
+/* ─── Delete button ──────────────────────────────────────────────────── */
+
+.pom-delete-btn {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.pom-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* ─── Value cell ─────────────────────────────────────────────────────── */
+
+.pom-value {
+  font-variant-numeric: tabular-nums;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ─── Tolerance cells ────────────────────────────────────────────────── */
+
+.pom-tolerance {
+  color: #888;
+  font-size: 10px;
+}
