@@ -56,6 +56,12 @@ export interface PatternPiece {
   linkMode?: 'symmetry' | 'instance';
   /** Rendering order in 2D canvas (higher = drawn on top). Default 0. */
   zOrder?: number;
+  /** Garment layer (0=innermost/body, higher=outer). Auto-detected from category. Default 0. */
+  layer?: number;
+  /** Fine ordering within same layer. Higher = on top. Default 0. */
+  sublayer?: number;
+  /** Cached body region from garment placement. */
+  bodyRegion?: string;
   /** When true, piece cannot be moved/edited interactively */
   locked?: boolean;
   createdAt: number;
