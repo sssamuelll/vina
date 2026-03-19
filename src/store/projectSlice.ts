@@ -416,6 +416,7 @@ const projectSlice = createSlice({
       if (arrangement) {
         state.arrangementOverrides[clone.id] = [...arrangement] as [number, number, number];
       }
+      state.isDirty = true;
     },
 
     superimposePiece(state, action: PayloadAction<{
@@ -441,6 +442,7 @@ const projectSlice = createSlice({
         piece.layer = Math.max(0, (target.layer ?? 1) - 1);
       }
       piece.updatedAt = Date.now();
+      state.isDirty = true;
     },
 
     // ─── Z-Order ───

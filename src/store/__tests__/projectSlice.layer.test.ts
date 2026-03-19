@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import reducer, { addPiece, setLayer, setSublayer } from '../projectSlice';
+import reducer, { addPiece, setLayer, setSublayer, cloneToLayer, superimposePiece } from '../projectSlice';
 import type { PatternPiece } from '../../types/types';
 
 function basePiece(overrides?: Partial<PatternPiece>): PatternPiece {
@@ -118,5 +118,25 @@ describe('setSublayer reducer', () => {
     const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', sublayer: 3 })] };
     const next = reducer(state, setSublayer({ pieceId: 'nonexistent', sublayer: 10 }));
     expect(next.pieces[0].sublayer).toBe(3);
+  });
+});
+
+describe('cloneToLayer reducer', () => {
+  it('sets isDirty when cloning', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 1 })] };
+    const next = reducer(state, cloneToLayer({ pieceId: 'p1', direction: 'over' }));
+    expect(next.isDirty).toBe(true);
+  });
+});
+
+describe('superimposePiece reducer', () => {
+  it('sets isDirty when superimposing', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 1 }), basePiece({ id: 'p2', layer: 2 })],
+      arrangementOverrides: { p2: [0, 0.5, 0] as [number, number, number] },
+    };
+    const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'p2', mode: 'over' }));
+    expect(next.isDirty).toBe(true);
   });
 });
