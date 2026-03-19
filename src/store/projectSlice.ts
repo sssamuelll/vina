@@ -395,7 +395,7 @@ const projectSlice = createSlice({
     setSublayer(state, action: PayloadAction<{ pieceId: string; sublayer: number }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (piece) {
-        piece.sublayer = action.payload.sublayer;
+        piece.sublayer = Math.max(0, action.payload.sublayer);
         piece.updatedAt = Date.now();
         state.isDirty = true;
       }

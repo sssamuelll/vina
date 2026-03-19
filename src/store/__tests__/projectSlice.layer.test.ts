@@ -119,6 +119,12 @@ describe('setSublayer reducer', () => {
     const next = reducer(state, setSublayer({ pieceId: 'nonexistent', sublayer: 10 }));
     expect(next.pieces[0].sublayer).toBe(3);
   });
+
+  it('clamps sublayer to minimum 0', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', sublayer: 3 })] };
+    const next = reducer(state, setSublayer({ pieceId: 'p1', sublayer: -5 }));
+    expect(next.pieces[0].sublayer).toBe(0);
+  });
 });
 
 describe('cloneToLayer reducer', () => {
