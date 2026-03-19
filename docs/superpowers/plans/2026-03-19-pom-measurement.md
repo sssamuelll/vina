@@ -178,7 +178,7 @@ describe('projectSlice — POM actions', () => {
   describe('recomputePOMValues', () => {
     it('batch updates POM values', () => {
       let state = reducer(initialState, addPOM(makePOM('pom1', { value: 100 })));
-      state = reducer(initialState, addPOM(makePOM('pom2', { value: 200 })));
+      state = reducer(state, addPOM(makePOM('pom2', { value: 200 })));
       state = reducer(state, recomputePOMValues([
         { id: 'pom1', value: 150 },
         { id: 'pom2', value: 250 },
@@ -233,8 +233,9 @@ In `src/store/projectSlice.ts`:
 
 4. In `loadProject` reducer, add after the piece backfill loop:
 ```typescript
-state.poms = (p as any).poms ?? [];
+state.poms = p.poms ?? [];
 ```
+(The `OpenCloProject` interface already has `poms?: PointOfMeasure[]`, so no cast needed.)
 
 5. In `removePiece` reducer, add after the groups cleanup:
 ```typescript
@@ -268,6 +269,7 @@ removePOM(state, action: PayloadAction<string>) {
   state.poms = state.poms.filter(p => p.id !== action.payload);
   state.isDirty = true;
 },
+/** Recompute derived values — intentionally does NOT set isDirty (not a user edit) */
 recomputePOMValues(state, action: PayloadAction<{ id: string; value: number }[]>) {
   for (const { id, value } of action.payload) {
     const pom = state.poms.find(p => p.id === id);
@@ -289,7 +291,17 @@ In `src/store/layoutSlice.ts` (line 3), add `'poms'` to the `BottomTab` union:
 export type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector' | 'poms';
 ```
 
-- [ ] **Step 5: Add undo labels**
+- [ ] **Step 5: Add selectedPOMId to editorSlice**
+
+In `src/store/editorSlice.ts`, add `selectedPOMId: string | null` to the state (alongside `selectedSeamId`), initialize to `null`, and add a `selectPOM` reducer:
+```typescript
+selectPOM(state, action: PayloadAction<string | null>) {
+  state.selectedPOMId = action.payload;
+},
+```
+Export `selectPOM` action.
+
+- [ ] **Step 6: Add undo labels**
 
 In `src/store/undoMiddleware.ts`, add to the `ACTION_LABELS` map:
 ```typescript
@@ -298,12 +310,12 @@ In `src/store/undoMiddleware.ts`, add to the `ACTION_LABELS` map:
 'project/removePOM': 'Remove Measurement',
 ```
 
-- [ ] **Step 6: Run tests**
+- [ ] **Step 7: Run tests**
 
 Run: `npx vitest run src/store/__tests__/projectSlice.pom.test.ts`
 Expected: All pass
 
-- [ ] **Step 7: Run type check**
+- [ ] **Step 8: Run type check**
 
 Run: `npx tsc -b --noEmit`
 Expected: No errors
@@ -510,10 +522,7 @@ export function computeAlongEdgeDistance(
   const edge = piece.edges.find(e => e.name === edgeName);
   if (!edge) return null;
 
-  // Use pre-computed edge length if available
-  if (edge.length != null && edge.length > 0) return edge.length;
-
-  // Fall back to arc-length computation
+  // Always compute from geometry for correctness (edge.length may be stale after edits)
   return computePathArcLength(piece.outline, edge.segmentRange[0], edge.segmentRange[1]);
 }
 
@@ -909,10 +918,27 @@ git commit -m "feat(pom): register 4 copilot tools (createPOM, getPOMs, updatePO
 ### Task 9: Diagnostic rule + keyboard shortcut
 
 **Files:**
-- Modify: `src/diagnostics/ruleEngine.ts`
-- Modify: `src/hooks/useKeyboardShortcuts.ts`
+- Modify: `src/diagnostics/types.ts` — add `poms?: PointOfMeasure[]` to `InspectionData`
+- Modify: `src/diagnostics/dataCollector.ts` — add `poms: state.project.poms` to returned object
+- Modify: `src/diagnostics/ruleEngine.ts` — add no-POMs rule
+- Modify: `src/hooks/useKeyboardShortcuts.ts` — add P shortcut
 
-- [ ] **Step 1: Add diagnostic rule**
+- [ ] **Step 1: Extend InspectionData**
+
+In `src/diagnostics/types.ts`, add to `InspectionData`:
+```typescript
+poms?: PointOfMeasure[];
+```
+Import `PointOfMeasure` from `../types/types`.
+
+- [ ] **Step 2: Pass POMs from dataCollector**
+
+In `src/diagnostics/dataCollector.ts`, add to the returned `InspectionData` object:
+```typescript
+poms: state.project.poms,
+```
+
+- [ ] **Step 3: Add diagnostic rule**
 
 In `src/diagnostics/ruleEngine.ts`, add a new rule function:
 
@@ -932,7 +958,7 @@ function ruleNoPOMs(data: InspectionData): Diagnostic[] {
 }
 ```
 
-Register in the `RULES` array. Also extend `InspectionData` in `src/diagnostics/types.ts` with `poms?: PointOfMeasure[]` and pass them from `dataCollector.ts`.
+Register in the `RULES` array.
 
 - [ ] **Step 2: Add P shortcut**
 
