@@ -127,6 +127,45 @@ describe('cloneToLayer reducer', () => {
     const next = reducer(state, cloneToLayer({ pieceId: 'p1', direction: 'over' }));
     expect(next.isDirty).toBe(true);
   });
+
+  it('creates clone one layer above with direction=over', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 1 })] };
+    const next = reducer(state, cloneToLayer({ pieceId: 'p1', direction: 'over' }));
+    expect(next.pieces).toHaveLength(2);
+    expect(next.pieces[1].layer).toBe(2);
+    expect(next.pieces[1].name).toBe('Test Piece (clone)');
+  });
+
+  it('creates clone one layer below with direction=under', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 2 })] };
+    const next = reducer(state, cloneToLayer({ pieceId: 'p1', direction: 'under' }));
+    expect(next.pieces).toHaveLength(2);
+    expect(next.pieces[1].layer).toBe(1);
+  });
+
+  it('clamps clone layer to 0 when cloning under from layer 0', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 0 })] };
+    const next = reducer(state, cloneToLayer({ pieceId: 'p1', direction: 'under' }));
+    expect(next.pieces).toHaveLength(2);
+    expect(next.pieces[1].layer).toBe(0);
+  });
+
+  it('copies arrangement override to clone', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 1 })],
+      arrangementOverrides: { p1: [0.5, 1.0, 0.2] as [number, number, number] },
+    };
+    const next = reducer(state, cloneToLayer({ pieceId: 'p1', direction: 'over' }));
+    const cloneId = next.pieces[1].id;
+    expect(next.arrangementOverrides[cloneId]).toEqual([0.5, 1.0, 0.2]);
+  });
+
+  it('does nothing if piece not found', () => {
+    const state = { ...emptyState(), pieces: [basePiece({ id: 'p1' })] };
+    const next = reducer(state, cloneToLayer({ pieceId: 'nonexistent', direction: 'over' }));
+    expect(next.pieces).toHaveLength(1);
+  });
 });
 
 describe('superimposePiece reducer', () => {
