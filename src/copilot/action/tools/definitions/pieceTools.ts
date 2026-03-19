@@ -80,6 +80,8 @@ const createPieceTool: ToolDefinition = {
           rotation: 0,
           mirrored: (params.mirrored as boolean) || false,
           seamAllowance: (params.seamAllowance as number) ?? 10,
+          layer: 1,
+          sublayer: 0,
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };

@@ -68,6 +68,8 @@ export function importSVG(svgString: string): SvgImportResult {
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
+    layer: 1,
+    sublayer: 0,
     createdAt: now,
     updatedAt: now,
   }));

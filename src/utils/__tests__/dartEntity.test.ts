@@ -17,7 +17,7 @@ function makePiece(internals: InternalLine[]): PatternPiece {
   return {
     id: 'test', name: 'Test', outline: [], internals,
     position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
-    seamAllowance: 10, createdAt: Date.now(), updatedAt: Date.now(),
+    seamAllowance: 10, layer: 1, sublayer: 0, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
 

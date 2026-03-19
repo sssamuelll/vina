@@ -15,6 +15,8 @@ interface NewPieceData {
   rotation: number;
   mirrored: boolean;
   seamAllowance: number;
+  layer: number;
+  sublayer: number;
 }
 
 const MIN_SIZE = 5;
@@ -85,6 +87,8 @@ export function useRectangleTool(
         rotation: 0,
         mirrored: false,
         seamAllowance: 10,
+        layer: 1,
+        sublayer: 0,
       });
     }
 

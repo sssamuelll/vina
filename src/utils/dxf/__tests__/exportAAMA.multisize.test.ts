@@ -19,6 +19,8 @@ function makePiece(name: string, w: number, h: number) {
     mirrored: false,
     internals: [],
     notches: [],
+    layer: 1,
+    sublayer: 0,
     createdAt: 0,
     updatedAt: 0,
   };

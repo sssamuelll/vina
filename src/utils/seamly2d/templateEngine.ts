@@ -128,6 +128,8 @@ export class PatternTemplateEngine {
           rotation: 0,
           mirrored: false,
           seamAllowance: piece.seamAllowance ?? 10,
+          layer: 1,
+          sublayer: 0,
           createdAt: now,
           updatedAt: now,
         });

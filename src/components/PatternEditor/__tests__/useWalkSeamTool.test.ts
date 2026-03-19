@@ -31,6 +31,8 @@ const pieceA: PatternPiece = {
   rotation: 0,
   mirrored: false,
   seamAllowance: 0,
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 };
@@ -55,6 +57,8 @@ const pieceB: PatternPiece = {
   rotation: 0,
   mirrored: false,
   seamAllowance: 0,
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 };
@@ -80,6 +84,8 @@ const pieceC: PatternPiece = {
   rotation: 0,
   mirrored: false,
   seamAllowance: 0,
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 };

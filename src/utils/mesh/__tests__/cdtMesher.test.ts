@@ -30,6 +30,8 @@ function createRectanglePiece(width: number = 100, height: number = 50): Pattern
     rotation: 0,
     mirrored: false,
     seamAllowance: 0,
+    layer: 1,
+    sublayer: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -56,6 +58,8 @@ function createLShapePiece(): PatternPiece {
     rotation: 0,
     mirrored: false,
     seamAllowance: 0,
+    layer: 1,
+    sublayer: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -336,6 +340,8 @@ describe('CDT Mesher', () => {
         rotation: 0,
         mirrored: false,
         seamAllowance: 0,
+        layer: 1,
+        sublayer: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -359,6 +365,8 @@ describe('CDT Mesher', () => {
         rotation: 0,
         mirrored: false,
         seamAllowance: 0,
+        layer: 1,
+        sublayer: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
@@ -662,6 +670,8 @@ describe('CDT Mesher', () => {
         rotation: 0,
         mirrored: false,
         seamAllowance: 0,
+        layer: 1,
+        sublayer: 0,
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Auto-Sew edge case tests — tricky inputs, multilingual naming,
  * degenerate geometry, and full pipeline integration.
@@ -19,6 +19,8 @@ function makePiece(id: string, name: string, outline: PathCommand[]): PatternPie
     rotation: 0,
     mirrored: false,
     seamAllowance: 10,
+    layer: 1,
+    sublayer: 0,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

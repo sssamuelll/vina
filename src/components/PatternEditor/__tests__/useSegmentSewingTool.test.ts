@@ -18,6 +18,8 @@ const squarePiece: PatternPiece = {
   mirrored: false,
   seamAllowance: 0,
   internals: [],
+  layer: 1,
+  sublayer: 0,
   createdAt: 0,
   updatedAt: 0,
 };
