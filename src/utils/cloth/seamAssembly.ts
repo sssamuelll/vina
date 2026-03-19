@@ -351,10 +351,13 @@ export function buildSeamConstraints(
   pieces?: Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>,
   config: SeamConstraintConfig = DEFAULT_SEAM_CONFIG,
 ): SeamConstraintSet {
-  const allPairs: Array<{ idA: number; idB: number; compliance: number }> = [];
+  const allPairs: Array<{ idA: number; idB: number; compliance: number; tension: number }> = [];
   const positions = mergedMesh.vertices;
 
   for (const seam of seams) {
+    // Skip inactive seams
+    if (seam.active === false) continue;
+
     const outlineA = outlines.get(seam.pieceA.pieceId);
     const outlineB = outlines.get(seam.pieceB.pieceId);
     if (!outlineA || !outlineB) continue;
@@ -373,14 +376,28 @@ export function buildSeamConstraints(
     // Default maxEdgeLength is 15 in CDT, but we should ideally pass this from config
     const maxEdgeLength = 15;
 
-    const edgeA = parameterizeEdge(outlineA, edgeADef.segmentRange[0], edgeADef.segmentRange[1], offsetA.vertexOffset, 12, maxEdgeLength);
-    const edgeB = parameterizeEdge(outlineB, edgeBDef.segmentRange[0], edgeBDef.segmentRange[1], offsetB.vertexOffset, 12, maxEdgeLength);
+    let edgeA = parameterizeEdge(outlineA, edgeADef.segmentRange[0], edgeADef.segmentRange[1], offsetA.vertexOffset, 12, maxEdgeLength);
+    let edgeB = parameterizeEdge(outlineB, edgeBDef.segmentRange[0], edgeBDef.segmentRange[1], offsetB.vertexOffset, 12, maxEdgeLength);
+
+    // Apply t-range filtering: restrict parameterized vertices to the sub-range
+    if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {
+      edgeA = edgeA.filter(v => v.t >= seam.pieceA.tStart! && v.t <= seam.pieceA.tEnd!);
+    }
+    if (seam.pieceB.tStart != null && seam.pieceB.tEnd != null) {
+      edgeB = edgeB.filter(v => v.t >= seam.pieceB.tStart! && v.t <= seam.pieceB.tEnd!);
+    }
 
     const pairs = matchVertices(edgeA, edgeB);
-    const compliance = config.compliance[seam.type];
+
+    // Compute per-seam compliance: base compliance adjusted by strength and tape
+    const baseCompliance = config.compliance[seam.type];
+    const seamCompliance = (baseCompliance / (seam.strength ?? 1.0)) * (seam.taped ? 0.1 : 1.0);
+
+    // Tension factor: 100 = normal, <100 = gathering, >100 = easing
+    const tension = seam.tension ?? 100;
 
     for (const [idA, idB] of pairs) {
-      allPairs.push({ idA, idB, compliance });
+      allPairs.push({ idA, idB, compliance: seamCompliance, tension });
     }
   }
 
@@ -390,17 +407,21 @@ export function buildSeamConstraints(
   const compliances = new Float32Array(count);
 
   for (let i = 0; i < count; i++) {
-    const { idA, idB, compliance } = allPairs[i];
+    const { idA, idB, compliance, tension } = allPairs[i];
     ids[2 * i] = idA;
     ids[2 * i + 1] = idB;
 
-    // Initial rest length = current distance
+    // Initial rest length = current distance, modified by tension
     const ai = idA * 3;
     const bi = idB * 3;
     const dx = positions[ai] - positions[bi];
     const dy = positions[ai + 1] - positions[bi + 1];
     const dz = positions[ai + 2] - positions[bi + 2];
-    restLengths[i] = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const currentDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    // tension=100 → restLength = currentDist (normal)
+    // tension<100 → restLength < currentDist (gathering / pulling tighter)
+    // tension>100 → restLength > currentDist (easing / allowing slack)
+    restLengths[i] = currentDist * (tension / 100);
 
     compliances[i] = compliance;
   }
