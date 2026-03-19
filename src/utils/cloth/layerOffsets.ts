@@ -16,7 +16,7 @@ import { getPhysicalFabric } from './physicalFabric';
 /** Minimal pattern-piece fields required for layer offset computation. */
 interface LayerPiece {
   id: string;
-  /** Garment layer; undefined treated as 0 (innermost). */
+  /** Garment layer; undefined treated as 1 (shell). */
   layer?: number;
   /** Fine ordering within same layer; undefined treated as 0. */
   sublayer?: number;
@@ -72,7 +72,7 @@ export function computeLayerOffset(
   piece: LayerPiece,
   allPieces: LayerPiece[],
 ): number {
-  const pieceLayer = piece.layer ?? 0;
+  const pieceLayer = piece.layer ?? 1;
   if (pieceLayer <= 0) return 0;
 
   let totalThicknessMm = 0;
@@ -80,7 +80,7 @@ export function computeLayerOffset(
   for (const p of allPieces) {
     if (p.id === piece.id) continue;
     if ((p.bodyRegion ?? '') !== (piece.bodyRegion ?? '')) continue;
-    const pLayer = p.layer ?? 0;
+    const pLayer = p.layer ?? 1;
     if (pLayer >= pieceLayer) continue;
 
     totalThicknessMm += lookupFabricThickness(p.fabricId);

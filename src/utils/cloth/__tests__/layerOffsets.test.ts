@@ -112,6 +112,14 @@ describe('computeLayerOffset', () => {
     expect(result).toBeCloseTo(0.5 / 1000, 10);
   });
 
+  it('treats undefined layer as 1 (shell), not 0', () => {
+    const piece = { id: 'outer', layer: undefined, bodyRegion: 'torso', fabricId: 'cotton-poplin' };
+    const inner = { id: 'inner', layer: 0, bodyRegion: 'torso', fabricId: 'cotton-poplin' };
+    const offset = computeLayerOffset(piece, [piece, inner]);
+    // undefined layer treated as 1 → inner (layer 0) is below → offset > 0
+    expect(offset).toBeGreaterThan(0);
+  });
+
   it('returns 0 when no pieces below', () => {
     const piece = makePiece({ id: 'solo', layer: 1, bodyRegion: 'torso' });
     const allPieces = [piece];
