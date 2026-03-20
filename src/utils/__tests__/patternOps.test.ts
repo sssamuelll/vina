@@ -187,6 +187,12 @@ describe('extendEdge', () => {
     extendEdge(original, 1, 'end', 50);
     expect(original.outline[1].values[0]).toBe(originalTopX);
   });
+
+  it('preserves the original piece ID', () => {
+    const piece = makeRect('Panel', 200, 200);
+    const result = extendEdge(piece, 1, 'end', 50);
+    expect(result.id).toBe(piece.id);
+  });
 });
 
 // ─── trimEdgeAtPoint ────────────────────────────────────────────────────────
@@ -220,5 +226,72 @@ describe('trimEdgeAtPoint', () => {
     const originalTopX = original.outline[1].values[0];
     trimEdgeAtPoint(original, 1, { x: 100, y: 0 }, 'before');
     expect(original.outline[1].values[0]).toBe(originalTopX);
+  });
+
+  it('preserves the original piece ID', () => {
+    const piece = makeRect('Panel', 200, 200);
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: 0 }, 'before');
+    expect(result.id).toBe(piece.id);
+  });
+});
+
+function makeBezierPiece(): PatternPiece {
+  return {
+    id: 'test-bezier', name: 'BezierPiece',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [50, -30, 150, -30, 200, 0] }, // cubic bezier top edge
+      { type: 'L', values: [200, 200] },
+      { type: 'L', values: [0, 200] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
+  };
+}
+
+describe('extendEdge — Bezier', () => {
+  it('extends end of cubic bezier along cp2→end tangent', () => {
+    const piece = makeBezierPiece();
+    const result = extendEdge(piece, 1, 'end', 50);
+    // Tangent at end: end(200,0) - cp2(150,-30) = (50,30), normalized
+    expect(result.outline[1].type).toBe('C');
+    expect(result.outline[1].values[4]).toBeGreaterThan(200); // extended X
+  });
+
+  it('extends start of cubic bezier along start-cp1 tangent', () => {
+    const piece = makeBezierPiece();
+    const result = extendEdge(piece, 1, 'start', 50);
+    // Tangent at start: start(0,0) - cp1(50,-30) = (-50,30)
+    // M command should move in (-50,30) direction
+    expect(result.outline[0].values[0]).toBeLessThan(0); // moved left
+  });
+
+  it('preserves piece ID on Bezier extend', () => {
+    const piece = makeBezierPiece();
+    const result = extendEdge(piece, 1, 'end', 50);
+    expect(result.id).toBe(piece.id);
+  });
+});
+
+describe('trimEdgeAtPoint — Bezier', () => {
+  it('trims cubic bezier keeping before portion', () => {
+    const piece = makeBezierPiece();
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'before');
+    expect(result.outline[1].type).toBe('L'); // simplified to line
+    expect(result.outline[1].values[0]).toBeCloseTo(100, 0);
+  });
+
+  it('trims cubic bezier keeping after portion', () => {
+    const piece = makeBezierPiece();
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'after');
+    // M should move to trim point
+    expect(result.outline[0].values[0]).toBeCloseTo(100, 0);
+  });
+
+  it('preserves piece ID on Bezier trim', () => {
+    const piece = makeBezierPiece();
+    const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'before');
+    expect(result.id).toBe(piece.id);
   });
 });

@@ -535,7 +535,7 @@ export function extendEdge(
   endpoint: 'start' | 'end',
   distance: number,
 ): PatternPiece {
-  const newPiece = clonePiece(piece);
+  const newPiece = clonePiece(piece, { id: piece.id });
   const cmds = [...newPiece.outline.map(c => ({ type: c.type, values: [...c.values] }))];
 
   const ep = getEdgeEndpoints(cmds, segmentIndex);
@@ -570,14 +570,37 @@ export function extendEdge(
     }
   } else {
     // Extend the start backwards along the tangent
+    const cmd = cmds[segmentIndex];
+    let startTx = -ux, startTy = -uy; // default: backwards along chord
+    if (cmd.type === 'C' && cmd.values.length >= 6) {
+      // Cubic Bezier: tangent at t=0 is (cp1 - start)
+      const cp1x = cmd.values[0], cp1y = cmd.values[1];
+      const tdx = ep.start.x - cp1x, tdy = ep.start.y - cp1y;
+      const tlen = Math.hypot(tdx, tdy);
+      if (tlen > 0.001) { startTx = tdx / tlen; startTy = tdy / tlen; }
+    } else if (cmd.type === 'Q' && cmd.values.length >= 4) {
+      const cpx = cmd.values[0], cpy = cmd.values[1];
+      const tdx = ep.start.x - cpx, tdy = ep.start.y - cpy;
+      const tlen = Math.hypot(tdx, tdy);
+      if (tlen > 0.001) { startTx = tdx / tlen; startTy = tdy / tlen; }
+    }
+
     if (segmentIndex === 1) {
-      // First edge — modify the M command
-      cmds[0] = { type: 'M', values: [ep.start.x - ux * distance, ep.start.y - uy * distance] };
+      cmds[0] = { type: 'M', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
     } else {
-      // Modify the endpoint of the previous segment
       const prev = cmds[segmentIndex - 1];
       if (prev.type === 'L') {
-        cmds[segmentIndex - 1] = { type: 'L', values: [ep.start.x - ux * distance, ep.start.y - uy * distance] };
+        cmds[segmentIndex - 1] = { type: 'L', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
+      } else if (prev.type === 'C') {
+        const v = [...prev.values];
+        v[4] = ep.start.x + startTx * distance;
+        v[5] = ep.start.y + startTy * distance;
+        cmds[segmentIndex - 1] = { type: 'C', values: v };
+      } else if (prev.type === 'Q') {
+        const v = [...prev.values];
+        v[2] = ep.start.x + startTx * distance;
+        v[3] = ep.start.y + startTy * distance;
+        cmds[segmentIndex - 1] = { type: 'Q', values: v };
       }
     }
   }
@@ -601,7 +624,7 @@ export function trimEdgeAtPoint(
   trimPoint: Point2D,
   keepSide: 'before' | 'after',
 ): PatternPiece {
-  const newPiece = clonePiece(piece);
+  const newPiece = clonePiece(piece, { id: piece.id });
   const cmds = [...newPiece.outline.map(c => ({ type: c.type, values: [...c.values] }))];
   const cmd = cmds[segmentIndex];
 
@@ -626,6 +649,16 @@ export function trimEdgeAtPoint(
     } else {
       if (segmentIndex === 1) {
         cmds[0] = { type: 'M', values: [trimPoint.x, trimPoint.y] };
+      } else {
+        // Adjust previous segment endpoint to trim point
+        const prev = cmds[segmentIndex - 1];
+        if (prev.type === 'L') {
+          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+        } else if (prev.type === 'C') {
+          const v = [...prev.values];
+          v[4] = trimPoint.x; v[5] = trimPoint.y;
+          cmds[segmentIndex - 1] = { type: 'C', values: v };
+        }
       }
       // Replace curve with line from trim point to original end
       cmds[segmentIndex] = { type: 'L', values: [cmd.values[4], cmd.values[5]] };

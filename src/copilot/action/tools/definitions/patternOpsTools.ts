@@ -6,6 +6,11 @@ import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
 import type { PatternPiece } from '../../../../types/types';
 
+function requireFiniteNumber(value: unknown, name: string): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
+  return null;
+}
+
 export const tools: ToolDefinition[] = [
   {
     name: 'splitPiece',
@@ -170,12 +175,14 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+      const distErr = requireFiniteNumber(params.distance, 'distance');
+      if (distErr) return { success: false, error: distErr };
       const joinType = (params.joinType as string) || 'miter';
       const newOutline = offsetPieceOutline(piece, params.distance as number, joinType as 'miter' | 'round' | 'square');
       if (!newOutline) return { success: false, error: `Offset collapsed the shape (distance too large)` };
       const replace = params.replace as boolean;
       if (replace) {
-        const snapshot = { ...piece } as PatternPiece;
+        const snapshot = JSON.parse(JSON.stringify(piece)) as PatternPiece;
         const updated: PatternPiece = { ...piece, outline: newOutline, edges: undefined, updatedAt: Date.now() };
         dispatch(updatePiece(updated));
         return {
@@ -226,9 +233,11 @@ export const tools: ToolDefinition[] = [
       if (!piece.edges) return { success: false, error: `Piece has no semantic edges` };
       const edge = findEdgeByName(piece.edges, params.edgeName as string);
       if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
+      const distErr = requireFiniteNumber(params.distance, 'distance');
+      if (distErr) return { success: false, error: distErr };
       const endpoint = params.endpoint as 'start' | 'end';
       const segmentIndex = endpoint === 'start' ? edge.segmentRange[0] : edge.segmentRange[1] - 1;
-      const snapshot = { ...piece } as PatternPiece;
+      const snapshot = JSON.parse(JSON.stringify(piece)) as PatternPiece;
       const result = extendEdgeFn(piece, segmentIndex, endpoint, params.distance as number);
       dispatch(updatePiece(result));
       return {
@@ -263,8 +272,29 @@ export const tools: ToolDefinition[] = [
       if (!piece.edges) return { success: false, error: `Piece has no semantic edges` };
       const edge = findEdgeByName(piece.edges, params.edgeName as string);
       if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
-      const segmentIndex = edge.segmentRange[0];
-      const snapshot = { ...piece } as PatternPiece;
+      const xErr = requireFiniteNumber(params.trimX, 'trimX');
+      if (xErr) return { success: false, error: xErr };
+      const yErr = requireFiniteNumber(params.trimY, 'trimY');
+      if (yErr) return { success: false, error: yErr };
+      // Find closest segment in edge range to trim point
+      const trimPt = { x: params.trimX as number, y: params.trimY as number };
+      let segmentIndex = edge.segmentRange[0];
+      let bestDist = Infinity;
+      let cx = 0, cy = 0;
+      for (let i = 0; i < piece.outline.length; i++) {
+        const c = piece.outline[i];
+        let ex = cx, ey = cy;
+        if (c.type === 'M') { ex = c.values[0]; ey = c.values[1]; }
+        else if (c.type === 'L') { ex = c.values[0]; ey = c.values[1]; }
+        else if (c.type === 'C') { ex = c.values[4]; ey = c.values[5]; }
+        if (i >= edge.segmentRange[0] && i < edge.segmentRange[1] && c.type !== 'M') {
+          const mx = (cx + ex) / 2, my = (cy + ey) / 2;
+          const d = Math.hypot(trimPt.x - mx, trimPt.y - my);
+          if (d < bestDist) { bestDist = d; segmentIndex = i; }
+        }
+        cx = ex; cy = ey;
+      }
+      const snapshot = JSON.parse(JSON.stringify(piece)) as PatternPiece;
       const keepSideParam = params.keepSide as string;
       const keepSide: 'before' | 'after' = keepSideParam === 'start' ? 'before' : 'after';
       const result = trimEdgeAtPoint(

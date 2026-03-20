@@ -4,6 +4,7 @@ import type { RootState } from '../../store';
 import { addPiece, updatePiece } from '../../store/projectSlice';
 import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { offsetPieceOutline } from '../../utils/patternOps';
+import { uid } from '../../utils/pathHelpers';
 
 export interface OffsetState {
   previewOutline: PathCommand[] | null;
@@ -85,7 +86,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
         } else {
           const newPiece: PatternPiece = {
             ...piece,
-            id: `piece-${Date.now()}-out`,
+            id: uid(),
             name: `${piece.name} Offset (out)`,
             outline: outward,
             edges: undefined,
@@ -100,7 +101,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       if (inward) {
         const newPiece: PatternPiece = {
           ...piece,
-          id: `piece-${Date.now()}-in`,
+          id: uid(),
           name: `${piece.name} Offset (in)`,
           outline: inward,
           edges: undefined,
@@ -124,7 +125,7 @@ export function useOffsetTool(zoom2D: number, pan2D: Point2D) {
       } else {
         const newPiece: PatternPiece = {
           ...piece,
-          id: `piece-${Date.now()}`,
+          id: uid(),
           name: `${piece.name} Offset`,
           outline: result,
           edges: undefined,
