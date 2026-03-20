@@ -109,6 +109,10 @@ interface SimulationSliceState {
   dragCoefficient: number;
   /** IDs of pieces whose particles are frozen (zero velocity, skip solver) */
   frozenPieceIds: string[];
+  /** Piece IDs hidden in 3D viewport (still simulate, just invisible) */
+  hiddenPieceIds: string[];
+  /** Piece IDs with flipped normals in 3D */
+  flippedPieceIds: string[];
   /** Latest fit map statistics (null when no fit map active) */
   fitMapStats: FitMapStats | null;
   /** Per-piece color tint (hex string, white = no tint) */
@@ -169,6 +173,8 @@ const initialState: SimulationSliceState = {
   windEnabled: false,
   dragCoefficient: 1.0,
   frozenPieceIds: [],
+  hiddenPieceIds: [],
+  flippedPieceIds: [],
   fitMapStats: null,
   pieceTints: {},
   pieceTextureOverrides: {},
@@ -388,6 +394,36 @@ const simulationSlice = createSlice({
     unfreezeAllPieces(state) {
       state.frozenPieceIds = [];
     },
+
+    // ─── 3D Arrangement: Hide / Flip ────────────────────────────────────────────
+
+    /** Toggle hide state for a single piece in 3D (add if absent, remove if present). */
+    toggleHide3D(state, action: PayloadAction<string>) {
+      const idx = state.hiddenPieceIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenPieceIds.splice(idx, 1);
+      } else {
+        state.hiddenPieceIds.push(action.payload);
+      }
+    },
+    /** Show all pieces (clear hidden list). */
+    showAll3D(state) {
+      state.hiddenPieceIds = [];
+    },
+    /** Hide specific pieces by ID list. */
+    hideAll3D(state, action: PayloadAction<string[]>) {
+      state.hiddenPieceIds = action.payload;
+    },
+    /** Toggle flipped normal for a single piece in 3D. */
+    toggleFlipNormal(state, action: PayloadAction<string>) {
+      const idx = state.flippedPieceIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.flippedPieceIds.splice(idx, 1);
+      } else {
+        state.flippedPieceIds.push(action.payload);
+      }
+    },
+
     /** Set the latest fit map statistics (null to clear). */
     setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
       state.fitMapStats = action.payload;
@@ -506,6 +542,11 @@ export const {
   setDragCoefficient,
   toggleFreezePiece,
   unfreezeAllPieces,
+  // 3D Arrangement: hide / flip
+  toggleHide3D,
+  showAll3D,
+  hideAll3D,
+  toggleFlipNormal,
   setFitMapStats,
   // PBR material overrides
   setPieceTint,

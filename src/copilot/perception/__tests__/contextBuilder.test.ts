@@ -132,6 +132,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       windEnabled: false,
       dragCoefficient: 1.0,
       frozenPieceIds: [],
+      hiddenPieceIds: [],
+      flippedPieceIds: [],
       steamBrush: { active: false, radius: 0.05, strength: 0.3 },
       meshGrab: { active: false, radius: 0.05, strength: 0.8 },
     },
