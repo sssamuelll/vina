@@ -576,13 +576,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     mat.normalNode = solver.normalBufNode.toAttribute();
     mat.side = THREE.DoubleSide;
     mat.transparent = true;
-    mat.opacity = effectiveOpacity;
     mat.roughness = renderParams.roughness;
     mat.metalness = renderParams.metalness;
-    if (effectiveEmission) {
-      mat.emissive = new THREE.Color(effectiveEmission);
-      mat.emissiveIntensity = effectiveEmissionIntensity;
-    }
     setTslMaterial(mat);
 
     return () => {
@@ -590,7 +585,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       setTslMaterial(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tslSolverRef.current, staticGeometry, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity]);
+  }, [tslSolverRef.current, staticGeometry]);
+
+  // Update TSL material opacity/emission without recreating it
+  useEffect(() => {
+    if (!tslMaterial) return;
+    tslMaterial.opacity = effectiveOpacity;
+    if (effectiveEmission) {
+      tslMaterial.emissive = new THREE.Color(effectiveEmission);
+      tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
+    } else {
+      tslMaterial.emissive = new THREE.Color(0x000000);
+      tslMaterial.emissiveIntensity = 0;
+    }
+    tslMaterial.needsUpdate = true;
+  }, [tslMaterial, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity]);
 
   // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {

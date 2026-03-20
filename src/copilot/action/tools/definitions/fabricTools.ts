@@ -294,6 +294,10 @@ const setPieceOpacityTool: ToolDefinition = {
     const pieceId = params.pieceId as string;
     const rawOpacity = params.opacity as number;
 
+    if (typeof rawOpacity !== 'number' || !Number.isFinite(rawOpacity)) {
+      return { success: false, error: 'opacity must be a finite number between 0 and 1' };
+    }
+
     const state = getState();
 
     // Validate piece exists
@@ -304,6 +308,8 @@ const setPieceOpacityTool: ToolDefinition = {
         error: `Piece "${pieceId}" not found. List pieces first.`,
       };
     }
+
+    const prevOpacity = state.simulation.pieceOpacity[pieceId];
 
     // Clamp opacity to [0, 1]
     const opacity = Math.max(0, Math.min(1, rawOpacity));
@@ -318,7 +324,11 @@ const setPieceOpacityTool: ToolDefinition = {
         opacity,
       },
       rollback: () => {
-        dispatch(clearPieceOpacity(pieceId));
+        if (prevOpacity !== undefined) {
+          dispatch(setPieceOpacity({ pieceId, opacity: prevOpacity }));
+        } else {
+          dispatch(clearPieceOpacity(pieceId));
+        }
       },
     };
   },
@@ -352,6 +362,14 @@ const setPieceEmissionTool: ToolDefinition = {
     const color = params.color as string;
     const rawIntensity = (params.intensity as number | undefined) ?? 1;
 
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+      return { success: false, error: `Invalid hex color "${color}". Use format "#rrggbb".` };
+    }
+
+    if (!Number.isFinite(rawIntensity)) {
+      return { success: false, error: 'intensity must be a finite number between 0 and 5' };
+    }
+
     const state = getState();
 
     // Validate piece exists
@@ -362,6 +380,9 @@ const setPieceEmissionTool: ToolDefinition = {
         error: `Piece "${pieceId}" not found. List pieces first.`,
       };
     }
+
+    const prevColor = state.simulation.pieceEmission[pieceId];
+    const prevIntensity = state.simulation.pieceEmissionIntensity[pieceId];
 
     // Clamp intensity to [0, 5]
     const intensity = Math.max(0, Math.min(5, rawIntensity));
@@ -377,7 +398,11 @@ const setPieceEmissionTool: ToolDefinition = {
         emissionIntensity: intensity,
       },
       rollback: () => {
-        dispatch(clearPieceEmission(pieceId));
+        if (prevColor !== undefined) {
+          dispatch(setPieceEmission({ pieceId, color: prevColor, intensity: prevIntensity }));
+        } else {
+          dispatch(clearPieceEmission(pieceId));
+        }
       },
     };
   },

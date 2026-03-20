@@ -443,6 +443,7 @@ const simulationSlice = createSlice({
     /** Set per-piece opacity (0-1). Removes override when fully opaque. */
     setPieceOpacity(state, action: PayloadAction<{ pieceId: string; opacity: number }>) {
       const { pieceId, opacity } = action.payload;
+      if (!Number.isFinite(opacity)) return;
       if (opacity >= 1.0) {
         delete state.pieceOpacity[pieceId];
       } else {
@@ -457,7 +458,7 @@ const simulationSlice = createSlice({
     setPieceEmission(state, action: PayloadAction<{ pieceId: string; color: string; intensity?: number }>) {
       const { pieceId, color, intensity } = action.payload;
       state.pieceEmission[pieceId] = color;
-      if (intensity !== undefined) {
+      if (intensity !== undefined && Number.isFinite(intensity)) {
         state.pieceEmissionIntensity[pieceId] = Math.max(0, Math.min(5, intensity));
       }
     },
