@@ -58,6 +58,8 @@ export function collectInspectionData(
     position: piece.position ?? { x: 0, y: 0 },
     rotation: piece.rotation ?? 0,
     seamAllowance: piece.seamAllowance ?? 0,
+    category: piece.category,
+    interfacingType: piece.interfacingType,
   };
 
   // ─── Fabric ───────────────────────────────────────────────────────────────

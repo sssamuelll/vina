@@ -18,8 +18,11 @@ import {
   removeSnapshot,
   setActiveSnapshot,
 } from '../../../../store/simulationSlice';
+import { updatePiece } from '../../../../store/projectSlice';
 import type { FitMapMode } from '../../../../utils/cloth/fitMaps';
+import type { InterfacingType } from '../../../../types/types';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
+import { computeStiffnessMultiplier } from '../../../../utils/cloth/interfacing';
 
 // ─── setFabric ──────────────────────────────────────────────────────────────
 
@@ -321,6 +324,119 @@ const deleteSimulationStateTool: ToolDefinition = {
   },
 };
 
+// ─── setInterfacing ────────────────────────────────────────────────────────
+
+const VALID_INTERFACING: InterfacingType[] = [
+  'none', 'fusible-light', 'fusible-medium', 'fusible-heavy',
+  'sew-in-light', 'sew-in-heavy', 'canvas',
+];
+
+const setInterfacingTool: ToolDefinition = {
+  name: 'setInterfacing',
+  description:
+    'Set the interfacing type for a pattern piece. Interfacing stiffens the fabric for structural support. ' +
+    '/ Establecer el tipo de entretela para una pieza de patrón. La entretela rigidiza la tela para soporte estructural.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece / ID de la pieza' },
+      interfacingType: {
+        type: 'string',
+        enum: VALID_INTERFACING,
+        description: 'Interfacing type / Tipo de entretela',
+      },
+    },
+    required: ['pieceId', 'interfacingType'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const interfacingType = params.interfacingType as InterfacingType;
+    const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+    if (!VALID_INTERFACING.includes(interfacingType)) {
+      return { success: false, error: `Invalid interfacing type "${interfacingType}"` };
+    }
+    dispatch(updatePiece({ ...piece, interfacingType, updatedAt: Date.now() }));
+    const multiplier = computeStiffnessMultiplier(interfacingType, piece.solidifyFactor);
+    return { success: true, data: { pieceId, interfacingType, stiffnessMultiplier: multiplier } };
+  },
+};
+
+// ─── setSolidify ───────────────────────────────────────────────────────────
+
+const setSolidifyTool: ToolDefinition = {
+  name: 'setSolidify',
+  description:
+    'Set the solidify factor (0–1) for a pattern piece. Solidify adds extra stiffness beyond interfacing. ' +
+    '/ Establecer el factor de solidificación (0–1) para una pieza. Solidificar añade rigidez extra más allá de la entretela.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece / ID de la pieza' },
+      solidifyFactor: {
+        type: 'number',
+        description: 'Solidify factor 0–1 (0 = none, 1 = maximum stiffness) / Factor de solidificación 0–1',
+      },
+    },
+    required: ['pieceId', 'solidifyFactor'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const raw = params.solidifyFactor as number;
+    const solidifyFactor = Math.max(0, Math.min(1, raw));
+    const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+    dispatch(updatePiece({ ...piece, solidifyFactor, updatedAt: Date.now() }));
+    const multiplier = computeStiffnessMultiplier(piece.interfacingType, solidifyFactor);
+    return { success: true, data: { pieceId, solidifyFactor, stiffnessMultiplier: multiplier } };
+  },
+};
+
+// ─── getSimulationProperties ───────────────────────────────────────────────
+
+const getSimulationPropertiesTool: ToolDefinition = {
+  name: 'getSimulationProperties',
+  description:
+    'Get simulation-related properties (fabric, interfacing, solidify, effective stiffness) for one or all pieces. ' +
+    '/ Obtener propiedades de simulación (tela, entretela, solidificación, rigidez efectiva) para una o todas las piezas.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Optional piece ID; omit for all pieces / ID de pieza opcional; omitir para todas' },
+    },
+  },
+  execute: async (params, _dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const pieces = state.project.pieces;
+    const targetId = params.pieceId as string | undefined;
+
+    const targets = targetId
+      ? pieces.filter((p: { id: string }) => p.id === targetId)
+      : pieces;
+
+    if (targetId && targets.length === 0) {
+      return { success: false, error: `Piece "${targetId}" not found` };
+    }
+
+    const result = targets.map((p: {
+      id: string; name: string; fabricId?: string;
+      interfacingType?: InterfacingType; solidifyFactor?: number;
+    }) => ({
+      pieceId: p.id,
+      name: p.name,
+      fabricId: p.fabricId ?? null,
+      interfacingType: p.interfacingType ?? 'none',
+      solidifyFactor: p.solidifyFactor ?? 0,
+      stiffnessMultiplier: computeStiffnessMultiplier(
+        (p.interfacingType as InterfacingType) ?? 'none',
+        p.solidifyFactor ?? 0,
+      ),
+    }));
+
+    return { success: true, data: { pieces: result } };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   setFabricTool,
   listFabricsTool,
@@ -332,4 +448,7 @@ export const tools: ToolDefinition[] = [
   restoreSimulationStateTool,
   listSimulationStatesTool,
   deleteSimulationStateTool,
+  setInterfacingTool,
+  setSolidifyTool,
+  getSimulationPropertiesTool,
 ];
