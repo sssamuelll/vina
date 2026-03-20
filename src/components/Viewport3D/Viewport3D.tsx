@@ -44,10 +44,10 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins } from '../../store/simulationSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
-import { setArrangement3D } from '../../store/projectSlice';
+import { setArrangement3D, clearArrangementOverrides } from '../../store/projectSlice';
 import { setCopilotOpen, setSidebarTab } from '../../store/layoutSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
@@ -137,6 +137,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const defaultFabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const showGarment = useSelector((s: RootState) => s.simulation.showGarment);
+  const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
+  const flippedPieceIds = useSelector((s: RootState) => s.simulation.flippedPieceIds);
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const { groundVisible, shadowOpacity, shadowBlur } = useSelector((s: RootState) => s.renderSettings);
   const playbackState = useSelector((s: RootState) => s.animation.playbackState);
@@ -539,6 +541,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
           (() => {
             const placements = placeGarmentPieces(pieces, avatar.measurements);
             return pieces.map((piece, i) => {
+              if (hiddenPieceIds.includes(piece.id)) return null;
               const fabricId = pieceFabrics[piece.id] || defaultFabricId;
               const fabric = FABRIC_LIBRARY[fabricId];
               return (
@@ -696,6 +699,15 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onInspect={(pieceId) => {
           dispatchInspectPiece(dispatch, pieceId);
         }}
+        onToggleHide={(id) => dispatch(toggleHide3D(id))}
+        onToggleFlipNormal={(id) => dispatch(toggleFlipNormal(id))}
+        onShowAll={() => dispatch(showAll3D())}
+        onResetAll3D={() => {
+          dispatch(clearArrangementOverrides());
+          dispatch(showAll3D());
+        }}
+        isPieceHidden={ctxMenu.pieceId ? hiddenPieceIds.includes(ctxMenu.pieceId) : false}
+        isPieceFlipped={ctxMenu.pieceId ? flippedPieceIds.includes(ctxMenu.pieceId) : false}
       />
     </div>
   );

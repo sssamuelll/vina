@@ -44,6 +44,12 @@ interface ContextMenu3DProps {
   onInspect?: (pieceId: string) => void;
   onDeactivatePiece?: (pieceId: string, active: boolean) => void;
   isPieceActive?: boolean;
+  onToggleHide?: (pieceId: string) => void;
+  onToggleFlipNormal?: (pieceId: string) => void;
+  onShowAll?: () => void;
+  onResetAll3D?: () => void;
+  isPieceHidden?: boolean;
+  isPieceFlipped?: boolean;
 }
 
 export default function ContextMenu3D({
@@ -53,7 +59,6 @@ export default function ContextMenu3D({
   onToggleAvatar,
   onSnapshot,
   onSelectPiece,
-  onResetArrangement,
   onResetPieceArrangement,
   onResetPose,
   onShowProperties,
@@ -62,6 +67,12 @@ export default function ContextMenu3D({
   onInspect,
   onDeactivatePiece,
   isPieceActive,
+  onToggleHide,
+  onToggleFlipNormal,
+  onShowAll,
+  onResetAll3D,
+  isPieceHidden,
+  isPieceFlipped,
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -101,6 +112,16 @@ export default function ContextMenu3D({
       label: 'Reset 3D Arrangement',
       icon: '↩',
       action: () => act(() => onResetPieceArrangement?.(pid)),
+    });
+    items.push({
+      label: isPieceHidden ? 'Show Piece' : 'Hide Piece',
+      icon: isPieceHidden ? '👁' : '🙈',
+      action: () => act(() => onToggleHide?.(pid)),
+    });
+    items.push({
+      label: isPieceFlipped ? 'Unflip Normal' : 'Flip Normal',
+      icon: '🔄',
+      action: () => act(() => onToggleFlipNormal?.(pid)),
       separator: true,
     });
     items.push({
@@ -187,10 +208,15 @@ export default function ContextMenu3D({
       action: () => act(() => onToggleAvatar?.()),
     });
     items.push({
-      label: 'Reset 3D Arrangement',
+      label: 'Show All Pieces',
+      icon: '👁',
+      action: () => act(() => onShowAll?.()),
+    });
+    items.push({
+      label: 'Reset All 3D',
       icon: '↩',
       shortcut: 'Ctrl+F',
-      action: () => act(() => onResetArrangement?.()),
+      action: () => act(() => onResetAll3D?.()),
       separator: true,
     });
     items.push({
