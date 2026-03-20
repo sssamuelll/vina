@@ -122,6 +122,12 @@ interface SimulationSliceState {
   }>;
   /** Per-piece UV transform */
   pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number }>;
+  /** Per-piece opacity overrides (0-1, undefined = use fabric default) */
+  pieceOpacity: Record<string, number>;
+  /** Per-piece emission color (hex, undefined = no emission) */
+  pieceEmission: Record<string, string>;
+  /** Per-piece emission intensity (0-5, default 0) */
+  pieceEmissionIntensity: Record<string, number>;
   /** Steam brush tool state (damps particle velocity on brush stroke) */
   steamBrush: {
     active: boolean;
@@ -173,6 +179,9 @@ const initialState: SimulationSliceState = {
   pieceTints: {},
   pieceTextureOverrides: {},
   pieceUVTransforms: {},
+  pieceOpacity: {},
+  pieceEmission: {},
+  pieceEmissionIntensity: {},
   steamBrush: {
     active: false,
     radius: 0.05,
@@ -429,6 +438,36 @@ const simulationSlice = createSlice({
       };
     },
 
+    // ─── Opacity & Emission ──────────────────────────────────────────────────
+
+    /** Set per-piece opacity (0-1). Removes override when fully opaque. */
+    setPieceOpacity(state, action: PayloadAction<{ pieceId: string; opacity: number }>) {
+      const { pieceId, opacity } = action.payload;
+      if (!Number.isFinite(opacity)) return;
+      if (opacity >= 1.0) {
+        delete state.pieceOpacity[pieceId];
+      } else {
+        state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity));
+      }
+    },
+    /** Clear per-piece opacity override. */
+    clearPieceOpacity(state, action: PayloadAction<string>) {
+      delete state.pieceOpacity[action.payload];
+    },
+    /** Set per-piece emission color and optional intensity. */
+    setPieceEmission(state, action: PayloadAction<{ pieceId: string; color: string; intensity?: number }>) {
+      const { pieceId, color, intensity } = action.payload;
+      state.pieceEmission[pieceId] = color;
+      if (intensity !== undefined && Number.isFinite(intensity)) {
+        state.pieceEmissionIntensity[pieceId] = Math.max(0, Math.min(5, intensity));
+      }
+    },
+    /** Clear per-piece emission color and intensity. */
+    clearPieceEmission(state, action: PayloadAction<string>) {
+      delete state.pieceEmission[action.payload];
+      delete state.pieceEmissionIntensity[action.payload];
+    },
+
     // ─── Steam Brush ──────────────────────────────────────────────────────────
 
     /** Activate or deactivate the steam brush tool. */
@@ -511,6 +550,11 @@ export const {
   setPieceTint,
   setPieceTextureOverride,
   setPieceUVTransform,
+  // Opacity & emission
+  setPieceOpacity,
+  clearPieceOpacity,
+  setPieceEmission,
+  clearPieceEmission,
   // Steam brush
   setSteamBrushActive,
   setSteamBrushRadius,
