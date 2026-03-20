@@ -1,12 +1,11 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { addPiece, removePiece, addSeam } from '../../store/projectSlice';
+import { addPiece, removePiece, addSeam, updatePiece } from '../../store/projectSlice';
 import type { Point2D, PatternPiece, Seam } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
 import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
-import { detectSemanticEdges } from '../../utils/semanticEdges';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 
 export interface ScissorsState {
@@ -159,23 +158,16 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
 
           // Auto-sew: detect edges and create seam on cut edges
           if (autoSew) {
-            const edgesA = detectSemanticEdges(pieceA);
-            const edgesB = detectSemanticEdges(pieceB);
-            pieceA.edges = edgesA;
-            pieceB.edges = edgesB;
-
             const cutPair = findCutEdgePair(pieceA, pieceB);
             if (cutPair) {
+              dispatch(updatePiece({ ...pieceA, edges: cutPair.edgesA }));
+              dispatch(updatePiece({ ...pieceB, edges: cutPair.edgesB }));
               dispatch(addSeam({
                 id: `cut-seam-${Date.now()}`,
                 pieceA: { pieceId: pieceA.id, edgeName: cutPair.edgeA.name },
                 pieceB: { pieceId: pieceB.id, edgeName: cutPair.edgeB.name },
                 type: seamType,
-                tension: 100,
-                strength: 1.0,
-                active: true,
-                taped: false,
-                tapeWidth: 10,
+                tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
               }));
             }
           }

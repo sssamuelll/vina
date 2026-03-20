@@ -502,7 +502,7 @@ function computeEdgeMidpoint(
 export function findCutEdgePair(
   pieceA: PatternPiece,
   pieceB: PatternPiece,
-): { edgeA: SemanticEdge; edgeB: SemanticEdge } | null {
+): { edgeA: SemanticEdge; edgeB: SemanticEdge; edgesA: SemanticEdge[]; edgesB: SemanticEdge[] } | null {
   // Step 1: Detect semantic edges if not already present
   const edgesA = pieceA.edges && pieceA.edges.length > 0
     ? pieceA.edges
@@ -511,16 +511,12 @@ export function findCutEdgePair(
     ? pieceB.edges
     : detectSemanticEdges(pieceB);
 
-  // Update the pieces' edges field
-  pieceA.edges = edgesA;
-  pieceB.edges = edgesB;
-
   if (edgesA.length === 0 || edgesB.length === 0) return null;
 
   const MIDPOINT_TOLERANCE = 20; // mm
   const ARC_LENGTH_TOLERANCE = 0.05; // 5%
 
-  let bestPair: { edgeA: SemanticEdge; edgeB: SemanticEdge } | null = null;
+  let bestPair: { edgeA: SemanticEdge; edgeB: SemanticEdge; edgesA: SemanticEdge[]; edgesB: SemanticEdge[] } | null = null;
   let bestDist = Infinity;
 
   for (const eA of edgesA) {
@@ -548,7 +544,7 @@ export function findCutEdgePair(
 
       if (dist < bestDist) {
         bestDist = dist;
-        bestPair = { edgeA: eA, edgeB: eB };
+        bestPair = { edgeA: eA, edgeB: eB, edgesA, edgesB };
       }
     }
   }

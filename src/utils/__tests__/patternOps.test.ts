@@ -116,11 +116,14 @@ describe('findCutEdgePair', () => {
     // The matching edges should have similar names (both are horizontal edges at the cut line)
     expect(result!.edgeA.name).toBeDefined();
     expect(result!.edgeB.name).toBeDefined();
-    // Both pieces should now have edges populated
-    expect(pieceA.edges).toBeDefined();
-    expect(pieceA.edges!.length).toBeGreaterThan(0);
-    expect(pieceB.edges).toBeDefined();
-    expect(pieceB.edges!.length).toBeGreaterThan(0);
+    // Return includes detected edges
+    expect(result!.edgesA).toBeDefined();
+    expect(result!.edgesA.length).toBeGreaterThan(0);
+    expect(result!.edgesB).toBeDefined();
+    expect(result!.edgesB.length).toBeGreaterThan(0);
+    // Input pieces NOT mutated (pure function)
+    expect(pieceA.edges).toBeUndefined();
+    expect(pieceB.edges).toBeUndefined();
   });
 
   it('returns null when pieces do not share a cut edge', () => {

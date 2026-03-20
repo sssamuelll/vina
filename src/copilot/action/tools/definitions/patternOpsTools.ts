@@ -5,6 +5,11 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
 
+function requireFiniteNumber(value: unknown, name: string): string | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
+  return null;
+}
+
 export const tools: ToolDefinition[] = [
   {
     name: 'splitPiece',
@@ -30,26 +35,35 @@ export const tools: ToolDefinition[] = [
     },
     execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
       const { splitPiece, findCutEdgePair } = await import('../../../../utils/patternOps');
-      const { detectSemanticEdges } = await import('../../../../utils/semanticEdges');
-      const { addPiece, removePiece, addSeam } = await import('../../../../store/projectSlice');
+      const { addPiece, removePiece, removeSeam, addSeam, updatePiece } = await import('../../../../store/projectSlice');
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
-      const [a, b] = splitPiece(piece, params.axis as 'horizontal' | 'vertical', params.position as number);
-      dispatch(removePiece(piece.id));
+
+      const posErr = requireFiniteNumber(params.position, 'position');
+      if (posErr) return { success: false, error: posErr };
+
+      const originalPiece = JSON.parse(JSON.stringify(piece));
+
+      let a, b;
+      try {
+        [a, b] = splitPiece(piece, params.axis as 'horizontal' | 'vertical', params.position as number);
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Split failed' };
+      }
+
+      dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
       dispatch(addPiece(a));
       dispatch(addPiece(b));
 
       // Auto-sew cut edges unless explicitly disabled
       let seamInfo: Record<string, unknown> | undefined;
       if (params.autoSew !== false) {
-        const edgesA = detectSemanticEdges(a);
-        const edgesB = detectSemanticEdges(b);
-        a.edges = edgesA;
-        b.edges = edgesB;
-
         const cutPair = findCutEdgePair(a, b);
         if (cutPair) {
+          // Persist detected edges to Redux store
+          dispatch(updatePiece({ ...a, edges: cutPair.edgesA }));
+          dispatch(updatePiece({ ...b, edges: cutPair.edgesB }));
           const seamId = `cut-seam-${Date.now()}`;
           const seamTypeVal = (params.seamType as string) || 'standard';
           dispatch(addSeam({
@@ -57,18 +71,9 @@ export const tools: ToolDefinition[] = [
             pieceA: { pieceId: a.id, edgeName: cutPair.edgeA.name },
             pieceB: { pieceId: b.id, edgeName: cutPair.edgeB.name },
             type: seamTypeVal as 'standard' | 'french' | 'flat-felled' | 'overlock',
-            tension: 100,
-            strength: 1.0,
-            active: true,
-            taped: false,
-            tapeWidth: 10,
+            tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
           }));
-          seamInfo = {
-            seamId,
-            edgeA: cutPair.edgeA.name,
-            edgeB: cutPair.edgeB.name,
-            type: seamTypeVal,
-          };
+          seamInfo = { seamId, edgeA: cutPair.edgeA.name, edgeB: cutPair.edgeB.name, type: seamTypeVal };
         }
       }
 
@@ -78,6 +83,14 @@ export const tools: ToolDefinition[] = [
           pieceA: { id: a.id, name: a.name },
           pieceB: { id: b.id, name: b.name },
           ...(seamInfo ? { seam: seamInfo } : {}),
+        },
+        rollback: () => {
+          dispatch(removePiece(a.id));
+          dispatch(removePiece(b.id));
+          if (seamInfo) {
+            dispatch(removeSeam(seamInfo.seamId as string));
+          }
+          dispatch(addPiece(originalPiece));
         },
       };
     },
@@ -225,12 +238,18 @@ export const tools: ToolDefinition[] = [
     },
     execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
       const { splitPieceAtLine, findCutEdgePair } = await import('../../../../utils/patternOps');
-      const { detectSemanticEdges } = await import('../../../../utils/semanticEdges');
-      const { addPiece, removePiece, addSeam } = await import('../../../../store/projectSlice');
+      const { addPiece, removePiece, removeSeam, addSeam, updatePiece } = await import('../../../../store/projectSlice');
 
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
+
+      for (const [name, val] of [['startX', params.startX], ['startY', params.startY], ['endX', params.endX], ['endY', params.endY]] as const) {
+        const err = requireFiniteNumber(val, name);
+        if (err) return { success: false, error: err };
+      }
+
+      const originalPiece = JSON.parse(JSON.stringify(piece));
 
       const startX = params.startX as number;
       const startY = params.startY as number;
@@ -248,19 +267,16 @@ export const tools: ToolDefinition[] = [
         return { success: false, error: err instanceof Error ? err.message : 'Cut failed' };
       }
 
-      dispatch(removePiece(piece.id));
+      dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
       dispatch(addPiece(a));
       dispatch(addPiece(b));
 
       // Auto-sew the cut edges
-      const edgesA = detectSemanticEdges(a);
-      const edgesB = detectSemanticEdges(b);
-      a.edges = edgesA;
-      b.edges = edgesB;
-
       let seamInfo: Record<string, unknown> | undefined;
       const cutPair = findCutEdgePair(a, b);
       if (cutPair) {
+        dispatch(updatePiece({ ...a, edges: cutPair.edgesA }));
+        dispatch(updatePiece({ ...b, edges: cutPair.edgesB }));
         const seamId = `cut-seam-${Date.now()}`;
         const seamTypeVal = (params.seamType as string) || 'standard';
         dispatch(addSeam({
@@ -268,18 +284,9 @@ export const tools: ToolDefinition[] = [
           pieceA: { pieceId: a.id, edgeName: cutPair.edgeA.name },
           pieceB: { pieceId: b.id, edgeName: cutPair.edgeB.name },
           type: seamTypeVal as 'standard' | 'french' | 'flat-felled' | 'overlock',
-          tension: 100,
-          strength: 1.0,
-          active: true,
-          taped: false,
-          tapeWidth: 10,
+          tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
         }));
-        seamInfo = {
-          seamId,
-          edgeA: cutPair.edgeA.name,
-          edgeB: cutPair.edgeB.name,
-          type: seamTypeVal,
-        };
+        seamInfo = { seamId, edgeA: cutPair.edgeA.name, edgeB: cutPair.edgeB.name, type: seamTypeVal };
       }
 
       return {
@@ -288,6 +295,14 @@ export const tools: ToolDefinition[] = [
           pieceA: { id: a.id, name: a.name },
           pieceB: { id: b.id, name: b.name },
           ...(seamInfo ? { seam: seamInfo } : {}),
+        },
+        rollback: () => {
+          dispatch(removePiece(a.id));
+          dispatch(removePiece(b.id));
+          if (seamInfo) {
+            dispatch(removeSeam(seamInfo.seamId as string));
+          }
+          dispatch(addPiece(originalPiece));
         },
       };
     },
