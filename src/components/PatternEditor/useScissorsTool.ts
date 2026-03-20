@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { addPiece, removePiece } from '../../store/projectSlice';
-import type { Point2D, PatternPiece } from '../../types/types';
+import { addPiece, removePiece, addSeam } from '../../store/projectSlice';
+import type { Point2D, PatternPiece, Seam } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
-import { splitPieceAtLine } from '../../utils/patternOps';
+import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
+import { detectSemanticEdges } from '../../utils/semanticEdges';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 
 export interface ScissorsState {
@@ -32,6 +33,8 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
+  const autoSew = useSelector((s: RootState) => s.tools.toolOptions?.scissors?.autoSew ?? true) as boolean;
+  const seamType = useSelector((s: RootState) => s.tools.toolOptions?.scissors?.seamType ?? 'standard') as Seam['type'];
   const guardAction = useGuardedAction();
 
   const [state, setState] = useState<ScissorsState>(INITIAL_STATE);
@@ -153,6 +156,30 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
           dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
           dispatch(addPiece(pieceA));
           dispatch(addPiece(pieceB));
+
+          // Auto-sew: detect edges and create seam on cut edges
+          if (autoSew) {
+            const edgesA = detectSemanticEdges(pieceA);
+            const edgesB = detectSemanticEdges(pieceB);
+            pieceA.edges = edgesA;
+            pieceB.edges = edgesB;
+
+            const cutPair = findCutEdgePair(pieceA, pieceB);
+            if (cutPair) {
+              dispatch(addSeam({
+                id: `cut-seam-${Date.now()}`,
+                pieceA: { pieceId: pieceA.id, edgeName: cutPair.edgeA.name },
+                pieceB: { pieceId: pieceB.id, edgeName: cutPair.edgeB.name },
+                type: seamType,
+                tension: 100,
+                strength: 1.0,
+                active: true,
+                taped: false,
+                tapeWidth: 10,
+              }));
+            }
+          }
+
           reset();
         } catch (err) {
           setState(prev => ({
@@ -162,7 +189,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
         }
       });
     },
-    [toPattern, pieces, selectedPieceIds, snapToOutline, validateCut, dispatch, reset, guardAction],
+    [toPattern, pieces, selectedPieceIds, snapToOutline, validateCut, dispatch, reset, guardAction, autoSew, seamType],
   );
 
   const handleMouseMove = useCallback(
