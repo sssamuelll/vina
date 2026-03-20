@@ -3,8 +3,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer } from '../../store/projectSlice';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
-import type { NotchShape, NotchOptions } from '../../types/types';
+import type { NotchShape, NotchOptions, InterfacingType } from '../../types/types';
 import type { PatternPiece } from '../../types/types';
+import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import PropertySection from './PropertySection';
 
 interface PiecePropertiesProps {
@@ -78,6 +79,36 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           ))}
         </select>
       </div>
+      <div className="panel-field">
+        <label>Interfacing</label>
+        <select
+          className="panel-input"
+          value={piece.interfacingType || 'none'}
+          onChange={e => dispatch(updatePiece({ ...piece, interfacingType: e.target.value as InterfacingType, updatedAt: Date.now() }))}
+        >
+          <option value="none">None</option>
+          <option value="fusible-light">Fusible Light (2x)</option>
+          <option value="fusible-medium">Fusible Medium (4x)</option>
+          <option value="fusible-heavy">Fusible Heavy (8x)</option>
+          <option value="sew-in-light">Sew-in Light (1.5x)</option>
+          <option value="sew-in-heavy">Sew-in Heavy (3x)</option>
+          <option value="canvas">Canvas (10x)</option>
+        </select>
+      </div>
+      <div className="panel-field">
+        <label>Solidify</label>
+        <input
+          type="range" className="panel-slider"
+          min={0} max={100} value={Math.round((piece.solidifyFactor ?? 0) * 100)}
+          onChange={e => dispatch(updatePiece({ ...piece, solidifyFactor: Number(e.target.value) / 100, updatedAt: Date.now() }))}
+        />
+        <span className="panel-value">{((piece.solidifyFactor ?? 0) * 100).toFixed(0)}%</span>
+      </div>
+      {(piece.interfacingType && piece.interfacingType !== 'none' || (piece.solidifyFactor ?? 0) > 0) && (
+        <div style={{ fontSize: 10, color: '#888', padding: '2px 0' }}>
+          Effective stiffness: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x
+        </div>
+      )}
       <div className="panel-field">
         <label>Mirror</label>
         <input

@@ -34,6 +34,8 @@ export interface MeshedPiece {
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
   /** UV coordinates from 2D pattern space for texture mapping */
   uvs?: Float32Array;
+  /** Per-piece stiffness multiplier (>1 = stiffer, from interfacing/solidify). Default 1. */
+  stiffnessMultiplier?: number;
 }
 
 interface UseMeshingProps {
