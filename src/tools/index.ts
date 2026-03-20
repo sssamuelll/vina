@@ -52,6 +52,8 @@ import { simulateTool } from './definitions/simulate';
 import { steamBrushTool } from './definitions/steamBrush';
 import { meshGrabTool } from './definitions/meshGrab';
 import { pomMeasureTool } from './definitions/pomMeasure';
+import { offsetOutlineTool } from './definitions/offsetOutline';
+import { extendTrimTool } from './definitions/extendTrim';
 
 // Register all tools
 const allTools = [
@@ -81,6 +83,8 @@ const allTools = [
   addPieceTool,
   fabricTextureTool,
   flattenTool,
+  offsetOutlineTool,
+  extendTrimTool,
   
   // 2D Tools — Sewing
   seamTool,
