@@ -150,6 +150,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
+  const pieceOpacity = useSelector((s: RootState) => s.simulation.pieceOpacity);
+  const pieceEmission = useSelector((s: RootState) => s.simulation.pieceEmission);
+  const pieceEmissionIntensity = useSelector((s: RootState) => s.simulation.pieceEmissionIntensity);
   const steamBrush = useSelector((s: RootState) => s.simulation.steamBrush);
   const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
@@ -532,6 +535,30 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   }, [fabricId]);
 
+  // Effective opacity: per-piece override OR fabric default
+  const effectiveOpacity = useMemo(() => {
+    for (const p of activePieces) {
+      if (pieceOpacity[p.id] !== undefined) return pieceOpacity[p.id];
+    }
+    return renderParams.opacity;
+  }, [activePieces, pieceOpacity, renderParams.opacity]);
+
+  // Effective emission color
+  const effectiveEmission = useMemo(() => {
+    for (const p of activePieces) {
+      if (pieceEmission[p.id]) return pieceEmission[p.id];
+    }
+    return undefined;
+  }, [activePieces, pieceEmission]);
+
+  // Effective emission intensity
+  const effectiveEmissionIntensity = useMemo(() => {
+    for (const p of activePieces) {
+      if (pieceEmissionIntensity[p.id] !== undefined) return pieceEmissionIntensity[p.id];
+    }
+    return 0;
+  }, [activePieces, pieceEmissionIntensity]);
+
   // Create TSL node material when solver initializes.
   // tslSolverRef.current is used as a dep — it's a ref value that only changes
   // when setTslGeneration triggers a re-render in useSimulationLifecycle.
@@ -549,9 +576,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     mat.normalNode = solver.normalBufNode.toAttribute();
     mat.side = THREE.DoubleSide;
     mat.transparent = true;
-    mat.opacity = renderParams.opacity;
+    mat.opacity = effectiveOpacity;
     mat.roughness = renderParams.roughness;
     mat.metalness = renderParams.metalness;
+    if (effectiveEmission) {
+      mat.emissive = new THREE.Color(effectiveEmission);
+      mat.emissiveIntensity = effectiveEmissionIntensity;
+    }
     setTslMaterial(mat);
 
     return () => {
@@ -559,7 +590,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       setTslMaterial(null);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tslSolverRef.current, staticGeometry]);
+  }, [tslSolverRef.current, staticGeometry, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity]);
 
   // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {
@@ -973,8 +1004,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             vertexColors={fitMapMode !== 'none'}
             color={effectiveTint || '#ffffff'}
             side={THREE.DoubleSide}
-            transparent
-            opacity={renderParams.opacity}
+            transparent={effectiveOpacity < 1}
+            opacity={effectiveOpacity}
             roughness={renderParams.roughness}
             metalness={renderParams.metalness}
             sheen={renderParams.sheen}
@@ -985,6 +1016,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             transmission={renderParams.transmission}
             thickness={renderParams.thickness}
             ior={renderParams.ior}
+            emissive={effectiveEmission ? new THREE.Color(effectiveEmission) : undefined}
+            emissiveIntensity={effectiveEmissionIntensity}
             map={fitMapMode === 'none' ? textures.map : null}
             normalMap={textures.normalMap}
             roughnessMap={fitMapMode === 'none' ? textures.roughnessMap : null}
