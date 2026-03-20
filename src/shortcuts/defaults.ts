@@ -54,6 +54,8 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.topstitchSeamline', key: ';', label: 'Seamline Topstitch', category: '2D Tools', context: '2d' },
 
   { id: 'tool.pomMeasure', key: 'p', label: 'POM Measure', category: '2D Tools', context: '2d' },
+  { id: 'tool.offsetOutline', key: 'r', label: 'Offset Outline', category: '2D Tools', context: '2d' },
+  { id: 'tool.extendTrim', key: 'u', label: 'Extend / Trim', category: '2D Tools', context: '2d' },
 
   // ─── Sewing ─────────────────────────────────────────────────────────────────
   { id: 'tool.seam', key: 'b', label: 'Edit Sewing (Seam)', category: 'Sewing', context: '2d' },

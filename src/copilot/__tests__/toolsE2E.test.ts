@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 123 tools registered', () => {
-      expect(registry.size).toBe(151); // +4 POM tools + 8 sewing enhancement tools + 3 interfacing/solidify tools + 1 cutAndSew
+      expect(registry.size).toBe(154); // +4 POM tools + 8 sewing enhancement tools + 3 interfacing/solidify tools + 1 cutAndSew + 3 offset/extend/trim tools
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(151); // +4 POM tools + 8 sewing enhancement tools + 3 interfacing/solidify tools + 1 cutAndSew
+      expect(names.length).toBe(154); // +4 POM tools + 8 sewing enhancement tools + 3 interfacing/solidify tools + 1 cutAndSew + 3 offset/extend/trim tools
 
       // Key tools from every category
       const expected = [

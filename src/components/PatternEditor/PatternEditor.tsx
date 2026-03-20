@@ -22,6 +22,8 @@ import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useTopstitchTool } from './useTopstitchTool';
 import { useWalkSeamTool } from './useWalkSeamTool';
+import { useOffsetTool } from './useOffsetTool';
+import { useExtendTrimTool } from './useExtendTrimTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
@@ -108,6 +110,8 @@ export default function PatternEditor() {
   const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
   const topstitchTool = useTopstitchTool(zoom2D, pan2D, pieces);
   const walkSeamTool = useWalkSeamTool(zoom2D, pan2D);
+  const offsetTool = useOffsetTool(zoom2D, pan2D);
+  const extendTrimTool = useExtendTrimTool(zoom2D, pan2D);
   const freeSewingMode = (toolOptions?.freesewing?.sewingType as 'free' | 'point') ?? 'free';
   const freeSewingTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete, freeSewingMode);
 
@@ -239,7 +243,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool,
     });
 
   const handleZoomToFit = useCallback(() => {
@@ -380,6 +384,12 @@ export default function PatternEditor() {
             freeSewingFirstEdge={freeSewingTool.firstEdge}
             freeSewingHoveredEdge={freeSewingTool.hoveredEdge}
             freeSewingMode={freeSewingTool.mode}
+            offsetPreviewOutline={offsetTool.previewOutline}
+            offsetPreviewPiecePosition={
+              editor.selectedPieceIds.length === 1
+                ? pieces.find(p => p.id === editor.selectedPieceIds[0])?.position ?? null
+                : null
+            }
             selectMarquee={selectMarquee}
           />
         </g>

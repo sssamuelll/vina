@@ -11,6 +11,9 @@ import type { PatternPiece, PathCommand, SemanticEdge, Dart, Point2D } from '../
 import { findOutlineIntersections, splitOutlineAtPoints } from './geometry/splitOutline';
 import { findSharedEdge, mergeOutlines } from './geometry/mergeOutline';
 import { detectSemanticEdges } from './semanticEdges';
+import { getEdgeEndpoints } from './geometry/path';
+import { generateSeamAllowance, flattenPath } from './seam';
+import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
 
 let _counter = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
@@ -550,4 +553,233 @@ export function findCutEdgePair(
   }
 
   return bestPair;
+}
+
+// ─── offsetPieceOutline ──────────────────────────────────────────────────────
+
+const CLIPPER_SCALE = 100;
+
+/**
+ * Offset a piece's outline by a distance. Positive = outward, negative = inward.
+ * Returns new PathCommand[] or null if the offset collapses the shape.
+ */
+export function offsetPieceOutline(
+  piece: PatternPiece,
+  distance: number,
+  joinType: 'round' | 'miter' | 'square' = 'round',
+): PathCommand[] | null {
+  if (distance === 0) return piece.outline.map(c => ({ type: c.type, values: [...c.values] }));
+
+  // Positive offset can use the existing seam allowance helper
+  if (distance > 0) {
+    const result = generateSeamAllowance(piece.outline, distance, joinType);
+    return result.length > 0 ? result : null;
+  }
+
+  // Negative (inward) offset — call Clipper2 directly since generateSeamAllowance
+  // only supports positive widths.
+  const flat = flattenPath(piece.outline);
+  if (flat.length < 3) return null;
+
+  // Remove closing duplicate if present
+  const last = flat[flat.length - 1];
+  const pts = (Math.abs(flat[0].x - last.x) < 0.001 && Math.abs(flat[0].y - last.y) < 0.001)
+    ? flat.slice(0, -1)
+    : flat;
+  if (pts.length < 3) return null;
+
+  const clipperPath = new Path64();
+  for (const p of pts) {
+    clipperPath.push(new Point64(
+      Math.round(p.x * CLIPPER_SCALE),
+      Math.round(p.y * CLIPPER_SCALE),
+    ));
+  }
+
+  const jt = joinType === 'miter' ? JoinType.Miter
+    : joinType === 'square' ? JoinType.Square
+    : JoinType.Round;
+
+  const co = new ClipperOffset();
+  co.addPath(clipperPath as unknown as Point64[], jt, EndType.Polygon);
+
+  const result = new Paths64();
+  co.execute(distance * CLIPPER_SCALE, result); // negative delta = inward
+
+  if (result.length === 0) return null;
+
+  // Take the largest remaining path
+  let largest = result[0];
+  let largestArea = 0;
+  for (const path of result) {
+    let area = 0;
+    for (let i = 0, n = path.length; i < n; i++) {
+      const j = (i + 1) % n;
+      area += Number(path[i].x) * Number(path[j].y);
+      area -= Number(path[j].x) * Number(path[i].y);
+    }
+    area = Math.abs(area);
+    if (area > largestArea) {
+      largestArea = area;
+      largest = path;
+    }
+  }
+
+  const commands: PathCommand[] = [
+    { type: 'M', values: [Number(largest[0].x) / CLIPPER_SCALE, Number(largest[0].y) / CLIPPER_SCALE] },
+  ];
+  for (let i = 1; i < largest.length; i++) {
+    commands.push({ type: 'L', values: [Number(largest[i].x) / CLIPPER_SCALE, Number(largest[i].y) / CLIPPER_SCALE] });
+  }
+  commands.push({ type: 'Z', values: [] });
+
+  return commands;
+}
+
+// ─── extendEdge ──────────────────────────────────────────────────────────────
+
+/**
+ * Extend an edge at its start or end by a distance along its tangent direction.
+ * Returns a new PatternPiece with modified outline.
+ */
+export function extendEdge(
+  piece: PatternPiece,
+  segmentIndex: number,
+  endpoint: 'start' | 'end',
+  distance: number,
+): PatternPiece {
+  const newPiece = clonePiece(piece, { id: piece.id });
+  const cmds = [...newPiece.outline.map(c => ({ type: c.type, values: [...c.values] }))];
+
+  const ep = getEdgeEndpoints(cmds, segmentIndex);
+  if (!ep) return newPiece;
+
+  // Compute tangent direction
+  const dx = ep.end.x - ep.start.x;
+  const dy = ep.end.y - ep.start.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.001) return newPiece;
+  const ux = dx / len;
+  const uy = dy / len;
+
+  if (endpoint === 'end') {
+    // Extend the endpoint further along the tangent
+    const cmd = cmds[segmentIndex];
+    if (cmd.type === 'L') {
+      cmds[segmentIndex] = { type: 'L', values: [ep.end.x + ux * distance, ep.end.y + uy * distance] };
+    } else if (cmd.type === 'C') {
+      // For cubic bezier, extend the final point along the tangent formed by cp2 → end
+      const cp2x = cmd.values[2], cp2y = cmd.values[3];
+      const ex = cmd.values[4], ey = cmd.values[5];
+      const tdx = ex - cp2x, tdy = ey - cp2y;
+      const tlen = Math.hypot(tdx, tdy);
+      if (tlen > 0.001) {
+        const tux = tdx / tlen, tuy = tdy / tlen;
+        cmds[segmentIndex] = {
+          type: 'C',
+          values: [cmd.values[0], cmd.values[1], cp2x, cp2y, ex + tux * distance, ey + tuy * distance],
+        };
+      }
+    }
+  } else {
+    // Extend the start backwards along the tangent
+    const cmd = cmds[segmentIndex];
+    let startTx = -ux, startTy = -uy; // default: backwards along chord
+    if (cmd.type === 'C' && cmd.values.length >= 6) {
+      // Cubic Bezier: tangent at t=0 is (cp1 - start)
+      const cp1x = cmd.values[0], cp1y = cmd.values[1];
+      const tdx = ep.start.x - cp1x, tdy = ep.start.y - cp1y;
+      const tlen = Math.hypot(tdx, tdy);
+      if (tlen > 0.001) { startTx = tdx / tlen; startTy = tdy / tlen; }
+    } else if (cmd.type === 'Q' && cmd.values.length >= 4) {
+      const cpx = cmd.values[0], cpy = cmd.values[1];
+      const tdx = ep.start.x - cpx, tdy = ep.start.y - cpy;
+      const tlen = Math.hypot(tdx, tdy);
+      if (tlen > 0.001) { startTx = tdx / tlen; startTy = tdy / tlen; }
+    }
+
+    if (segmentIndex === 1) {
+      cmds[0] = { type: 'M', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
+    } else {
+      const prev = cmds[segmentIndex - 1];
+      if (prev.type === 'L') {
+        cmds[segmentIndex - 1] = { type: 'L', values: [ep.start.x + startTx * distance, ep.start.y + startTy * distance] };
+      } else if (prev.type === 'C') {
+        const v = [...prev.values];
+        v[4] = ep.start.x + startTx * distance;
+        v[5] = ep.start.y + startTy * distance;
+        cmds[segmentIndex - 1] = { type: 'C', values: v };
+      } else if (prev.type === 'Q') {
+        const v = [...prev.values];
+        v[2] = ep.start.x + startTx * distance;
+        v[3] = ep.start.y + startTy * distance;
+        cmds[segmentIndex - 1] = { type: 'Q', values: v };
+      }
+    }
+  }
+
+  newPiece.outline = cmds;
+  newPiece.edges = undefined; // invalidate semantic edges
+  newPiece.updatedAt = Date.now();
+  return newPiece;
+}
+
+// ─── trimEdgeAtPoint ────────────────────────────────────────────────────────
+
+/**
+ * Trim an edge at a given point. Keeps the 'before' or 'after' portion.
+ * For 'before': the edge ends at trimPoint.
+ * For 'after': the edge starts at trimPoint.
+ */
+export function trimEdgeAtPoint(
+  piece: PatternPiece,
+  segmentIndex: number,
+  trimPoint: Point2D,
+  keepSide: 'before' | 'after',
+): PatternPiece {
+  const newPiece = clonePiece(piece, { id: piece.id });
+  const cmds = [...newPiece.outline.map(c => ({ type: c.type, values: [...c.values] }))];
+  const cmd = cmds[segmentIndex];
+
+  if (cmd.type === 'L') {
+    if (keepSide === 'before') {
+      cmds[segmentIndex] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+    } else {
+      // Move the previous endpoint to trimPoint
+      if (segmentIndex === 1) {
+        cmds[0] = { type: 'M', values: [trimPoint.x, trimPoint.y] };
+      } else {
+        const prev = cmds[segmentIndex - 1];
+        if (prev.type === 'L') {
+          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+        }
+      }
+    }
+  } else if (cmd.type === 'C') {
+    // Simplified: for cubic bezier, replace with a line to/from the trim point
+    if (keepSide === 'before') {
+      cmds[segmentIndex] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+    } else {
+      if (segmentIndex === 1) {
+        cmds[0] = { type: 'M', values: [trimPoint.x, trimPoint.y] };
+      } else {
+        // Adjust previous segment endpoint to trim point
+        const prev = cmds[segmentIndex - 1];
+        if (prev.type === 'L') {
+          cmds[segmentIndex - 1] = { type: 'L', values: [trimPoint.x, trimPoint.y] };
+        } else if (prev.type === 'C') {
+          const v = [...prev.values];
+          v[4] = trimPoint.x; v[5] = trimPoint.y;
+          cmds[segmentIndex - 1] = { type: 'C', values: v };
+        }
+      }
+      // Replace curve with line from trim point to original end
+      cmds[segmentIndex] = { type: 'L', values: [cmd.values[4], cmd.values[5]] };
+    }
+  }
+
+  newPiece.outline = cmds;
+  newPiece.edges = undefined;
+  newPiece.updatedAt = Date.now();
+  return newPiece;
 }
