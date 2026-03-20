@@ -547,7 +547,8 @@ export class XPBDClothSolver {
     if (!this.stretchCompliances || !this.bendCompliances) return;
 
     // Build vertex → piece index lookup
-    const vertexToPiece = new Uint16Array(this.numParticles);
+    if (pieceOffsets.length !== multipliers.length) return;
+    const vertexToPiece = new Uint32Array(this.numParticles);
     for (let p = 0; p < pieceOffsets.length; p++) {
       const { vertexOffset, vertexCount } = pieceOffsets[p];
       for (let v = vertexOffset; v < vertexOffset + vertexCount; v++) {

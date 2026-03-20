@@ -43,4 +43,18 @@ describe('computeStiffnessMultiplier', () => {
     // fusible-light=2 * 10 = 20
     expect(computeStiffnessMultiplier('fusible-light', 99)).toBe(20);
   });
+
+  it('returns 1.0 when solidifyFactor is NaN', () => {
+    expect(computeStiffnessMultiplier('none', NaN)).toBe(1.0);
+  });
+
+  it('returns finite value when solidifyFactor is Infinity', () => {
+    const result = computeStiffnessMultiplier('none', Infinity);
+    expect(Number.isFinite(result)).toBe(true);
+  });
+
+  it('returns finite value when solidifyFactor is -Infinity', () => {
+    const result = computeStiffnessMultiplier('fusible-medium', -Infinity);
+    expect(Number.isFinite(result)).toBe(true);
+  });
 });

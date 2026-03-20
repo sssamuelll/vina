@@ -15,6 +15,7 @@ export function computeStiffnessMultiplier(
   solidifyFactor: number = 0,
 ): number {
   const interfacingMul = INTERFACING_STIFFNESS[interfacingType] ?? 1.0;
-  const solidifyMul = 1 + Math.max(0, Math.min(1, solidifyFactor)) * 9;
+  const safeSolidify = Number.isFinite(solidifyFactor) ? solidifyFactor : 0;
+  const solidifyMul = 1 + Math.max(0, Math.min(1, safeSolidify)) * 9;
   return Math.min(interfacingMul * solidifyMul, 50); // cap at 50x to prevent instability
 }

@@ -356,9 +356,14 @@ const setInterfacingTool: ToolDefinition = {
     if (!VALID_INTERFACING.includes(interfacingType)) {
       return { success: false, error: `Invalid interfacing type "${interfacingType}"` };
     }
+    const prev = { interfacingType: piece.interfacingType, solidifyFactor: piece.solidifyFactor };
     dispatch(updatePiece({ ...piece, interfacingType, updatedAt: Date.now() }));
     const multiplier = computeStiffnessMultiplier(interfacingType, piece.solidifyFactor);
-    return { success: true, data: { pieceId, interfacingType, stiffnessMultiplier: multiplier } };
+    return {
+      success: true,
+      data: { pieceId, interfacingType, stiffnessMultiplier: multiplier },
+      rollback: () => dispatch(updatePiece({ ...piece, ...prev, updatedAt: Date.now() })),
+    };
   },
 };
 
@@ -382,13 +387,21 @@ const setSolidifyTool: ToolDefinition = {
   },
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const pieceId = params.pieceId as string;
-    const raw = params.solidifyFactor as number;
+    const raw = params.solidifyFactor;
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+      return { success: false, error: 'solidifyFactor must be a valid number' };
+    }
     const solidifyFactor = Math.max(0, Math.min(1, raw));
     const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
     if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+    const prev = { interfacingType: piece.interfacingType, solidifyFactor: piece.solidifyFactor };
     dispatch(updatePiece({ ...piece, solidifyFactor, updatedAt: Date.now() }));
     const multiplier = computeStiffnessMultiplier(piece.interfacingType, solidifyFactor);
-    return { success: true, data: { pieceId, solidifyFactor, stiffnessMultiplier: multiplier } };
+    return {
+      success: true,
+      data: { pieceId, solidifyFactor, stiffnessMultiplier: multiplier },
+      rollback: () => dispatch(updatePiece({ ...piece, ...prev, updatedAt: Date.now() })),
+    };
   },
 };
 
