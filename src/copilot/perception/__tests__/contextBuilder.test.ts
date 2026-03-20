@@ -83,13 +83,14 @@ function mockState(overrides?: Partial<RootState>): RootState {
       },
       avatarMode: 'model',
       avatarModelUrl: null,
-      isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {},
+      isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
     },
     editor: {
       viewMode: 'split',
       activeTool: 'select',
       selectedPieceIds: ['piece-1'],
       selectedSeamId: null,
+      selectedPOMId: null,
       selectedInternalLine: null,
       zoom2D: 1,
       pan2D: { x: 0, y: 0 },
@@ -343,7 +344,7 @@ describe('buildAgentContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {},
+        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
       },
     });
     const context = buildAgentContext(state);
@@ -378,7 +379,7 @@ describe('serializeContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {},
+        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
       },
     });
     const context = buildAgentContext(state);

@@ -200,6 +200,36 @@ export interface SeamGroup {
   tapeWidth: number;
 }
 
+// ─── Points of Measure (POM) ────────────────────────────────────────────────
+
+/** Measurement method — how the value is computed */
+export type POMMethod = 'straight' | 'alongEdge' | 'circumference' | 'height' | 'surfaceTape';
+
+/** Measurement category for grouping and filtering */
+export type POMCategory = 'length' | 'width' | 'circumference' | 'height' | 'custom';
+
+/** A reference point on a pattern piece (piece-local coordinates) */
+export interface POMPoint {
+  pieceId: string;
+  edgeName?: string;
+  t?: number;
+  localPosition: Point2D;
+}
+
+/** Persistent named measurement */
+export interface PointOfMeasure {
+  id: string;
+  name: string;
+  category: POMCategory;
+  method: POMMethod;
+  pointA: POMPoint;
+  pointB: POMPoint;
+  value: number;
+  tolerance?: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ─── Fabrics ───
 
 export interface Fabric {
@@ -306,6 +336,8 @@ export interface OpenCloProject {
   avatar: Avatar;
   /** Named piece groups (optional for backward compat) */
   groups?: PieceGroup[];
+  /** Points of measure (optional for backward compat) */
+  poms?: PointOfMeasure[];
   /** Named seam groups (optional for backward compat) */
   seamGroups?: SeamGroup[];
   createdAt: number;
@@ -361,6 +393,7 @@ export type Tool2D =
   | 'measure'      // distance / angle measurement
   | 'measureCurve'  // arc-length along a curve
   | 'compareCurves' // compare two curve lengths
+  | 'pomMeasure'    // points of measure tool
   | 'walkSeam'      // walk seam verification
   | 'scissors'     // split pattern pieces
   | 'merge'        // merge adjacent pattern pieces
@@ -375,6 +408,7 @@ export interface EditorState {
   activeTool: Tool2D;
   selectedPieceIds: string[];
   selectedSeamId: string | null;
+  selectedPOMId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;

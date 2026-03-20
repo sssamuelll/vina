@@ -7,6 +7,7 @@ import CopilotPanel from '../CopilotPanel/CopilotPanel';
 import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reasoning/proactiveAnalysis';
 import Timeline from '../Timeline/Timeline';
 import InspectorTab from './InspectorTab';
+import POMPanel from './POMPanel';
 import './BottomPanel.css';
 
 interface BottomPanelProps {
@@ -25,6 +26,7 @@ function buildTabs(problemCount: number): { id: BottomTab; label: string }[] {
     { id: 'nesting-preview', label: 'Nesting Preview' },
     { id: 'timeline', label: 'Timeline' },
     { id: 'inspector', label: 'Inspector' },
+    { id: 'poms', label: 'POMs' },
   ];
 }
 
@@ -194,6 +196,7 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
           )}
           {activeTab === 'timeline' && <Timeline />}
           {activeTab === 'inspector' && <InspectorTab />}
+          {activeTab === 'poms' && <POMPanel />}
         </div>
       </div>
     </div>

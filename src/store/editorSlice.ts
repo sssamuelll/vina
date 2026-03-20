@@ -7,6 +7,7 @@ const initialState: EditorState = {
   activeTool: 'select',
   selectedPieceIds: [],
   selectedSeamId: null,
+  selectedPOMId: null,
   selectedInternalLine: null,
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
@@ -36,9 +37,11 @@ const editorSlice = createSlice({
     },
     selectPiece(state, action: PayloadAction<string>) {
       state.selectedPieceIds = [action.payload];
+      state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
     togglePieceSelection(state, action: PayloadAction<string>) {
+      state.selectedPOMId = null;
       const idx = state.selectedPieceIds.indexOf(action.payload);
       if (idx === -1) {
         state.selectedPieceIds.push(action.payload);
@@ -49,22 +52,32 @@ const editorSlice = createSlice({
     clearSelection(state) {
       state.selectedPieceIds = [];
       state.selectedSeamId = null;
+      state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
     selectAllPieces(state, action: PayloadAction<string[]>) {
       state.selectedPieceIds = action.payload;
       state.selectedSeamId = null;
+      state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
     selectSeam(state, action: PayloadAction<string>) {
       state.selectedSeamId = action.payload;
+      state.selectedPOMId = null;
       state.selectedPieceIds = [];
+      state.selectedInternalLine = null;
+    },
+    selectPOM(state, action: PayloadAction<string | null>) {
+      state.selectedPOMId = action.payload;
+      state.selectedPieceIds = [];
+      state.selectedSeamId = null;
       state.selectedInternalLine = null;
     },
     selectInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
       state.selectedInternalLine = action.payload;
       state.selectedPieceIds = [action.payload.pieceId];
       state.selectedSeamId = null;
+      state.selectedPOMId = null;
     },
     setZoom2D(state, action: PayloadAction<number>) {
       state.zoom2D = Math.max(0.1, Math.min(10, action.payload));
@@ -124,7 +137,7 @@ const editorSlice = createSlice({
 
 export const {
   setViewMode, setActiveTool,
-  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectSeam, selectInternalLine,
+  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectSeam, selectPOM, selectInternalLine,
   setZoom2D, setPan2D,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,

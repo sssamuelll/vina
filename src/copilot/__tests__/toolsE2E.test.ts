@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 123 tools registered', () => {
-      expect(registry.size).toBe(143); // +8 sewing enhancement tools (#368)
+      expect(registry.size).toBe(147); // +4 POM tools + 8 sewing enhancement tools
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(143); // +8 sewing enhancement tools (#368)
+      expect(names.length).toBe(147); // +4 POM tools + 8 sewing enhancement tools
 
       // Key tools from every category
       const expected = [
@@ -427,6 +427,7 @@ describe('Tools E2E', () => {
         'runGarmentPipeline',
         'modifyDimension',
         'setLayer', 'cloneToLayer', 'superimpose', 'getLayerInfo',
+        'createPOM', 'getPOMs', 'updatePOM', 'removePOM',
       ];
       for (const name of expected) {
         expect(names).toContain(name);

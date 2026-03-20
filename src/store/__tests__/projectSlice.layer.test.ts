@@ -35,6 +35,7 @@ function emptyState() {
     groups: [],
     seamGroups: [],
     arrangementOverrides: {},
+    poms: [],
   };
 }
 

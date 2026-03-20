@@ -275,6 +275,24 @@ const ruleLayerOverlap: Rule = (data) => {
   return diags;
 };
 
+// ─── POM rules ───────────────────────────────────────────────────────────────
+
+const ruleNoPOMs: Rule = (data) => {
+  const hasPOMs = data.poms?.some(
+    p => p.pointA.pieceId === data.piece?.id || p.pointB.pieceId === data.piece?.id,
+  );
+  if (!hasPOMs) {
+    return [
+      {
+        severity: 'info',
+        category: 'measurement',
+        message: 'No POMs reference this piece — consider adding measurements for tech pack completeness',
+      },
+    ];
+  }
+  return [];
+};
+
 // ─── Rule registry ────────────────────────────────────────────────────────────
 
 const RULES: Rule[] = [
@@ -300,6 +318,8 @@ const RULES: Rule[] = [
   ruleNoEdgesDefined,
   // layer
   ruleLayerOverlap,
+  // pom
+  ruleNoPOMs,
 ];
 
 // ─── Public API ───────────────────────────────────────────────────────────────

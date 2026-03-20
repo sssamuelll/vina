@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
 import { NEW_PROJECT } from './actions';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
@@ -60,6 +60,8 @@ interface ProjectState {
   seamGroups: SeamGroup[];
   /** Per-piece 3D arrangement position overrides (piece ID → [x,y,z]) */
   arrangementOverrides: Record<string, [number, number, number]>;
+  /** Points of measure */
+  poms: PointOfMeasure[];
 }
 
 const initialState: ProjectState = {
@@ -75,6 +77,7 @@ const initialState: ProjectState = {
   groups: [],
   seamGroups: [],
   arrangementOverrides: {},
+  poms: [],
 };
 
 const projectSlice = createSlice({
@@ -93,6 +96,7 @@ const projectSlice = createSlice({
       state.fabrics = p.fabrics;
       state.avatar = p.avatar;
       state.groups = p.groups ?? [];
+      state.poms = p.poms ?? [];
       state.seamGroups = (p as any).seamGroups ?? [];
       state.isDirty = false;
       // Backfill layer/sublayer for pieces loaded from older project files
@@ -150,6 +154,10 @@ const projectSlice = createSlice({
       for (const group of state.groups) {
         group.pieceIds = group.pieceIds.filter(id => id !== action.payload);
       }
+      // Remove POMs referencing deleted piece
+      state.poms = state.poms.filter(
+        pom => pom.pointA.pieceId !== action.payload && pom.pointB.pieceId !== action.payload
+      );
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
@@ -384,6 +392,29 @@ const projectSlice = createSlice({
         seam.pieceA = seam.pieceB;
         seam.pieceB = temp;
         state.isDirty = true;
+      }
+    },
+
+    // ─── Points of Measure (POM) ───
+    addPOM(state, action: PayloadAction<PointOfMeasure>) {
+      state.poms.push(action.payload);
+      state.isDirty = true;
+    },
+    updatePOM(state, action: PayloadAction<PointOfMeasure>) {
+      const idx = state.poms.findIndex(p => p.id === action.payload.id);
+      if (idx !== -1) {
+        state.poms[idx] = action.payload;
+        state.isDirty = true;
+      }
+    },
+    removePOM(state, action: PayloadAction<string>) {
+      state.poms = state.poms.filter(p => p.id !== action.payload);
+      state.isDirty = true;
+    },
+    recomputePOMValues(state, action: PayloadAction<Array<{ id: string; value: number }>>) {
+      for (const { id, value } of action.payload) {
+        const pom = state.poms.find(p => p.id === id);
+        if (pom) pom.value = value;
       }
     },
 
@@ -704,6 +735,8 @@ export const {
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
   addSeamGroup, removeSeamGroup,
+  // POMs
+  addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,

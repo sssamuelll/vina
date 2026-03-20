@@ -1,4 +1,5 @@
 import type { PhysicalFabric } from '../utils/cloth/physicalFabric';
+import type { PointOfMeasure } from '../types/types';
 
 // ─── Inspection Target ───────────────────────────────────────────────────────
 
@@ -81,6 +82,8 @@ export interface InspectionData {
   bodyRegion?: string;
   /** Other pieces on the same layer (for overlap detection) */
   piecesOnSameLayer?: { id: string; name: string; bodyRegion?: string }[];
+  /** Points of measure referencing any piece */
+  poms?: PointOfMeasure[];
   /** Whether the inspected piece is active (participates in simulation). */
   pieceActive?: boolean;
 }

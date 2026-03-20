@@ -42,6 +42,7 @@ import { tools as modifyDimensionToolDefs } from './definitions/modifyDimensionT
 import { tools as threeDInteractionToolDefs } from './definitions/3dInteractionTools';
 import { tools as groupToolDefs } from './definitions/groupTools';
 import { tools as layerToolDefs } from './definitions/layerTools';
+import { tools as pomToolDefs } from './definitions/pomTools';
 import { tools as sewingEnhancementToolDefs } from './definitions/sewingEnhancementTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -362,6 +363,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   threeDInteractionToolDefs,
   groupToolDefs,
   layerToolDefs,
+  pomToolDefs,
   sewingEnhancementToolDefs,
 ];
 
