@@ -63,11 +63,18 @@ export function computeStiffnessMultiplier(
 }
 ```
 
-The result is a single number that divides constraint compliance:
+The result is a single number that divides constraint compliance. Clamped to a maximum of 50 to prevent simulation instability:
+
+```typescript
+return Math.min(interfacingMul * solidifyMul, 50);
+```
+
 - `1.0` = normal fabric behavior
 - `4.0` = fusible-medium interfacing (standard collar/cuff)
 - `10.0` = canvas (tailored jacket chest piece)
-- `40.0` = fusible-heavy + solidify 1.0 (extremely rigid)
+- `50.0` = maximum (canvas + solidify 1.0, clamped from 100)
+
+**Note:** Without clamping, canvas (10x) + solidify 1.0 (10x) = 100x, which can cause instability. The 50x cap keeps pieces stiff but simulatable.
 
 ## Solver Integration
 
@@ -83,11 +90,20 @@ Lower compliance = stiffer constraint = less stretch/bend.
 
 ### Where the modification happens
 
-In `xpbdSolver.ts`, during constraint initialization (`initConstraints` or equivalent), the solver already iterates over constraints and assigns compliance values. The modification adds a per-piece lookup:
+After the solver is constructed via `new XPBDClothSolver(mergedMeshData, config)`, the solver's `initPhysics()` builds `stretchCompliances` and `bendCompliances` arrays from the global fabric config. These are private arrays — we need a new public method to apply per-piece stiffness:
 
-1. Each constraint involves two vertices. Both vertices belong to the same piece (intra-piece constraints) or span two pieces (seam constraints).
-2. For intra-piece constraints: apply the piece's stiffness multiplier.
-3. For seam constraints: use the maximum stiffness of the two connected pieces (conservative — the stiffer piece governs the seam).
+```typescript
+// New method on XPBDClothSolver:
+applyPieceStiffness(pieceOffsets: PieceOffset[], multipliers: number[]): void {
+  // Build vertex → piece index lookup from pieceOffsets
+  // For each stretch constraint: find which piece both vertices belong to, divide compliance
+  // For each bend constraint: same treatment
+}
+```
+
+The `PieceOffset` data (vertex offset + count per piece) already exists from `mergeMeshes()` in the worker. After solver construction, the worker calls `solver.applyPieceStiffness(pieceOffsets, multipliers)` to modify the internal compliance arrays.
+
+**Seam constraints are NOT modified** by piece stiffness — they model sewing thread with its own physical properties (`strength`, `taped`), independent of fabric stiffness. The seam system already has its own compliance modifiers via `buildSeamConstraints()`.
 
 ### Worker interface
 
@@ -111,9 +127,13 @@ The main thread computes `stiffnessMultiplier` via `computeStiffnessMultiplier(p
 
 When `interfacingType` or `solidifyFactor` changes on a piece, the simulation must rebuild constraints. This uses the same mechanism as fabric changes: the `GarmentSimulation` component detects piece property changes and re-sends `initMultiPiece` to the worker.
 
-### No WASM changes needed
+### WASM + GPU solver scope
 
-The JS fallback solver (`xpbdSolver.ts`) applies the multiplier during constraint initialization. The WASM solver receives the same pre-modified compliance values through the existing constraint setup path. No Rust code changes required for Phase 1.
+**JS solver (`xpbdSolver.ts`):** Full support. The new `applyPieceStiffness()` method modifies the internal compliance arrays after construction.
+
+**WASM solver (`lib.rs`):** The Rust solver re-derives per-constraint compliance from global config values via `set_stretch_with_types()`. It does not accept per-constraint compliance overrides. **Phase 1 limitation: per-piece stiffness has no effect in WASM mode.** To support it, Phase 2 would add a `set_compliance_overrides(&[f32])` method to the Rust solver. For now, the worker should fall through to the JS solver's compliance arrays when stiffness multipliers differ from 1.0 (or accept the limitation silently).
+
+**GPU solver (TSL):** Same limitation as WASM — compliance is baked into the compute shader from global config. Per-piece stiffness is not applied in GPU mode. Phase 2 scope.
 
 ## UI: PieceProperties Panel
 
@@ -207,8 +227,9 @@ One new rule in `ruleEngine.ts`:
 
 ### Not Touched
 
-- WASM solver (`crates/xpbd-wasm/src/lib.rs`) — receives pre-modified compliance, no changes
-- Seam system — seam constraints already have their own strength/tape modifiers
+- WASM solver (`crates/xpbd-wasm/src/lib.rs`) — per-piece stiffness not applied in WASM mode (Phase 2)
+- GPU solver (TSL) — per-piece stiffness not applied in GPU mode (Phase 2)
+- Seam system — seam constraints have their own strength/tape modifiers, NOT modified by piece stiffness
 - Layer system
 - Confirmation middleware
 
@@ -221,7 +242,14 @@ One new rule in `ruleEngine.ts`:
 
 ## Migration
 
-Existing pieces have no `interfacingType` or `solidifyFactor` fields. Both default to `'none'` / `0` (no behavioral change). `loadProject` does NOT need explicit backfill since both fields are optional with sane defaults read at computation time. The `computeStiffnessMultiplier` function handles `undefined` inputs gracefully.
+Existing pieces have no `interfacingType` or `solidifyFactor` fields. `loadProject` backfills defaults following the established pattern:
+
+```typescript
+if ((piece as any).interfacingType === undefined) piece.interfacingType = 'none';
+if ((piece as any).solidifyFactor === undefined) piece.solidifyFactor = 0;
+```
+
+This is consistent with how `layer`, `sublayer`, `active` are backfilled. `computeStiffnessMultiplier` also handles `undefined` gracefully as a safety net.
 
 ## Future (Phase 2 — #382)
 
