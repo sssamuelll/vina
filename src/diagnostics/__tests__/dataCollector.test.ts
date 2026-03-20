@@ -103,6 +103,9 @@ function makeState(overrides: {
       pieceTints: {},
       pieceTextureOverrides: {},
       pieceUVTransforms: {},
+      pieceOpacity: {},
+      pieceEmission: {},
+      pieceEmissionIntensity: {},
       steamBrush: { active: false, radius: 0, strength: 0 },
     },
     // cast rest as never — the data collector only reads the three slices above

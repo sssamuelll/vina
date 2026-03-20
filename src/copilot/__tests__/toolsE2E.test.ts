@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 123 tools registered', () => {
-      expect(registry.size).toBe(159); // +5 3D arrangement tools (hide/show/showAll/flip/reset)
+      expect(registry.size).toBe(162); // +5 3D arrangement tools (#370) on top of 157 from main
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(159); // +5 3D arrangement tools (hide/show/showAll/flip/reset)
+      expect(names.length).toBe(162); // +5 3D arrangement tools (#370) on top of 157 from main
 
       // Key tools from every category
       const expected = [

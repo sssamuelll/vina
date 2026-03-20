@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride } from '../../store/simulationSlice';
+import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride, setPieceOpacity, setPieceEmission, clearPieceEmission } from '../../store/simulationSlice';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 
 // Note: Drag-drop textures use blob URLs which are session-scoped and won't
@@ -72,6 +72,9 @@ export default function MaterialTab() {
   const defaultFabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
+  const pieceOpacity = useSelector((s: RootState) => s.simulation.pieceOpacity);
+  const pieceEmission = useSelector((s: RootState) => s.simulation.pieceEmission);
+  const pieceEmissionIntensity = useSelector((s: RootState) => s.simulation.pieceEmissionIntensity);
 
   const handleFabricSelect = useCallback((id: string) => {
     if (!selectedPieceId) return;
@@ -86,6 +89,9 @@ export default function MaterialTab() {
   const fabric = getPhysicalFabric(fabricId);
   const tint = pieceTints[selectedPieceId] || '#ffffff';
   const uv = pieceUVTransforms[selectedPieceId] || { repeatX: 4, repeatY: 4, rotation: 0 };
+  const currentOpacity = pieceOpacity[selectedPieceId] ?? 1.0;
+  const currentEmission = pieceEmission[selectedPieceId] || null;
+  const currentEmissionIntensity = pieceEmissionIntensity[selectedPieceId] ?? 0;
 
   return (
     <div style={{ padding: '0 8px' }}>
@@ -146,6 +152,61 @@ export default function MaterialTab() {
           >
             Reset
           </button>
+        </div>
+      </div>
+
+      {/* Opacity */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>OPACITY</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={Math.round(currentOpacity * 100)}
+            onChange={e => {
+              const val = Number(e.target.value) / 100;
+              dispatch(setPieceOpacity({ pieceId: selectedPieceId, opacity: val }));
+            }}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 10, color: '#aaa', minWidth: 32, textAlign: 'right' }}>{Math.round(currentOpacity * 100)}%</span>
+        </div>
+      </div>
+
+      {/* Emission */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>EMISSION</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="color"
+            value={currentEmission || '#000000'}
+            onChange={e => {
+              dispatch(setPieceEmission({ pieceId: selectedPieceId, color: e.target.value, intensity: currentEmissionIntensity || 1 }));
+            }}
+            style={{ width: 28, height: 28, border: '1px solid #555', borderRadius: 4, cursor: 'pointer' }}
+          />
+          {currentEmission && currentEmission !== '#000000' && (
+            <>
+              <input
+                type="range"
+                min={0}
+                max={500}
+                value={Math.round(currentEmissionIntensity * 100)}
+                onChange={e => {
+                  dispatch(setPieceEmission({ pieceId: selectedPieceId, color: currentEmission, intensity: Number(e.target.value) / 100 }));
+                }}
+                style={{ flex: 1 }}
+              />
+              <span style={{ fontSize: 10, color: '#aaa', minWidth: 32, textAlign: 'right' }}>{currentEmissionIntensity.toFixed(1)}</span>
+              <button
+                onClick={() => dispatch(clearPieceEmission(selectedPieceId))}
+                style={{ background: '#555', border: 'none', borderRadius: 3, color: '#ccc', padding: '3px 8px', cursor: 'pointer', fontSize: 10 }}
+              >
+                Clear
+              </button>
+            </>
+          )}
         </div>
       </div>
 
