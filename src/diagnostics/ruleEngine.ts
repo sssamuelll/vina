@@ -275,6 +275,23 @@ const ruleLayerOverlap: Rule = (data) => {
   return diags;
 };
 
+// ─── Interfacing rules ───────────────────────────────────────────────────────
+
+const ruleMissingInterfacing: Rule = (data) => {
+  if (!data.piece) return [];
+  const cat = data.piece.category;
+  const needsInterfacing = cat !== undefined && ['collar', 'cuff', 'waistband'].includes(cat);
+  const hasInterfacing = data.piece.interfacingType !== undefined && data.piece.interfacingType !== 'none';
+  if (needsInterfacing && !hasInterfacing) {
+    return [{
+      severity: 'info',
+      category: 'simulation',
+      message: 'No interfacing applied — consider adding interfacing for structural support',
+    }];
+  }
+  return [];
+};
+
 // ─── POM rules ───────────────────────────────────────────────────────────────
 
 const ruleNoPOMs: Rule = (data) => {
@@ -318,6 +335,8 @@ const RULES: Rule[] = [
   ruleNoEdgesDefined,
   // layer
   ruleLayerOverlap,
+  // interfacing
+  ruleMissingInterfacing,
   // pom
   ruleNoPOMs,
 ];

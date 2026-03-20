@@ -38,7 +38,7 @@ export interface SeamInitData {
 /** Messages sent from main thread → worker */
 export type WorkerInMessage =
   | { type: 'init'; meshData: { vertices: Float32Array; triIds: Int32Array }; config?: Partial<ClothSimConfig> }
-  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }> }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
+  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }>; stiffnessMultiplier?: number }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
   | { type: 'setSeams'; seams: SeamInitData[] }
   | { type: 'start' }
   | { type: 'stop' }
@@ -195,6 +195,13 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
           }
           const seamSet = buildSeamConstraints(seams, outlineMap, merged, pieceEdges);
           solver.setSeamConstraints(seamSet);
+        }
+
+        // Apply per-piece stiffness multipliers (interfacing / solidify)
+        const multipliers = msg.pieces.map(p => p.stiffnessMultiplier ?? 1);
+        const hasStiffness = multipliers.some(m => m > 1);
+        if (hasStiffness && merged.pieces) {
+          solver.applyPieceStiffness(merged.pieces, multipliers);
         }
 
         running = false;

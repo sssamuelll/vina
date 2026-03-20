@@ -533,6 +533,56 @@ export class XPBDClothSolver {
   }
 
   /**
+   * Apply per-piece stiffness multipliers to constraint compliance arrays.
+   * Must be called after initPhysics(). Divides stretch and bend compliance
+   * for constraints whose vertices belong to the given piece.
+   *
+   * @param pieceOffsets - Array of { vertexOffset, vertexCount } per piece
+   * @param multipliers - Stiffness multiplier per piece (1 = no change, >1 = stiffer)
+   */
+  applyPieceStiffness(
+    pieceOffsets: Array<{ vertexOffset: number; vertexCount: number }>,
+    multipliers: number[],
+  ): void {
+    if (!this.stretchCompliances || !this.bendCompliances) return;
+
+    // Build vertex → piece index lookup
+    if (pieceOffsets.length !== multipliers.length) return;
+    const vertexToPiece = new Uint32Array(this.numParticles);
+    for (let p = 0; p < pieceOffsets.length; p++) {
+      const { vertexOffset, vertexCount } = pieceOffsets[p];
+      for (let v = vertexOffset; v < vertexOffset + vertexCount; v++) {
+        vertexToPiece[v] = p;
+      }
+    }
+
+    // Modify stretch constraints
+    for (let i = 0; i < this.stretchingLengths.length; i++) {
+      const idA = this.stretchingIds[2 * i];
+      const idB = this.stretchingIds[2 * i + 1];
+      const pieceA = vertexToPiece[idA];
+      const pieceB = vertexToPiece[idB];
+      // Use the piece with higher stiffness (lower compliance)
+      const mul = Math.max(multipliers[pieceA] ?? 1, multipliers[pieceB] ?? 1);
+      if (mul > 1) {
+        this.stretchCompliances[i] /= mul;
+      }
+    }
+
+    // Modify bend constraints
+    for (let i = 0; i < this.bendingLengths.length; i++) {
+      const idA = this.bendingIds[4 * i + 2];
+      const idB = this.bendingIds[4 * i + 3];
+      const pieceA = vertexToPiece[idA];
+      const pieceB = vertexToPiece[idB];
+      const mul = Math.max(multipliers[pieceA] ?? 1, multipliers[pieceB] ?? 1);
+      if (mul > 1) {
+        this.bendCompliances[i] /= mul;
+      }
+    }
+  }
+
+  /**
    * Pin a particle in place (invMass = 0).
    *
    * @param particleIndex - Index of the particle to pin

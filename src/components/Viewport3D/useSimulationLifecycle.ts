@@ -45,6 +45,8 @@ export interface PlacedMesh {
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
   uvs?: Float32Array;
+  /** Per-piece stiffness multiplier (>1 = stiffer, from interfacing/solidify). Default 1. */
+  stiffnessMultiplier?: number;
 }
 
 interface UseSimulationLifecycleProps {

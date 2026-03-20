@@ -1,5 +1,5 @@
 import type { PhysicalFabric } from '../utils/cloth/physicalFabric';
-import type { PointOfMeasure } from '../types/types';
+import type { PointOfMeasure, PieceCategory, InterfacingType } from '../types/types';
 
 // ─── Inspection Target ───────────────────────────────────────────────────────
 
@@ -22,6 +22,10 @@ export interface InspectionPieceData {
   position: { x: number; y: number };
   rotation: number;
   seamAllowance: number;
+  /** Piece type classification */
+  category?: PieceCategory;
+  /** Interfacing type applied to this piece */
+  interfacingType?: InterfacingType;
 }
 
 export interface InspectionEdgeData {

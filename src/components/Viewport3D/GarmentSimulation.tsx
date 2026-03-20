@@ -38,6 +38,7 @@ import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
+import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -262,7 +263,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         transformed[vi * 3 + 1] = y3 + py;
         transformed[vi * 3 + 2] = z2 + pz;
       }
-      return { ...pm, vertices: transformed };
+      const piece = activePieces[i];
+      const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
+      return { ...pm, vertices: transformed, stiffnessMultiplier };
     });
   }, [pieceMeshes, activePieces, avatarMeasurements]);
 
