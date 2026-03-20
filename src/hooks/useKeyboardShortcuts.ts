@@ -178,6 +178,8 @@ export function useKeyboardShortcuts() {
       ['tool.topstitchSeamline', () => { dispatch(setActiveTool('topstitchSeamline' as any)); dispatch(setActiveTool2D('topstitchSeamline')); }],
 
       ['tool.pomMeasure', () => { dispatch(setActiveTool('pomMeasure' as any)); dispatch(setActiveTool2D('pomMeasure')); }],
+      ['tool.offsetOutline', () => { dispatch(setActiveTool('offsetOutline' as any)); dispatch(setActiveTool2D('offsetOutline')); }],
+      ['tool.extendTrim', () => { dispatch(setActiveTool('extendTrim' as any)); dispatch(setActiveTool2D('extendTrim')); }],
 
       // Sewing
       ['tool.seam', () => { dispatch(setActiveTool('seam' as any)); dispatch(setActiveTool2D('seam')); }],

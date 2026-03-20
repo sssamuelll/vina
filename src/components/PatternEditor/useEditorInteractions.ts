@@ -167,6 +167,22 @@ interface ToolHooks {
     handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
     handleKeyDown: (e: KeyboardEvent) => void;
   };
+  offsetTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: () => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    getCursor: () => string;
+    reset: () => void;
+  };
+  extendTrimTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseUp: () => void;
+    handleKeyDown: (e: KeyboardEvent) => void;
+    getCursor: () => string;
+    reset: () => void;
+  };
 }
 
 export function useEditorInteractions(
@@ -189,7 +205,7 @@ export function useEditorInteractions(
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool } = tools;
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -259,12 +275,14 @@ export function useEditorInteractions(
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') handlers.push(topstitchTool.handleKeyDown);
     if (activeTool === 'walkSeam') handlers.push(walkSeamTool.handleKeyDown);
     if (activeTool === 'freesewing') handlers.push(freeSewingTool.handleKeyDown);
+    if (activeTool === 'offsetOutline') handlers.push(offsetTool.handleKeyDown);
+    if (activeTool === 'extendTrim') handlers.push(extendTrimTool.handleKeyDown);
     if (activeTool === 'select' && selectedInternalLine) handlers.push(handleInternalLineKeyDown);
     if (handlers.length === 0) return;
     const handler = (e: KeyboardEvent) => handlers.forEach(h => h(e));
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown]);
+  }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown]);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -335,6 +353,8 @@ export function useEditorInteractions(
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') { topstitchTool.handleMouseDown(e); return; }
     if (activeTool === 'walkSeam') { walkSeamTool.handleMouseDown(e); return; }
     if (activeTool === 'freesewing') { freeSewingTool.handleMouseDown(e); return; }
+    if (activeTool === 'offsetOutline') { offsetTool.handleMouseDown(e); return; }
+    if (activeTool === 'extendTrim') { extendTrimTool.handleMouseDown(e); return; }
     if (activeTool === 'transform') {
       const handled = transformTool.handleMouseDown(e);
       if (handled) return;
@@ -453,7 +473,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -560,7 +580,9 @@ export function useEditorInteractions(
     if (activeTool === 'topstitchSeamline' || activeTool === 'topstitchSegment' || activeTool === 'topstitchFree') topstitchTool.handleMouseMove(e);
     if (activeTool === 'walkSeam') walkSeamTool.handleMouseMove(e);
     if (activeTool === 'freesewing') freeSewingTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee]);
+    if (activeTool === 'offsetOutline') offsetTool.handleMouseMove(e);
+    if (activeTool === 'extendTrim') extendTrimTool.handleMouseMove(e);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool]);
 
   const handleMouseUp = useCallback(() => {
     // Resolve marquee selection
@@ -631,7 +653,9 @@ export function useEditorInteractions(
     if (activeTool === 'editPattern') editPattern.handleMouseUp();
     if (activeTool === 'scissors') scissorsTool.handleMouseUp();
     if (activeTool === 'merge') mergeTool.handleMouseUp();
-  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee]);
+    if (activeTool === 'offsetOutline') offsetTool.handleMouseUp();
+    if (activeTool === 'extendTrim') extendTrimTool.handleMouseUp();
+  }, [activeTool, pen, rectTool, grainlineTool, transformTool, nodeEditor, editPattern, scissorsTool, mergeTool, dispatch, pieces, zoom2D, selectedPieceIds, setSelectMarquee, offsetTool, extendTrimTool]);
 
   const getCursor = () => {
     if (nodeEditor.isEditing) return nodeEditor.hoveredNode ? 'move' : 'default';
@@ -652,6 +676,8 @@ export function useEditorInteractions(
       case 'walkSeam': return walkSeamTool.getCursor();
       case 'freesewing': return 'crosshair';
       case 'topstitchEdit': return 'default';
+      case 'offsetOutline': return offsetTool.getCursor();
+      case 'extendTrim': return extendTrimTool.getCursor();
       default: return 'crosshair';
     }
   };

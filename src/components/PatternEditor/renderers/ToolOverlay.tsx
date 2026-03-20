@@ -1,4 +1,4 @@
-import { PatternPiece, Point2D, Tool2D } from '../../../types/types';
+import { PatternPiece, PathCommand, Point2D, Tool2D } from '../../../types/types';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../../store';
 import { NodeRef } from '../nodeEditorUtils';
@@ -19,6 +19,7 @@ import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import WalkSeamOverlay from './overlays/WalkSeamOverlay';
+import OffsetPreviewOverlay from './overlays/OffsetPreviewOverlay';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
 import type { FreeEdgeSelection } from '../sewingUtils';
@@ -138,6 +139,9 @@ interface ToolOverlayProps {
   freeSewingFirstEdge: FreeEdgeSelection | null;
   freeSewingHoveredEdge: FreeEdgeSelection | null;
   freeSewingMode: 'free' | 'point';
+  // Offset Preview
+  offsetPreviewOutline: PathCommand[] | null;
+  offsetPreviewPiecePosition: Point2D | null;
 }
 
 export default function ToolOverlay(props: ToolOverlayProps) {
@@ -282,6 +286,14 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           metrics={props.walkSeamMetrics}
           formatDistance={props.walkSeamFormatDistance}
           hoveredSnapPoint={props.walkSeamHoveredSnapPoint}
+        />
+      )}
+
+      {activeTool === 'offsetOutline' && props.offsetPreviewOutline && props.offsetPreviewPiecePosition && (
+        <OffsetPreviewOverlay
+          previewOutline={props.offsetPreviewOutline}
+          piecePosition={props.offsetPreviewPiecePosition}
+          zoom2D={zoom2D}
         />
       )}
 
