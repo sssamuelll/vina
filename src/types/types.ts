@@ -406,6 +406,8 @@ export type Tool2D =
   | 'scissors'     // split pattern pieces
   | 'merge'        // merge adjacent pattern pieces
   | 'freesewing'   // free sewing between edges
+  | 'offsetOutline' // offset piece outline inward/outward
+  | 'extendTrim'   // extend or trim edges
   | 'hand'         // pan
   | 'zoom';
 

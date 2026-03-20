@@ -4,6 +4,7 @@
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
+import type { PatternPiece } from '../../../../types/types';
 
 export const tools: ToolDefinition[] = [
   {
@@ -147,6 +148,137 @@ export const tools: ToolDefinition[] = [
       if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
       const length = measureEdgeLength(piece, edge);
       return { success: true, data: { edgeName: edge.name, length, lengthCm: (length / 10).toFixed(1) + 'cm' } };
+    },
+  },
+  {
+    name: 'offsetPattern',
+    description:
+      'Offset a pattern piece outline by a distance. Positive = outward, negative = inward. / Desplazar el contorno de una pieza de patrón. Positivo = hacia afuera, negativo = hacia adentro.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        distance: { type: 'number', description: 'Offset distance in mm (positive = outward, negative = inward)' },
+        joinType: { type: 'string', description: 'Join type: miter, round, or square (default miter)' },
+        replace: { type: 'boolean', description: 'Replace original piece instead of creating a new one (default false)' },
+      },
+      required: ['pieceId', 'distance'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { offsetPieceOutline } = await import('../../../../utils/patternOps');
+      const { addPiece, updatePiece, removePiece } = await import('../../../../store/projectSlice');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece not found` };
+      const joinType = (params.joinType as string) || 'miter';
+      const newOutline = offsetPieceOutline(piece, params.distance as number, joinType as 'miter' | 'round' | 'square');
+      if (!newOutline) return { success: false, error: `Offset collapsed the shape (distance too large)` };
+      const replace = params.replace as boolean;
+      if (replace) {
+        const snapshot = { ...piece } as PatternPiece;
+        const updated: PatternPiece = { ...piece, outline: newOutline, edges: undefined, updatedAt: Date.now() };
+        dispatch(updatePiece(updated));
+        return {
+          success: true,
+          data: { pieceId: piece.id, distance: params.distance, joinType, replaced: true },
+          rollback: () => dispatch(updatePiece(snapshot)),
+        };
+      } else {
+        const offsetPiece: PatternPiece = {
+          ...piece,
+          id: `offset-${piece.id}-${Date.now()}`,
+          name: `${piece.name} Offset`,
+          outline: newOutline,
+          edges: undefined,
+          position: { x: piece.position.x + 15, y: piece.position.y },
+          updatedAt: Date.now(),
+        };
+        dispatch(addPiece(offsetPiece));
+        return {
+          success: true,
+          data: { pieceId: offsetPiece.id, name: offsetPiece.name, distance: params.distance, joinType, replaced: false },
+          rollback: () => dispatch(removePiece(offsetPiece.id)),
+        };
+      }
+    },
+  },
+  {
+    name: 'extendEdge',
+    description:
+      'Extend a semantic edge of a pattern piece by a given distance. / Extender un borde semántico de una pieza de patrón por una distancia dada.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        edgeName: { type: 'string', description: 'Semantic edge name (e.g., hemline, sideSeam)' },
+        endpoint: { type: 'string', description: 'Which end to extend: start or end' },
+        distance: { type: 'number', description: 'Extension distance in mm' },
+      },
+      required: ['pieceId', 'edgeName', 'endpoint', 'distance'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { extendEdge: extendEdgeFn } = await import('../../../../utils/patternOps');
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const { findEdgeByName } = await import('../../../../utils/semanticEdges');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece not found` };
+      if (!piece.edges) return { success: false, error: `Piece has no semantic edges` };
+      const edge = findEdgeByName(piece.edges, params.edgeName as string);
+      if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
+      const endpoint = params.endpoint as 'start' | 'end';
+      const segmentIndex = endpoint === 'start' ? edge.segmentRange[0] : edge.segmentRange[1] - 1;
+      const snapshot = { ...piece } as PatternPiece;
+      const result = extendEdgeFn(piece, segmentIndex, endpoint, params.distance as number);
+      dispatch(updatePiece(result));
+      return {
+        success: true,
+        data: { pieceId: result.id, edgeName: params.edgeName, endpoint, distance: params.distance },
+        rollback: () => dispatch(updatePiece(snapshot)),
+      };
+    },
+  },
+  {
+    name: 'trimEdge',
+    description:
+      'Trim a semantic edge at a given point, keeping one side. / Recortar un borde semántico en un punto dado, conservando un lado.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        edgeName: { type: 'string', description: 'Semantic edge name' },
+        trimX: { type: 'number', description: 'X coordinate of trim point in mm' },
+        trimY: { type: 'number', description: 'Y coordinate of trim point in mm' },
+        keepSide: { type: 'string', description: 'Which side to keep: start or end' },
+      },
+      required: ['pieceId', 'edgeName', 'trimX', 'trimY', 'keepSide'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { trimEdgeAtPoint } = await import('../../../../utils/patternOps');
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const { findEdgeByName } = await import('../../../../utils/semanticEdges');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece not found` };
+      if (!piece.edges) return { success: false, error: `Piece has no semantic edges` };
+      const edge = findEdgeByName(piece.edges, params.edgeName as string);
+      if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
+      const segmentIndex = edge.segmentRange[0];
+      const snapshot = { ...piece } as PatternPiece;
+      const keepSideParam = params.keepSide as string;
+      const keepSide: 'before' | 'after' = keepSideParam === 'start' ? 'before' : 'after';
+      const result = trimEdgeAtPoint(
+        piece,
+        segmentIndex,
+        { x: params.trimX as number, y: params.trimY as number },
+        keepSide,
+      );
+      dispatch(updatePiece(result));
+      return {
+        success: true,
+        data: { pieceId: result.id, edgeName: params.edgeName, trimX: params.trimX, trimY: params.trimY, keepSide: params.keepSide },
+        rollback: () => dispatch(updatePiece(snapshot)),
+      };
     },
   },
 ];
