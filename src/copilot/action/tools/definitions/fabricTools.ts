@@ -10,9 +10,17 @@ import {
   getPhysicalFabric,
   getAllPhysicalFabrics,
   toXPBDParams,
+  toMeshPhysicalParams,
   type PhysicalFabric,
 } from '../../../../utils/cloth/physicalFabric';
-import { setFabric, setPieceTint } from '../../../../store/simulationSlice';
+import {
+  setFabric,
+  setPieceTint,
+  setPieceOpacity,
+  clearPieceOpacity,
+  setPieceEmission,
+  clearPieceEmission,
+} from '../../../../store/simulationSlice';
 
 function fabricSummary(f: PhysicalFabric) {
   return {
@@ -262,9 +270,201 @@ const assignFabricTool: ToolDefinition = {
   },
 };
 
+const setPieceOpacityTool: ToolDefinition = {
+  name: 'setPieceOpacity',
+  description:
+    'Set the opacity of a piece in 3D. 0 = fully transparent, 1 = fully opaque. ' +
+    'Use for sheer fabrics like chiffon, organza, tulle. ' +
+    '/ Establecer la opacidad de una pieza en 3D. 0 = transparente, 1 = opaco.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: {
+        type: 'string',
+        description: 'ID of the pattern piece / ID de la pieza de patrón',
+      },
+      opacity: {
+        type: 'number',
+        description: 'Opacity value 0-1 (0 = transparent, 1 = opaque) / Valor de opacidad 0-1',
+      },
+    },
+    required: ['pieceId', 'opacity'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const rawOpacity = params.opacity as number;
+
+    const state = getState();
+
+    // Validate piece exists
+    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) {
+      return {
+        success: false,
+        error: `Piece "${pieceId}" not found. List pieces first.`,
+      };
+    }
+
+    // Clamp opacity to [0, 1]
+    const opacity = Math.max(0, Math.min(1, rawOpacity));
+
+    dispatch(setPieceOpacity({ pieceId, opacity }));
+
+    return {
+      success: true,
+      data: {
+        pieceId,
+        pieceName: (piece as { name?: string }).name ?? pieceId,
+        opacity,
+      },
+      rollback: () => {
+        dispatch(clearPieceOpacity(pieceId));
+      },
+    };
+  },
+};
+
+const setPieceEmissionTool: ToolDefinition = {
+  name: 'setPieceEmission',
+  description:
+    'Set emission (glow) color and intensity for a piece. Useful for presentation renders. ' +
+    '/ Establecer color de emisión (brillo) e intensidad para una pieza. Útil para renders de presentación.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: {
+        type: 'string',
+        description: 'ID of the pattern piece / ID de la pieza de patrón',
+      },
+      color: {
+        type: 'string',
+        description: 'Emission color as hex string (e.g., "#ff0000") / Color de emisión en hexadecimal',
+      },
+      intensity: {
+        type: 'number',
+        description: 'Emission intensity 0-5 (default 1) / Intensidad de emisión 0-5',
+      },
+    },
+    required: ['pieceId', 'color'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const color = params.color as string;
+    const rawIntensity = (params.intensity as number | undefined) ?? 1;
+
+    const state = getState();
+
+    // Validate piece exists
+    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) {
+      return {
+        success: false,
+        error: `Piece "${pieceId}" not found. List pieces first.`,
+      };
+    }
+
+    // Clamp intensity to [0, 5]
+    const intensity = Math.max(0, Math.min(5, rawIntensity));
+
+    dispatch(setPieceEmission({ pieceId, color, intensity }));
+
+    return {
+      success: true,
+      data: {
+        pieceId,
+        pieceName: (piece as { name?: string }).name ?? pieceId,
+        emissionColor: color,
+        emissionIntensity: intensity,
+      },
+      rollback: () => {
+        dispatch(clearPieceEmission(pieceId));
+      },
+    };
+  },
+};
+
+const getMaterialPropertiesTool: ToolDefinition = {
+  name: 'getMaterialProperties',
+  description:
+    'Get comprehensive material/render properties for a pattern piece, including fabric, tint, opacity, emission, ' +
+    'textures, UV transforms, and computed PBR render parameters. ' +
+    '/ Obtener propiedades completas de material de una pieza: tela, tinte, opacidad, emisión, texturas, UV y parámetros PBR.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: {
+        type: 'string',
+        description: 'ID of the pattern piece / ID de la pieza de patrón',
+      },
+    },
+    required: ['pieceId'],
+  },
+  execute: async (params, _dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const state = getState();
+
+    // Validate piece exists
+    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) {
+      return {
+        success: false,
+        error: `Piece "${pieceId}" not found. List pieces first.`,
+      };
+    }
+
+    const sim = state.simulation;
+    const fabricId = sim.pieceFabrics[pieceId] ?? sim.defaultFabricId;
+    const fabric = getPhysicalFabric(fabricId);
+    const tint = sim.pieceTints[pieceId] ?? '#ffffff';
+    const opacity = sim.pieceOpacity[pieceId] ?? undefined;
+    const emissionColor = sim.pieceEmission[pieceId] ?? undefined;
+    const emissionIntensity = sim.pieceEmissionIntensity[pieceId] ?? undefined;
+    const textureOverrides = sim.pieceTextureOverrides[pieceId] ?? {};
+    const uvTransform = sim.pieceUVTransforms[pieceId] ?? { repeatX: 4, repeatY: 4, rotation: 0 };
+
+    // Compute render params from fabric
+    let renderParams: Record<string, unknown> | undefined;
+    if (fabric) {
+      const params = toMeshPhysicalParams(fabric, tint);
+      renderParams = {
+        roughness: params.roughness,
+        metalness: params.metalness,
+        sheen: params.sheen,
+        sheenRoughness: params.sheenRoughness,
+        sheenColor: params.sheenColor,
+        clearcoat: params.clearcoat,
+        clearcoatRoughness: params.clearcoatRoughness,
+        transmission: params.transmission,
+        thickness: params.thickness,
+        ior: params.ior,
+        baseOpacity: params.opacity,
+      };
+    }
+
+    return {
+      success: true,
+      data: {
+        pieceId,
+        pieceName: (piece as { name?: string }).name ?? pieceId,
+        fabricId,
+        fabricName: fabric?.name ?? 'unknown',
+        tint,
+        opacity: opacity ?? (renderParams?.baseOpacity as number | undefined) ?? 1,
+        emission: emissionColor ? { color: emissionColor, intensity: emissionIntensity ?? 0 } : null,
+        textureOverrides,
+        uvTransform,
+        renderParams: renderParams ?? null,
+      },
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   searchFabricsTool,
   getFabricDetailsTool,
   compareFabricsTool,
   assignFabricTool,
+  setPieceOpacityTool,
+  setPieceEmissionTool,
+  getMaterialPropertiesTool,
 ];
