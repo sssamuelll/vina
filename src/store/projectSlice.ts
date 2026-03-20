@@ -110,6 +110,8 @@ const projectSlice = createSlice({
         if ((piece as any).active === undefined) {
           piece.active = true;
         }
+        if ((piece as any).interfacingType === undefined) piece.interfacingType = 'none';
+        if ((piece as any).solidifyFactor === undefined) piece.solidifyFactor = 0;
       }
       // Backfill sewing enhancement fields for seams from older projects
       for (const seam of state.seams) {

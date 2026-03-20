@@ -66,6 +66,10 @@ export interface PatternPiece {
   locked?: boolean;
   /** Whether this piece participates in simulation. Default true. */
   active: boolean;
+  /** Interfacing type applied to this piece */
+  interfacingType?: InterfacingType;
+  /** Solidify factor (0-1) for extra stiffness */
+  solidifyFactor?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -229,6 +233,10 @@ export interface PointOfMeasure {
   createdAt: number;
   updatedAt: number;
 }
+
+// ─── Interfacing ───
+
+export type InterfacingType = 'none' | 'fusible-light' | 'fusible-medium' | 'fusible-heavy' | 'sew-in-light' | 'sew-in-heavy' | 'canvas';
 
 // ─── Fabrics ───
 
