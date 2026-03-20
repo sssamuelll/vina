@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, offsetPieceOutline, extendEdge, trimEdgeAtPoint } from '../patternOps';
+import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint } from '../patternOps';
 import type { PatternPiece, SemanticEdge } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
@@ -101,6 +101,44 @@ describe('measureEdgeLength', () => {
     };
     const length = measureEdgeLength(piece, edge);
     expect(length).toBeCloseTo(400, 0);
+  });
+});
+
+describe('findCutEdgePair', () => {
+  it('finds matching cut edges after horizontal split', () => {
+    const original = makeRect('Panel', 400, 600);
+    const [pieceA, pieceB] = splitPiece(original, 'horizontal', 300);
+
+    const result = findCutEdgePair(pieceA, pieceB);
+    expect(result).not.toBeNull();
+    expect(result!.edgeA).toBeDefined();
+    expect(result!.edgeB).toBeDefined();
+    // The matching edges should have similar names (both are horizontal edges at the cut line)
+    expect(result!.edgeA.name).toBeDefined();
+    expect(result!.edgeB.name).toBeDefined();
+    // Return includes detected edges
+    expect(result!.edgesA).toBeDefined();
+    expect(result!.edgesA.length).toBeGreaterThan(0);
+    expect(result!.edgesB).toBeDefined();
+    expect(result!.edgesB.length).toBeGreaterThan(0);
+    // Input pieces NOT mutated (pure function)
+    expect(pieceA.edges).toBeUndefined();
+    expect(pieceB.edges).toBeUndefined();
+  });
+
+  it('returns null when pieces do not share a cut edge', () => {
+    // Two pieces at completely different locations with no spatial overlap
+    const pieceA: PatternPiece = {
+      ...makeRect('PieceA', 100, 100),
+      position: { x: 0, y: 0 },
+    };
+    const pieceB: PatternPiece = {
+      ...makeRect('PieceB', 100, 100),
+      position: { x: 500, y: 500 },
+    };
+
+    const result = findCutEdgePair(pieceA, pieceB);
+    expect(result).toBeNull();
   });
 });
 

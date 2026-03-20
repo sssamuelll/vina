@@ -10,6 +10,7 @@
 import type { PatternPiece, PathCommand, SemanticEdge, Dart, Point2D } from '../types/types';
 import { findOutlineIntersections, splitOutlineAtPoints } from './geometry/splitOutline';
 import { findSharedEdge, mergeOutlines } from './geometry/mergeOutline';
+import { detectSemanticEdges } from './semanticEdges';
 import { getEdgeEndpoints } from './geometry/path';
 import { generateSeamAllowance, flattenPath } from './seam';
 import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
@@ -440,6 +441,118 @@ export function measureEdgeLength(piece: PatternPiece, edge: SemanticEdge): numb
   }
 
   return Math.round(length * 100) / 100;
+}
+
+// ─── findCutEdgePair ──────────────────────────────────────────────────────────
+
+/**
+ * Compute the midpoint of an edge's segments on a piece outline.
+ * Uses the average of all segment midpoints weighted by segment length.
+ */
+function computeEdgeMidpoint(
+  piece: PatternPiece,
+  edge: SemanticEdge,
+): { x: number; y: number; arcLength: number } {
+  let cx = 0, cy = 0;
+  let totalLength = 0;
+  let midX = 0, midY = 0;
+
+  for (let i = 0; i < piece.outline.length; i++) {
+    const cmd = piece.outline[i];
+    let ex = cx, ey = cy;
+
+    switch (cmd.type) {
+      case 'M': ex = cmd.values[0]; ey = cmd.values[1]; break;
+      case 'L': ex = cmd.values[0]; ey = cmd.values[1]; break;
+      case 'C': ex = cmd.values[4]; ey = cmd.values[5]; break;
+      default: break;
+    }
+
+    if (i >= edge.segmentRange[0] && i < edge.segmentRange[1] && cmd.type !== 'M') {
+      const dx = ex - cx, dy = ey - cy;
+      const segLen = Math.sqrt(dx * dx + dy * dy);
+      const segMidX = (cx + ex) / 2;
+      const segMidY = (cy + ey) / 2;
+      midX += segMidX * segLen;
+      midY += segMidY * segLen;
+      totalLength += segLen;
+    }
+
+    cx = ex; cy = ey;
+  }
+
+  if (totalLength === 0) return { x: 0, y: 0, arcLength: 0 };
+  return {
+    x: midX / totalLength,
+    y: midY / totalLength,
+    arcLength: totalLength,
+  };
+}
+
+/**
+ * After splitting a piece, find the pair of edges on pieceA and pieceB
+ * that correspond to the cut line. These edges will be at the same
+ * spatial location with opposite normals.
+ *
+ * Algorithm:
+ * 1. Detect semantic edges on both pieces.
+ * 2. Compute midpoints for each edge (in pattern space, accounting for piece position).
+ * 3. Find the pair with closest midpoints (within 20mm tolerance, accounting for
+ *    the 15px position offset applied to pieceB after split).
+ * 4. Verify similar arc lengths (within 5% tolerance).
+ * 5. Return the matching pair, or null if no good match.
+ */
+export function findCutEdgePair(
+  pieceA: PatternPiece,
+  pieceB: PatternPiece,
+): { edgeA: SemanticEdge; edgeB: SemanticEdge; edgesA: SemanticEdge[]; edgesB: SemanticEdge[] } | null {
+  // Step 1: Detect semantic edges if not already present
+  const edgesA = pieceA.edges && pieceA.edges.length > 0
+    ? pieceA.edges
+    : detectSemanticEdges(pieceA);
+  const edgesB = pieceB.edges && pieceB.edges.length > 0
+    ? pieceB.edges
+    : detectSemanticEdges(pieceB);
+
+  if (edgesA.length === 0 || edgesB.length === 0) return null;
+
+  const MIDPOINT_TOLERANCE = 20; // mm
+  const ARC_LENGTH_TOLERANCE = 0.05; // 5%
+
+  let bestPair: { edgeA: SemanticEdge; edgeB: SemanticEdge; edgesA: SemanticEdge[]; edgesB: SemanticEdge[] } | null = null;
+  let bestDist = Infinity;
+
+  for (const eA of edgesA) {
+    const midA = computeEdgeMidpoint(pieceA, eA);
+    // Convert to pattern space
+    const patMidAx = midA.x + pieceA.position.x;
+    const patMidAy = midA.y + pieceA.position.y;
+
+    for (const eB of edgesB) {
+      const midB = computeEdgeMidpoint(pieceB, eB);
+      // Convert to pattern space
+      const patMidBx = midB.x + pieceB.position.x;
+      const patMidBy = midB.y + pieceB.position.y;
+
+      const dist = Math.hypot(patMidAx - patMidBx, patMidAy - patMidBy);
+
+      if (dist > MIDPOINT_TOLERANCE) continue;
+
+      // Verify similar arc lengths (within 5%)
+      const lenA = midA.arcLength;
+      const lenB = midB.arcLength;
+      if (lenA === 0 || lenB === 0) continue;
+      const ratio = Math.min(lenA, lenB) / Math.max(lenA, lenB);
+      if (ratio < 1 - ARC_LENGTH_TOLERANCE) continue;
+
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestPair = { edgeA: eA, edgeB: eB, edgesA, edgesB };
+      }
+    }
+  }
+
+  return bestPair;
 }
 
 // ─── offsetPieceOutline ──────────────────────────────────────────────────────

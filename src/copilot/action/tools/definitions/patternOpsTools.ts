@@ -14,27 +14,86 @@ function requireFiniteNumber(value: unknown, name: string): string | null {
 export const tools: ToolDefinition[] = [
   {
     name: 'splitPiece',
-    description: 'Split a piece along a horizontal or vertical line into two pieces',
+    description:
+      'Split a piece along a horizontal or vertical line into two pieces. ' +
+      'Optionally auto-sew the cut edges. ' +
+      '/ Dividir una pieza a lo largo de una línea horizontal o vertical. ' +
+      'Opcionalmente coser automáticamente los bordes cortados.',
     parameters: {
       type: 'object',
       properties: {
         pieceId: { type: 'string', description: 'Piece ID' },
         axis: { type: 'string', description: 'horizontal or vertical' },
         position: { type: 'number', description: 'Y (horizontal) or X (vertical) coordinate in mm' },
+        autoSew: { type: 'boolean', description: 'Auto-sew cut edges (default true)' },
+        seamType: {
+          type: 'string',
+          enum: ['standard', 'french', 'flat-felled', 'overlock'],
+          description: 'Seam type for auto-sew (default standard)',
+        },
       },
       required: ['pieceId', 'axis', 'position'],
     },
     execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
-      const { splitPiece } = await import('../../../../utils/patternOps');
-      const { addPiece, removePiece } = await import('../../../../store/projectSlice');
+      const { splitPiece, findCutEdgePair } = await import('../../../../utils/patternOps');
+      const { addPiece, removePiece, removeSeam, addSeam, updatePiece } = await import('../../../../store/projectSlice');
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece not found` };
-      const [a, b] = splitPiece(piece, params.axis as 'horizontal' | 'vertical', params.position as number);
-      dispatch(removePiece(piece.id));
+
+      const posErr = requireFiniteNumber(params.position, 'position');
+      if (posErr) return { success: false, error: posErr };
+
+      const originalPiece = JSON.parse(JSON.stringify(piece));
+
+      let a, b;
+      try {
+        [a, b] = splitPiece(piece, params.axis as 'horizontal' | 'vertical', params.position as number);
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Split failed' };
+      }
+
+      dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
       dispatch(addPiece(a));
       dispatch(addPiece(b));
-      return { success: true, data: { pieceA: { id: a.id, name: a.name }, pieceB: { id: b.id, name: b.name } } };
+
+      // Auto-sew cut edges unless explicitly disabled
+      let seamInfo: Record<string, unknown> | undefined;
+      if (params.autoSew !== false) {
+        const cutPair = findCutEdgePair(a, b);
+        if (cutPair) {
+          // Persist detected edges to Redux store
+          dispatch(updatePiece({ ...a, edges: cutPair.edgesA }));
+          dispatch(updatePiece({ ...b, edges: cutPair.edgesB }));
+          const seamId = `cut-seam-${Date.now()}`;
+          const seamTypeVal = (params.seamType as string) || 'standard';
+          dispatch(addSeam({
+            id: seamId,
+            pieceA: { pieceId: a.id, edgeName: cutPair.edgeA.name },
+            pieceB: { pieceId: b.id, edgeName: cutPair.edgeB.name },
+            type: seamTypeVal as 'standard' | 'french' | 'flat-felled' | 'overlock',
+            tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
+          }));
+          seamInfo = { seamId, edgeA: cutPair.edgeA.name, edgeB: cutPair.edgeB.name, type: seamTypeVal };
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          pieceA: { id: a.id, name: a.name },
+          pieceB: { id: b.id, name: b.name },
+          ...(seamInfo ? { seam: seamInfo } : {}),
+        },
+        rollback: () => {
+          dispatch(removePiece(a.id));
+          dispatch(removePiece(b.id));
+          if (seamInfo) {
+            dispatch(removeSeam(seamInfo.seamId as string));
+          }
+          dispatch(addPiece(originalPiece));
+        },
+      };
     },
   },
   {
@@ -153,6 +212,100 @@ export const tools: ToolDefinition[] = [
       if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found` };
       const length = measureEdgeLength(piece, edge);
       return { success: true, data: { edgeName: edge.name, length, lengthCm: (length / 10).toFixed(1) + 'cm' } };
+    },
+  },
+  {
+    name: 'cutAndSew',
+    description:
+      'Cut a piece along a line and automatically sew the cut edges. ' +
+      'Combines splitPieceAtLine + auto-detect edges + create seam in one step. ' +
+      '/ Cortar una pieza a lo largo de una línea y coser automáticamente los bordes cortados. ' +
+      'Combina división + detección de bordes + creación de costura en un solo paso.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID to cut / ID de la pieza a cortar' },
+        startX: { type: 'number', description: 'Cut line start X (piece-local coords) / Inicio de línea de corte X' },
+        startY: { type: 'number', description: 'Cut line start Y (piece-local coords) / Inicio de línea de corte Y' },
+        endX: { type: 'number', description: 'Cut line end X (piece-local coords) / Fin de línea de corte X' },
+        endY: { type: 'number', description: 'Cut line end Y (piece-local coords) / Fin de línea de corte Y' },
+        seamType: {
+          type: 'string',
+          enum: ['standard', 'french', 'flat-felled', 'overlock'],
+          description: 'Seam type (default standard) / Tipo de costura (defecto standard)',
+        },
+      },
+      required: ['pieceId', 'startX', 'startY', 'endX', 'endY'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { splitPieceAtLine, findCutEdgePair } = await import('../../../../utils/patternOps');
+      const { addPiece, removePiece, removeSeam, addSeam, updatePiece } = await import('../../../../store/projectSlice');
+
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece not found` };
+
+      for (const [name, val] of [['startX', params.startX], ['startY', params.startY], ['endX', params.endX], ['endY', params.endY]] as const) {
+        const err = requireFiniteNumber(val, name);
+        if (err) return { success: false, error: err };
+      }
+
+      const originalPiece = JSON.parse(JSON.stringify(piece));
+
+      const startX = params.startX as number;
+      const startY = params.startY as number;
+      const endX = params.endX as number;
+      const endY = params.endY as number;
+
+      // Convert piece-local coords to pattern space
+      const startPoint = { x: startX + piece.position.x, y: startY + piece.position.y };
+      const endPoint = { x: endX + piece.position.x, y: endY + piece.position.y };
+
+      let a, b;
+      try {
+        [a, b] = splitPieceAtLine(piece, startPoint, endPoint);
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Cut failed' };
+      }
+
+      dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
+      dispatch(addPiece(a));
+      dispatch(addPiece(b));
+
+      // Auto-sew the cut edges
+      let seamInfo: Record<string, unknown> | undefined;
+      const cutPair = findCutEdgePair(a, b);
+      if (cutPair) {
+        dispatch(updatePiece({ ...a, edges: cutPair.edgesA }));
+        dispatch(updatePiece({ ...b, edges: cutPair.edgesB }));
+        const seamId = `cut-seam-${Date.now()}`;
+        const seamTypeVal = (params.seamType as string) || 'standard';
+        dispatch(addSeam({
+          id: seamId,
+          pieceA: { pieceId: a.id, edgeName: cutPair.edgeA.name },
+          pieceB: { pieceId: b.id, edgeName: cutPair.edgeB.name },
+          type: seamTypeVal as 'standard' | 'french' | 'flat-felled' | 'overlock',
+          tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
+        }));
+        seamInfo = { seamId, edgeA: cutPair.edgeA.name, edgeB: cutPair.edgeB.name, type: seamTypeVal };
+      }
+
+      return {
+        success: true,
+        data: {
+          pieceA: { id: a.id, name: a.name },
+          pieceB: { id: b.id, name: b.name },
+          ...(seamInfo ? { seam: seamInfo } : {}),
+        },
+        rollback: () => {
+          dispatch(removePiece(a.id));
+          dispatch(removePiece(b.id));
+          if (seamInfo) {
+            dispatch(removeSeam(seamInfo.seamId as string));
+          }
+          dispatch(addPiece(originalPiece));
+        },
+      };
     },
   },
   {

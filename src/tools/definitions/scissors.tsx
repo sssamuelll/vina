@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -44,6 +44,24 @@ export const scissorsTool: ToolDefinition = {
       label: 'Keep Both Sides',
       type: 'toggle',
       value: true,
+    },
+    {
+      id: 'autoSew',
+      label: 'Auto-Sew Cut',
+      type: 'toggle',
+      value: true,
+    },
+    {
+      id: 'seamType',
+      label: 'Seam Type',
+      type: 'select',
+      value: 'standard',
+      choices: [
+        { label: 'Standard', value: 'standard' },
+        { label: 'French', value: 'french' },
+        { label: 'Flat-felled', value: 'flat-felled' },
+        { label: 'Overlock', value: 'overlock' },
+      ],
     },
   ],
   copilot: {
