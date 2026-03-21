@@ -19,6 +19,7 @@ import {
   setActiveSnapshot,
   toggleHide3D,
   showAll3D,
+  hideAll3D,
   toggleFlipNormal,
 } from '../../../../store/simulationSlice';
 import { updatePiece, setArrangement3D, clearArrangementOverrides } from '../../../../store/projectSlice';
@@ -472,8 +473,12 @@ const hide3DPieceTool: ToolDefinition = {
     const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
     if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
     dispatch(toggleHide3D(pieceId));
-    const isNowHidden = !getState().simulation.hiddenPieceIds.includes(pieceId);
-    return { success: true, data: { pieceId, hidden: !isNowHidden } };
+    const isNowHidden = getState().simulation.hiddenPieceIds.includes(pieceId);
+    return {
+      success: true,
+      data: { pieceId, hidden: isNowHidden },
+      rollback: () => dispatch(toggleHide3D(pieceId)),
+    };
   },
 };
 
@@ -494,13 +499,25 @@ const show3DPieceTool: ToolDefinition = {
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const pieceId = params.pieceId as string;
     if (pieceId === 'all') {
+      const prevHidden = [...getState().simulation.hiddenPieceIds];
       dispatch(showAll3D());
-      return { success: true, data: { showedAll: true } };
+      return {
+        success: true,
+        data: { showedAll: true },
+        rollback: () => dispatch(hideAll3D(prevHidden)),
+      };
     }
     const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
     if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
-    dispatch(toggleHide3D(pieceId));
-    return { success: true, data: { pieceId, hidden: getState().simulation.hiddenPieceIds.includes(pieceId) } };
+    const wasHidden = getState().simulation.hiddenPieceIds.includes(pieceId);
+    if (wasHidden) {
+      dispatch(toggleHide3D(pieceId));
+    }
+    return {
+      success: true,
+      data: { pieceId, hidden: false },
+      rollback: () => { if (wasHidden) dispatch(toggleHide3D(pieceId)); },
+    };
   },
 };
 
@@ -514,9 +531,14 @@ const showAll3DPiecesTool: ToolDefinition = {
     type: 'object',
     properties: {},
   },
-  execute: async (_params, dispatch): Promise<ToolResult> => {
+  execute: async (_params, dispatch, getState): Promise<ToolResult> => {
+    const prevHidden = [...getState().simulation.hiddenPieceIds];
     dispatch(showAll3D());
-    return { success: true, data: { showedAll: true } };
+    return {
+      success: true,
+      data: { showedAll: true },
+      rollback: () => dispatch(hideAll3D(prevHidden)),
+    };
   },
 };
 
@@ -540,7 +562,11 @@ const flipNormal3DTool: ToolDefinition = {
     if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
     dispatch(toggleFlipNormal(pieceId));
     const isFlipped = getState().simulation.flippedPieceIds.includes(pieceId);
-    return { success: true, data: { pieceId, flipped: isFlipped } };
+    return {
+      success: true,
+      data: { pieceId, flipped: isFlipped },
+      rollback: () => dispatch(toggleFlipNormal(pieceId)),
+    };
   },
 };
 
@@ -562,11 +588,25 @@ const reset3DArrangementTool: ToolDefinition = {
     if (pieceId) {
       const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
       if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+      const prevPos = getState().project.arrangementOverrides[pieceId];
       dispatch(setArrangement3D({ pieceId, position: [0, 0, 0] }));
-      return { success: true, data: { pieceId, resetPosition: [0, 0, 0] } };
+      return {
+        success: true,
+        data: { pieceId, resetPosition: [0, 0, 0] },
+        rollback: () => { if (prevPos) dispatch(setArrangement3D({ pieceId, position: prevPos })); },
+      };
     }
+    const prevOverrides = { ...getState().project.arrangementOverrides };
     dispatch(clearArrangementOverrides());
-    return { success: true, data: { resetAll: true } };
+    return {
+      success: true,
+      data: { resetAll: true },
+      rollback: () => {
+        for (const [id, pos] of Object.entries(prevOverrides)) {
+          dispatch(setArrangement3D({ pieceId: id, position: pos as [number, number, number] }));
+        }
+      },
+    };
   },
 };
 

@@ -109,7 +109,7 @@ interface SimulationSliceState {
   dragCoefficient: number;
   /** IDs of pieces whose particles are frozen (zero velocity, skip solver) */
   frozenPieceIds: string[];
-  /** Piece IDs hidden in 3D viewport (still simulate, just invisible) */
+  /** Piece IDs hidden in 3D viewport (excluded from simulation and rendering) */
   hiddenPieceIds: string[];
   /** Piece IDs with flipped normals in 3D */
   flippedPieceIds: string[];
@@ -432,6 +432,10 @@ const simulationSlice = createSlice({
         state.flippedPieceIds.push(action.payload);
       }
     },
+    /** Clear all flipped normals. */
+    clearFlippedNormals(state) {
+      state.flippedPieceIds = [];
+    },
 
     /** Set the latest fit map statistics (null to clear). */
     setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
@@ -536,6 +540,20 @@ const simulationSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
+    builder.addMatcher(
+      (action) => action.type === 'project/removePiece',
+      (state, action) => {
+        const pieceId = (action as unknown as { payload: string }).payload;
+        state.hiddenPieceIds = state.hiddenPieceIds.filter(id => id !== pieceId);
+        state.flippedPieceIds = state.flippedPieceIds.filter(id => id !== pieceId);
+        delete state.pieceOpacity[pieceId];
+        delete state.pieceEmission[pieceId];
+        delete state.pieceEmissionIntensity[pieceId];
+        delete state.pieceTints[pieceId];
+        delete state.pieceTextureOverrides[pieceId];
+        delete state.pieceUVTransforms[pieceId];
+      },
+    );
   },
 });
 
@@ -586,6 +604,7 @@ export const {
   showAll3D,
   hideAll3D,
   toggleFlipNormal,
+  clearFlippedNormals,
   setFitMapStats,
   // PBR material overrides
   setPieceTint,

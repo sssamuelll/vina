@@ -44,7 +44,7 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal } from '../../store/simulationSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D, clearArrangementOverrides } from '../../store/projectSlice';
@@ -553,6 +553,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 position={placements[i].position}
                 rotation={placements[i].rotation}
                 arrangementOverride={arrangementOverrides[piece.id]}
+                flippedPieceIds={flippedPieceIds}
                 canDrag={isArrangeMode}
                 onSelect={(id, shift) => dispatch(shift ? togglePieceSelection(id) : selectPiece(id))}
                 onDragEnd={(id, pos) => dispatch(setArrangement3D({ pieceId: id, position: pos }))}
@@ -705,6 +706,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onResetAll3D={() => {
           dispatch(clearArrangementOverrides());
           dispatch(showAll3D());
+          dispatch(clearFlippedNormals());
         }}
         isPieceHidden={ctxMenu.pieceId ? hiddenPieceIds.includes(ctxMenu.pieceId) : false}
         isPieceFlipped={ctxMenu.pieceId ? flippedPieceIds.includes(ctxMenu.pieceId) : false}
