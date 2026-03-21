@@ -157,9 +157,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const seamGroups = useSelector((s: RootState) => s.project.seamGroups);
+  const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
 
   // Filter inactive pieces — only active pieces participate in simulation
-  const activePieces = useMemo(() => pieces.filter(p => p.active !== false), [pieces]);
+  // Also filter out hidden pieces (3D arrangement visibility)
+  const activePieces = useMemo(
+    () => pieces.filter(p => p.active !== false && !hiddenPieceIds.includes(p.id)),
+    [pieces, hiddenPieceIds],
+  );
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 

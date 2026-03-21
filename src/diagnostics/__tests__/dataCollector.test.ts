@@ -97,6 +97,8 @@ function makeState(overrides: {
       windEnabled: false,
       dragCoefficient: 1,
       frozenPieceIds: [],
+      hiddenPieceIds: [],
+      flippedPieceIds: [],
       fitMapStats: null,
       pieceTints: {},
       pieceTextureOverrides: {},

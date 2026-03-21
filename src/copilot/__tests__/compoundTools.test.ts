@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // Updated after #79-#82 copilot epic completion + #142 3D interaction tools + snapshot tools
-      expect(registry.size).toBe(157); // +4 POM tools + 8 sewing enhancement tools + 3 interfacing/solidify tools + 1 cutAndSew + 3 offset/extend/trim tools + 3 fabric material tools
+      expect(registry.size).toBe(162); // +5 3D arrangement tools (#370) on top of 157 from main
     });
   });
 });
