@@ -548,10 +548,14 @@ export const tools: ToolDefinition[] = [
       if (!piece) return { success: false, error: 'Piece not found' };
       const distErr = requireFiniteNumber(params.distance, 'distance');
       if (distErr) return { success: false, error: distErr };
+      const rawCount = (params.count as number) ?? 1;
+      const countErr = requireFiniteNumber(rawCount, 'count');
+      if (countErr) return { success: false, error: countErr };
+      const count = Math.max(1, Math.min(10, Math.round(rawCount)));
       const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
       try {
         const result = offsetInternalLine(piece, params.sourceLineId as string, {
-          count: (params.count as number) ?? 1, distance: params.distance as number,
+          count, distance: params.distance as number,
           reverse: params.reverse as boolean | undefined, extend: params.extend as boolean | undefined,
         });
         dispatch(updatePiece(result));
@@ -582,6 +586,12 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const points = params.points as Array<{ x: number; y: number; type: string; handleIn?: { x: number; y: number }; handleOut?: { x: number; y: number } }>;
       if (!points || points.length < 2) return { success: false, error: 'Need at least 2 points' };
+      for (let i = 0; i < points.length; i++) {
+        const xErr = requireFiniteNumber(points[i].x, `points[${i}].x`);
+        if (xErr) return { success: false, error: xErr };
+        const yErr = requireFiniteNumber(points[i].y, `points[${i}].y`);
+        if (yErr) return { success: false, error: yErr };
+      }
 
       const cmds: PathCommand[] = [{ type: 'M', values: [points[0].x, points[0].y] }];
       for (let i = 1; i < points.length; i++) {
