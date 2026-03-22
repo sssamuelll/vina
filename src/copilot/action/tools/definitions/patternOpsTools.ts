@@ -11,6 +11,10 @@ function requireFiniteNumber(value: unknown, name: string): string | null {
   return null;
 }
 
+function uid(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export const tools: ToolDefinition[] = [
   {
     name: 'splitPiece',
@@ -608,7 +612,7 @@ export const tools: ToolDefinition[] = [
 
       const mode = (params.mode as string) || 'piece';
       if (mode === 'piece') {
-        const newPiece = { id: `piece-${Date.now()}`, name: 'Poly Pen Piece', outline: cmds, internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now() };
+        const newPiece = { id: uid('piece'), name: 'Poly Pen Piece', outline: cmds, internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now() };
         dispatch(addPiece(newPiece));
         return { success: true, data: { pieceId: newPiece.id }, rollback: () => dispatch({ type: 'project/removePiece', payload: newPiece.id, meta: { skipConfirmation: true } }) };
       } else {
@@ -618,7 +622,7 @@ export const tools: ToolDefinition[] = [
         if (!piece) return { success: false, error: 'Target piece not found' };
         const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
         const lt = (params.lineType as string) || 'fold';
-        const lineId = `line-${Date.now()}`;
+        const lineId = uid('line');
         dispatch(updatePiece({ ...piece, internals: [...piece.internals, { id: lineId, type: lt as InternalLineType, path: cmds.slice(0, -1) }], updatedAt: Date.now() }));
         return { success: true, data: { pieceId: targetId, lineId }, rollback: () => dispatch(updatePiece(snapshot)) };
       }
