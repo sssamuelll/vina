@@ -62,6 +62,10 @@ interface ProjectState {
   arrangementOverrides: Record<string, [number, number, number]>;
   /** Points of measure */
   poms: PointOfMeasure[];
+  /** Custom layer names (layer number → display name) */
+  layerNames: Record<number, string>;
+  /** Layer lock state (layer number → locked) */
+  layerLocked: Record<number, boolean>;
 }
 
 const initialState: ProjectState = {
@@ -78,6 +82,8 @@ const initialState: ProjectState = {
   seamGroups: [],
   arrangementOverrides: {},
   poms: [],
+  layerNames: {},
+  layerLocked: {},
 };
 
 const projectSlice = createSlice({
@@ -537,6 +543,45 @@ const projectSlice = createSlice({
       state.isDirty = true;
     },
 
+    // ─── Layer Metadata ───
+    /** Set a custom display name for a layer. */
+    renameLayer(state, action: PayloadAction<{ layer: number; name: string }>) {
+      state.layerNames[action.payload.layer] = action.payload.name;
+      state.isDirty = true;
+    },
+    /** Remove a custom display name for a layer. */
+    deleteLayerName(state, action: PayloadAction<{ layer: number }>) {
+      delete state.layerNames[action.payload.layer];
+      state.isDirty = true;
+    },
+    /** Lock or unlock a layer to prevent edits. */
+    setLayerLocked(state, action: PayloadAction<{ layer: number; locked: boolean }>) {
+      state.layerLocked[action.payload.layer] = action.payload.locked;
+      state.isDirty = true;
+    },
+    /** Register an empty layer (creates an entry in layerNames with a default name). */
+    addLayer(state, action: PayloadAction<{ layer: number; name?: string }>) {
+      const { layer, name } = action.payload;
+      if (!state.layerNames[layer]) {
+        state.layerNames[layer] = name ?? `Layer ${layer}`;
+      }
+      state.isDirty = true;
+    },
+    /** Remove a layer and move its pieces to layer 1. */
+    removeLayer(state, action: PayloadAction<{ layer: number }>) {
+      const { layer } = action.payload;
+      if (layer === 1) return; // cannot remove base layer
+      for (const piece of state.pieces) {
+        if ((piece.layer ?? 1) === layer) {
+          piece.layer = 1;
+          piece.updatedAt = Date.now();
+        }
+      }
+      delete state.layerNames[layer];
+      delete state.layerLocked[layer];
+      state.isDirty = true;
+    },
+
     // ─── Z-Order ───
     bringToFront(state, action: PayloadAction<string>) {
       const piece = state.pieces.find(p => p.id === action.payload);
@@ -742,6 +787,7 @@ export const {
   linkPieces, unlinkPieces, cloneAsLinked,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,
+  renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece,
   // Groups
@@ -753,3 +799,14 @@ export const {
 } = projectSlice.actions;
 
 export default projectSlice.reducer;
+
+/**
+ * Get the display name for a layer. Falls back to "Layer N" if no custom name is set.
+ * Accepts a partial RootState shape so it can be used with getState().
+ */
+export function getLayerDisplayName(
+  state: { project: { layerNames: Record<number, string> } },
+  layer: number,
+): string {
+  return state.project.layerNames[layer] ?? `Layer ${layer}`;
+}

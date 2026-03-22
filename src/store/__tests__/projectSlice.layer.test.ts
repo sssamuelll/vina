@@ -36,6 +36,8 @@ function emptyState() {
     seamGroups: [],
     arrangementOverrides: {},
     poms: [],
+    layerNames: {},
+    layerLocked: {},
   };
 }
 

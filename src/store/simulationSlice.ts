@@ -137,6 +137,16 @@ interface SimulationSliceState {
     radius: number;
     strength: number;
   };
+  /** Layer IDs that are hidden in the 3D viewport */
+  hiddenLayerIds: number[];
+  /** Piece IDs that are individually hidden in the 3D viewport */
+  hiddenPieceIds: string[];
+  /** Custom outline/accent colors per layer (layer number → hex) */
+  layerOutlineColors: Record<number, string>;
+  /** Whether X-ray transparency mode is active (allows seeing through layers) */
+  xrayMode: boolean;
+  /** Active layer in X-ray mode (kept opaque); null = all transparent */
+  xrayActiveLayer: number | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -186,6 +196,11 @@ const initialState: SimulationSliceState = {
     radius: 0.08,
     strength: 0.6,
   },
+  hiddenLayerIds: [],
+  hiddenPieceIds: [],
+  layerOutlineColors: {},
+  xrayMode: false,
+  xrayActiveLayer: null,
 };
 
 const simulationSlice = createSlice({
@@ -336,6 +351,36 @@ const simulationSlice = createSlice({
     },
     setSurfaceMode3D(state, action: PayloadAction<SurfaceMode3D>) {
       state.surfaceMode3D = action.payload;
+    },
+
+    // ─── Layer Visibility ────────────────────────────────────────────────────
+
+    /** Toggle visibility of an entire layer. */
+    toggleLayerVisibility(state, action: PayloadAction<number>) {
+      const idx = state.hiddenLayerIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenLayerIds.splice(idx, 1);
+      } else {
+        state.hiddenLayerIds.push(action.payload);
+      }
+    },
+    /** Toggle visibility of a single piece. */
+    toggleHide3D(state, action: PayloadAction<string>) {
+      const idx = state.hiddenPieceIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenPieceIds.splice(idx, 1);
+      } else {
+        state.hiddenPieceIds.push(action.payload);
+      }
+    },
+    /** Enable or disable X-ray mode (with optional active layer). */
+    setXrayMode(state, action: PayloadAction<{ enabled: boolean; activeLayer?: number }>) {
+      state.xrayMode = action.payload.enabled;
+      state.xrayActiveLayer = action.payload.activeLayer ?? null;
+    },
+    /** Set a custom outline/accent color for a layer. */
+    setLayerOutlineColor(state, action: PayloadAction<{ layer: number; color: string }>) {
+      state.layerOutlineColors[action.payload.layer] = action.payload.color;
     },
 
     // ─── Snapshot Metadata ──────────────────────────────────────────────────
@@ -497,6 +542,11 @@ export const {
   toggleSeamlines3D,
   toggleInternalLines3D,
   setSurfaceMode3D,
+  // Layer visibility & X-ray
+  toggleLayerVisibility,
+  toggleHide3D,
+  setXrayMode,
+  setLayerOutlineColor,
   // Snapshots
   addSnapshot,
   removeSnapshot,
