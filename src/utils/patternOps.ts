@@ -1093,3 +1093,97 @@ export function offsetInternalLine(
 
   return { ...piece, id: piece.id, internals: newInternals, updatedAt: Date.now() };
 }
+
+// ─── replaceAsPatternOutline ─────────────────────────────────────────────────
+
+export function replaceAsPatternOutline(
+  piece: PatternPiece,
+  internalLineId: string,
+  outlineSegmentRange: [number, number],
+): PatternPiece {
+  const line = piece.internals.find(l => l.id === internalLineId);
+  if (!line) throw new Error(`Internal line "${internalLineId}" not found`);
+
+  const [rangeStart, rangeEnd] = outlineSegmentRange;
+  if (rangeStart < 0 || rangeEnd >= piece.outline.length) {
+    throw new Error('Outline segment range out of bounds');
+  }
+
+  const outlineStartPt = cmdEndpoint(piece.outline[rangeStart])
+    || { x: piece.outline[rangeStart].values[0], y: piece.outline[rangeStart].values[1] };
+  const outlineEndPt = cmdEndpoint(piece.outline[rangeEnd])!;
+
+  const lineStartPt = { x: line.path[0].values[0], y: line.path[0].values[1] };
+  const lineLastCmd = line.path[line.path.length - 1];
+  const lineEndPt = cmdEndpoint(lineLastCmd)
+    || { x: lineLastCmd.values[0], y: lineLastCmd.values[1] };
+
+  const TOLERANCE = 2;
+  const startToStart = distPt(lineStartPt, outlineStartPt);
+  const startToEnd = distPt(lineStartPt, outlineEndPt);
+
+  let lineCmds: PathCommand[];
+  if (startToStart <= TOLERANCE) {
+    lineCmds = line.path.slice(1);
+    if (distPt(lineEndPt, outlineEndPt) > TOLERANCE) {
+      throw new Error('Internal line endpoints do not match outline segment');
+    }
+  } else if (startToEnd <= TOLERANCE) {
+    if (distPt(lineEndPt, outlineStartPt) > TOLERANCE) {
+      throw new Error('Internal line endpoints do not match outline segment');
+    }
+    const allPts: Point2D[] = [{ x: line.path[0].values[0], y: line.path[0].values[1] }];
+    for (const cmd of line.path.slice(1)) {
+      const ep = cmdEndpoint(cmd);
+      if (ep) allPts.push(ep);
+    }
+    allPts.reverse();
+    const reversed: PathCommand[] = [];
+    for (let i = 1; i < allPts.length; i++) {
+      reversed.push({ type: 'L', values: [allPts[i].x, allPts[i].y] });
+    }
+    lineCmds = reversed;
+  } else {
+    throw new Error('Internal line endpoints are too far from outline segment');
+  }
+
+  const insertCmds = lineCmds.map(c => ({
+    type: c.type === 'M' ? 'L' : c.type,
+    values: [...c.values],
+  }));
+
+  const before = piece.outline.slice(0, rangeStart + 1).map(c => ({ type: c.type, values: [...c.values] }));
+  const after = piece.outline.slice(rangeEnd + 1).map(c => ({ type: c.type, values: [...c.values] }));
+
+  const newOutline = [...before, ...insertCmds, ...after];
+  if (newOutline[newOutline.length - 1].type !== 'Z') {
+    newOutline.push({ type: 'Z', values: [] });
+  }
+
+  const oldSegment: PathCommand[] = [
+    { type: 'M', values: [outlineStartPt.x, outlineStartPt.y] },
+    ...piece.outline.slice(rangeStart + 1, rangeEnd + 1).map(c => ({ type: c.type, values: [...c.values] })),
+  ];
+
+  const refLine = {
+    id: uid('line'),
+    type: 'reference' as const,
+    path: oldSegment,
+  };
+
+  const newInternals = piece.internals
+    .filter(l => l.id !== internalLineId)
+    .map(l => ({ ...l, path: l.path.map(c => ({ type: c.type, values: [...c.values] })) }));
+  newInternals.push(refLine);
+
+  const result = {
+    ...piece,
+    id: piece.id,
+    outline: newOutline,
+    internals: newInternals,
+    updatedAt: Date.now(),
+  };
+
+  result.edges = detectSemanticEdges(result);
+  return result;
+}

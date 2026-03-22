@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves, offsetInternalLine } from '../patternOps';
+import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves, offsetInternalLine, replaceAsPatternOutline } from '../patternOps';
 import type { PatternPiece, SemanticEdge, PathCommand } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
@@ -640,5 +640,56 @@ describe('offsetInternalLine', () => {
     }];
     const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 10 });
     expect(result.internals[1].type).toBe('pleat');
+  });
+});
+
+describe('replaceAsPatternOutline', () => {
+  it('replaces outline segment with internal line', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [
+        { type: 'M', values: [0, 0] },
+        { type: 'C', values: [66, -30, 133, -30, 200, 0] },
+      ],
+    }];
+    const result = replaceAsPatternOutline(piece, 'style-1', [0, 1]);
+    const refLines = result.internals.filter(l => l.type === 'reference');
+    expect(refLines.length).toBe(1);
+    expect(result.internals.find(l => l.id === 'style-1')).toBeUndefined();
+  });
+
+  it('preserves piece ID', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }],
+    }];
+    const result = replaceAsPatternOutline(piece, 'style-1', [0, 1]);
+    expect(result.id).toBe(piece.id);
+  });
+
+  it('throws if internal line not found', () => {
+    const piece = makeRect('Test', 200, 400);
+    expect(() => replaceAsPatternOutline(piece, 'nope', [0, 1])).toThrow();
+  });
+
+  it('throws if endpoints too far from outline', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [{ type: 'M', values: [0, 50] }, { type: 'L', values: [200, 50] }],
+    }];
+    expect(() => replaceAsPatternOutline(piece, 'style-1', [0, 1])).toThrow();
+  });
+
+  it('outline is still closed after replacement', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }],
+    }];
+    const result = replaceAsPatternOutline(piece, 'style-1', [0, 1]);
+    expect(result.outline[result.outline.length - 1].type).toBe('Z');
   });
 });
