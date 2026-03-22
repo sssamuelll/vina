@@ -783,3 +783,150 @@ export function trimEdgeAtPoint(
   newPiece.updatedAt = Date.now();
   return newPiece;
 }
+
+// ─── unfoldPiece ─────────────────────────────────────────────────────────────
+
+function reflectPoint(pt: Point2D, p1: Point2D, p2: Point2D): Point2D {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { ...pt };
+  const t = ((pt.x - p1.x) * dx + (pt.y - p1.y) * dy) / lenSq;
+  const projX = p1.x + t * dx, projY = p1.y + t * dy;
+  return { x: 2 * projX - pt.x, y: 2 * projY - pt.y };
+}
+
+function reflectCommands(commands: PathCommand[], p1: Point2D, p2: Point2D): PathCommand[] {
+  return commands.map(cmd => {
+    const vals = [...cmd.values];
+    for (let i = 0; i < vals.length; i += 2) {
+      if (i + 1 < vals.length) {
+        const reflected = reflectPoint({ x: vals[i], y: vals[i + 1] }, p1, p2);
+        vals[i] = reflected.x;
+        vals[i + 1] = reflected.y;
+      }
+    }
+    return { type: cmd.type, values: vals };
+  });
+}
+
+function distPt(a: Point2D, b: Point2D): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function cmdEndpoint(cmd: PathCommand): Point2D | null {
+  if (cmd.type === 'Z' || cmd.values.length < 2) return null;
+  return { x: cmd.values[cmd.values.length - 2], y: cmd.values[cmd.values.length - 1] };
+}
+
+export function unfoldPiece(
+  piece: PatternPiece,
+  foldLineId: string,
+  options?: { outlineOnly?: boolean },
+): PatternPiece {
+  const foldLine = piece.internals.find(l => l.id === foldLineId);
+  if (!foldLine) throw new Error(`Fold line "${foldLineId}" not found`);
+  if (foldLine.type !== 'fold') throw new Error(`Internal line "${foldLineId}" is not a fold line`);
+
+  const foldStart = cmdEndpoint(foldLine.path[0]) || { x: foldLine.path[0].values[0], y: foldLine.path[0].values[1] };
+  const foldEnd = cmdEndpoint(foldLine.path[foldLine.path.length - 1])!;
+
+  const TOLERANCE = 2;
+  const outlinePoints: { idx: number; pt: Point2D }[] = [];
+  for (let i = 0; i < piece.outline.length; i++) {
+    const ep = cmdEndpoint(piece.outline[i]);
+    if (ep) outlinePoints.push({ idx: i, pt: ep });
+  }
+
+  let splitA = -1, splitB = -1;
+  let minDistA = Infinity, minDistB = Infinity;
+  for (const { idx, pt } of outlinePoints) {
+    const dA = distPt(pt, foldStart);
+    const dB = distPt(pt, foldEnd);
+    if (dA < minDistA) { minDistA = dA; splitA = idx; }
+    if (dB < minDistB) { minDistB = dB; splitB = idx; }
+  }
+
+  if (minDistA > TOLERANCE || minDistB > TOLERANCE) {
+    throw new Error('Fold line endpoints are not on the piece outline');
+  }
+
+  if (splitA > splitB) { [splitA, splitB] = [splitB, splitA]; }
+
+  const keptCmds: PathCommand[] = [];
+  for (let i = splitA + 1; i <= splitB; i++) {
+    keptCmds.push({ type: piece.outline[i].type, values: [...piece.outline[i].values] });
+  }
+
+  const mirroredCmds = reflectCommands(keptCmds, foldStart, foldEnd);
+
+  const startPt = outlinePoints.find(p => p.idx === splitA)!.pt;
+  const merged: PathCommand[] = [{ type: 'M', values: [startPt.x, startPt.y] }];
+
+  for (const cmd of keptCmds) {
+    merged.push({ type: cmd.type === 'M' ? 'L' : cmd.type, values: [...cmd.values] });
+  }
+
+  // Reverse mirrored half — collect (start, cmd) segments, walk in reverse
+  const mirrorSegs: { start: Point2D; cmd: PathCommand }[] = [];
+  let mirrorCursor = { x: mirroredCmds[0]?.values[0] ?? 0, y: mirroredCmds[0]?.values[1] ?? 0 };
+  for (const cmd of mirroredCmds) {
+    if (cmd.type === 'M') {
+      mirrorCursor = { x: cmd.values[0], y: cmd.values[1] };
+      continue;
+    }
+    if (cmd.type === 'Z') continue;
+    mirrorSegs.push({ start: { ...mirrorCursor }, cmd });
+    const ep = cmdEndpoint(cmd);
+    if (ep) mirrorCursor = ep;
+  }
+  for (let i = mirrorSegs.length - 1; i >= 0; i--) {
+    const { start, cmd } = mirrorSegs[i];
+    if (cmd.type === 'L' || cmd.type === 'H' || cmd.type === 'V') {
+      merged.push({ type: 'L', values: [start.x, start.y] });
+    } else if (cmd.type === 'C') {
+      const [cx1, cy1, cx2, cy2] = cmd.values;
+      merged.push({ type: 'C', values: [cx2, cy2, cx1, cy1, start.x, start.y] });
+    }
+  }
+
+  merged.push({ type: 'Z', values: [] });
+
+  const newInternals = piece.internals
+    .filter(l => l.id !== foldLineId)
+    .map(l => ({ ...l, path: l.path.map(c => ({ type: c.type, values: [...c.values] })) }));
+
+  if (!options?.outlineOnly) {
+    const mirrored = piece.internals
+      .filter(l => l.id !== foldLineId)
+      .map(l => ({
+        ...l,
+        id: uid('line'),
+        path: reflectCommands(l.path, foldStart, foldEnd),
+      }));
+    newInternals.push(...mirrored);
+  }
+
+  let newDarts = piece.darts ? [...piece.darts] : undefined;
+  if (piece.darts && !options?.outlineOnly) {
+    const mirroredDarts = piece.darts.map(d => ({
+      ...d,
+      id: uid('dart'),
+      apex: reflectPoint(d.apex, foldStart, foldEnd),
+      legs: d.legs.map(leg => leg.map(pt => reflectPoint(pt, foldStart, foldEnd))) as [Point2D[], Point2D[]],
+      foldDirection: d.foldDirection === 'left' ? 'right' as const
+        : d.foldDirection === 'right' ? 'left' as const
+        : d.foldDirection,
+    }));
+    newDarts = [...piece.darts, ...mirroredDarts];
+  }
+
+  return {
+    ...piece,
+    id: piece.id,
+    outline: merged,
+    internals: newInternals,
+    darts: newDarts,
+    edges: detectSemanticEdges({ ...piece, outline: merged }),
+    updatedAt: Date.now(),
+  };
+}

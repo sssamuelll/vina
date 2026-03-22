@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint } from '../patternOps';
+import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece } from '../patternOps';
 import type { PatternPiece, SemanticEdge } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
@@ -331,5 +331,89 @@ describe('trimEdgeAtPoint — Bezier', () => {
     const piece = makeBezierPiece();
     const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'before');
     expect(result.id).toBe(piece.id);
+  });
+});
+
+// ─── unfoldPiece ─────────────────────────────────────────────────────────────
+
+function makeHalfRect(name: string): PatternPiece {
+  return {
+    id: `test-${name}`, name,
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [200, 600] },
+      { type: 'L', values: [0, 600] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [
+      {
+        id: 'fold-1',
+        type: 'fold' as const,
+        path: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [0, 600] },
+        ],
+      },
+    ],
+    position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 10, layer: 1, sublayer: 0, active: true,
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+}
+
+describe('unfoldPiece', () => {
+  it('mirrors half-rect into full rect', () => {
+    const half = makeHalfRect('Front');
+    const full = unfoldPiece(half, 'fold-1');
+    const xs = full.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
+    const minX = Math.min(...xs.filter(isFinite));
+    const maxX = Math.max(...xs.filter(isFinite));
+    expect(maxX - minX).toBeCloseTo(400, 0);
+  });
+
+  it('preserves piece ID', () => {
+    const half = makeHalfRect('Front');
+    const full = unfoldPiece(half, 'fold-1');
+    expect(full.id).toBe(half.id);
+  });
+
+  it('removes fold line from internals', () => {
+    const half = makeHalfRect('Front');
+    const full = unfoldPiece(half, 'fold-1');
+    expect(full.internals.find(l => l.id === 'fold-1')).toBeUndefined();
+  });
+
+  it('mirrors internals when outlineOnly is false', () => {
+    const half = makeHalfRect('Front');
+    half.internals.push({
+      id: 'dart-1', type: 'dart',
+      path: [{ type: 'M', values: [100, 100] }, { type: 'L', values: [100, 200] }],
+    });
+    const full = unfoldPiece(half, 'fold-1');
+    const darts = full.internals.filter(l => l.type === 'dart');
+    expect(darts.length).toBe(2);
+  });
+
+  it('does not mirror internals when outlineOnly is true', () => {
+    const half = makeHalfRect('Front');
+    half.internals.push({
+      id: 'dart-1', type: 'dart',
+      path: [{ type: 'M', values: [100, 100] }, { type: 'L', values: [100, 200] }],
+    });
+    const full = unfoldPiece(half, 'fold-1', { outlineOnly: true });
+    const darts = full.internals.filter(l => l.type === 'dart');
+    expect(darts.length).toBe(1);
+  });
+
+  it('throws if fold line not found', () => {
+    const half = makeHalfRect('Front');
+    expect(() => unfoldPiece(half, 'nonexistent')).toThrow();
+  });
+
+  it('throws if line is not type fold', () => {
+    const half = makeHalfRect('Front');
+    half.internals[0].type = 'dart';
+    expect(() => unfoldPiece(half, 'fold-1')).toThrow();
   });
 });
