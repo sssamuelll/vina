@@ -71,8 +71,8 @@ interface CustomLight {
   type: LightType;                              // NEW (default: 'rect')
   color: string;
   intensity: number;
-  width: number;                                 // rect only
-  height: number;                                // rect only
+  width?: number;                                // rect only (default: 1)
+  height?: number;                               // rect only (default: 1)
   position: [number, number, number];
   rotation: [number, number, number];
   castShadow: boolean;                           // NEW (default: false)
@@ -193,7 +193,7 @@ New buttons use appropriate Lucide icons:
 **Constraint:** The WebGPURenderer's NodeMaterial system rejects legacy materials (`MeshDepthMaterial`, `ShadowMaterial`) required for shadow map generation. The codebase explicitly disables shadows with `shadows={!nodeMaterialActive}` (always false). Shadow maps are not feasible with the current renderer.
 
 **v1 approach:**
-- Keep `ContactShadows` for ground visual (existing)
+- `ContactShadows` is currently disabled by the same NodeMaterial constraint (`!nodeMaterialActive`). Ground shadows rely on the existing ground plane opacity/blur setup
 - `castShadow` and `shadowSoftness` fields exist in state but are **UI-only indicators** — they do not produce real shadow maps
 - The "Natural" preset sets `castShadow: true` on the directional light as a forward-compatible default
 - When Three.js NodeMaterial adds shadow support (tracked upstream), enabling real shadows becomes a renderer config change, not a state/UI change
