@@ -9,7 +9,14 @@
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
-import { setLayer, setSublayer, cloneToLayer, superimposePiece, setArrangement3D } from '../../../../store/projectSlice';
+import {
+  setLayer, setSublayer, cloneToLayer, superimposePiece, setArrangement3D,
+  renameLayer as renameLayerAction, deleteLayerName, setLayerLocked as setLayerLockedAction,
+  removePiece,
+} from '../../../../store/projectSlice';
+import {
+  toggleLayerVisibility, setXrayMode,
+} from '../../../../store/simulationSlice';
 
 // ─── setLayer ────────────────────────────────────────────────────────────────
 
@@ -108,6 +115,7 @@ const cloneToLayerTool: ToolDefinition = {
         cloneId: clone?.id,
         cloneLayer: clone?.layer,
       },
+      rollback: clone ? () => { dispatch(removePiece(clone.id)); } : undefined,
     };
   },
 };
@@ -226,6 +234,111 @@ const getLayerInfoTool: ToolDefinition = {
   },
 };
 
+// ─── setLayerVisibility ──────────────────────────────────────────────────────
+
+const setLayerVisibilityTool: ToolDefinition = {
+  name: 'setLayerVisibility',
+  description: 'Show or hide an entire garment layer in both 2D and 3D viewports.',
+  parameters: {
+    type: 'object',
+    properties: {
+      layer: { type: 'number', description: 'Layer number to show/hide' },
+      visible: { type: 'boolean', description: 'true to show, false to hide' },
+    },
+    required: ['layer', 'visible'],
+  },
+  execute: async (params, dispatch, getState) => {
+    const state = getState();
+    const isHidden = state.simulation.hiddenLayerIds.includes(params.layer as number);
+    const shouldHide = !(params.visible as boolean);
+    if (isHidden !== shouldHide) {
+      dispatch(toggleLayerVisibility(params.layer as number));
+    }
+    return {
+      success: true,
+      data: { layer: params.layer, visible: params.visible },
+      rollback: () => { dispatch(toggleLayerVisibility(params.layer as number)); },
+    };
+  },
+};
+
+// ─── toggleXrayMode ──────────────────────────────────────────────────────────
+
+const toggleXrayModeTool: ToolDefinition = {
+  name: 'toggleXrayMode',
+  description: 'Toggle X-ray transparency mode to see through garment layers.',
+  parameters: {
+    type: 'object',
+    properties: {
+      enabled: { type: 'boolean', description: 'true to enable, false to disable' },
+      activeLayer: { type: 'number', description: 'Layer to keep opaque (optional)' },
+    },
+    required: ['enabled'],
+  },
+  execute: async (params, dispatch) => {
+    dispatch(setXrayMode({
+      enabled: params.enabled as boolean,
+      activeLayer: params.activeLayer as number | undefined,
+    }));
+    return {
+      success: true,
+      data: { enabled: params.enabled, activeLayer: params.activeLayer },
+      rollback: () => { dispatch(setXrayMode({ enabled: !(params.enabled as boolean) })); },
+    };
+  },
+};
+
+// ─── renameLayer ─────────────────────────────────────────────────────────────
+
+const renameLayerTool: ToolDefinition = {
+  name: 'renameLayer',
+  description: 'Set a custom display name for a garment layer.',
+  parameters: {
+    type: 'object',
+    properties: {
+      layer: { type: 'number', description: 'Layer number' },
+      name: { type: 'string', description: 'Display name for the layer' },
+    },
+    required: ['layer', 'name'],
+  },
+  execute: async (params, dispatch, getState) => {
+    const prevName = getState().project.layerNames[params.layer as number];
+    dispatch(renameLayerAction({ layer: params.layer as number, name: params.name as string }));
+    return {
+      success: true,
+      data: { layer: params.layer, name: params.name },
+      rollback: () => {
+        if (prevName) dispatch(renameLayerAction({ layer: params.layer as number, name: prevName }));
+        else dispatch(deleteLayerName({ layer: params.layer as number }));
+      },
+    };
+  },
+};
+
+// ─── setLayerLock ────────────────────────────────────────────────────────────
+
+const setLayerLockTool: ToolDefinition = {
+  name: 'setLayerLock',
+  description: 'Lock or unlock a garment layer to prevent/allow edits.',
+  parameters: {
+    type: 'object',
+    properties: {
+      layer: { type: 'number', description: 'Layer number' },
+      locked: { type: 'boolean', description: 'true to lock, false to unlock' },
+    },
+    required: ['layer', 'locked'],
+  },
+  execute: async (params, dispatch, getState) => {
+    const prevLocked = getState().project.layerLocked[params.layer as number] ?? false;
+    dispatch(setLayerLockedAction({ layer: params.layer as number, locked: params.locked as boolean }));
+    return {
+      success: true,
+      data: { layer: params.layer, locked: params.locked },
+      rollback: () => { dispatch(setLayerLockedAction({ layer: params.layer as number, locked: prevLocked })); },
+    };
+  },
+};
+
 // ─── Export ──────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -233,4 +346,8 @@ export const tools: ToolDefinition[] = [
   cloneToLayerTool,
   superimposeTool,
   getLayerInfoTool,
+  setLayerVisibilityTool,
+  toggleXrayModeTool,
+  renameLayerTool,
+  setLayerLockTool,
 ];
