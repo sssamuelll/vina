@@ -25,7 +25,7 @@ import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin, setFitMapStats } from '../../store/simulationSlice';
+import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
 import PinRenderer from './PinRenderer';
@@ -158,13 +158,32 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const seamGroups = useSelector((s: RootState) => s.project.seamGroups);
   const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
+  const xrayActiveLayer = useSelector((s: RootState) => s.simulation.xrayActiveLayer);
 
   // Filter inactive pieces — only active pieces participate in simulation
-  // Also filter out hidden pieces (3D arrangement visibility)
+  // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
   const activePieces = useMemo(
-    () => pieces.filter(p => p.active !== false && !hiddenPieceIds.includes(p.id)),
-    [pieces, hiddenPieceIds],
+    () => pieces.filter(p =>
+      p.active !== false
+      && !hiddenPieceIds.includes(p.id)
+      && !hiddenLayerIds.includes(p.layer ?? 1)
+    ),
+    [pieces, hiddenPieceIds, hiddenLayerIds],
   );
+
+  // ─── X-ray opacity ──────────────────────────────────────────────────────────
+  // When xrayMode is on, set active-layer pieces to full opacity and others to 0.2
+  useEffect(() => {
+    if (!xrayMode) return;
+    for (const p of pieces) {
+      if (p.active === false) continue;
+      const layer = p.layer ?? 1;
+      const opacity = (xrayActiveLayer === layer) ? 1.0 : 0.2;
+      dispatch(setPieceOpacity({ pieceId: p.id, opacity }));
+    }
+  }, [xrayMode, xrayActiveLayer, pieces, dispatch]);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 
