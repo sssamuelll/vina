@@ -348,11 +348,11 @@ export default function RenderSettingsPanel({
                     <div>
                       <div className="ap-slider-label">
                         <span>Width</span>
-                        <span>{light.width.toFixed(1)}</span>
+                        <span>{(light.width ?? 1).toFixed(1)}</span>
                       </div>
                       <div className="ap-slider-control">
                         <input
-                          type="range" min={0.1} max={5} step={0.1} value={light.width}
+                          type="range" min={0.1} max={5} step={0.1} value={light.width ?? 1}
                           onChange={e => dispatch(updateLight({ id: light.id, changes: { width: Number(e.target.value) } }))}
                         />
                       </div>
@@ -361,11 +361,11 @@ export default function RenderSettingsPanel({
                     <div>
                       <div className="ap-slider-label">
                         <span>Height</span>
-                        <span>{light.height.toFixed(1)}</span>
+                        <span>{(light.height ?? 1).toFixed(1)}</span>
                       </div>
                       <div className="ap-slider-control">
                         <input
-                          type="range" min={0.1} max={5} step={0.1} value={light.height}
+                          type="range" min={0.1} max={5} step={0.1} value={light.height ?? 1}
                           onChange={e => dispatch(updateLight({ id: light.id, changes: { height: Number(e.target.value) } }))}
                         />
                       </div>
