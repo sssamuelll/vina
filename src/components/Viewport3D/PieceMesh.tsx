@@ -142,16 +142,25 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
   const roughness = fabricRoughness ?? 0.7;
   if (!geometry) return null;
 
-  const solidOpacity = surfaceMode === 'translucent'
-    ? (isSelected ? 0.4 : 0.2)
-    : surfaceMode === 'textured'
-    ? 1.0
-    : surfaceMode === 'thick'
-    ? (isSelected ? 0.95 : 0.85)
-    : (isSelected ? 0.85 : 0.6);
-
+  const isWireMode = surfaceMode === 'mesh' || surfaceMode === 'xray'
+    || surfaceMode === 'shaded-wire' || surfaceMode === 'textured-wire';
   const showSolid = surfaceMode !== 'mesh';
-  const showWireframe = surfaceMode === 'mesh';
+  const showWireframe = isWireMode;
+
+  let solidOpacity = 1.0;
+  let useEmissiveOnly = false;
+  let stripTextures = false;
+
+  switch (surfaceMode) {
+    case 'translucent': solidOpacity = isSelected ? 0.4 : 0.2; break;
+    case 'thick': solidOpacity = isSelected ? 0.95 : 0.85; break;
+    case 'flat': solidOpacity = 1.0; useEmissiveOnly = true; break;
+    case 'xray': solidOpacity = 0.1; break;
+    case 'shaded': case 'shaded-wire': solidOpacity = 1.0; stripTextures = true; break;
+    case 'textured': case 'textured-wire': solidOpacity = 1.0; break;
+    case 'mesh': solidOpacity = isSelected ? 0.85 : 0.6; break;
+    default: solidOpacity = 1.0;
+  }
 
   return (
     <group position={position} rotation={finalRotation}>
@@ -159,23 +168,28 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
       {showSolid && (
         <mesh geometry={geometry}>
           <meshStandardMaterial
-            color={meshColor}
+            color={useEmissiveOnly ? '#000000' : meshColor}
             side={THREE.DoubleSide}
             transparent={solidOpacity < 1}
             opacity={solidOpacity}
-            roughness={roughness}
+            roughness={useEmissiveOnly ? 1 : roughness}
             metalness={0}
+            emissive={useEmissiveOnly ? meshColor : undefined}
+            emissiveIntensity={useEmissiveOnly ? 1 : 0}
+            map={stripTextures ? null : undefined}
+            normalMap={stripTextures ? null : undefined}
+            roughnessMap={stripTextures ? null : undefined}
           />
         </mesh>
       )}
-      {/* Wireframe outline */}
+      {/* Wireframe overlay / standalone wireframe */}
       {showWireframe && (
         <mesh geometry={geometry}>
           <meshBasicMaterial
-            color={meshColor}
+            color={surfaceMode === 'mesh' ? meshColor : '#888888'}
             wireframe
             transparent
-            opacity={0.8}
+            opacity={surfaceMode === 'mesh' ? 0.8 : 0.3}
           />
         </mesh>
       )}

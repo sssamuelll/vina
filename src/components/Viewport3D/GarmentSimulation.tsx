@@ -145,6 +145,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const fitMapMode = useSelector((s: RootState) => s.simulation.fitMapMode);
   const fitMapConfig = useSelector((s: RootState) => s.simulation.fitMapConfig);
   const fabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
+  const surfaceMode3D = useSelector((s: RootState) => s.simulation.surfaceMode3D);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
@@ -971,11 +972,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         {!tslMaterial && (
           <meshPhysicalMaterial
             vertexColors={fitMapMode !== 'none'}
-            color={effectiveTint || '#ffffff'}
+            color={surfaceMode3D === 'flat' ? '#000000' : (effectiveTint || '#ffffff')}
             side={THREE.DoubleSide}
             transparent
-            opacity={renderParams.opacity}
-            roughness={renderParams.roughness}
+            opacity={surfaceMode3D === 'xray' ? 0.1 : renderParams.opacity}
+            depthWrite={surfaceMode3D !== 'xray'}
+            roughness={surfaceMode3D === 'flat' ? 1 : renderParams.roughness}
             metalness={renderParams.metalness}
             sheen={renderParams.sheen}
             sheenRoughness={renderParams.sheenRoughness}
@@ -985,13 +987,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             transmission={renderParams.transmission}
             thickness={renderParams.thickness}
             ior={renderParams.ior}
-            map={fitMapMode === 'none' ? textures.map : null}
-            normalMap={textures.normalMap}
-            roughnessMap={fitMapMode === 'none' ? textures.roughnessMap : null}
+            emissive={surfaceMode3D === 'flat' ? (effectiveTint || '#ffffff') : undefined}
+            emissiveIntensity={surfaceMode3D === 'flat' ? 1 : 0}
+            map={(fitMapMode === 'none' && surfaceMode3D !== 'shaded' && surfaceMode3D !== 'shaded-wire') ? textures.map : null}
+            normalMap={(surfaceMode3D !== 'shaded' && surfaceMode3D !== 'shaded-wire') ? textures.normalMap : null}
+            roughnessMap={(fitMapMode === 'none' && surfaceMode3D !== 'shaded' && surfaceMode3D !== 'shaded-wire') ? textures.roughnessMap : null}
             aoMap={textures.aoMap}
           />
         )}
       </mesh>
+      {(surfaceMode3D === 'xray' || surfaceMode3D === 'shaded-wire' || surfaceMode3D === 'textured-wire') && staticGeometry && (
+        <mesh geometry={staticGeometry}>
+          <meshBasicMaterial wireframe color="#888888" transparent opacity={0.3}
+            depthTest polygonOffset polygonOffsetFactor={-1} />
+        </mesh>
+      )}
       <PinRenderer livePositions={positionsRef.current || undefined} />
       {/* Steam brush cursor */}
       {activeTool3D === 'steamBrush' && (
