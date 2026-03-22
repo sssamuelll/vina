@@ -416,6 +416,22 @@ describe('unfoldPiece', () => {
     half.internals[0].type = 'dart';
     expect(() => unfoldPiece(half, 'fold-1')).toThrow();
   });
+
+  it('should handle fold line ending with Z without crashing', () => {
+    const pieceWithZFold: PatternPiece = {
+      ...makeHalfRect('Front'),
+      internals: [{
+        id: 'zfold', type: 'fold' as const,
+        path: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [0, 600] },
+          { type: 'Z', values: [] },
+        ],
+      }],
+    };
+    // Should either succeed or throw a clear error, NOT a TypeError
+    expect(() => unfoldPiece(pieceWithZFold, 'zfold')).not.toThrow(TypeError);
+  });
 });
 
 // ─── optimizeCurvePoints ─────────────────────────────────────────────────────

@@ -831,7 +831,13 @@ export function unfoldPiece(
   if (foldLine.type !== 'fold') throw new Error(`Internal line "${foldLineId}" is not a fold line`);
 
   const foldStart = cmdEndpoint(foldLine.path[0]) || { x: foldLine.path[0].values[0], y: foldLine.path[0].values[1] };
-  const foldEnd = cmdEndpoint(foldLine.path[foldLine.path.length - 1])!;
+  // Skip trailing Z commands to find the actual endpoint
+  let foldEndCmd = foldLine.path[foldLine.path.length - 1];
+  if (foldEndCmd.type === 'Z' && foldLine.path.length > 1) {
+    foldEndCmd = foldLine.path[foldLine.path.length - 2];
+  }
+  const foldEnd = cmdEndpoint(foldEndCmd);
+  if (!foldEnd) throw new Error('Cannot determine fold line endpoint');
 
   const TOLERANCE = 2;
   const outlinePoints: { idx: number; pt: Point2D }[] = [];
@@ -1003,7 +1009,7 @@ export function optimizePieceCurves(
       path: shouldOptimize ? optimizeCurvePoints(l.path, ratio) : l.path.map(c => ({ type: c.type, values: [...c.values] })),
     };
   });
-  return { ...piece, id: piece.id, outline: newOutline, internals: newInternals, updatedAt: Date.now() };
+  return { ...piece, id: piece.id, outline: newOutline, internals: newInternals, edges: undefined, updatedAt: Date.now() };
 }
 
 // ─── offsetInternalLine ──────────────────────────────────────────────────────
@@ -1063,7 +1069,7 @@ export function offsetInternalLine(
     const dist = i * options.distance * sign;
     const offsetPts = offsetPolyline(sourcePoints, dist);
 
-    let finalPts = offsetPts;
+    const finalPts = [...offsetPts];
 
     if (options.extend && offsetPts.length >= 2) {
       const outlineSamples = samplePathAtIntervals(piece.outline, 0.5);
