@@ -1,36 +1,22 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
-  setHdriPreset,
-  setHdriRotation,
-  setHdriCustomUrl,
   setToneMapping,
   setExposure,
-  setBackgroundMode,
-  setBackgroundColor,
   addLight,
   removeLight,
   updateLight,
   applyLightPreset,
-  setGroundVisible,
-  setShadowOpacity,
-  setShadowBlur,
   setTurntableFrameCount,
   setTurntableDirection,
-  HDRI_PRESETS,
 } from '../../store/renderSettingsSlice';
-import type { ToneMapping, BackgroundMode } from '../../store/renderSettingsSlice';
+import type { ToneMapping } from '../../store/renderSettingsSlice';
+import EnvironmentSection from './renderSections/EnvironmentSection';
+import BackgroundSection from './renderSections/BackgroundSection';
+import GroundSection from './renderSections/GroundSection';
+import type { RenderSettingsPanelProps } from './renderSections/types';
 import './RenderSettingsPanel.css';
-
-interface RenderSettingsPanelProps {
-  open: boolean;
-  onClose: () => void;
-  onExportStill?: (w: number, h: number, transparent: boolean) => void;
-  onExportTurntable?: () => void;
-  onExportAllViews?: (w: number, h: number, transparent: boolean) => void;
-  onExport3D?: (format: '3d-glb' | '3d-gltf' | '3d-usdz', includeAvatar: boolean, scale: number) => void;
-}
 
 export default function RenderSettingsPanel({
   open,
@@ -42,19 +28,11 @@ export default function RenderSettingsPanel({
 }: RenderSettingsPanelProps) {
   const dispatch = useDispatch<AppDispatch>();
 
-  // Redux state
+  // Redux state (only what inline sections still need)
   const {
-    hdriPreset,
-    hdriRotation,
-    hdriCustomUrl,
     toneMapping,
     exposure,
-    backgroundMode,
-    backgroundColor,
     lights,
-    groundVisible,
-    shadowOpacity,
-    shadowBlur,
     turntableFrameCount,
     turntableDirection,
   } = useSelector((s: RootState) => s.renderSettings);
@@ -75,16 +53,6 @@ export default function RenderSettingsPanel({
   const [export3DIncludeAvatar, setExport3DIncludeAvatar] = useState(true);
   const [export3DScale, setExport3DScale] = useState(0.001); // mm → m
 
-  // HDRI file input ref
-  const hdriInputRef = useRef<HTMLInputElement>(null);
-
-  const handleHdriUpload = useCallback((file: File) => {
-    const ext = file.name.toLowerCase().split('.').pop() || '';
-    if (!['hdr', 'exr'].includes(ext)) return;
-    const url = URL.createObjectURL(file);
-    dispatch(setHdriCustomUrl(url));
-  }, [dispatch]);
-
   if (!open) return null;
 
   return (
@@ -97,66 +65,7 @@ export default function RenderSettingsPanel({
 
         <div className="render-panel-scroll">
           {/* ── Environment Section ── */}
-          <div className="ap-section">
-            <button className="ap-section-header" onClick={() => setEnvOpen(!envOpen)}>
-              <span className={`ap-chevron ${envOpen ? 'open' : ''}`}>&#9656;</span>
-              Environment
-            </button>
-            {envOpen && (
-              <div className="ap-section-body">
-                <div className="render-hdri-grid">
-                  {HDRI_PRESETS.map(preset => (
-                    <button
-                      key={preset.id}
-                      className={`render-hdri-item ${hdriPreset === preset.id && !hdriCustomUrl ? 'active' : ''}`}
-                      onClick={() => dispatch(setHdriPreset(preset.id))}
-                      title={preset.name}
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
-                </div>
-
-                <div>
-                  <div className="ap-slider-label">
-                    <span>Rotation</span>
-                    <span>{hdriRotation}&deg;</span>
-                  </div>
-                  <div className="ap-slider-control">
-                    <input
-                      type="range" min={-180} max={180} step={1} value={hdriRotation}
-                      onChange={e => dispatch(setHdriRotation(Number(e.target.value)))}
-                    />
-                    <input
-                      type="number" min={-180} max={180} step={1} value={hdriRotation}
-                      onChange={e => dispatch(setHdriRotation(Number(e.target.value)))}
-                    />
-                  </div>
-                </div>
-
-                <input
-                  ref={hdriInputRef}
-                  type="file"
-                  accept=".hdr,.exr"
-                  style={{ display: 'none' }}
-                  onChange={e => {
-                    const f = e.target.files?.[0];
-                    if (f) handleHdriUpload(f);
-                    e.target.value = '';
-                  }}
-                />
-                <button
-                  className="ap-btn"
-                  onClick={() => hdriInputRef.current?.click()}
-                >
-                  Upload HDRI
-                </button>
-                {hdriCustomUrl && (
-                  <div className="ap-hint">Custom HDRI loaded</div>
-                )}
-              </div>
-            )}
-          </div>
+          <EnvironmentSection open={envOpen} onToggle={() => setEnvOpen(!envOpen)} />
 
           {/* ── Rendering Section ── */}
           <div className="ap-section">
@@ -202,92 +111,10 @@ export default function RenderSettingsPanel({
           </div>
 
           {/* ── Background Section ── */}
-          <div className="ap-section">
-            <button className="ap-section-header" onClick={() => setBgOpen(!bgOpen)}>
-              <span className={`ap-chevron ${bgOpen ? 'open' : ''}`}>&#9656;</span>
-              Background
-            </button>
-            {bgOpen && (
-              <div className="ap-section-body">
-                <div className="ap-mode-toggle">
-                  {(['hdri', 'solid', 'transparent'] as BackgroundMode[]).map(mode => (
-                    <button
-                      key={mode}
-                      className={backgroundMode === mode ? 'active' : ''}
-                      onClick={() => dispatch(setBackgroundMode(mode))}
-                    >
-                      {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                    </button>
-                  ))}
-                </div>
-
-                {backgroundMode === 'solid' && (
-                  <div className="render-color-row">
-                    <input
-                      type="color"
-                      value={backgroundColor}
-                      onChange={e => dispatch(setBackgroundColor(e.target.value))}
-                    />
-                    <span style={{ fontSize: 11, color: '#999' }}>{backgroundColor}</span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <BackgroundSection open={bgOpen} onToggle={() => setBgOpen(!bgOpen)} />
 
           {/* ── Ground Section ── */}
-          <div className="ap-section">
-            <button className="ap-section-header" onClick={() => setGroundOpen(!groundOpen)}>
-              <span className={`ap-chevron ${groundOpen ? 'open' : ''}`}>&#9656;</span>
-              Ground
-            </button>
-            {groundOpen && (
-              <div className="ap-section-body">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    checked={groundVisible}
-                    onChange={e => dispatch(setGroundVisible(e.target.checked))}
-                  />
-                  Visible
-                </label>
-
-                <div>
-                  <div className="ap-slider-label">
-                    <span>Shadow Opacity</span>
-                    <span>{shadowOpacity.toFixed(2)}</span>
-                  </div>
-                  <div className="ap-slider-control">
-                    <input
-                      type="range" min={0} max={1} step={0.05} value={shadowOpacity}
-                      onChange={e => dispatch(setShadowOpacity(Number(e.target.value)))}
-                    />
-                    <input
-                      type="number" min={0} max={1} step={0.05} value={shadowOpacity}
-                      onChange={e => dispatch(setShadowOpacity(Number(e.target.value)))}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="ap-slider-label">
-                    <span>Shadow Blur</span>
-                    <span>{shadowBlur.toFixed(1)}</span>
-                  </div>
-                  <div className="ap-slider-control">
-                    <input
-                      type="range" min={0} max={5} step={0.1} value={shadowBlur}
-                      onChange={e => dispatch(setShadowBlur(Number(e.target.value)))}
-                    />
-                    <input
-                      type="number" min={0} max={5} step={0.1} value={shadowBlur}
-                      onChange={e => dispatch(setShadowBlur(Number(e.target.value)))}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <GroundSection open={groundOpen} onToggle={() => setGroundOpen(!groundOpen)} />
 
           {/* ── Lighting Section ── */}
           <div className="ap-section">
