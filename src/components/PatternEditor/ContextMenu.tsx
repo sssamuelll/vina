@@ -34,9 +34,14 @@ import {
   addPiecesToGroup,
   removePiecesFromGroup,
   deactivatePiece,
+  setLayer,
+  setSublayer,
+  cloneToLayer,
 } from '../../store/projectSlice';
-import { selectPiece, clearSelection, copyPieces, createPastedPieces } from '../../store/editorSlice';
+import { selectPiece, clearSelection, copyPieces, createPastedPieces, enterSuperimposePickMode } from '../../store/editorSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
+import SubMenu from '../../components/shared/SubMenu';
+import type { SubMenuItem } from '../../components/shared/SubMenu';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -55,6 +60,10 @@ export interface ContextMenuState {
   segmentIsCurve?: boolean;
   /** Active tool when context menu was opened */
   activeTool?: string;
+  /** ID of internal line under cursor, or null */
+  internalLineId?: string | null;
+  /** Type of internal line under cursor */
+  internalLineType?: string | null;
 }
 
 interface ContextMenuProps {
@@ -63,6 +72,9 @@ interface ContextMenuProps {
   onRename?: (pieceId: string) => void;
   onConvertSegment?: (commandIndex: number, toCurve: boolean) => void;
   onZoomToFit?: () => void;
+  onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
+  onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
+  onOptimizeCurves?: (pieceId: string, lineId?: string) => void;
 }
 
 // ─── Menu Items ─────────────────────────────────────────────────────────────
@@ -74,11 +86,13 @@ interface MenuItem {
   action: () => void;
   separator?: boolean;
   danger?: boolean;
+  /** When set, renders a SubMenu component instead of a flat button */
+  _layerSubmenu?: SubMenuItem[];
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit }: ContextMenuProps) {
+export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit, onUnfold, onOffsetInternalLine, onOptimizeCurves }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
@@ -118,6 +132,39 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       label: menu.segmentIsCurve ? 'Convert to Line' : 'Convert to Curve',
       icon: menu.segmentIsCurve ? '─' : '⌒',
       action: () => { onConvertSegment?.(menu.segmentIndex!, !menu.segmentIsCurve); onClose(); },
+      separator: true,
+    });
+  }
+
+  // ── Internal line context ──
+  if (menu.internalLineId && menu.pieceId) {
+    const piece = pieces.find(p => p.id === menu.pieceId);
+    const line = piece?.internals.find(l => l.id === menu.internalLineId);
+
+    if (line?.type === 'fold') {
+      items.push({
+        label: 'Unfold',
+        icon: '⇔',
+        action: () => act(() => onUnfold?.(menu.pieceId!, menu.internalLineId!)),
+      });
+      items.push({
+        label: 'Unfold Outline Only',
+        icon: '⇔',
+        action: () => act(() => onUnfold?.(menu.pieceId!, menu.internalLineId!, true)),
+        separator: true,
+      });
+    }
+
+    items.push({
+      label: 'Offset as Internal Line',
+      icon: '⏛',
+      action: () => act(() => onOffsetInternalLine?.(menu.pieceId!, menu.internalLineId!)),
+    });
+
+    items.push({
+      label: 'Optimize Curve Points',
+      icon: '◇',
+      action: () => act(() => onOptimizeCurves?.(menu.pieceId!, menu.internalLineId!)),
       separator: true,
     });
   }
@@ -268,6 +315,47 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       separator: true,
     });
 
+    // Layer submenu
+    const layerItems: SubMenuItem[] = [
+      {
+        label: `Set Layer... (${piece?.layer ?? 1})`,
+        action: () => { dispatch(setLayer({ pieceId: pid, layer: ((piece?.layer ?? 1) % 10) + 1 })); onClose(); },
+      },
+      {
+        label: `Set Sublayer... (${piece?.sublayer ?? 0})`,
+        action: () => { dispatch(setSublayer({ pieceId: pid, sublayer: ((piece?.sublayer ?? 0) + 1) % 5 })); onClose(); },
+      },
+      {
+        separator: true,
+        label: 'Clone Above',
+        action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'over' })); onClose(); },
+      },
+      {
+        label: 'Clone Below',
+        action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'under' })); onClose(); },
+      },
+      {
+        separator: true,
+        label: 'Superimpose Over...',
+        action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'over' })); onClose(); },
+      },
+      {
+        label: 'Superimpose Under...',
+        action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'under' })); onClose(); },
+      },
+      {
+        label: 'Superimpose Side...',
+        action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'side' })); onClose(); },
+      },
+    ];
+    items.push({
+      label: 'Layer',
+      icon: '📑',
+      action: () => {},
+      _layerSubmenu: layerItems,
+      separator: true,
+    });
+
     // Duplicate
     items.push({
       label: 'Duplicate',
@@ -378,6 +466,15 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       separator: true,
     });
 
+    if (!menu.internalLineId && !menu.seamId) {
+      items.push({
+        label: 'Optimize All Curve Points',
+        icon: '◇',
+        action: () => act(() => onOptimizeCurves?.(pid)),
+        separator: true,
+      });
+    }
+
     items.push({
       label: 'Select',
       icon: '☐',
@@ -478,30 +575,34 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       )}
       {items.map((item, i) => (
         <div key={i}>
-          <button
-            onClick={item.action}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              width: '100%',
-              padding: '6px 12px',
-              border: 'none',
-              background: 'transparent',
-              color: item.danger ? '#ff6b6b' : '#e0e0e0',
-              cursor: 'pointer',
-              fontSize: 13,
-              textAlign: 'left',
-              gap: 8,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#2d2d2d')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <span style={{ width: 20, textAlign: 'center', fontSize: 14 }}>{item.icon}</span>
-            <span style={{ flex: 1 }}>{item.label}</span>
-            {item.shortcut && (
-              <span style={{ fontSize: 11, color: '#666', marginLeft: 12 }}>{item.shortcut}</span>
-            )}
-          </button>
+          {item._layerSubmenu ? (
+            <SubMenu label={item.label} icon={item.icon} items={item._layerSubmenu} />
+          ) : (
+            <button
+              onClick={item.action}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                padding: '6px 12px',
+                border: 'none',
+                background: 'transparent',
+                color: item.danger ? '#ff6b6b' : '#e0e0e0',
+                cursor: 'pointer',
+                fontSize: 13,
+                textAlign: 'left',
+                gap: 8,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#2d2d2d')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ width: 20, textAlign: 'center', fontSize: 14 }}>{item.icon}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.shortcut && (
+                <span style={{ fontSize: 11, color: '#666', marginLeft: 12 }}>{item.shortcut}</span>
+              )}
+            </button>
+          )}
           {item.separator && (
             <div style={{ height: 1, background: '#333', margin: '2px 8px' }} />
           )}
