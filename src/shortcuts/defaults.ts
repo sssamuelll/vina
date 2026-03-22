@@ -72,6 +72,8 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'view.toggleSeamAllowance', key: 's', shift: true, label: 'Toggle Seam Allowance', category: 'View', context: 'global' },
   { id: 'view.helpOverlay', key: '/', shift: true, label: 'Shortcut Help', category: 'View', context: 'global' },
   { id: 'view.helpOverlayAlt', key: '?', label: 'Shortcut Help (Alt)', category: 'View', context: 'global' },
+  { id: 'view.layersPanel', key: 'l', ctrl: true, shift: true, label: 'Toggle Layers Panel', category: 'View', context: 'global' },
+  { id: 'view.xrayMode', key: 'x', shift: true, label: 'Toggle X-Ray Mode', category: 'View', context: 'global' },
 
   // ─── 3D Tools ───────────────────────────────────────────────────────────────
   { id: 'tool3d.camera', key: 'q', label: 'Select/Move (3D)', category: '3D Tools', context: '3d' },

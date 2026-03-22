@@ -155,6 +155,8 @@ export function useKeyboardShortcuts() {
 
       // View
       ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
+      ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('openclo:toggleLayersPanel'))],
+      // view.xrayMode handler will be wired in Task 2 once setXrayMode is exported from simulationSlice
 
       // 2D Tools (CLO3D mapping)
       ['tool.transform', () => { dispatch(setActiveTool('transform' as any)); dispatch(setActiveTool2D('transform')); }],
