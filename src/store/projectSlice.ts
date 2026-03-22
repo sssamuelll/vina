@@ -62,6 +62,10 @@ interface ProjectState {
   arrangementOverrides: Record<string, [number, number, number]>;
   /** Points of measure */
   poms: PointOfMeasure[];
+  /** Custom layer names (layer number → display name) */
+  layerNames: Record<number, string>;
+  /** Layer lock state (layer number → locked) */
+  layerLocked: Record<number, boolean>;
 }
 
 const initialState: ProjectState = {
@@ -78,6 +82,8 @@ const initialState: ProjectState = {
   seamGroups: [],
   arrangementOverrides: {},
   poms: [],
+  layerNames: {},
+  layerLocked: {},
 };
 
 const projectSlice = createSlice({
@@ -121,6 +127,9 @@ const projectSlice = createSlice({
         if ((seam as any).taped === undefined) seam.taped = false;
         if ((seam as any).tapeWidth === undefined) seam.tapeWidth = 10;
       }
+      // Backfill layer metadata from older projects
+      state.layerNames = (p as any).layerNames ?? {};
+      state.layerLocked = (p as any).layerLocked ?? {};
     },
     setProjectName(state, action: PayloadAction<string>) {
       state.name = action.payload;
@@ -537,6 +546,39 @@ const projectSlice = createSlice({
       state.isDirty = true;
     },
 
+    // ─── Layer Metadata ───
+    renameLayer(state, action: PayloadAction<{ layer: number; name: string }>) {
+      state.layerNames[action.payload.layer] = action.payload.name;
+      state.isDirty = true;
+    },
+    deleteLayerName(state, action: PayloadAction<{ layer: number }>) {
+      delete state.layerNames[action.payload.layer];
+      state.isDirty = true;
+    },
+    setLayerLocked(state, action: PayloadAction<{ layer: number; locked: boolean }>) {
+      state.layerLocked[action.payload.layer] = action.payload.locked;
+      state.isDirty = true;
+    },
+    addLayer(state, action: PayloadAction<{ layer: number; name?: string }>) {
+      if (action.payload.name) {
+        state.layerNames[action.payload.layer] = action.payload.name;
+      }
+      state.isDirty = true;
+    },
+    removeLayer(state, action: PayloadAction<{ layer: number }>) {
+      const layer = action.payload.layer;
+      if (layer === 1) return;
+      for (const piece of state.pieces) {
+        if (piece.layer === layer) {
+          piece.layer = 1;
+          piece.updatedAt = Date.now();
+        }
+      }
+      delete state.layerNames[layer];
+      delete state.layerLocked[layer];
+      state.isDirty = true;
+    },
+
     // ─── Z-Order ───
     bringToFront(state, action: PayloadAction<string>) {
       const piece = state.pieces.find(p => p.id === action.payload);
@@ -742,6 +784,7 @@ export const {
   linkPieces, unlinkPieces, cloneAsLinked,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,
+  renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer,
   bringToFront, sendToBack, bringForward, sendBackward,
   lockPiece, unlockPiece,
   // Groups
@@ -751,5 +794,11 @@ export const {
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;
+
+const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };
+
+export function getLayerDisplayName(state: { project: { layerNames: Record<number, string> } }, layer: number): string {
+  return state.project.layerNames[layer] ?? DEFAULT_LAYER_NAMES[layer] ?? `Layer ${layer}`;
+}
 
 export default projectSlice.reducer;
