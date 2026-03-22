@@ -28,7 +28,10 @@ export interface ArrangementSnapshot {
 export type SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape';
 
 /** 3D surface rendering mode. */
-export type SurfaceMode3D = 'textured' | 'translucent' | 'mesh' | 'thick';
+export type SurfaceMode3D =
+  | 'textured' | 'translucent' | 'mesh' | 'thick'
+  | 'flat' | 'xray' | 'shaded'
+  | 'shaded-wire' | 'textured-wire';
 
 /** Pin strength determines how firmly the vertex is held. */
 export type PinStrength = 'weak' | 'medium' | 'strong';
