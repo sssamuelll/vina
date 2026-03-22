@@ -408,6 +408,7 @@ export type Tool2D =
   | 'freesewing'   // free sewing between edges
   | 'offsetOutline' // offset piece outline inward/outward
   | 'extendTrim'   // extend or trim edges
+  | 'polyPen'      // combined straight + bezier pen
   | 'hand'         // pan
   | 'zoom';
 
