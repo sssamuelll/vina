@@ -140,6 +140,11 @@ function mockState(overrides?: Partial<RootState>): RootState {
       flippedPieceIds: [],
       steamBrush: { active: false, radius: 0.05, strength: 0.3 },
       meshGrab: { active: false, radius: 0.05, strength: 0.8 },
+      hiddenLayerIds: [],
+      layerOutlineColors: {},
+      xrayMode: false,
+      xrayActiveLayer: null,
+      xrayOpacitySnapshot: null,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {

@@ -571,7 +571,9 @@ const simulationSlice = createSlice({
     },
     setXrayMode(state, action: PayloadAction<{ enabled: boolean; activeLayer?: number }>) {
       if (action.payload.enabled) {
-        state.xrayOpacitySnapshot = { ...state.pieceOpacity };
+        if (!state.xrayMode) {
+          state.xrayOpacitySnapshot = { ...state.pieceOpacity };
+        }
         state.xrayMode = true;
         state.xrayActiveLayer = action.payload.activeLayer ?? null;
       } else {
