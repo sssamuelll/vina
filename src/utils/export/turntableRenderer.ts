@@ -6,7 +6,8 @@ export interface TurntableConfig {
   direction: 'cw' | 'ccw';
   width?: number;           // render width (default: canvas width)
   height?: number;          // render height (default: canvas height)
-  fps?: number;             // default 24
+  fps?: number;             // default 30
+  videoFormat?: 'webm' | 'mp4';
   target?: THREE.Vector3;   // orbit target (default: [0, 0.75, 0])
   radius?: number;          // orbit radius (default: current camera distance)
   cameraY?: number;         // camera Y (default: current)
@@ -27,7 +28,8 @@ export async function renderTurntable(
   // 5. Stop MediaRecorder, restore camera, return video blob
 
   const {
-    frameCount, direction, fps = 24,
+    frameCount, direction, fps = 30,
+    videoFormat,
     target = new THREE.Vector3(0, 0.75, 0),
   } = config;
 
@@ -47,12 +49,22 @@ export async function renderTurntable(
   const ctx = offscreen.getContext('2d')!;
 
   const stream = offscreen.captureStream(fps);
+
+  let mimeType: string;
+  if (videoFormat === 'mp4' && MediaRecorder.isTypeSupported('video/mp4; codecs=avc1')) {
+    mimeType = 'video/mp4; codecs=avc1';
+  } else if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')) {
+    mimeType = 'video/webm;codecs=vp9';
+  } else {
+    mimeType = 'video/webm';
+  }
+
   const mediaRecorder = new MediaRecorder(stream, {
-    mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : 'video/webm',
+    mimeType,
     videoBitsPerSecond: 8_000_000,
   });
+
+  const blobType = mimeType.split(';')[0].trim();
 
   const chunks: BlobPart[] = [];
   mediaRecorder.ondataavailable = (e) => {
@@ -61,7 +73,7 @@ export async function renderTurntable(
 
   const recordingDone = new Promise<Blob>((resolve) => {
     mediaRecorder.onstop = () => {
-      resolve(new Blob(chunks, { type: 'video/webm' }));
+      resolve(new Blob(chunks, { type: blobType }));
     };
   });
 
