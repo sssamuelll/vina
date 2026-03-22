@@ -178,6 +178,8 @@ export function fitCubicBezier(points: Point2D[], maxError = 1.0): import('../..
     c01 += a1x * a2x + a1y * a2y;
     c11 += a2x * a2x + a2y * a2y;
 
+    // Residual = point - B_base(t), where B_base is the degenerate cubic with cp1=p0, cp2=pN (alpha=0).
+    // This is correct per Schneider's parameterization: cp1 = p0 + alpha0*hat0, cp2 = pN - alpha1*hatN.
     const dx = points[i].x - (b0 * p0.x + b1 * p0.x + b2 * pN.x + b3 * pN.x);
     const dy = points[i].y - (b0 * p0.y + b1 * p0.y + b2 * pN.y + b3 * pN.y);
 
