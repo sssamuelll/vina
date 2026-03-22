@@ -130,6 +130,9 @@ const ACTION_LABELS: Record<string, string> = {
   'simulation/toggleHide3D': 'Toggle Hide Piece',
   'simulation/showAll3D': 'Show All Pieces',
   'simulation/toggleFlipNormal': 'Flip Normal',
+  'simulation/toggleLayerVisibility': 'Toggle Layer Visibility',
+  'simulation/showAllLayers': 'Show All Layers',
+  'simulation/setXrayMode': 'Toggle X-Ray Mode',
 };
 
 function getActionLabel(actionType: string): string {
