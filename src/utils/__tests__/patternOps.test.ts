@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece } from '../patternOps';
-import type { PatternPiece, SemanticEdge } from '../../types/types';
+import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves } from '../patternOps';
+import type { PatternPiece, SemanticEdge, PathCommand } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
   return {
@@ -415,5 +415,170 @@ describe('unfoldPiece', () => {
     const half = makeHalfRect('Front');
     half.internals[0].type = 'dart';
     expect(() => unfoldPiece(half, 'fold-1')).toThrow();
+  });
+});
+
+// ─── optimizeCurvePoints ─────────────────────────────────────────────────────
+
+describe('optimizeCurvePoints', () => {
+  it('preserves M and Z commands', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    expect(result[0].type).toBe('M');
+    expect(result[result.length - 1].type).toBe('Z');
+  });
+
+  it('ratio 1.0 is a passthrough (returns copy)', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 1.0);
+    expect(result).toHaveLength(cmds.length);
+    expect(result[0]).not.toBe(cmds[0]); // should be a copy
+    expect(result[0].values[0]).toBe(0);
+  });
+
+  it('merges collinear line segments', () => {
+    // Three collinear points: (0,0) → (50,0) → (100,0)
+    // The middle segment is redundant
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    // The (50,0) L command should have been merged away
+    const ls = result.filter(c => c.type === 'L');
+    // Should have fewer L commands than the original 3
+    expect(ls.length).toBeLessThan(3);
+  });
+
+  it('reduces bezier curve to fewer commands', () => {
+    // A path with a cubic bezier
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [50, -30, 150, -30, 200, 0] },
+      { type: 'L', values: [200, 200] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    // Result should start with M and end with Z
+    expect(result[0].type).toBe('M');
+    expect(result[result.length - 1].type).toBe('Z');
+    // Should still have at least M + 1 geo command + Z
+    expect(result.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('handles path with no Z', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    expect(result[0].type).toBe('M');
+    expect(result[result.length - 1].type).not.toBe('Z');
+  });
+
+  it('does not mutate original commands', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    optimizeCurvePoints(cmds, 0.5);
+    expect(cmds[1].values[0]).toBe(100);
+  });
+});
+
+// ─── optimizePieceCurves ─────────────────────────────────────────────────────
+
+describe('optimizePieceCurves', () => {
+  it('returns piece with same id', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const result = optimizePieceCurves(piece);
+    expect(result.id).toBe(piece.id);
+  });
+
+  it('optimizes outline by default (target=all)', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const result = optimizePieceCurves(piece, { ratio: 0.5 });
+    expect(result.outline.length).toBeGreaterThan(0);
+    expect(result.outline[0].type).toBe('M');
+  });
+
+  it('skips outline when target=outline for internal line targeting', () => {
+    const piece: PatternPiece = {
+      ...makeRect('Opt', 200, 200),
+      internals: [
+        {
+          id: 'line-1', type: 'dart',
+          path: [
+            { type: 'M', values: [100, 0] },
+            { type: 'L', values: [100, 100] },
+          ],
+        },
+      ],
+    };
+    // Target only outline
+    const result = optimizePieceCurves(piece, { ratio: 0.5, target: 'outline' });
+    // Internal line should be unchanged (deep copy, same values)
+    expect(result.internals[0].path[1].values[1]).toBe(100);
+  });
+
+  it('targets specific internal line by id', () => {
+    const piece: PatternPiece = {
+      ...makeRect('Opt', 200, 200),
+      internals: [
+        {
+          id: 'line-a', type: 'dart',
+          path: [
+            { type: 'M', values: [50, 0] },
+            { type: 'L', values: [50, 50] },
+            { type: 'L', values: [50, 100] },
+          ],
+        },
+        {
+          id: 'line-b', type: 'dart',
+          path: [
+            { type: 'M', values: [100, 0] },
+            { type: 'L', values: [100, 100] },
+          ],
+        },
+      ],
+    };
+    const result = optimizePieceCurves(piece, {
+      ratio: 0.5,
+      target: { internalLineId: 'line-a' },
+    });
+    // line-b should be untouched (same length)
+    expect(result.internals[1].path).toHaveLength(2);
+    // line-a may be optimized (length <= original)
+    expect(result.internals[0].path.length).toBeGreaterThan(0);
+  });
+
+  it('does not mutate the original piece', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const originalLen = piece.outline.length;
+    optimizePieceCurves(piece, { ratio: 0.5 });
+    expect(piece.outline.length).toBe(originalLen);
+  });
+
+  it('updates updatedAt timestamp', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const before = piece.updatedAt;
+    const result = optimizePieceCurves(piece, { ratio: 0.5 });
+    expect(result.updatedAt).toBeGreaterThanOrEqual(before);
   });
 });

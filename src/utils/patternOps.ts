@@ -14,6 +14,8 @@ import { detectSemanticEdges } from './semanticEdges';
 import { getEdgeEndpoints } from './geometry/path';
 import { generateSeamAllowance, flattenPath } from './seam';
 import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
+import { samplePathAtIntervals } from './geometry/arcLength';
+import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
 
 let _counter = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
@@ -929,4 +931,76 @@ export function unfoldPiece(
     edges: detectSemanticEdges({ ...piece, outline: merged }),
     updatedAt: Date.now(),
   };
+}
+
+// ─── optimizeCurvePoints ─────────────────────────────────────────────────────
+
+function areCollinear(a: Point2D, b: Point2D, c: Point2D, eps = 0.1): boolean {
+  const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  return Math.abs(cross) < eps;
+}
+
+export function optimizeCurvePoints(commands: PathCommand[], ratio: number): PathCommand[] {
+  if (ratio >= 1.0) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+  if (commands.length <= 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+
+  const mCmd = commands[0];
+  const hasZ = commands[commands.length - 1].type === 'Z';
+  const geoCmds = commands.slice(1, hasZ ? -1 : undefined);
+  const hasCurves = geoCmds.some(c => c.type === 'C' || c.type === 'Q');
+
+  if (hasCurves) {
+    const samples = samplePathAtIntervals(commands, 0.5);
+    if (samples.length < 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+    const points = samples.map(s => s.point);
+    const bbox = outlineBBox(commands);
+    const diag = Math.hypot(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
+    const tolerance = (1 - ratio) * diag * 0.005;
+    const simplified = rdpSimplify(points, tolerance);
+    if (simplified.length < 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+    const fitted = fitCubicBezier(simplified, tolerance);
+    if (hasZ) fitted.push({ type: 'Z', values: [] });
+    return fitted;
+  }
+
+  const result: PathCommand[] = [{ type: mCmd.type, values: [...mCmd.values] }];
+  let prevPt: Point2D = { x: mCmd.values[0], y: mCmd.values[1] };
+  for (let i = 0; i < geoCmds.length; i++) {
+    const cmd = geoCmds[i];
+    const endPt: Point2D = { x: cmd.values[cmd.values.length - 2], y: cmd.values[cmd.values.length - 1] };
+    if (i + 1 < geoCmds.length) {
+      const nextCmd = geoCmds[i + 1];
+      const nextEnd: Point2D = { x: nextCmd.values[nextCmd.values.length - 2], y: nextCmd.values[nextCmd.values.length - 1] };
+      if ((cmd.type === 'L' || cmd.type === 'H' || cmd.type === 'V') &&
+          (nextCmd.type === 'L' || nextCmd.type === 'H' || nextCmd.type === 'V') &&
+          areCollinear(prevPt, endPt, nextEnd)) {
+        prevPt = endPt;
+        continue;
+      }
+    }
+    result.push({ type: cmd.type, values: [...cmd.values] });
+    prevPt = endPt;
+  }
+  if (hasZ) result.push({ type: 'Z', values: [] });
+  return result;
+}
+
+export function optimizePieceCurves(
+  piece: PatternPiece,
+  options?: { ratio?: number; target?: 'all' | 'outline' | { internalLineId: string } },
+): PatternPiece {
+  const ratio = options?.ratio ?? 0.5;
+  const target = options?.target ?? 'all';
+  const newOutline = (target === 'all' || target === 'outline')
+    ? optimizeCurvePoints(piece.outline, ratio)
+    : piece.outline.map(c => ({ type: c.type, values: [...c.values] }));
+  const newInternals = piece.internals.map(l => {
+    const shouldOptimize = target === 'all' ||
+      (typeof target === 'object' && 'internalLineId' in target && target.internalLineId === l.id);
+    return {
+      ...l,
+      path: shouldOptimize ? optimizeCurvePoints(l.path, ratio) : l.path.map(c => ({ type: c.type, values: [...c.values] })),
+    };
+  });
+  return { ...piece, id: piece.id, outline: newOutline, internals: newInternals, updatedAt: Date.now() };
 }
