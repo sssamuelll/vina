@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves } from '../patternOps';
+import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves, offsetInternalLine } from '../patternOps';
 import type { PatternPiece, SemanticEdge, PathCommand } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
@@ -580,5 +580,65 @@ describe('optimizePieceCurves', () => {
     const before = piece.updatedAt;
     const result = optimizePieceCurves(piece, { ratio: 0.5 });
     expect(result.updatedAt).toBeGreaterThanOrEqual(before);
+  });
+});
+
+describe('offsetInternalLine', () => {
+  it('creates one offset copy', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 20 });
+    expect(result.internals.length).toBe(2);
+  });
+
+  it('creates multiple offset copies', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 3, distance: 10 });
+    expect(result.internals.length).toBe(4);
+  });
+
+  it('reverses direction', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const normal = offsetInternalLine(piece, 'line-1', { count: 1, distance: 20 });
+    const reversed = offsetInternalLine(piece, 'line-1', { count: 1, distance: 20, reverse: true });
+    const normalX = normal.internals[1].path[1].values[0];
+    const reversedX = reversed.internals[1].path[1].values[0];
+    expect(normalX).not.toBeCloseTo(reversedX, 0);
+  });
+
+  it('preserves piece ID', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 10 });
+    expect(result.id).toBe(piece.id);
+  });
+
+  it('throws if source line not found', () => {
+    const piece = makeRect('Test', 200, 400);
+    expect(() => offsetInternalLine(piece, 'nope', { count: 1, distance: 10 })).toThrow();
+  });
+
+  it('preserves source line type on offset copies', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'pleat',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 10 });
+    expect(result.internals[1].type).toBe('pleat');
   });
 });

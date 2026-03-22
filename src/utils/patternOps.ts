@@ -16,6 +16,7 @@ import { generateSeamAllowance, flattenPath } from './seam';
 import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
 import { samplePathAtIntervals } from './geometry/arcLength';
 import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
+import { linePolylineIntersections } from './geometry/lineIntersect';
 
 let _counter = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
@@ -1003,4 +1004,92 @@ export function optimizePieceCurves(
     };
   });
   return { ...piece, id: piece.id, outline: newOutline, internals: newInternals, updatedAt: Date.now() };
+}
+
+// ─── offsetInternalLine ──────────────────────────────────────────────────────
+
+function normalAtSegment(ax: number, ay: number, bx: number, by: number): Point2D {
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return { x: 0, y: 1 };
+  return { x: -dy / len, y: dx / len };
+}
+
+function offsetPolyline(points: Point2D[], dist: number): Point2D[] {
+  if (points.length < 2) return points.map(p => ({ ...p }));
+  const result: Point2D[] = [];
+  for (let i = 0; i < points.length; i++) {
+    let nx = 0, ny = 0, count = 0;
+    if (i > 0) {
+      const n = normalAtSegment(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+      nx += n.x; ny += n.y; count++;
+    }
+    if (i < points.length - 1) {
+      const n = normalAtSegment(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y);
+      nx += n.x; ny += n.y; count++;
+    }
+    if (count > 0) { nx /= count; ny /= count; }
+    const len = Math.hypot(nx, ny);
+    if (len > 0) { nx /= len; ny /= len; }
+    result.push({ x: points[i].x + nx * dist, y: points[i].y + ny * dist });
+  }
+  return result;
+}
+
+export function offsetInternalLine(
+  piece: PatternPiece,
+  sourceLineId: string,
+  options: {
+    count: number;
+    distance: number;
+    reverse?: boolean;
+    extend?: boolean;
+    sourceSegmentRange?: [number, number];
+  },
+): PatternPiece {
+  const sourceLine = piece.internals.find(l => l.id === sourceLineId);
+  if (!sourceLine) throw new Error(`Internal line "${sourceLineId}" not found`);
+
+  const sign = options.reverse ? -1 : 1;
+  const newInternals = piece.internals.map(l => ({
+    ...l,
+    path: l.path.map(c => ({ type: c.type, values: [...c.values] })),
+  }));
+
+  const samples = samplePathAtIntervals(sourceLine.path, 0.5);
+  const sourcePoints = samples.map(s => s.point);
+
+  for (let i = 1; i <= options.count; i++) {
+    const dist = i * options.distance * sign;
+    const offsetPts = offsetPolyline(sourcePoints, dist);
+
+    let finalPts = offsetPts;
+
+    if (options.extend && offsetPts.length >= 2) {
+      const outlineSamples = samplePathAtIntervals(piece.outline, 0.5);
+      const outlinePoly = outlineSamples.map(s => s.point);
+
+      const startTanX = offsetPts[0].x - offsetPts[1].x;
+      const startTanY = offsetPts[0].y - offsetPts[1].y;
+      const extStart = { x: offsetPts[0].x + startTanX * 100, y: offsetPts[0].y + startTanY * 100 };
+      const hitsStart = linePolylineIntersections(extStart, offsetPts[0], outlinePoly);
+      if (hitsStart.length > 0) finalPts[0] = hitsStart[hitsStart.length - 1].point;
+
+      const last = offsetPts.length - 1;
+      const endTanX = offsetPts[last].x - offsetPts[last - 1].x;
+      const endTanY = offsetPts[last].y - offsetPts[last - 1].y;
+      const extEnd = { x: offsetPts[last].x + endTanX * 100, y: offsetPts[last].y + endTanY * 100 };
+      const hitsEnd = linePolylineIntersections(offsetPts[last], extEnd, outlinePoly);
+      if (hitsEnd.length > 0) finalPts[last] = hitsEnd[0].point;
+    }
+
+    const fitted = fitCubicBezier(finalPts, 0.5);
+    newInternals.push({
+      id: uid('line'),
+      type: sourceLine.type,
+      path: fitted,
+    });
+  }
+
+  return { ...piece, id: piece.id, internals: newInternals, updatedAt: Date.now() };
 }

@@ -120,9 +120,9 @@ export function rdpSimplify(points: Point2D[], epsilon: number): Point2D[] {
  * Returns PathCommand[] starting with an 'M' followed by 'C' segments.
  *
  * @param points - Ordered list of 2D points to fit (>= 2)
- * @param _tolerance - Fitting tolerance (reserved; future adaptive subdivision)
+ * @param maxError - Maximum allowed fitting error (used for chord fallback scaling)
  */
-export function fitCubicBezier(points: Point2D[], _tolerance = 1.0): import('../../types/types').PathCommand[] {
+export function fitCubicBezier(points: Point2D[], maxError = 1.0): import('../../types/types').PathCommand[] {
   if (points.length < 2) return [];
 
   // Compute chord-length parameterization
@@ -197,10 +197,11 @@ export function fitCubicBezier(points: Point2D[], _tolerance = 1.0): import('../
     alpha1 = (x1 * c00 - x0 * c01) / det;
   }
 
-  // Clamp negatives to chord-length fallback
+  // Clamp negatives to chord-length fallback (scale by maxError for tighter fits)
   const chord = Math.hypot(pN.x - p0.x, pN.y - p0.y) / 3;
-  if (alpha0 < 0) alpha0 = chord;
-  if (alpha1 < 0) alpha1 = chord;
+  const clampScale = Math.max(0.1, Math.min(maxError, 2.0));
+  if (alpha0 < 0) alpha0 = chord * clampScale;
+  if (alpha1 < 0) alpha1 = chord * clampScale;
 
   const cp1 = { x: p0.x + hat0.x * alpha0, y: p0.y + hat0.y * alpha0 };
   const cp2 = { x: pN.x - hatN.x * alpha1, y: pN.y - hatN.y * alpha1 };
