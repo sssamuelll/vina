@@ -4,7 +4,7 @@
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
-import type { PatternPiece } from '../../../../types/types';
+import type { PatternPiece, InternalLineType, PathCommand } from '../../../../types/types';
 
 function requireFiniteNumber(value: unknown, name: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
@@ -462,6 +462,205 @@ export const tools: ToolDefinition[] = [
         data: { pieceId: result.id, edgeName: params.edgeName, trimX: params.trimX, trimY: params.trimY, keepSide: params.keepSide },
         rollback: () => dispatch(updatePiece(snapshot)),
       };
+    },
+  },
+  {
+    name: 'unfoldPiece',
+    description: 'Mirror a half-pattern along a fold line to produce a full symmetric piece. / Desplegar una mitad de patrón a lo largo de una línea de doblez.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        foldLineId: { type: 'string', description: 'ID of the fold internal line' },
+        outlineOnly: { type: 'boolean', description: 'Mirror only the outline, not internal lines (default false)' },
+      },
+      required: ['pieceId', 'foldLineId'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { unfoldPiece } = await import('../../../../utils/patternOps');
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: 'Piece not found' };
+      const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
+      try {
+        const result = unfoldPiece(piece, params.foldLineId as string, { outlineOnly: params.outlineOnly as boolean | undefined });
+        dispatch(updatePiece(result));
+        return { success: true, data: { pieceId: result.id, internalsCount: result.internals.length }, rollback: () => dispatch(updatePiece(snapshot)) };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Unfold failed' };
+      }
+    },
+  },
+  {
+    name: 'optimizeCurvePoints',
+    description: 'Reduce bezier control points while preserving curve shape. / Optimizar puntos de curva manteniendo la forma.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        ratio: { type: 'number', description: 'Simplification ratio: 0.0 (aggressive) to 1.0 (preserve all), default 0.5' },
+        target: { type: 'string', description: '"all" (default), "outline", or an internalLineId' },
+      },
+      required: ['pieceId'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { optimizePieceCurves } = await import('../../../../utils/patternOps');
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: 'Piece not found' };
+      const ratioErr = params.ratio !== undefined ? requireFiniteNumber(params.ratio, 'ratio') : null;
+      if (ratioErr) return { success: false, error: ratioErr };
+      const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
+      const ratio = (params.ratio as number) ?? 0.5;
+      const targetStr = (params.target as string) ?? 'all';
+      const target = (targetStr === 'all' || targetStr === 'outline') ? targetStr : { internalLineId: targetStr };
+      try {
+        const result = optimizePieceCurves(piece, { ratio, target });
+        dispatch(updatePiece(result));
+        return { success: true, data: { pieceId: result.id, outlinePoints: result.outline.length }, rollback: () => dispatch(updatePiece(snapshot)) };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Optimize failed' };
+      }
+    },
+  },
+  {
+    name: 'offsetInternalLine',
+    description: 'Create parallel copies of an internal line at a given distance. / Crear copias paralelas de una línea interna a una distancia dada.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        sourceLineId: { type: 'string', description: 'Source internal line ID' },
+        count: { type: 'number', description: 'Number of copies (1-10, default 1)' },
+        distance: { type: 'number', description: 'Distance between copies in mm' },
+        reverse: { type: 'boolean', description: 'Flip offset direction (default false)' },
+        extend: { type: 'boolean', description: 'Extend to outline boundary (default false)' },
+      },
+      required: ['pieceId', 'sourceLineId', 'distance'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { offsetInternalLine } = await import('../../../../utils/patternOps');
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: 'Piece not found' };
+      const distErr = requireFiniteNumber(params.distance, 'distance');
+      if (distErr) return { success: false, error: distErr };
+      const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
+      try {
+        const result = offsetInternalLine(piece, params.sourceLineId as string, {
+          count: (params.count as number) ?? 1, distance: params.distance as number,
+          reverse: params.reverse as boolean | undefined, extend: params.extend as boolean | undefined,
+        });
+        dispatch(updatePiece(result));
+        return { success: true, data: { pieceId: result.id, totalInternals: result.internals.length }, rollback: () => dispatch(updatePiece(snapshot)) };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Offset failed' };
+      }
+    },
+  },
+  {
+    name: 'polyPenDraw',
+    description: 'Draw a shape from a list of points with straight lines and curves. / Dibujar una forma con líneas rectas y curvas.',
+    parameters: {
+      type: 'object',
+      properties: {
+        points: {
+          type: 'array', description: 'Array of {x, y, type: "straight"|"curve", handleIn?: {x,y}, handleOut?: {x,y}}',
+          items: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' }, type: { type: 'string', enum: ['straight', 'curve'] }, handleIn: { type: 'object' }, handleOut: { type: 'object' } }, required: ['x', 'y', 'type'] },
+        },
+        mode: { type: 'string', enum: ['piece', 'internalLine'], description: 'piece (default) or internalLine' },
+        targetPieceId: { type: 'string', description: 'Required when mode is internalLine' },
+        lineType: { type: 'string', enum: ['fold', 'reference', 'topstitch'], description: 'Internal line type (default fold)' },
+      },
+      required: ['points'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { addPiece, updatePiece } = await import('../../../../store/projectSlice');
+      const state = getState();
+      const points = params.points as Array<{ x: number; y: number; type: string; handleIn?: { x: number; y: number }; handleOut?: { x: number; y: number } }>;
+      if (!points || points.length < 2) return { success: false, error: 'Need at least 2 points' };
+
+      const cmds: PathCommand[] = [{ type: 'M', values: [points[0].x, points[0].y] }];
+      for (let i = 1; i < points.length; i++) {
+        const prev = points[i - 1], curr = points[i];
+        if (curr.type === 'curve' || prev.type === 'curve') {
+          const cp1 = prev.handleOut || { x: prev.x, y: prev.y };
+          const cp2 = curr.handleIn || { x: curr.x, y: curr.y };
+          cmds.push({ type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, curr.x, curr.y] });
+        } else {
+          cmds.push({ type: 'L', values: [curr.x, curr.y] });
+        }
+      }
+      cmds.push({ type: 'Z', values: [] });
+
+      const mode = (params.mode as string) || 'piece';
+      if (mode === 'piece') {
+        const newPiece = { id: `piece-${Date.now()}`, name: 'Poly Pen Piece', outline: cmds, internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now() };
+        dispatch(addPiece(newPiece));
+        return { success: true, data: { pieceId: newPiece.id }, rollback: () => dispatch({ type: 'project/removePiece', payload: newPiece.id, meta: { skipConfirmation: true } }) };
+      } else {
+        const targetId = params.targetPieceId as string;
+        if (!targetId) return { success: false, error: 'targetPieceId required for internalLine mode' };
+        const piece = state.project.pieces.find(p => p.id === targetId);
+        if (!piece) return { success: false, error: 'Target piece not found' };
+        const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
+        const lt = (params.lineType as string) || 'fold';
+        const lineId = `line-${Date.now()}`;
+        dispatch(updatePiece({ ...piece, internals: [...piece.internals, { id: lineId, type: lt as InternalLineType, path: cmds.slice(0, -1) }], updatedAt: Date.now() }));
+        return { success: true, data: { pieceId: targetId, lineId }, rollback: () => dispatch(updatePiece(snapshot)) };
+      }
+    },
+  },
+  {
+    name: 'replaceAsPatternOutline',
+    description: 'Swap an internal line with a section of the pattern outline. Old outline becomes a reference line. / Reemplazar sección del contorno con una línea interna.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'Piece ID' },
+        internalLineId: { type: 'string', description: 'Internal line to promote to outline' },
+        outlineSegmentRange: { type: 'array', items: { type: 'number' }, description: 'Start and end command indices: [start, end]' },
+        outlineStartPoint: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Alternative: start point near outline' },
+        outlineEndPoint: { type: 'object', properties: { x: { type: 'number' }, y: { type: 'number' } }, description: 'Alternative: end point near outline' },
+      },
+      required: ['pieceId', 'internalLineId'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      const { replaceAsPatternOutline } = await import('../../../../utils/patternOps');
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: 'Piece not found' };
+      const snapshot: PatternPiece = JSON.parse(JSON.stringify(piece));
+
+      let range = params.outlineSegmentRange as [number, number] | undefined;
+      if (!range && params.outlineStartPoint && params.outlineEndPoint) {
+        const start = params.outlineStartPoint as { x: number; y: number };
+        const end = params.outlineEndPoint as { x: number; y: number };
+        let bestStartIdx = 0, bestEndIdx = 0, bestStartDist = Infinity, bestEndDist = Infinity;
+        for (let i = 0; i < piece.outline.length; i++) {
+          const v = piece.outline[i].values;
+          if (v.length < 2) continue;
+          const ex = v[v.length - 2], ey = v[v.length - 1];
+          const dStart = Math.hypot(ex - start.x, ey - start.y);
+          const dEnd = Math.hypot(ex - end.x, ey - end.y);
+          if (dStart < bestStartDist) { bestStartDist = dStart; bestStartIdx = i; }
+          if (dEnd < bestEndDist) { bestEndDist = dEnd; bestEndIdx = i; }
+        }
+        range = [Math.min(bestStartIdx, bestEndIdx), Math.max(bestStartIdx, bestEndIdx)];
+      }
+      if (!range) return { success: false, error: 'outlineSegmentRange or start/end points required' };
+
+      try {
+        const result = replaceAsPatternOutline(piece, params.internalLineId as string, range);
+        dispatch(updatePiece(result));
+        return { success: true, data: { pieceId: result.id }, rollback: () => dispatch(updatePiece(snapshot)) };
+      } catch (err) {
+        return { success: false, error: err instanceof Error ? err.message : 'Replace failed' };
+      }
     },
   },
 ];
