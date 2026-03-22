@@ -311,6 +311,21 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     link.click();
   }, []);
 
+  const handleCopyToClipboard = useCallback(async () => {
+    const container = containerRef.current;
+    if (!container) return;
+    const canvas = container.querySelector('canvas');
+    if (!canvas) return;
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'),
+      );
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    } catch (err) {
+      console.warn('Copy to clipboard failed:', err);
+    }
+  }, []);
+
   const handleExportStill = useCallback(async (width: number, height: number, transparent: boolean) => {
     const container = containerRef.current;
     if (!container) return;
@@ -319,7 +334,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    await exportStill(gl, sc, cam, { width, height, transparent });
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { imageFormat: 'png' | 'jpeg' | 'exr'; jpegQuality: number; samplesPerPixel: number; denoiserEnabled: boolean } } } | undefined;
+    const rs = store?.getState().renderSettings;
+    await exportStill(gl, sc, cam, {
+      width,
+      height,
+      transparent,
+      format: rs?.imageFormat ?? 'png',
+      jpegQuality: rs?.jpegQuality ?? 0.92,
+      samplesPerPixel: rs?.samplesPerPixel,
+      denoiserEnabled: rs?.denoiserEnabled,
+    });
   }, []);
 
   const handleExportTurntable = useCallback(async () => {
@@ -331,13 +356,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
     // Read config from Redux store directly
-    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { turntableFrameCount: number; turntableDirection: 'cw' | 'ccw' } } } | undefined;
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { turntableFrameCount: number; turntableDirection: 'cw' | 'ccw'; videoFps: number; videoFormat: 'webm' | 'mp4' } } } | undefined;
     const config = store?.getState().renderSettings;
+    const videoFormat = config?.videoFormat ?? 'webm';
     const blob = await renderTurntable(gl, sc, cam, {
       frameCount: config?.turntableFrameCount ?? 36,
       direction: config?.turntableDirection ?? 'cw',
+      fps: config?.videoFps ?? 30,
+      videoFormat,
     });
-    downloadBlob(blob, `openclo-turntable-${Date.now()}.webm`);
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    downloadBlob(blob, `openclo-turntable-${Date.now()}.${ext}`);
   }, []);
 
   const handleExportAllViews = useCallback(async (width: number, height: number, transparent: boolean) => {
@@ -348,7 +377,15 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
     const sc = refs.__scene as THREE.Scene | undefined;
     const cam = refs.__camera as THREE.PerspectiveCamera | undefined;
     if (!gl || !sc || !cam) return;
-    await exportAllViews(gl, sc, cam, { width, height, transparent });
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as { getState: () => { renderSettings: { imageFormat: 'png' | 'jpeg' | 'exr'; jpegQuality: number } } } | undefined;
+    const rs = store?.getState().renderSettings;
+    await exportAllViews(gl, sc, cam, {
+      width,
+      height,
+      transparent,
+      format: rs?.imageFormat ?? 'png',
+      jpegQuality: rs?.jpegQuality ?? 0.92,
+    });
   }, []);
 
   const handleExport3D = useCallback(async (
@@ -634,6 +671,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         onExportTurntable={handleExportTurntable}
         onExportAllViews={handleExportAllViews}
         onExport3D={handleExport3D}
+        onCopyToClipboard={handleCopyToClipboard}
       />
 
       {/* Collision Body toggle + panel */}
