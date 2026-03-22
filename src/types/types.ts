@@ -437,4 +437,10 @@ export interface EditorState {
   clipboard: {
     pieces: PatternPiece[];
   } | null;
+  /** Superimpose pick mode — active when user is picking a target piece */
+  superimposePickMode: {
+    active: boolean;
+    sourcePieceId: string | null;
+    mode: 'over' | 'under' | 'side' | null;
+  } | null;
 }

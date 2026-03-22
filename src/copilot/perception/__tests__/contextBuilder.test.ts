@@ -106,6 +106,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       gridSize: 10,
       units: 'mm',
       clipboard: null,
+      superimposePickMode: null,
     },
     simulation: {
       simulationState: 'idle',
