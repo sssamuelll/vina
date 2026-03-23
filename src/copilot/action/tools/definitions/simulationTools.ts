@@ -17,8 +17,12 @@ import {
   addSnapshot,
   removeSnapshot,
   setActiveSnapshot,
+  toggleHide3D,
+  showAll3D,
+  hideAll3D,
+  toggleFlipNormal,
 } from '../../../../store/simulationSlice';
-import { updatePiece } from '../../../../store/projectSlice';
+import { updatePiece, setArrangement3D, clearArrangementOverrides } from '../../../../store/projectSlice';
 import type { FitMapMode } from '../../../../utils/cloth/fitMaps';
 import type { InterfacingType } from '../../../../types/types';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
@@ -450,6 +454,162 @@ const getSimulationPropertiesTool: ToolDefinition = {
   },
 };
 
+// ─── hide3DPiece ────────────────────────────────────────────────────────────
+
+const hide3DPieceTool: ToolDefinition = {
+  name: 'hide3DPiece',
+  description:
+    'Hide a pattern piece in the 3D viewport (toggle). The piece is excluded from rendering but can be shown again. ' +
+    '/ Ocultar una pieza de patrón en la vista 3D (alternar). La pieza se excluye del renderizado pero puede mostrarse de nuevo.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece to hide / ID de la pieza a ocultar' },
+    },
+    required: ['pieceId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+    dispatch(toggleHide3D(pieceId));
+    const isNowHidden = getState().simulation.hiddenPieceIds.includes(pieceId);
+    return {
+      success: true,
+      data: { pieceId, hidden: isNowHidden },
+      rollback: () => dispatch(toggleHide3D(pieceId)),
+    };
+  },
+};
+
+// ─── show3DPiece ────────────────────────────────────────────────────────────
+
+const show3DPieceTool: ToolDefinition = {
+  name: 'show3DPiece',
+  description:
+    'Show a hidden piece in the 3D viewport (toggle), or show all pieces if pieceId is "all". ' +
+    '/ Mostrar una pieza oculta en la vista 3D (alternar), o mostrar todas si pieceId es "all".',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece to show, or "all" / ID de la pieza a mostrar, o "all"' },
+    },
+    required: ['pieceId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    if (pieceId === 'all') {
+      const prevHidden = [...getState().simulation.hiddenPieceIds];
+      dispatch(showAll3D());
+      return {
+        success: true,
+        data: { showedAll: true },
+        rollback: () => dispatch(hideAll3D(prevHidden)),
+      };
+    }
+    const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+    const wasHidden = getState().simulation.hiddenPieceIds.includes(pieceId);
+    if (wasHidden) {
+      dispatch(toggleHide3D(pieceId));
+    }
+    return {
+      success: true,
+      data: { pieceId, hidden: false },
+      rollback: () => { if (wasHidden) dispatch(toggleHide3D(pieceId)); },
+    };
+  },
+};
+
+// ─── showAll3DPieces ────────────────────────────────────────────────────────
+
+const showAll3DPiecesTool: ToolDefinition = {
+  name: 'showAll3DPieces',
+  description:
+    'Show all hidden pieces in the 3D viewport. / Mostrar todas las piezas ocultas en la vista 3D.',
+  parameters: {
+    type: 'object',
+    properties: {},
+  },
+  execute: async (_params, dispatch, getState): Promise<ToolResult> => {
+    const prevHidden = [...getState().simulation.hiddenPieceIds];
+    dispatch(showAll3D());
+    return {
+      success: true,
+      data: { showedAll: true },
+      rollback: () => dispatch(hideAll3D(prevHidden)),
+    };
+  },
+};
+
+// ─── flipNormal3D ───────────────────────────────────────────────────────────
+
+const flipNormal3DTool: ToolDefinition = {
+  name: 'flipNormal3D',
+  description:
+    'Flip the surface normal of a piece in the 3D viewport (toggle). Useful for inside-out pieces. ' +
+    '/ Invertir la normal de superficie de una pieza en la vista 3D (alternar). Útil para piezas al revés.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece to flip / ID de la pieza a invertir' },
+    },
+    required: ['pieceId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string;
+    const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+    dispatch(toggleFlipNormal(pieceId));
+    const isFlipped = getState().simulation.flippedPieceIds.includes(pieceId);
+    return {
+      success: true,
+      data: { pieceId, flipped: isFlipped },
+      rollback: () => dispatch(toggleFlipNormal(pieceId)),
+    };
+  },
+};
+
+// ─── reset3DArrangement ─────────────────────────────────────────────────────
+
+const reset3DArrangementTool: ToolDefinition = {
+  name: 'reset3DArrangement',
+  description:
+    'Reset the 3D position of a specific piece, or reset all piece positions. ' +
+    '/ Restablecer la posición 3D de una pieza específica, o restablecer todas las posiciones.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Optional piece ID; omit to reset all / ID de pieza opcional; omitir para restablecer todo' },
+    },
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const pieceId = params.pieceId as string | undefined;
+    if (pieceId) {
+      const piece = getState().project.pieces.find((p: { id: string }) => p.id === pieceId);
+      if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+      const prevPos = getState().project.arrangementOverrides[pieceId];
+      dispatch(setArrangement3D({ pieceId, position: [0, 0, 0] }));
+      return {
+        success: true,
+        data: { pieceId, resetPosition: [0, 0, 0] },
+        rollback: () => { if (prevPos) dispatch(setArrangement3D({ pieceId, position: prevPos })); },
+      };
+    }
+    const prevOverrides = { ...getState().project.arrangementOverrides };
+    dispatch(clearArrangementOverrides());
+    return {
+      success: true,
+      data: { resetAll: true },
+      rollback: () => {
+        for (const [id, pos] of Object.entries(prevOverrides)) {
+          dispatch(setArrangement3D({ pieceId: id, position: pos as [number, number, number] }));
+        }
+      },
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   setFabricTool,
   listFabricsTool,
@@ -464,4 +624,9 @@ export const tools: ToolDefinition[] = [
   setInterfacingTool,
   setSolidifyTool,
   getSimulationPropertiesTool,
+  hide3DPieceTool,
+  show3DPieceTool,
+  showAll3DPiecesTool,
+  flipNormal3DTool,
+  reset3DArrangementTool,
 ];

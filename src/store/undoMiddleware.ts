@@ -122,6 +122,17 @@ const ACTION_LABELS: Record<string, string> = {
   'project/addPOM': 'Add Measurement',
   'project/updatePOM': 'Update Measurement',
   'project/removePOM': 'Remove Measurement',
+  'project/renameLayer': 'Rename Layer',
+  'project/deleteLayerName': 'Remove Layer Name',
+  'project/setLayerLocked': 'Toggle Layer Lock',
+  'project/addLayer': 'Add Layer',
+  'project/removeLayer': 'Remove Layer',
+  'simulation/toggleHide3D': 'Toggle Hide Piece',
+  'simulation/showAll3D': 'Show All Pieces',
+  'simulation/toggleFlipNormal': 'Flip Normal',
+  'simulation/toggleLayerVisibility': 'Toggle Layer Visibility',
+  'simulation/showAllLayers': 'Show All Layers',
+  'simulation/setXrayMode': 'Toggle X-Ray Mode',
 };
 
 function getActionLabel(actionType: string): string {

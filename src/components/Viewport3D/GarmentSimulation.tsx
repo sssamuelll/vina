@@ -25,7 +25,7 @@ import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
-import { addPin, setFitMapStats } from '../../store/simulationSlice';
+import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
 import PinRenderer from './PinRenderer';
@@ -151,13 +151,40 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
+  const pieceOpacity = useSelector((s: RootState) => s.simulation.pieceOpacity);
+  const pieceEmission = useSelector((s: RootState) => s.simulation.pieceEmission);
+  const pieceEmissionIntensity = useSelector((s: RootState) => s.simulation.pieceEmissionIntensity);
   const steamBrush = useSelector((s: RootState) => s.simulation.steamBrush);
   const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const seamGroups = useSelector((s: RootState) => s.project.seamGroups);
+  const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
+  const xrayActiveLayer = useSelector((s: RootState) => s.simulation.xrayActiveLayer);
 
   // Filter inactive pieces — only active pieces participate in simulation
-  const activePieces = useMemo(() => pieces.filter(p => p.active !== false), [pieces]);
+  // Also filter out hidden pieces (3D arrangement visibility) and hidden layers
+  const activePieces = useMemo(
+    () => pieces.filter(p =>
+      p.active !== false
+      && !hiddenPieceIds.includes(p.id)
+      && !hiddenLayerIds.includes(p.layer ?? 1)
+    ),
+    [pieces, hiddenPieceIds, hiddenLayerIds],
+  );
+
+  // ─── X-ray opacity ──────────────────────────────────────────────────────────
+  // When xrayMode is on, set active-layer pieces to full opacity and others to 0.2
+  useEffect(() => {
+    if (!xrayMode) return;
+    for (const p of pieces) {
+      if (p.active === false) continue;
+      const layer = p.layer ?? 1;
+      const opacity = (xrayActiveLayer === layer) ? 1.0 : 0.2;
+      dispatch(setPieceOpacity({ pieceId: p.id, opacity }));
+    }
+  }, [xrayMode, xrayActiveLayer, pieces, dispatch]);
 
   // ─── Meshing ────────────────────────────────────────────────────────────────
 
@@ -533,6 +560,30 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   }, [fabricId]);
 
+  // Effective opacity: per-piece override OR fabric default
+  const effectiveOpacity = useMemo(() => {
+    for (const p of activePieces) {
+      if (pieceOpacity[p.id] !== undefined) return pieceOpacity[p.id];
+    }
+    return renderParams.opacity;
+  }, [activePieces, pieceOpacity, renderParams.opacity]);
+
+  // Effective emission color
+  const effectiveEmission = useMemo(() => {
+    for (const p of activePieces) {
+      if (pieceEmission[p.id]) return pieceEmission[p.id];
+    }
+    return undefined;
+  }, [activePieces, pieceEmission]);
+
+  // Effective emission intensity
+  const effectiveEmissionIntensity = useMemo(() => {
+    for (const p of activePieces) {
+      if (pieceEmissionIntensity[p.id] !== undefined) return pieceEmissionIntensity[p.id];
+    }
+    return 0;
+  }, [activePieces, pieceEmissionIntensity]);
+
   // Create TSL node material when solver initializes.
   // tslSolverRef.current is used as a dep — it's a ref value that only changes
   // when setTslGeneration triggers a re-render in useSimulationLifecycle.
@@ -550,7 +601,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     mat.normalNode = solver.normalBufNode.toAttribute();
     mat.side = THREE.DoubleSide;
     mat.transparent = true;
-    mat.opacity = renderParams.opacity;
     mat.roughness = renderParams.roughness;
     mat.metalness = renderParams.metalness;
     setTslMaterial(mat);
@@ -561,6 +611,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tslSolverRef.current, staticGeometry]);
+
+  // Update TSL material opacity/emission without recreating it
+  useEffect(() => {
+    if (!tslMaterial) return;
+    tslMaterial.opacity = effectiveOpacity;
+    if (effectiveEmission) {
+      tslMaterial.emissive = new THREE.Color(effectiveEmission);
+      tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
+    } else {
+      tslMaterial.emissive = new THREE.Color(0x000000);
+      tslMaterial.emissiveIntensity = 0;
+    }
+    tslMaterial.needsUpdate = true;
+  }, [tslMaterial, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity]);
 
   // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {
@@ -974,8 +1038,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             vertexColors={fitMapMode !== 'none'}
             color={surfaceMode3D === 'flat' ? '#000000' : (effectiveTint || '#ffffff')}
             side={THREE.DoubleSide}
-            transparent
-            opacity={surfaceMode3D === 'xray' ? 0.1 : renderParams.opacity}
+            transparent={effectiveOpacity < 1}
+            opacity={effectiveOpacity}
             depthWrite={surfaceMode3D !== 'xray'}
             roughness={surfaceMode3D === 'flat' ? 1 : renderParams.roughness}
             metalness={renderParams.metalness}
@@ -987,8 +1051,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
             transmission={renderParams.transmission}
             thickness={renderParams.thickness}
             ior={renderParams.ior}
-            emissive={surfaceMode3D === 'flat' ? (effectiveTint || '#ffffff') : undefined}
-            emissiveIntensity={surfaceMode3D === 'flat' ? 1 : 0}
+            emissive={surfaceMode3D === 'flat' ? (effectiveTint || '#ffffff') : (effectiveEmission ? new THREE.Color(effectiveEmission) : undefined)}
+            emissiveIntensity={surfaceMode3D === 'flat' ? 1 : effectiveEmissionIntensity}
             map={(fitMapMode === 'none' && surfaceMode3D !== 'shaded' && surfaceMode3D !== 'shaded-wire') ? textures.map : null}
             normalMap={(surfaceMode3D !== 'shaded' && surfaceMode3D !== 'shaded-wire') ? textures.normalMap : null}
             roughnessMap={(fitMapMode === 'none' && surfaceMode3D !== 'shaded' && surfaceMode3D !== 'shaded-wire') ? textures.roughnessMap : null}

@@ -1,5 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
-import reducer, { addPiece, setLayer, setSublayer, cloneToLayer, superimposePiece } from '../projectSlice';
+import reducer, {
+  addPiece, setLayer, setSublayer, cloneToLayer, superimposePiece,
+  renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer, loadProject,
+} from '../projectSlice';
 import type { PatternPiece } from '../../types/types';
 
 function basePiece(overrides?: Partial<PatternPiece>): PatternPiece {
@@ -253,5 +257,139 @@ describe('superimposePiece reducer', () => {
     const state = { ...emptyState(), pieces: [basePiece({ id: 'p1', layer: 1 })] };
     const next = reducer(state, superimposePiece({ pieceId: 'p1', targetPieceId: 'ghost', mode: 'over' }));
     expect(next.pieces[0].layer).toBe(1);
+  });
+});
+
+describe('renameLayer reducer', () => {
+  it('sets a custom layer name', () => {
+    const state = emptyState();
+    const next = reducer(state, renameLayer({ layer: 1, name: 'Outer Shell' }));
+    expect(next.layerNames[1]).toBe('Outer Shell');
+    expect(next.isDirty).toBe(true);
+  });
+
+  it('is idempotent — overwrites existing name', () => {
+    const state = { ...emptyState(), layerNames: { 1: 'Old Name' } };
+    const next = reducer(state, renameLayer({ layer: 1, name: 'New Name' }));
+    expect(next.layerNames[1]).toBe('New Name');
+  });
+});
+
+describe('deleteLayerName reducer', () => {
+  it('removes a custom layer name', () => {
+    const state = { ...emptyState(), layerNames: { 1: 'Shell', 2: 'Trims' } };
+    const next = reducer(state, deleteLayerName({ layer: 1 }));
+    expect(next.layerNames[1]).toBeUndefined();
+    expect(next.layerNames[2]).toBe('Trims');
+    expect(next.isDirty).toBe(true);
+  });
+});
+
+describe('setLayerLocked reducer', () => {
+  it('locks a layer', () => {
+    const state = emptyState();
+    const next = reducer(state, setLayerLocked({ layer: 2, locked: true }));
+    expect(next.layerLocked[2]).toBe(true);
+    expect(next.isDirty).toBe(true);
+  });
+
+  it('unlocks a layer', () => {
+    const state = { ...emptyState(), layerLocked: { 2: true } };
+    const next = reducer(state, setLayerLocked({ layer: 2, locked: false }));
+    expect(next.layerLocked[2]).toBe(false);
+  });
+});
+
+describe('addLayer reducer', () => {
+  it('adds a layer with a name', () => {
+    const state = emptyState();
+    const next = reducer(state, addLayer({ layer: 5, name: 'Interlining' }));
+    expect(next.layerNames[5]).toBe('Interlining');
+    expect(next.isDirty).toBe(true);
+  });
+
+  it('overwrites name if layer already has one', () => {
+    const state = { ...emptyState(), layerNames: { 5: 'Old' } };
+    const next = reducer(state, addLayer({ layer: 5, name: 'New' }));
+    expect(next.layerNames[5]).toBe('New');
+  });
+
+  it('adds layer without name', () => {
+    const state = emptyState();
+    const next = reducer(state, addLayer({ layer: 3 }));
+    expect(next.layerNames[3]).toBeUndefined();
+    expect(next.isDirty).toBe(true);
+  });
+});
+
+describe('removeLayer reducer', () => {
+  it('moves pieces from removed layer to layer 1 and cleans metadata', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [
+        basePiece({ id: 'p1', layer: 3 }),
+        basePiece({ id: 'p2', layer: 1 }),
+        basePiece({ id: 'p3', layer: 3 }),
+      ],
+      layerNames: { 3: 'Custom' },
+      layerLocked: { 3: true },
+    };
+    const next = reducer(state, removeLayer({ layer: 3 }));
+    expect(next.pieces[0].layer).toBe(1);
+    expect(next.pieces[1].layer).toBe(1);
+    expect(next.pieces[2].layer).toBe(1);
+    expect(next.layerNames[3]).toBeUndefined();
+    expect(next.layerLocked[3]).toBeUndefined();
+    expect(next.isDirty).toBe(true);
+  });
+
+  it('does not remove layer 1', () => {
+    const state = {
+      ...emptyState(),
+      pieces: [basePiece({ id: 'p1', layer: 1 })],
+      layerNames: { 1: 'Shell' },
+    };
+    const next = reducer(state, removeLayer({ layer: 1 }));
+    expect(next.layerNames[1]).toBe('Shell');
+    expect(next.isDirty).toBe(false);
+  });
+});
+
+describe('loadProject backfills layer metadata', () => {
+  it('backfills layerNames and layerLocked from older projects', () => {
+    const state = emptyState();
+    const oldProject = {
+      id: 'old',
+      name: 'Old Project',
+      pieces: [basePiece({ id: 'p1' })],
+      seams: [],
+      fabrics: [],
+      avatar: state.avatar,
+      groups: [],
+      poms: [],
+      // no layerNames or layerLocked
+    };
+    const next = reducer(state, loadProject(oldProject as any));
+    expect(next.layerNames).toEqual({});
+    expect(next.layerLocked).toEqual({});
+  });
+
+  it('preserves layerNames and layerLocked when present', () => {
+    const state = emptyState();
+    const project = {
+      id: 'new',
+      name: 'New Project',
+      pieces: [basePiece({ id: 'p1' })],
+      seams: [],
+      fabrics: [],
+      avatar: state.avatar,
+      groups: [],
+      poms: [],
+      layerNames: { 1: 'Shell', 2: 'Trims' },
+      layerLocked: { 0: true },
+    };
+    const next = reducer(state, loadProject(project as any));
+    expect(next.layerNames).toEqual({ 1: 'Shell', 2: 'Trims' });
+    expect(next.layerLocked).toEqual({ 0: true });
   });
 });

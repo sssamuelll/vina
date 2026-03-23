@@ -127,6 +127,9 @@ const projectSlice = createSlice({
         if ((seam as any).taped === undefined) seam.taped = false;
         if ((seam as any).tapeWidth === undefined) seam.tapeWidth = 10;
       }
+      // Backfill layer metadata from older projects
+      state.layerNames = (p as any).layerNames ?? {};
+      state.layerLocked = (p as any).layerLocked ?? {};
     },
     setProjectName(state, action: PayloadAction<string>) {
       state.name = action.payload;
@@ -559,11 +562,10 @@ const projectSlice = createSlice({
       state.layerLocked[action.payload.layer] = action.payload.locked;
       state.isDirty = true;
     },
-    /** Register an empty layer (creates an entry in layerNames with a default name). */
+    /** Register or update a layer (sets the custom name if provided). */
     addLayer(state, action: PayloadAction<{ layer: number; name?: string }>) {
-      const { layer, name } = action.payload;
-      if (!state.layerNames[layer]) {
-        state.layerNames[layer] = name ?? `Layer ${layer}`;
+      if (action.payload.name) {
+        state.layerNames[action.payload.layer] = action.payload.name;
       }
       state.isDirty = true;
     },
@@ -798,15 +800,10 @@ export const {
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
 } = projectSlice.actions;
 
-export default projectSlice.reducer;
+const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };
 
-/**
- * Get the display name for a layer. Falls back to "Layer N" if no custom name is set.
- * Accepts a partial RootState shape so it can be used with getState().
- */
-export function getLayerDisplayName(
-  state: { project: { layerNames: Record<number, string> } },
-  layer: number,
-): string {
-  return state.project.layerNames[layer] ?? `Layer ${layer}`;
+export function getLayerDisplayName(state: { project: { layerNames: Record<number, string> } }, layer: number): string {
+  return state.project.layerNames[layer] ?? DEFAULT_LAYER_NAMES[layer] ?? `Layer ${layer}`;
 }
+
+export default projectSlice.reducer;

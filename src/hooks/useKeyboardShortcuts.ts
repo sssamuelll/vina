@@ -33,6 +33,7 @@ import {
   saveArrangementSnapshot,
   clearArrangementSnapshot,
   setFitMapMode,
+  setXrayMode,
 } from '../store/simulationSlice';
 import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
 import { saveToLocalStorage } from '../utils/projectIO';
@@ -59,6 +60,7 @@ export function useKeyboardShortcuts() {
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectState = useSelector((s: RootState) => s.project);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
+  const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
 
   useEffect(() => {
     if (!registry) return;
@@ -155,6 +157,7 @@ export function useKeyboardShortcuts() {
 
       // View
       ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
+      ['view.xrayMode', () => dispatch(setXrayMode({ enabled: !xrayMode }))],
 
       // 2D Tools (CLO3D mapping)
       ['tool.transform', () => { dispatch(setActiveTool('transform' as any)); dispatch(setActiveTool2D('transform')); }],
@@ -215,5 +218,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, fitMapMode, avatar, projectState, clipboard]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode]);
 }

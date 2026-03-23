@@ -1,52 +1,54 @@
-import { useRef, useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+
+const PRESET_COLORS = [
+  '#4ade80', '#60a5fa', '#f97316', '#a78bfa',
+  '#f43f5e', '#facc15', '#2dd4bf', '#e879f9',
+];
 
 interface LayerColorPickerProps {
   color: string;
   onChange: (color: string) => void;
 }
 
-/**
- * A compact inline color swatch that opens a native color input on click.
- * Used in the Layer Panel header to set per-layer outline/accent colors.
- */
 export default function LayerColorPicker({ color, onChange }: LayerColorPickerProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [hovered, setHovered] = useState(false);
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
 
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    inputRef.current?.click();
-  };
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
 
   return (
-    <span
-      className="layer-color-swatch"
-      style={{
-        display: 'inline-block',
-        width: 12,
-        height: 12,
-        borderRadius: 3,
-        background: color,
-        border: hovered ? '2px solid #fff' : '1px solid rgba(255,255,255,0.3)',
-        cursor: 'pointer',
-        flexShrink: 0,
-        marginRight: 4,
-        verticalAlign: 'middle',
-      }}
-      onClick={handleClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      title={`Layer color: ${color}`}
-    >
-      <input
-        ref={inputRef}
-        type="color"
-        value={color}
-        onChange={e => onChange(e.target.value)}
-        onClick={e => e.stopPropagation()}
-        style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-        tabIndex={-1}
+    <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        className="layer-color-dot"
+        style={{ backgroundColor: color }}
+        onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}
+        title="Change layer color"
       />
-    </span>
+      {open && (
+        <div className="layer-color-popover">
+          {PRESET_COLORS.map(c => (
+            <button
+              key={c}
+              className={`layer-color-swatch${c === color ? ' active' : ''}`}
+              style={{ backgroundColor: c }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange(c);
+                setOpen(false);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

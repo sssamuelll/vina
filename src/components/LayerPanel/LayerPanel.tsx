@@ -7,21 +7,12 @@ import {
 } from '../../store/projectSlice';
 import {
   toggleLayerVisibility, toggleHide3D,
-  setXrayMode, setLayerOutlineColor,
+  setXrayMode, setLayerOutlineColor, cleanupRemovedLayer,
 } from '../../store/simulationSlice';
 import { selectPiece } from '../../store/editorSlice';
 import LayerColorPicker from './LayerColorPicker';
+import { getOutlineColor } from '../../utils/layerColors';
 import './LayerPanel.css';
-
-// ─── Outline Color Helpers ──────────────────────────────────────────────────
-
-const DEFAULT_OUTLINE_COLORS: Record<number, string> = {
-  0: '#4ade80', 1: '#60a5fa', 2: '#f97316',
-};
-
-function getOutlineColor(layer: number, overrides: Record<number, string>): string {
-  return overrides[layer] ?? DEFAULT_OUTLINE_COLORS[layer] ?? `hsl(${layer * 137.5}, 70%, 60%)`;
-}
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
@@ -141,6 +132,7 @@ export default function LayerPanel() {
   const handleContextDelete = useCallback(() => {
     if (!contextMenu) return;
     dispatch(removeLayer({ layer: contextMenu.layer }));
+    dispatch(cleanupRemovedLayer(contextMenu.layer));
     setContextMenu(null);
   }, [contextMenu, dispatch]);
 
@@ -186,7 +178,9 @@ export default function LayerPanel() {
     setDragOverLayer(layer);
   }, [layerLocked]);
 
-  const handleDragLeave = useCallback(() => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) return;
     setDragOverLayer(null);
     setDragOverPieceId(null);
   }, []);
