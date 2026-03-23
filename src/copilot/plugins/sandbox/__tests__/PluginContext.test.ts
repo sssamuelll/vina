@@ -1,22 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { PluginContext } from '../PluginContext';
 import { PermissionDeniedError, TimeoutError, CAPABILITY_TIMEOUT_MS } from '../protocol';
 import type { CapabilityResultMessage, CapabilityDeniedMessage } from '../protocol';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-type SpyFn = ReturnType<typeof vi.fn<(msg: unknown) => void>>;
+type PostMessageMock = Mock<(msg: unknown) => void>;
+
+/** Returns the requestId from the most recent call on the mock. */
+function lastRequestId(spy: PostMessageMock): string {
+  const calls = spy.mock.calls;
+  const last = calls[calls.length - 1][0] as { requestId: string };
+  return last.requestId;
+}
 
 /**
  * Extract the requestId from the most recent postMessage call and inject a
  * `capabilityResult` response into the context.
  */
-function resolveLastRequest(ctx: PluginContext, spy: SpyFn, data: unknown): void {
-  const calls = spy.mock.calls;
-  const lastCall = calls[calls.length - 1][0] as { requestId: string };
+function resolveLastRequest(ctx: PluginContext, spy: PostMessageMock, data: unknown): void {
   const msg: CapabilityResultMessage = {
     type: 'capabilityResult',
-    requestId: lastCall.requestId,
+    requestId: lastRequestId(spy),
     data,
   };
   ctx.handleResponse(msg);
@@ -27,15 +33,13 @@ function resolveLastRequest(ctx: PluginContext, spy: SpyFn, data: unknown): void
  */
 function denyLastRequest(
   ctx: PluginContext,
-  spy: SpyFn,
+  spy: PostMessageMock,
   permission: string,
   reason: string,
 ): void {
-  const calls = spy.mock.calls;
-  const lastCall = calls[calls.length - 1][0] as { requestId: string };
   const msg: CapabilityDeniedMessage = {
     type: 'capabilityDenied',
-    requestId: lastCall.requestId,
+    requestId: lastRequestId(spy),
     permission,
     reason,
   };
@@ -45,7 +49,7 @@ function denyLastRequest(
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('PluginContext', () => {
-  let postMessage: SpyFn;
+  let postMessage: PostMessageMock;
   let ctx: PluginContext;
 
   beforeEach(() => {
@@ -227,7 +231,7 @@ describe('PluginContext', () => {
       vi.useFakeTimers();
 
       const promise = ctx.readPieces();
-      const sentRequestId = (postMessage.mock.calls[0][0] as { requestId: string }).requestId;
+      const sentRequestId = lastRequestId(postMessage);
       vi.advanceTimersByTime(CAPABILITY_TIMEOUT_MS + 1);
 
       const err = (await promise.catch((e: unknown) => e)) as TimeoutError;
