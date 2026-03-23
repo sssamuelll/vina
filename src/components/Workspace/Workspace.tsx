@@ -36,6 +36,7 @@ import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import CopilotUIOverlay from '../CopilotPanel/CopilotUIOverlay';
 import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
 import DisplayBar3D from '../DisplayBar3D/DisplayBar3D';
+import { PanelErrorBoundary } from '../ErrorBoundary/PanelErrorBoundary';
 import './Workspace.css';
 
 /**
@@ -393,15 +394,19 @@ export default function Workspace() {
         
         {/* Left copilot panel */}
         {copilotPosition === 'left' && (
-          <CopilotSidePanel position="left" />
+          <PanelErrorBoundary panelName="Copilot">
+            <CopilotSidePanel position="left" />
+          </PanelErrorBoundary>
         )}
 
         <div className="editor-area">
           <div className="editors-with-toolbar">
             {/* Toolbar2D floating in 2D viewport area */}
             <div className={`toolbar2d-wrapper ${viewMode !== '3d' ? 'visible' : 'hidden'}`}>
-              <ToolOptionsBar2D />
-              <Toolbar2D />
+              <PanelErrorBoundary panelName="2D Toolbar">
+                <ToolOptionsBar2D />
+                <Toolbar2D />
+              </PanelErrorBoundary>
             </div>
 
             {/* Viewports — ALWAYS mounted, sized via CSS width (VS Code pattern) */}
@@ -411,7 +416,9 @@ export default function Workspace() {
                 style={{ width: get2dWidth() }}
               >
                 <div className="viewport-label">PATTERN</div>
-                <PatternEditor />
+                <PanelErrorBoundary panelName="2D Editor">
+                  <PatternEditor />
+                </PanelErrorBoundary>
                 <DisplayBar2D />
               </div>
 
@@ -430,29 +437,35 @@ export default function Workspace() {
                     <Viewport3D activeTool3D={activeTool3D as Tool3D} />
                   </Viewport3DErrorBoundary>
                   <AvatarPanel open={avatarPanelOpen} onClose={() => setAvatarPanelOpen(false)} />
-                  <div className={`toolbar3d-wrapper ${viewMode !== '2d' ? 'visible' : 'hidden'}`}>
-                    <Toolbar3D
-                      avatarPanelOpen={avatarPanelOpen}
-                      onToggleAvatarPanel={() => setAvatarPanelOpen(v => !v)}
-                    />
-                  </div>
-                  <ToolOptionsBar />
+                  <PanelErrorBoundary panelName="3D Toolbar">
+                    <div className={`toolbar3d-wrapper ${viewMode !== '2d' ? 'visible' : 'hidden'}`}>
+                      <Toolbar3D
+                        avatarPanelOpen={avatarPanelOpen}
+                        onToggleAvatarPanel={() => setAvatarPanelOpen(v => !v)}
+                      />
+                    </div>
+                    <ToolOptionsBar />
+                  </PanelErrorBoundary>
                 </div>
               </div>
             </div>
           </div>
 
-          <BottomPanel
-            isOpen={bottomPanelOpen}
-            onToggle={() => dispatch(toggleBottomPanel())}
-            activeTab={bottomPanelTab}
-            onTabChange={(tab) => dispatch(setBottomPanelTab(tab))}
-          />
+          <PanelErrorBoundary panelName="Bottom Panel">
+            <BottomPanel
+              isOpen={bottomPanelOpen}
+              onToggle={() => dispatch(toggleBottomPanel())}
+              activeTab={bottomPanelTab}
+              onTabChange={(tab) => dispatch(setBottomPanelTab(tab))}
+            />
+          </PanelErrorBoundary>
         </div>
         
         {/* Right copilot panel */}
         {copilotPosition === 'right' && (
-          <CopilotSidePanel position="right" />
+          <PanelErrorBoundary panelName="Copilot">
+            <CopilotSidePanel position="right" />
+          </PanelErrorBoundary>
         )}
       </div>
 
