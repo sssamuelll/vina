@@ -64,6 +64,9 @@ export {
   loadEnabledPlugins,
   loadAndRegisterPlugin,
   resetPluginManager,
+  initPluginHost,
+  getPluginHost,
+  resetPluginHost,
 } from './pluginManager';
 
 export {
