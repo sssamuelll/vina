@@ -144,11 +144,13 @@ const hasOwn = (obj: Record<string, unknown>, key: string): boolean =>
 // and intermediate values are meaningless (returned as 0).
 
 class Parser {
+  private static MAX_DEPTH = 256;
   private tokens: Token[];
   private pos: number;
   private vars: Record<string, number>;
   private allowedFns: Set<string> | null;
   private skip: number; // > 0 means we are inside a skipped branch
+  private depth: number;
 
   constructor(
     tokens: Token[],
@@ -160,6 +162,7 @@ class Parser {
     this.vars = vars;
     this.allowedFns = allowedFunctions ? new Set(allowedFunctions) : null;
     this.skip = 0;
+    this.depth = 0;
   }
 
   private peek(): Token {
@@ -191,7 +194,14 @@ class Parser {
 
   // expression -> ternary
   private expression(): number {
-    return this.ternary();
+    if (++this.depth > Parser.MAX_DEPTH) {
+      throw new Error('Expression too deeply nested');
+    }
+    try {
+      return this.ternary();
+    } finally {
+      this.depth--;
+    }
   }
 
   // ternary -> or ('?' ternary ':' ternary)?   SHORT-CIRCUIT
@@ -236,7 +246,7 @@ class Parser {
         this.skip++;
         this.and();
         this.skip--;
-        // left stays truthy
+        left = 1; // normalize to boolean
       } else {
         const right = this.and();
         left = right !== 0 ? 1 : 0;
@@ -393,7 +403,11 @@ class Parser {
       this.expect('paren', ')');
 
       if (this.skip > 0) return 0;
-      return BUILTINS[name](...args);
+      const fnResult = BUILTINS[name](...args);
+      if (!Number.isFinite(fnResult)) {
+        throw new Error(`Function ${name}(${args.join(', ')}) produced ${Number.isNaN(fnResult) ? 'NaN' : fnResult}`);
+      }
+      return fnResult;
     }
     return this.primary();
   }
@@ -454,7 +468,7 @@ export function safeEval(
   const parser = new Parser(tokens, vars, allowedFunctions);
   const result = parser.parse();
 
-  if (Number.isNaN(result)) {
+  if (!Number.isFinite(result)) {
     throw new Error('Formula resulted in invalid number');
   }
 

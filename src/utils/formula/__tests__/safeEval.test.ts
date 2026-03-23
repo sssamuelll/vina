@@ -96,4 +96,35 @@ describe('safeEval — security', () => {
     expect(() => safeEval('globalThis')).toThrow('Undefined variable');
   });
   it('constructor blocked', () => expect(() => safeEval('constructor')).toThrow('Undefined variable'));
+  it('__proto__ blocked', () => expect(() => safeEval('__proto__')).toThrow('Undefined variable'));
+  it('toString blocked', () => expect(() => safeEval('toString')).toThrow('Undefined variable'));
+  it('valueOf blocked', () => expect(() => safeEval('valueOf')).toThrow('Undefined variable'));
+  it('prototype blocked', () => expect(() => safeEval('prototype')).toThrow('Undefined variable'));
+  it('hasOwnProperty blocked', () => expect(() => safeEval('hasOwnProperty')).toThrow('Undefined variable'));
+});
+
+describe('safeEval — NaN and Infinity guards', () => {
+  it('sqrt(-1) throws', () => expect(() => safeEval('sqrt(-1)')).toThrow('NaN'));
+  it('asin(2) throws', () => expect(() => safeEval('asin(2)')).toThrow('NaN'));
+  it('pow(0, -1) throws (Infinity)', () => expect(() => safeEval('pow(0, -1)')).toThrow('Infinity'));
+  it('min() with no args throws (Infinity)', () => expect(() => safeEval('min()')).toThrow('Infinity'));
+  it('max() with no args throws (-Infinity)', () => expect(() => safeEval('max()')).toThrow('-Infinity'));
+});
+
+describe('safeEval — short-circuit side effects', () => {
+  it('&& short-circuits (no div by zero)', () => expect(safeEval('0 && 1/0')).toBe(0));
+  it('|| short-circuits (no div by zero)', () => expect(safeEval('1 || 1/0')).toBe(1));
+  it('|| normalizes truthy to 1', () => expect(safeEval('5 || 0')).toBe(1));
+  it('&& normalizes truthy to 1', () => expect(safeEval('1 && 5')).toBe(1));
+});
+
+describe('safeEval — edge cases', () => {
+  it('chained comparison rejected', () => expect(() => safeEval('1 <= 2 <= 3')).toThrow('Chained comparisons'));
+  it('leading decimal point', () => expect(safeEval('.5 + .5')).toBe(1));
+  it('whitespace-only string', () => expect(() => safeEval('   ')).toThrow('Empty expression'));
+  it('extra closing paren', () => expect(() => safeEval('2 + 3)')).toThrow());
+  it('deeply nested parens', () => {
+    const deep = '('.repeat(300) + '1' + ')'.repeat(300);
+    expect(() => safeEval(deep)).toThrow('too deeply nested');
+  });
 });

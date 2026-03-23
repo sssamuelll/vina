@@ -2,7 +2,6 @@ import type { FormulaContext, FormulaResult } from './types';
 import { safeEval } from './safeEval';
 
 const ALLOWED_FUNCTIONS = ['min', 'max', 'abs', 'round', 'floor', 'ceil', 'sqrt'];
-const RESTRICTED_FUNCTIONS = ['min', 'max', 'abs', 'round', 'floor', 'ceil', 'sqrt'];
 const CONSTANTS: Record<string, number> = { PI: Math.PI };
 
 function tokenize(formula: string): string[] {
@@ -81,8 +80,8 @@ export function validateFormula(
  *
  * @remarks
  * The formula is tokenized, variables are substituted, and the resulting
- * expression is evaluated in a sandboxed `Function` constructor with only
- * `Math` in scope.
+ * expression is evaluated using a recursive descent parser (`safeEval`)
+ * with no dynamic code construction.
  *
  * @param formula - The formula expression (e.g. `"chest / 4 + 2"`)
  * @param context - Context providing variable name → numeric value mappings
@@ -124,7 +123,7 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
 
     const expr = exprParts.join(' ');
     try {
-      const result = safeEval(expr, {}, RESTRICTED_FUNCTIONS);
+      const result = safeEval(expr, {}, ALLOWED_FUNCTIONS);
       return { value: result };
     } catch (evalErr) {
       return { value: NaN, error: evalErr instanceof Error ? evalErr.message : 'Evaluation error' };

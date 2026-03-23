@@ -89,7 +89,7 @@ export function evaluateFormula(
     }
     return result;
   } catch (err) {
-    throw new Error(`Failed to evaluate formula "${formula}" (resolved: "${expr}"): ${(err as Error).message}`);
+    throw new Error(`Failed to evaluate formula "${formula}" (resolved: "${expr}"): ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -161,8 +161,9 @@ export function resolveVariables(
     if (resolved[name] !== undefined) continue; // already set (cycle)
     try {
       resolved[name] = evaluateFormula(variables[name].formula, context);
-    } catch {
-      resolved[name] = 0; // graceful fallback
+    } catch (err) {
+      console.warn(`[formulaEvaluator] Failed to resolve variable "${name}": ${err instanceof Error ? err.message : String(err)}. Defaulting to 0.`);
+      resolved[name] = 0;
     }
   }
 
