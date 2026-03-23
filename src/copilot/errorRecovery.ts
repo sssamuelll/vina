@@ -14,6 +14,7 @@
  */
 
 import type { ProviderConfig } from './providers/types';
+import { SecureStorage } from './providers/secureStorage';
 
 // ─── Error Classification ───────────────────────────────────────────────────
 
@@ -295,30 +296,73 @@ export function simplifyOutline(
 
 // ─── Provider Fallback ──────────────────────────────────────────────────────
 
-/** Stored fallback provider configuration key */
+/** Stored fallback provider configuration key (non-secret fields only) */
 const FALLBACK_PROVIDER_KEY = 'openclo-fallback-provider';
+/** SecureStorage key for fallback provider API key */
+const FALLBACK_APIKEY_SECURE_KEY = 'fallback-apikey';
+/** Legacy key that stored full config including API key — cleared on startup */
+const LEGACY_FALLBACK_KEY = 'openclo-fallback-provider';
 
 /**
- * Load a fallback provider configuration from localStorage.
+ * Remove any API keys stored in localStorage from the legacy fallback provider format.
+ * Call once on app startup to migrate away from insecure storage.
+ */
+export function clearLegacyFallbackKeys(): void {
+  try {
+    const saved = localStorage.getItem(LEGACY_FALLBACK_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
+        // Re-save without the API key
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { apiKey: _removed, ...rest } = parsed;
+        localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+/**
+ * Load a fallback provider configuration.
+ * Non-secret config from localStorage, API key from SecureStorage (sessionStorage).
  *
  * @returns Fallback provider config, or null if not configured
  */
 export function loadFallbackProvider(): ProviderConfig | null {
   try {
     const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
-    if (saved) return JSON.parse(saved);
+    if (!saved) return null;
+    const config = JSON.parse(saved);
+    // Retrieve API key from SecureStorage (never from localStorage)
+    const apiKey = SecureStorage.get(FALLBACK_APIKEY_SECURE_KEY) ?? '';
+    return {
+      provider: config.provider,
+      model: config.model ?? '',
+      baseUrl: config.baseUrl,
+      apiKey,
+    };
   } catch { /* ignore */ }
   return null;
 }
 
 /**
- * Save a fallback provider configuration to localStorage.
+ * Save a fallback provider configuration.
+ * API key goes to SecureStorage (sessionStorage), non-secret config to localStorage.
  *
  * @param config - Fallback provider configuration
  */
 export function saveFallbackProvider(config: ProviderConfig): void {
   try {
-    import("../utils/storage").then(({ storageSet }) => { storageSet("settings", "fallback-provider", config); }).catch(() => {}); try { localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+    // Store API key in SecureStorage (sessionStorage, cleared on tab close)
+    SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
+    // Store non-secret config in localStorage
+    const storedConfig = {
+      provider: config.provider,
+      model: config.model,
+      baseUrl: config.baseUrl,
+    };
+    import("../utils/storage").then(({ storageSet }) => { storageSet("settings", "fallback-provider", storedConfig); }).catch(() => {});
+    try { localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig)); } catch { /* ignore */ }
   } catch { /* ignore */ }
 }
 

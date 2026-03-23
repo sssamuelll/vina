@@ -7,6 +7,10 @@ import './index.css';
 // Initialize tool registry
 import './tools';
 
+// Security: clear any API keys from legacy localStorage fallback storage
+import { clearLegacyFallbackKeys } from './copilot/errorRecovery';
+clearLegacyFallbackKeys();
+
 // ─── Block browser zoom (Cmd+/-, Cmd+0, Ctrl+wheel, pinch) ───
 // Zoom gestures are reserved for the 2D canvas and 3D viewport.
 document.addEventListener('keydown', (e) => {
