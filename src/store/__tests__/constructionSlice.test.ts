@@ -19,7 +19,7 @@ const emptyState: ConstructionState = {
 
 function addAndGetState(
   state: ConstructionState,
-  payload: Parameters<typeof addPoint>[0]['payload'],
+  payload: Parameters<typeof addPoint>[0],
 ): ConstructionState {
   return reducer(state, addPoint(payload));
 }

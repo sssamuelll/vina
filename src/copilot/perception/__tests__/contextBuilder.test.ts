@@ -294,6 +294,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       agentAnalysis: null,
       agentStreaming: false,
       agentError: null,
+      unresolvedCount: 0,
     },
   };
 

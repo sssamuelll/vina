@@ -69,7 +69,7 @@ export function resolveConstructionPoints(
     ctx.variables[name] = typeof val === 'number' ? val : evaluateFormula(val, ctx);
   }
 
-  const resolved: Array<{ id: string; x: number; y: number }> = [];
+  const resolved: ResolveResult['resolved'] = [];
   const errors: Array<{ id: string; label: string; error: string }> = [];
   const pointMap = new Map<string, { x: number; y: number }>();
 
