@@ -151,7 +151,7 @@ function safeClone<T>(value: T): T | null {
   try {
     return structuredClone(value);
   } catch {
-    // structuredClone rejects functions / symbols — fall back to JSON
+    console.warn('[undoMiddleware] structuredClone failed, falling back to JSON (may lose NaN/undefined)');
   }
   try {
     return JSON.parse(JSON.stringify(value));
@@ -170,11 +170,10 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     if (undoState.past.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
     const snapshot = safeClone(currentProject);
-    if (snapshot) {
-      undoState.future.push(snapshot);
-      const entry = undoState.pastEntries.pop();
-      if (entry) undoState.futureEntries.push(entry);
-    }
+    if (!snapshot) return; // abort undo — can't save current state for redo
+    undoState.future.push(snapshot);
+    const entry = undoState.pastEntries.pop();
+    if (entry) undoState.futureEntries.push(entry);
     const previous = undoState.past.pop()!;
     bumpRevision();
     const result = next({ type: 'project/restoreState', payload: previous });
@@ -190,11 +189,10 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     if (undoState.future.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
     const snapshot = safeClone(currentProject);
-    if (snapshot) {
-      undoState.past.push(snapshot);
-      const entry = undoState.futureEntries.pop();
-      if (entry) undoState.pastEntries.push(entry);
-    }
+    if (!snapshot) return; // abort redo — can't save current state for undo
+    undoState.past.push(snapshot);
+    const entry = undoState.futureEntries.pop();
+    if (entry) undoState.pastEntries.push(entry);
     const nextState = undoState.future.pop()!;
     bumpRevision();
     return next({ type: 'project/restoreState', payload: nextState });
