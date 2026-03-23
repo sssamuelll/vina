@@ -49,7 +49,7 @@ function lineLineIntersect(
 // ─── Main Resolver ──────────────────────────────────────────────────────────
 
 export interface ResolveResult {
-  resolved: Array<{ id: string; x: number; y: number }>;
+  resolved: Array<{ id: string; x: number; y: number; resolutionError?: string }>;
   errors: Array<{ id: string; label: string; error: string }>;
 }
 
@@ -92,10 +92,11 @@ export function resolveConstructionPoints(
       pointMap.set(point.id, pos);
       resolved.push({ id: point.id, x: pos.x, y: pos.y });
     } catch (e) {
-      errors.push({ id: point.id, label: point.label, error: (e as Error).message });
+      const error = (e as Error).message;
+      errors.push({ id: point.id, label: point.label, error });
       // Place at 0,0 so downstream points can still try
       pointMap.set(point.id, { x: 0, y: 0 });
-      resolved.push({ id: point.id, x: 0, y: 0 });
+      resolved.push({ id: point.id, x: 0, y: 0, resolutionError: error });
     }
   }
 

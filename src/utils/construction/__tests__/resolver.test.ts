@@ -130,3 +130,35 @@ describe('Construction Resolver', () => {
     expect(Math.abs(result.resolved[2].y)).toBeCloseTo(50, 0);
   });
 });
+
+describe('resolveConstructionPoints — resolutionError propagation', () => {
+  it('omits resolutionError on successful resolution', () => {
+    const points = [makePoint('p1', 'A', { type: 'manual', x: 100, y: 200 })];
+    const result = resolveConstructionPoints(points, {}, {});
+    expect(result.resolved[0].resolutionError).toBeUndefined();
+    expect(result.errors).toHaveLength(0);
+  });
+
+  it('includes resolutionError on failed resolution', () => {
+    const points = [
+      makePoint('p1', 'B', { type: 'endLine', basePoint: 'nonexistent', angle: 0, length: 10 }),
+    ];
+    const result = resolveConstructionPoints(points, {}, {});
+    expect(result.resolved[0].resolutionError).toBeDefined();
+    expect(result.resolved[0].x).toBe(0);
+    expect(result.resolved[0].y).toBe(0);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0].error).toMatch(/nonexistent/i);
+  });
+
+  it('downstream points can still resolve after an upstream failure', () => {
+    const points = [
+      makePoint('p1', 'Broken', { type: 'endLine', basePoint: 'ghost', angle: 0, length: 10 }),
+      makePoint('p2', 'OK', { type: 'manual', x: 50, y: 60 }),
+    ];
+    const result = resolveConstructionPoints(points, {}, {});
+    expect(result.resolved[0].resolutionError).toBeDefined();
+    expect(result.resolved[1].resolutionError).toBeUndefined();
+    expect(result.resolved[1].x).toBe(50);
+  });
+});
