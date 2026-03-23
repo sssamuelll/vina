@@ -295,6 +295,36 @@ describe('evaluateRules', () => {
     expect(diags).toHaveLength(0);
   });
 
+  // ── Unresolved construction points ──────────────────────────────────
+
+  describe('ruleUnresolvedPoints', () => {
+    it('fires error when unresolvedPoints is non-empty', () => {
+      const data = makeData({
+        unresolvedPoints: [
+          { label: 'bustApex', error: "Dangling reference: point 'shoulderPt' not found" },
+        ],
+      });
+      const diagnostics = evaluateRules(data);
+      const found = diagnostics.find(d => d.category === 'construction' && d.severity === 'error');
+      expect(found).toBeDefined();
+      expect(found!.message).toMatch(/1 construction point/);
+    });
+
+    it('does not fire when unresolvedPoints is absent', () => {
+      const data = makeData();
+      const diagnostics = evaluateRules(data);
+      const found = diagnostics.find(d => d.category === 'construction' && d.message.match(/construction point.*failed/i));
+      expect(found).toBeUndefined();
+    });
+
+    it('does not fire when unresolvedPoints is empty', () => {
+      const data = makeData({ unresolvedPoints: [] });
+      const diagnostics = evaluateRules(data);
+      const found = diagnostics.find(d => d.category === 'construction' && d.message.match(/construction point.*failed/i));
+      expect(found).toBeUndefined();
+    });
+  });
+
   // ── Multiple rules fire simultaneously ────────────────────────────────────
 
   it('can fire multiple rules at the same time', () => {
