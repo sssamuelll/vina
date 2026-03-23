@@ -32,20 +32,26 @@ export function evaluateFormula(
   let expr = formula.trim();
 
   // Replace function-style references like Line_A_B, AngleLine_A_B, Spl_A_B, SplPath_A_B etc.
+  // These may be unresolved during construction if the referenced geometry hasn't been computed yet.
+  // Fall back to 0 (not throw) so the formula can still evaluate — the construction resolver
+  // populates these incrementally as it processes steps in order.
   expr = expr.replace(/\b(Line|AngleLine|CurrentLength|CurrentSeamAllowance|Spl|SplPath)_[A-Za-z0-9_]+/g, (match) => {
     if (context.variables[match] !== undefined) return String(context.variables[match]);
     if (context.variables[`#${match}`] !== undefined) return String(context.variables[`#${match}`]);
-    throw new Error(`Unknown variable: ${match}`);
+    console.warn(`[formulaEvaluator] Unresolved reference: ${match}, defaulting to 0`);
+    return '0';
   });
 
   // Replace @MeasurementName references (Cyrillic/Unicode measurement names)
+  // Fall back to 0 if the measurement is not in context — it may be an optional measurement.
   expr = expr.replace(/@([\p{L}_][\p{L}\p{N}_]*)/gu, (_match, name) => {
     const val = context.measurements[name] ?? context.measurements[`@${name}`];
     if (val !== undefined) return String(val);
     // Try as variable
     const vval = context.variables[`@${name}`] ?? context.variables[name];
     if (vval !== undefined) return String(vval);
-    throw new Error(`Unknown measurement: @${name}`);
+    console.warn(`[formulaEvaluator] Unresolved measurement: @${name}, defaulting to 0`);
+    return '0';
   });
 
   // Replace #VariableName references with their numeric values (Unicode-aware)
