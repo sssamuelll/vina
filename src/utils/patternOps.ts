@@ -14,6 +14,9 @@ import { detectSemanticEdges } from './semanticEdges';
 import { getEdgeEndpoints } from './geometry/path';
 import { generateSeamAllowance, flattenPath } from './seam';
 import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
+import { samplePathAtIntervals } from './geometry/arcLength';
+import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
+import { linePolylineIntersections } from './geometry/lineIntersect';
 
 let _counter = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
@@ -782,4 +785,411 @@ export function trimEdgeAtPoint(
   newPiece.edges = undefined;
   newPiece.updatedAt = Date.now();
   return newPiece;
+}
+
+// ─── unfoldPiece ─────────────────────────────────────────────────────────────
+
+function reflectPoint(pt: Point2D, p1: Point2D, p2: Point2D): Point2D {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { ...pt };
+  const t = ((pt.x - p1.x) * dx + (pt.y - p1.y) * dy) / lenSq;
+  const projX = p1.x + t * dx, projY = p1.y + t * dy;
+  return { x: 2 * projX - pt.x, y: 2 * projY - pt.y };
+}
+
+function reflectCommands(commands: PathCommand[], p1: Point2D, p2: Point2D): PathCommand[] {
+  return commands.map(cmd => {
+    const vals = [...cmd.values];
+    for (let i = 0; i < vals.length; i += 2) {
+      if (i + 1 < vals.length) {
+        const reflected = reflectPoint({ x: vals[i], y: vals[i + 1] }, p1, p2);
+        vals[i] = reflected.x;
+        vals[i + 1] = reflected.y;
+      }
+    }
+    return { type: cmd.type, values: vals };
+  });
+}
+
+function distPt(a: Point2D, b: Point2D): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function cmdEndpoint(cmd: PathCommand): Point2D | null {
+  if (cmd.type === 'Z' || cmd.values.length < 2) return null;
+  return { x: cmd.values[cmd.values.length - 2], y: cmd.values[cmd.values.length - 1] };
+}
+
+export function unfoldPiece(
+  piece: PatternPiece,
+  foldLineId: string,
+  options?: { outlineOnly?: boolean },
+): PatternPiece {
+  const foldLine = piece.internals.find(l => l.id === foldLineId);
+  if (!foldLine) throw new Error(`Fold line "${foldLineId}" not found`);
+  if (foldLine.type !== 'fold') throw new Error(`Internal line "${foldLineId}" is not a fold line`);
+
+  const foldStart = cmdEndpoint(foldLine.path[0]) || { x: foldLine.path[0].values[0], y: foldLine.path[0].values[1] };
+  // Skip trailing Z commands to find the actual endpoint
+  let foldEndCmd = foldLine.path[foldLine.path.length - 1];
+  if (foldEndCmd.type === 'Z' && foldLine.path.length > 1) {
+    foldEndCmd = foldLine.path[foldLine.path.length - 2];
+  }
+  const foldEnd = cmdEndpoint(foldEndCmd);
+  if (!foldEnd) throw new Error('Cannot determine fold line endpoint');
+
+  const TOLERANCE = 2;
+  const outlinePoints: { idx: number; pt: Point2D }[] = [];
+  for (let i = 0; i < piece.outline.length; i++) {
+    const ep = cmdEndpoint(piece.outline[i]);
+    if (ep) outlinePoints.push({ idx: i, pt: ep });
+  }
+
+  let splitA = -1, splitB = -1;
+  let minDistA = Infinity, minDistB = Infinity;
+  for (const { idx, pt } of outlinePoints) {
+    const dA = distPt(pt, foldStart);
+    const dB = distPt(pt, foldEnd);
+    if (dA < minDistA) { minDistA = dA; splitA = idx; }
+    if (dB < minDistB) { minDistB = dB; splitB = idx; }
+  }
+
+  if (minDistA > TOLERANCE || minDistB > TOLERANCE) {
+    throw new Error('Fold line endpoints are not on the piece outline');
+  }
+
+  if (splitA > splitB) { [splitA, splitB] = [splitB, splitA]; }
+
+  const keptCmds: PathCommand[] = [];
+  for (let i = splitA + 1; i <= splitB; i++) {
+    keptCmds.push({ type: piece.outline[i].type, values: [...piece.outline[i].values] });
+  }
+
+  const mirroredCmds = reflectCommands(keptCmds, foldStart, foldEnd);
+
+  const startPt = outlinePoints.find(p => p.idx === splitA)!.pt;
+  const merged: PathCommand[] = [{ type: 'M', values: [startPt.x, startPt.y] }];
+
+  for (const cmd of keptCmds) {
+    merged.push({ type: cmd.type === 'M' ? 'L' : cmd.type, values: [...cmd.values] });
+  }
+
+  // Reverse mirrored half — collect (start, cmd) segments, walk in reverse
+  const mirrorSegs: { start: Point2D; cmd: PathCommand }[] = [];
+  let mirrorCursor = { x: mirroredCmds[0]?.values[0] ?? 0, y: mirroredCmds[0]?.values[1] ?? 0 };
+  for (const cmd of mirroredCmds) {
+    if (cmd.type === 'M') {
+      mirrorCursor = { x: cmd.values[0], y: cmd.values[1] };
+      continue;
+    }
+    if (cmd.type === 'Z') continue;
+    mirrorSegs.push({ start: { ...mirrorCursor }, cmd });
+    const ep = cmdEndpoint(cmd);
+    if (ep) mirrorCursor = ep;
+  }
+  for (let i = mirrorSegs.length - 1; i >= 0; i--) {
+    const { start, cmd } = mirrorSegs[i];
+    if (cmd.type === 'L' || cmd.type === 'H' || cmd.type === 'V') {
+      merged.push({ type: 'L', values: [start.x, start.y] });
+    } else if (cmd.type === 'C') {
+      const [cx1, cy1, cx2, cy2] = cmd.values;
+      merged.push({ type: 'C', values: [cx2, cy2, cx1, cy1, start.x, start.y] });
+    }
+  }
+
+  merged.push({ type: 'Z', values: [] });
+
+  const newInternals = piece.internals
+    .filter(l => l.id !== foldLineId)
+    .map(l => ({ ...l, path: l.path.map(c => ({ type: c.type, values: [...c.values] })) }));
+
+  if (!options?.outlineOnly) {
+    const mirrored = piece.internals
+      .filter(l => l.id !== foldLineId)
+      .map(l => ({
+        ...l,
+        id: uid('line'),
+        path: reflectCommands(l.path, foldStart, foldEnd),
+      }));
+    newInternals.push(...mirrored);
+  }
+
+  let newDarts = piece.darts ? [...piece.darts] : undefined;
+  if (piece.darts && !options?.outlineOnly) {
+    const mirroredDarts = piece.darts.map(d => ({
+      ...d,
+      id: uid('dart'),
+      apex: reflectPoint(d.apex, foldStart, foldEnd),
+      legs: d.legs.map(leg => leg.map(pt => reflectPoint(pt, foldStart, foldEnd))) as [Point2D[], Point2D[]],
+      foldDirection: d.foldDirection === 'left' ? 'right' as const
+        : d.foldDirection === 'right' ? 'left' as const
+        : d.foldDirection,
+    }));
+    newDarts = [...piece.darts, ...mirroredDarts];
+  }
+
+  return {
+    ...piece,
+    id: piece.id,
+    outline: merged,
+    internals: newInternals,
+    darts: newDarts,
+    edges: detectSemanticEdges({ ...piece, outline: merged }),
+    updatedAt: Date.now(),
+  };
+}
+
+// ─── optimizeCurvePoints ─────────────────────────────────────────────────────
+
+function areCollinear(a: Point2D, b: Point2D, c: Point2D, eps = 0.1): boolean {
+  const cross = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  return Math.abs(cross) < eps;
+}
+
+export function optimizeCurvePoints(commands: PathCommand[], ratio: number): PathCommand[] {
+  if (ratio >= 1.0) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+  if (commands.length <= 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+
+  const mCmd = commands[0];
+  const hasZ = commands[commands.length - 1].type === 'Z';
+  const geoCmds = commands.slice(1, hasZ ? -1 : undefined);
+  const hasCurves = geoCmds.some(c => c.type === 'C' || c.type === 'Q');
+
+  if (hasCurves) {
+    const samples = samplePathAtIntervals(commands, 0.5);
+    if (samples.length < 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+    const points = samples.map(s => s.point);
+    const bbox = outlineBBox(commands);
+    const diag = Math.hypot(bbox.maxX - bbox.minX, bbox.maxY - bbox.minY);
+    const tolerance = (1 - ratio) * diag * 0.005;
+    const simplified = rdpSimplify(points, tolerance);
+    if (simplified.length < 2) return commands.map(c => ({ type: c.type, values: [...c.values] }));
+    const fitted = fitCubicBezier(simplified, tolerance);
+    if (hasZ) fitted.push({ type: 'Z', values: [] });
+    return fitted;
+  }
+
+  const result: PathCommand[] = [{ type: mCmd.type, values: [...mCmd.values] }];
+  let prevPt: Point2D = { x: mCmd.values[0], y: mCmd.values[1] };
+  for (let i = 0; i < geoCmds.length; i++) {
+    const cmd = geoCmds[i];
+    const endPt: Point2D = { x: cmd.values[cmd.values.length - 2], y: cmd.values[cmd.values.length - 1] };
+    if (i + 1 < geoCmds.length) {
+      const nextCmd = geoCmds[i + 1];
+      const nextEnd: Point2D = { x: nextCmd.values[nextCmd.values.length - 2], y: nextCmd.values[nextCmd.values.length - 1] };
+      if ((cmd.type === 'L' || cmd.type === 'H' || cmd.type === 'V') &&
+          (nextCmd.type === 'L' || nextCmd.type === 'H' || nextCmd.type === 'V') &&
+          areCollinear(prevPt, endPt, nextEnd)) {
+        prevPt = endPt;
+        continue;
+      }
+    }
+    result.push({ type: cmd.type, values: [...cmd.values] });
+    prevPt = endPt;
+  }
+  if (hasZ) result.push({ type: 'Z', values: [] });
+  return result;
+}
+
+export function optimizePieceCurves(
+  piece: PatternPiece,
+  options?: { ratio?: number; target?: 'all' | 'outline' | { internalLineId: string } },
+): PatternPiece {
+  const ratio = options?.ratio ?? 0.5;
+  const target = options?.target ?? 'all';
+  const newOutline = (target === 'all' || target === 'outline')
+    ? optimizeCurvePoints(piece.outline, ratio)
+    : piece.outline.map(c => ({ type: c.type, values: [...c.values] }));
+  const newInternals = piece.internals.map(l => {
+    const shouldOptimize = target === 'all' ||
+      (typeof target === 'object' && 'internalLineId' in target && target.internalLineId === l.id);
+    return {
+      ...l,
+      path: shouldOptimize ? optimizeCurvePoints(l.path, ratio) : l.path.map(c => ({ type: c.type, values: [...c.values] })),
+    };
+  });
+  return { ...piece, id: piece.id, outline: newOutline, internals: newInternals, edges: undefined, updatedAt: Date.now() };
+}
+
+// ─── offsetInternalLine ──────────────────────────────────────────────────────
+
+function normalAtSegment(ax: number, ay: number, bx: number, by: number): Point2D {
+  const dx = bx - ax, dy = by - ay;
+  const len = Math.hypot(dx, dy);
+  if (len === 0) return { x: 0, y: 1 };
+  return { x: -dy / len, y: dx / len };
+}
+
+function offsetPolyline(points: Point2D[], dist: number): Point2D[] {
+  if (points.length < 2) return points.map(p => ({ ...p }));
+  const result: Point2D[] = [];
+  for (let i = 0; i < points.length; i++) {
+    let nx = 0, ny = 0, count = 0;
+    if (i > 0) {
+      const n = normalAtSegment(points[i - 1].x, points[i - 1].y, points[i].x, points[i].y);
+      nx += n.x; ny += n.y; count++;
+    }
+    if (i < points.length - 1) {
+      const n = normalAtSegment(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y);
+      nx += n.x; ny += n.y; count++;
+    }
+    if (count > 0) { nx /= count; ny /= count; }
+    const len = Math.hypot(nx, ny);
+    if (len > 0) { nx /= len; ny /= len; }
+    result.push({ x: points[i].x + nx * dist, y: points[i].y + ny * dist });
+  }
+  return result;
+}
+
+export function offsetInternalLine(
+  piece: PatternPiece,
+  sourceLineId: string,
+  options: {
+    count: number;
+    distance: number;
+    reverse?: boolean;
+    extend?: boolean;
+    sourceSegmentRange?: [number, number];
+  },
+): PatternPiece {
+  const sourceLine = piece.internals.find(l => l.id === sourceLineId);
+  if (!sourceLine) throw new Error(`Internal line "${sourceLineId}" not found`);
+
+  const sign = options.reverse ? -1 : 1;
+  const newInternals = piece.internals.map(l => ({
+    ...l,
+    path: l.path.map(c => ({ type: c.type, values: [...c.values] })),
+  }));
+
+  const samples = samplePathAtIntervals(sourceLine.path, 0.5);
+  const sourcePoints = samples.map(s => s.point);
+
+  for (let i = 1; i <= options.count; i++) {
+    const dist = i * options.distance * sign;
+    const offsetPts = offsetPolyline(sourcePoints, dist);
+
+    const finalPts = [...offsetPts];
+
+    if (options.extend && offsetPts.length >= 2) {
+      const outlineSamples = samplePathAtIntervals(piece.outline, 0.5);
+      const outlinePoly = outlineSamples.map(s => s.point);
+
+      const startTanX = offsetPts[0].x - offsetPts[1].x;
+      const startTanY = offsetPts[0].y - offsetPts[1].y;
+      const extStart = { x: offsetPts[0].x + startTanX * 100, y: offsetPts[0].y + startTanY * 100 };
+      const hitsStart = linePolylineIntersections(extStart, offsetPts[0], outlinePoly);
+      if (hitsStart.length > 0) finalPts[0] = hitsStart[hitsStart.length - 1].point;
+
+      const last = offsetPts.length - 1;
+      const endTanX = offsetPts[last].x - offsetPts[last - 1].x;
+      const endTanY = offsetPts[last].y - offsetPts[last - 1].y;
+      const extEnd = { x: offsetPts[last].x + endTanX * 100, y: offsetPts[last].y + endTanY * 100 };
+      const hitsEnd = linePolylineIntersections(offsetPts[last], extEnd, outlinePoly);
+      if (hitsEnd.length > 0) finalPts[last] = hitsEnd[0].point;
+    }
+
+    const fitted = fitCubicBezier(finalPts, 0.5);
+    newInternals.push({
+      id: uid('line'),
+      type: sourceLine.type,
+      path: fitted,
+    });
+  }
+
+  return { ...piece, id: piece.id, internals: newInternals, updatedAt: Date.now() };
+}
+
+// ─── replaceAsPatternOutline ─────────────────────────────────────────────────
+
+export function replaceAsPatternOutline(
+  piece: PatternPiece,
+  internalLineId: string,
+  outlineSegmentRange: [number, number],
+): PatternPiece {
+  const line = piece.internals.find(l => l.id === internalLineId);
+  if (!line) throw new Error(`Internal line "${internalLineId}" not found`);
+
+  const [rangeStart, rangeEnd] = outlineSegmentRange;
+  if (rangeStart < 0 || rangeEnd >= piece.outline.length) {
+    throw new Error('Outline segment range out of bounds');
+  }
+
+  const outlineStartPt = cmdEndpoint(piece.outline[rangeStart])
+    || { x: piece.outline[rangeStart].values[0], y: piece.outline[rangeStart].values[1] };
+  const outlineEndPt = cmdEndpoint(piece.outline[rangeEnd])!;
+
+  const lineStartPt = { x: line.path[0].values[0], y: line.path[0].values[1] };
+  const lineLastCmd = line.path[line.path.length - 1];
+  const lineEndPt = cmdEndpoint(lineLastCmd)
+    || { x: lineLastCmd.values[0], y: lineLastCmd.values[1] };
+
+  const TOLERANCE = 2;
+  const startToStart = distPt(lineStartPt, outlineStartPt);
+  const startToEnd = distPt(lineStartPt, outlineEndPt);
+
+  let lineCmds: PathCommand[];
+  if (startToStart <= TOLERANCE) {
+    lineCmds = line.path.slice(1);
+    if (distPt(lineEndPt, outlineEndPt) > TOLERANCE) {
+      throw new Error('Internal line endpoints do not match outline segment');
+    }
+  } else if (startToEnd <= TOLERANCE) {
+    if (distPt(lineEndPt, outlineStartPt) > TOLERANCE) {
+      throw new Error('Internal line endpoints do not match outline segment');
+    }
+    const allPts: Point2D[] = [{ x: line.path[0].values[0], y: line.path[0].values[1] }];
+    for (const cmd of line.path.slice(1)) {
+      const ep = cmdEndpoint(cmd);
+      if (ep) allPts.push(ep);
+    }
+    allPts.reverse();
+    const reversed: PathCommand[] = [];
+    for (let i = 1; i < allPts.length; i++) {
+      reversed.push({ type: 'L', values: [allPts[i].x, allPts[i].y] });
+    }
+    lineCmds = reversed;
+  } else {
+    throw new Error('Internal line endpoints are too far from outline segment');
+  }
+
+  const insertCmds = lineCmds.map(c => ({
+    type: c.type === 'M' ? 'L' : c.type,
+    values: [...c.values],
+  }));
+
+  const before = piece.outline.slice(0, rangeStart + 1).map(c => ({ type: c.type, values: [...c.values] }));
+  const after = piece.outline.slice(rangeEnd + 1).map(c => ({ type: c.type, values: [...c.values] }));
+
+  const newOutline = [...before, ...insertCmds, ...after];
+  if (newOutline[newOutline.length - 1].type !== 'Z') {
+    newOutline.push({ type: 'Z', values: [] });
+  }
+
+  const oldSegment: PathCommand[] = [
+    { type: 'M', values: [outlineStartPt.x, outlineStartPt.y] },
+    ...piece.outline.slice(rangeStart + 1, rangeEnd + 1).map(c => ({ type: c.type, values: [...c.values] })),
+  ];
+
+  const refLine = {
+    id: uid('line'),
+    type: 'reference' as const,
+    path: oldSegment,
+  };
+
+  const newInternals = piece.internals
+    .filter(l => l.id !== internalLineId)
+    .map(l => ({ ...l, path: l.path.map(c => ({ type: c.type, values: [...c.values] })) }));
+  newInternals.push(refLine);
+
+  const result = {
+    ...piece,
+    id: piece.id,
+    outline: newOutline,
+    internals: newInternals,
+    updatedAt: Date.now(),
+  };
+
+  result.edges = detectSemanticEdges(result);
+  return result;
 }

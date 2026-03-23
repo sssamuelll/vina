@@ -157,6 +157,7 @@ export function useKeyboardShortcuts() {
 
       // View
       ['view.toggleSeamAllowance', () => dispatch(toggleSeamAllowance())],
+      ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('openclo:toggleLayersPanel'))],
       ['view.xrayMode', () => dispatch(setXrayMode({ enabled: !xrayMode }))],
 
       // 2D Tools (CLO3D mapping)
@@ -183,6 +184,7 @@ export function useKeyboardShortcuts() {
       ['tool.pomMeasure', () => { dispatch(setActiveTool('pomMeasure' as any)); dispatch(setActiveTool2D('pomMeasure')); }],
       ['tool.offsetOutline', () => { dispatch(setActiveTool('offsetOutline' as any)); dispatch(setActiveTool2D('offsetOutline')); }],
       ['tool.extendTrim', () => { dispatch(setActiveTool('extendTrim' as any)); dispatch(setActiveTool2D('extendTrim')); }],
+      ['tool.polyPen', () => { dispatch(setActiveTool('polyPen' as any)); dispatch(setActiveTool2D('polyPen')); }],
 
       // Sewing
       ['tool.seam', () => { dispatch(setActiveTool('seam' as any)); dispatch(setActiveTool2D('seam')); }],

@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
+import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
@@ -24,7 +25,9 @@ import { useTopstitchTool } from './useTopstitchTool';
 import { useWalkSeamTool } from './useWalkSeamTool';
 import { useOffsetTool } from './useOffsetTool';
 import { useExtendTrimTool } from './useExtendTrimTool';
+import { usePolyPenTool } from './usePolyPenTool';
 import { useEditorInteractions } from './useEditorInteractions';
+import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
 import SeamRenderer from './renderers/SeamRenderer';
@@ -115,6 +118,58 @@ export default function PatternEditor() {
   const freeSewingMode = (toolOptions?.freesewing?.sewingType as 'free' | 'point') ?? 'free';
   const freeSewingTool = useFreeSewingTool(zoom2D, pan2D, pieces, handleSeamComplete, freeSewingMode);
 
+  // PolyPen tool options
+  const polyPenMode = (toolOptions?.polyPen?.mode as 'piece' | 'internalLine') ?? 'piece';
+  const polyPenLineType = (toolOptions?.polyPen?.lineType as import('../../types/types').InternalLineType) ?? 'fold';
+
+  const handlePolyPenCompleteInternalLine = useCallback((path: import('../../types/types').PathCommand[], lineType: import('../../types/types').InternalLineType) => {
+    // Attach to the first selected piece, or the last piece if none selected
+    const targetPieceId = selectedPieceIds[0] ?? pieces[pieces.length - 1]?.id;
+    if (!targetPieceId) return;
+    const line: InternalLine = {
+      id: `iline-${Date.now()}`,
+      type: lineType,
+      path,
+    };
+    dispatch(addInternalLine({ pieceId: targetPieceId, line }));
+  }, [selectedPieceIds, pieces, dispatch]);
+
+  const polyPenTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handlePolyPenCompleteInternalLine, polyPenMode, polyPenLineType);
+
+  // Context menu handlers for patternOps
+  const handleUnfold = useCallback((pieceId: string, foldLineId: string, outlineOnly?: boolean) => {
+    const piece = pieces.find(p => p.id === pieceId);
+    if (!piece) return;
+    try {
+      const result = unfoldPiece(piece, foldLineId, { outlineOnly });
+      dispatch(updatePiece({ ...result, id: pieceId, updatedAt: Date.now() }));
+    } catch (err) {
+      console.warn('[PatternEditor] unfoldPiece failed:', err);
+    }
+  }, [pieces, dispatch]);
+
+  const handleOffsetInternalLine = useCallback((pieceId: string, lineId: string) => {
+    const piece = pieces.find(p => p.id === pieceId);
+    if (!piece) return;
+    try {
+      const result = offsetInternalLine(piece, lineId, { count: 1, distance: 10 });
+      dispatch(updatePiece({ ...result, id: pieceId, updatedAt: Date.now() }));
+    } catch (err) {
+      console.warn('[PatternEditor] offsetInternalLine failed:', err);
+    }
+  }, [pieces, dispatch]);
+
+  const handleOptimizeCurves = useCallback((pieceId: string, lineId?: string) => {
+    const piece = pieces.find(p => p.id === pieceId);
+    if (!piece) return;
+    try {
+      const result = optimizePieceCurves(piece, lineId ? { target: { internalLineId: lineId } } : { target: 'all' });
+      dispatch(updatePiece({ ...result, id: pieceId, updatedAt: Date.now() }));
+    } catch (err) {
+      console.warn('[PatternEditor] optimizePieceCurves failed:', err);
+    }
+  }, [pieces, dispatch]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     // Determine which piece (if any) is under the cursor
@@ -183,6 +238,50 @@ export default function PatternEditor() {
       }
     }
 
+    // Hit-test internal lines on the hit piece
+    let hitInternalLineId: string | null = null;
+    let hitInternalLineType: string | null = null;
+    if (hitPiece && !hitSeamId) {
+      const IL_THRESHOLD = 6 / zoom2D;
+      let nearestDist = Infinity;
+      for (const line of hitPiece.internals) {
+        const localX = canvasX - (hitPiece.position?.x ?? 0);
+        const localY = canvasY - (hitPiece.position?.y ?? 0);
+        let prevX = 0, prevY = 0;
+        for (const cmd of line.path) {
+          if (cmd.type === 'M') {
+            prevX = cmd.values[0]; prevY = cmd.values[1];
+          } else if (cmd.type === 'L') {
+            const dx = cmd.values[0] - prevX, dy = cmd.values[1] - prevY;
+            const lenSq = dx * dx + dy * dy;
+            let dist = Infinity;
+            if (lenSq > 0) {
+              let t = ((localX - prevX) * dx + (localY - prevY) * dy) / lenSq;
+              t = Math.max(0, Math.min(1, t));
+              dist = Math.hypot(localX - (prevX + t * dx), localY - (prevY + t * dy));
+            } else {
+              dist = Math.hypot(localX - prevX, localY - prevY);
+            }
+            if (dist < IL_THRESHOLD && dist < nearestDist) {
+              nearestDist = dist;
+              hitInternalLineId = line.id;
+              hitInternalLineType = line.type;
+            }
+            prevX = cmd.values[0]; prevY = cmd.values[1];
+          } else if (cmd.type === 'C') {
+            // Approximate with endpoint distance for context menu purposes
+            const dist = Math.hypot(localX - cmd.values[4], localY - cmd.values[5]);
+            if (dist < IL_THRESHOLD && dist < nearestDist) {
+              nearestDist = dist;
+              hitInternalLineId = line.id;
+              hitInternalLineType = line.type;
+            }
+            prevX = cmd.values[4]; prevY = cmd.values[5];
+          }
+        }
+      }
+    }
+
     let segmentIndex: number | undefined;
     let segmentIsCurve: boolean | undefined;
     if (editPatternTool.isEditing && editPatternTool.editingPieceId && hitPiece?.id === editPatternTool.editingPieceId) {
@@ -205,6 +304,8 @@ export default function PatternEditor() {
       segmentIndex,
       segmentIsCurve,
       activeTool,
+      internalLineId: hitInternalLineId,
+      internalLineType: hitInternalLineType,
     });
   }, [pieces, seams, pan2D, zoom2D, activeTool, editPatternTool.isEditing, editPatternTool.editingPieceId]);
 
@@ -243,7 +344,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool,
     });
 
   const handleZoomToFit = useCallback(() => {
@@ -392,6 +493,15 @@ export default function PatternEditor() {
             }
             selectMarquee={selectMarquee}
           />
+          {activeTool === 'polyPen' && (
+            <PolyPenToolOverlay
+              nodes={polyPenTool.nodes}
+              previewPoint={polyPenTool.previewPoint}
+              isDragging={polyPenTool.isDragging}
+              dragHandle={polyPenTool.dragHandle}
+              zoom2D={zoom2D}
+            />
+          )}
         </g>
 
         <HintText
@@ -410,6 +520,9 @@ export default function PatternEditor() {
         onRename={(id) => setEditingPieceNameId(id)}
         onConvertSegment={(idx, toCurve) => editPatternTool.convertSegment(idx, toCurve)}
         onZoomToFit={handleZoomToFit}
+        onUnfold={handleUnfold}
+        onOffsetInternalLine={handleOffsetInternalLine}
+        onOptimizeCurves={handleOptimizeCurves}
       />
     </div>
   );

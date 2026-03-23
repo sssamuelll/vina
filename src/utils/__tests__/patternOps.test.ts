@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint } from '../patternOps';
-import type { PatternPiece, SemanticEdge } from '../../types/types';
+import { splitPiece, addFullness, addFacing, slashAndSpread, transferDart, measureEdgeLength, findCutEdgePair, offsetPieceOutline, extendEdge, trimEdgeAtPoint, unfoldPiece, optimizeCurvePoints, optimizePieceCurves, offsetInternalLine, replaceAsPatternOutline } from '../patternOps';
+import type { PatternPiece, SemanticEdge, PathCommand } from '../../types/types';
 
 function makeRect(name: string, w: number, h: number): PatternPiece {
   return {
@@ -331,5 +331,381 @@ describe('trimEdgeAtPoint — Bezier', () => {
     const piece = makeBezierPiece();
     const result = trimEdgeAtPoint(piece, 1, { x: 100, y: -30 }, 'before');
     expect(result.id).toBe(piece.id);
+  });
+});
+
+// ─── unfoldPiece ─────────────────────────────────────────────────────────────
+
+function makeHalfRect(name: string): PatternPiece {
+  return {
+    id: `test-${name}`, name,
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'L', values: [200, 600] },
+      { type: 'L', values: [0, 600] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [
+      {
+        id: 'fold-1',
+        type: 'fold' as const,
+        path: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [0, 600] },
+        ],
+      },
+    ],
+    position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    seamAllowance: 10, layer: 1, sublayer: 0, active: true,
+    createdAt: Date.now(), updatedAt: Date.now(),
+  };
+}
+
+describe('unfoldPiece', () => {
+  it('mirrors half-rect into full rect', () => {
+    const half = makeHalfRect('Front');
+    const full = unfoldPiece(half, 'fold-1');
+    const xs = full.outline.flatMap(c => c.values.filter((_, i) => i % 2 === 0));
+    const minX = Math.min(...xs.filter(isFinite));
+    const maxX = Math.max(...xs.filter(isFinite));
+    expect(maxX - minX).toBeCloseTo(400, 0);
+  });
+
+  it('preserves piece ID', () => {
+    const half = makeHalfRect('Front');
+    const full = unfoldPiece(half, 'fold-1');
+    expect(full.id).toBe(half.id);
+  });
+
+  it('removes fold line from internals', () => {
+    const half = makeHalfRect('Front');
+    const full = unfoldPiece(half, 'fold-1');
+    expect(full.internals.find(l => l.id === 'fold-1')).toBeUndefined();
+  });
+
+  it('mirrors internals when outlineOnly is false', () => {
+    const half = makeHalfRect('Front');
+    half.internals.push({
+      id: 'dart-1', type: 'dart',
+      path: [{ type: 'M', values: [100, 100] }, { type: 'L', values: [100, 200] }],
+    });
+    const full = unfoldPiece(half, 'fold-1');
+    const darts = full.internals.filter(l => l.type === 'dart');
+    expect(darts.length).toBe(2);
+  });
+
+  it('does not mirror internals when outlineOnly is true', () => {
+    const half = makeHalfRect('Front');
+    half.internals.push({
+      id: 'dart-1', type: 'dart',
+      path: [{ type: 'M', values: [100, 100] }, { type: 'L', values: [100, 200] }],
+    });
+    const full = unfoldPiece(half, 'fold-1', { outlineOnly: true });
+    const darts = full.internals.filter(l => l.type === 'dart');
+    expect(darts.length).toBe(1);
+  });
+
+  it('throws if fold line not found', () => {
+    const half = makeHalfRect('Front');
+    expect(() => unfoldPiece(half, 'nonexistent')).toThrow();
+  });
+
+  it('throws if line is not type fold', () => {
+    const half = makeHalfRect('Front');
+    half.internals[0].type = 'dart';
+    expect(() => unfoldPiece(half, 'fold-1')).toThrow();
+  });
+
+  it('should handle fold line ending with Z without crashing', () => {
+    const pieceWithZFold: PatternPiece = {
+      ...makeHalfRect('Front'),
+      internals: [{
+        id: 'zfold', type: 'fold' as const,
+        path: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [0, 600] },
+          { type: 'Z', values: [] },
+        ],
+      }],
+    };
+    // Should either succeed or throw a clear error, NOT a TypeError
+    expect(() => unfoldPiece(pieceWithZFold, 'zfold')).not.toThrow(TypeError);
+  });
+});
+
+// ─── optimizeCurvePoints ─────────────────────────────────────────────────────
+
+describe('optimizeCurvePoints', () => {
+  it('preserves M and Z commands', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    expect(result[0].type).toBe('M');
+    expect(result[result.length - 1].type).toBe('Z');
+  });
+
+  it('ratio 1.0 is a passthrough (returns copy)', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [200, 0] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 1.0);
+    expect(result).toHaveLength(cmds.length);
+    expect(result[0]).not.toBe(cmds[0]); // should be a copy
+    expect(result[0].values[0]).toBe(0);
+  });
+
+  it('merges collinear line segments', () => {
+    // Three collinear points: (0,0) → (50,0) → (100,0)
+    // The middle segment is redundant
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [50, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    // The (50,0) L command should have been merged away
+    const ls = result.filter(c => c.type === 'L');
+    // Should have fewer L commands than the original 3
+    expect(ls.length).toBeLessThan(3);
+  });
+
+  it('reduces bezier curve to fewer commands', () => {
+    // A path with a cubic bezier
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [50, -30, 150, -30, 200, 0] },
+      { type: 'L', values: [200, 200] },
+      { type: 'Z', values: [] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    // Result should start with M and end with Z
+    expect(result[0].type).toBe('M');
+    expect(result[result.length - 1].type).toBe('Z');
+    // Should still have at least M + 1 geo command + Z
+    expect(result.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('handles path with no Z', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+    ];
+    const result = optimizeCurvePoints(cmds, 0.5);
+    expect(result[0].type).toBe('M');
+    expect(result[result.length - 1].type).not.toBe('Z');
+  });
+
+  it('does not mutate original commands', () => {
+    const cmds: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    optimizeCurvePoints(cmds, 0.5);
+    expect(cmds[1].values[0]).toBe(100);
+  });
+});
+
+// ─── optimizePieceCurves ─────────────────────────────────────────────────────
+
+describe('optimizePieceCurves', () => {
+  it('returns piece with same id', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const result = optimizePieceCurves(piece);
+    expect(result.id).toBe(piece.id);
+  });
+
+  it('optimizes outline by default (target=all)', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const result = optimizePieceCurves(piece, { ratio: 0.5 });
+    expect(result.outline.length).toBeGreaterThan(0);
+    expect(result.outline[0].type).toBe('M');
+  });
+
+  it('skips outline when target=outline for internal line targeting', () => {
+    const piece: PatternPiece = {
+      ...makeRect('Opt', 200, 200),
+      internals: [
+        {
+          id: 'line-1', type: 'dart',
+          path: [
+            { type: 'M', values: [100, 0] },
+            { type: 'L', values: [100, 100] },
+          ],
+        },
+      ],
+    };
+    // Target only outline
+    const result = optimizePieceCurves(piece, { ratio: 0.5, target: 'outline' });
+    // Internal line should be unchanged (deep copy, same values)
+    expect(result.internals[0].path[1].values[1]).toBe(100);
+  });
+
+  it('targets specific internal line by id', () => {
+    const piece: PatternPiece = {
+      ...makeRect('Opt', 200, 200),
+      internals: [
+        {
+          id: 'line-a', type: 'dart',
+          path: [
+            { type: 'M', values: [50, 0] },
+            { type: 'L', values: [50, 50] },
+            { type: 'L', values: [50, 100] },
+          ],
+        },
+        {
+          id: 'line-b', type: 'dart',
+          path: [
+            { type: 'M', values: [100, 0] },
+            { type: 'L', values: [100, 100] },
+          ],
+        },
+      ],
+    };
+    const result = optimizePieceCurves(piece, {
+      ratio: 0.5,
+      target: { internalLineId: 'line-a' },
+    });
+    // line-b should be untouched (same length)
+    expect(result.internals[1].path).toHaveLength(2);
+    // line-a may be optimized (length <= original)
+    expect(result.internals[0].path.length).toBeGreaterThan(0);
+  });
+
+  it('does not mutate the original piece', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const originalLen = piece.outline.length;
+    optimizePieceCurves(piece, { ratio: 0.5 });
+    expect(piece.outline.length).toBe(originalLen);
+  });
+
+  it('updates updatedAt timestamp', () => {
+    const piece = makeRect('Opt', 200, 200);
+    const before = piece.updatedAt;
+    const result = optimizePieceCurves(piece, { ratio: 0.5 });
+    expect(result.updatedAt).toBeGreaterThanOrEqual(before);
+  });
+});
+
+describe('offsetInternalLine', () => {
+  it('creates one offset copy', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 20 });
+    expect(result.internals.length).toBe(2);
+  });
+
+  it('creates multiple offset copies', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 3, distance: 10 });
+    expect(result.internals.length).toBe(4);
+  });
+
+  it('reverses direction', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const normal = offsetInternalLine(piece, 'line-1', { count: 1, distance: 20 });
+    const reversed = offsetInternalLine(piece, 'line-1', { count: 1, distance: 20, reverse: true });
+    const normalX = normal.internals[1].path[1].values[0];
+    const reversedX = reversed.internals[1].path[1].values[0];
+    expect(normalX).not.toBeCloseTo(reversedX, 0);
+  });
+
+  it('preserves piece ID', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'fold',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 10 });
+    expect(result.id).toBe(piece.id);
+  });
+
+  it('throws if source line not found', () => {
+    const piece = makeRect('Test', 200, 400);
+    expect(() => offsetInternalLine(piece, 'nope', { count: 1, distance: 10 })).toThrow();
+  });
+
+  it('preserves source line type on offset copies', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'line-1', type: 'pleat',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 400] }],
+    }];
+    const result = offsetInternalLine(piece, 'line-1', { count: 1, distance: 10 });
+    expect(result.internals[1].type).toBe('pleat');
+  });
+});
+
+describe('replaceAsPatternOutline', () => {
+  it('replaces outline segment with internal line', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [
+        { type: 'M', values: [0, 0] },
+        { type: 'C', values: [66, -30, 133, -30, 200, 0] },
+      ],
+    }];
+    const result = replaceAsPatternOutline(piece, 'style-1', [0, 1]);
+    const refLines = result.internals.filter(l => l.type === 'reference');
+    expect(refLines.length).toBe(1);
+    expect(result.internals.find(l => l.id === 'style-1')).toBeUndefined();
+  });
+
+  it('preserves piece ID', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }],
+    }];
+    const result = replaceAsPatternOutline(piece, 'style-1', [0, 1]);
+    expect(result.id).toBe(piece.id);
+  });
+
+  it('throws if internal line not found', () => {
+    const piece = makeRect('Test', 200, 400);
+    expect(() => replaceAsPatternOutline(piece, 'nope', [0, 1])).toThrow();
+  });
+
+  it('throws if endpoints too far from outline', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [{ type: 'M', values: [0, 50] }, { type: 'L', values: [200, 50] }],
+    }];
+    expect(() => replaceAsPatternOutline(piece, 'style-1', [0, 1])).toThrow();
+  });
+
+  it('outline is still closed after replacement', () => {
+    const piece = makeRect('Test', 200, 400);
+    piece.internals = [{
+      id: 'style-1', type: 'fold',
+      path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [200, 0] }],
+    }];
+    const result = replaceAsPatternOutline(piece, 'style-1', [0, 1]);
+    expect(result.outline[result.outline.length - 1].type).toBe('Z');
   });
 });
