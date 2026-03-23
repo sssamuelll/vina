@@ -16,6 +16,18 @@ import reducer, {
   setShadowBlur,
   setTurntableFrameCount,
   setTurntableDirection,
+  setResolutionPreset,
+  setExportWidth,
+  setExportHeight,
+  setAspectRatioLocked,
+  setImageFormat,
+  setJpegQuality,
+  setVideoFormat,
+  setVideoFps,
+  setSamplesPerPixel,
+  setDenoiserEnabled,
+  setAvatarRenderStyle,
+  setExportTransparent,
   HDRI_PRESETS,
   LIGHT_PRESETS,
   type RenderSettingsState,
@@ -292,5 +304,109 @@ describe('renderSettingsSlice', () => {
     expect(keys).toContain('softBox');
     expect(keys).toContain('dramatic');
     expect(keys).toContain('natural');
+  });
+
+  // ─── Resolution ─────────────────────────────────────────────────────
+
+  it('setResolutionPreset sets dimensions for 1080p', () => {
+    const state = reducer(initial(), setResolutionPreset('1080p'));
+    expect(state.resolutionPreset).toBe('1080p');
+    expect(state.exportWidth).toBe(1920);
+    expect(state.exportHeight).toBe(1080);
+  });
+
+  it('setResolutionPreset sets dimensions for 4k', () => {
+    const state = reducer(initial(), setResolutionPreset('4k'));
+    expect(state.exportWidth).toBe(3840);
+    expect(state.exportHeight).toBe(2160);
+  });
+
+  it('setResolutionPreset sets dimensions for instagram', () => {
+    const state = reducer(initial(), setResolutionPreset('instagram'));
+    expect(state.exportWidth).toBe(1080);
+    expect(state.exportHeight).toBe(1080);
+  });
+
+  it('setResolutionPreset sets dimensions for instagram-story', () => {
+    const state = reducer(initial(), setResolutionPreset('instagram-story'));
+    expect(state.exportWidth).toBe(1080);
+    expect(state.exportHeight).toBe(1920);
+  });
+
+  it('setExportWidth sets width', () => {
+    const state = reducer(initial(), setExportWidth(1920));
+    expect(state.exportWidth).toBe(1920);
+  });
+
+  it('setExportHeight sets height', () => {
+    const state = reducer(initial(), setExportHeight(1080));
+    expect(state.exportHeight).toBe(1080);
+  });
+
+  it('setAspectRatioLocked toggles lock', () => {
+    const state = reducer(initial(), setAspectRatioLocked(true));
+    expect(state.aspectRatioLocked).toBe(true);
+    const state2 = reducer(state, setAspectRatioLocked(false));
+    expect(state2.aspectRatioLocked).toBe(false);
+  });
+
+  // ─── Format ─────────────────────────────────────────────────────────
+
+  it('setImageFormat sets format', () => {
+    const state = reducer(initial(), setImageFormat('jpeg'));
+    expect(state.imageFormat).toBe('jpeg');
+    const state2 = reducer(state, setImageFormat('webp'));
+    expect(state2.imageFormat).toBe('webp');
+  });
+
+  it('setJpegQuality clamps to 0-1', () => {
+    const state = reducer(initial(), setJpegQuality(0.8));
+    expect(state.jpegQuality).toBe(0.8);
+    const state2 = reducer(initial(), setJpegQuality(2.0));
+    expect(state2.jpegQuality).toBe(1.0);
+    const state3 = reducer(initial(), setJpegQuality(-0.5));
+    expect(state3.jpegQuality).toBe(0);
+  });
+
+  it('setVideoFormat sets format', () => {
+    const state = reducer(initial(), setVideoFormat('mp4'));
+    expect(state.videoFormat).toBe('mp4');
+  });
+
+  it('setVideoFps clamps to valid range', () => {
+    const state = reducer(initial(), setVideoFps(60));
+    expect(state.videoFps).toBe(60);
+  });
+
+  it('setExportTransparent toggles transparency', () => {
+    const state = reducer(initial(), setExportTransparent(true));
+    expect(state.exportTransparent).toBe(true);
+  });
+
+  // ─── Quality ────────────────────────────────────────────────────────
+
+  it('setSamplesPerPixel sets value', () => {
+    const state = reducer(initial(), setSamplesPerPixel(16));
+    expect(state.samplesPerPixel).toBe(16);
+  });
+
+  it('setDenoiserEnabled toggles denoiser', () => {
+    const state = reducer(initial(), setDenoiserEnabled(true));
+    expect(state.denoiserEnabled).toBe(true);
+    const state2 = reducer(state, setDenoiserEnabled(false));
+    expect(state2.denoiserEnabled).toBe(false);
+  });
+
+  // ─── Avatar Style ───────────────────────────────────────────────────
+
+  it('setAvatarRenderStyle sets style', () => {
+    const state = reducer(initial(), setAvatarRenderStyle('hidden'));
+    expect(state.avatarRenderStyle).toBe('hidden');
+    const state2 = reducer(state, setAvatarRenderStyle('wireframe'));
+    expect(state2.avatarRenderStyle).toBe('wireframe');
+    const state3 = reducer(state2, setAvatarRenderStyle('xray'));
+    expect(state3.avatarRenderStyle).toBe('xray');
+    const state4 = reducer(state3, setAvatarRenderStyle('visible'));
+    expect(state4.avatarRenderStyle).toBe('visible');
   });
 });
