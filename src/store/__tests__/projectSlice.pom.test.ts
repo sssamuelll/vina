@@ -23,6 +23,8 @@ function baseState(overrides: Record<string, any> = {}) {
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
     arrangementOverrides: {}, groups: [], seamGroups: [], poms: [] as PointOfMeasure[],
     layerNames: {}, layerLocked: {},
+    loadDiagnostics: [],
+    loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
     ...overrides,
   };
 }
@@ -107,8 +109,14 @@ describe('projectSlice — loadProject backfills poms', () => {
 
   it('loadProject preserves existing poms', () => {
     const state = baseState();
+    const minPiece = (id: string) => ({
+      id, name: id, outline: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }, { type: 'L', values: [10, 10] }, { type: 'Z', values: [] }],
+      internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+      seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0,
+    });
     const project = {
-      id: 'new', name: 'New Project', pieces: [], seams: [], fabrics: [],
+      id: 'new', name: 'New Project',
+      pieces: [minPiece('p1'), minPiece('p2')], seams: [], fabrics: [],
       avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} },
       poms: [makePOM('pom-1')],
       createdAt: 0, updatedAt: 0,

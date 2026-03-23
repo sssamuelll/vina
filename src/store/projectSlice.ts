@@ -2,6 +2,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
 import { NEW_PROJECT } from './actions';
+import { validateAndRepairProject } from '../utils/projectValidator';
+import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
   lining: 0, facing: 0,
@@ -66,6 +68,10 @@ interface ProjectState {
   layerNames: Record<number, string>;
   /** Layer lock state (layer number → locked) */
   layerLocked: Record<number, boolean>;
+  /** Diagnostics produced during the last loadProject call */
+  loadDiagnostics: ValidationDiagnostic[];
+  /** Entities quarantined (removed) during the last loadProject call */
+  loadQuarantine: Quarantine;
 }
 
 const initialState: ProjectState = {
@@ -84,6 +90,8 @@ const initialState: ProjectState = {
   poms: [],
   layerNames: {},
   layerLocked: {},
+  loadDiagnostics: [] as ValidationDiagnostic[],
+  loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] } as Quarantine,
 };
 
 const projectSlice = createSlice({
@@ -94,7 +102,11 @@ const projectSlice = createSlice({
       return action.payload;
     },
     loadProject(state, action: PayloadAction<OpenCloProject>) {
-      const p = action.payload;
+      const { project: validated, diagnostics, quarantine } = validateAndRepairProject(action.payload);
+      state.loadDiagnostics = diagnostics;
+      state.loadQuarantine = quarantine;
+
+      const p = validated;
       state.id = p.id;
       state.name = p.name;
       state.pieces = p.pieces;
@@ -130,6 +142,10 @@ const projectSlice = createSlice({
       // Backfill layer metadata from older projects
       state.layerNames = (p as any).layerNames ?? {};
       state.layerLocked = (p as any).layerLocked ?? {};
+    },
+    clearLoadDiagnostics(state) {
+      state.loadDiagnostics = [];
+      state.loadQuarantine = { pieces: [], seams: [], poms: [], seamGroups: [] };
     },
     setProjectName(state, action: PayloadAction<string>) {
       state.name = action.payload;
@@ -777,7 +793,7 @@ const projectSlice = createSlice({
 });
 
 export const {
-  restoreState, loadProject, setProjectName,
+  restoreState, loadProject, clearLoadDiagnostics, setProjectName,
   addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   // Reactive solver (parametric updates)

@@ -234,6 +234,12 @@ describe('projectSlice — addSeamGroup / removeSeamGroup', () => {
 });
 
 describe('projectSlice — loadProject backfills', () => {
+  const validPiece = (id: string) => ({
+    id, name: id,
+    outline: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] }, { type: 'L', values: [100, 100] }, { type: 'Z', values: [] }],
+    internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10,
+    layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0,
+  });
   const baseProject = {
     id: 'proj-1', name: 'Test Project',
     createdAt: 0, updatedAt: 0,
@@ -244,7 +250,7 @@ describe('projectSlice — loadProject backfills', () => {
   it('backfills seam defaults on load', () => {
     const project = {
       ...baseProject,
-      pieces: [],
+      pieces: [validPiece('p1'), validPiece('p2')] as any,
       seams: [
         { id: 's1', pieceA: { pieceId: 'p1', edgeName: 'e' }, pieceB: { pieceId: 'p2', edgeName: 'e' }, type: 'standard' },
       ] as any,
@@ -258,11 +264,11 @@ describe('projectSlice — loadProject backfills', () => {
   });
 
   it('backfills piece.active on load', () => {
+    const p = validPiece('p1');
+    delete (p as any).active; // remove so backfill kicks in
     const project = {
       ...baseProject,
-      pieces: [
-        { id: 'p1', name: 'B', outline: [], internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 0, createdAt: 0, updatedAt: 0 },
-      ] as any,
+      pieces: [p] as any,
       seams: [],
     };
     const next = reducer(undefined, loadProject(project));
@@ -272,7 +278,7 @@ describe('projectSlice — loadProject backfills', () => {
   it('loads seamGroups from project', () => {
     const project = {
       ...baseProject,
-      pieces: [],
+      pieces: [validPiece('p1'), validPiece('p2')] as any,
       seams: [],
       seamGroups: [makeSeamGroup('sg1')],
     };

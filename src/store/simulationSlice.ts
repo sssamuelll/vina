@@ -706,4 +706,26 @@ export const {
 /** @deprecated Use setSimulationMode */
 export const setQualityLevel = setSimulationMode;
 
+/**
+ * Clamp sim config values to documented safe ranges before sending to the worker.
+ * Safe to call on any partial or full ClothSimConfig object.
+ */
+export function clampSimConfig(config: Record<string, unknown>): Record<string, unknown> {
+  const c = { ...config };
+  if (typeof c.damping === 'number') c.damping = Math.max(0, Math.min(1, c.damping));
+  if (typeof c.thickness === 'number') c.thickness = Math.max(0.0001, Math.min(0.05, c.thickness));
+  if (typeof c.substeps === 'number') c.substeps = Math.max(1, Math.min(100, Math.round(c.substeps)));
+  if (typeof c.internalDamping === 'number') c.internalDamping = Math.max(0, Math.min(1, c.internalDamping));
+  for (const key of [
+    'stretchComplianceWarp',
+    'stretchComplianceWeft',
+    'stretchComplianceShear',
+    'bendComplianceWarp',
+    'bendComplianceWeft',
+  ]) {
+    if (typeof c[key] === 'number') c[key] = Math.max(0, Math.min(100, c[key] as number));
+  }
+  return c;
+}
+
 export default simulationSlice.reducer;
