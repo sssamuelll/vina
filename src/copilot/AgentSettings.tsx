@@ -15,10 +15,11 @@
  * @module AgentSettings
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ProviderConfig,
   loadProviderConfig,
+  loadProviderConfigSync,
   saveProviderConfig,
   PROVIDER_OPTIONS,
   MODEL_OPTIONS,
@@ -105,24 +106,26 @@ export default function AgentSettings({
   onBudgetChange,
 }: AgentSettingsProps) {
   const ollamaConfig = loadOllamaConfig();
+  const syncConfig = loadProviderConfigSync();
 
-  const [provider, setProvider] = useState<ProviderConfig['provider']>('anthropic');
+  const [provider, setProvider] = useState<ProviderConfig['provider']>(
+    syncConfig?.provider ?? 'anthropic'
+  );
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('claude-sonnet-4-20250514');
+  const [model, setModel] = useState(syncConfig?.model ?? 'claude-sonnet-4-20250514');
 
-  // Load provider config asynchronously (SecureStorage uses Web Crypto)
+  // Hydrate API key asynchronously (SecureStorage uses Web Crypto)
   useEffect(() => {
     loadProviderConfig().then((cfg) => {
-      if (cfg) {
-        setProvider(cfg.provider);
-        setApiKey(cfg.apiKey);
-        setModel(cfg.model);
-      }
+      if (cfg) setApiKey(cfg.apiKey);
     });
   }, []);
   const [teachingMode, setTeachingModeState] = useState(isTeachingModeEnabled);
   const [language, setLanguage] = useState<LanguagePreference>(loadLanguagePreference);
   const [budgetValue, setBudgetValue] = useState(budget ?? 5);
+
+  // Guard against stale async resolutions when switching providers rapidly
+  const providerSwitchId = useRef(0);
 
   // Ollama state
   const [ollamaUrl, setOllamaUrl] = useState(ollamaConfig.url);
@@ -151,9 +154,11 @@ export default function AgentSettings({
     const opt = PROVIDER_OPTIONS.find(o => o.value === p);
     if (opt) setModel(opt.defaultModel);
     // Load API key from SecureStorage for the selected provider (async)
+    // Use a monotonic counter to discard stale resolutions from rapid switching
     if (p !== 'ollama') {
+      const id = ++providerSwitchId.current;
       SecureStorage.get(`${p}-apikey`).then((storedKey) => {
-        setApiKey(storedKey ?? '');
+        if (providerSwitchId.current === id) setApiKey(storedKey ?? '');
       });
     }
   }, []);

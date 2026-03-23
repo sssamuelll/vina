@@ -12,6 +12,7 @@ import { claudeBridgeProvider } from '../../copilot/providers/claudeBridge';
 import {
   ProviderConfig,
   loadProviderConfig,
+  loadProviderConfigSync,
   PROVIDER_OPTIONS,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
@@ -68,9 +69,9 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(loadAgentConfig);
-  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfigSync);
 
-  // Load provider config asynchronously (SecureStorage uses Web Crypto)
+  // Hydrate API key asynchronously (SecureStorage uses Web Crypto)
   useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
   const [isMobile, setIsMobile] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());

@@ -159,6 +159,26 @@ export interface StoredProviderConfig {
 }
 
 /**
+ * Load provider config synchronously from localStorage only (no API key).
+ * Returns config with `apiKey: ''`. Use for initial render to avoid flash;
+ * call `loadProviderConfig()` to hydrate the encrypted API key.
+ */
+export function loadProviderConfigSync(): ProviderConfig | null {
+  try {
+    const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
+    if (!saved) return null;
+    const config: StoredProviderConfig = JSON.parse(saved);
+    return {
+      provider: config.provider as ProviderConfig['provider'],
+      model: config.model ?? '',
+      baseUrl: config.baseUrl,
+      apiKey: '', // async hydration needed
+    };
+  } catch { /* ignore */ }
+  return null;
+}
+
+/**
  * Load provider config from localStorage + apiKey from SecureStorage.
  * @returns ProviderConfig or null if not set
  */
