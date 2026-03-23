@@ -229,15 +229,27 @@ function assignPriority(
  */
 function resolvePointsSync(
   reduxState: SolverRootState
-): { points: CPoint[]; context: FormulaContext } {
+): { points: CPoint[]; context: FormulaContext; errors: Array<{ pointId: string; label: string; error: string }> } {
   const { points, variables } = reduxState.construction;
   const measurements = reduxState.parametric.baseMeasurements || reduxState.project.avatar.measurements;
   const overrides = reduxState.parametric.variableOverrides;
 
+  const errors: Array<{ pointId: string; label: string; error: string }> = [];
+
   // Build formula context - convert variables to numbers only
   const numericVariables: Record<string, number> = {};
   for (const [key, val] of Object.entries(variables)) {
-    numericVariables[key] = typeof val === 'number' ? val : parseFloat(String(val)) || 0;
+    if (typeof val === 'number') {
+      numericVariables[key] = val;
+    } else {
+      const parsed = parseFloat(String(val));
+      if (Number.isNaN(parsed)) {
+        errors.push({ pointId: '', label: '', error: `Variable '${key}' is not numeric: '${val}'` });
+        numericVariables[key] = 0;
+      } else {
+        numericVariables[key] = parsed;
+      }
+    }
   }
 
   const context: FormulaContext = {
@@ -245,11 +257,14 @@ function resolvePointsSync(
     variables: { ...numericVariables, ...overrides },
   };
 
-  // If we have points with definitions, resolve them
-  // For now, return as-is since points are already resolved when added
-  // Full resolution would require constructionResolver for complex dependencies
+  // Collect points with resolutionError
+  for (const pt of points) {
+    if (pt.resolutionError) {
+      errors.push({ pointId: pt.id, label: pt.label, error: pt.resolutionError });
+    }
+  }
 
-  return { points: [...points], context };
+  return { points: [...points], context, errors };
 }
 
 // ─── Piece Building (Phase 2) ────────────────────────────────────────────────
@@ -270,6 +285,18 @@ async function buildPiecesAsync(
     return;
   }
 
+  // Filter out construction pieces where any node references an errored point
+  const buildablePieces = pieces.filter(cPiece =>
+    !cPiece.nodes.some(node => {
+      const pt = points.find(p => p.id === node.pointId);
+      return pt?.resolutionError != null;
+    })
+  );
+
+  if (buildablePieces.length === 0) {
+    return;
+  }
+
   const pointCount = points.length;
   const strategy = selectStrategy(state.capabilities, pointCount);
 
@@ -278,14 +305,14 @@ async function buildPiecesAsync(
 
   // For small datasets or no worker support, use main thread
   if (strategy === 'mainThread' || pointCount < MAIN_THREAD_THRESHOLD) {
-    buildPiecesMainThread(dispatch, pieces, points, curves, context, pieceIdentityMap, generationId);
+    buildPiecesMainThread(dispatch, buildablePieces, points, curves, context, pieceIdentityMap, generationId);
     return;
   }
 
   // Use worker pool
   await buildPiecesWorkerPool(
     dispatch,
-    pieces,
+    buildablePieces,
     points,
     curves,
     context,
@@ -555,12 +582,21 @@ export function createReactiveSolverMiddleware(): Middleware<{}, any> {
       const reduxState = store.getState();
 
       // Phase 1: Resolve points synchronously (instant feedback)
-      const { points } = resolvePointsSync(reduxState);
+      const { points, errors } = resolvePointsSync(reduxState);
 
-      // Dispatch resolved points
+      // Report resolution errors to metrics
+      if (errors.length > 0) {
+        for (const err of errors) {
+          if (state.metrics.errors.length < 10) {
+            state.metrics.errors.push(err.error);
+          }
+        }
+      }
+
+      // Dispatch resolved points (including resolutionError for propagation)
       if (points.length > 0) {
         store.dispatch(resolveAll({
-          resolved: points.map(p => ({ id: p.id, x: p.x, y: p.y })),
+          resolved: points.map(p => ({ id: p.id, x: p.x, y: p.y, resolutionError: p.resolutionError })),
         }) as AnyAction);
       }
 
