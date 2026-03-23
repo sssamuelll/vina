@@ -45,11 +45,39 @@ All imported files (`.openclo`, `.val`, `.dxf`) must pass strict schema validati
 - **Geometry Sanitization**: Polygons must be checked for self-intersections and zero-area conditions before entering the meshing pipeline to prevent solver crashes.
 - **DXF Entity Validation**: The DXF parser validates entity types (LINE, LWPOLYLINE, POLYLINE, SPLINE, ARC, CIRCLE) and rejects malformed geometry.
 
-### 2.2 Skill Sandboxing (.oskill)
-Community-created Skills from the Marketplace execute arbitrary logic.
-- **Web Worker Isolation**: Skills must run in a dedicated Web Worker with **no DOM access** and **no direct network access**.
-- **Permission Manifests**: Skills must declare requested capabilities (e.g., `read:project`, `export:dxf`). The user must explicitly grant these before execution.
-- **Community Skill Validation**: The `validateCommunitySkill()` pipeline checks skill integrity before installation.
+### 2.2 Plugin Sandboxing
+Community-created plugins extend OpenClo functionality with custom tools, skills, fabrics, and templates.
+- **Web Worker Isolation**: Implemented — each plugin runs in a dedicated Web Worker with **no DOM access**, **no direct network access**, and **no access to the main thread state**.
+- **Permission Manifests**: Implemented — plugins declare requested capabilities (`read-pieces`, `write-pieces`, `read-measurements`, `export`, `simulation`, `network`, `storage`) at install time. The capability-gated bridge enforces these at runtime — each API method is guarded by a permission check.
+- **Community Skill Validation**: Planned — the plugin validation pipeline will check plugin integrity, verify manifest structure, and validate semver compatibility before installation.
+
+### 2.3 Plugin Bridge Protocol
+Plugins communicate with OpenClo's main thread via a dedicated postMessage bridge that enforces permissions, validates mutations, and handles errors.
+
+**Architecture:**
+- **One Worker per plugin**: Each installed plugin spawns a single Web Worker that lives for the duration of the session. The plugin's sandboxed code runs entirely inside the Worker with no access to the DOM or main thread state.
+- **Global lockdown (defense-in-depth)**: The bridge is never fully "open." Even if a plugin is granted a permission (e.g., `write-pieces`), it can only invoke capabilities through the `PluginContext` API (Worker-side). The main thread's `PluginBridge` validates all requests before executing them, including ownership checks, mutation boundaries, and type validation.
+- **Capability-gated message passing**: Messages from the Worker to the main thread use the `CapabilityRequestMessage` protocol. Each capability method is mapped to a required permission. If the permission is missing, the bridge responds with `CapabilityDeniedMessage` instead of executing the request.
+
+**Network & Storage:**
+- **URL allowlists for network access**: Plugins specify allowed hosts in their manifest (e.g., `https://api.example.com/*`). The `NetworkValidator` converts globs to regexes and blocks all requests outside the allowlist. Additionally, **private IP blocking** prevents access to reserved ranges (10.x.x.x, 172.16–31.x.x, 192.168.x.x, 169.254.x.x, 127.x.x.x, ::1, localhost).
+- **Storage scoping**: Each plugin receives a 1 MB quota (`MAX_STORAGE_QUOTA_BYTES`) for persisted data. Individual storage keys are capped at 100 KB (`MAX_STORAGE_VALUE_BYTES`). Storage is isolated by plugin ID — no two plugins can access each other's data.
+
+**Mutation Validation:**
+- **Piece ownership**: When a plugin calls `updatePiece()`, the bridge records which pieces were read during this execution (via prior `readPiece` calls). Only pieces marked as "read" can be modified — preventing unauthorized edits.
+- **Type & boundary checking**: Coordinates are validated for NaN, Infinity, and reasonable bounds (±100 meters). Updated edge lengths, seam positions, and measurement values pass through deterministic validation matching core tool standards.
+- **Request limits**: Plugins can request at most 50 pieces per API call (`MAX_PIECES_PER_REQUEST`). Network responses are capped at 10 MiB (`MAX_FETCH_RESPONSE_BYTES`). Fetch requests are rate-limited to 60 per minute per plugin.
+
+**Timeouts & Crash Rollback:**
+- **Capability timeout**: Individual capability calls (e.g., `fetch`, `readPiece`) are limited to 30 seconds (`CAPABILITY_TIMEOUT_MS`). If a response is not received in time, the bridge rejects the request with a `TimeoutError`.
+- **Execution timeout**: Complete tool executions are limited to 60 seconds (`EXECUTION_TIMEOUT_MS`). If the plugin does not complete, the bridge terminates the request and cleans up pending state.
+- **Crash rollback via undo batching**: All piece mutations during a single tool execution are wrapped in an undo batch. If the Worker crashes or times out, the batch is rolled back — the pieces revert to their state before the execution began.
+
+**API Versioning:**
+- **apiVersion 1 (legacy)**: Read-only API with basic piece access. Plugins get piece data without construction context or materials.
+- **apiVersion 2 (current)**: Full context API including fabrics, seams, internal lines, measurements, and writethrough support for updatePiece. Plugins are told the API version during load so they can conditionally adapt.
+
+See `docs/superpowers/specs/2026-03-23-plugin-sandbox-design.md` for the complete architecture and threat model.
 
 ## 3. Path Traversal & Command Injection
 
