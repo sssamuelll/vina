@@ -157,7 +157,7 @@ export async function exportAllViews(
 ): Promise<void> {
   const target = new THREE.Vector3(0, 0.75, 0);
   const originalPos = camera.position.clone();
-  const ext = config.format === 'jpeg' ? 'jpg' : (config.format ?? 'png');
+  const ext = config.format === 'jpeg' ? 'jpg' : config.format === 'webp' ? 'webp' : (config.format ?? 'png');
 
   for (const [view, pos] of Object.entries(VIEW_POSITIONS) as [ViewAngle, [number, number, number]][]) {
     camera.position.set(...pos);
