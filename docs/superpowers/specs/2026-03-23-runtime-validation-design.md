@@ -40,7 +40,7 @@ Validation runs inside the `loadProject` reducer in `projectSlice.ts`, NOT in `l
 - `Workspace.tsx:168` (autosave) → `dispatch(loadProject(...))`
 - `actionExecutor.ts:909` → `dispatch(loadProject(...))`
 
-The reducer calls `validateAndRepairProject(payload)` before assigning to state, and stores diagnostics in `state.loadDiagnostics`. Console warnings are logged for each diagnostic.
+The reducer calls `validateAndRepairProject(payload)` before assigning to state, and stores diagnostics in `state.loadDiagnostics` and quarantined entities in `state.loadQuarantine`. Console warnings are logged for each diagnostic. If any error-severity diagnostics exist (pieces removed), a `console.error` summarizes what was removed.
 
 ### File Map
 
@@ -75,17 +75,31 @@ interface ValidationDiagnostic {
   field?: string;
 }
 
+interface Quarantine {
+  pieces: PatternPiece[];
+  seams: Seam[];
+  poms: PointOfMeasure[];
+  seamGroups: SeamGroup[];
+}
+
 interface ValidationResult {
   project: OpenCloProject;
   diagnostics: ValidationDiagnostic[];
+  quarantine: Quarantine;
 }
 ```
 
-Diagnostics stored in `projectSlice` state as `loadDiagnostics: ValidationDiagnostic[]`, cleared on each new project load.
+Diagnostics stored in `projectSlice` state as `loadDiagnostics: ValidationDiagnostic[]`, cleared on each new project load. Quarantined entities stored in `loadQuarantine: Quarantine` — removed pieces/seams/POMs are preserved for potential recovery. Quarantine is cleared on next project load.
 
 ---
 
 ## 3. Validation Rules (Project-Load)
+
+**Execution order is a requirement.** Rules MUST run sequentially in numbered order because earlier rules can remove pieces, and later rules validate against the post-repair piece list:
+
+1. Outline validation (Rules 1–2) — may remove pieces
+2. Cross-reference validation (Rules 3–5) — runs against the cleaned piece list
+3. Field validation (Rule 4) — runs against cleaned pieces
 
 All rules guard against `undefined` arrays — older project files may lack `poms`, `seamGroups`, or individual piece `outline`/`edges`.
 
@@ -168,7 +182,7 @@ Add clamping to existing setters that currently lack bounds. Parameters already 
 |-----------|---------------------|-------|
 | damping | Add in sim config update path | [0, 1] |
 | thickness | Add in sim config update path | [0.0001, 0.05] |
-| compliance values | Clamp >= 0 where set | [0, Infinity) |
+| compliance values | Clamp where set | [0, 100] |
 
 If no individual setter exists for a parameter, add the clamp in the `setSimConfig` or equivalent bulk-update reducer that sends config to the worker.
 
@@ -203,8 +217,8 @@ Diagnostics stored in `projectSlice.loadDiagnostics`, cleared on each new projec
 
 ## 6. Non-Goals
 
-- **UI for diagnostics** — deferred, stored in Redux for future consumption
-- **Undo/redo for auto-repairs** — repairs happen inside the `loadProject` reducer before state is committed
+- **UI for diagnostics/quarantine** — deferred, stored in Redux for future consumption (toast, recovery dialog)
+- **Undo/redo for auto-repairs** — repairs happen inside the `loadProject` reducer before state is committed. Removed entities are preserved in `loadQuarantine` for potential future recovery UI.
 - **Deep outline geometry validation** — we check M/Z structure, not geometric validity
 - **Network/worker boundary validation** — covered by plugin sandbox (#393) and WASM protocol
 - **`pieceFabrics` map validation** — not serialized in project; the `simulationSlice.setFabric` reducer could add a check in a future iteration
