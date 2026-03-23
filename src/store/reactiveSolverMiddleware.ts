@@ -37,6 +37,7 @@ import {
 
 import { resolveAll, mapPieceIdentity } from './constructionSlice';
 import { upsertPieceOutline, addPiece } from './projectSlice';
+import { setUnresolvedCount } from './inspectorSlice';
 import { buildPieceWithOffset } from '../utils/construction/pieceBuilder';
 import type { FormulaContext } from '../utils/seamly2d/formulaEvaluator';
 import type { CPoint, CCurve, CPiece } from '../types/construction';
@@ -557,6 +558,15 @@ export function createReactiveSolverMiddleware(): Middleware<{}, any> {
       // Let the action go through first
       const result = next(action);
 
+      // Update unresolvedCount when points are removed (removePoint flags dependents)
+      if ((action as AnyAction).type === 'construction/removePoint') {
+        const updatedState = store.getState() as SolverRootState;
+        const count = updatedState.construction.points.filter(
+          (p: CPoint) => p.resolutionError != null
+        ).length;
+        store.dispatch(setUnresolvedCount(count) as AnyAction);
+      }
+
       // Check if this is a trigger action
       const typedAction = action as AnyAction;
       const actionType = typedAction.type as string;
@@ -599,6 +609,10 @@ export function createReactiveSolverMiddleware(): Middleware<{}, any> {
           resolved: points.map(p => ({ id: p.id, x: p.x, y: p.y, resolutionError: p.resolutionError })),
         }) as AnyAction);
       }
+
+      // Update unresolved count for UI badge
+      const unresolvedCount = points.filter(p => p.resolutionError != null).length;
+      store.dispatch(setUnresolvedCount(unresolvedCount) as AnyAction);
 
       // Phase 2: Debounced piece building
       const debounceMs = calculateDebounceMs();
