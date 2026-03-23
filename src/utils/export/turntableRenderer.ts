@@ -82,23 +82,26 @@ export async function renderTurntable(
   const angleStep = ((direction === 'ccw' ? -1 : 1) * 2 * Math.PI) / frameCount;
   const startAngle = Math.atan2(offset.x, offset.z);
 
-  for (let i = 0; i < frameCount; i++) {
-    const angle = startAngle + angleStep * i;
-    camera.position.set(
-      target.x + radius * Math.sin(angle),
-      cameraY,
-      target.z + radius * Math.cos(angle),
-    );
-    camera.lookAt(target);
-    renderer.render(scene, camera);
-    ctx.drawImage(canvas, 0, 0, width, height);
-    onProgress?.(i + 1, frameCount);
-    await new Promise(r => setTimeout(r, 1000 / fps));
-  }
+  try {
+    for (let i = 0; i < frameCount; i++) {
+      const angle = startAngle + angleStep * i;
+      camera.position.set(
+        target.x + radius * Math.sin(angle),
+        cameraY,
+        target.z + radius * Math.cos(angle),
+      );
+      camera.lookAt(target);
+      renderer.render(scene, camera);
+      ctx.drawImage(canvas, 0, 0, width, height);
+      onProgress?.(i + 1, frameCount);
+      await new Promise(r => setTimeout(r, 1000 / fps));
+    }
 
-  mediaRecorder.stop();
-  camera.position.copy(originalPos);
-  camera.lookAt(target);
+    mediaRecorder.stop();
+  } finally {
+    camera.position.copy(originalPos);
+    camera.lookAt(target);
+  }
 
   return recordingDone;
 }
