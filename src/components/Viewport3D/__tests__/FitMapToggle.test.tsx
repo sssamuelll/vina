@@ -61,7 +61,9 @@ function createTestStore() {
         hiddenPieceIds: [],
         layerOutlineColors: {},
         xrayMode: false,
+        pieceOpacity: {},
         xrayActiveLayer: null,
+        xrayOpacitySnapshot: null,
       },
     },
   });

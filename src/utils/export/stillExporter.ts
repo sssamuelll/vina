@@ -6,7 +6,7 @@ export interface StillExportConfig {
   height: number;
   transparent?: boolean;
   filename?: string;
-  format?: 'png' | 'jpeg' | 'exr';
+  format?: 'png' | 'jpeg' | 'webp' | 'exr';
   jpegQuality?: number;   // 0.1-1.0
   samplesPerPixel?: number;
   denoiserEnabled?: boolean;
@@ -80,7 +80,6 @@ export async function exportStill(
   renderer.setClearAlpha(originalClearAlpha);
   camera.aspect = originalAspect;
   camera.updateProjectionMatrix();
-  renderTarget.dispose();
 
   // Flip vertically (WebGL bottom-up) and put into canvas
   const canvas = document.createElement('canvas');
@@ -101,8 +100,11 @@ export async function exportStill(
       const { EXRExporter } = await import('three/examples/jsm/exporters/EXRExporter.js');
       const exporter = new EXRExporter();
       // EXRExporter expects a DataTexture or similar — fall back to PNG if it fails
-      const exrData = exporter.parse(renderer, renderTarget);
-      const blob = new Blob([exrData], { type: 'application/octet-stream' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const exrData = await (exporter.parse as any)(renderer, renderTarget);
+      renderTarget.dispose();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = new Blob([exrData as any], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.download = filename || timestampedFilename('exr');
@@ -116,8 +118,10 @@ export async function exportStill(
     }
   }
 
-  const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-  const ext = format === 'jpeg' ? 'jpg' : 'png';
+  renderTarget.dispose();
+
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+  const ext = format === 'jpeg' ? 'jpg' : format === 'webp' ? 'webp' : 'png';
   const quality = format === 'jpeg' ? jpegQuality : undefined;
 
   const blob = await new Promise<Blob>((resolve, reject) =>

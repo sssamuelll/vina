@@ -140,7 +140,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       hiddenPieceIds: [],
       layerOutlineColors: {},
       xrayMode: false,
+      pieceOpacity: {},
       xrayActiveLayer: null,
+      xrayOpacitySnapshot: null,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {

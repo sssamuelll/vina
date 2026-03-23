@@ -143,10 +143,14 @@ interface SimulationSliceState {
   hiddenPieceIds: string[];
   /** Custom outline/accent colors per layer (layer number → hex) */
   layerOutlineColors: Record<number, string>;
+  /** Per-piece opacity override (0-1); omitted keys default to fully opaque */
+  pieceOpacity: Record<string, number>;
   /** Whether X-ray transparency mode is active (allows seeing through layers) */
   xrayMode: boolean;
   /** Active layer in X-ray mode (kept opaque); null = all transparent */
   xrayActiveLayer: number | null;
+  /** Snapshot of pieceOpacity before X-ray mode was enabled (for restore) */
+  xrayOpacitySnapshot: Record<string, number> | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -199,8 +203,10 @@ const initialState: SimulationSliceState = {
   hiddenLayerIds: [],
   hiddenPieceIds: [],
   layerOutlineColors: {},
+  pieceOpacity: {},
   xrayMode: false,
   xrayActiveLayer: null,
+  xrayOpacitySnapshot: null,
 };
 
 const simulationSlice = createSlice({
@@ -375,8 +381,18 @@ const simulationSlice = createSlice({
     },
     /** Enable or disable X-ray mode (with optional active layer). */
     setXrayMode(state, action: PayloadAction<{ enabled: boolean; activeLayer?: number }>) {
-      state.xrayMode = action.payload.enabled;
-      state.xrayActiveLayer = action.payload.activeLayer ?? null;
+      if (action.payload.enabled) {
+        if (!state.xrayMode) {
+          state.xrayOpacitySnapshot = { ...state.pieceOpacity };
+        }
+        state.xrayMode = true;
+        state.xrayActiveLayer = action.payload.activeLayer ?? null;
+      } else {
+        state.pieceOpacity = state.xrayOpacitySnapshot ? { ...state.xrayOpacitySnapshot } : {};
+        state.xrayOpacitySnapshot = null;
+        state.xrayMode = false;
+        state.xrayActiveLayer = null;
+      }
     },
     /** Set a custom outline/accent color for a layer. */
     setLayerOutlineColor(state, action: PayloadAction<{ layer: number; color: string }>) {
