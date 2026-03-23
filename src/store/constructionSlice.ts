@@ -39,6 +39,30 @@ function cid(prefix: string): string {
   return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Returns true if the given point definition references a point by id or label. */
+function referencesPoint(definition: PointDefinition, id: string, label: string): boolean {
+  switch (definition.type) {
+    case 'endLine':
+      return definition.basePoint === id || definition.basePoint === label;
+    case 'alongLine':
+    case 'midpoint':
+    case 'normal':
+      return [definition.from, definition.to].some(ref => ref === id || ref === label);
+    case 'intersectionXY':
+      return [definition.xFrom, definition.yFrom].some(ref => ref === id || ref === label);
+    case 'intersection':
+      return [definition.line1Start, definition.line1End, definition.line2Start, definition.line2End]
+        .some(ref => ref === id || ref === label);
+    case 'absolute':
+    case 'manual':
+      return false;
+    default:
+      return false;
+  }
+}
+
 // ─── Slice ──────────────────────────────────────────────────────────────────
 
 const constructionSlice = createSlice({
@@ -185,7 +209,18 @@ const constructionSlice = createSlice({
 
     removePoint(state, action: PayloadAction<string>) {
       const id = action.payload;
+      const deletedPoint = state.points.find(p => p.id === id);
+      const deletedLabel = deletedPoint?.label ?? id;
+
       state.points = state.points.filter(p => p.id !== id);
+
+      // Flag dependents with resolutionError immediately
+      for (const point of state.points) {
+        if (referencesPoint(point.definition, id, deletedLabel)) {
+          point.resolutionError = `Dangling reference: point '${deletedLabel}' was deleted`;
+        }
+      }
+
       // Remove lines/curves referencing this point
       state.lines = state.lines.filter(l => l.from !== id && l.to !== id);
       // Remove piece nodes referencing this point

@@ -112,4 +112,66 @@ describe('constructionSlice', () => {
       expect(state.points[0].resolutionError).toMatch(/nope/);
     });
   });
+
+  describe('removePoint — cascade flagging', () => {
+    it('flags dependent points with resolutionError when referenced point is deleted', () => {
+      let state = addAndGetState(emptyState, {
+        label: 'A',
+        definition: { type: 'manual', x: 100, y: 200 },
+      });
+      const pointAId = state.points[0].id;
+      state = addAndGetState(state, {
+        label: 'B',
+        definition: { type: 'endLine', basePoint: 'A', angle: 0, length: 50 },
+      });
+      expect(state.points[1].resolutionError).toBeUndefined();
+      expect(state.points[1].x).toBe(150);
+
+      state = reducer(state, removePoint(pointAId));
+
+      expect(state.points).toHaveLength(1);
+      expect(state.points[0].label).toBe('B');
+      expect(state.points[0].resolutionError).toMatch(/A.*deleted/);
+    });
+
+    it('flags multiple dependents when a point is deleted', () => {
+      let state = addAndGetState(emptyState, {
+        label: 'Origin',
+        definition: { type: 'manual', x: 0, y: 0 },
+      });
+      const originId = state.points[0].id;
+      state = addAndGetState(state, {
+        label: 'P1',
+        definition: { type: 'endLine', basePoint: 'Origin', angle: 0, length: 10 },
+      });
+      state = addAndGetState(state, {
+        label: 'P2',
+        definition: { type: 'endLine', basePoint: 'Origin', angle: 90, length: 20 },
+      });
+
+      state = reducer(state, removePoint(originId));
+
+      expect(state.points).toHaveLength(2);
+      expect(state.points[0].resolutionError).toMatch(/Origin.*deleted/);
+      expect(state.points[1].resolutionError).toMatch(/Origin.*deleted/);
+    });
+
+    it('does not flag points that do not reference the deleted point', () => {
+      let state = addAndGetState(emptyState, {
+        label: 'A',
+        definition: { type: 'manual', x: 10, y: 20 },
+      });
+      state = addAndGetState(state, {
+        label: 'B',
+        definition: { type: 'manual', x: 30, y: 40 },
+      });
+      const pointAId = state.points[0].id;
+
+      state = reducer(state, removePoint(pointAId));
+
+      expect(state.points).toHaveLength(1);
+      expect(state.points[0].label).toBe('B');
+      expect(state.points[0].resolutionError).toBeUndefined();
+    });
+  });
 });
