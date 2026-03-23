@@ -315,7 +315,7 @@ const FALLBACK_APIKEY_SECURE_KEY = 'fallback-apikey';
  * Idempotent — safe to call on every startup. No-ops if no apiKey field exists.
  * Call once on app startup to migrate away from insecure storage.
  */
-export function clearLegacyFallbackKeys(): void {
+export async function clearLegacyFallbackKeys(): Promise<void> {
   // Clean localStorage
   try {
     const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
@@ -332,8 +332,8 @@ export function clearLegacyFallbackKeys(): void {
     }
 
     if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
-      // Migrate API key to SecureStorage for the current session
-      SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
+      // Migrate API key to SecureStorage for the current session (encrypted)
+      await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
       // Re-save without the API key
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { apiKey: _removed, ...rest } = parsed;
@@ -372,13 +372,13 @@ export function clearLegacyFallbackKeys(): void {
  *
  * @returns Fallback provider config, or null if not configured
  */
-export function loadFallbackProvider(): ProviderConfig | null {
+export async function loadFallbackProvider(): Promise<ProviderConfig | null> {
   try {
     const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
     if (!saved) return null;
     const config = JSON.parse(saved);
-    // Retrieve API key from SecureStorage (never from localStorage)
-    const apiKey = SecureStorage.get(FALLBACK_APIKEY_SECURE_KEY) ?? '';
+    // Retrieve API key from SecureStorage (encrypted, async)
+    const apiKey = (await SecureStorage.get(FALLBACK_APIKEY_SECURE_KEY)) ?? '';
     return {
       provider: config.provider,
       model: config.model ?? '',
@@ -398,9 +398,9 @@ export function loadFallbackProvider(): ProviderConfig | null {
  *
  * @param config - Fallback provider configuration
  */
-export function saveFallbackProvider(config: ProviderConfig): void {
-  // Store API key in SecureStorage (sessionStorage, cleared on tab close)
-  const stored = SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
+export async function saveFallbackProvider(config: ProviderConfig): Promise<void> {
+  // Store API key in SecureStorage (AES-GCM encrypted, sessionStorage)
+  const stored = await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
   if (!stored) {
     console.warn('[errorRecovery] API key could not be stored securely; fallback provider may not work after page refresh');
   }
@@ -426,8 +426,8 @@ export function saveFallbackProvider(config: ProviderConfig): void {
  * @param currentProvider - The provider that just failed
  * @returns Whether a fallback provider is configured
  */
-export function hasFallbackProvider(currentProvider: string): boolean {
-  const fallback = loadFallbackProvider();
+export async function hasFallbackProvider(currentProvider: string): Promise<boolean> {
+  const fallback = await loadFallbackProvider();
   if (!fallback) return false;
   return fallback.provider !== currentProvider && fallback.apiKey.length > 0;
 }

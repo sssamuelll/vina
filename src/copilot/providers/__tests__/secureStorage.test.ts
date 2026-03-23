@@ -1,52 +1,78 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
-// Mock sessionStorage
+// ─── sessionStorage mock ────────────────────────────────────────────────────
 const store: Record<string, string> = {};
 const sessionStorageMock = {
-  getItem: vi.fn((key: string) => store[key] ?? null),
-  setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-  removeItem: vi.fn((key: string) => { delete store[key]; }),
-  clear: vi.fn(() => { Object.keys(store).forEach(k => delete store[k]); }),
+  getItem: (key: string) => store[key] ?? null,
+  setItem: (key: string, value: string) => { store[key] = value; },
+  removeItem: (key: string) => { delete store[key]; },
+  clear: () => { Object.keys(store).forEach(k => delete store[k]); },
   get length() { return Object.keys(store).length; },
-  key: vi.fn((i: number) => Object.keys(store)[i] ?? null),
+  key: (i: number) => Object.keys(store)[i] ?? null,
 };
-vi.stubGlobal('sessionStorage', sessionStorageMock);
+Object.defineProperty(globalThis, 'sessionStorage', { value: sessionStorageMock, writable: true });
 
 import { SecureStorage } from '../secureStorage';
 
-describe('SecureStorage', () => {
+describe('SecureStorage (AES-GCM)', () => {
   beforeEach(() => {
     sessionStorageMock.clear();
-    vi.clearAllMocks();
+    SecureStorage._resetForTest();
   });
 
-  it('stores and retrieves a value', () => {
-    SecureStorage.set('test-key', 'secret-value');
-    expect(SecureStorage.get('test-key')).toBe('secret-value');
+  it('stores and retrieves a value', async () => {
+    await SecureStorage.set('test-key', 'secret-value');
+    expect(await SecureStorage.get('test-key')).toBe('secret-value');
   });
 
-  it('returns null for missing key', () => {
-    expect(SecureStorage.get('nonexistent')).toBeNull();
+  it('returns null for missing key', async () => {
+    expect(await SecureStorage.get('nonexistent')).toBeNull();
   });
 
-  it('removes a value', () => {
-    SecureStorage.set('test-key', 'secret-value');
+  it('removes a value', async () => {
+    await SecureStorage.set('test-key', 'secret-value');
     SecureStorage.remove('test-key');
-    expect(SecureStorage.get('test-key')).toBeNull();
+    expect(await SecureStorage.get('test-key')).toBeNull();
   });
 
-  it('clears all secure values', () => {
-    SecureStorage.set('key1', 'value1');
-    SecureStorage.set('key2', 'value2');
+  it('clears all secure values', async () => {
+    await SecureStorage.set('key1', 'value1');
+    await SecureStorage.set('key2', 'value2');
     SecureStorage.clear();
-    expect(SecureStorage.get('key1')).toBeNull();
-    expect(SecureStorage.get('key2')).toBeNull();
+    expect(await SecureStorage.get('key1')).toBeNull();
+    expect(await SecureStorage.get('key2')).toBeNull();
   });
 
-  it('does not affect non-prefixed sessionStorage items', () => {
+  it('does not affect non-prefixed sessionStorage items', async () => {
     sessionStorage.setItem('other-key', 'other-value');
-    SecureStorage.set('secure-key', 'secure-value');
+    await SecureStorage.set('secure-key', 'secure-value');
     SecureStorage.clear();
     expect(sessionStorage.getItem('other-key')).toBe('other-value');
+  });
+
+  it('stores encrypted data in sessionStorage (not plaintext)', async () => {
+    await SecureStorage.set('api-key', 'sk-ant-secret-12345');
+    const raw = sessionStorage.getItem('openclo-secure-api-key');
+    expect(raw).not.toBeNull();
+    // The raw value must NOT be the plaintext or simple base64 of the plaintext
+    expect(raw).not.toBe('sk-ant-secret-12345');
+    expect(raw).not.toBe(btoa('sk-ant-secret-12345'));
+  });
+
+  it('returns null and removes stale entries from a previous session key', async () => {
+    // Store a value, then reset the key (simulating page reload)
+    await SecureStorage.set('stale', 'old-value');
+    SecureStorage._resetForTest();
+    // get() should fail decryption and return null
+    expect(await SecureStorage.get('stale')).toBeNull();
+    // Stale entry should have been removed
+    expect(sessionStorage.getItem('openclo-secure-stale')).toBeNull();
+  });
+
+  it('uses in-memory cache for repeated reads', async () => {
+    await SecureStorage.set('cached', 'fast-value');
+    // First get populates cache, second reads from cache
+    expect(await SecureStorage.get('cached')).toBe('fast-value');
+    expect(await SecureStorage.get('cached')).toBe('fast-value');
   });
 });

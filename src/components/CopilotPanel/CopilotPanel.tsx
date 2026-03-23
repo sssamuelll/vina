@@ -68,7 +68,10 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(loadAgentConfig);
-  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfig);
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
+
+  // Load provider config asynchronously (SecureStorage uses Web Crypto)
+  useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
   const [isMobile, setIsMobile] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [sessionCostLabel, setSessionCostLabel] = useState('');

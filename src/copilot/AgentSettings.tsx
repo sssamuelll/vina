@@ -104,14 +104,22 @@ export default function AgentSettings({
   budget,
   onBudgetChange,
 }: AgentSettingsProps) {
-  const existingConfig = loadProviderConfig();
   const ollamaConfig = loadOllamaConfig();
 
-  const [provider, setProvider] = useState<ProviderConfig['provider']>(
-    existingConfig?.provider ?? 'anthropic'
-  );
-  const [apiKey, setApiKey] = useState(existingConfig?.apiKey ?? '');
-  const [model, setModel] = useState(existingConfig?.model ?? 'claude-sonnet-4-20250514');
+  const [provider, setProvider] = useState<ProviderConfig['provider']>('anthropic');
+  const [apiKey, setApiKey] = useState('');
+  const [model, setModel] = useState('claude-sonnet-4-20250514');
+
+  // Load provider config asynchronously (SecureStorage uses Web Crypto)
+  useEffect(() => {
+    loadProviderConfig().then((cfg) => {
+      if (cfg) {
+        setProvider(cfg.provider);
+        setApiKey(cfg.apiKey);
+        setModel(cfg.model);
+      }
+    });
+  }, []);
   const [teachingMode, setTeachingModeState] = useState(isTeachingModeEnabled);
   const [language, setLanguage] = useState<LanguagePreference>(loadLanguagePreference);
   const [budgetValue, setBudgetValue] = useState(budget ?? 5);
@@ -142,14 +150,15 @@ export default function AgentSettings({
     setProvider(p);
     const opt = PROVIDER_OPTIONS.find(o => o.value === p);
     if (opt) setModel(opt.defaultModel);
-    // Load API key from SecureStorage for the selected provider
+    // Load API key from SecureStorage for the selected provider (async)
     if (p !== 'ollama') {
-      const storedKey = SecureStorage.get(`${p}-apikey`) ?? '';
-      setApiKey(storedKey);
+      SecureStorage.get(`${p}-apikey`).then((storedKey) => {
+        setApiKey(storedKey ?? '');
+      });
     }
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     // Save teaching mode
     setTeachingMode(teachingMode);
     saveLanguagePreference(language);
@@ -161,7 +170,7 @@ export default function AgentSettings({
         model: 'claude-code',
         baseUrl: apiKey.trim() || undefined, // Reuse API key field for bridge URL
       };
-      saveProviderConfig(config);
+      await saveProviderConfig(config);
       onSave(config);
     } else if (provider === 'ollama') {
       saveOllamaConfig({ url: ollamaUrl, model, autoDetect: true });
@@ -171,11 +180,11 @@ export default function AgentSettings({
         model,
         baseUrl: ollamaUrl,
       };
-      saveProviderConfig(config);
+      await saveProviderConfig(config);
       onSave(config);
     } else if (apiKey.trim()) {
       const config: ProviderConfig = { provider, apiKey, model };
-      saveProviderConfig(config);
+      await saveProviderConfig(config);
       onSave(config);
     } else {
       onSave(null);
