@@ -692,7 +692,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       switch (avatarRenderStyle) {
         case 'visible':
           mat.opacity = 1.0; mat.transparent = false; mat.depthWrite = true;
-          mat.emissive?.setHex(0x000000); mat.emissiveIntensity = 0; break;
+          mat.color?.setHex(0xffffff); mat.emissive?.setHex(0x000000); mat.emissiveIntensity = 0; break;
         case 'xray':
           mat.opacity = 0.3; mat.transparent = true; mat.depthWrite = false;
           mat.emissive?.setHex(0x000000); mat.emissiveIntensity = 0; break;
