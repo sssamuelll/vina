@@ -2,7 +2,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import {
   Shirt, Link, Spline,
   Image, Droplets, Box, Layers,
-  Activity, ArrowLeftRight, User, CircleDot,
+  Activity, ArrowLeftRight, User,
+  Square, Scan, Circle, CircleDot, ImagePlus, Target,
 } from 'lucide-react';
 import { RootState } from '../../store';
 import {
@@ -48,13 +49,21 @@ export default function DisplayBar3D() {
     { icon: <Droplets size={18} />, label: 'Translucent', mode: 'translucent' },
     { icon: <Box size={18} />, label: 'Mesh', mode: 'mesh' },
     { icon: <Layers size={18} />, label: 'Thick Surface', mode: 'thick' },
+    { icon: <Square size={18} />, label: 'Flat', mode: 'flat' },
+    { icon: <Scan size={18} />, label: 'X-Ray', mode: 'xray' },
+    { icon: <Circle size={18} />, label: 'Shaded', mode: 'shaded' },
+  ];
+
+  const wireModes: ModeItem[] = [
+    { icon: <CircleDot size={18} />, label: 'Shaded + Wire', mode: 'shaded-wire' },
+    { icon: <ImagePlus size={18} />, label: 'Textured + Wire', mode: 'textured-wire' },
   ];
 
   const fitModes: FitItem[] = [
     { icon: <Activity size={18} />, label: 'Stress Map', mode: 'stress' },
     { icon: <ArrowLeftRight size={18} />, label: 'Strain Map', mode: 'strain' },
     { icon: <User size={18} />, label: 'Fit Map', mode: 'fit' },
-    { icon: <CircleDot size={18} />, label: 'Pressure Points', mode: 'pressure' },
+    { icon: <Target size={18} />, label: 'Pressure Points', mode: 'pressure' },
   ];
 
   return (
@@ -73,6 +82,19 @@ export default function DisplayBar3D() {
       <div className="db-separator" />
 
       {surfaceModes.map(m => (
+        <ToolTooltip key={m.mode} name={m.label} position="right">
+          <button
+            className={`db-btn ${sim.surfaceMode3D === m.mode ? 'mode-active' : ''}`}
+            onClick={() => dispatch(setSurfaceMode3D(m.mode))}
+          >
+            {m.icon}
+          </button>
+        </ToolTooltip>
+      ))}
+
+      <div className="db-separator" />
+
+      {wireModes.map(m => (
         <ToolTooltip key={m.mode} name={m.label} position="right">
           <button
             className={`db-btn ${sim.surfaceMode3D === m.mode ? 'mode-active' : ''}`}

@@ -29,7 +29,10 @@ export interface ArrangementSnapshot {
 export type SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape';
 
 /** 3D surface rendering mode. */
-export type SurfaceMode3D = 'textured' | 'translucent' | 'mesh' | 'thick';
+export type SurfaceMode3D =
+  | 'textured' | 'translucent' | 'mesh' | 'thick'
+  | 'flat' | 'xray' | 'shaded'
+  | 'shaded-wire' | 'textured-wire';
 
 /** Pin strength determines how firmly the vertex is held. */
 export type PinStrength = 'weak' | 'medium' | 'strong';
@@ -145,13 +148,13 @@ interface SimulationSliceState {
     radius: number;
     strength: number;
   };
-  /** Layer IDs hidden in 3D viewport */
+  /** Layer IDs that are hidden in the 3D viewport */
   hiddenLayerIds: number[];
-  /** Per-layer outline color for 3D wireframe indicators */
+  /** Custom outline/accent colors per layer (layer number → hex) */
   layerOutlineColors: Record<number, string>;
-  /** Whether X-ray mode is active (non-active layers rendered translucent) */
+  /** Whether X-ray transparency mode is active (allows seeing through layers) */
   xrayMode: boolean;
-  /** Active layer during X-ray mode */
+  /** Active layer in X-ray mode (kept opaque); null = all transparent */
   xrayActiveLayer: number | null;
   /** Snapshot of pieceOpacity before X-ray mode was enabled (for restore) */
   xrayOpacitySnapshot: Record<string, number> | null;
@@ -691,7 +694,7 @@ export const {
   setMeshGrabActive,
   setMeshGrabRadius,
   setMeshGrabStrength,
-  // Layer visibility
+  // Layer visibility & X-ray
   toggleLayerVisibility,
   showAllLayers,
   setLayerOutlineColor,

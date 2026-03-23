@@ -55,6 +55,7 @@ import { meshGrabTool } from './definitions/meshGrab';
 import { pomMeasureTool } from './definitions/pomMeasure';
 import { offsetOutlineTool } from './definitions/offsetOutline';
 import { extendTrimTool } from './definitions/extendTrim';
+import { renderTools } from './renderTools';
 
 // Register all tools
 const allTools = [
@@ -133,6 +134,9 @@ const allTools = [
   simulateTool,
   steamBrushTool,
   meshGrabTool,
+
+  // 3D Tools — Render (copilot-only, hidden from toolbar)
+  ...renderTools,
 ];
 
 // Auto-register all tools

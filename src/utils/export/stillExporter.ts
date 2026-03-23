@@ -6,6 +6,21 @@ export interface StillExportConfig {
   height: number;
   transparent?: boolean;
   filename?: string;
+  format?: 'png' | 'jpeg' | 'webp' | 'exr';
+  jpegQuality?: number;   // 0.1-1.0
+  samplesPerPixel?: number;
+  denoiserEnabled?: boolean;
+}
+
+function timestampedFilename(ext: string): string {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const HH = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  return `openclo-render-${yyyy}-${mm}-${dd}-${HH}${min}${ss}.${ext}`;
 }
 
 export async function exportStill(
@@ -14,7 +29,14 @@ export async function exportStill(
   camera: THREE.PerspectiveCamera,
   config: StillExportConfig,
 ): Promise<void> {
-  const { width, height, transparent = false, filename } = config;
+  const {
+    width,
+    height,
+    transparent = false,
+    filename,
+    format = 'png',
+    jpegQuality = 0.92,
+  } = config;
 
   // Save state
   const originalBackground = scene.background;
@@ -58,9 +80,8 @@ export async function exportStill(
   renderer.setClearAlpha(originalClearAlpha);
   camera.aspect = originalAspect;
   camera.updateProjectionMatrix();
-  renderTarget.dispose();
 
-  // Flip vertically (WebGL bottom-up) and encode PNG
+  // Flip vertically (WebGL bottom-up) and put into canvas
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
@@ -73,10 +94,50 @@ export async function exportStill(
   }
   ctx.putImageData(imageData, 0, 0);
 
+  // Encode and download based on format
+  if (format === 'exr') {
+    try {
+      const { EXRExporter } = await import('three/examples/jsm/exporters/EXRExporter.js');
+      const exporter = new EXRExporter();
+      // EXRExporter expects a DataTexture or similar — fall back to PNG if it fails
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const exrData = await (exporter.parse as any)(renderer, renderTarget);
+      renderTarget.dispose();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const blob = new Blob([exrData as any], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = filename || timestampedFilename('exr');
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      return;
+    } catch {
+      console.warn('[stillExporter] EXRExporter unavailable, falling back to PNG');
+      // Fall through to PNG below
+    }
+  }
+
+  renderTarget.dispose();
+
+  const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+  const ext = format === 'jpeg' ? 'jpg' : format === 'webp' ? 'webp' : 'png';
+  const quality = format === 'jpeg' ? jpegQuality : undefined;
+
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('canvas.toBlob returned null'))),
+      mimeType,
+      quality,
+    ),
+  );
+
+  const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
-  link.download = filename || `openclo-render-${width}x${height}-${Date.now()}.png`;
-  link.href = canvas.toDataURL('image/png');
+  link.download = filename || timestampedFilename(ext);
+  link.href = url;
   link.click();
+  URL.revokeObjectURL(url);
 }
 
 export type ViewAngle = 'front' | 'back' | 'left' | 'right';
@@ -96,13 +157,14 @@ export async function exportAllViews(
 ): Promise<void> {
   const target = new THREE.Vector3(0, 0.75, 0);
   const originalPos = camera.position.clone();
+  const ext = config.format === 'jpeg' ? 'jpg' : config.format === 'webp' ? 'webp' : (config.format ?? 'png');
 
   for (const [view, pos] of Object.entries(VIEW_POSITIONS) as [ViewAngle, [number, number, number]][]) {
     camera.position.set(...pos);
     camera.lookAt(target);
     await exportStill(renderer, scene, camera, {
       ...config,
-      filename: `openclo-${view}-${config.width}x${config.height}.png`,
+      filename: `openclo-${view}-${config.width}x${config.height}.${ext}`,
     });
   }
 

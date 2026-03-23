@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // Updated after #79-#82 copilot epic completion + #142 3D interaction tools + snapshot tools
-      expect(registry.size).toBe(171); // 166 (main + layers) + 5 pattern edit phase 2 tools
+      expect(registry.size).toBe(178); // 171 (main + layers + pattern edit) + 7 render tools
     });
   });
 });

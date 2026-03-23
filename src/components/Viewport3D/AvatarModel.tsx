@@ -186,6 +186,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const ikChains = useSelector((s: RootState) => s.avatar.pose.ikChains);
   const ikTargets = useSelector((s: RootState) => s.avatar.pose.ikTargets);
   const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
+  const avatarRenderStyle = useSelector((s: RootState) => s.renderSettings.avatarRenderStyle);
 
   // Load VRM files separately
   useEffect(() => {
@@ -670,6 +671,40 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       vrmInstance.update(delta);
     }
   });
+
+  // Apply avatar render style whenever the scene or style changes
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group) return;
+    // Use the active scene (first child of group)
+    const scene = group.children[0] as THREE.Object3D | undefined;
+    if (!scene) return;
+
+    scene.visible = avatarRenderStyle !== 'hidden';
+    if (avatarRenderStyle === 'hidden') return;
+
+    scene.renderOrder = avatarRenderStyle === 'xray' ? 1 : 0;
+    scene.traverse((child) => {
+      if (!(child as THREE.Mesh).isMesh) return;
+      const mesh = child as THREE.Mesh;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      if (!mat?.isMeshStandardMaterial) return;
+      switch (avatarRenderStyle) {
+        case 'visible':
+          mat.opacity = 1.0; mat.transparent = false; mat.depthWrite = true;
+          mat.color?.setHex(0xffffff); mat.emissive?.setHex(0x000000); mat.emissiveIntensity = 0; break;
+        case 'xray':
+          mat.opacity = 0.3; mat.transparent = true; mat.depthWrite = false;
+          mat.emissive?.setHex(0x000000); mat.emissiveIntensity = 0; break;
+        case 'wireframe':
+          mat.opacity = 0.8; mat.transparent = true; mat.depthWrite = true;
+          mat.color?.setHex(0x000000); mat.emissive?.setHex(0x111111);
+          mat.emissiveIntensity = 1; mat.roughness = 1; break;
+      }
+      mat.needsUpdate = true;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vrmScene, objFbxScene, gltf, avatarRenderStyle]);
 
   return <group ref={groupRef} onPointerDown={onPointerDown} userData={{ opencloRole: 'avatar' }} />;
 }

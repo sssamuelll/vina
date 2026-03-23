@@ -44,6 +44,7 @@ import { tools as groupToolDefs } from './definitions/groupTools';
 import { tools as layerToolDefs } from './definitions/layerTools';
 import { tools as pomToolDefs } from './definitions/pomTools';
 import { tools as sewingEnhancementToolDefs } from './definitions/sewingEnhancementTools';
+import { tools as renderToolDefs } from './definitions/renderTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -365,6 +366,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   layerToolDefs,
   pomToolDefs,
   sewingEnhancementToolDefs,
+  renderToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

@@ -547,29 +547,34 @@ const projectSlice = createSlice({
     },
 
     // ─── Layer Metadata ───
+    /** Set a custom display name for a layer. */
     renameLayer(state, action: PayloadAction<{ layer: number; name: string }>) {
       state.layerNames[action.payload.layer] = action.payload.name;
       state.isDirty = true;
     },
+    /** Remove a custom display name for a layer. */
     deleteLayerName(state, action: PayloadAction<{ layer: number }>) {
       delete state.layerNames[action.payload.layer];
       state.isDirty = true;
     },
+    /** Lock or unlock a layer to prevent edits. */
     setLayerLocked(state, action: PayloadAction<{ layer: number; locked: boolean }>) {
       state.layerLocked[action.payload.layer] = action.payload.locked;
       state.isDirty = true;
     },
+    /** Register or update a layer (sets the custom name if provided). */
     addLayer(state, action: PayloadAction<{ layer: number; name?: string }>) {
       if (action.payload.name) {
         state.layerNames[action.payload.layer] = action.payload.name;
       }
       state.isDirty = true;
     },
+    /** Remove a layer and move its pieces to layer 1. */
     removeLayer(state, action: PayloadAction<{ layer: number }>) {
-      const layer = action.payload.layer;
-      if (layer === 1) return;
+      const { layer } = action.payload;
+      if (layer === 1) return; // cannot remove base layer
       for (const piece of state.pieces) {
-        if (piece.layer === layer) {
+        if ((piece.layer ?? 1) === layer) {
           piece.layer = 1;
           piece.updatedAt = Date.now();
         }
