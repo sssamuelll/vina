@@ -5,17 +5,15 @@
  * "(#BustCircumfence < 112 ? #BustCircumfence/5-1 : 10)"
  * against a context of measurements and variables.
  *
- * Uses sanitized `new Function()` — only allows numbers, arithmetic,
- * comparisons, ternary, and variable references.
+ * Uses safeEval — a recursive-descent parser with no dynamic code construction.
  */
+
+import { safeEval } from '../formula/safeEval';
 
 export interface FormulaContext {
   measurements: Record<string, number>;
   variables: Record<string, number>;
 }
-
-/** Characters/tokens allowed in a sanitized formula (after variable substitution). */
-const SAFE_FORMULA_RE = /^[\d\s+\-*/().?:<>=!&|,A-Za-z_\u00C0-\u024F\u0400-\u04FF\u0500-\u052F]+$/;
 
 /**
  * Evaluate a single Seamly2D formula string given a context.
@@ -34,19 +32,25 @@ export function evaluateFormula(
   let expr = formula.trim();
 
   // Replace function-style references like Line_A_B, AngleLine_A_B, Spl_A_B, SplPath_A_B etc.
+  // These may be unresolved during construction if the referenced geometry hasn't been computed yet.
+  // Fall back to 0 (not throw) so the formula can still evaluate — the construction resolver
+  // populates these incrementally as it processes steps in order.
   expr = expr.replace(/\b(Line|AngleLine|CurrentLength|CurrentSeamAllowance|Spl|SplPath)_[A-Za-z0-9_]+/g, (match) => {
     if (context.variables[match] !== undefined) return String(context.variables[match]);
     if (context.variables[`#${match}`] !== undefined) return String(context.variables[`#${match}`]);
+    console.warn(`[formulaEvaluator] Unresolved reference: ${match}, defaulting to 0`);
     return '0';
   });
 
   // Replace @MeasurementName references (Cyrillic/Unicode measurement names)
+  // Fall back to 0 if the measurement is not in context — it may be an optional measurement.
   expr = expr.replace(/@([\p{L}_][\p{L}\p{N}_]*)/gu, (_match, name) => {
     const val = context.measurements[name] ?? context.measurements[`@${name}`];
     if (val !== undefined) return String(val);
     // Try as variable
     const vval = context.variables[`@${name}`] ?? context.variables[name];
     if (vval !== undefined) return String(vval);
+    console.warn(`[formulaEvaluator] Unresolved measurement: @${name}, defaulting to 0`);
     return '0';
   });
 
@@ -79,40 +83,19 @@ export function evaluateFormula(
   // Replace ; with , inside parentheses (function calls)
   expr = expr.replace(/;/g, ',');
 
-  // Replace Seamly2D-specific math functions (aliases)
-  expr = expr.replace(/\brint\b/g, '__ROUND__');
-  expr = expr.replace(/\bsign\b/g, '__SIGN__');
-
-  // Replace math functions with Math.* equivalents
-  expr = expr.replace(/\b(atan2|atan|asin|acos|sin|cos|tan|sqrt|abs|min|max|pow|floor|ceil|round)\b/g, 'Math.$1');
-
-  // Now replace aliases (after main pass to avoid double-replacement)
-  expr = expr.replace(/__ROUND__/g, 'Math.round');
-  expr = expr.replace(/__SIGN__/g, 'Math.sign');
-
-  // Validate the expression is safe
-  if (!SAFE_FORMULA_RE.test(expr)) {
-    throw new Error(`Unsafe formula expression: ${expr} (original: ${formula})`);
-  }
-
-  // CRITICAL: Prevent assignment operators that could corrupt global Math object
-  // Check for single = that isn't part of == or >= or <= or !=
-  if (/(?<![=!<>])=(?!=)/.test(expr)) {
-    throw new Error(`Assignment not allowed in formula: ${formula}`);
-  }
+  // Replace Seamly2D-specific math function aliases
+  expr = expr.replace(/\brint\b/g, 'round');
+  // 'sign' maps directly — safeEval recognizes it
+  // Math function names (sin, cos, sqrt, etc.) pass through as-is — safeEval resolves them
 
   try {
-    // The assignment check above prevents formulas like "cos=270" from corrupting Math.
-    // Pass the real Math object since spreading doesn't copy methods properly.
-    // This formula evaluator is intentionally limited to math expressions only.
-    const fn = new Function(`"use strict"; return (${expr});`);
-    const result = fn();
+    const result = safeEval(expr);
     if (typeof result !== 'number' || !isFinite(result)) {
       throw new Error(`Formula did not evaluate to a finite number: ${formula} → ${result}`);
     }
     return result;
   } catch (err) {
-    throw new Error(`Failed to evaluate formula "${formula}" (resolved: "${expr}"): ${(err as Error).message}`);
+    throw new Error(`Failed to evaluate formula "${formula}" (resolved: "${expr}"): ${err instanceof Error ? err.message : String(err)}`);
   }
 }
 
@@ -184,8 +167,9 @@ export function resolveVariables(
     if (resolved[name] !== undefined) continue; // already set (cycle)
     try {
       resolved[name] = evaluateFormula(variables[name].formula, context);
-    } catch {
-      resolved[name] = 0; // graceful fallback
+    } catch (err) {
+      console.warn(`[formulaEvaluator] Failed to resolve variable "${name}": ${err instanceof Error ? err.message : String(err)}. Defaulting to 0.`);
+      resolved[name] = 0;
     }
   }
 

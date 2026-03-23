@@ -1,4 +1,5 @@
 import type { FormulaContext, FormulaResult } from './types';
+import { safeEval } from './safeEval';
 
 const ALLOWED_FUNCTIONS = ['min', 'max', 'abs', 'round', 'floor', 'ceil', 'sqrt'];
 const CONSTANTS: Record<string, number> = { PI: Math.PI };
@@ -79,8 +80,8 @@ export function validateFormula(
  *
  * @remarks
  * The formula is tokenized, variables are substituted, and the resulting
- * expression is evaluated in a sandboxed `Function` constructor with only
- * `Math` in scope.
+ * expression is evaluated using a recursive descent parser (`safeEval`)
+ * with no dynamic code construction.
  *
  * @param formula - The formula expression (e.g. `"chest / 4 + 2"`)
  * @param context - Context providing variable name → numeric value mappings
@@ -105,7 +106,7 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
       const t = tokens[i];
       if (/^[a-zA-Z_]/.test(t)) {
         if (ALLOWED_FUNCTIONS.includes(t)) {
-          exprParts.push('Math.' + t);
+          exprParts.push(t);
         } else if (t in CONSTANTS) {
           exprParts.push(String(CONSTANTS[t]));
         } else if (t in context.variables) {
@@ -121,19 +122,12 @@ export function evaluateFormula(formula: string, context: FormulaContext): Formu
     }
 
     const expr = exprParts.join(' ');
-    // Sanitize: only allow numbers, Math.*, operators, parens, commas, spaces, dots
-    if (!/^[\s0-9+\-*/%(),.a-zA-Z]*$/.test(expr)) {
-      return { value: NaN, error: 'Invalid characters in formula' };
+    try {
+      const result = safeEval(expr, {}, ALLOWED_FUNCTIONS);
+      return { value: result };
+    } catch (evalErr) {
+      return { value: NaN, error: evalErr instanceof Error ? evalErr.message : 'Evaluation error' };
     }
-
-    const fn = new Function('Math', `"use strict"; return (${expr});`);
-    const result = fn(Math);
-
-    if (typeof result !== 'number' || !isFinite(result)) {
-      return { value: NaN, error: 'Formula resulted in invalid number' };
-    }
-
-    return { value: result };
   } catch (e) {
     return { value: NaN, error: e instanceof Error ? e.message : 'Evaluation error' };
   }
