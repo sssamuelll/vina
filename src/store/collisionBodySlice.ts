@@ -47,7 +47,14 @@ const collisionBodySlice = createSlice({
     ) {
       const body = state.bodies.find((b) => b.id === action.payload.id);
       if (body) {
-        Object.assign(body.collision, action.payload.collision);
+        const changes = { ...action.payload.collision };
+        if (changes.friction !== undefined) {
+          changes.friction = Math.max(0, Math.min(1, changes.friction));
+        }
+        if (changes.offset !== undefined) {
+          changes.offset = Math.max(0, Math.min(0.1, changes.offset));
+        }
+        Object.assign(body.collision, changes);
       }
     },
 
