@@ -211,6 +211,24 @@ const ruleNoEdgesDefined: Rule = (data) => {
   return [];
 };
 
+const ruleUnresolvedPoints: Rule = (data) => {
+  if (!data.unresolvedPoints || data.unresolvedPoints.length === 0) {
+    return [];
+  }
+  const count = data.unresolvedPoints.length;
+  const detail = data.unresolvedPoints
+    .map(p => `• ${p.label}: ${p.error}`)
+    .join('\n');
+  return [
+    {
+      severity: 'error',
+      category: 'construction',
+      message: `${count} construction point(s) failed to resolve`,
+      detail,
+    },
+  ];
+};
+
 // ─── Seam tension / deactivation rules ────────────────────────────────────
 
 const ruleSeamTension: Rule = (data) => {
@@ -333,6 +351,7 @@ const RULES: Rule[] = [
   ruleNotSimulated,
   // construction
   ruleNoEdgesDefined,
+  ruleUnresolvedPoints,
   // layer
   ruleLayerOverlap,
   // interfacing

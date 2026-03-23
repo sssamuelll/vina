@@ -136,6 +136,25 @@ export function collectInspectionData(
     }
   }
 
+  // ─── Unresolved construction points ──────────────────────────────────────
+  const unresolvedPoints: Array<{ label: string; error: string }> = [];
+  const { pieceIdentityMap, pieces: cPieces, points: cPoints } = state.construction;
+  // Reverse lookup: find construction piece ID whose pattern piece ID matches
+  for (const [cPieceId, patternPieceId] of Object.entries(pieceIdentityMap)) {
+    if (patternPieceId === piece.id) {
+      const cPiece = cPieces.find(cp => cp.id === cPieceId);
+      if (cPiece) {
+        for (const node of cPiece.nodes) {
+          const pt = cPoints.find(p => p.id === node.pointId);
+          if (pt?.resolutionError) {
+            unresolvedPoints.push({ label: pt.label, error: pt.resolutionError });
+          }
+        }
+      }
+      break;
+    }
+  }
+
   // ─── Simulation metadata ──────────────────────────────────────────────────
   const simulation: InspectionSimulationData = {
     particleCount: state.simulation.particleCount,
@@ -161,5 +180,6 @@ export function collectInspectionData(
       .map(p => ({ id: p.id, name: p.name, bodyRegion: p.bodyRegion })),
     poms: state.project.poms,
     pieceActive: piece.active,
+    ...(unresolvedPoints.length > 0 ? { unresolvedPoints } : {}),
   };
 }

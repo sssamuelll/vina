@@ -37,6 +37,8 @@ export interface InspectorState {
   agentStreaming: boolean;
   /** Last agent error message, if any. */
   agentError: string | null;
+  /** Global count of construction points with resolution errors */
+  unresolvedCount: number;
 }
 
 const initialState: InspectorState = {
@@ -46,6 +48,7 @@ const initialState: InspectorState = {
   agentAnalysis: null,
   agentStreaming: false,
   agentError: null,
+  unresolvedCount: 0,
 };
 
 // ============================================================================
@@ -108,6 +111,13 @@ const inspectorSlice = createSlice({
     },
 
     /**
+     * Update the global count of construction points with resolution errors.
+     */
+    setUnresolvedCount(state, action: PayloadAction<number>) {
+      state.unresolvedCount = action.payload;
+    },
+
+    /**
      * Reset the inspector to its initial (closed) state.
      */
     clearInspection() {
@@ -123,6 +133,7 @@ export const {
   setAgentAnalysis,
   setAgentStreaming,
   setAgentError,
+  setUnresolvedCount,
   clearInspection,
 } = inspectorSlice.actions;
 

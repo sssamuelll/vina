@@ -90,6 +90,8 @@ export interface InspectionData {
   poms?: PointOfMeasure[];
   /** Whether the inspected piece is active (participates in simulation). */
   pieceActive?: boolean;
+  /** Construction points that failed to resolve for this piece */
+  unresolvedPoints?: Array<{ label: string; error: string }>;
 }
 
 // ─── Diagnostics ─────────────────────────────────────────────────────────────

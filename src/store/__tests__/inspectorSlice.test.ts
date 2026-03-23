@@ -6,6 +6,7 @@ import inspectorReducer, {
   setAgentAnalysis,
   setAgentStreaming,
   setAgentError,
+  setUnresolvedCount,
   clearInspection,
   type InspectorState,
 } from '../inspectorSlice';
@@ -70,6 +71,7 @@ describe('inspectorSlice — initial state', () => {
     expect(state.agentAnalysis).toBeNull();
     expect(state.agentStreaming).toBe(false);
     expect(state.agentError).toBeNull();
+    expect(state.unresolvedCount).toBe(0);
   });
 });
 
@@ -279,5 +281,26 @@ describe('side-effect interaction tests', () => {
     state = inspectorReducer(state, setAgentError('Rate limit exceeded'));
     expect(state.agentStreaming).toBe(false);
     expect(state.agentError).toBe('Rate limit exceeded');
+  });
+});
+
+// ─── setUnresolvedCount ──────────────────────────────────────────────────────
+
+describe('setUnresolvedCount', () => {
+  it('updates unresolvedCount', () => {
+    const state = inspectorReducer(undefined, setUnresolvedCount(5));
+    expect(state.unresolvedCount).toBe(5);
+  });
+
+  it('resets to zero', () => {
+    let state = inspectorReducer(undefined, setUnresolvedCount(3));
+    state = inspectorReducer(state, setUnresolvedCount(0));
+    expect(state.unresolvedCount).toBe(0);
+  });
+
+  it('is reset by clearInspection', () => {
+    let state = inspectorReducer(undefined, setUnresolvedCount(7));
+    state = inspectorReducer(state, clearInspection());
+    expect(state.unresolvedCount).toBe(0);
   });
 });
