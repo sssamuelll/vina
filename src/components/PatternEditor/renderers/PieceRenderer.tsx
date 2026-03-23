@@ -80,6 +80,8 @@ interface SinglePieceProps {
   layerColor?: string;
   /** Whether the piece's layer is locked (reduced opacity + no pointer events) */
   isLayerLocked?: boolean;
+  /** Whether the piece has unresolved construction points */
+  hasResolutionErrors?: boolean;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
   onPieceNameCancel?: () => void;
@@ -100,6 +102,7 @@ const SinglePiece = memo(function SinglePiece({
   groupColor,
   layerColor,
   isLayerLocked,
+  hasResolutionErrors,
   onPieceNameDoubleClick,
   onPieceNameSave,
   onPieceNameCancel,
@@ -171,6 +174,17 @@ const SinglePiece = memo(function SinglePiece({
           strokeWidth={2.5 / zoom2D}
           strokeDasharray={`${6 / zoom2D} ${4 / zoom2D}`}
           opacity={0.7}
+          pointerEvents="none"
+        />
+      )}
+
+      {hasResolutionErrors && (
+        <path
+          d={pathToSVG(piece.outline)}
+          fill="none"
+          stroke="#ef4444"
+          strokeWidth={2 / zoom2D}
+          strokeDasharray={`${6 / zoom2D} ${4 / zoom2D}`}
           pointerEvents="none"
         />
       )}
@@ -401,6 +415,26 @@ export default function PieceRenderer({
   const layerOutlineColors = useSelector((s: RootState) => s.simulation.layerOutlineColors);
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
+  // Construction resolution error selectors
+  const constructionPoints = useSelector((s: RootState) => s.construction.points);
+  const pieceIdentityMap = useSelector((s: RootState) => s.construction.pieceIdentityMap);
+  const constructionPieces = useSelector((s: RootState) => s.construction.pieces);
+
+  const hasResolutionErrors = useMemo(() => {
+    const errorMap = new Map<string, boolean>();
+    for (const [cPieceId, ppId] of Object.entries(pieceIdentityMap)) {
+      const cPiece = constructionPieces.find(cp => cp.id === cPieceId);
+      if (cPiece) {
+        const hasErrors = cPiece.nodes.some(node => {
+          const pt = constructionPoints.find(p => p.id === node.pointId);
+          return pt?.resolutionError != null;
+        });
+        errorMap.set(ppId, hasErrors);
+      }
+    }
+    return errorMap;
+  }, [constructionPoints, pieceIdentityMap, constructionPieces]);
+
   const sortedPieces = useMemo(
     () => [...pieces]
       .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
@@ -424,6 +458,7 @@ export default function PieceRenderer({
           groupColor={groupColors?.[piece.id]}
           layerColor={getOutlineColor(piece.layer ?? 1, layerOutlineColors)}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
+          hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}

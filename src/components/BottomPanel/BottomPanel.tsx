@@ -18,14 +18,14 @@ interface BottomPanelProps {
   defaultTab?: BottomTab;
 }
 
-function buildTabs(problemCount: number): { id: BottomTab; label: string }[] {
+function buildTabs(problemCount: number, unresolvedCount: number): { id: BottomTab; label: string }[] {
   return [
     { id: 'copilot', label: 'Copilot' },
     { id: 'problems', label: problemCount > 0 ? `Problems (${problemCount})` : 'Problems' },
     { id: 'output', label: 'Output' },
     { id: 'nesting-preview', label: 'Nesting Preview' },
     { id: 'timeline', label: 'Timeline' },
-    { id: 'inspector', label: 'Inspector' },
+    { id: 'inspector', label: unresolvedCount > 0 ? `Inspector (${unresolvedCount})` : 'Inspector' },
     { id: 'poms', label: 'POMs' },
   ];
 }
@@ -62,12 +62,13 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
   const { copilotPosition } = useSelector((state: RootState) => state.layout);
   const pieces = useSelector((state: RootState) => state.project.pieces);
   const seams = useSelector((state: RootState) => state.project.seams);
+  const unresolvedCount = useSelector((state: RootState) => state.inspector.unresolvedCount);
 
   // Reactive proactive analysis — runs when pieces/seams change
   const warnings = useMemo(() => runProactiveAnalysis(pieces, seams), [pieces, seams]);
 
   // Filter tabs based on copilot position
-  const allTabs = buildTabs(warnings.length);
+  const allTabs = buildTabs(warnings.length, unresolvedCount);
   const tabs = allTabs.filter(tab =>
     tab.id !== 'copilot' || copilotPosition === 'bottom'
   );
