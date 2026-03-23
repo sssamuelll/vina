@@ -11,17 +11,8 @@ import {
 } from '../../store/simulationSlice';
 import { selectPiece } from '../../store/editorSlice';
 import LayerColorPicker from './LayerColorPicker';
+import { getOutlineColor } from '../../utils/layerColors';
 import './LayerPanel.css';
-
-// ─── Outline Color Helpers ──────────────────────────────────────────────────
-
-const DEFAULT_OUTLINE_COLORS: Record<number, string> = {
-  0: '#4ade80', 1: '#60a5fa', 2: '#f97316',
-};
-
-function getOutlineColor(layer: number, overrides: Record<number, string>): string {
-  return overrides[layer] ?? DEFAULT_OUTLINE_COLORS[layer] ?? `hsl(${layer * 137.5}, 70%, 60%)`;
-}
 
 // ─── Component ──────────────────────────────────────────────────────────────
 

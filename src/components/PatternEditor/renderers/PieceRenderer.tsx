@@ -6,18 +6,7 @@ import { PatternPiece, PathCommand } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
 import { extractNodes } from '../nodeEditorUtils';
-
-/* ── Layer color helpers ─────────────────────────────────────────────────── */
-
-const DEFAULT_OUTLINE_COLORS: Record<number, string> = {
-  0: '#4ade80',  // green – innermost / body
-  1: '#60a5fa',  // blue  – default mid layer
-  2: '#f97316',  // orange – outer shell
-};
-
-function getOutlineColor(layer: number, overrides: Record<number, string>): string {
-  return overrides[layer] ?? DEFAULT_OUTLINE_COLORS[layer] ?? `hsl(${layer * 137.5}, 70%, 60%)`;
-}
+import { getOutlineColor } from '../../../utils/layerColors';
 
 /** Compute bounding box extents of a path outline. */
 function getOutlineBounds(outline: PathCommand[]): { minX: number; minY: number; maxX: number; maxY: number } {

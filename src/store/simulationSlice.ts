@@ -1,7 +1,8 @@
 /**
  * Redux slice for cloth simulation state.
  *
- * Manages simulation lifecycle (idle/running/paused) and per-piece fabric assignments.
+ * Manages simulation lifecycle (idle/running/paused), per-piece fabric assignments,
+ * layer visibility, and X-ray transparency mode.
  *
  * @module simulationSlice
  */
@@ -505,6 +506,14 @@ const simulationSlice = createSlice({
         state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity));
       }
     },
+    /** Set opacity for multiple pieces in a single dispatch. */
+    setBatchPieceOpacity(state, action: PayloadAction<Record<string, number>>) {
+      for (const [pieceId, opacity] of Object.entries(action.payload)) {
+        if (!Number.isFinite(opacity)) continue;
+        if (opacity >= 1.0) { delete state.pieceOpacity[pieceId]; }
+        else { state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity)); }
+      }
+    },
     /** Clear per-piece opacity override. */
     clearPieceOpacity(state, action: PayloadAction<string>) {
       delete state.pieceOpacity[action.payload];
@@ -670,6 +679,7 @@ export const {
   setPieceUVTransform,
   // Opacity & emission
   setPieceOpacity,
+  setBatchPieceOpacity,
   clearPieceOpacity,
   setPieceEmission,
   clearPieceEmission,
