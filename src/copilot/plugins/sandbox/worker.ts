@@ -16,27 +16,63 @@ const BLOCKED_GLOBALS = [
   'indexedDB', 'BroadcastChannel', 'caches',
   'Blob', 'URL',
   'WebAssembly',
+  // Block dynamic code construction
+  'eval',
+  'SharedArrayBuffer',
+  // Block Function constructor to prevent reconstruction of blocked globals
+  'Function',
 ];
 
+const lockdownFailures: string[] = [];
 for (const name of BLOCKED_GLOBALS) {
   try {
     Object.defineProperty(self, name, {
       value: undefined, writable: false, configurable: false,
     });
-  } catch { /* some may already be non-configurable */ }
+  } catch {
+    lockdownFailures.push(name);
+  }
 }
+
+// Override setTimeout/setInterval to reject string arguments (eval-equivalent)
+const _setTimeout = setTimeout;
+const _setInterval = setInterval;
+// @ts-expect-error — overriding global with stricter signature
+self.setTimeout = (handler: unknown, ...args: unknown[]) => {
+  if (typeof handler === 'string') throw new Error('setTimeout with string argument is blocked');
+  return _setTimeout(handler as TimerHandler, ...(args as [number?]));
+};
+// @ts-expect-error — overriding global with stricter signature
+self.setInterval = (handler: unknown, ...args: unknown[]) => {
+  if (typeof handler === 'string') throw new Error('setInterval with string argument is blocked');
+  return _setInterval(handler as TimerHandler, ...(args as [number?]));
+};
 
 // Freeze prototype chain
 try {
   const proto = Object.getPrototypeOf(self);
   for (const name of BLOCKED_GLOBALS) {
     if (name in proto) {
-      Object.defineProperty(proto, name, {
-        value: undefined, writable: false, configurable: false,
-      });
+      try {
+        Object.defineProperty(proto, name, {
+          value: undefined, writable: false, configurable: false,
+        });
+      } catch {
+        lockdownFailures.push(`proto.${name}`);
+      }
     }
   }
-} catch { /* best-effort */ }
+} catch {
+  lockdownFailures.push('proto-chain');
+}
+
+if (lockdownFailures.length > 0) {
+  console.warn(
+    '[PluginSandbox] Failed to lock down globals:',
+    lockdownFailures.join(', '),
+    '— defense-in-depth layer incomplete',
+  );
+}
 
 // ─── State ──────────────────────────────────────────────────────────────────
 import { PluginContext } from './PluginContext';
@@ -52,6 +88,15 @@ const pluginTools: Map<string, {
 }> = new Map();
 let apiVersion = 1;
 let context: PluginContext | null = null;
+
+// ─── Global Error Handler ───────────────────────────────────────────────────
+self.onerror = (event) => {
+  self.postMessage({
+    type: 'error',
+    requestId: '__global__',
+    error: `Unhandled Worker error: ${event instanceof ErrorEvent ? event.message : String(event)}`,
+  });
+};
 
 // ─── Message Handler ────────────────────────────────────────────────────────
 self.onmessage = async (event: MessageEvent<MainToWorkerMessage>) => {
@@ -78,6 +123,22 @@ self.onmessage = async (event: MessageEvent<MainToWorkerMessage>) => {
 async function handleLoad(msg: LoadMessage): Promise<void> {
   try {
     apiVersion = msg.apiVersion ?? 1;
+
+    // Security: scan for dynamic import() which can bypass fetch lockdown
+    const FORBIDDEN_PATTERNS = [
+      /\bimport\s*\(/,     // dynamic import()
+      /\bimport\s*\.\s*meta/, // import.meta access
+    ];
+    for (const pattern of FORBIDDEN_PATTERNS) {
+      if (pattern.test(msg.pluginCode)) {
+        self.postMessage({
+          type: 'loadError',
+          error: `Plugin code contains forbidden pattern: ${pattern.source}. Dynamic import() is not allowed in sandboxed plugins.`,
+        });
+        return;
+      }
+    }
+
     const blob = new _Blob([msg.pluginCode], { type: 'application/javascript' });
     const blobUrl = _URL.createObjectURL(blob);
 
@@ -96,7 +157,10 @@ async function handleLoad(msg: LoadMessage): Promise<void> {
 
     const tools: ToolSchema[] = [];
     for (const rawTool of pluginExport['tools'] as Record<string, unknown>[]) {
-      if (!rawTool['name'] || !rawTool['handler']) continue;
+      if (!rawTool['name'] || !rawTool['handler']) {
+        console.warn(`[PluginSandbox] Skipping tool at index ${tools.length}: missing 'name' or 'handler'`);
+        continue;
+      }
       const schema: ToolSchema = {
         name: rawTool['name'] as string,
         description: (rawTool['description'] as string) || '',

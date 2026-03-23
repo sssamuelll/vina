@@ -144,6 +144,12 @@ export interface PluginManifest {
    * absent. Increment when breaking changes are introduced to the plugin API.
    */
   apiVersion?: number;
+  /**
+   * URL patterns the plugin is allowed to fetch when it has the `network` permission.
+   * Uses glob syntax (e.g. `"https://api.example.com/*"`).
+   * Empty or absent means no URLs are allowed even with the `network` permission.
+   */
+  networkAllowlist?: string[];
 }
 
 // ─── OpenClo Plugin ─────────────────────────────────────────────────────────

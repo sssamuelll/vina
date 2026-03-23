@@ -17,15 +17,17 @@ import type { PluginPermission } from '../types';
 import { NetworkValidator } from './networkValidator';
 import {
   EXECUTION_TIMEOUT_MS,
+  CAPABILITY_TIMEOUT_MS,
+  FETCH_RATE_LIMIT_PER_MINUTE,
   MAX_PIECES_PER_REQUEST,
   MAX_FETCH_RESPONSE_BYTES,
   MAX_STORAGE_QUOTA_BYTES,
   MAX_STORAGE_VALUE_BYTES,
   PluginCrashError,
   TimeoutError,
+  isWorkerToMainMessage,
 } from './protocol';
 import type {
-  WorkerToMainMessage,
   CapabilityRequestMessage,
   LoadedMessage,
   LoadErrorMessage,
@@ -158,7 +160,11 @@ export class PluginBridge {
 
     return new Promise<ToolResult>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.pendingExecutions.delete(requestId);
+        const pending = this.pendingExecutions.get(requestId);
+        if (pending) {
+          this.rollbackModifications(pending.bridgeState);
+          this.pendingExecutions.delete(requestId);
+        }
         reject(new TimeoutError(requestId, EXECUTION_TIMEOUT_MS));
       }, EXECUTION_TIMEOUT_MS);
 
@@ -175,8 +181,17 @@ export class PluginBridge {
 
   // ─── Worker Message Routing ────────────────────────────────────────────────
 
-  private handleWorkerMessage(event: MessageEvent<WorkerToMainMessage>): void {
+  private handleWorkerMessage(event: MessageEvent): void {
     const msg = event.data;
+
+    // Validate message structure at the trust boundary
+    if (!isWorkerToMainMessage(msg)) {
+      console.warn(
+        `[PluginBridge:${this.pluginId}] Received unrecognized message from Worker:`,
+        typeof msg === 'object' && msg !== null ? (msg as Record<string, unknown>).type : typeof msg,
+      );
+      return;
+    }
 
     switch (msg.type) {
       case 'loaded':
@@ -215,7 +230,10 @@ export class PluginBridge {
 
   private handleResult(msg: ResultMessage): void {
     const pending = this.pendingExecutions.get(msg.requestId);
-    if (!pending) return;
+    if (!pending) {
+      console.warn(`[PluginBridge:${this.pluginId}] Received 'result' for unknown requestId '${msg.requestId}' — likely timed out`);
+      return;
+    }
 
     clearTimeout(pending.timer);
     this.pendingExecutions.delete(msg.requestId);
@@ -228,7 +246,10 @@ export class PluginBridge {
 
   private handleError(msg: ErrorMessage): void {
     const pending = this.pendingExecutions.get(msg.requestId);
-    if (!pending) return;
+    if (!pending) {
+      console.warn(`[PluginBridge:${this.pluginId}] Received 'error' for unknown requestId '${msg.requestId}' — likely timed out`);
+      return;
+    }
 
     clearTimeout(pending.timer);
     this.pendingExecutions.delete(msg.requestId);
@@ -307,7 +328,7 @@ export class PluginBridge {
     }
 
     try {
-      const args = msg.args as unknown as Record<string, unknown>;
+      const args = msg.args;
       const data = await this.executeCapability(method, args, bridgeState);
       this.worker.postMessage({
         type: 'capabilityResult',
@@ -479,9 +500,9 @@ export class PluginBridge {
       }
     }
 
-    // Take snapshot before first modification (for rollback)
+    // Take deep snapshot before first modification (for rollback)
     if (!bridgeState.pieceSnapshots.has(piece.id)) {
-      bridgeState.pieceSnapshots.set(piece.id, { ...existing });
+      bridgeState.pieceSnapshots.set(piece.id, structuredClone(existing));
     }
 
     bridgeState.modifiedPieceIds.add(piece.id);
@@ -499,28 +520,46 @@ export class PluginBridge {
 
   private async capFetch(args: Record<string, unknown>): Promise<{ status: number; body: string }> {
     const url = args['url'] as string;
-    const options = (args['options'] as RequestInit | undefined) ?? {};
+    const rawOptions = (args['options'] as Record<string, unknown> | undefined) ?? {};
 
     if (!this.networkValidator.isUrlAllowed(url)) {
       throw new Error(`fetch: URL '${url}' is not in the allowlist or targets a private network`);
     }
 
     if (!this.networkValidator.checkRateLimit()) {
-      throw new Error(`fetch: rate limit exceeded (max ${60} requests per minute)`);
+      throw new Error(`fetch: rate limit exceeded (max ${FETCH_RATE_LIMIT_PER_MINUTE} requests per minute)`);
     }
 
-    const response = await fetch(url, options);
+    // Sanitize RequestInit — only allow safe properties, force security defaults
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CAPABILITY_TIMEOUT_MS);
+    const sanitizedOptions: RequestInit = {
+      method: typeof rawOptions.method === 'string' ? rawOptions.method : 'GET',
+      headers: rawOptions.headers as HeadersInit | undefined,
+      body: rawOptions.body as BodyInit | undefined,
+      // Security: force safe defaults — never send cookies, block redirects to private IPs
+      credentials: 'omit',
+      redirect: 'error',
+      mode: 'cors',
+      signal: controller.signal,
+    };
 
-    // Cap response at 10 MB
-    const blob = await response.blob();
-    if (blob.size > MAX_FETCH_RESPONSE_BYTES) {
-      throw new Error(
-        `fetch: response body exceeds the ${MAX_FETCH_RESPONSE_BYTES / (1024 * 1024)} MiB limit`,
-      );
+    try {
+      const response = await fetch(url, sanitizedOptions);
+
+      // Cap response at 10 MB
+      const blob = await response.blob();
+      if (blob.size > MAX_FETCH_RESPONSE_BYTES) {
+        throw new Error(
+          `fetch: response body exceeds the ${MAX_FETCH_RESPONSE_BYTES / (1024 * 1024)} MiB limit`,
+        );
+      }
+
+      const body = await blob.text();
+      return { status: response.status, body };
+    } finally {
+      clearTimeout(timer);
     }
-
-    const body = await blob.text();
-    return { status: response.status, body };
   }
 
   // ─── getStorage ─────────────────────────────────────────────────────────────
@@ -531,8 +570,9 @@ export class PluginBridge {
     try {
       const value = localStorage.getItem(storageKey);
       return { value };
-    } catch {
-      return { value: null };
+    } catch (err) {
+      console.error(`[PluginBridge:${this.pluginId}] localStorage.getItem failed for '${storageKey}':`, err);
+      throw new Error(`getStorage: unable to read key '${key}' — localStorage may be unavailable`);
     }
   }
 
@@ -566,8 +606,10 @@ export class PluginBridge {
           totalBytes += new TextEncoder().encode(v).length;
         }
       }
-    } catch {
-      // If we can't read storage to check quota, allow and let the set fail naturally
+    } catch (err) {
+      // Fail closed: if we can't verify quota, deny the write
+      console.error(`[PluginBridge:${this.pluginId}] Cannot verify storage quota:`, err);
+      throw new Error('setStorage: unable to verify storage quota — write denied. localStorage may be unavailable.');
     }
 
     if (totalBytes + valueBytes > MAX_STORAGE_QUOTA_BYTES) {
@@ -623,14 +665,27 @@ export class PluginBridge {
    * Called when the Worker crashes mid-execution.
    */
   private rollbackModifications(bridgeState: BridgeState): void {
+    let rollbackFailures = 0;
     for (const [pieceId, snapshot] of bridgeState.pieceSnapshots) {
-      // Only roll back if the piece was actually modified
       if (bridgeState.modifiedPieceIds.has(pieceId)) {
         try {
           this.dispatch(updatePiece(snapshot));
-        } catch {
-          // Best-effort rollback; swallow errors
+        } catch (err) {
+          rollbackFailures++;
+          console.error(
+            `[PluginBridge:${this.pluginId}] Failed to rollback piece '${pieceId}':`, err,
+          );
         }
+      }
+    }
+    if (rollbackFailures > 0) {
+      try {
+        this.dispatch(setPluginError({
+          id: this.pluginId,
+          error: `Crash rollback partially failed: ${rollbackFailures} piece(s) could not be restored. Manual undo may be required.`,
+        }));
+      } catch {
+        // Dispatch itself failed
       }
     }
   }

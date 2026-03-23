@@ -177,8 +177,8 @@ export interface CapabilityRequestMessage {
   requestId: string;
   /** Capability method being invoked (e.g. `'getPieces'`, `'fetch'`). */
   method: string;
-  /** Arguments passed to the capability method. */
-  args: unknown[];
+  /** Arguments passed to the capability method (key-value pairs). */
+  args: Record<string, unknown>;
 }
 
 /** Union of all messages the Worker sends to the main thread. */

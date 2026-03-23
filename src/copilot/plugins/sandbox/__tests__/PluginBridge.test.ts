@@ -107,7 +107,7 @@ function sendCapabilityRequest(
     type: 'capability',
     requestId,
     method,
-    args: args as unknown[],
+    args: args as Record<string, unknown>,
   };
   worker.simulateMessage(msg);
 }

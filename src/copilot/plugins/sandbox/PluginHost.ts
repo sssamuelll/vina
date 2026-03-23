@@ -235,11 +235,8 @@ export class PluginHost {
    * plugins without an explicit version declaration still work.
    */
   private resolveApiVersion(manifest: PluginManifest): number {
-    // PluginManifest does not currently declare apiVersion; keep this method
-    // as an extension point and default to 1.
-    const manifestAsAny = manifest as unknown as Record<string, unknown>;
-    if (typeof manifestAsAny['apiVersion'] === 'number') {
-      return manifestAsAny['apiVersion'] as number;
+    if (manifest.apiVersion != null) {
+      return manifest.apiVersion;
     }
     console.warn(
       `[PluginHost] Plugin "${manifest.id}" has no apiVersion in manifest; ` +
@@ -260,7 +257,16 @@ export class PluginHost {
    * @param pluginId - Used only for error messages.
    */
   private waitForLoaded(worker: Worker, pluginId: string): Promise<ToolSchema[]> {
+    const LOAD_TIMEOUT_MS = 30_000;
+
     return new Promise<ToolSchema[]>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(
+          `Plugin "${pluginId}" failed to load: timed out after ${LOAD_TIMEOUT_MS}ms waiting for 'loaded' message`,
+        ));
+      }, LOAD_TIMEOUT_MS);
+
       const onMessage = (event: MessageEvent): void => {
         const msg = event.data as { type: string };
 
@@ -275,8 +281,6 @@ export class PluginHost {
             ),
           );
         }
-        // Ignore other message types (e.g. capability requests that arrive
-        // before the bridge's listener is fully active).
       };
 
       const onError = (event: ErrorEvent): void => {
@@ -285,6 +289,7 @@ export class PluginHost {
       };
 
       const cleanup = (): void => {
+        clearTimeout(timer);
         worker.removeEventListener('message', onMessage);
         worker.removeEventListener('error', onError);
       };
@@ -328,9 +333,7 @@ export function defaultBridgeFactory(
     pluginId: manifest.id,
     pluginName: manifest.name,
     grantedPermissions: manifest.permissions,
-    // Network allowlist is empty by default. Production callers can subclass
-    // or wrap this factory to populate it from the manifest or host config.
-    networkAllowlist: [],
+    networkAllowlist: manifest.networkAllowlist ?? [],
     dispatch,
     getState,
   });

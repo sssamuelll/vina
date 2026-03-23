@@ -1,5 +1,4 @@
-// TODO: import FETCH_RATE_LIMIT_PER_MINUTE from './protocol' once Task 1 (protocol.ts) is committed
-const FETCH_RATE_LIMIT_PER_MINUTE = 60;
+import { FETCH_RATE_LIMIT_PER_MINUTE } from './protocol';
 
 /**
  * Regex patterns that match private / reserved IP ranges that plugins must not
@@ -12,6 +11,8 @@ const FETCH_RATE_LIMIT_PER_MINUTE = 60;
  *   0.x.x.x           — Reserved "this" network
  *   localhost          — Hostname alias for loopback
  *   ::1 / [::1]       — IPv6 loopback
+ *   ::ffff:x.x.x.x    — IPv6-mapped IPv4 addresses
+ *   [0:0:0:0:0:0:0:1] — Full-form IPv6 loopback
  */
 const PRIVATE_IP_PATTERNS: RegExp[] = [
   /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
@@ -22,6 +23,13 @@ const PRIVATE_IP_PATTERNS: RegExp[] = [
   /^0\.\d{1,3}\.\d{1,3}\.\d{1,3}$/,
   /^localhost$/i,
   /^\[?::1\]?$/,
+  // IPv6-mapped IPv4 private ranges
+  /^\[?::ffff:(10|127|0)\.\d{1,3}\.\d{1,3}\.\d{1,3}\]?$/i,
+  /^\[?::ffff:192\.168\.\d{1,3}\.\d{1,3}\]?$/i,
+  /^\[?::ffff:172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}\]?$/i,
+  /^\[?::ffff:169\.254\.\d{1,3}\.\d{1,3}\]?$/i,
+  // Full-form IPv6 loopback
+  /^\[?0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}:0{0,4}1?\]?$/,
 ];
 
 /**
@@ -75,8 +83,26 @@ export class NetworkValidator {
     }
 
     // Rule 3 — block private / reserved IP ranges and hostnames
+    // Check the raw hostname
     const hostname = parsed.hostname;
     if (isPrivateHost(hostname)) {
+      return false;
+    }
+
+    // Also block non-standard IP encodings (decimal, hex, octal)
+    // by checking if the hostname is purely numeric (decimal IP like 2130706433)
+    if (/^\d+$/.test(hostname)) {
+      return false; // Decimal IP — block all (could resolve to private)
+    }
+    if (/^0x[0-9a-f]+$/i.test(hostname)) {
+      return false; // Hex IP
+    }
+    if (/^0\d+/.test(hostname)) {
+      return false; // Octal IP
+    }
+
+    // Only allow http: and https: schemes
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return false;
     }
 
