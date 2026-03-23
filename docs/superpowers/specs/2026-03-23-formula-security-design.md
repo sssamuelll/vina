@@ -6,6 +6,8 @@
 
 Replace dynamic code construction in both formula evaluators with a hand-rolled recursive descent parser. Zero dependencies, zero eval, ~200 lines.
 
+**Scope boundary:** This spec addresses audit Finding #06 (dynamic code construction). The `resolveVariables` caller-level fallback-to-0 for failed variable resolution is audit Finding #04's territory — `resolveVariables` intentionally catches errors for dependency cycles and forward references. This spec ensures `evaluateFormula` itself produces clear errors instead of silently computing wrong results; propagation of those errors through the call stack is a separate concern.
+
 ## Architecture
 
 One shared safe evaluator, two thin adapters:
@@ -60,6 +62,17 @@ call           → IDENT '(' arguments ')' | primary
 arguments      → (expression (',' expression)*)?
 primary        → NUMBER | IDENT | '(' expression ')'
 ```
+
+### Evaluation semantics
+
+- **Ternary short-circuits:** only the taken branch is evaluated. `x > 0 ? 1/x : 0` with `x = 0` returns `0` without evaluating `1/x`. This matches every mainstream language and is essential for guard expressions common in garment formulas (e.g., `waistEase > 0 ? bustWidth / waistEase : bustWidth`).
+- **`&&` and `||` short-circuit:** `0 && expr` returns `0` without evaluating `expr`. `1 || expr` returns `1`.
+- **Division by zero throws immediately:** `1 / 0` throws `"Division by zero"` at the `/` operator, not as a post-evaluation NaN/Infinity check. This catches the problem at its source rather than allowing intermediate Infinity to propagate through further computation.
+- **Comparison chaining is intentionally disallowed:** `a <= x <= b` is a syntax error. The parser produces a helpful message: `"Chained comparisons not supported. Use a <= x && x <= b instead."` This prevents the classic JS footgun where `1 < 2 < 3` silently evaluates as `(true) < 3`.
+
+### Tokenizer
+
+The tokenizer's `IDENT` rule matches Unicode letters: `[\p{L}_][\p{L}\p{N}_]*`. This ensures that if an adapter's variable substitution fails to resolve a Cyrillic or accented name, the unresolved identifier passes through to `safeEval` and produces a clear `"Undefined variable: ШиринаСпины"` error instead of a cryptic tokenizer error.
 
 ### Built-in functions (whitelist)
 
@@ -138,13 +151,14 @@ Fix silent `return '0'` fallbacks for unknown references:
 - `"Unexpected token ')' at position 12"` — syntax error
 - `"Unknown function: xyz"` — disallowed function name
 - `"Undefined variable: foo"` — variable not in scope
-- `"Formula resulted in invalid number"` — NaN or Infinity result
+- `"Division by zero"` — thrown immediately at `/` or `%` operators when divisor is 0
+- `"Formula resulted in invalid number"` — final result is NaN (post-evaluation guard)
+
+Division by zero is caught eagerly at the operator, not as a post-evaluation check. This prevents intermediate `Infinity` from propagating through further computation and producing misleading results (e.g., `(1/0) > 0 ? 1 : 0` would yield `1` if Infinity propagated).
 
 Adapters convert to their existing contracts:
 - `formulaEngine.ts` → `{ value: NaN, error: 'message' }` (unchanged API)
 - `seamly2d/formulaEvaluator.ts` → throws Error (unchanged API)
-
-Post-evaluation guard: if result is `NaN` or `±Infinity`, `safeEval` throws rather than returning silently.
 
 ---
 
@@ -157,12 +171,12 @@ Post-evaluation guard: if result is `NaN` or `±Infinity`, `safeEval` throws rat
 - **Unary:** `-5`, `--5 = 5`, `-(-3)`
 - **Comparison:** `1 < 2`, `3 >= 3`, `1 == 1`, `1 != 2`
 - **Boolean:** `1 && 0 = 0`, `0 || 1 = 1`, `!0 = 1`
-- **Ternary:** `1 > 0 ? 10 : 20 = 10`, nested
+- **Ternary:** `1 > 0 ? 10 : 20 = 10`, nested, short-circuit (`0 > 0 ? 1/0 : 42 = 42` — does not throw)
 - **Functions:** `sqrt(16) = 4`, `min(3, 1, 2) = 1`, `max(1, 5, 3) = 5`, `abs(-7) = 7`, `round(3.6) = 4`, `atan2(1, 1)`, `pow(2, 8) = 256`
-- **Constants:** `PI ≈ 3.14159`, `E ≈ 2.71828`
+- **Constants:** `PI ≈ 3.14159`, `E` as variable name works (not shadowed by constant)
 - **Variables:** `safeEval('x + y', { x: 3, y: 4 }) = 7`
 - **Security:** attempts to call dangerous functions throw, unknown function throws
-- **Errors:** unknown variable throws, syntax error throws, empty string throws, `1/0` → throws (Infinity)
+- **Errors:** unknown variable throws, syntax error throws, empty string throws, `1/0` → throws (division by zero), `a <= x <= b` → throws with helpful message, chained comparison guidance
 
 ### Existing tests must continue passing
 
@@ -186,6 +200,10 @@ Post-evaluation guard: if result is `NaN` or `±Infinity`, `safeEval` throws rat
 |------|---------|
 | `src/utils/formula/formulaEngine.ts` | Replace dynamic code construction with `safeEval` call |
 | `src/utils/seamly2d/formulaEvaluator.ts` | Replace dynamic code construction + regex checks with `safeEval`, fix silent zero fallbacks |
+
+### Performance note
+
+The recursive descent parser re-parses the formula string on every evaluation. For the current usage (~200 construction points per pattern, short formulas), this is negligible. If patterns grow to 1000+ points or formulas become complex, AST caching could be added (parse once, evaluate many times with different variables). This is deferred as premature optimization — the parser is ~200 lines and formulas are short arithmetic expressions.
 
 ### Acceptance Criteria (from issue)
 
