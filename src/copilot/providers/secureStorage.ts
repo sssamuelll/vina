@@ -1,6 +1,8 @@
 /**
  * Secure storage for sensitive data like API keys.
- * Uses sessionStorage (cleared on tab close) with base64 obfuscation.
+ * Uses sessionStorage (cleared on tab close) with base64 encoding.
+ * Note: base64 is NOT encryption — it only prevents accidental visual
+ * exposure of keys in devtools. It does not protect against XSS.
  *
  * @module copilot/providers/secureStorage
  */
@@ -9,13 +11,15 @@ export class SecureStorage {
   private static PREFIX = 'openclo-secure-';
 
   /**
-   * Store a value securely.
+   * Store a value securely. Returns true on success, false if storage is unavailable.
    */
-  static set(key: string, value: string): void {
+  static set(key: string, value: string): boolean {
     try {
       sessionStorage.setItem(this.PREFIX + key, btoa(value));
-    } catch {
-      // Ignore storage errors (e.g., private browsing)
+      return true;
+    } catch (err) {
+      console.warn('[SecureStorage] Failed to store key — sessionStorage may be unavailable:', key, err);
+      return false;
     }
   }
 
@@ -26,7 +30,8 @@ export class SecureStorage {
     try {
       const val = sessionStorage.getItem(this.PREFIX + key);
       return val ? atob(val) : null;
-    } catch {
+    } catch (err) {
+      console.warn('[SecureStorage] Failed to read key:', key, err);
       return null;
     }
   }
@@ -38,7 +43,7 @@ export class SecureStorage {
     try {
       sessionStorage.removeItem(this.PREFIX + key);
     } catch {
-      // Ignore
+      // Storage removal failure is non-critical
     }
   }
 
@@ -56,7 +61,7 @@ export class SecureStorage {
       }
       keysToRemove.forEach(k => sessionStorage.removeItem(k));
     } catch {
-      // Ignore
+      // Clear failure is non-critical
     }
   }
 }

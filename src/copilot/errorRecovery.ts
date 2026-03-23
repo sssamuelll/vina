@@ -296,35 +296,79 @@ export function simplifyOutline(
 
 // ─── Provider Fallback ──────────────────────────────────────────────────────
 
-/** Stored fallback provider configuration key (non-secret fields only) */
+/**
+ * localStorage key for fallback provider configuration.
+ * After migration, contains non-secret fields only (provider, model, baseUrl).
+ * Note: the legacy format used this same key but stored the full config including
+ * the API key. clearLegacyFallbackKeys() strips the apiKey field from any existing
+ * entry at this key and migrates it to SecureStorage for the current session.
+ */
 const FALLBACK_PROVIDER_KEY = 'openclo-fallback-provider';
 /** SecureStorage key for fallback provider API key */
 const FALLBACK_APIKEY_SECURE_KEY = 'fallback-apikey';
-/** Legacy key that stored full config including API key — cleared on startup */
-const LEGACY_FALLBACK_KEY = 'openclo-fallback-provider';
 
 /**
- * Remove any API keys stored in localStorage from the legacy fallback provider format.
+ * Strip any API key from the fallback provider config in localStorage and IndexedDB.
+ * Re-saves the config without the apiKey field. Migrates the key to SecureStorage
+ * for the current session so the user doesn't lose their fallback immediately.
+ *
+ * Idempotent — safe to call on every startup. No-ops if no apiKey field exists.
  * Call once on app startup to migrate away from insecure storage.
  */
 export function clearLegacyFallbackKeys(): void {
+  // Clean localStorage
   try {
-    const saved = localStorage.getItem(LEGACY_FALLBACK_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
-        // Re-save without the API key
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { apiKey: _removed, ...rest } = parsed;
-        localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
-      }
+    const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
+    if (!saved) return;
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(saved);
+    } catch (parseErr) {
+      // Corrupted data — remove the entire key to be safe (may contain a key in raw text)
+      console.warn('[Security] Failed to parse legacy fallback config, removing entire key:', parseErr);
+      localStorage.removeItem(FALLBACK_PROVIDER_KEY);
+      return;
     }
-  } catch { /* ignore */ }
+
+    if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
+      // Migrate API key to SecureStorage for the current session
+      SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
+      // Re-save without the API key
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { apiKey: _removed, ...rest } = parsed;
+      localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
+      console.info('[Security] Migrated legacy API key from localStorage to SecureStorage');
+    }
+  } catch (err) {
+    // Storage itself is inaccessible — log but do not crash app
+    console.error('[Security] Failed to clear legacy API keys from localStorage:', err);
+  }
+
+  // Clean IndexedDB (async, fire-and-forget but with logging)
+  import("../utils/storage").then(async ({ storageGet, storageSet }) => {
+    try {
+      const idbConfig = await storageGet("settings", "fallback-provider");
+      if (idbConfig && typeof idbConfig === 'object' && 'apiKey' in idbConfig) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { apiKey: _removed, ...rest } = idbConfig as Record<string, unknown>;
+        await storageSet("settings", "fallback-provider", rest);
+        console.info('[Security] Cleared legacy API key from IndexedDB');
+      }
+    } catch (err) {
+      console.warn('[Security] Failed to clean IndexedDB fallback provider entry:', err);
+    }
+  }).catch((err) => {
+    console.warn('[Security] Failed to load storage module for IndexedDB cleanup:', err);
+  });
 }
 
 /**
  * Load a fallback provider configuration.
  * Non-secret config from localStorage, API key from SecureStorage (sessionStorage).
+ *
+ * Note: after the browser tab is closed, the API key is lost (sessionStorage is
+ * ephemeral). The user must re-enter it each session for fallback to be available.
  *
  * @returns Fallback provider config, or null if not configured
  */
@@ -341,29 +385,39 @@ export function loadFallbackProvider(): ProviderConfig | null {
       baseUrl: config.baseUrl,
       apiKey,
     };
-  } catch { /* ignore */ }
+  } catch (err) {
+    console.warn('[errorRecovery] Failed to load fallback provider config:', err);
+  }
   return null;
 }
 
 /**
  * Save a fallback provider configuration.
- * API key goes to SecureStorage (sessionStorage), non-secret config to localStorage.
+ * API key goes to SecureStorage (sessionStorage, cleared on tab close),
+ * non-secret config to localStorage and IndexedDB.
  *
  * @param config - Fallback provider configuration
  */
 export function saveFallbackProvider(config: ProviderConfig): void {
+  // Store API key in SecureStorage (sessionStorage, cleared on tab close)
+  const stored = SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
+  if (!stored) {
+    console.warn('[errorRecovery] API key could not be stored securely; fallback provider may not work after page refresh');
+  }
+  // Store non-secret config in localStorage and IndexedDB
+  const storedConfig = {
+    provider: config.provider,
+    model: config.model,
+    baseUrl: config.baseUrl,
+  };
+  import("../utils/storage")
+    .then(({ storageSet }) => { storageSet("settings", "fallback-provider", storedConfig); })
+    .catch((err) => { console.warn('[errorRecovery] storageSet for fallback provider failed:', err); });
   try {
-    // Store API key in SecureStorage (sessionStorage, cleared on tab close)
-    SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
-    // Store non-secret config in localStorage
-    const storedConfig = {
-      provider: config.provider,
-      model: config.model,
-      baseUrl: config.baseUrl,
-    };
-    import("../utils/storage").then(({ storageSet }) => { storageSet("settings", "fallback-provider", storedConfig); }).catch(() => {});
-    try { localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig)); } catch { /* ignore */ }
-  } catch { /* ignore */ }
+    localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig));
+  } catch (err) {
+    console.warn('[errorRecovery] localStorage write for fallback provider failed:', err);
+  }
 }
 
 /**
