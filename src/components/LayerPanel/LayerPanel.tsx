@@ -7,7 +7,7 @@ import {
 } from '../../store/projectSlice';
 import {
   toggleLayerVisibility, toggleHide3D,
-  setXrayMode, setLayerOutlineColor,
+  setXrayMode, setLayerOutlineColor, cleanupRemovedLayer,
 } from '../../store/simulationSlice';
 import { selectPiece } from '../../store/editorSlice';
 import LayerColorPicker from './LayerColorPicker';
@@ -141,6 +141,7 @@ export default function LayerPanel() {
   const handleContextDelete = useCallback(() => {
     if (!contextMenu) return;
     dispatch(removeLayer({ layer: contextMenu.layer }));
+    dispatch(cleanupRemovedLayer(contextMenu.layer));
     setContextMenu(null);
   }, [contextMenu, dispatch]);
 
@@ -186,7 +187,9 @@ export default function LayerPanel() {
     setDragOverLayer(layer);
   }, [layerLocked]);
 
-  const handleDragLeave = useCallback(() => {
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const related = e.relatedTarget as Node | null;
+    if (related && e.currentTarget.contains(related)) return;
     setDragOverLayer(null);
     setDragOverPieceId(null);
   }, []);

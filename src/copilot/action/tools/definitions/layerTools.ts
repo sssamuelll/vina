@@ -275,15 +275,29 @@ const toggleXrayModeTool: ToolDefinition = {
     },
     required: ['enabled'],
   },
-  execute: async (params, dispatch) => {
+  execute: async (
+    params: Record<string, unknown>,
+    dispatch: AppDispatch,
+    getState: () => RootState,
+  ): Promise<ToolResult> => {
+    const state = getState();
+    const wasEnabled = state.simulation.xrayMode;
+    const previousActiveLayer = state.simulation.xrayActiveLayer;
+
     dispatch(setXrayMode({
       enabled: params.enabled as boolean,
       activeLayer: params.activeLayer as number | undefined,
     }));
+
     return {
       success: true,
       data: { enabled: params.enabled, activeLayer: params.activeLayer },
-      rollback: () => { dispatch(setXrayMode({ enabled: !(params.enabled as boolean) })); },
+      rollback: () => {
+        dispatch(setXrayMode({
+          enabled: wasEnabled,
+          activeLayer: wasEnabled ? (previousActiveLayer ?? undefined) : undefined,
+        }));
+      },
     };
   },
 };
