@@ -113,6 +113,39 @@ describe('constructionSlice', () => {
     });
   });
 
+  describe('resolveAll — resolutionError propagation', () => {
+    it('clears resolutionError on successful re-resolution', () => {
+      let state = addAndGetState(emptyState, {
+        label: 'X',
+        definition: { type: 'endLine', basePoint: 'missing', angle: 0, length: 10 },
+      });
+      expect(state.points[0].resolutionError).toBeDefined();
+      const pointId = state.points[0].id;
+
+      state = reducer(state, resolveAll({
+        resolved: [{ id: pointId, x: 50, y: 60 }],
+      }));
+      expect(state.points[0].x).toBe(50);
+      expect(state.points[0].y).toBe(60);
+      expect(state.points[0].resolutionError).toBeUndefined();
+    });
+
+    it('sets resolutionError on failed re-resolution', () => {
+      let state = addAndGetState(emptyState, {
+        label: 'Y',
+        definition: { type: 'manual', x: 10, y: 20 },
+      });
+      expect(state.points[0].resolutionError).toBeUndefined();
+      const pointId = state.points[0].id;
+
+      state = reducer(state, resolveAll({
+        resolved: [{ id: pointId, x: 0, y: 0, resolutionError: 'Point "base" not found' }],
+      }));
+      expect(state.points[0].x).toBe(0);
+      expect(state.points[0].resolutionError).toBe('Point "base" not found');
+    });
+  });
+
   describe('removePoint — cascade flagging', () => {
     it('flags dependent points with resolutionError when referenced point is deleted', () => {
       let state = addAndGetState(emptyState, {

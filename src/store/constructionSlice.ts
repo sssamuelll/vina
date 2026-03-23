@@ -292,10 +292,14 @@ const constructionSlice = createSlice({
     },
 
     // ─── Bulk resolve — updates all point coordinates after measurement/variable change ───
-    resolveAll(state, action: PayloadAction<{ resolved: Array<{ id: string; x: number; y: number }> }>) {
-      for (const { id, x, y } of action.payload.resolved) {
+    resolveAll(state, action: PayloadAction<{ resolved: Array<{ id: string; x: number; y: number; resolutionError?: string }> }>) {
+      for (const { id, x, y, resolutionError } of action.payload.resolved) {
         const point = state.points.find(p => p.id === id);
-        if (point) { point.x = x; point.y = y; }
+        if (point) {
+          point.x = x;
+          point.y = y;
+          point.resolutionError = resolutionError; // cleared to undefined on success
+        }
       }
     },
 
