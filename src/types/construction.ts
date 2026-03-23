@@ -29,6 +29,8 @@ export interface CPoint {
   visible: boolean;
   /** Block this point belongs to (for overlay grouping) */
   blockId?: string;
+  /** Set when resolution failed — x,y are unreliable (0,0 or stale) */
+  resolutionError?: string;
 }
 
 export type PointDefinition =
