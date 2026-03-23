@@ -25,6 +25,7 @@ interface DraggablePieceProps {
   position: [number, number, number];
   rotation?: [number, number, number];
   arrangementOverride?: [number, number, number];
+  flippedPieceIds?: string[];
   canDrag: boolean;
   onSelect: (pieceId: string, shiftKey: boolean) => void;
   onDragEnd: (pieceId: string, position: [number, number, number]) => void;
@@ -40,6 +41,7 @@ export default function DraggablePiece({
   position,
   rotation,
   arrangementOverride,
+  flippedPieceIds,
   canDrag,
   onSelect,
   onDragEnd,
@@ -49,6 +51,7 @@ export default function DraggablePiece({
 }: DraggablePieceProps) {
   const groupRef = useRef<THREE.Group>(null);
   const actualPos = arrangementOverride || position;
+  const isFlipped = flippedPieceIds?.includes(piece.id) ?? false;
 
   const handleClick = useCallback((e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
@@ -86,7 +89,7 @@ export default function DraggablePiece({
         onMouseDown={handleMouseDown}
         onMouseUp={handleMouseUp}
       >
-        <group ref={groupRef} onClick={handleClick} position={actualPos}>
+        <group ref={groupRef} onClick={handleClick} position={actualPos} scale={[1, 1, isFlipped ? -1 : 1]}>
           <PieceMesh
             piece={piece}
             isSelected={isSelected}
@@ -102,7 +105,7 @@ export default function DraggablePiece({
   }
 
   return (
-    <group onClick={handleClick}>
+    <group onClick={handleClick} scale={[1, 1, isFlipped ? -1 : 1]}>
       <PieceMesh
         piece={piece}
         isSelected={isSelected}

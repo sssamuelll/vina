@@ -1,7 +1,8 @@
 /**
  * Redux slice for cloth simulation state.
  *
- * Manages simulation lifecycle (idle/running/paused) and per-piece fabric assignments.
+ * Manages simulation lifecycle (idle/running/paused), per-piece fabric assignments,
+ * layer visibility, and X-ray transparency mode.
  *
  * @module simulationSlice
  */
@@ -109,6 +110,10 @@ interface SimulationSliceState {
   dragCoefficient: number;
   /** IDs of pieces whose particles are frozen (zero velocity, skip solver) */
   frozenPieceIds: string[];
+  /** Piece IDs hidden in 3D viewport (excluded from simulation and rendering) */
+  hiddenPieceIds: string[];
+  /** Piece IDs with flipped normals in 3D */
+  flippedPieceIds: string[];
   /** Latest fit map statistics (null when no fit map active) */
   fitMapStats: FitMapStats | null;
   /** Per-piece color tint (hex string, white = no tint) */
@@ -122,6 +127,12 @@ interface SimulationSliceState {
   }>;
   /** Per-piece UV transform */
   pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number }>;
+  /** Per-piece opacity overrides (0-1, undefined = use fabric default) */
+  pieceOpacity: Record<string, number>;
+  /** Per-piece emission color (hex, undefined = no emission) */
+  pieceEmission: Record<string, string>;
+  /** Per-piece emission intensity (0-5, default 0) */
+  pieceEmissionIntensity: Record<string, number>;
   /** Steam brush tool state (damps particle velocity on brush stroke) */
   steamBrush: {
     active: boolean;
@@ -134,6 +145,16 @@ interface SimulationSliceState {
     radius: number;
     strength: number;
   };
+  /** Layer IDs hidden in 3D viewport */
+  hiddenLayerIds: number[];
+  /** Per-layer outline color for 3D wireframe indicators */
+  layerOutlineColors: Record<number, string>;
+  /** Whether X-ray mode is active (non-active layers rendered translucent) */
+  xrayMode: boolean;
+  /** Active layer during X-ray mode */
+  xrayActiveLayer: number | null;
+  /** Snapshot of pieceOpacity before X-ray mode was enabled (for restore) */
+  xrayOpacitySnapshot: Record<string, number> | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -169,10 +190,15 @@ const initialState: SimulationSliceState = {
   windEnabled: false,
   dragCoefficient: 1.0,
   frozenPieceIds: [],
+  hiddenPieceIds: [],
+  flippedPieceIds: [],
   fitMapStats: null,
   pieceTints: {},
   pieceTextureOverrides: {},
   pieceUVTransforms: {},
+  pieceOpacity: {},
+  pieceEmission: {},
+  pieceEmissionIntensity: {},
   steamBrush: {
     active: false,
     radius: 0.05,
@@ -183,6 +209,11 @@ const initialState: SimulationSliceState = {
     radius: 0.08,
     strength: 0.6,
   },
+  hiddenLayerIds: [],
+  layerOutlineColors: {},
+  xrayMode: false,
+  xrayActiveLayer: null,
+  xrayOpacitySnapshot: null,
 };
 
 const simulationSlice = createSlice({
@@ -388,6 +419,40 @@ const simulationSlice = createSlice({
     unfreezeAllPieces(state) {
       state.frozenPieceIds = [];
     },
+
+    // ─── 3D Arrangement: Hide / Flip ────────────────────────────────────────────
+
+    /** Toggle hide state for a single piece in 3D (add if absent, remove if present). */
+    toggleHide3D(state, action: PayloadAction<string>) {
+      const idx = state.hiddenPieceIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenPieceIds.splice(idx, 1);
+      } else {
+        state.hiddenPieceIds.push(action.payload);
+      }
+    },
+    /** Show all pieces (clear hidden list). */
+    showAll3D(state) {
+      state.hiddenPieceIds = [];
+    },
+    /** Hide specific pieces by ID list. */
+    hideAll3D(state, action: PayloadAction<string[]>) {
+      state.hiddenPieceIds = action.payload;
+    },
+    /** Toggle flipped normal for a single piece in 3D. */
+    toggleFlipNormal(state, action: PayloadAction<string>) {
+      const idx = state.flippedPieceIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.flippedPieceIds.splice(idx, 1);
+      } else {
+        state.flippedPieceIds.push(action.payload);
+      }
+    },
+    /** Clear all flipped normals. */
+    clearFlippedNormals(state) {
+      state.flippedPieceIds = [];
+    },
+
     /** Set the latest fit map statistics (null to clear). */
     setFitMapStats(state, action: PayloadAction<FitMapStats | null>) {
       state.fitMapStats = action.payload;
@@ -429,6 +494,44 @@ const simulationSlice = createSlice({
       };
     },
 
+    // ─── Opacity & Emission ──────────────────────────────────────────────────
+
+    /** Set per-piece opacity (0-1). Removes override when fully opaque. */
+    setPieceOpacity(state, action: PayloadAction<{ pieceId: string; opacity: number }>) {
+      const { pieceId, opacity } = action.payload;
+      if (!Number.isFinite(opacity)) return;
+      if (opacity >= 1.0) {
+        delete state.pieceOpacity[pieceId];
+      } else {
+        state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity));
+      }
+    },
+    /** Set opacity for multiple pieces in a single dispatch. */
+    setBatchPieceOpacity(state, action: PayloadAction<Record<string, number>>) {
+      for (const [pieceId, opacity] of Object.entries(action.payload)) {
+        if (!Number.isFinite(opacity)) continue;
+        if (opacity >= 1.0) { delete state.pieceOpacity[pieceId]; }
+        else { state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity)); }
+      }
+    },
+    /** Clear per-piece opacity override. */
+    clearPieceOpacity(state, action: PayloadAction<string>) {
+      delete state.pieceOpacity[action.payload];
+    },
+    /** Set per-piece emission color and optional intensity. */
+    setPieceEmission(state, action: PayloadAction<{ pieceId: string; color: string; intensity?: number }>) {
+      const { pieceId, color, intensity } = action.payload;
+      state.pieceEmission[pieceId] = color;
+      if (intensity !== undefined && Number.isFinite(intensity)) {
+        state.pieceEmissionIntensity[pieceId] = Math.max(0, Math.min(5, intensity));
+      }
+    },
+    /** Clear per-piece emission color and intensity. */
+    clearPieceEmission(state, action: PayloadAction<string>) {
+      delete state.pieceEmission[action.payload];
+      delete state.pieceEmissionIntensity[action.payload];
+    },
+
     // ─── Steam Brush ──────────────────────────────────────────────────────────
 
     /** Activate or deactivate the steam brush tool. */
@@ -458,9 +561,66 @@ const simulationSlice = createSlice({
     setMeshGrabStrength(state, action: PayloadAction<number>) {
       state.meshGrab.strength = Math.max(0, Math.min(1, action.payload));
     },
+
+    // ─── Layer Visibility ────────────────────────────────────────────────────────
+
+    toggleLayerVisibility(state, action: PayloadAction<number>) {
+      const idx = state.hiddenLayerIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenLayerIds.splice(idx, 1);
+      } else {
+        state.hiddenLayerIds.push(action.payload);
+      }
+    },
+    showAllLayers(state) {
+      state.hiddenLayerIds = [];
+    },
+    setLayerOutlineColor(state, action: PayloadAction<{ layer: number; color: string }>) {
+      state.layerOutlineColors[action.payload.layer] = action.payload.color;
+    },
+    setXrayMode(state, action: PayloadAction<{ enabled: boolean; activeLayer?: number }>) {
+      if (action.payload.enabled) {
+        if (!state.xrayMode) {
+          state.xrayOpacitySnapshot = { ...state.pieceOpacity };
+        }
+        state.xrayMode = true;
+        state.xrayActiveLayer = action.payload.activeLayer ?? null;
+      } else {
+        if (state.xrayOpacitySnapshot) {
+          state.pieceOpacity = { ...state.xrayOpacitySnapshot };
+        }
+        state.xrayOpacitySnapshot = null;
+        state.xrayMode = false;
+        state.xrayActiveLayer = null;
+      }
+    },
+    setXrayActiveLayer(state, action: PayloadAction<number>) {
+      state.xrayActiveLayer = action.payload;
+    },
+    cleanupRemovedLayer(state, action: PayloadAction<number>) {
+      state.hiddenLayerIds = state.hiddenLayerIds.filter(id => id !== action.payload);
+      delete state.layerOutlineColors[action.payload];
+      if (state.xrayActiveLayer === action.payload) {
+        state.xrayActiveLayer = null;
+      }
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
+    builder.addMatcher(
+      (action) => action.type === 'project/removePiece',
+      (state, action) => {
+        const pieceId = (action as unknown as { payload: string }).payload;
+        state.hiddenPieceIds = state.hiddenPieceIds.filter(id => id !== pieceId);
+        state.flippedPieceIds = state.flippedPieceIds.filter(id => id !== pieceId);
+        delete state.pieceOpacity[pieceId];
+        delete state.pieceEmission[pieceId];
+        delete state.pieceEmissionIntensity[pieceId];
+        delete state.pieceTints[pieceId];
+        delete state.pieceTextureOverrides[pieceId];
+        delete state.pieceUVTransforms[pieceId];
+      },
+    );
   },
 });
 
@@ -506,11 +666,23 @@ export const {
   setDragCoefficient,
   toggleFreezePiece,
   unfreezeAllPieces,
+  // 3D Arrangement: hide / flip
+  toggleHide3D,
+  showAll3D,
+  hideAll3D,
+  toggleFlipNormal,
+  clearFlippedNormals,
   setFitMapStats,
   // PBR material overrides
   setPieceTint,
   setPieceTextureOverride,
   setPieceUVTransform,
+  // Opacity & emission
+  setPieceOpacity,
+  setBatchPieceOpacity,
+  clearPieceOpacity,
+  setPieceEmission,
+  clearPieceEmission,
   // Steam brush
   setSteamBrushActive,
   setSteamBrushRadius,
@@ -519,6 +691,13 @@ export const {
   setMeshGrabActive,
   setMeshGrabRadius,
   setMeshGrabStrength,
+  // Layer visibility
+  toggleLayerVisibility,
+  showAllLayers,
+  setLayerOutlineColor,
+  setXrayMode,
+  setXrayActiveLayer,
+  cleanupRemovedLayer,
 } = simulationSlice.actions;
 
 /** @deprecated Use setSimulationMode */

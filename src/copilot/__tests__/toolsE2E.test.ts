@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 123 tools registered', () => {
-      expect(registry.size).toBe(159); // +5 pattern edit phase 2 tools (unfold, optimize, offset, polyPenDraw, replaceOutline)
+      expect(registry.size).toBe(171); // 166 (main + layers) + 5 pattern edit phase 2 tools
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(159); // +5 pattern edit phase 2 tools (unfold, optimize, offset, polyPenDraw, replaceOutline)
+      expect(names.length).toBe(171); // 166 (main + layers) + 5 pattern edit phase 2 tools
 
       // Key tools from every category
       const expected = [

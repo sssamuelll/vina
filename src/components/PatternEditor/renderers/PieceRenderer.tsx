@@ -1,9 +1,39 @@
 
 import { memo, useMemo } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../store';
 import { PatternPiece, PathCommand } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
 import { extractNodes } from '../nodeEditorUtils';
+import { getOutlineColor } from '../../../utils/layerColors';
+
+/** Compute bounding box extents of a path outline. */
+function getOutlineBounds(outline: PathCommand[]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const cmd of outline) {
+    const v = cmd.values;
+    if (cmd.type === 'M' || cmd.type === 'L') {
+      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+      if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
+    } else if (cmd.type === 'C') {
+      for (let i = 0; i < 6; i += 2) {
+        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
+        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
+      }
+    } else if (cmd.type === 'Q') {
+      for (let i = 0; i < 4; i += 2) {
+        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
+        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
+      }
+    } else if (cmd.type === 'H') {
+      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
+    } else if (cmd.type === 'V') {
+      if (v[0] < minY) minY = v[0]; if (v[0] > maxY) maxY = v[0];
+    }
+  }
+  return { minX, minY, maxX, maxY };
+}
 
 /** Compute bounding box center of a path outline. */
 function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {
@@ -46,6 +76,10 @@ interface SinglePieceProps {
   isEditingName: boolean;
   /** Group color for visual indicator (first group the piece belongs to) */
   groupColor?: string;
+  /** Layer outline color for left-border indicator */
+  layerColor?: string;
+  /** Whether the piece's layer is locked (reduced opacity + no pointer events) */
+  isLayerLocked?: boolean;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
   onPieceNameCancel?: () => void;
@@ -64,6 +98,8 @@ const SinglePiece = memo(function SinglePiece({
   selectedLineId,
   isEditingName,
   groupColor,
+  layerColor,
+  isLayerLocked,
   onPieceNameDoubleClick,
   onPieceNameSave,
   onPieceNameCancel,
@@ -73,14 +109,37 @@ const SinglePiece = memo(function SinglePiece({
     : '#4a9eff';
   const { cx, cy } = piece.outline?.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };
 
+  // Compute bounding box for layer color indicator
+  const bounds = piece.outline?.length ? getOutlineBounds(piece.outline) : null;
+
+  // Layer-locked: reduce opacity and disable pointer events
+  const groupOpacity = piece.active === false ? 0.3 : isLayerLocked ? 0.5 : 1;
+  const groupStyle: React.CSSProperties | undefined =
+    piece.active === false ? { filter: 'grayscale(100%)' }
+    : isLayerLocked ? { pointerEvents: 'none' as const }
+    : undefined;
+
   return (
     <g
       data-piece-id={piece.id}
       transform={`translate(${piece.position.x}, ${piece.position.y}) rotate(${piece.rotation}, ${cx}, ${cy})`}
       className={`pattern-piece ${isSelected ? 'selected' : ''}`}
-      opacity={piece.active === false ? 0.3 : 1}
-      style={piece.active === false ? { filter: 'grayscale(100%)' } : undefined}
+      opacity={groupOpacity}
+      style={groupStyle}
     >
+      {/* Layer color left-border indicator */}
+      {layerColor && bounds && (
+        <rect
+          x={bounds.minX - 4 / zoom2D}
+          y={bounds.minY}
+          width={3 / zoom2D}
+          height={bounds.maxY - bounds.minY}
+          fill={layerColor}
+          opacity={0.5}
+          pointerEvents="none"
+          rx={1.5 / zoom2D}
+        />
+      )}
       <path
         d={pathToSVG(piece.outline)}
         fill={
@@ -337,9 +396,16 @@ export default function PieceRenderer({
   onPieceNameSave,
   onPieceNameCancel
 }: PieceRendererProps) {
+  // Layer visibility selectors
+  const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
+  const layerOutlineColors = useSelector((s: RootState) => s.simulation.layerOutlineColors);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
+
   const sortedPieces = useMemo(
-    () => [...pieces].sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
-    [pieces],
+    () => [...pieces]
+      .filter(p => !hiddenLayerIds.includes(p.layer ?? 1))
+      .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+    [pieces, hiddenLayerIds],
   );
 
   return (
@@ -356,6 +422,8 @@ export default function PieceRenderer({
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
           groupColor={groupColors?.[piece.id]}
+          layerColor={getOutlineColor(piece.layer ?? 1, layerOutlineColors)}
+          isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}

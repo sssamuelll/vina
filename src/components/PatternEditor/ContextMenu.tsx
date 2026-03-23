@@ -315,42 +315,20 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       separator: true,
     });
 
+
     // Layer submenu
     const layerItems: SubMenuItem[] = [
-      {
-        label: `Set Layer... (${piece?.layer ?? 1})`,
-        action: () => { dispatch(setLayer({ pieceId: pid, layer: ((piece?.layer ?? 1) % 10) + 1 })); onClose(); },
-      },
-      {
-        label: `Set Sublayer... (${piece?.sublayer ?? 0})`,
-        action: () => { dispatch(setSublayer({ pieceId: pid, sublayer: ((piece?.sublayer ?? 0) + 1) % 5 })); onClose(); },
-      },
-      {
-        separator: true,
-        label: 'Clone Above',
-        action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'over' })); onClose(); },
-      },
-      {
-        label: 'Clone Below',
-        action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'under' })); onClose(); },
-      },
-      {
-        separator: true,
-        label: 'Superimpose Over...',
-        action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'over' })); onClose(); },
-      },
-      {
-        label: 'Superimpose Under...',
-        action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'under' })); onClose(); },
-      },
-      {
-        label: 'Superimpose Side...',
-        action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'side' })); onClose(); },
-      },
+      { label: `Set Layer... (${piece?.layer ?? 1})`, action: () => { dispatch(setLayer({ pieceId: pid, layer: ((piece?.layer ?? 1) % 10) + 1 })); onClose(); } },
+      { label: `Set Sublayer... (${piece?.sublayer ?? 0})`, action: () => { dispatch(setSublayer({ pieceId: pid, sublayer: ((piece?.sublayer ?? 0) + 1) % 5 })); onClose(); } },
+      { separator: true, label: 'Clone Above', action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'over' })); onClose(); } },
+      { label: 'Clone Below', action: () => { dispatch(cloneToLayer({ pieceId: pid, direction: 'under' })); onClose(); } },
+      { separator: true, label: 'Superimpose Over...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'over' })); onClose(); } },
+      { label: 'Superimpose Under...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'under' })); onClose(); } },
+      { label: 'Superimpose Side...', action: () => { dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode: 'side' })); onClose(); } },
     ];
     items.push({
       label: 'Layer',
-      icon: '📑',
+      icon: '\u{1F4D1}',
       action: () => {},
       _layerSubmenu: layerItems,
       separator: true,
