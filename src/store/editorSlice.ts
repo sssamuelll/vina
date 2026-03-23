@@ -23,6 +23,7 @@ const initialState: EditorState = {
   gridSize: 10,
   units: 'mm',
   clipboard: null,
+  superimposePickMode: null,
 };
 
 const editorSlice = createSlice({
@@ -126,6 +127,16 @@ const editorSlice = createSlice({
     clearClipboard(state) {
       state.clipboard = null;
     },
+    enterSuperimposePickMode(state, action: PayloadAction<{ sourcePieceId: string; mode: 'over' | 'under' | 'side' }>) {
+      state.superimposePickMode = {
+        active: true,
+        sourcePieceId: action.payload.sourcePieceId,
+        mode: action.payload.mode,
+      };
+    },
+    exitSuperimposePickMode(state) {
+      state.superimposePickMode = null;
+    },
     // These are intercepted by undoMiddleware — they never actually modify editor state
     undo() {},
     redo() {},
@@ -143,6 +154,7 @@ export const {
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   setUnits,
   copyPieces, clearClipboard,
+  enterSuperimposePickMode, exitSuperimposePickMode,
   undo, redo,
 } = editorSlice.actions;
 

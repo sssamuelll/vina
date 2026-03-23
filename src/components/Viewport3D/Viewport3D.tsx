@@ -41,13 +41,13 @@ import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
 import type { ViewPreset } from '../../store/cameraSlice';
-import { selectPiece, clearSelection, togglePieceSelection } from '../../store/editorSlice';
+import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
-import { setArrangement3D, clearArrangementOverrides } from '../../store/projectSlice';
+import { setArrangement3D, clearArrangementOverrides, setLayer, setSublayer, cloneToLayer } from '../../store/projectSlice';
 import { setCopilotOpen, setSidebarTab } from '../../store/layoutSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
@@ -710,6 +710,17 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
         }}
         isPieceHidden={ctxMenu.pieceId ? hiddenPieceIds.includes(ctxMenu.pieceId) : false}
         isPieceFlipped={ctxMenu.pieceId ? flippedPieceIds.includes(ctxMenu.pieceId) : false}
+        layerProps={ctxMenu.pieceId ? (() => {
+          const ctxPiece = pieces.find(p => p.id === ctxMenu.pieceId);
+          return {
+            currentLayer: ctxPiece?.layer,
+            currentSublayer: ctxPiece?.sublayer,
+            onSetLayer: (pid: string, layer: number) => dispatch(setLayer({ pieceId: pid, layer })),
+            onSetSublayer: (pid: string, sublayer: number) => dispatch(setSublayer({ pieceId: pid, sublayer })),
+            onCloneToLayer: (pid: string, direction: 'over' | 'under') => dispatch(cloneToLayer({ pieceId: pid, direction })),
+            onSuperimpose: (pid: string, mode: 'over' | 'under' | 'side') => dispatch(enterSuperimposePickMode({ sourcePieceId: pid, mode })),
+          };
+        })() : undefined}
       />
     </div>
   );

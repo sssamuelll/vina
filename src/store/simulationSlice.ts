@@ -1,7 +1,8 @@
 /**
  * Redux slice for cloth simulation state.
  *
- * Manages simulation lifecycle (idle/running/paused) and per-piece fabric assignments.
+ * Manages simulation lifecycle (idle/running/paused), per-piece fabric assignments,
+ * layer visibility, and X-ray transparency mode.
  *
  * @module simulationSlice
  */
@@ -144,6 +145,16 @@ interface SimulationSliceState {
     radius: number;
     strength: number;
   };
+  /** Layer IDs hidden in 3D viewport */
+  hiddenLayerIds: number[];
+  /** Per-layer outline color for 3D wireframe indicators */
+  layerOutlineColors: Record<number, string>;
+  /** Whether X-ray mode is active (non-active layers rendered translucent) */
+  xrayMode: boolean;
+  /** Active layer during X-ray mode */
+  xrayActiveLayer: number | null;
+  /** Snapshot of pieceOpacity before X-ray mode was enabled (for restore) */
+  xrayOpacitySnapshot: Record<string, number> | null;
 }
 
 const initialState: SimulationSliceState = {
@@ -198,6 +209,11 @@ const initialState: SimulationSliceState = {
     radius: 0.08,
     strength: 0.6,
   },
+  hiddenLayerIds: [],
+  layerOutlineColors: {},
+  xrayMode: false,
+  xrayActiveLayer: null,
+  xrayOpacitySnapshot: null,
 };
 
 const simulationSlice = createSlice({
@@ -490,6 +506,14 @@ const simulationSlice = createSlice({
         state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity));
       }
     },
+    /** Set opacity for multiple pieces in a single dispatch. */
+    setBatchPieceOpacity(state, action: PayloadAction<Record<string, number>>) {
+      for (const [pieceId, opacity] of Object.entries(action.payload)) {
+        if (!Number.isFinite(opacity)) continue;
+        if (opacity >= 1.0) { delete state.pieceOpacity[pieceId]; }
+        else { state.pieceOpacity[pieceId] = Math.max(0, Math.min(1, opacity)); }
+      }
+    },
     /** Clear per-piece opacity override. */
     clearPieceOpacity(state, action: PayloadAction<string>) {
       delete state.pieceOpacity[action.payload];
@@ -536,6 +560,49 @@ const simulationSlice = createSlice({
     /** Set mesh grab strength (0–1). Clamped to [0, 1]. */
     setMeshGrabStrength(state, action: PayloadAction<number>) {
       state.meshGrab.strength = Math.max(0, Math.min(1, action.payload));
+    },
+
+    // ─── Layer Visibility ────────────────────────────────────────────────────────
+
+    toggleLayerVisibility(state, action: PayloadAction<number>) {
+      const idx = state.hiddenLayerIds.indexOf(action.payload);
+      if (idx >= 0) {
+        state.hiddenLayerIds.splice(idx, 1);
+      } else {
+        state.hiddenLayerIds.push(action.payload);
+      }
+    },
+    showAllLayers(state) {
+      state.hiddenLayerIds = [];
+    },
+    setLayerOutlineColor(state, action: PayloadAction<{ layer: number; color: string }>) {
+      state.layerOutlineColors[action.payload.layer] = action.payload.color;
+    },
+    setXrayMode(state, action: PayloadAction<{ enabled: boolean; activeLayer?: number }>) {
+      if (action.payload.enabled) {
+        if (!state.xrayMode) {
+          state.xrayOpacitySnapshot = { ...state.pieceOpacity };
+        }
+        state.xrayMode = true;
+        state.xrayActiveLayer = action.payload.activeLayer ?? null;
+      } else {
+        if (state.xrayOpacitySnapshot) {
+          state.pieceOpacity = { ...state.xrayOpacitySnapshot };
+        }
+        state.xrayOpacitySnapshot = null;
+        state.xrayMode = false;
+        state.xrayActiveLayer = null;
+      }
+    },
+    setXrayActiveLayer(state, action: PayloadAction<number>) {
+      state.xrayActiveLayer = action.payload;
+    },
+    cleanupRemovedLayer(state, action: PayloadAction<number>) {
+      state.hiddenLayerIds = state.hiddenLayerIds.filter(id => id !== action.payload);
+      delete state.layerOutlineColors[action.payload];
+      if (state.xrayActiveLayer === action.payload) {
+        state.xrayActiveLayer = null;
+      }
     },
   },
   extraReducers: (builder) => {
@@ -612,6 +679,7 @@ export const {
   setPieceUVTransform,
   // Opacity & emission
   setPieceOpacity,
+  setBatchPieceOpacity,
   clearPieceOpacity,
   setPieceEmission,
   clearPieceEmission,
@@ -623,6 +691,13 @@ export const {
   setMeshGrabActive,
   setMeshGrabRadius,
   setMeshGrabStrength,
+  // Layer visibility
+  toggleLayerVisibility,
+  showAllLayers,
+  setLayerOutlineColor,
+  setXrayMode,
+  setXrayActiveLayer,
+  cleanupRemovedLayer,
 } = simulationSlice.actions;
 
 /** @deprecated Use setSimulationMode */

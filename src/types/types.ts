@@ -110,7 +110,7 @@ export interface GrainLine {
   path: PathCommand[];
 }
 
-export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch';
+export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch' | 'reference';
 
 export type NotchShape = 'slit' | 't-notch' | 'v-internal' | 'v-external' | 'u-notch' | 'castle' | 'diamond';
 export type NotchSubType = 'straightforward' | 'bisector' | 'intersection';
@@ -436,5 +436,11 @@ export interface EditorState {
   /** Clipboard for copy/paste */
   clipboard: {
     pieces: PatternPiece[];
+  } | null;
+  /** Superimpose pick mode — active when user is picking a target piece */
+  superimposePickMode: {
+    active: boolean;
+    sourcePieceId: string | null;
+    mode: 'over' | 'under' | 'side' | null;
   } | null;
 }

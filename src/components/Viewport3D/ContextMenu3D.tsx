@@ -10,6 +10,8 @@
  */
 
 import { useCallback, useEffect, useRef } from 'react';
+import SubMenu from '../shared/SubMenu';
+import type { SubMenuItem } from '../shared/SubMenu';
 
 export interface ContextMenu3DState {
   visible: boolean;
@@ -26,6 +28,7 @@ interface MenuItem {
   shortcut?: string;
   action: () => void;
   separator?: boolean;
+  _layerSubmenu?: SubMenuItem[];
 }
 
 interface ContextMenu3DProps {
@@ -50,6 +53,14 @@ interface ContextMenu3DProps {
   onResetAll3D?: () => void;
   isPieceHidden?: boolean;
   isPieceFlipped?: boolean;
+  layerProps?: {
+    currentLayer?: number;
+    currentSublayer?: number;
+    onSetLayer: (pieceId: string, layer: number) => void;
+    onSetSublayer: (pieceId: string, sublayer: number) => void;
+    onCloneToLayer: (pieceId: string, direction: 'over' | 'under') => void;
+    onSuperimpose: (pieceId: string, mode: 'over' | 'under' | 'side') => void;
+  };
 }
 
 export default function ContextMenu3D({
@@ -73,6 +84,7 @@ export default function ContextMenu3D({
   onResetAll3D,
   isPieceHidden,
   isPieceFlipped,
+  layerProps,
 }: ContextMenu3DProps) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -135,10 +147,25 @@ export default function ContextMenu3D({
       action: () => act(() => onDeactivatePiece?.(pid, isPieceActive === false)),
     });
     items.push({
-      label: 'Properties…',
-      icon: 'ℹ',
+      label: 'Properties\u2026',
+      icon: '\u2139',
       action: () => act(() => onShowProperties?.(pid)),
+      separator: true,
     });
+
+    // Layer submenu
+    if (layerProps) {
+      const layerItems: SubMenuItem[] = [
+        { label: `Set Layer... (${layerProps.currentLayer ?? 1})`, action: () => { layerProps.onSetLayer(pid, ((layerProps.currentLayer ?? 1) % 10) + 1); onClose(); } },
+        { label: `Set Sublayer... (${layerProps.currentSublayer ?? 0})`, action: () => { layerProps.onSetSublayer(pid, ((layerProps.currentSublayer ?? 0) + 1) % 5); onClose(); } },
+        { separator: true, label: 'Clone Above', action: () => { layerProps.onCloneToLayer(pid, 'over'); onClose(); } },
+        { label: 'Clone Below', action: () => { layerProps.onCloneToLayer(pid, 'under'); onClose(); } },
+        { separator: true, label: 'Superimpose Over...', action: () => { layerProps.onSuperimpose(pid, 'over'); onClose(); } },
+        { label: 'Superimpose Under...', action: () => { layerProps.onSuperimpose(pid, 'under'); onClose(); } },
+        { label: 'Superimpose Side...', action: () => { layerProps.onSuperimpose(pid, 'side'); onClose(); } },
+      ];
+      items.push({ label: 'Layer', icon: '\u{1F4D1}', action: () => {}, _layerSubmenu: layerItems });
+    }
   } else if (menu.target === 'avatar') {
     items.push({
       label: 'Toggle Avatar',
@@ -260,30 +287,34 @@ export default function ContextMenu3D({
       )}
       {items.map((item, i) => (
         <div key={i}>
-          <button
-            onClick={item.action}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              width: '100%',
-              padding: '6px 12px',
-              border: 'none',
-              background: 'transparent',
-              color: '#e0e0e0',
-              cursor: 'pointer',
-              fontSize: 13,
-              textAlign: 'left',
-              gap: 8,
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#2d2d2d')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-          >
-            <span style={{ width: 20, textAlign: 'center', fontSize: 14 }}>{item.icon}</span>
-            <span style={{ flex: 1 }}>{item.label}</span>
-            {item.shortcut && (
-              <span style={{ fontSize: 11, color: '#666', marginLeft: 12 }}>{item.shortcut}</span>
-            )}
-          </button>
+          {item._layerSubmenu ? (
+            <SubMenu label={item.label} icon={item.icon} items={item._layerSubmenu} />
+          ) : (
+            <button
+              onClick={item.action}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                width: '100%',
+                padding: '6px 12px',
+                border: 'none',
+                background: 'transparent',
+                color: '#e0e0e0',
+                cursor: 'pointer',
+                fontSize: 13,
+                textAlign: 'left',
+                gap: 8,
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#2d2d2d')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <span style={{ width: 20, textAlign: 'center', fontSize: 14 }}>{item.icon}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.shortcut && (
+                <span style={{ fontSize: 11, color: '#666', marginLeft: 12 }}>{item.shortcut}</span>
+              )}
+            </button>
+          )}
           {item.separator && (
             <div style={{ height: 1, background: '#333', margin: '2px 8px' }} />
           )}

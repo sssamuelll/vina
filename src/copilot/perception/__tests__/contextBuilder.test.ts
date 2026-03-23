@@ -83,7 +83,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       },
       avatarMode: 'model',
       avatarModelUrl: null,
-      isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
+      isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [], layerNames: {}, layerLocked: {},
     },
     editor: {
       viewMode: 'split',
@@ -106,6 +106,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       gridSize: 10,
       units: 'mm',
       clipboard: null,
+      superimposePickMode: null,
     },
     simulation: {
       simulationState: 'idle',
@@ -139,6 +140,11 @@ function mockState(overrides?: Partial<RootState>): RootState {
       flippedPieceIds: [],
       steamBrush: { active: false, radius: 0.05, strength: 0.3 },
       meshGrab: { active: false, radius: 0.05, strength: 0.8 },
+      hiddenLayerIds: [],
+      layerOutlineColors: {},
+      xrayMode: false,
+      xrayActiveLayer: null,
+      xrayOpacitySnapshot: null,
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
@@ -349,7 +355,7 @@ describe('buildAgentContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
+        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [], layerNames: {}, layerLocked: {},
       },
     });
     const context = buildAgentContext(state);
@@ -384,7 +390,7 @@ describe('serializeContext', () => {
         avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
         avatarMode: 'model',
         avatarModelUrl: null,
-        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
+        isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [], layerNames: {}, layerLocked: {},
       },
     });
     const context = buildAgentContext(state);

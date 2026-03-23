@@ -65,3 +65,151 @@ export function distToBezier(
 
   return { distance: bestDist, t: bestT, point: bestPoint };
 }
+
+// ─── rdpSimplify ──────────────────────────────────────────────────────────────
+
+/**
+ * Ramer–Douglas–Peucker polyline simplification.
+ * Returns a subset of `points` with collinear or near-collinear points removed.
+ *
+ * @param points - Input polyline (>= 2 points)
+ * @param epsilon - Maximum perpendicular distance to keep a point (in the same units as points)
+ */
+export function rdpSimplify(points: Point2D[], epsilon: number): Point2D[] {
+  if (points.length <= 2) return [...points];
+
+  // Find the point with the maximum distance from the line start→end
+  const start = points[0];
+  const end = points[points.length - 1];
+  let maxDist = 0;
+  let maxIdx = 0;
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const p = points[i];
+    // Perpendicular distance from p to line (start, end)
+    const dx = end.x - start.x;
+    const dy = end.y - start.y;
+    const len = Math.hypot(dx, dy);
+    let dist: number;
+    if (len < 1e-10) {
+      dist = Math.hypot(p.x - start.x, p.y - start.y);
+    } else {
+      dist = Math.abs(dy * p.x - dx * p.y + end.x * start.y - end.y * start.x) / len;
+    }
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIdx = i;
+    }
+  }
+
+  if (maxDist > epsilon) {
+    const left = rdpSimplify(points.slice(0, maxIdx + 1), epsilon);
+    const right = rdpSimplify(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+
+  return [start, end];
+}
+
+// ─── fitCubicBezier ───────────────────────────────────────────────────────────
+
+/**
+ * Fit a sequence of cubic Bezier segments through the given points using the
+ * chord-length parameterization and Schneider's algorithm (simplified).
+ *
+ * Returns PathCommand[] starting with an 'M' followed by 'C' segments.
+ *
+ * @param points - Ordered list of 2D points to fit (>= 2)
+ * @param maxError - Maximum allowed fitting error (used for chord fallback scaling)
+ */
+export function fitCubicBezier(points: Point2D[], maxError = 1.0): import('../../types/types').PathCommand[] {
+  if (points.length < 2) return [];
+
+  // Compute chord-length parameterization
+  const dists: number[] = [0];
+  for (let i = 1; i < points.length; i++) {
+    dists.push(dists[i - 1] + Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y));
+  }
+  const totalLen = dists[dists.length - 1];
+  const ts = totalLen > 0 ? dists.map(d => d / totalLen) : dists.map((_, i) => i / (points.length - 1));
+
+  // For 2 points, emit a straight-line cubic (trivial)
+  if (points.length === 2) {
+    const p0 = points[0];
+    const p3 = points[1];
+    const cp1 = { x: p0.x + (p3.x - p0.x) / 3, y: p0.y + (p3.y - p0.y) / 3 };
+    const cp2 = { x: p0.x + (p3.x - p0.x) * 2 / 3, y: p0.y + (p3.y - p0.y) * 2 / 3 };
+    return [
+      { type: 'M', values: [p0.x, p0.y] },
+      { type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, p3.x, p3.y] },
+    ];
+  }
+
+  // Fit a single cubic using least-squares (Schneider, Graphics Gems)
+  // Tangents at endpoints: use first/last chord direction
+  const p0 = points[0];
+  const pN = points[points.length - 1];
+
+  const t0 = { x: points[1].x - points[0].x, y: points[1].y - points[0].y };
+  const tN = { x: points[points.length - 1].x - points[points.length - 2].x, y: points[points.length - 1].y - points[points.length - 2].y };
+  const len0 = Math.hypot(t0.x, t0.y) || 1;
+  const lenN = Math.hypot(tN.x, tN.y) || 1;
+  const hat0 = { x: t0.x / len0, y: t0.y / len0 };
+  const hatN = { x: tN.x / lenN, y: tN.y / lenN };
+
+  // Build A matrices: A1[i] = B1(t)*hat0, A2[i] = B2(t)*hatN
+  let c00 = 0, c01 = 0, c11 = 0;
+  let x0 = 0, x1 = 0;
+
+  for (let i = 0; i < points.length; i++) {
+    const t = ts[i];
+    const mt = 1 - t;
+    const b0 = mt * mt * mt;
+    const b1 = 3 * mt * mt * t;
+    const b2 = 3 * mt * t * t;
+    const b3 = t * t * t;
+
+    const a1x = hat0.x * b1;
+    const a1y = hat0.y * b1;
+    const a2x = hatN.x * b2;
+    const a2y = hatN.y * b2;
+
+    c00 += a1x * a1x + a1y * a1y;
+    c01 += a1x * a2x + a1y * a2y;
+    c11 += a2x * a2x + a2y * a2y;
+
+    // Residual = point - B_base(t), where B_base is the degenerate cubic with cp1=p0, cp2=pN (alpha=0).
+    // This is correct per Schneider's parameterization: cp1 = p0 + alpha0*hat0, cp2 = pN - alpha1*hatN.
+    const dx = points[i].x - (b0 * p0.x + b1 * p0.x + b2 * pN.x + b3 * pN.x);
+    const dy = points[i].y - (b0 * p0.y + b1 * p0.y + b2 * pN.y + b3 * pN.y);
+
+    x0 += a1x * dx + a1y * dy;
+    x1 += a2x * dx + a2y * dy;
+  }
+
+  const det = c00 * c11 - c01 * c01;
+  let alpha0: number, alpha1: number;
+  if (Math.abs(det) < 1e-10) {
+    // Fallback: chord-length heuristic
+    const chord = Math.hypot(pN.x - p0.x, pN.y - p0.y) / 3;
+    alpha0 = chord;
+    alpha1 = chord;
+  } else {
+    alpha0 = (x0 * c11 - x1 * c01) / det;
+    alpha1 = (x1 * c00 - x0 * c01) / det;
+  }
+
+  // Clamp negatives to chord-length fallback (scale by maxError for tighter fits)
+  const chord = Math.hypot(pN.x - p0.x, pN.y - p0.y) / 3;
+  const clampScale = Math.max(0.1, Math.min(maxError, 2.0));
+  if (alpha0 < 0) alpha0 = chord * clampScale;
+  if (alpha1 < 0) alpha1 = chord * clampScale;
+
+  const cp1 = { x: p0.x + hat0.x * alpha0, y: p0.y + hat0.y * alpha0 };
+  const cp2 = { x: pN.x - hatN.x * alpha1, y: pN.y - hatN.y * alpha1 };
+
+  return [
+    { type: 'M', values: [p0.x, p0.y] },
+    { type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, pN.x, pN.y] },
+  ];
+}
