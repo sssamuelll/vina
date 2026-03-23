@@ -189,4 +189,31 @@ describe('importMesh — file size limit', () => {
       expect(err).not.toBeInstanceOf(MeshImportLimitError);
     }
   });
+
+  it('rejects via fileSizeBytes option without any fetch', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as typeof fetch;
+
+    await expect(
+      importMesh('blob:http://localhost/abc', 'model.obj', {
+        fileSizeBytes: 100 * 1024 * 1024,
+        limits: { maxFileSizeBytes: 50 * 1024 * 1024 },
+      }),
+    ).rejects.toThrow(MeshImportLimitError);
+
+    // No fetch should have been made — size was known upfront
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips blob URL size check when fileSizeBytes not provided', async () => {
+    // Blob URLs without fileSizeBytes skip the size check entirely.
+    // The import will still fail (no real blob), but NOT with MeshImportLimitError.
+    try {
+      await importMesh('blob:http://localhost/abc', 'model.obj', {
+        limits: { maxFileSizeBytes: 1 }, // tiny limit — would reject if checked
+      });
+    } catch (err) {
+      expect(err).not.toBeInstanceOf(MeshImportLimitError);
+    }
+  });
 });
