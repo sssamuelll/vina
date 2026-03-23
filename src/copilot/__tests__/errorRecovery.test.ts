@@ -11,6 +11,7 @@ import {
   hasFallbackProvider,
   loadFallbackProvider,
   saveFallbackProvider,
+  clearLegacyFallbackKeys,
 } from '../errorRecovery';
 import type { ProviderConfig } from '../providers/types';
 
@@ -29,6 +30,22 @@ const localStorageMock = (() => {
 })();
 
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
+
+// ─── sessionStorage mock (for SecureStorage) ────────────────────────────────
+
+const sessionStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: vi.fn((key: string) => store[key] || null),
+    setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
+    removeItem: vi.fn((key: string) => { delete store[key]; }),
+    clear: vi.fn(() => { store = {}; }),
+    get length() { return Object.keys(store).length; },
+    key: vi.fn((i: number) => Object.keys(store)[i] || null),
+  };
+})();
+
+Object.defineProperty(globalThis, 'sessionStorage', { value: sessionStorageMock });
 
 // ─── classifyError ──────────────────────────────────────────────────────────
 
@@ -573,6 +590,7 @@ describe('getOfflineActions', () => {
 describe('Fallback Provider', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    sessionStorageMock.clear();
   });
 
   it('should return null when no fallback configured', () => {
@@ -588,6 +606,31 @@ describe('Fallback Provider', () => {
     saveFallbackProvider(config);
     const loaded = loadFallbackProvider();
     expect(loaded).toEqual(config);
+  });
+
+  it('should NOT store API key in localStorage', () => {
+    saveFallbackProvider({
+      provider: 'openai',
+      apiKey: 'sk-secret-key',
+      model: 'gpt-4o-mini',
+    });
+    const raw = localStorageMock.getItem('openclo-fallback-provider');
+    expect(raw).not.toBeNull();
+    const parsed = JSON.parse(raw!);
+    expect(parsed.apiKey).toBeUndefined();
+    expect(parsed.provider).toBe('openai');
+  });
+
+  it('should store API key in sessionStorage via SecureStorage', () => {
+    saveFallbackProvider({
+      provider: 'openai',
+      apiKey: 'sk-secret-key',
+      model: 'gpt-4o-mini',
+    });
+    // SecureStorage uses 'openclo-secure-' prefix + btoa
+    const stored = sessionStorageMock.getItem('openclo-secure-fallback-apikey');
+    expect(stored).not.toBeNull();
+    expect(atob(stored!)).toBe('sk-secret-key');
   });
 
   it('should detect when fallback is available', () => {
@@ -612,6 +655,98 @@ describe('Fallback Provider', () => {
   it('should handle corrupted localStorage for fallback', () => {
     localStorageMock.setItem('openclo-fallback-provider', 'not-json{');
     expect(loadFallbackProvider()).toBeNull();
+  });
+
+  it('should strip legacy API keys from localStorage on migration', () => {
+    // Simulate legacy format: full config with API key in localStorage
+    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+      provider: 'openai',
+      apiKey: 'sk-leaked-key',
+      model: 'gpt-4o-mini',
+    }));
+    clearLegacyFallbackKeys();
+    const raw = localStorageMock.getItem('openclo-fallback-provider');
+    const parsed = JSON.parse(raw!);
+    expect(parsed.apiKey).toBeUndefined();
+    expect(parsed.provider).toBe('openai');
+    expect(parsed.model).toBe('gpt-4o-mini');
+  });
+
+  it('should migrate legacy API key to SecureStorage for current session', () => {
+    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+      provider: 'openai',
+      apiKey: 'sk-migrate-me',
+      model: 'gpt-4o-mini',
+    }));
+    clearLegacyFallbackKeys();
+    // Key should now be in sessionStorage via SecureStorage
+    const stored = sessionStorageMock.getItem('openclo-secure-fallback-apikey');
+    expect(stored).not.toBeNull();
+    expect(atob(stored!)).toBe('sk-migrate-me');
+  });
+
+  it('should not crash during migration with missing localStorage', () => {
+    expect(() => clearLegacyFallbackKeys()).not.toThrow();
+  });
+
+  it('should not crash on corrupted JSON during migration', () => {
+    localStorageMock.setItem('openclo-fallback-provider', 'not-json{');
+    expect(() => clearLegacyFallbackKeys()).not.toThrow();
+    // Corrupted entry should be removed entirely
+    expect(localStorageMock.getItem('openclo-fallback-provider')).toBeNull();
+  });
+
+  it('should be idempotent (no-op on already-migrated data)', () => {
+    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    }));
+    clearLegacyFallbackKeys();
+    const raw = localStorageMock.getItem('openclo-fallback-provider');
+    expect(JSON.parse(raw!)).toEqual({ provider: 'openai', model: 'gpt-4o-mini' });
+  });
+
+  it('should NEVER leak API key string into any localStorage value', () => {
+    const secretKey = 'sk-super-secret-test-key-12345';
+    saveFallbackProvider({
+      provider: 'openai',
+      apiKey: secretKey,
+      model: 'gpt-4o-mini',
+    });
+    // Scan every localStorage value
+    for (let i = 0; i < localStorageMock.length; i++) {
+      const k = localStorageMock.key(i)!;
+      const v = localStorageMock.getItem(k)!;
+      expect(v).not.toContain(secretKey);
+    }
+  });
+
+  it('should assemble config from split storage independently', () => {
+    // Set up localStorage and sessionStorage independently (not via save)
+    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+    }));
+    sessionStorageMock.setItem('openclo-secure-fallback-apikey', btoa('sk-from-session'));
+    const loaded = loadFallbackProvider();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.apiKey).toBe('sk-from-session');
+    expect(loaded!.provider).toBe('anthropic');
+    expect(loaded!.model).toBe('claude-sonnet-4-20250514');
+  });
+
+  it('should return empty apiKey when sessionStorage has no key', () => {
+    localStorageMock.setItem('openclo-fallback-provider', JSON.stringify({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+    }));
+    // sessionStorage is empty — no API key
+    const loaded = loadFallbackProvider();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.apiKey).toBe('');
+    expect(loaded!.provider).toBe('openai');
+    // hasFallbackProvider should return false (empty key)
+    expect(hasFallbackProvider('anthropic')).toBe(false);
   });
 });
 
