@@ -27,19 +27,21 @@ One shared safe evaluator, two thin adapters:
     └─────────────┘    └──────────────────────┘
 ```
 
-- **`src/utils/formula/safeEval.ts`** — new recursive descent parser. Pure function: `safeEval(expr: string, vars?: Record<string, number>): number`. No external dependencies. No dynamic code construction.
+- **`src/utils/formula/safeEval.ts`** — new recursive descent parser. Pure function: `safeEval(expr: string, vars?: Record<string, number>, allowedFunctions?: string[]): number`. No external dependencies. No dynamic code construction.
 - **`src/utils/formula/formulaEngine.ts`** — keeps current API (`evaluateFormula`, `getFormulaVariables`, `validateFormula`), internally calls `safeEval` instead of dynamic code construction
 - **`src/utils/seamly2d/formulaEvaluator.ts`** — keeps current API, after variable substitution calls `safeEval` instead of dynamic code construction. Removes `SAFE_FORMULA_RE`, assignment check, and dynamic code block.
 
 ### No API changes
 
 All existing callers continue calling the same functions with the same signatures:
-- `constructionResolver.ts`
-- `pieceBuilder.ts`
-- `blueprintExecutor.ts`
-- `seamlyAdapter.ts`
-- `formulaPlugin.ts`
-- `analysisTools.ts`
+- `src/utils/seamly2d/constructionResolver.ts`
+- `src/utils/construction/resolver.ts`
+- `src/utils/construction/pieceBuilder.ts`
+- `src/utils/construction/blueprintExecutor.ts`
+- `src/utils/seamly2d/seamlyAdapter.ts`
+- `src/copilot/plugins/formulaPlugin.ts`
+- `src/copilot/action/tools/definitions/analysisTools.ts`
+- `src/hooks/useParametricEngine.ts` (imports `resolveVariables`)
 
 ---
 
@@ -53,21 +55,26 @@ and            → comparison ('&&' comparison)*
 comparison     → addition (('==' | '!=' | '<' | '>' | '<=' | '>=') addition)?
 addition       → multiplication (('+' | '-') multiplication)*
 multiplication → unary (('*' | '/' | '%') unary)*
-unary          → ('-' | '!') unary | call
+unary          → ('+' | '-' | '!') unary | call
 call           → IDENT '(' arguments ')' | primary
-arguments      → expression (',' expression)*
+arguments      → (expression (',' expression)*)?
 primary        → NUMBER | IDENT | '(' expression ')'
 ```
 
 ### Built-in functions (whitelist)
 
-`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sqrt`, `abs`, `min`, `max`, `pow`, `floor`, `ceil`, `round`, `sign`
+`safeEval` accepts an optional `allowedFunctions` parameter to let each adapter control scope:
 
-No other function names are accepted. Unknown functions throw.
+- **Full set (used by Seamly2D adapter):** `sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sqrt`, `abs`, `min`, `max`, `pow`, `floor`, `ceil`, `round`, `sign`
+- **Restricted set (used by formulaEngine):** `min`, `max`, `abs`, `round`, `floor`, `ceil`, `sqrt` (matching current behavior)
+
+If `allowedFunctions` is not passed, the full set is used. Unknown functions always throw.
 
 ### Constants
 
-`PI` → `Math.PI`, `E` → `Math.E`
+`PI` → `Math.PI`
+
+`E` is **not** included as a built-in constant (it's not in either evaluator today, and adding it would silently shadow any user variable named `E`).
 
 ### Variables
 
@@ -111,11 +118,17 @@ Remove:
 
 Replace with a single `safeEval(expr)` call. The regex substitution phase stays — it handles Seamly2D-specific syntax.
 
+**Alias rewriting update:** The current adapter maps `rint` → `__ROUND__` → `Math.round` and `sign` → `__SIGN__` → `Math.sign`. Since `safeEval` uses its own function names (not `Math.*`), the adapter must map `rint` → `round` and `sign` → `sign` directly. The two-stage `__ROUND__`/`__SIGN__` dance is no longer needed. Similarly, the `Math.$1` replacement (line 87) changes to just `$1` since `safeEval` resolves function names internally.
+
+**Semicolon handling preserved:** The `;` → `,` replacement (line 80) for European locale support stays as a pre-processing step before `safeEval`. This is adapter logic, not parser logic.
+
 ### Silent zero fallbacks → errors
 
 Fix silent `return '0'` fallbacks for unknown references:
 - Line 40: `return '0'` for unknown `Line_*` → `throw new Error('Unknown variable: ${match}')`
 - Line 50: `return '0'` for unknown `@Meas` → `throw new Error('Unknown measurement: @${name}')`
+
+**Migration risk:** This is a behavioral change. Seamly2D patterns that reference undefined `Line_*` or `@Meas` names currently silently evaluate to 0 — after this fix they will throw. The `resolveVariables` function already catches evaluation errors and falls back to 0 (line 187-189), so patterns with undefined variables in variable definitions are still safe. But direct callers of `evaluateFormula` for individual formulas will see the new errors. Existing test suites will validate this is safe.
 
 ---
 
