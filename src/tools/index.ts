@@ -43,6 +43,7 @@ import { scissorsTool } from './definitions/scissors';
 import { mergeTool } from './definitions/merge';
 import { dartTool } from './definitions/dart';
 import { circleTool } from './definitions/circle';
+import { polyPenTool } from './definitions/polyPen';
 import { mirrorTool } from './definitions/mirror';
 import { traceTool } from './definitions/trace';
 import { freeSewingTool } from './definitions/freeSewing';
@@ -74,7 +75,8 @@ const allTools = [
   dartTool,
   traceTool,
   circleTool,
-  
+  polyPenTool,
+
   // 2D Tools — Pattern Editing
   scissorsTool,
   mergeTool,

@@ -60,6 +60,10 @@ export interface ContextMenuState {
   segmentIsCurve?: boolean;
   /** Active tool when context menu was opened */
   activeTool?: string;
+  /** ID of internal line under cursor, or null */
+  internalLineId?: string | null;
+  /** Type of internal line under cursor */
+  internalLineType?: string | null;
 }
 
 interface ContextMenuProps {
@@ -68,6 +72,9 @@ interface ContextMenuProps {
   onRename?: (pieceId: string) => void;
   onConvertSegment?: (commandIndex: number, toCurve: boolean) => void;
   onZoomToFit?: () => void;
+  onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
+  onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
+  onOptimizeCurves?: (pieceId: string, lineId?: string) => void;
 }
 
 // ─── Menu Items ─────────────────────────────────────────────────────────────
@@ -85,7 +92,7 @@ interface MenuItem {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit }: ContextMenuProps) {
+export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit, onUnfold, onOffsetInternalLine, onOptimizeCurves }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
@@ -125,6 +132,39 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       label: menu.segmentIsCurve ? 'Convert to Line' : 'Convert to Curve',
       icon: menu.segmentIsCurve ? '─' : '⌒',
       action: () => { onConvertSegment?.(menu.segmentIndex!, !menu.segmentIsCurve); onClose(); },
+      separator: true,
+    });
+  }
+
+  // ── Internal line context ──
+  if (menu.internalLineId && menu.pieceId) {
+    const piece = pieces.find(p => p.id === menu.pieceId);
+    const line = piece?.internals.find(l => l.id === menu.internalLineId);
+
+    if (line?.type === 'fold') {
+      items.push({
+        label: 'Unfold',
+        icon: '⇔',
+        action: () => act(() => onUnfold?.(menu.pieceId!, menu.internalLineId!)),
+      });
+      items.push({
+        label: 'Unfold Outline Only',
+        icon: '⇔',
+        action: () => act(() => onUnfold?.(menu.pieceId!, menu.internalLineId!, true)),
+        separator: true,
+      });
+    }
+
+    items.push({
+      label: 'Offset as Internal Line',
+      icon: '⏛',
+      action: () => act(() => onOffsetInternalLine?.(menu.pieceId!, menu.internalLineId!)),
+    });
+
+    items.push({
+      label: 'Optimize Curve Points',
+      icon: '◇',
+      action: () => act(() => onOptimizeCurves?.(menu.pieceId!, menu.internalLineId!)),
       separator: true,
     });
   }
@@ -403,6 +443,15 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       action: () => {},
       separator: true,
     });
+
+    if (!menu.internalLineId && !menu.seamId) {
+      items.push({
+        label: 'Optimize All Curve Points',
+        icon: '◇',
+        action: () => act(() => onOptimizeCurves?.(pid)),
+        separator: true,
+      });
+    }
 
     items.push({
       label: 'Select',

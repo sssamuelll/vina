@@ -108,6 +108,13 @@ export default function Workspace() {
   // ─── Activity Bar & Sidebar ───
   const [activeView, setActiveView] = useState<SidebarView | null>(null);
 
+  // ─── Layers panel shortcut (Ctrl+Shift+L) ───
+  useEffect(() => {
+    const handler = () => setActiveView(v => v === 'layers' ? null : 'layers');
+    window.addEventListener('openclo:toggleLayersPanel', handler);
+    return () => window.removeEventListener('openclo:toggleLayersPanel', handler);
+  }, []);
+
   // ─── Bottom Panel ───
   const bottomPanelOpen = useSelector((s: RootState) => s.layout.bottomPanelOpen);
   const bottomPanelTab = useSelector((s: RootState) => s.layout.bottomPanelTab);

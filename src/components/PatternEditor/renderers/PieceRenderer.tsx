@@ -191,15 +191,17 @@ const SinglePiece = memo(function SinglePiece({
                 line.type === 'notch' ? '#ff9800' :
                 line.type === 'fold' ? '#9c27b0' :
                 line.type === 'topstitch' ? (line.topstitchOptions?.threadColor ?? '#333') :
+                line.type === 'reference' ? '#999' :
                 '#888'
               }
               strokeWidth={isLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
               strokeDasharray={
                 line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D}` :
                 line.type === 'topstitch' ? `${(line.topstitchOptions?.stitchLength ?? 3) / zoom2D} ${1.5 / zoom2D}` :
+                line.type === 'reference' ? `${4 / zoom2D} ${4 / zoom2D}` :
                 'none'
               }
-              opacity={line.type === 'grainline' && !showGrainlines ? 0 : isLineSelected ? 1 : 0.7}
+              opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.7}
             />
             {isLineSelected && (() => {
               const first = line.path[0];
