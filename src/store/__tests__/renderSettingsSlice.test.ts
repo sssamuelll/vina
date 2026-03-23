@@ -285,11 +285,12 @@ describe('renderSettingsSlice', () => {
     expect(ids).toContain('neutral-grey');
   });
 
-  it('LIGHT_PRESETS has 3 entries', () => {
+  it('LIGHT_PRESETS has 4 entries', () => {
     const keys = Object.keys(LIGHT_PRESETS);
-    expect(keys.length).toBe(3);
+    expect(keys.length).toBe(4);
     expect(keys).toContain('studio3Point');
     expect(keys).toContain('softBox');
     expect(keys).toContain('dramatic');
+    expect(keys).toContain('natural');
   });
 });

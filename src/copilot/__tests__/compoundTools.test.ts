@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // Updated after #79-#82 copilot epic completion + #142 3D interaction tools + snapshot tools
-      expect(registry.size).toBe(154); // +4 POM tools + 8 sewing enhancement tools + 3 interfacing/solidify tools + 1 cutAndSew + 3 offset/extend/trim tools
+      expect(registry.size).toBe(161); // +7 render tools (#377)
     });
   });
 });
