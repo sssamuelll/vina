@@ -17,6 +17,48 @@ import {
   validateManifest,
 } from './pluginLoader';
 import { getDefaultPluginRegistry } from './pluginRegistry';
+import { PluginHost } from './sandbox/PluginHost';
+import type { AppDispatch, RootState } from '../../store';
+import type { ToolRegistry } from '../action/tools/registry';
+
+// ─── PluginHost Singleton ────────────────────────────────────────────────────
+
+/** Lazy-initialized singleton PluginHost instance */
+let _pluginHost: PluginHost | null = null;
+
+/**
+ * Initialize the PluginHost singleton with Redux and registry dependencies.
+ *
+ * Must be called once during application startup (e.g. in the store setup or
+ * the root component) before `loadEnabledPlugins()` is invoked. Subsequent
+ * calls are no-ops — the first set of dependencies wins.
+ *
+ * @param dispatch   - Redux dispatch function
+ * @param getState   - Function returning the current Redux state
+ * @param registry   - Core ToolRegistry to register plugin tools into
+ */
+export function initPluginHost(
+  dispatch: AppDispatch,
+  getState: () => RootState,
+  registry: ToolRegistry,
+): void {
+  if (_pluginHost) return; // already initialized — no-op
+  _pluginHost = new PluginHost(dispatch, getState, registry);
+}
+
+/**
+ * Get the current PluginHost singleton, or null if not yet initialized.
+ */
+export function getPluginHost(): PluginHost | null {
+  return _pluginHost;
+}
+
+/**
+ * Reset the PluginHost singleton (for testing).
+ */
+export function resetPluginHost(): void {
+  _pluginHost = null;
+}
 
 /** localStorage key for the installed plugins list */
 const INSTALLED_PLUGINS_KEY = 'openclo_installed_plugins';
@@ -247,8 +289,13 @@ export function listEnabledPluginIds(): string[] {
 /**
  * Load and register all enabled plugins at application startup.
  *
- * Iterates through the installed plugins list, loads each enabled plugin
- * via dynamic import, and registers its assets in the plugin registry.
+ * When a PluginHost has been initialized via `initPluginHost()`, each enabled
+ * plugin is loaded through the sandboxed Worker path: the plugin source is
+ * fetched as text and passed to `PluginHost.loadPlugin()`. This ensures the
+ * plugin code runs in a sandboxed Worker with enforced permissions.
+ *
+ * If no PluginHost is available (legacy / test path), falls back to the old
+ * `loadPlugin` → `pluginRegistry.registerPlugin` flow via dynamic import.
  *
  * @returns Object with arrays of successfully loaded and failed plugin ids
  */
@@ -260,16 +307,49 @@ export async function loadEnabledPlugins(): Promise<{
   const enabled = installed.filter(p => p.enabled);
   const loaded: string[] = [];
   const failed: Array<{ id: string; error: string }> = [];
-  const registry = getDefaultPluginRegistry();
+
+  const host = _pluginHost;
 
   for (const entry of enabled) {
-    try {
-      const plugin = await loadPlugin(entry.manifest);
-      registry.registerPlugin(plugin, entry.manifest.permissions);
-      loaded.push(entry.manifest.id);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      failed.push({ id: entry.manifest.id, error: msg });
+    const { manifest } = entry;
+
+    if (host) {
+      // ── Sandboxed path via PluginHost ───────────────────────────────────
+      // Fetch the plugin source code as text so it can be sent to the Worker.
+      // The entryPoint is expected to be an absolute or relative URL resolvable
+      // from the application origin.
+      try {
+        let pluginCode: string;
+        try {
+          const response = await fetch(manifest.entryPoint);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          pluginCode = await response.text();
+        } catch (fetchErr: unknown) {
+          const msg = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+          throw new Error(`Failed to fetch plugin source from "${manifest.entryPoint}": ${msg}`);
+        }
+
+        await host.loadPlugin(manifest, pluginCode);
+        loaded.push(manifest.id);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        failed.push({ id: manifest.id, error: msg });
+      }
+    } else {
+      // ── Legacy path (no sandbox) ─────────────────────────────────────────
+      // Kept for backward compatibility when PluginHost is not initialized.
+      // Deprecated: callers should call initPluginHost() at startup.
+      const registry = getDefaultPluginRegistry();
+      try {
+        const plugin = await loadPlugin(manifest);
+        registry.registerPlugin(plugin, manifest.permissions);
+        loaded.push(manifest.id);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        failed.push({ id: manifest.id, error: msg });
+      }
     }
   }
 
@@ -295,7 +375,10 @@ export function loadAndRegisterPlugin(
 
 /**
  * Reset all plugin manager state (for testing).
+ *
+ * Also resets the PluginHost singleton so tests can re-initialize it cleanly.
  */
 export function resetPluginManager(): void {
   import("../../utils/storage").then(({ storageDel }) => { storageDel("plugins", "installed"); }).catch(() => {}); try { localStorage.removeItem(INSTALLED_PLUGINS_KEY); } catch { /* ignore */ }
+  _pluginHost = null;
 }
