@@ -42,6 +42,8 @@ function emptyState() {
     poms: [],
     layerNames: {},
     layerLocked: {},
+    loadDiagnostics: [],
+    loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
   };
 }
 

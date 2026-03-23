@@ -16,6 +16,8 @@ function stateWith(pieces: { id: string }[], groups: { id: string; name: string;
     poms: [],
     layerNames: {},
     layerLocked: {},
+    loadDiagnostics: [],
+    loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
   };
 }
 

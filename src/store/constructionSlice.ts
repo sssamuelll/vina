@@ -268,7 +268,7 @@ const constructionSlice = createSlice({
     builder.addMatcher(
       (action) => action.type === 'project/removePiece',
       (state, action) => {
-        const pieceId = (action as { payload: string }).payload;
+        const pieceId = (action as unknown as { payload: string }).payload;
         for (const [cId, pId] of Object.entries(state.pieceIdentityMap)) {
           if (pId === pieceId) {
             delete state.pieceIdentityMap[cId];
