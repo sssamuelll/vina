@@ -265,6 +265,18 @@ const constructionSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
+    builder.addMatcher(
+      (action) => action.type === 'project/removePiece',
+      (state, action) => {
+        const pieceId = (action as { payload: string }).payload;
+        for (const [cId, pId] of Object.entries(state.pieceIdentityMap)) {
+          if (pId === pieceId) {
+            delete state.pieceIdentityMap[cId];
+          }
+        }
+        delete state.pieceIdentityMap[pieceId];
+      },
+    );
   },
 });
 
