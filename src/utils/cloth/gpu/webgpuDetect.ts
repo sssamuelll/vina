@@ -7,6 +7,8 @@
  * @module webgpuDetect
  */
 
+import { safeGetItem } from '../../safeStorage';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export type SolverBackend = 'webgpu' | 'cpu';
@@ -45,8 +47,7 @@ export function isWebGPUAvailable(): boolean {
  * legacy MeshDepthMaterial).
  */
 export const isWebGPURendererActive: boolean = isWebGPUAvailable() && (() => {
-  try { return localStorage.getItem('webclo-use-webgpu') !== 'false'; }
-  catch { return true; }
+  return safeGetItem('webclo-use-webgpu') !== 'false';
 })();
 
 /**

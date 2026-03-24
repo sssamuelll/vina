@@ -15,6 +15,7 @@
 
 import type { ProviderConfig } from './providers/types';
 import { SecureStorage } from './providers/secureStorage';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../utils/safeStorage';
 
 // ─── Error Classification ───────────────────────────────────────────────────
 
@@ -317,37 +318,32 @@ const FALLBACK_APIKEY_SECURE_KEY = 'fallback-apikey';
  */
 export async function clearLegacyFallbackKeys(): Promise<void> {
   // Clean localStorage
-  try {
-    const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
-    if (!saved) return;
+  const saved = safeGetItem(FALLBACK_PROVIDER_KEY);
+  if (!saved) return;
 
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(saved);
-    } catch (parseErr) {
-      // Corrupted data — remove the entire key to be safe (may contain a key in raw text)
-      console.warn('[Security] Failed to parse legacy fallback config, removing entire key:', parseErr);
-      localStorage.removeItem(FALLBACK_PROVIDER_KEY);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(saved);
+  } catch (parseErr) {
+    // Corrupted data — remove the entire key to be safe (may contain a key in raw text)
+    console.warn('[Security] Failed to parse legacy fallback config, removing entire key:', parseErr);
+    safeRemoveItem(FALLBACK_PROVIDER_KEY);
+    return;
+  }
+
+  if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
+    // Migrate API key to SecureStorage for the current session (encrypted)
+    const stored = await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
+    if (!stored) {
+      // Encryption failed — keep the key in localStorage rather than losing it
+      console.warn('[Security] Could not encrypt legacy API key; leaving it in localStorage for now');
       return;
     }
-
-    if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
-      // Migrate API key to SecureStorage for the current session (encrypted)
-      const stored = await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
-      if (!stored) {
-        // Encryption failed — keep the key in localStorage rather than losing it
-        console.warn('[Security] Could not encrypt legacy API key; leaving it in localStorage for now');
-        return;
-      }
-      // Re-save without the API key (safe — SecureStorage has the encrypted copy)
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { apiKey: _removed, ...rest } = parsed;
-      localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
-      console.info('[Security] Migrated legacy API key from localStorage to SecureStorage');
-    }
-  } catch (err) {
-    // Storage itself is inaccessible — log but do not crash app
-    console.error('[Security] Failed to clear legacy API keys from localStorage:', err);
+    // Re-save without the API key (safe — SecureStorage has the encrypted copy)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { apiKey: _removed, ...rest } = parsed;
+    safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
+    console.info('[Security] Migrated legacy API key from localStorage to SecureStorage');
   }
 
   // Clean IndexedDB (async, fire-and-forget but with logging)
@@ -379,7 +375,7 @@ export async function clearLegacyFallbackKeys(): Promise<void> {
  */
 export async function loadFallbackProvider(): Promise<ProviderConfig | null> {
   try {
-    const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
+    const saved = safeGetItem(FALLBACK_PROVIDER_KEY);
     if (!saved) return null;
     const config = JSON.parse(saved);
     // Retrieve API key from SecureStorage (encrypted, async)
@@ -418,11 +414,7 @@ export async function saveFallbackProvider(config: ProviderConfig): Promise<void
   import("../utils/storage")
     .then(({ storageSet }) => { storageSet("settings", "fallback-provider", storedConfig); })
     .catch((err) => { console.warn('[errorRecovery] storageSet for fallback provider failed:', err); });
-  try {
-    localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig));
-  } catch (err) {
-    console.warn('[errorRecovery] localStorage write for fallback provider failed:', err);
-  }
+  safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig));
 }
 
 /**

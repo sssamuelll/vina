@@ -1,4 +1,5 @@
 import { BodyMeasurements } from '../../types/types';
+import { safeGetItem, safeSetItem } from '../safeStorage';
 
 export interface AvatarProfile {
   id: string;
@@ -47,7 +48,7 @@ export function getDefaultProfiles(): AvatarProfile[] {
 
 export function loadProfiles(): AvatarProfile[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeGetItem(STORAGE_KEY);
     if (!raw) return getDefaultProfiles();
     const parsed = JSON.parse(raw) as AvatarProfile[];
     return parsed.length > 0 ? parsed : getDefaultProfiles();
@@ -66,11 +67,11 @@ export function saveProfile(profile: AvatarProfile): void {
   }
   // Write to both IndexedDB and localStorage
   import('../storage').then(({ storageSet }) => { storageSet('avatars', 'profiles', profiles); });
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
+  safeSetItem(STORAGE_KEY, JSON.stringify(profiles));
 }
 
 export function deleteProfile(id: string): void {
   const profiles = loadProfiles().filter(p => p.id !== id);
   import('../storage').then(({ storageSet }) => { storageSet('avatars', 'profiles', profiles); });
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles)); } catch { /* ignore */ }
+  safeSetItem(STORAGE_KEY, JSON.stringify(profiles));
 }

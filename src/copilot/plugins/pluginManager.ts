@@ -20,6 +20,7 @@ import { getDefaultPluginRegistry } from './pluginRegistry';
 import { PluginHost } from './sandbox/PluginHost';
 import type { AppDispatch, RootState } from '../../store';
 import type { ToolRegistry } from '../action/tools/registry';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../../utils/safeStorage';
 
 // ─── PluginHost Singleton ────────────────────────────────────────────────────
 
@@ -72,7 +73,7 @@ const INSTALLED_PLUGINS_KEY = 'openclo_installed_plugins';
  */
 export function loadInstalledPluginsList(): InstalledPlugin[] {
   try {
-    const raw = localStorage.getItem(INSTALLED_PLUGINS_KEY);
+    const raw = safeGetItem(INSTALLED_PLUGINS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -88,7 +89,8 @@ export function loadInstalledPluginsList(): InstalledPlugin[] {
  * @param plugins - Array of InstalledPlugin entries to persist
  */
 export function saveInstalledPluginsList(plugins: InstalledPlugin[]): void {
-  import("../../utils/storage").then(({ storageSet }) => { storageSet("plugins", "installed", plugins); }).catch(() => {}); try { localStorage.setItem(INSTALLED_PLUGINS_KEY, JSON.stringify(plugins)); } catch { /* ignore */ }
+  import("../../utils/storage").then(({ storageSet }) => { storageSet("plugins", "installed", plugins); }).catch(() => {});
+  safeSetItem(INSTALLED_PLUGINS_KEY, JSON.stringify(plugins));
 }
 
 // ─── Install / Remove ───────────────────────────────────────────────────────
@@ -379,6 +381,7 @@ export function loadAndRegisterPlugin(
  * Also resets the PluginHost singleton so tests can re-initialize it cleanly.
  */
 export function resetPluginManager(): void {
-  import("../../utils/storage").then(({ storageDel }) => { storageDel("plugins", "installed"); }).catch(() => {}); try { localStorage.removeItem(INSTALLED_PLUGINS_KEY); } catch { /* ignore */ }
+  import("../../utils/storage").then(({ storageDel }) => { storageDel("plugins", "installed"); }).catch(() => {});
+  safeRemoveItem(INSTALLED_PLUGINS_KEY);
   _pluginHost = null;
 }

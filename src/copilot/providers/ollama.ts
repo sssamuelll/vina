@@ -20,6 +20,7 @@ import type {
   ProviderToolCall,
   StreamChunk,
 } from './types';
+import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
 
 /** Default Ollama API URL */
 export const OLLAMA_DEFAULT_URL = 'http://localhost:11434';
@@ -49,7 +50,7 @@ export interface OllamaConfig {
  */
 export function loadOllamaConfig(): OllamaConfig {
   try {
-    const saved = localStorage.getItem(OLLAMA_CONFIG_KEY);
+    const saved = safeGetItem(OLLAMA_CONFIG_KEY);
     if (saved) return JSON.parse(saved);
   } catch { /* ignore */ }
   return { url: OLLAMA_DEFAULT_URL, model: 'llama3', autoDetect: true };
@@ -61,9 +62,8 @@ export function loadOllamaConfig(): OllamaConfig {
  * @param config - Configuration to save
  */
 export function saveOllamaConfig(config: OllamaConfig): void {
-  try {
-    import("../../utils/storage").then(({ storageSet }) => { storageSet("settings", "ollama-config", config); }).catch(() => {}); try { localStorage.setItem(OLLAMA_CONFIG_KEY, JSON.stringify(config)); } catch { /* ignore */ }
-  } catch { /* ignore */ }
+  import("../../utils/storage").then(({ storageSet }) => { storageSet("settings", "ollama-config", config); }).catch(() => {});
+  safeSetItem(OLLAMA_CONFIG_KEY, JSON.stringify(config));
 }
 
 /**
