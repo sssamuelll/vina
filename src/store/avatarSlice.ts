@@ -1,6 +1,8 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
 import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
+import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import { NEW_PROJECT } from './actions';
 
 export interface JointRotation {
   x: number;  // degrees
@@ -194,7 +196,7 @@ const POSES_STORAGE_KEY = 'openclo-saved-poses';
 function loadSavedPoses(): SavedPose[] {
   // Sync fallback for initial state — async migration happens in loadSavedPosesFromStorage
   try {
-    const raw = localStorage.getItem(POSES_STORAGE_KEY);
+    const raw = safeGetItem(POSES_STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
@@ -204,7 +206,7 @@ function persistPoses(poses: SavedPose[]) {
   import('../utils/storage').then(({ storageSet }) => {
     storageSet('avatars', 'saved-poses', poses);
   });
-  try { localStorage.setItem(POSES_STORAGE_KEY, JSON.stringify(poses)); } catch { /* ignore */ }
+  safeSetItem(POSES_STORAGE_KEY, JSON.stringify(poses));
 }
 
 const initialState: AvatarState = {
@@ -373,6 +375,21 @@ const avatarSlice = createSlice({
       state.availableMorphTargets = [];
       state.morphTargets = {};
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, (state) => {
+      // Reset project-specific state; preserve user-level data (savedPoses, profiles).
+      // Known limitation: savedPoses may reference joint names or morph targets from
+      // a previous avatar. Applying such a pose on a different skeleton silently
+      // ignores missing joints (setJointRotation writes to a dict, renderer skips
+      // unknown keys). This is acceptable — poses are "best effort" across avatars.
+      state.pose = { ...initialState.pose };
+      state.poseEditorOpen = false;
+      state.selectedJoint = null;
+      state.morphTargets = {};
+      state.availableMorphTargets = [];
+      state.activeProfileId = null;
+    });
   },
 });
 

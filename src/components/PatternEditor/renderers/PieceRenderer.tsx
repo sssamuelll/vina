@@ -7,6 +7,7 @@ import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
 import { extractNodes } from '../nodeEditorUtils';
 import { getOutlineColor } from '../../../utils/layerColors';
+import { getFabricCodeColor } from '../../../utils/fabricCodes';
 
 /** Compute bounding box extents of a path outline. */
 function getOutlineBounds(outline: PathCommand[]): { minX: number; minY: number; maxX: number; maxY: number } {
@@ -313,24 +314,34 @@ const SinglePiece = memo(function SinglePiece({
           );
         } else {
           return (
-            <text
-              x={cx}
-              y={cy}
-              fontSize={11 / zoom2D}
-              fill="#555"
-              textAnchor="middle"
-              dominantBaseline="middle"
-              pointerEvents="auto"
-              fontFamily="Inter, sans-serif"
-              transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onPieceNameDoubleClick?.(piece.id);
-              }}
-              style={{ cursor: 'pointer' }}
-            >
-              {piece.name}
-            </text>
+            <g transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}>
+              <circle
+                cx={cx}
+                cy={cy - 10 / zoom2D}
+                r={3.5 / zoom2D}
+                fill={getFabricCodeColor(piece.fabricCode)}
+                stroke="none"
+                opacity={0.9}
+                pointerEvents="none"
+              />
+              <text
+                x={cx}
+                y={cy}
+                fontSize={11 / zoom2D}
+                fill="#555"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                pointerEvents="auto"
+                fontFamily="Inter, sans-serif"
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  onPieceNameDoubleClick?.(piece.id);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
+                {piece.name}
+              </text>
+            </g>
           );
         }
       })()}

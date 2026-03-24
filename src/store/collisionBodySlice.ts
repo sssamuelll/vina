@@ -5,6 +5,7 @@ import type {
   CollisionBodyCollision,
   CollisionBodyAnimation,
 } from '../types/collisionBody';
+import { NEW_PROJECT } from './actions';
 
 export interface CollisionBodyState {
   bodies: CollisionBody[];
@@ -85,6 +86,13 @@ const collisionBodySlice = createSlice({
         Object.assign(body.animation, action.payload.animation);
       }
     },
+  },
+  extraReducers: (builder) => {
+    // Worker-level cleanup: simulation lifecycle hook (useSimulationLifecycle) reads
+    // collisionBodies via ref. When simulationSlice resets to 'idle' on NEW_PROJECT,
+    // the old solver clients are destroyed. A new simulation reads the (now empty)
+    // bodies array, so no stale collision meshes leak into the worker.
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

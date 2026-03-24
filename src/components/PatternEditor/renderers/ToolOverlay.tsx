@@ -15,6 +15,7 @@ import NodeEditorOverlay from './overlays/NodeEditorOverlay';
 import EditPatternOverlay from './overlays/EditPatternOverlay';
 import TransformHandlesOverlay from './overlays/TransformHandlesOverlay';
 import ScissorsOverlay from './overlays/ScissorsOverlay';
+import SlashAndSpreadOverlay from './overlays/SlashAndSpreadOverlay';
 import MergeOverlay from './overlays/MergeOverlay';
 import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
@@ -25,6 +26,7 @@ import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } fr
 import type { FreeEdgeSelection } from '../sewingUtils';
 import type { BBox, HandlePosition } from '../../../utils/geometry/transform';
 import type { TransformPreview } from '../useTransformTool';
+import type { SlashAndSpreadPhase } from '../useSlashAndSpreadTool';
 
 interface PenNode {
   anchor: Point2D;
@@ -105,6 +107,18 @@ interface ToolOverlayProps {
   scissorsEndPoint: Point2D | null;
   scissorsHoveredEdgePoint: Point2D | null;
   scissorsPreviewValid: boolean;
+  // Slash and Spread
+  ssPhase: SlashAndSpreadPhase;
+  ssTargetPieceId: string | null;
+  ssStartPoint: Point2D | null;
+  ssEndPoint: Point2D | null;
+  ssHalfA: PathCommand[] | null;
+  ssHalfB: PathCommand[] | null;
+  ssSelectedHalf: 'A' | 'B' | null;
+  ssHoveredHalf: 'A' | 'B' | null;
+  ssPivotPoint: Point2D | null;
+  ssSpreadAmount: number;
+  ssPreviewPiece: PatternPiece | null;
   // Merge
   mergePieceIdA: string | null;
   mergePieceIdB: string | null;
@@ -233,6 +247,24 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           endPoint={props.scissorsEndPoint}
           hoveredEdgePoint={props.scissorsHoveredEdgePoint}
           previewValid={props.scissorsPreviewValid}
+        />
+      )}
+
+      {activeTool === 'slashAndSpread' && (
+        <SlashAndSpreadOverlay
+          zoom2D={zoom2D}
+          pieces={pieces}
+          phase={props.ssPhase}
+          targetPieceId={props.ssTargetPieceId}
+          startPoint={props.ssStartPoint}
+          endPoint={props.ssEndPoint}
+          halfA={props.ssHalfA}
+          halfB={props.ssHalfB}
+          selectedHalf={props.ssSelectedHalf}
+          hoveredHalf={props.ssHoveredHalf}
+          pivotPoint={props.ssPivotPoint}
+          spreadAmount={props.ssSpreadAmount}
+          previewPiece={props.ssPreviewPiece}
         />
       )}
 

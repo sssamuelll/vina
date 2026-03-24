@@ -205,6 +205,64 @@ describe('AgenticLoop', () => {
     expect(assistantMsg!.reasoning_content).toBe('Let me check the garment state first.');
   });
 
+  it('produces error result when tool arguments are malformed JSON', async () => {
+    const malformedArgs = '{"pieceId": "p1", delta: INVALID}';
+
+    const mockRegistry = {
+      execute: vi.fn(async () => ({ success: true, data: {} })),
+      get: vi.fn(() => ({ name: 'modifyEdge' })),
+    };
+
+    const send = createMockSend([
+      // LLM sends malformed JSON arguments
+      { content: '', toolCalls: [{ id: 'tc1', name: 'modifyEdge', arguments: malformedArgs }] },
+      // LLM sees the error and responds
+      { content: 'Sorry, I had a formatting error. Let me try again.', toolCalls: [] },
+    ]);
+
+    const actionToolDefs: ProviderToolDef[] = [{
+      name: 'modifyEdge',
+      description: 'Modify edge',
+      parameters: { type: 'object', properties: {} },
+    }];
+
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [],
+      actionToolDefs,
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+      registry: mockRegistry as never,
+    });
+
+    const events: AgenticEvent[] = [];
+    await loop.run('modify neckline', (e) => events.push(e));
+
+    // Tool should NOT have been executed with empty args
+    expect(mockRegistry.execute).not.toHaveBeenCalled();
+
+    // Should NOT emit tool:start (tool never started)
+    const startEvents = events.filter(e => e.type === 'tool:start');
+    expect(startEvents).toHaveLength(0);
+
+    // Should emit tool:error event
+    const errorEvents = events.filter(e => e.type === 'tool:error');
+    expect(errorEvents).toHaveLength(1);
+
+    // Error message should include the raw malformed string for debugging
+    const errorEvent = errorEvents[0] as { type: 'tool:error'; error: string };
+    expect(errorEvent.error).toContain('Malformed JSON');
+    expect(errorEvent.error).toContain(malformedArgs);
+
+    // Error result should have been sent back to LLM as tool response
+    const secondCallMessages = (send.mock.calls as unknown[][])[1][0] as Array<{ role: string; content: string }>;
+    const toolMsg = secondCallMessages.find(m => m.role === 'tool');
+    expect(toolMsg).toBeDefined();
+    const toolResult = JSON.parse(toolMsg!.content);
+    expect(toolResult.success).toBe(false);
+    expect(toolResult.error).toContain('Malformed JSON');
+  });
+
   it('emits tool:error event when action tool throws', async () => {
     const mockRegistry = {
       execute: vi.fn(async () => { throw new Error('kaboom'); }),

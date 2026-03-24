@@ -14,6 +14,7 @@
  */
 
 import { openDB, type IDBPDatabase } from 'idb';
+import { safeGetItem, safeSetItem, safeRemoveItem } from './safeStorage';
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ export async function storageGet<T = unknown>(store: StoreNames, key: string): P
   } catch {
     // Fallback to localStorage
     try {
-      const raw = localStorage.getItem(`${DB_NAME}:${store}:${key}`);
+      const raw = safeGetItem(`${DB_NAME}:${store}:${key}`);
       return raw ? JSON.parse(raw) : undefined;
     } catch {
       return undefined;
@@ -75,11 +76,7 @@ export async function storageSet(store: StoreNames, key: string, value: unknown)
     await db.put(store, value, key);
   } catch {
     // Fallback to localStorage
-    try {
-      localStorage.setItem(`${DB_NAME}:${store}:${key}`, JSON.stringify(value));
-    } catch {
-      // Quota exceeded or unavailable — silent fail
-    }
+    safeSetItem(`${DB_NAME}:${store}:${key}`, JSON.stringify(value));
   }
 }
 
@@ -91,9 +88,7 @@ export async function storageDel(store: StoreNames, key: string): Promise<void> 
     const db = await getDB();
     await db.delete(store, key);
   } catch {
-    try {
-      localStorage.removeItem(`${DB_NAME}:${store}:${key}`);
-    } catch { /* ignore */ }
+    safeRemoveItem(`${DB_NAME}:${store}:${key}`);
   }
 }
 
@@ -149,11 +144,11 @@ export async function migrateFromLocalStorage<T = unknown>(
   idbKey: string,
 ): Promise<T | undefined> {
   try {
-    const raw = localStorage.getItem(localKey);
+    const raw = safeGetItem(localKey);
     if (!raw) return undefined;
     const value = JSON.parse(raw) as T;
     await storageSet(store, idbKey, value);
-    localStorage.removeItem(localKey);
+    safeRemoveItem(localKey);
     return value;
   } catch {
     return undefined;
@@ -184,5 +179,5 @@ export async function loadProject(): Promise<unknown | undefined> {
 export async function clearProject(): Promise<void> {
   await storageDel('projects', AUTOSAVE_KEY);
   // Also clear legacy
-  try { localStorage.removeItem(LEGACY_AUTOSAVE_KEY); } catch { /* ignore */ }
+  safeRemoveItem(LEGACY_AUTOSAVE_KEY);
 }

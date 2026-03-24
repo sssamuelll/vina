@@ -32,7 +32,7 @@ const TOOL_GROUPS: string[][] = [
   ['internalShape', 'trace'],
   ['dart'],
   // ─── Pattern Editing ───
-  ['scissors'],
+  ['scissors', 'slashAndSpread'],
   ['mirror', 'duplicate', 'copyPattern'],
   ['flatten'],
   ['seamAllowance'],
