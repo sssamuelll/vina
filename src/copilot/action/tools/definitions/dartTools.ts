@@ -159,20 +159,17 @@ export const tools: ToolDefinition[] = [
       const dartLine = piece.internals.find((l: { id: string }) => l.id === dartId);
       if (!dartLine) return { success: false, error: `Dart "${dartId}" not found on piece "${piece.id}"` };
 
-      // Snapshot piece for rollback
-      const snapshot = { ...piece };
+      // Deep clone for rollback (prevents Immer draft revocation)
+      const snapshot = structuredClone(piece);
 
       const newDarts = segmentDart(piece, dartId, segments);
 
-      // Remove original dart
-      dispatch({ type: 'project/removeInternalLine', payload: { pieceId: piece.id, lineId: dartId } });
-
-      // Add each new segment
-      const newIds: string[] = [];
-      for (const dart of newDarts) {
-        dispatch({ type: 'project/addInternalLine', payload: { pieceId: piece.id, line: dart } });
-        newIds.push(dart.id);
-      }
+      // Single atomic dispatch: replace original dart with N segments
+      const updatedInternals = [
+        ...piece.internals.filter((l: { id: string }) => l.id !== dartId),
+        ...newDarts,
+      ];
+      dispatch({ type: 'project/updatePiece', payload: { ...piece, internals: updatedInternals } });
 
       return {
         success: true,
@@ -180,7 +177,7 @@ export const tools: ToolDefinition[] = [
           pieceId: piece.id,
           originalDartId: dartId,
           segments,
-          newDartIds: newIds,
+          newDartIds: newDarts.map(d => d.id),
         },
         rollback: () => dispatch({ type: 'project/updatePiece', payload: snapshot }),
       };
@@ -216,7 +213,7 @@ export const tools: ToolDefinition[] = [
       const dart = extractDartFromInternal(dartLine);
       if (!dart) return { success: false, error: `Line "${dartId}" is not a valid dart` };
 
-      const snapshot = { ...piece };
+      const snapshot = structuredClone(piece);
       const newPath = shapeDartCap(dart, capShape);
 
       const updatedInternals = piece.internals.map((l: { id: string }) =>

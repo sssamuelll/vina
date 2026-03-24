@@ -107,11 +107,23 @@ describe('segmentDart', () => {
     expect(() => segmentDart(makePiece([]), 'nope', 2)).toThrow();
   });
 
-  it('segment IDs contain original dart ID', () => {
-    const result = segmentDart(makePiece([dartLine]), 'dart-1', 2);
+  it('segment IDs are unique', () => {
+    const result = segmentDart(makePiece([dartLine]), 'dart-1', 3);
+    const ids = result.map(s => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('total segment intake equals original intake', () => {
+    const result = segmentDart(makePiece([dartLine]), 'dart-1', 3);
+    // Each segment is a V-path: M(base1) L(apex) L(base2) — intake = distance(base1, base2)
+    let totalIntake = 0;
     for (const seg of result) {
-      expect(seg.id.startsWith('dart-1-seg')).toBe(true);
+      const b1x = seg.path[0].values[0], b1y = seg.path[0].values[1];
+      const b2x = seg.path[2].values[0], b2y = seg.path[2].values[1];
+      totalIntake += Math.sqrt((b2x - b1x) ** 2 + (b2y - b1y) ** 2);
     }
+    // Original intake is 20mm (base at 100,400 to 120,400)
+    expect(totalIntake).toBeCloseTo(20, 0);
   });
 });
 

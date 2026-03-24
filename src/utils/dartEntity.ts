@@ -156,13 +156,13 @@ export function adjustDartIntake(dart: Dart, deltaMm: number): Dart {
  */
 export function segmentDart(
   piece: PatternPiece,
-  dartId: string,
+  targetDartId: string,
   segments: number,
 ): InternalLine[] {
   if (segments < 2 || segments > 6) throw new Error(`segments must be 2–6, got ${segments}`);
 
-  const dartLine = piece.internals.find(l => l.id === dartId && l.type === 'dart');
-  if (!dartLine) throw new Error(`dart ${dartId} not found`);
+  const dartLine = piece.internals.find(l => l.id === targetDartId && l.type === 'dart');
+  if (!dartLine) throw new Error(`dart ${targetDartId} not found`);
 
   const dart = extractDartFromInternal(dartLine, piece.edges);
   if (!dart) throw new Error(`could not parse dart ${dartId}`);
@@ -219,7 +219,7 @@ export function segmentDart(
     ];
 
     results.push({
-      id: `${dartId}-seg${i + 1}`,
+      id: dartId(),
       type: 'dart',
       path,
       dartOptions: dartLine.dartOptions,
