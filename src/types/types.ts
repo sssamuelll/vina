@@ -202,6 +202,35 @@ export interface Seam {
   tapeWidth: number;
 }
 
+// ─── Elastics (edge-based elastic/gathering) ───
+
+export type ElasticType = 'band' | 'shirring' | 'drawstring';
+
+export interface Elastic {
+  id: string;
+  pieceId: string;
+  edgeName: string;
+  stretchRatio: number;   // 0.1–2.0
+  width: number;          // mm
+  type: ElasticType;
+  tStart: number;         // 0.0–1.0
+  tEnd: number;           // 0.0–1.0
+  active: boolean;
+}
+
+export const ELASTIC_DEFAULTS: Omit<Elastic, 'id' | 'pieceId' | 'edgeName'> = {
+  stretchRatio: 0.5,
+  width: 12,
+  type: 'band',
+  tStart: 0,
+  tEnd: 1,
+  active: true,
+};
+
+export function clampStretchRatio(v: number): number {
+  return Math.max(0.1, Math.min(2.0, v));
+}
+
 /** A seam group connects multiple edge segments between two sets of edges */
 export interface SeamGroup {
   id: string;
@@ -431,6 +460,7 @@ export interface EditorState {
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
+  selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;
