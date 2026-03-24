@@ -5,6 +5,7 @@ import type {
   CollisionBodyCollision,
   CollisionBodyAnimation,
 } from '../types/collisionBody';
+import { NEW_PROJECT } from './actions';
 
 export interface CollisionBodyState {
   bodies: CollisionBody[];
@@ -85,6 +86,9 @@ const collisionBodySlice = createSlice({
         Object.assign(body.animation, action.payload.animation);
       }
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

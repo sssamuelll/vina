@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
 import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
+import { NEW_PROJECT } from './actions';
 
 export interface JointRotation {
   x: number;  // degrees
@@ -373,6 +374,17 @@ const avatarSlice = createSlice({
       state.availableMorphTargets = [];
       state.morphTargets = {};
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, (state) => {
+      // Reset project-specific state; preserve user-level data (savedPoses, profiles)
+      state.pose = { ...initialState.pose };
+      state.poseEditorOpen = false;
+      state.selectedJoint = null;
+      state.morphTargets = {};
+      state.availableMorphTargets = [];
+      state.activeProfileId = null;
+    });
   },
 });
 
