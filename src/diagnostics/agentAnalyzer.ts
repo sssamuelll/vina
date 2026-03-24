@@ -1,4 +1,5 @@
 import type { InspectionData, Diagnostic, AgentAnalysis, AgentSuggestion } from './types';
+import { TINY_PIECE_MESSAGE_PREFIX } from './ruleEngine';
 
 // Generate suggestions based on diagnostic category
 function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): AgentSuggestion[] {
@@ -51,7 +52,7 @@ function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): A
         }
         break;
       case 'geometry':
-        if (d.message.includes('Orphaned tiny piece')) {
+        if (d.message.startsWith(TINY_PIECE_MESSAGE_PREFIX)) {
           suggestions.push({
             description: 'Remove this orphaned tiny piece',
             impact: 'Improves simulation stability and cleanliness',

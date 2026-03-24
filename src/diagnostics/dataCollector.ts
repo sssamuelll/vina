@@ -56,6 +56,9 @@ export function collectInspectionData(
   const piece = state.project.pieces.find(p => p.id === target.pieceId);
 
   // ─── Fallback when piece is not found ────────────────────────────────────
+  // Stub data for a missing piece. area: 0 with empty seams[] would normally
+  // trigger ruleTinyPiece, but this is harmless — the stub represents a deleted
+  // or orphaned reference, and surfacing a "tiny piece" warning is appropriate.
   if (!piece) {
     return {
       target,

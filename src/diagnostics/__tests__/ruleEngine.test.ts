@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { evaluateRules } from '../ruleEngine';
+import { evaluateRules, TINY_PIECE_THRESHOLD_MM2, TINY_PIECE_MESSAGE_PREFIX } from '../ruleEngine';
 import type { InspectionData } from '../types';
 import type { PhysicalFabric } from '../../utils/cloth/physicalFabric';
 
@@ -394,6 +394,107 @@ describe('evaluateRules', () => {
       });
       const diags = evaluateRules(data);
       expect(diags.some(d => d.category === 'geometry' && d.severity === 'warning')).toBe(true);
+    });
+
+    // ── Boundary tests ────────────────────────────────────────────────────
+
+    it('does not fire warning at exactly the threshold (1000 mm2)', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: TINY_PIECE_THRESHOLD_MM2 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.message.startsWith(TINY_PIECE_MESSAGE_PREFIX))).toBe(false);
+    });
+
+    it('fires warning at 1 mm2 below the threshold (999 mm2)', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: TINY_PIECE_THRESHOLD_MM2 - 1 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.message.startsWith(TINY_PIECE_MESSAGE_PREFIX))).toBe(true);
+    });
+
+    // ── Seam active-field edge cases ──────────────────────────────────────
+
+    it('treats seam with active: undefined as active (no warning)', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [
+          {
+            id: 's1',
+            partnerPieceId: 'p2',
+            partnerPieceName: 'Back',
+            edgeName: 'side',
+            type: 'plain',
+            // active is omitted — should default to active
+          },
+        ],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'geometry')).toBe(false);
+    });
+
+    it('does not fire when at least one seam is active among mixed active/inactive', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [
+          {
+            id: 's1',
+            partnerPieceId: 'p2',
+            partnerPieceName: 'Back',
+            edgeName: 'side',
+            type: 'plain',
+            active: false,
+          },
+          {
+            id: 's2',
+            partnerPieceId: 'p3',
+            partnerPieceName: 'Sleeve',
+            edgeName: 'armhole',
+            type: 'plain',
+            active: true,
+          },
+        ],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'geometry')).toBe(false);
+    });
+
+    // ── Diagnostic deduplication ──────────────────────────────────────────
+
+    it('suppresses seam:no-connections when ruleTinyPiece fires (avoids duplicate noise)', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.message.startsWith(TINY_PIECE_MESSAGE_PREFIX))).toBe(true);
+      expect(diags.some(d => d.category === 'seam' && d.message.includes('No seam connections'))).toBe(false);
+    });
+
+    it('still fires seam:no-connections for normal-sized pieces with no seams', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 5000 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'seam' && d.message.includes('No seam connections'))).toBe(true);
+      expect(diags.some(d => d.category === 'geometry')).toBe(false);
+    });
+
+    // ── Message constant integrity ────────────────────────────────────────
+
+    it('message starts with the shared TINY_PIECE_MESSAGE_PREFIX constant', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      const tinyDiag = diags.find(d => d.category === 'geometry');
+      expect(tinyDiag).toBeDefined();
+      expect(tinyDiag!.message).toMatch(new RegExp(`^${TINY_PIECE_MESSAGE_PREFIX}`));
     });
   });
 });
