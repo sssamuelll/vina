@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 186 + 1 texture tiling tool (setTextureRepeat)
-      expect(registry.size).toBe(187);
+      // 187 + 3 pleat tools (createPleat, removePleat, updatePleat)
+      expect(registry.size).toBe(190);
     });
   });
 });
