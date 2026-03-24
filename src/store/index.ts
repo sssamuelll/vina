@@ -48,6 +48,17 @@ export const store = configureStore({
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
+      // All ignored paths below ARE JSON-serializable. They are excluded from
+      // RTK's runtime serializableCheck for performance — the check recurses
+      // every dispatched state diff and these paths contain large arrays
+      // (hundreds of pattern pieces / collision bodies) that make the check
+      // too slow in dev mode.  The undo system relies on JSON round-tripping
+      // the project slice, which is safe because pieces and avatar are plain
+      // JSON objects (see undoMiddleware.test.ts round-trip test).
+      //
+      // copilotUI.pendingConfirmation: holds transient confirmation payloads
+      // whose `action`/`reduxAction` fields may contain non-serializable
+      // values.  This slice is NOT part of the undo snapshot.
       serializableCheck: {
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
