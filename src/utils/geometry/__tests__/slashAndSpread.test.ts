@@ -317,3 +317,154 @@ describe('classifyDarts', () => {
     expect(dartsB.map(d => d.id)).toContain('d2');
   });
 });
+
+// ─── applyPivotSpread + applyParallelSpread ───────────────────────────────────
+
+import { applyPivotSpread, applyParallelSpread } from '../slashAndSpread';
+
+// Simple triangle outline used in spread tests:
+//   M(50,0) L(100,0) L(50,100) Z
+const triangleOutline: PathCommand[] = [
+  { type: 'M', values: [50, 0] },
+  { type: 'L', values: [100, 0] },
+  { type: 'L', values: [50, 100] },
+  { type: 'Z', values: [] },
+];
+
+const noInternals: InternalLine[] = [];
+const noDarts: Dart[] = [];
+
+describe('applyPivotSpread', () => {
+  it('90° rotation around origin maps (50,0) → (0,50)', () => {
+    const result = applyPivotSpread(
+      [{ type: 'M', values: [50, 0] }, { type: 'Z', values: [] }],
+      noInternals,
+      noDarts,
+      { x: 0, y: 0 },
+      90,
+    );
+    // M command: values[0]=x, values[1]=y
+    const m = result.outline[0];
+    expect(m.values[0]).toBeCloseTo(0, 5);
+    expect(m.values[1]).toBeCloseTo(50, 5);
+  });
+
+  it('0° rotation returns identical outline coordinates', () => {
+    const result = applyPivotSpread(triangleOutline, noInternals, noDarts, { x: 0, y: 0 }, 0);
+    // M command
+    expect(result.outline[0].values[0]).toBeCloseTo(50, 5);
+    expect(result.outline[0].values[1]).toBeCloseTo(0, 5);
+    // First L command
+    expect(result.outline[1].values[0]).toBeCloseTo(100, 5);
+    expect(result.outline[1].values[1]).toBeCloseTo(0, 5);
+  });
+
+  it('negative angle rotates in the opposite direction from positive angle', () => {
+    const pivot = { x: 0, y: 0 };
+    const pt: PathCommand[] = [{ type: 'M', values: [50, 0] }, { type: 'Z', values: [] }];
+    const pos = applyPivotSpread(pt, noInternals, noDarts, pivot, 45);
+    const neg = applyPivotSpread(pt, noInternals, noDarts, pivot, -45);
+    // Both rotated from (50,0); y coords should be opposite sign
+    expect(pos.outline[0].values[1]).toBeCloseTo(-neg.outline[0].values[1], 5);
+  });
+
+  it('internals are rotated with the outline (90° around origin)', () => {
+    const internal: InternalLine = {
+      id: 'grain',
+      type: 'grainline',
+      path: [
+        { type: 'M', values: [50, 0] },
+        { type: 'L', values: [50, 50] },
+      ],
+    };
+    const result = applyPivotSpread(triangleOutline, [internal], noDarts, { x: 0, y: 0 }, 90);
+    expect(result.internals).toHaveLength(1);
+    // M(50,0) rotated 90° around origin → (0,50)
+    expect(result.internals[0].path[0].values[0]).toBeCloseTo(0, 5);
+    expect(result.internals[0].path[0].values[1]).toBeCloseTo(50, 5);
+    // L(50,50) rotated 90° around origin → (-50,50)
+    expect(result.internals[0].path[1].values[0]).toBeCloseTo(-50, 5);
+    expect(result.internals[0].path[1].values[1]).toBeCloseTo(50, 5);
+  });
+
+  it('dart apex and legs are rotated (90° around origin)', () => {
+    const dart: Dart = {
+      id: 'dart1',
+      intake: 10,
+      apex: { x: 50, y: 0 },
+      legs: [[{ x: 40, y: 0 }], [{ x: 60, y: 0 }]],
+      foldDirection: 'left',
+    };
+    const result = applyPivotSpread(triangleOutline, noInternals, [dart], { x: 0, y: 0 }, 90);
+    expect(result.darts).toHaveLength(1);
+    // apex (50,0) → (0,50)
+    expect(result.darts[0].apex.x).toBeCloseTo(0, 5);
+    expect(result.darts[0].apex.y).toBeCloseTo(50, 5);
+    // leg point (40,0) → (0,40)
+    expect(result.darts[0].legs[0][0].x).toBeCloseTo(0, 5);
+    expect(result.darts[0].legs[0][0].y).toBeCloseTo(40, 5);
+  });
+});
+
+describe('applyParallelSpread', () => {
+  it('vertical slash direction (0,1) gives perpendicular (1,0): translates x by distance', () => {
+    const result = applyParallelSpread(
+      [{ type: 'M', values: [50, 0] }, { type: 'Z', values: [] }],
+      noInternals,
+      noDarts,
+      { x: 0, y: 1 },
+      20,
+    );
+    // x should shift by +20, y unchanged
+    expect(result.outline[0].values[0]).toBeCloseTo(70, 5);
+    expect(result.outline[0].values[1]).toBeCloseTo(0, 5);
+  });
+
+  it('all coordinate values in the outline are shifted by the computed translation', () => {
+    const result = applyParallelSpread(triangleOutline, noInternals, noDarts, { x: 0, y: 1 }, 10);
+    // M(50,0) → (60,0)
+    expect(result.outline[0].values[0]).toBeCloseTo(60, 5);
+    expect(result.outline[0].values[1]).toBeCloseTo(0, 5);
+    // L(100,0) → (110,0)
+    expect(result.outline[1].values[0]).toBeCloseTo(110, 5);
+    expect(result.outline[1].values[1]).toBeCloseTo(0, 5);
+    // L(50,100) → (60,100)
+    expect(result.outline[2].values[0]).toBeCloseTo(60, 5);
+    expect(result.outline[2].values[1]).toBeCloseTo(100, 5);
+  });
+
+  it('internals are translated with the outline', () => {
+    const internal: InternalLine = {
+      id: 'grain',
+      type: 'grainline',
+      path: [
+        { type: 'M', values: [50, 10] },
+        { type: 'L', values: [50, 90] },
+      ],
+    };
+    const result = applyParallelSpread(triangleOutline, [internal], noDarts, { x: 0, y: 1 }, 15);
+    expect(result.internals).toHaveLength(1);
+    expect(result.internals[0].path[0].values[0]).toBeCloseTo(65, 5);
+    expect(result.internals[0].path[0].values[1]).toBeCloseTo(10, 5);
+    expect(result.internals[0].path[1].values[0]).toBeCloseTo(65, 5);
+    expect(result.internals[0].path[1].values[1]).toBeCloseTo(90, 5);
+  });
+
+  it('darts are translated with the outline', () => {
+    const dart: Dart = {
+      id: 'dart1',
+      intake: 10,
+      apex: { x: 50, y: 50 },
+      legs: [[{ x: 45, y: 100 }], [{ x: 55, y: 100 }]],
+      foldDirection: 'left',
+    };
+    const result = applyParallelSpread(triangleOutline, noInternals, [dart], { x: 0, y: 1 }, 25);
+    expect(result.darts).toHaveLength(1);
+    // apex (50,50) → (75,50)
+    expect(result.darts[0].apex.x).toBeCloseTo(75, 5);
+    expect(result.darts[0].apex.y).toBeCloseTo(50, 5);
+    // leg (45,100) → (70,100)
+    expect(result.darts[0].legs[0][0].x).toBeCloseTo(70, 5);
+    expect(result.darts[0].legs[0][0].y).toBeCloseTo(100, 5);
+  });
+});

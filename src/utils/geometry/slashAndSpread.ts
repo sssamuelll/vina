@@ -410,6 +410,187 @@ export function classifyInternals(
 }
 
 // --------------------------------------------------------------------------
+// SpreadHalfResult
+// --------------------------------------------------------------------------
+
+/**
+ * Result returned by the spread transformation functions.
+ * Contains the transformed outline, internals, and darts for one half.
+ */
+export interface SpreadHalfResult {
+  outline: PathCommand[];
+  internals: InternalLine[];
+  darts: Dart[];
+}
+
+// --------------------------------------------------------------------------
+// Internal rotation / translation helpers
+// --------------------------------------------------------------------------
+
+/**
+ * Rotate a single point counter-clockwise around a pivot by angleDeg degrees.
+ */
+function rotatePoint(pt: Point2D, pivot: Point2D, angleDeg: number): Point2D {
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const dx = pt.x - pivot.x;
+  const dy = pt.y - pivot.y;
+  return {
+    x: pivot.x + dx * cos - dy * sin,
+    y: pivot.y + dx * sin + dy * cos,
+  };
+}
+
+/**
+ * Rotate all coordinate pairs in a PathCommand[] counter-clockwise around
+ * a pivot by angleDeg degrees.  Each pair of consecutive values is treated
+ * as an (x, y) coordinate, so H/V commands with a single value are left
+ * untouched (they are absolute-axis commands that don't pair naturally).
+ */
+function rotateCommands(cmds: PathCommand[], pivot: Point2D, angleDeg: number): PathCommand[] {
+  const rad = (angleDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  return cmds.map(cmd => {
+    if (cmd.values.length === 0) {
+      // Z — no coordinates
+      return { ...cmd };
+    }
+
+    const newValues = [...cmd.values];
+
+    // Rotate every (x, y) pair in the values array
+    for (let i = 0; i + 1 < newValues.length; i += 2) {
+      const dx = newValues[i] - pivot.x;
+      const dy = newValues[i + 1] - pivot.y;
+      newValues[i] = pivot.x + dx * cos - dy * sin;
+      newValues[i + 1] = pivot.y + dx * sin + dy * cos;
+    }
+
+    return { type: cmd.type, values: newValues };
+  });
+}
+
+/**
+ * Translate all coordinate pairs in a PathCommand[] by (dx, dy).
+ */
+function translateCommands(cmds: PathCommand[], dx: number, dy: number): PathCommand[] {
+  return cmds.map(cmd => {
+    if (cmd.values.length === 0) {
+      // Z — no coordinates
+      return { ...cmd };
+    }
+
+    const newValues = [...cmd.values];
+
+    // Translate every (x, y) pair in the values array
+    for (let i = 0; i + 1 < newValues.length; i += 2) {
+      newValues[i] += dx;
+      newValues[i + 1] += dy;
+    }
+
+    return { type: cmd.type, values: newValues };
+  });
+}
+
+// --------------------------------------------------------------------------
+// applyPivotSpread
+// --------------------------------------------------------------------------
+
+/**
+ * Rotate a half-outline, its internals, and darts counter-clockwise around
+ * `pivot` by `angleDeg` degrees.
+ *
+ * This is used in "pivot spread" mode: one half stays fixed, the other is
+ * rotated around a point on the slash line (typically one of the two
+ * intersection points).
+ *
+ * @param half      - PathCommand[] for the half to transform
+ * @param internals - InternalLines belonging to this half
+ * @param darts     - Darts belonging to this half
+ * @param pivot     - Rotation centre
+ * @param angleDeg  - Counter-clockwise angle in degrees
+ * @returns SpreadHalfResult with all geometry rotated
+ */
+export function applyPivotSpread(
+  half: PathCommand[],
+  internals: InternalLine[],
+  darts: Dart[],
+  pivot: Point2D,
+  angleDeg: number,
+): SpreadHalfResult {
+  const outline = rotateCommands(half, pivot, angleDeg);
+
+  const rotatedInternals: InternalLine[] = internals.map(line => ({
+    ...line,
+    path: rotateCommands(line.path, pivot, angleDeg),
+  }));
+
+  const rotatedDarts: Dart[] = darts.map(dart => ({
+    ...dart,
+    apex: rotatePoint(dart.apex, pivot, angleDeg),
+    legs: dart.legs.map(leg => leg.map(pt => rotatePoint(pt, pivot, angleDeg))) as [Point2D[], Point2D[]],
+  }));
+
+  return { outline, internals: rotatedInternals, darts: rotatedDarts };
+}
+
+// --------------------------------------------------------------------------
+// applyParallelSpread
+// --------------------------------------------------------------------------
+
+/**
+ * Translate a half-outline, its internals, and darts perpendicular to the
+ * slash direction by `distance` units.
+ *
+ * This is used in "parallel spread" mode: the half slides sideways away
+ * from the slash line rather than rotating.
+ *
+ * The perpendicular direction is computed as:
+ *   perp = (-slashDir.y / |slashDir|, slashDir.x / |slashDir|)
+ * so the translation is always to the left of the slash direction.
+ *
+ * @param half           - PathCommand[] for the half to transform
+ * @param internals      - InternalLines belonging to this half
+ * @param darts          - Darts belonging to this half
+ * @param slashDirection - Unit-ish vector along the slash line
+ * @param distance       - Distance to translate perpendicular to slash
+ * @returns SpreadHalfResult with all geometry translated
+ */
+export function applyParallelSpread(
+  half: PathCommand[],
+  internals: InternalLine[],
+  darts: Dart[],
+  slashDirection: Point2D,
+  distance: number,
+): SpreadHalfResult {
+  const len = Math.sqrt(slashDirection.x ** 2 + slashDirection.y ** 2);
+  const safeLen = len === 0 ? 1 : len;
+
+  const dx = (slashDirection.y / safeLen) * distance;
+  const dy = (-slashDirection.x / safeLen) * distance;
+
+  const outline = translateCommands(half, dx, dy);
+
+  const translatedInternals: InternalLine[] = internals.map(line => ({
+    ...line,
+    path: translateCommands(line.path, dx, dy),
+  }));
+
+  const translatedDarts: Dart[] = darts.map(dart => ({
+    ...dart,
+    apex: { x: dart.apex.x + dx, y: dart.apex.y + dy },
+    legs: dart.legs.map(leg =>
+      leg.map(pt => ({ x: pt.x + dx, y: pt.y + dy }))
+    ) as [Point2D[], Point2D[]],
+  }));
+
+  return { outline, internals: translatedInternals, darts: translatedDarts };
+}
+
+// --------------------------------------------------------------------------
 // classifyDarts
 // --------------------------------------------------------------------------
 
