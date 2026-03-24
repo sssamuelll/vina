@@ -136,7 +136,15 @@ export class AgenticLoop {
 
       // Execute each tool call and append results
       for (const toolCall of response.toolCalls) {
-        const args = this.parseArgs(toolCall);
+        let args: Record<string, unknown> = {};
+        let parseError: string | undefined;
+
+        try {
+          args = this.parseArgs(toolCall);
+        } catch (err) {
+          parseError = err instanceof Error ? err.message : String(err);
+        }
+
         onEvent({ type: 'tool:start', name: toolCall.name, args });
 
         const start = performance.now();
@@ -144,20 +152,25 @@ export class AgenticLoop {
         let isMetaTool = false;
         let toolError: string | undefined;
 
-        try {
-          const metaTool = this.metaTools.get(toolCall.name);
-          if (metaTool) {
-            isMetaTool = true;
-            result = await metaTool.execute(args, this.getState);
-          } else if (this.registry) {
-            result = await this.registry.execute(toolCall.name, args);
-          } else {
-            result = { success: false, error: `Unknown tool: ${toolCall.name}` };
+        if (parseError) {
+          result = { success: false, error: parseError };
+          toolError = parseError;
+        } else {
+          try {
+            const metaTool = this.metaTools.get(toolCall.name);
+            if (metaTool) {
+              isMetaTool = true;
+              result = await metaTool.execute(args, this.getState);
+            } else if (this.registry) {
+              result = await this.registry.execute(toolCall.name, args);
+            } else {
+              result = { success: false, error: `Unknown tool: ${toolCall.name}` };
+            }
+          } catch (err) {
+            const errorMsg = err instanceof Error ? err.message : String(err);
+            result = { success: false, error: errorMsg };
+            toolError = errorMsg;
           }
-        } catch (err) {
-          const errorMsg = err instanceof Error ? err.message : String(err);
-          result = { success: false, error: errorMsg };
-          toolError = errorMsg;
         }
 
         // Record BEFORE firing event so getLastToolCalls() is up-to-date
@@ -192,7 +205,13 @@ export class AgenticLoop {
     try {
       return JSON.parse(toolCall.arguments);
     } catch {
-      return {};
+      const raw =
+        toolCall.arguments.length > 200
+          ? toolCall.arguments.slice(0, 200) + '…'
+          : toolCall.arguments;
+      throw new Error(
+        `Malformed JSON in tool arguments for "${toolCall.name}". Raw: ${raw}`,
+      );
     }
   }
 
