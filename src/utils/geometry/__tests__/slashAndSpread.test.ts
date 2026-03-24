@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import type { PathCommand } from '../../../types/types';
+import type { PathCommand, InternalLine, Dart } from '../../../types/types';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
+  classifyInternals,
+  classifyDarts,
 } from '../slashAndSpread';
 
 // 100x150 rectangle: corners at (0,0), (100,0), (100,150), (0,150)
@@ -174,5 +176,144 @@ describe('splitOutlineAtSlash', () => {
     // M commands at split points and the closing L commands are inserted (-1)
     const allIndices = [...splitMap.halfAIndices, ...splitMap.halfBIndices];
     expect(allIndices.some(i => i === -1)).toBe(true);
+  });
+});
+
+// ─── classifyInternals + classifyDarts ───────────────────────────────────────
+//
+// Halves: 100x150 rectangle split at x=50
+//   halfA = left half  (x: 0–50)
+//   halfB = right half (x: 50–100)
+//
+const halfA: PathCommand[] = [
+  { type: 'M', values: [0, 0] },
+  { type: 'L', values: [50, 0] },
+  { type: 'L', values: [50, 150] },
+  { type: 'L', values: [0, 150] },
+  { type: 'Z', values: [] },
+];
+const halfB: PathCommand[] = [
+  { type: 'M', values: [50, 0] },
+  { type: 'L', values: [100, 0] },
+  { type: 'L', values: [100, 150] },
+  { type: 'L', values: [50, 150] },
+  { type: 'Z', values: [] },
+];
+
+describe('classifyInternals', () => {
+  it('assigns grainline on left side to internalsA', () => {
+    // Grainline running vertically near x=25 — clearly inside halfA
+    const grainline: InternalLine = {
+      id: 'grain-left',
+      type: 'grainline',
+      path: [
+        { type: 'M', values: [25, 30] },
+        { type: 'L', values: [25, 120] },
+      ],
+    };
+    const { internalsA, internalsB } = classifyInternals([grainline], halfA, halfB);
+    expect(internalsA).toHaveLength(1);
+    expect(internalsA[0].id).toBe('grain-left');
+    expect(internalsB).toHaveLength(0);
+  });
+
+  it('assigns internal line on right side to internalsB', () => {
+    // Reference line running horizontally near x=75 — clearly inside halfB
+    const refLine: InternalLine = {
+      id: 'ref-right',
+      type: 'reference',
+      path: [
+        { type: 'M', values: [60, 75] },
+        { type: 'L', values: [90, 75] },
+      ],
+    };
+    const { internalsA, internalsB } = classifyInternals([refLine], halfA, halfB);
+    expect(internalsB).toHaveLength(1);
+    expect(internalsB[0].id).toBe('ref-right');
+    expect(internalsA).toHaveLength(0);
+  });
+
+  it('handles internal near the boundary by majority vote', () => {
+    // Line from x=40 to x=60 — 3 of 5 samples (at 40, 45, 50, 55, 60) lie in halfA:
+    //   x=40 → halfA, x=45 → halfA, x=50 → boundary (counted by whichever polygon
+    //   the ray-cast returns; either is acceptable), x=55 → halfB, x=60 → halfB
+    // We just verify it's assigned to one of the two halves without throwing.
+    const boundary: InternalLine = {
+      id: 'boundary-line',
+      type: 'fold',
+      path: [
+        { type: 'M', values: [40, 75] },
+        { type: 'L', values: [60, 75] },
+      ],
+    };
+    const { internalsA, internalsB } = classifyInternals([boundary], halfA, halfB);
+    const total = internalsA.length + internalsB.length;
+    expect(total).toBe(1);
+  });
+
+  it('returns empty arrays when no internals are provided', () => {
+    const { internalsA, internalsB } = classifyInternals([], halfA, halfB);
+    expect(internalsA).toHaveLength(0);
+    expect(internalsB).toHaveLength(0);
+  });
+
+  it('classifies multiple internals correctly in one call', () => {
+    const left: InternalLine = {
+      id: 'left',
+      type: 'grainline',
+      path: [{ type: 'M', values: [20, 50] }, { type: 'L', values: [20, 100] }],
+    };
+    const right: InternalLine = {
+      id: 'right',
+      type: 'topstitch',
+      path: [{ type: 'M', values: [70, 50] }, { type: 'L', values: [70, 100] }],
+    };
+    const { internalsA, internalsB } = classifyInternals([left, right], halfA, halfB);
+    expect(internalsA.map(l => l.id)).toContain('left');
+    expect(internalsB.map(l => l.id)).toContain('right');
+  });
+});
+
+describe('classifyDarts', () => {
+  it('assigns dart with apex on left to dartsA', () => {
+    const dart: Dart = {
+      id: 'dart-left',
+      intake: 10,
+      apex: { x: 25, y: 75 },
+      legs: [[{ x: 20, y: 150 }], [{ x: 30, y: 150 }]],
+      foldDirection: 'toward-center',
+    };
+    const { dartsA, dartsB } = classifyDarts([dart], halfA, halfB);
+    expect(dartsA).toHaveLength(1);
+    expect(dartsA[0].id).toBe('dart-left');
+    expect(dartsB).toHaveLength(0);
+  });
+
+  it('assigns dart with apex on right to dartsB', () => {
+    const dart: Dart = {
+      id: 'dart-right',
+      intake: 8,
+      apex: { x: 75, y: 75 },
+      legs: [[{ x: 70, y: 150 }], [{ x: 80, y: 150 }]],
+      foldDirection: 'toward-center',
+    };
+    const { dartsA, dartsB } = classifyDarts([dart], halfA, halfB);
+    expect(dartsB).toHaveLength(1);
+    expect(dartsB[0].id).toBe('dart-right');
+    expect(dartsA).toHaveLength(0);
+  });
+
+  it('returns empty arrays when no darts are provided', () => {
+    const { dartsA, dartsB } = classifyDarts([], halfA, halfB);
+    expect(dartsA).toHaveLength(0);
+    expect(dartsB).toHaveLength(0);
+  });
+
+  it('classifies multiple darts correctly', () => {
+    const d1: Dart = { id: 'd1', intake: 10, apex: { x: 15, y: 60 }, legs: [[], []], foldDirection: 'left' };
+    const d2: Dart = { id: 'd2', intake: 6,  apex: { x: 85, y: 60 }, legs: [[], []], foldDirection: 'right' };
+    const { dartsA, dartsB } = classifyDarts([d1, d2], halfA, halfB);
+    expect(dartsA.map(d => d.id)).toContain('d1');
+    expect(dartsB.map(d => d.id)).toContain('d2');
   });
 });

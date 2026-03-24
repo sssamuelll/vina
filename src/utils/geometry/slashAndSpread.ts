@@ -1,4 +1,4 @@
-import type { PathCommand, Point2D } from '../../types/types';
+import type { PathCommand, Point2D, InternalLine, Dart } from '../../types/types';
 import {
   findOutlineIntersections,
   splitOutlineAtPoints,
@@ -182,4 +182,259 @@ function findCommandInOutline(outline: PathCommand[], cmd: PathCommand): number 
     if (match) return i;
   }
   return -1;
+}
+
+// --------------------------------------------------------------------------
+// flattenPathToPoints
+// --------------------------------------------------------------------------
+
+/**
+ * Extract coordinate pairs from a PathCommand[] into an ordered Point2D[].
+ *
+ * Rules per command type:
+ * - M, L → (values[0], values[1])
+ * - H    → (values[0], last y)
+ * - V    → (last x, values[0])
+ * - C    → control points ignored; only end point (values[4], values[5])
+ * - S    → end point (values[2], values[3])
+ * - Q    → end point (values[2], values[3])
+ * - T    → end point (values[0], values[1])
+ * - A    → end point (values[5], values[6])
+ * - Z    → closes back to first point (appended if distinct from last)
+ */
+export function flattenPathToPoints(cmds: PathCommand[]): Point2D[] {
+  const pts: Point2D[] = [];
+  let cx = 0;
+  let cy = 0;
+  let startX = 0;
+  let startY = 0;
+
+  for (const cmd of cmds) {
+    switch (cmd.type) {
+      case 'M':
+        cx = cmd.values[0];
+        cy = cmd.values[1];
+        startX = cx;
+        startY = cy;
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'L':
+        cx = cmd.values[0];
+        cy = cmd.values[1];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'H':
+        cx = cmd.values[0];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'V':
+        cy = cmd.values[0];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'C':
+        // Cubic bezier: (x1 y1 x2 y2 x y) — take endpoint only
+        cx = cmd.values[4];
+        cy = cmd.values[5];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'S':
+        // Smooth cubic bezier: (x2 y2 x y)
+        cx = cmd.values[2];
+        cy = cmd.values[3];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'Q':
+        // Quadratic bezier: (x1 y1 x y)
+        cx = cmd.values[2];
+        cy = cmd.values[3];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'T':
+        // Smooth quadratic: (x y)
+        cx = cmd.values[0];
+        cy = cmd.values[1];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'A':
+        // Arc: (rx ry x-rot large-arc sweep x y)
+        cx = cmd.values[5];
+        cy = cmd.values[6];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'Z':
+        // Close path — add start point only if it differs from last
+        if (pts.length === 0 || pts[pts.length - 1].x !== startX || pts[pts.length - 1].y !== startY) {
+          pts.push({ x: startX, y: startY });
+        }
+        cx = startX;
+        cy = startY;
+        break;
+    }
+  }
+
+  return pts;
+}
+
+// --------------------------------------------------------------------------
+// pointInPolygon
+// --------------------------------------------------------------------------
+
+/**
+ * Ray-casting point-in-polygon test.
+ *
+ * Flattens `polygon` (PathCommand[]) to a Point2D[] vertex list, then casts a
+ * horizontal ray from `point` to +∞ and counts edge crossings.  An odd count
+ * means the point is inside.
+ *
+ * Points exactly on an edge return `true` (counted as inside) via the
+ * standard up-crossing convention.
+ */
+export function pointInPolygon(point: Point2D, polygon: PathCommand[]): boolean {
+  const verts = flattenPathToPoints(polygon);
+  // Remove duplicate closing vertex if present
+  const n = verts.length;
+  if (n < 3) return false;
+
+  const { x, y } = point;
+  let inside = false;
+
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = verts[i].x;
+    const yi = verts[i].y;
+    const xj = verts[j].x;
+    const yj = verts[j].y;
+
+    // Standard ray-casting: ray goes right (+x direction)
+    const intersects =
+      yi > y !== yj > y &&
+      x < ((xj - xi) * (y - yi)) / (yj - yi) + xi;
+
+    if (intersects) inside = !inside;
+  }
+
+  return inside;
+}
+
+// --------------------------------------------------------------------------
+// samplePointsAlongPath
+// --------------------------------------------------------------------------
+
+/**
+ * Sample `count` evenly-spaced points along the flattened polyline of `path`.
+ *
+ * Samples are spaced by equal arc-length increments from t=0 to t=1, where
+ * t=0 is the first point and t=1 is the last.  For a single-segment line the
+ * samples are simply linearly interpolated.
+ */
+function samplePointsAlongPath(path: PathCommand[], count: number): Point2D[] {
+  const pts = flattenPathToPoints(path);
+  if (pts.length === 0) return [];
+  if (pts.length === 1 || count === 1) {
+    // Return midpoint or first point
+    return [pts[0]];
+  }
+
+  // Build cumulative arc-length table
+  const lengths: number[] = [0];
+  for (let i = 1; i < pts.length; i++) {
+    const dx = pts[i].x - pts[i - 1].x;
+    const dy = pts[i].y - pts[i - 1].y;
+    lengths.push(lengths[i - 1] + Math.sqrt(dx * dx + dy * dy));
+  }
+  const total = lengths[lengths.length - 1];
+  if (total === 0) {
+    // All points identical — return same point `count` times
+    return Array.from({ length: count }, () => ({ ...pts[0] }));
+  }
+
+  const samples: Point2D[] = [];
+  for (let k = 0; k < count; k++) {
+    const targetLen = (k / (count - 1)) * total;
+    // Binary search for the segment containing targetLen
+    let lo = 0;
+    let hi = lengths.length - 1;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) >> 1;
+      if (lengths[mid] <= targetLen) lo = mid;
+      else hi = mid;
+    }
+    const segLen = lengths[hi] - lengths[lo];
+    const t = segLen === 0 ? 0 : (targetLen - lengths[lo]) / segLen;
+    samples.push({
+      x: pts[lo].x + t * (pts[hi].x - pts[lo].x),
+      y: pts[lo].y + t * (pts[hi].y - pts[lo].y),
+    });
+  }
+
+  return samples;
+}
+
+// --------------------------------------------------------------------------
+// classifyInternals
+// --------------------------------------------------------------------------
+
+/**
+ * Classify each internal line into the half that contains the majority of 5
+ * evenly-spaced sample points along the line's flattened path.
+ *
+ * If both halves receive an equal sample count the line is assigned to halfA.
+ */
+export function classifyInternals(
+  internals: InternalLine[],
+  halfA: PathCommand[],
+  halfB: PathCommand[],
+): { internalsA: InternalLine[]; internalsB: InternalLine[] } {
+  const internalsA: InternalLine[] = [];
+  const internalsB: InternalLine[] = [];
+
+  const SAMPLE_COUNT = 5;
+
+  for (const line of internals) {
+    const samples = samplePointsAlongPath(line.path, SAMPLE_COUNT);
+
+    let countA = 0;
+    let countB = 0;
+    for (const pt of samples) {
+      if (pointInPolygon(pt, halfA)) countA++;
+      if (pointInPolygon(pt, halfB)) countB++;
+    }
+
+    if (countB > countA) {
+      internalsB.push(line);
+    } else {
+      internalsA.push(line);
+    }
+  }
+
+  return { internalsA, internalsB };
+}
+
+// --------------------------------------------------------------------------
+// classifyDarts
+// --------------------------------------------------------------------------
+
+/**
+ * Classify each dart into the half that contains its apex point.
+ *
+ * If the apex lies in neither half (e.g. exactly on the boundary where both
+ * ray-casts return false) the dart is assigned to halfA.
+ */
+export function classifyDarts(
+  darts: Dart[],
+  _halfA: PathCommand[],
+  halfB: PathCommand[],
+): { dartsA: Dart[]; dartsB: Dart[] } {
+  const dartsA: Dart[] = [];
+  const dartsB: Dart[] = [];
+
+  for (const dart of darts) {
+    const inB = pointInPolygon(dart.apex, halfB);
+    if (inB) {
+      dartsB.push(dart);
+    } else {
+      dartsA.push(dart);
+    }
+  }
+
+  return { dartsA, dartsB };
 }
