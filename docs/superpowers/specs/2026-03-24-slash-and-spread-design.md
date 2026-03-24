@@ -22,7 +22,7 @@ IDLE → DRAWING_SLASH → SLASH_COMPLETE → SELECTING_HALF → HALF_CONFIRMED 
 | **AWAITING_DRAG** | Begin mouse drag | Pivot point locked, cursor changes to rotation |
 | **SPREADING** | Drag to rotate/translate, release to apply | Live preview of spread half, angle arc, degree + mm labels |
 
-Escape at any step resets to IDLE. Tab toggles between pivot/parallel mode.
+Escape at any step resets to IDLE (during SPREADING, the live preview is discarded — only mouse-up commits). Tab toggles between pivot/parallel mode.
 
 ## Spread Modes
 
@@ -37,71 +37,110 @@ Translate the selected half perpendicular to the slash line. Opens a uniform-wid
 | Option | Behavior |
 |--------|----------|
 | **Straight** (default) | Gap edges connected with line segments (triangular insert shape) |
-| **Smooth** | Gap edges blended with bezier curves for continuous arc (production-ready hemlines) |
+| **Smooth** | Gap edges blended with Catmull-Rom → cubic bezier conversion for G1 continuity at junction points |
 
 Controlled via tool option toggle.
 
 ## Geometry Engine
 
-All pure functions in `src/utils/geometry/slashAndSpread.ts`. No Redux, fully testable.
+All pure functions in `src/utils/geometry/slashAndSpread.ts`. No Redux, fully testable. Re-exported from `src/utils/geometry/` barrel if one exists, otherwise imported directly.
 
 ### Functions
 
 **`findSlashIntersections(outline, startPoint, endPoint)`**
-Find exactly 2 intersection points where the slash line crosses the piece outline. Returns indices + exact coordinates. Errors if not exactly 2 intersections.
+Wraps the existing `findOutlineIntersections()` from `src/utils/geometry/splitOutline.ts`. Validates exactly 2 intersections. Returns `OutlineHit[]` with command indices and t parameters.
 
-**`splitOutlineAtSlash(outline, intersection1, intersection2)`**
-Split outline into two closed sub-paths at the intersection points. Each half includes the slash segment as closing edge. Bezier curves split via de Casteljau subdivision.
+**`splitOutlineAtSlash(outline, hit1, hit2)`**
+Wraps the existing `splitOutlineAtPoints()` from `src/utils/geometry/splitOutline.ts`. Returns two closed sub-paths. Each half includes the slash segment as its closing edge. Bezier curves split via de Casteljau (already handled by `splitOutlineAtPoints`).
 
-Returns: `{ halfA: PathCommand[], halfB: PathCommand[], slashEdgeA, slashEdgeB }`
+Returns: `{ halfA: PathCommand[], halfB: PathCommand[], slashEdgeA: [Point2D, Point2D], slashEdgeB: [Point2D, Point2D] }`
 
 **`classifyInternals(internals, halfA, halfB)`**
-Assign each internal line to its containing half via point-in-polygon. Dart spanning the slash → assigned to the half containing the apex.
+Assign each internal line to its containing half. Classification uses the centroid of the internal line's flattened path for point-in-polygon testing. For `InternalLine` of type `'dart'`, uses the apex point (the path's furthest-from-baseline point) instead of centroid.
 
 Returns: `{ internalsA: InternalLine[], internalsB: InternalLine[] }`
 
-**`applyPivotSpread(half, internals, pivot, angleDeg)`**
-Rotate half-outline and its internals around pivot point by angle. Pure coordinate rotation.
+**`classifyDarts(darts, halfA, halfB)`**
+Assign each rich `Dart` entity to its containing half using the `dart.apex` coordinate for point-in-polygon.
 
-**`applyParallelSpread(half, internals, slashDirection, distance)`**
-Translate half-outline and its internals perpendicular to slash line by distance.
+Returns: `{ dartsA: Dart[], dartsB: Dart[] }`
+
+**`applyPivotSpread(half, internals, darts, pivot, angleDeg)`**
+Rotate half-outline, internals, and darts around pivot point by angle. Pure coordinate rotation.
+
+**`applyParallelSpread(half, internals, darts, slashDirection, distance)`**
+Translate half-outline, internals, and darts perpendicular to slash line by distance.
 
 **`mergeSpreadHalves(halfA, halfB, gapFill: 'straight' | 'smooth')`**
-Reconnect two halves into single closed outline. Straight: line segments. Smooth: bezier curve fit across gap points.
+Reconnect two halves into single closed outline. Straight: line segments. Smooth: Catmull-Rom interpolation through the gap endpoints converted to cubic bezier, ensuring G1 tangent continuity at junction points.
 
-**`buildSpreadPiece(piece, intersection1, intersection2, selectedHalf, pivot, spreadAmount, mode, gapFill)`**
-Orchestrator: calls all above, returns new PatternPiece with spread applied. Called by both the UI hook and the copilot tool.
+**`rebuildSemanticEdges(originalEdges, originalOutline, newOutline)`**
+Rebuild `SemanticEdge[]` segment ranges after outline modification. Maps original edge start/end points to nearest positions on the new outline to recompute `segmentRange` indices.
+
+**`buildSpreadPiece(piece, hit1, hit2, selectedHalf, pivot, spreadAmount, mode, gapFill)`**
+Orchestrator: calls all above, returns new PatternPiece with spread applied. **Preserves the original `piece.id`** — the piece is modified in-place conceptually (same ID, new geometry). Existing seams referencing this piece ID remain valid; their edge geometry updates automatically since seams reference edges by name and edges are rebuilt.
+
+Called by both the UI hook and the copilot tool.
 
 ### Key Decisions
-- Works on `PathCommand[]` directly — no intermediate representation
-- Bezier curves preserved through intersection splitting (de Casteljau)
+- Reuses existing `findOutlineIntersections` and `splitOutlineAtPoints` from `splitOutline.ts` — no reinvention
 - Pivot point is always one of the two slash-line intersection points
-- Internal lines (darts, grainline, notches) on selected half move with it
-- Multiple slashes: sequential operations, each modifies the piece. Undo individually.
+- Internal lines on selected half move with it; grainline rotates with its half (standard pattern-making behavior)
+- Rich `Dart` entities (`piece.darts`) classified and rotated separately from `InternalLine` internals
+- `SemanticEdge[]` (`piece.edges`) segment ranges rebuilt after outline modification
+- Piece ID preserved → existing `Seam` references remain valid
+- If piece has `linkedPieceId`, the link is broken (set to `undefined`) since the geometry has diverged
+- Multiple slashes: sequential operations, each modifies the piece. Undo individually via standard undo middleware.
 
 ## Tool Definition
 
 File: `src/tools/definitions/slashAndSpread.tsx`
 
 ```typescript
-{
+export const slashAndSpreadTool: ToolDefinition = {
   id: 'slashAndSpread',
   name: 'Slash & Spread',
   context: '2d',
   cursor: 'crosshair',
   group: 'pattern',  // alongside scissors
+  icon: SlashAndSpreadIcon,
   options: [
-    { id: 'mode', type: 'select', value: 'pivot', choices: ['pivot', 'parallel'] },
-    { id: 'gapFill', type: 'select', value: 'straight', choices: ['straight', 'smooth'] },
+    {
+      id: 'mode',
+      label: 'Spread Mode',
+      type: 'select',
+      value: 'pivot',
+      choices: [
+        { label: 'Pivot (Angle)', value: 'pivot' },
+        { label: 'Parallel (Distance)', value: 'parallel' },
+      ],
+    },
+    {
+      id: 'gapFill',
+      label: 'Gap Fill',
+      type: 'select',
+      value: 'straight',
+      choices: [
+        { label: 'Straight', value: 'straight' },
+        { label: 'Smooth Curve', value: 'smooth' },
+      ],
+    },
   ],
   copilot: {
-    keywords: ['slash', 'spread', 'fullness', 'flare', 'ease', 'pivot'],
+    description:
+      'Slash and spread a pattern piece to add fullness. Cuts a piece along a line and spreads the halves apart by rotating (pivot mode) or translating (parallel mode). Used for flared skirts, dart equivalency, and adding ease.',
+    examples: [
+      'Spread this skirt panel 15 degrees for flare',
+      'Slash and spread the bodice to add fullness',
+      'Add 20mm ease by slashing this piece',
+    ],
+    keywords: ['slash', 'spread', 'fullness', 'flare', 'ease', 'pivot', 'rotate', 'wedge'],
     requiresSelection: 'piece',
     produces: 'piece',
     undoable: true,
     dangerous: false,
   },
-}
+};
 ```
 
 ## Hook
@@ -114,7 +153,7 @@ Standard pattern: state machine in useRef, `toPattern()` coordinate conversion, 
 - `handleMouseMove` — updates preview per state (slash line, half highlight, live spread)
 - `handleMouseUp` — in SPREADING state, applies spread via `buildSpreadPiece()`, dispatches `updatePiece`
 - `handleKeyDown` — Escape resets, Tab toggles pivot/parallel
-- Uses `useGuardedAction` for piece modification
+- Does NOT use `useGuardedAction` — slash-and-spread is non-destructive (modifies in-place, fully undoable via standard undo middleware)
 
 ## Overlay
 
@@ -129,23 +168,40 @@ Per-state rendering:
 
 ## Copilot Tool
 
-File: `src/copilot/action/tools/definitions/slashAndSpreadTool.ts`
+Updated in-place in `src/copilot/action/tools/definitions/patternOpsTools.ts` — replaces the existing naive `slashAndSpread` tool entry (line 152).
 
 ```typescript
 {
   name: 'slashAndSpread',
   description: 'Slash a piece along a line and spread to add fullness / Cortar una pieza a lo largo de una línea y abrir para agregar amplitud',
   parameters: {
-    pieceId: { type: 'string', required: true },
-    slashStart: { type: 'object', properties: { x: number, y: number }, required: true },
-    slashEnd: { type: 'object', properties: { x: number, y: number }, required: true },
-    selectedHalf: { type: 'string', enum: ['A', 'B'], required: true },
-    pivotEnd: { type: 'string', enum: ['start', 'end'], required: true },
-    spreadAmount: { type: 'number', required: true },  // degrees or mm
-    mode: { type: 'string', enum: ['pivot', 'parallel'], default: 'pivot' },
-    gapFill: { type: 'string', enum: ['straight', 'smooth'], default: 'straight' },
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Target piece ID' },
+      slashStart: {
+        type: 'object',
+        description: 'Start point on piece outline (x, y in mm)',
+        properties: { x: { type: 'number' }, y: { type: 'number' } },
+        required: ['x', 'y'],
+      },
+      slashEnd: {
+        type: 'object',
+        description: 'End point on piece outline (x, y in mm)',
+        properties: { x: { type: 'number' }, y: { type: 'number' } },
+        required: ['x', 'y'],
+      },
+      selectedHalf: { type: 'string', enum: ['A', 'B'], description: 'Which half to spread (A = start side, B = end side)' },
+      pivotEnd: { type: 'string', enum: ['start', 'end'], description: 'Which slash endpoint to use as pivot' },
+      spreadAmount: { type: 'number', description: 'Degrees (pivot mode) or mm (parallel mode)' },
+      mode: { type: 'string', enum: ['pivot', 'parallel'], description: 'Spread mode' },
+      gapFill: { type: 'string', enum: ['straight', 'smooth'], description: 'Gap fill method' },
+    },
+    required: ['pieceId', 'slashStart', 'slashEnd', 'selectedHalf', 'pivotEnd', 'spreadAmount'],
   },
-  execute: calls buildSpreadPiece() → dispatches updatePiece → returns ToolResult
+  execute: async (params, dispatch, getState) => {
+    // imports buildSpreadPiece from geometry module
+    // finds piece, validates intersections, applies spread, dispatches updatePiece
+  },
 }
 ```
 
@@ -153,11 +209,13 @@ File: `src/copilot/action/tools/definitions/slashAndSpreadTool.ts`
 
 | File | Change |
 |------|--------|
-| `src/tools/index.ts` | Import and register slashAndSpread tool definition |
-| `src/components/Toolbar2D/Toolbar2D.tsx` | Add `'slashAndSpread'` to scissors group in TOOL_GROUPS |
-| `src/components/PatternEditor/PatternEditor.tsx` | Instantiate hook, wire mouse handlers |
-| `src/components/PatternEditor/renderers/ToolOverlay.tsx` | Add SlashAndSpreadOverlay dispatch |
-| `src/copilot/action/tools/registry.ts` | Register copilot slashAndSpread tool |
+| `src/types/types.ts` | Add `'slashAndSpread'` to `Tool2D` string union |
+| `src/tools/index.ts` | Import and register `slashAndSpreadTool` definition |
+| `src/components/Toolbar2D/Toolbar2D.tsx` | Add `'slashAndSpread'` to scissors group in `TOOL_GROUPS` |
+| `src/components/PatternEditor/PatternEditor.tsx` | Instantiate hook, pass to `useEditorInteractions` |
+| `src/components/PatternEditor/useEditorInteractions.ts` | Add `slashAndSpread` entries in `ToolHooks` interface, mouse handler routing, keyboard routing, cursor routing |
+| `src/components/PatternEditor/renderers/ToolOverlay.tsx` | Add `SlashAndSpreadOverlay` dispatch + extend `ToolOverlayProps` with slash-and-spread state |
+| `src/copilot/action/tools/definitions/patternOpsTools.ts` | Replace naive `slashAndSpread` entry with full implementation |
 
 ## Testing
 
@@ -165,23 +223,26 @@ File: `src/copilot/action/tools/definitions/slashAndSpreadTool.ts`
 
 - `findSlashIntersections`: line crosses rectangle at 2 points; diagonal on irregular shape; tangent line → error; miss → error
 - `splitOutlineAtSlash`: rectangle split produces two valid closed paths; bezier curves preserved via de Casteljau; correct segments per half
-- `classifyInternals`: grainline on left → halfA; dart apex determines assignment
+- `classifyInternals`: grainline on left → halfA; dart centroid/apex determines assignment
+- `classifyDarts`: dart apex on left → dartsA; dart apex on right → dartsB
 - `applyPivotSpread`: 45° rotation matches expected coords; 0° returns identical; negative angle reverses
 - `applyParallelSpread`: perpendicular translation correct; direction matches slash orientation
-- `mergeSpreadHalves`: straight fill produces line segments; smooth fill produces beziers; merged outline is closed
-- `buildSpreadPiece`: full round-trip preserves id/name, correct outline, internals rotated
+- `mergeSpreadHalves`: straight fill produces line segments; smooth fill produces beziers; merged outline is closed; G1 continuity at junctions
+- `rebuildSemanticEdges`: edge ranges correctly shifted after gap insertion
+- `buildSpreadPiece`: full round-trip preserves id/name, correct outline, internals rotated, darts rotated, edges rebuilt, linkedPieceId cleared
 
 ### Hook — `src/components/PatternEditor/__tests__/useSlashAndSpreadTool.test.ts`
 
 - State transitions: click → DRAWING_SLASH → click → SLASH_COMPLETE → etc.
-- Escape at any state → IDLE
+- Escape at any state → IDLE (including during SPREADING → discard preview)
+- Tab toggles mode between pivot/parallel
 - Full flow dispatches updatePiece with spread piece
 
-### Copilot — `src/copilot/action/tools/__tests__/slashAndSpreadTool.test.ts`
+### Copilot — `src/copilot/action/tools/definitions/__tests__/slashAndSpreadTool.test.ts`
 
 - Valid params → success, piece updated
 - Nonexistent pieceId → error result
-- Slash line doesn't intersect → error result
+- Slash line doesn't intersect outline at 2 points → error result
 
 ## Files Created
 
@@ -191,14 +252,15 @@ File: `src/copilot/action/tools/definitions/slashAndSpreadTool.ts`
 - `src/components/PatternEditor/useSlashAndSpreadTool.ts` — Hook with state machine
 - `src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx` — Preview overlay
 - `src/components/PatternEditor/__tests__/useSlashAndSpreadTool.test.ts` — Hook tests
-- `src/copilot/action/tools/definitions/slashAndSpreadTool.ts` — Copilot tool
-- `src/copilot/action/tools/__tests__/slashAndSpreadTool.test.ts` — Copilot tool tests
+- `src/copilot/action/tools/definitions/__tests__/slashAndSpreadTool.test.ts` — Copilot tool tests
 
 ## Files Modified
 
-- `src/utils/patternOps.ts` — Remove old naive `slashAndSpread()`, import from new module
+- `src/types/types.ts` — Add `'slashAndSpread'` to `Tool2D` union
+- `src/utils/patternOps.ts` — Remove old naive `slashAndSpread()`, re-export from new geometry module for backward compat
 - `src/tools/index.ts` — Register tool
 - `src/components/Toolbar2D/Toolbar2D.tsx` — Add to TOOL_GROUPS
-- `src/components/PatternEditor/PatternEditor.tsx` — Wire hook
-- `src/components/PatternEditor/renderers/ToolOverlay.tsx` — Wire overlay
-- `src/copilot/action/tools/registry.ts` — Register copilot tool
+- `src/components/PatternEditor/PatternEditor.tsx` — Instantiate hook
+- `src/components/PatternEditor/useEditorInteractions.ts` — Wire mouse/keyboard/cursor routing
+- `src/components/PatternEditor/renderers/ToolOverlay.tsx` — Wire overlay + extend props
+- `src/copilot/action/tools/definitions/patternOpsTools.ts` — Replace naive copilot tool entry
