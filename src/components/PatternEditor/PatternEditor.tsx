@@ -26,6 +26,7 @@ import { useWalkSeamTool } from './useWalkSeamTool';
 import { useOffsetTool } from './useOffsetTool';
 import { useExtendTrimTool } from './useExtendTrimTool';
 import { usePolyPenTool } from './usePolyPenTool';
+import { usePleatTool } from '../../hooks/usePleatTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
 import GridLayer from './renderers/GridLayer';
@@ -135,6 +136,7 @@ export default function PatternEditor() {
   }, [selectedPieceIds, pieces, dispatch]);
 
   const polyPenTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handlePolyPenCompleteInternalLine, polyPenMode, polyPenLineType);
+  const pleatTool = usePleatTool(zoom2D, pan2D);
 
   // Context menu handlers for patternOps
   const handleUnfold = useCallback((pieceId: string, foldLineId: string, outlineOnly?: boolean) => {
@@ -344,7 +346,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool,
     });
 
   const handleZoomToFit = useCallback(() => {

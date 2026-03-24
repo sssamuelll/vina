@@ -448,6 +448,7 @@ export type Tool2D =
   | 'offsetOutline' // offset piece outline inward/outward
   | 'extendTrim'   // extend or trim edges
   | 'polyPen'      // combined straight + bezier pen
+  | 'pleat'        // add/edit pleats along piece edges
   | 'hand'         // pan
   | 'zoom';
 

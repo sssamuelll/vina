@@ -25,6 +25,7 @@ import { duplicateTool } from './definitions/duplicate';
 import { gradingTool } from './definitions/grading';
 import { textAnnotationTool } from './definitions/textAnnotation';
 import { elasticTool } from './definitions/elastic';
+import { pleatTool } from './definitions/pleat';
 import { addPieceTool } from './definitions/addPiece';
 import { fabricTextureTool } from './definitions/fabricTexture';
 import { flattenTool } from './definitions/flatten';
@@ -98,6 +99,7 @@ const allTools = [
   topstitchEditTool,
   seamAllowanceTool,
   elasticTool,
+  pleatTool,
   freeSewingTool,
   
   // 2D Tools — Annotation
