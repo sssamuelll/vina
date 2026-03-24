@@ -116,6 +116,58 @@ export async function garbageCollect(activeImageIds: string[]): Promise<void> {
 }
 
 /**
+ * Read all image blobs from IndexedDB and encode to base64 for project save.
+ * Returns a map of imageId → base64 data URL string.
+ */
+export async function serializeReferenceImages(
+  imageIds: string[],
+): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  for (const id of imageIds) {
+    const blob = await loadImageBlob(id);
+    if (blob) {
+      result[id] = await blobToBase64(blob);
+    }
+  }
+  return result;
+}
+
+/**
+ * Restore reference images from base64 data embedded in a project file.
+ * Creates blob URLs and stores blobs in IndexedDB.
+ * Returns a map of imageId → objectUrl.
+ */
+export async function deserializeReferenceImages(
+  data: Record<string, string>,
+): Promise<Map<string, string>> {
+  const urlMap = new Map<string, string>();
+  for (const [id, base64] of Object.entries(data)) {
+    const blob = base64ToBlob(base64);
+    await storeImageBlob(id, blob);
+    urlMap.set(id, URL.createObjectURL(blob));
+  }
+  return urlMap;
+}
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function base64ToBlob(dataUrl: string): Blob {
+  const [header, data] = dataUrl.split(',');
+  const mime = header.match(/:(.*?);/)?.[1] ?? 'image/png';
+  const bytes = atob(data);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+/**
  * Reset the cached DB promise.
  * ONLY for use in tests — allows each test to get a fresh connection.
  * @internal

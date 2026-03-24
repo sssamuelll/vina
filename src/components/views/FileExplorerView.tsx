@@ -2,6 +2,11 @@ import { useState, useRef, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { addPiece, loadProject, addSeam, updateAvatar, updateMeasurements, setProjectName } from '../../store/projectSlice';
+import {
+  serializeReferenceImages,
+  deserializeReferenceImages,
+  garbageCollect,
+} from '../../utils/import/referenceImageStore';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
 import type { DXFDocument } from '../../utils/dxf/types';
 import { downloadPDF } from '../../utils/exportPDF';
@@ -55,6 +60,7 @@ export default function FileExplorerView() {
   const avatar = useSelector((s: RootState) => s.project.avatar);
   const projectName = useSelector((s: RootState) => s.project.name);
   const projectId = useSelector((s: RootState) => s.project.id);
+  const referenceImages = useSelector((s: RootState) => s.project.referenceImages);
   const construction = useSelector((s: RootState) => s.construction);
 
   // Check if construction has data for skill export
@@ -299,14 +305,17 @@ export default function FileExplorerView() {
 
   // ─── Project Save / Load ───
 
-  const handleSaveProject = useCallback(() => {
-    const project: OpenCloProject = {
+  const handleSaveProject = useCallback(async () => {
+    const imageData = await serializeReferenceImages(referenceImages.map(i => i.id));
+    const project = {
       id: projectId,
       name: projectName,
       pieces,
       seams,
       fabrics,
       avatar,
+      referenceImages,
+      referenceImageData: imageData,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -322,7 +331,7 @@ export default function FileExplorerView() {
       filename: `${projectName || 'project'}.openclo.json`,
       date: new Date().toLocaleString(),
     });
-  }, [projectId, projectName, pieces, seams, fabrics, avatar]);
+  }, [projectId, projectName, pieces, seams, fabrics, avatar, referenceImages]);
 
   const handleLoadProject = useCallback(() => {
     projectInputRef.current?.click();
@@ -334,8 +343,15 @@ export default function FileExplorerView() {
       if (!file) return;
       try {
         const text = await file.text();
-        const project = JSON.parse(text) as OpenCloProject;
-        dispatch(loadProject(project));
+        const raw = JSON.parse(text) as OpenCloProject & { referenceImageData?: Record<string, string> };
+        dispatch(loadProject(raw));
+        // Restore reference image blobs from base64 data embedded in the project file
+        if (raw.referenceImageData && Object.keys(raw.referenceImageData).length > 0) {
+          await deserializeReferenceImages(raw.referenceImageData);
+        }
+        // Garbage-collect orphaned IndexedDB entries
+        const activeIds = (raw.referenceImages ?? []).map((i) => i.id);
+        await garbageCollect(activeIds);
       } catch (err) {
         console.error('Failed to load project:', err);
       }

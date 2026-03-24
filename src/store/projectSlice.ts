@@ -145,6 +145,8 @@ const projectSlice = createSlice({
       // Backfill layer metadata from older projects
       state.layerNames = (p as any).layerNames ?? {};
       state.layerLocked = (p as any).layerLocked ?? {};
+      // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
+      state.referenceImages = (p as any).referenceImages ?? [];
     },
     clearLoadDiagnostics(state) {
       state.loadDiagnostics = [];

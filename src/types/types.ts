@@ -365,6 +365,10 @@ export interface OpenCloProject {
   poms?: PointOfMeasure[];
   /** Named seam groups (optional for backward compat) */
   seamGroups?: SeamGroup[];
+  /** Reference images for 2D tracing (optional for backward compat) */
+  referenceImages?: ReferenceImage[];
+  /** Base64-encoded image blobs keyed by imageId (present in .openclo.json files only) */
+  referenceImageData?: Record<string, string>;
   createdAt: number;
   updatedAt: number;
 }
