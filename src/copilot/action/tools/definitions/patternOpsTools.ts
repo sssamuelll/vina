@@ -4,7 +4,7 @@
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
-import type { PatternPiece, InternalLineType, PathCommand } from '../../../../types/types';
+import type { PatternPiece, InternalLineType, PathCommand, SemanticEdge, Point2D } from '../../../../types/types';
 
 function requireFiniteNumber(value: unknown, name: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
@@ -13,6 +13,77 @@ function requireFiniteNumber(value: unknown, name: string): string | null {
 
 function uid(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Interpolate a point at parametric position `t` along a SemanticEdge's
+ * segment range within a piece outline.
+ *
+ * Flattens the commands in the segment range to a sequence of endpoint
+ * coordinates, then linearly interpolates at t ∈ [0, 1].
+ */
+function getPointOnEdge(outline: PathCommand[], edge: SemanticEdge, t: number): Point2D {
+  const [start, end] = edge.segmentRange;
+  const pts: Point2D[] = [];
+
+  let cx = 0;
+  let cy = 0;
+
+  for (let i = start; i < end && i < outline.length; i++) {
+    const cmd = outline[i];
+    switch (cmd.type) {
+      case 'M':
+        cx = cmd.values[0]; cy = cmd.values[1];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'L':
+        cx = cmd.values[0]; cy = cmd.values[1];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'H':
+        cx = cmd.values[0];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'V':
+        cy = cmd.values[0];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'C':
+        cx = cmd.values[4]; cy = cmd.values[5];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'S':
+        cx = cmd.values[2]; cy = cmd.values[3];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'Q':
+        cx = cmd.values[2]; cy = cmd.values[3];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'T':
+        cx = cmd.values[0]; cy = cmd.values[1];
+        pts.push({ x: cx, y: cy });
+        break;
+      case 'A':
+        cx = cmd.values[5]; cy = cmd.values[6];
+        pts.push({ x: cx, y: cy });
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (pts.length === 0) return { x: 0, y: 0 };
+  if (pts.length === 1) return pts[0];
+
+  const idx = t * (pts.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.min(lo + 1, pts.length - 1);
+  const frac = idx - lo;
+  return {
+    x: pts[lo].x + (pts[hi].x - pts[lo].x) * frac,
+    y: pts[lo].y + (pts[hi].y - pts[lo].y) * frac,
+  };
 }
 
 export const tools: ToolDefinition[] = [
@@ -150,25 +221,78 @@ export const tools: ToolDefinition[] = [
   },
   {
     name: 'slashAndSpread',
-    description: 'Slash piece vertically and spread to add fullness (fundamental manipulation)',
+    description: 'Slash a piece along a line between two edges and spread to add fullness / Cortar una pieza a lo largo de una línea entre dos bordes y abrir para agregar amplitud',
     parameters: {
       type: 'object',
       properties: {
-        pieceId: { type: 'string', description: 'Piece ID' },
-        slashX: { type: 'number', description: 'X position of slash line in mm' },
-        spreadAmount: { type: 'number', description: 'Spread amount in mm' },
+        pieceId: { type: 'string', description: 'Target piece ID' },
+        fromEdge: { type: 'string', description: 'Edge name where slash starts (e.g. "armhole", "sideSeam")' },
+        fromT: { type: 'number', description: 'Parametric position on fromEdge (0.0=start, 1.0=end, 0.5=midpoint). Default 0.5' },
+        toEdge: { type: 'string', description: 'Edge name where slash ends (e.g. "hemline", "waist")' },
+        toT: { type: 'number', description: 'Parametric position on toEdge (0.0=start, 1.0=end, 0.5=midpoint). Default 0.5' },
+        selectedHalf: { type: 'string', enum: ['A', 'B'], description: 'Which half to spread (A=fromEdge side, B=toEdge side)' },
+        pivotEnd: { type: 'string', enum: ['from', 'to'], description: 'Which slash endpoint is the pivot' },
+        spreadAmount: { type: 'number', description: 'Degrees (pivot mode) or mm (parallel mode)' },
+        mode: { type: 'string', enum: ['pivot', 'parallel'], description: 'Spread mode. Default: pivot' },
+        gapFill: { type: 'string', enum: ['straight', 'smooth'], description: 'Gap fill method. Default: straight' },
       },
-      required: ['pieceId', 'slashX', 'spreadAmount'],
+      required: ['pieceId', 'fromEdge', 'toEdge', 'selectedHalf', 'spreadAmount'],
     },
     execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
-      const { slashAndSpread } = await import('../../../../utils/patternOps');
-      const { updatePiece } = await import('../../../../store/projectSlice');
+      // 1. Find piece
       const state = getState();
       const piece = state.project.pieces.find(p => p.id === params.pieceId);
-      if (!piece) return { success: false, error: `Piece not found` };
-      const result = slashAndSpread(piece, params.slashX as number, params.spreadAmount as number);
+      if (!piece) return { success: false, error: 'Piece not found' };
+
+      // 2. Resolve edge names to SemanticEdge objects
+      const edges = piece.edges ?? [];
+      const fromEdge = edges.find(e => e.name === params.fromEdge);
+      if (!fromEdge) return { success: false, error: `Edge "${params.fromEdge}" not found on piece` };
+      const toEdge = edges.find(e => e.name === params.toEdge);
+      if (!toEdge) return { success: false, error: `Edge "${params.toEdge}" not found on piece` };
+
+      // 3. Compute points at parametric t along each edge's segment range
+      const fromT = typeof params.fromT === 'number' ? params.fromT : 0.5;
+      const toT = typeof params.toT === 'number' ? params.toT : 0.5;
+      const fromPt = getPointOnEdge(piece.outline, fromEdge, fromT);
+      const toPt = getPointOnEdge(piece.outline, toEdge, toT);
+
+      // 4. Find intersections and build spread piece
+      const { findSlashIntersections, buildSpreadPiece } = await import('../../../../utils/geometry/slashAndSpread');
+      let hit1, hit2;
+      try {
+        [hit1, hit2] = findSlashIntersections(piece.outline, fromPt, toPt);
+      } catch (err) {
+        return { success: false, error: `Slash line does not cross outline at exactly 2 points: ${err instanceof Error ? err.message : err}` };
+      }
+
+      const mode = (params.mode as string) ?? 'pivot';
+      const gapFill = (params.gapFill as string) ?? 'straight';
+      const pivotEnd = params.pivotEnd === 'to' ? 'end' : 'start';
+      const selectedHalf = (params.selectedHalf as string) ?? 'B';
+
+      const result = buildSpreadPiece(
+        piece, hit1, hit2,
+        selectedHalf as 'A' | 'B',
+        pivotEnd as 'start' | 'end',
+        params.spreadAmount as number,
+        mode as 'pivot' | 'parallel',
+        gapFill as 'straight' | 'smooth',
+      );
+
+      const { updatePiece } = await import('../../../../store/projectSlice');
       dispatch(updatePiece(result));
-      return { success: true, data: { pieceId: result.id, slashX: params.slashX, spread: params.spreadAmount } };
+
+      return {
+        success: true,
+        data: {
+          pieceId: result.id,
+          fromEdge: params.fromEdge,
+          toEdge: params.toEdge,
+          spreadAmount: params.spreadAmount,
+          mode,
+        },
+      };
     },
   },
   {
