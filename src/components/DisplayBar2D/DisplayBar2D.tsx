@@ -1,12 +1,13 @@
 import { useSelector, useDispatch } from 'react-redux';
 import {
   ScissorsLineDashed, Type, Ruler, Wheat, Link,
-  Image, Droplets, Box,
+  Image, Droplets, Box, Layers,
 } from 'lucide-react';
 import { RootState } from '../../store';
 import {
   toggleSeamAllowance, toggleGrainlines,
   togglePieceNames, toggleLineLengths, toggleSewingLines,
+  toggleReferenceImages,
   setRenderMode2D,
 } from '../../store/editorSlice';
 import ToolTooltip from '../Toolbar3D/ToolTooltip';
@@ -37,6 +38,7 @@ export default function DisplayBar2D() {
     { icon: <Ruler size={18} />, label: 'Line Lengths', active: editor.showLineLengths, onClick: () => dispatch(toggleLineLengths()) },
     { icon: <Wheat size={18} />, label: 'Grainlines', active: editor.showGrainlines, onClick: () => dispatch(toggleGrainlines()) },
     { icon: <Link size={18} />, label: 'Sewing Lines', active: editor.showSewingLines, onClick: () => dispatch(toggleSewingLines()) },
+    { icon: <Layers size={18} />, label: 'Reference Images', active: editor.showReferenceImages, onClick: () => dispatch(toggleReferenceImages()) },
   ];
 
   const modes: ModeItem[] = [
