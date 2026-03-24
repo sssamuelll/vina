@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Pleat, MAX_PLEAT_COUNT } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
+import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
@@ -51,6 +52,7 @@ interface ProjectState {
   name: string;
   pieces: PatternPiece[];
   seams: Seam[];
+  pleats: Pleat[];
   fabrics: Fabric[];
   avatar: Avatar;
   avatarMode: AvatarMode;
@@ -79,6 +81,7 @@ const initialState: ProjectState = {
   name: 'Untitled Project',
   pieces: [],
   seams: [],
+  pleats: [],
   fabrics: [defaultFabric],
   avatar: defaultAvatar,
   avatarMode: 'model',
@@ -185,6 +188,7 @@ const projectSlice = createSlice({
       state.poms = state.poms.filter(
         pom => pom.pointA.pieceId !== action.payload && pom.pointB.pieceId !== action.payload
       );
+      state.pleats = state.pleats.filter(p => p.pieceId !== action.payload);
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
@@ -452,6 +456,55 @@ const projectSlice = createSlice({
     },
     removeSeamGroup(state, action: PayloadAction<string>) {
       state.seamGroups = state.seamGroups.filter(g => g.id !== action.payload);
+      state.isDirty = true;
+    },
+
+    // ─── Pleats ───
+    addPleat(state, action: PayloadAction<Omit<Pleat, 'generatedLineIds'>>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const edge = piece.edges?.find(e => e.name === action.payload.edgeName);
+      if (!edge) return;
+      const pleat: Pleat = {
+        ...action.payload,
+        count: Math.min(action.payload.count, MAX_PLEAT_COUNT),
+        generatedLineIds: [],
+      };
+      const lines = generatePleatFoldLines(pleat, piece);
+      lines.forEach(l => piece.internals.push(l));
+      pleat.generatedLineIds = lines.map(l => l.id);
+      state.pleats.push(pleat);
+      state.isDirty = true;
+    },
+    removePleat(state, action: PayloadAction<string>) {
+      const pleat = state.pleats.find(p => p.id === action.payload);
+      if (!pleat) return;
+      const piece = state.pieces.find(p => p.id === pleat.pieceId);
+      if (piece) {
+        piece.internals = piece.internals.filter(l => l.foldOptions?.pleatId !== pleat.id);
+      }
+      state.pleats = state.pleats.filter(p => p.id !== action.payload);
+      state.isDirty = true;
+    },
+    updatePleat(state, action: PayloadAction<Partial<Pleat> & { id: string }>) {
+      const idx = state.pleats.findIndex(p => p.id === action.payload.id);
+      if (idx === -1) return;
+      const pleat = state.pleats[idx];
+      const piece = state.pieces.find(p => p.id === pleat.pieceId);
+      if (!piece) return;
+      // Remove old lines by pleatId scan (handles manual deletions)
+      piece.internals = piece.internals.filter(l => l.foldOptions?.pleatId !== pleat.id);
+      // Merge updates
+      const updated: Pleat = {
+        ...pleat,
+        ...action.payload,
+        count: Math.min((action.payload.count ?? pleat.count), MAX_PLEAT_COUNT),
+      };
+      // Recompute fold lines
+      const lines = generatePleatFoldLines(updated, piece);
+      lines.forEach(l => piece.internals.push(l));
+      updated.generatedLineIds = lines.map(l => l.id);
+      state.pleats[idx] = updated;
       state.isDirty = true;
     },
 
@@ -800,6 +853,8 @@ export const {
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
   addSeamGroup, removeSeamGroup,
+  // Pleats
+  addPleat, removePleat, updatePleat,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,

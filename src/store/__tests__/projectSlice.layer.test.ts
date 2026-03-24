@@ -31,6 +31,7 @@ function emptyState() {
     name: 'Test',
     pieces: [] as PatternPiece[],
     seams: [],
+    pleats: [],
     fabrics: [],
     avatar: { id: 'a', name: 'A', modelUrl: '', measurements: { height: 170, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } },
     avatarMode: 'model' as const,
