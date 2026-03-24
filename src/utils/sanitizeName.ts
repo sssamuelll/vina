@@ -80,10 +80,10 @@ export function escapePdfString(s: string): string {
 }
 
 /**
- * Escape a string for use in a DXF TEXT entity value.
- * DXF uses backslash sequences for special formatting:
- *  \\P = newline, \\; = semicolon, etc.
- * We escape backslashes and strip newlines to prevent injection.
+ * Escape a string for use in a DXF TEXT entity value (group code 1).
+ * DXF MTEXT entities interpret backslash sequences (\\P = newline, etc.)
+ * but plain TEXT entities do not. We escape backslashes and strip newlines
+ * defensively so the output is safe for both TEXT and MTEXT contexts.
  */
 export function escapeDxfString(s: string): string {
   return s

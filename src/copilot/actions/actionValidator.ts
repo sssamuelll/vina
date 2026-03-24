@@ -30,6 +30,8 @@ export interface ValidationResult {
   valid: boolean;
   errors: string[];
   warnings: string[];
+  /** Sanitized values that the caller should apply to the action before execution. */
+  sanitized?: Record<string, unknown>;
 }
 
 function ok(): ValidationResult {
@@ -149,7 +151,7 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       if (action.params.name != null) {
         const nameResult = validateName(action.params.name);
         if (!nameResult.valid) return fail(...nameResult.errors);
-        action.params.name = nameResult.sanitized;
+        return { valid: true, errors: [], warnings: [], sanitized: { 'params.name': nameResult.sanitized } };
       }
       return ok();
     }
@@ -183,9 +185,7 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       }
       const nameResult = validateName(action.name);
       if (!nameResult.valid) return fail(...nameResult.errors);
-      // Replace with sanitized version (strips control chars, truncates)
-      action.name = nameResult.sanitized;
-      return ok();
+      return { valid: true, errors: [], warnings: [], sanitized: { name: nameResult.sanitized } };
     }
 
     case 'mirror_piece':
