@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import projectReducer, { addPiece, addSeam, addPOM, removePieces } from '../projectSlice';
 
@@ -9,7 +10,7 @@ describe('projectSlice batch operations', () => {
     let state = projectReducer(initialState, addPiece({ id: 'p1', name: 'P1', outline: [], internals: [] } as any));
     state = projectReducer(state, addPiece({ id: 'p2', name: 'P2', outline: [], internals: [] } as any));
     state = projectReducer(state, addPiece({ id: 'p3', name: 'P3', outline: [], internals: [] } as any));
-    
+
     state = projectReducer(state, addSeam({
       id: 's1',
       pieceA: { pieceId: 'p1', edgeName: 'e1' },
@@ -34,10 +35,10 @@ describe('projectSlice batch operations', () => {
     // 3. Verify cascades
     expect(state.pieces).toHaveLength(1);
     expect(state.pieces[0].id).toBe('p3');
-    
+
     // Seam s1 should be gone because it referenced p1 and p2
     expect(state.seams).toHaveLength(0);
-    
+
     // POM pom1 should be gone because it referenced p1
     expect(state.poms).toHaveLength(0);
   });
