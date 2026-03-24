@@ -801,4 +801,99 @@ export const tools: ToolDefinition[] = [
       }
     },
   },
+  {
+    name: 'slashAndSpreadSimple',
+    description:
+      'Slash a piece horizontally at a parametric position (0=top, 1=bottom) and spread by angle. ' +
+      'Simpler alternative to slashAndSpread — no coordinates needed. ' +
+      '/ Cortar una pieza horizontalmente en una posición paramétrica (0=arriba, 1=abajo) y abrir por ángulo.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'ID of the piece to slash' },
+        position: { type: 'number', description: 'Parametric position along piece height (0=top, 1=bottom, 0.5=middle)' },
+        spreadAngleDeg: { type: 'number', description: 'Spread angle in degrees' },
+        pivotEnd: { type: 'string', enum: ['start', 'end'], description: 'Which end is pivot (start=top, end=bottom). Default: start' },
+        smooth: { type: 'boolean', description: 'Smooth gap fill (default true)' },
+      },
+      required: ['pieceId', 'position', 'spreadAngleDeg'],
+    },
+    execute: async (params: Record<string, unknown>, dispatch: AppDispatch, getState: () => RootState): Promise<ToolResult> => {
+      // 1. Find the piece
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: 'Piece not found' };
+
+      const posErr = requireFiniteNumber(params.position, 'position');
+      if (posErr) return { success: false, error: posErr };
+      const angleErr = requireFiniteNumber(params.spreadAngleDeg, 'spreadAngleDeg');
+      if (angleErr) return { success: false, error: angleErr };
+
+      const position = params.position as number;
+      if (position < 0 || position > 1) return { success: false, error: 'position must be between 0 and 1' };
+
+      // 2. Compute bounding box of the outline inline
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const cmd of piece.outline) {
+        for (let i = 0; i < cmd.values.length; i += 2) {
+          if (i + 1 < cmd.values.length) {
+            const x = cmd.values[i], y = cmd.values[i + 1];
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+      }
+      if (!isFinite(minX) || !isFinite(maxX) || !isFinite(minY) || !isFinite(maxY)) {
+        return { success: false, error: 'Could not compute bounding box — piece has no valid outline points' };
+      }
+
+      // 3. Compute Y coordinate from parametric position
+      const slashY = minY + position * (maxY - minY);
+
+      // 4. Create a horizontal slash line extending beyond the piece
+      const fromPt = { x: minX - 10, y: slashY };
+      const toPt = { x: maxX + 10, y: slashY };
+
+      // 5. Find intersections and build spread piece
+      const { findSlashIntersections, buildSpreadPiece } = await import('../../../../utils/geometry/slashAndSpread');
+      let hit1, hit2;
+      try {
+        [hit1, hit2] = findSlashIntersections(piece.outline, fromPt, toPt);
+      } catch (err) {
+        return { success: false, error: `Slash line does not cross outline at exactly 2 points: ${err instanceof Error ? err.message : err}` };
+      }
+
+      const pivotEnd = params.pivotEnd === 'end' ? 'end' : 'start';
+      const gapFill = params.smooth === false ? 'straight' : 'smooth';
+
+      const result = buildSpreadPiece(
+        piece, hit1, hit2,
+        'B',
+        pivotEnd as 'start' | 'end',
+        params.spreadAngleDeg as number,
+        'pivot',
+        gapFill as 'straight' | 'smooth',
+      );
+
+      // 7. Dispatch updatePiece with result
+      const { updatePiece } = await import('../../../../store/projectSlice');
+      const snapshot = JSON.parse(JSON.stringify(piece)) as PatternPiece;
+      dispatch(updatePiece(result));
+
+      return {
+        success: true,
+        data: {
+          pieceId: result.id,
+          position,
+          slashY,
+          spreadAngleDeg: params.spreadAngleDeg,
+          pivotEnd,
+          gapFill,
+        },
+        rollback: () => dispatch(updatePiece(snapshot)),
+      };
+    },
+  },
 ];
