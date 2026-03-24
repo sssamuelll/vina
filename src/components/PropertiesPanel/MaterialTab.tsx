@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride, setPieceOpacity, setPieceEmission, clearPieceEmission } from '../../store/simulationSlice';
@@ -64,6 +64,7 @@ function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughnes
 
 export default function MaterialTab() {
   const dispatch = useDispatch();
+  const [lockAspect, setLockAspect] = useState(true);
   const selectedPieceId = useSelector((s: RootState) => {
     const ids = s.editor?.selectedPieceIds;
     return ids && ids.length > 0 ? ids[0] : null;
@@ -88,7 +89,7 @@ export default function MaterialTab() {
   const fabricId = pieceFabrics[selectedPieceId] || defaultFabricId;
   const fabric = getPhysicalFabric(fabricId);
   const tint = pieceTints[selectedPieceId] || '#ffffff';
-  const uv = pieceUVTransforms[selectedPieceId] || { repeatX: 4, repeatY: 4, rotation: 0 };
+  const uv = pieceUVTransforms[selectedPieceId] || { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 };
   const currentOpacity = pieceOpacity[selectedPieceId] ?? 1.0;
   const currentEmission = pieceEmission[selectedPieceId] || null;
   const currentEmissionIntensity = pieceEmissionIntensity[selectedPieceId] ?? 0;
@@ -213,41 +214,120 @@ export default function MaterialTab() {
       {/* UV Transform */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>UV TRANSFORM</div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <label style={{ fontSize: 10, color: '#aaa' }}>
+
+        {/* Repeat Presets */}
+        <div className="panel-field" style={{ gap: 4 }}>
+          <label>Presets</label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[1, 2, 4, 8].map(n => (
+              <button
+                key={n}
+                className="panel-btn-sm"
+                onClick={() => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: n, repeatY: n }))}
+                style={{ fontSize: 11, padding: '2px 6px' }}
+              >
+                {n}x{n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Repeat X */}
+        <div className="panel-field">
+          <label>
             Repeat X
-            <input
-              type="number"
-              value={uv.repeatX}
-              step={1}
-              min={0.1}
-              onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: Number(e.target.value) }))}
-              style={{ width: 45, marginLeft: 4, background: '#333', border: '1px solid #555', borderRadius: 3, color: '#fff', padding: '2px 4px', fontSize: 11 }}
-            />
+            <button
+              onClick={() => setLockAspect(!lockAspect)}
+              title={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, marginLeft: 4, padding: 0 }}
+            >
+              {lockAspect ? '\uD83D\uDD17' : '\uD83D\uDD13'}
+            </button>
           </label>
-          <label style={{ fontSize: 10, color: '#aaa' }}>
-            Y
-            <input
-              type="number"
-              value={uv.repeatY}
-              step={1}
-              min={0.1}
-              onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatY: Number(e.target.value) }))}
-              style={{ width: 45, marginLeft: 4, background: '#333', border: '1px solid #555', borderRadius: 3, color: '#fff', padding: '2px 4px', fontSize: 11 }}
-            />
-          </label>
-          <label style={{ fontSize: 10, color: '#aaa' }}>
-            Rot
-            <input
-              type="number"
-              value={uv.rotation}
-              step={15}
-              min={0}
-              max={360}
-              onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, rotation: Number(e.target.value) }))}
-              style={{ width: 45, marginLeft: 4, background: '#333', border: '1px solid #555', borderRadius: 3, color: '#fff', padding: '2px 4px', fontSize: 11 }}
-            />
-          </label>
+          <input
+            type="range"
+            min={0.1}
+            max={20}
+            step={0.5}
+            value={uv.repeatX}
+            onChange={e => {
+              const val = Number(e.target.value);
+              if (lockAspect) {
+                dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: val, repeatY: val }));
+              } else {
+                dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: val }));
+              }
+            }}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{uv.repeatX}</span>
+        </div>
+
+        {/* Repeat Y */}
+        <div className="panel-field">
+          <label>Repeat Y</label>
+          <input
+            type="range"
+            min={0.1}
+            max={20}
+            step={0.5}
+            value={uv.repeatY}
+            onChange={e => {
+              const val = Number(e.target.value);
+              if (lockAspect) {
+                dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: val, repeatY: val }));
+              } else {
+                dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatY: val }));
+              }
+            }}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{uv.repeatY}</span>
+        </div>
+
+        {/* Offset X */}
+        <div className="panel-field">
+          <label>Offset X</label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={uv.offsetX ?? 0}
+            onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, offsetX: Number(e.target.value) }))}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{(uv.offsetX ?? 0).toFixed(2)}</span>
+        </div>
+
+        {/* Offset Y */}
+        <div className="panel-field">
+          <label>Offset Y</label>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={uv.offsetY ?? 0}
+            onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, offsetY: Number(e.target.value) }))}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{(uv.offsetY ?? 0).toFixed(2)}</span>
+        </div>
+
+        {/* Rotation */}
+        <div className="panel-field">
+          <label>Rotation</label>
+          <input
+            type="range"
+            min={0}
+            max={360}
+            step={15}
+            value={uv.rotation}
+            onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, rotation: Number(e.target.value) }))}
+            style={{ flex: 1 }}
+          />
+          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{uv.rotation}&deg;</span>
         </div>
       </div>
 

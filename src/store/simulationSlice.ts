@@ -129,7 +129,7 @@ interface SimulationSliceState {
     ao?: string;
   }>;
   /** Per-piece UV transform */
-  pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number }>;
+  pieceUVTransforms: Record<string, { repeatX: number; repeatY: number; rotation: number; offsetX: number; offsetY: number }>;
   /** Per-piece opacity overrides (0-1, undefined = use fabric default) */
   pieceOpacity: Record<string, number>;
   /** Per-piece emission color (hex, undefined = no emission) */
@@ -489,10 +489,12 @@ const simulationSlice = createSlice({
       repeatX?: number;
       repeatY?: number;
       rotation?: number;
+      offsetX?: number;
+      offsetY?: number;
     }>) {
       const { pieceId, ...transform } = action.payload;
       state.pieceUVTransforms[pieceId] = {
-        ...(state.pieceUVTransforms[pieceId] ?? { repeatX: 4, repeatY: 4, rotation: 0 }),
+        ...(state.pieceUVTransforms[pieceId] ?? { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 }),
         ...transform,
       };
     },

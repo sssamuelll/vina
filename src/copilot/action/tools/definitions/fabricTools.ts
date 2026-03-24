@@ -484,6 +484,49 @@ const getMaterialPropertiesTool: ToolDefinition = {
   },
 };
 
+const setTextureRepeatTool: ToolDefinition = {
+  name: 'setTextureRepeat',
+  description:
+    'Set texture tiling repeat, offset, and rotation for a pattern piece. ' +
+    '/ Configurar repetición, desplazamiento y rotación de textura para una pieza.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece' },
+      repeatX: { type: 'number', description: 'Horizontal repeat count (0.1–20)' },
+      repeatY: { type: 'number', description: 'Vertical repeat count (0.1–20)' },
+      rotation: { type: 'number', description: 'Rotation in degrees (0–360)' },
+      offsetX: { type: 'number', description: 'Horizontal offset (0–1)' },
+      offsetY: { type: 'number', description: 'Vertical offset (0–1)' },
+    },
+    required: ['pieceId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const pieceId = params.pieceId as string;
+    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
+
+    // Snapshot for rollback
+    const oldUV = state.simulation.pieceUVTransforms[pieceId] || { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 };
+
+    const update: Record<string, unknown> = { pieceId };
+    if (params.repeatX !== undefined) update.repeatX = params.repeatX;
+    if (params.repeatY !== undefined) update.repeatY = params.repeatY;
+    if (params.rotation !== undefined) update.rotation = params.rotation;
+    if (params.offsetX !== undefined) update.offsetX = params.offsetX;
+    if (params.offsetY !== undefined) update.offsetY = params.offsetY;
+
+    dispatch({ type: 'simulation/setPieceUVTransform', payload: update });
+
+    return {
+      success: true,
+      data: { pieceId, ...update },
+      rollback: () => dispatch({ type: 'simulation/setPieceUVTransform', payload: { pieceId, ...oldUV } }),
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   searchFabricsTool,
   getFabricDetailsTool,
@@ -492,4 +535,5 @@ export const tools: ToolDefinition[] = [
   setPieceOpacityTool,
   setPieceEmissionTool,
   getMaterialPropertiesTool,
+  setTextureRepeatTool,
 ];
