@@ -47,6 +47,7 @@ function makeData(overrides: Partial<InspectionData> = {}): InspectionData {
       position: { x: 0, y: 0 },
       rotation: 0,
       seamAllowance: 10,
+      area: 2500, // Default area for test piece
     },
     fabric: makeFabric(),
     edge: { name: 'top', type: 'straight', length: 100 },

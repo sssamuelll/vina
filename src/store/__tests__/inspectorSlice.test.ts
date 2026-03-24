@@ -39,6 +39,7 @@ const mockData: InspectionData = {
     position: { x: 0, y: 0 },
     rotation: 0,
     seamAllowance: 10,
+    area: 2500,
   },
   seams: [],
   internals: [],

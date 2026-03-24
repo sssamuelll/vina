@@ -10,6 +10,7 @@
 import type { RootState } from '../store';
 import { getPhysicalFabric } from '../utils/cloth/physicalFabric';
 import { flattenPath } from '../utils/seam';
+import type { Point2D } from '../types/types';
 import type {
   InspectionTarget,
   InspectionData,
@@ -27,15 +28,15 @@ import type {
  * Compute the area of a polygon using the Shoelace formula.
  * The input points are assumed to be a closed loop in mm.
  *
- * @param points Array of [x, y] coordinates
+ * @param points Array of Point2D coordinates
  * @returns Area in mm2
  */
-function computeShoelaceArea(points: [number, number][]): number {
+function computeShoelaceArea(points: Point2D[]): number {
   let area = 0;
   for (let i = 0; i < points.length; i++) {
-    const [x1, y1] = points[i];
-    const [x2, y2] = points[(i + 1) % points.length];
-    area += x1 * y2 - x2 * y1;
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    area += p1.x * p2.y - p2.x * p1.y;
   }
   return Math.abs(area) / 2;
 }
