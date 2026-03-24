@@ -172,18 +172,38 @@ const projectSlice = createSlice({
       }
     },
     removePiece(state, action: PayloadAction<string>) {
-      state.pieces = state.pieces.filter(p => p.id !== action.payload);
+      const id = action.payload;
+      state.pieces = state.pieces.filter(p => p.id !== id);
       state.seams = state.seams.filter(
-        s => s.pieceA.pieceId !== action.payload && s.pieceB.pieceId !== action.payload
+        s => s.pieceA.pieceId !== id && s.pieceB.pieceId !== id
       );
-      delete state.arrangementOverrides[action.payload];
+      delete state.arrangementOverrides[id];
       // Auto-remove from all groups
       for (const group of state.groups) {
-        group.pieceIds = group.pieceIds.filter(id => id !== action.payload);
+        group.pieceIds = group.pieceIds.filter(pid => pid !== id);
       }
       // Remove POMs referencing deleted piece
       state.poms = state.poms.filter(
-        pom => pom.pointA.pieceId !== action.payload && pom.pointB.pieceId !== action.payload
+        pom => pom.pointA.pieceId !== id && pom.pointB.pieceId !== id
+      );
+      state.isDirty = true;
+    },
+    removePieces(state, action: PayloadAction<string[]>) {
+      const ids = new Set(action.payload);
+      state.pieces = state.pieces.filter(p => !ids.has(p.id));
+      state.seams = state.seams.filter(
+        s => !ids.has(s.pieceA.pieceId) && !ids.has(s.pieceB.pieceId)
+      );
+      for (const id of ids) {
+        delete state.arrangementOverrides[id];
+      }
+      // Auto-remove from all groups
+      for (const group of state.groups) {
+        group.pieceIds = group.pieceIds.filter(pid => !ids.has(pid));
+      }
+      // Remove POMs referencing deleted pieces
+      state.poms = state.poms.filter(
+        pom => !ids.has(pom.pointA.pieceId) && !ids.has(pom.pointB.pieceId)
       );
       state.isDirty = true;
     },
@@ -794,7 +814,7 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, clearLoadDiagnostics, setProjectName,
-  addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
+  addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,

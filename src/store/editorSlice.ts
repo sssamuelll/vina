@@ -56,13 +56,23 @@ const editorSlice = createSlice({
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
-    selectAllPieces(state, action: PayloadAction<string[]>) {
-      state.selectedPieceIds = action.payload;
+    selectPiece(state, action: PayloadAction<string>) {
+      state.selectedPieceIds = [action.payload];
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
-    selectSeam(state, action: PayloadAction<string>) {
+    selectAllPieces(state, action: PayloadAction<{ pieces: PatternPiece[]; layerLocked: Record<number, boolean> }>) {
+      const { pieces, layerLocked } = action.payload;
+      state.selectedPieceIds = pieces
+        .filter(p => p.active !== false && p.locked !== true && !layerLocked[p.layer ?? 1])
+        .map(p => p.id);
+      state.selectedSeamId = null;
+      state.selectedPOMId = null;
+      state.selectedInternalLine = null;
+    },
+    togglePieceSelection(state, action: PayloadAction<string>) {
+
       state.selectedSeamId = action.payload;
       state.selectedPOMId = null;
       state.selectedPieceIds = [];
