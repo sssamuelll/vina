@@ -4,12 +4,12 @@
 
 ## Overview
 
-Slash and Spread is a core pattern-making operation: cut a piece along a line, then spread the two halves apart to add fullness. Follows CLO3D's full 8-step interaction flow with both pivot (angular) and parallel (uniform) spread modes.
+Slash and Spread is a core pattern-making operation: cut a piece along a line, then spread the two halves apart to add fullness. Follows CLO3D's full multi-step interaction flow with both pivot (angular) and parallel (uniform) spread modes.
 
-## Interaction Flow — 8-Step State Machine
+## Interaction Flow — State Machine
 
 ```
-IDLE → DRAWING_SLASH → SLASH_COMPLETE → SELECTING_HALF → HALF_CONFIRMED → AWAITING_DRAG → SPREADING → apply → IDLE
+IDLE → DRAWING_SLASH → SLASH_COMPLETE → SELECTING_HALF → HALF_CONFIRMED → AWAITING_DRAG → SPREADING → SPREAD_PREVIEW → apply → IDLE
 ```
 
 | State | User Action | Visual Feedback |
@@ -20,9 +20,12 @@ IDLE → DRAWING_SLASH → SLASH_COMPLETE → SELECTING_HALF → HALF_CONFIRMED 
 | **SELECTING_HALF** | Click again to confirm | Clicked half highlights light-blue (#ADD8E6, 30%) |
 | **HALF_CONFIRMED** | Click slash endpoint to set pivot | Selected half highlights yellow (#FFD700, 30%), pivot indicator |
 | **AWAITING_DRAG** | Begin mouse drag | Pivot point locked, cursor changes to rotation |
-| **SPREADING** | Drag to rotate/translate, release to apply | Live preview of spread half, angle arc, degree + mm labels |
+| **SPREADING** | Drag to rotate/translate, release to preview | Live preview of spread half, angle arc, degree + mm labels |
+| **SPREAD_PREVIEW** | Enter to commit, Escape to discard, drag again to adjust | Spread result shown with editable angle/distance value; input field for exact numeric entry |
 
-Escape at any step resets to IDLE (during SPREADING, the live preview is discarded — only mouse-up commits). Tab toggles between pivot/parallel mode.
+Escape at any step resets to IDLE. In SPREAD_PREVIEW, Escape discards the preview and returns to AWAITING_DRAG (user can re-drag). Tab toggles between pivot/parallel mode (available in HALF_CONFIRMED and later states).
+
+The SPREAD_PREVIEW state prevents accidental commits from mouse-up. The user can: (a) press Enter to apply, (b) type an exact value in the overlay input, (c) drag again to re-adjust, or (d) Escape to discard.
 
 ## Spread Modes
 
@@ -43,7 +46,7 @@ Controlled via tool option toggle.
 
 ## Geometry Engine
 
-All pure functions in `src/utils/geometry/slashAndSpread.ts`. No Redux, fully testable. Re-exported from `src/utils/geometry/` barrel if one exists, otherwise imported directly.
+All pure functions in `src/utils/geometry/slashAndSpread.ts`. No Redux, fully testable.
 
 ### Functions
 
@@ -53,10 +56,14 @@ Wraps the existing `findOutlineIntersections()` from `src/utils/geometry/splitOu
 **`splitOutlineAtSlash(outline, hit1, hit2)`**
 Wraps the existing `splitOutlineAtPoints()` from `src/utils/geometry/splitOutline.ts`. Returns two closed sub-paths. Each half includes the slash segment as its closing edge. Bezier curves split via de Casteljau (already handled by `splitOutlineAtPoints`).
 
-Returns: `{ halfA: PathCommand[], halfB: PathCommand[], slashEdgeA: [Point2D, Point2D], slashEdgeB: [Point2D, Point2D] }`
+Returns: `{ halfA: PathCommand[], halfB: PathCommand[], slashEdgeA: [Point2D, Point2D], slashEdgeB: [Point2D, Point2D], splitMap: SplitMap }`
+
+The `splitMap` tracks the exact command-index mapping from original outline → each half's commands, including which original commands ended up in which half and at what indices. This is used by `rebuildSemanticEdges` for precise index-based edge rebuilding.
 
 **`classifyInternals(internals, halfA, halfB)`**
-Assign each internal line to its containing half. Classification uses the centroid of the internal line's flattened path for point-in-polygon testing. For `InternalLine` of type `'dart'`, uses the apex point (the path's furthest-from-baseline point) instead of centroid.
+Assign each internal line to its containing half. Classification samples 5 evenly-spaced points along the internal line's flattened path and assigns by majority vote (which half contains more sample points). This handles L-shaped or concave internals correctly, unlike centroid-based classification.
+
+For `InternalLine` of type `'dart'`, uses the apex point (the path's furthest-from-baseline point) as the single deciding point, since the apex determines the dart's functional association.
 
 Returns: `{ internalsA: InternalLine[], internalsB: InternalLine[] }`
 
@@ -72,10 +79,16 @@ Rotate half-outline, internals, and darts around pivot point by angle. Pure coor
 Translate half-outline, internals, and darts perpendicular to slash line by distance.
 
 **`mergeSpreadHalves(halfA, halfB, gapFill: 'straight' | 'smooth')`**
-Reconnect two halves into single closed outline. Straight: line segments. Smooth: Catmull-Rom interpolation through the gap endpoints converted to cubic bezier, ensuring G1 tangent continuity at junction points.
+Reconnect two halves into single closed outline. Returns `{ outline: PathCommand[], gapCommandCount: number }`.
 
-**`rebuildSemanticEdges(originalEdges, originalOutline, newOutline)`**
-Rebuild `SemanticEdge[]` segment ranges after outline modification. Maps original edge start/end points to nearest positions on the new outline to recompute `segmentRange` indices.
+Straight: line segments connecting gap edges. Smooth: Catmull-Rom interpolation through the gap endpoints converted to cubic bezier, ensuring G1 tangent continuity at junction points.
+
+`gapCommandCount` records how many new commands were inserted at each gap for use by `rebuildSemanticEdges`.
+
+**`rebuildSemanticEdges(originalEdges, splitMap, gapCommandCount, selectedHalf)`**
+Rebuild `SemanticEdge[]` segment ranges using **tracked index offsets** from the split operation — not geometric nearest-point search. The `splitMap` from `splitOutlineAtSlash` provides the exact mapping of original command indices → half indices. After merge, edges on the static half retain their original index positions; edges on the spread half are offset by the gap insert count; edges that were split by the slash line are split into two sub-edges.
+
+This is deterministic and exact — no ambiguity from geometric proximity searches.
 
 **`buildSpreadPiece(piece, hit1, hit2, selectedHalf, pivot, spreadAmount, mode, gapFill)`**
 Orchestrator: calls all above, returns new PatternPiece with spread applied. **Preserves the original `piece.id`** — the piece is modified in-place conceptually (same ID, new geometry). Existing seams referencing this piece ID remain valid; their edge geometry updates automatically since seams reference edges by name and edges are rebuilt.
@@ -85,9 +98,10 @@ Called by both the UI hook and the copilot tool.
 ### Key Decisions
 - Reuses existing `findOutlineIntersections` and `splitOutlineAtPoints` from `splitOutline.ts` — no reinvention
 - Pivot point is always one of the two slash-line intersection points
-- Internal lines on selected half move with it; grainline rotates with its half (standard pattern-making behavior)
-- Rich `Dart` entities (`piece.darts`) classified and rotated separately from `InternalLine` internals
-- `SemanticEdge[]` (`piece.edges`) segment ranges rebuilt after outline modification
+- Internal lines classified by majority-of-path sampling (5 points), not centroid
+- Rich `Dart` entities (`piece.darts`) classified by apex point
+- `SemanticEdge[]` rebuilt via tracked index offsets from `splitMap`, not geometric nearest-point
+- Seam allowance is safe: `piece.seamAllowance` is a scalar (mm), and SA outlines are dynamically generated at render time from the piece outline. No stale SA path to worry about.
 - Piece ID preserved → existing `Seam` references remain valid
 - If piece has `linkedPieceId`, the link is broken (set to `undefined`) since the geometry has diverged
 - Multiple slashes: sequential operations, each modifies the piece. Undo individually via standard undo middleware.
@@ -149,10 +163,10 @@ File: `src/components/PatternEditor/useSlashAndSpreadTool.ts`
 
 Standard pattern: state machine in useRef, `toPattern()` coordinate conversion, mouse handlers.
 
-- `handleMouseDown` — drives state transitions through the 8 steps
+- `handleMouseDown` — drives state transitions through steps (place start → place end → select half → confirm half → set pivot → begin drag)
 - `handleMouseMove` — updates preview per state (slash line, half highlight, live spread)
-- `handleMouseUp` — in SPREADING state, applies spread via `buildSpreadPiece()`, dispatches `updatePiece`
-- `handleKeyDown` — Escape resets, Tab toggles pivot/parallel
+- `handleMouseUp` — in SPREADING state, transitions to SPREAD_PREVIEW (does NOT commit)
+- `handleKeyDown` — Escape resets (or discards preview in SPREAD_PREVIEW), Enter commits in SPREAD_PREVIEW, Tab toggles pivot/parallel
 - Does NOT use `useGuardedAction` — slash-and-spread is non-destructive (modifies in-place, fully undoable via standard undo middleware)
 
 ## Overlay
@@ -165,10 +179,13 @@ Per-state rendering:
 - **SELECTING_HALF**: hovered half filled light-blue at 30% opacity
 - **HALF_CONFIRMED**: selected half filled yellow at 30% opacity, pivot point dot
 - **SPREADING**: live transformed half, dashed angle arc (pivot mode) or distance lines (parallel mode), degree + mm labels
+- **SPREAD_PREVIEW**: spread result displayed, editable numeric input showing angle (°) or distance (mm), "Enter to apply, Esc to cancel" hint text
 
 ## Copilot Tool
 
 Updated in-place in `src/copilot/action/tools/definitions/patternOpsTools.ts` — replaces the existing naive `slashAndSpread` tool entry (line 152).
+
+The copilot tool uses **semantic edge references** instead of raw coordinates, since the LLM doesn't know exact outline coordinates. The execute function resolves edge names + parametric t values to actual coordinates internally.
 
 ```typescript
 {
@@ -178,32 +195,28 @@ Updated in-place in `src/copilot/action/tools/definitions/patternOpsTools.ts` �
     type: 'object',
     properties: {
       pieceId: { type: 'string', description: 'Target piece ID' },
-      slashStart: {
-        type: 'object',
-        description: 'Start point on piece outline (x, y in mm)',
-        properties: { x: { type: 'number' }, y: { type: 'number' } },
-        required: ['x', 'y'],
-      },
-      slashEnd: {
-        type: 'object',
-        description: 'End point on piece outline (x, y in mm)',
-        properties: { x: { type: 'number' }, y: { type: 'number' } },
-        required: ['x', 'y'],
-      },
-      selectedHalf: { type: 'string', enum: ['A', 'B'], description: 'Which half to spread (A = start side, B = end side)' },
-      pivotEnd: { type: 'string', enum: ['start', 'end'], description: 'Which slash endpoint to use as pivot' },
+      fromEdge: { type: 'string', description: 'Edge name where slash starts (e.g. "armhole", "sideSeam")' },
+      fromT: { type: 'number', description: 'Parametric position on fromEdge (0.0 = start, 1.0 = end, 0.5 = midpoint). Default 0.5' },
+      toEdge: { type: 'string', description: 'Edge name where slash ends (e.g. "hemline", "waist")' },
+      toT: { type: 'number', description: 'Parametric position on toEdge (0.0 = start, 1.0 = end, 0.5 = midpoint). Default 0.5' },
+      selectedHalf: { type: 'string', enum: ['A', 'B'], description: 'Which half to spread (A = fromEdge side, B = toEdge side)' },
+      pivotEnd: { type: 'string', enum: ['from', 'to'], description: 'Which slash endpoint to use as pivot' },
       spreadAmount: { type: 'number', description: 'Degrees (pivot mode) or mm (parallel mode)' },
-      mode: { type: 'string', enum: ['pivot', 'parallel'], description: 'Spread mode' },
-      gapFill: { type: 'string', enum: ['straight', 'smooth'], description: 'Gap fill method' },
+      mode: { type: 'string', enum: ['pivot', 'parallel'], description: 'Spread mode. Default: pivot' },
+      gapFill: { type: 'string', enum: ['straight', 'smooth'], description: 'Gap fill method. Default: straight' },
     },
-    required: ['pieceId', 'slashStart', 'slashEnd', 'selectedHalf', 'pivotEnd', 'spreadAmount'],
+    required: ['pieceId', 'fromEdge', 'toEdge', 'selectedHalf', 'spreadAmount'],
   },
   execute: async (params, dispatch, getState) => {
-    // imports buildSpreadPiece from geometry module
-    // finds piece, validates intersections, applies spread, dispatches updatePiece
+    // 1. Find piece, resolve edge names to outline coordinates via piece.edges
+    // 2. Use fromT/toT (default 0.5) to compute exact points on edges
+    // 3. Call buildSpreadPiece with resolved coordinates
+    // 4. Dispatch updatePiece
   },
 }
 ```
+
+This API lets the LLM say: `{ pieceId: "front-bodice", fromEdge: "armhole", toEdge: "hemline", selectedHalf: "B", spreadAmount: 15 }` — which is natural language-adjacent and doesn't require coordinate knowledge.
 
 ## Registration Touchpoints
 
@@ -222,27 +235,30 @@ Updated in-place in `src/copilot/action/tools/definitions/patternOpsTools.ts` �
 ### Unit — `src/utils/geometry/__tests__/slashAndSpread.test.ts`
 
 - `findSlashIntersections`: line crosses rectangle at 2 points; diagonal on irregular shape; tangent line → error; miss → error
-- `splitOutlineAtSlash`: rectangle split produces two valid closed paths; bezier curves preserved via de Casteljau; correct segments per half
-- `classifyInternals`: grainline on left → halfA; dart centroid/apex determines assignment
+- `splitOutlineAtSlash`: rectangle split produces two valid closed paths; bezier curves preserved via de Casteljau; correct segments per half; `splitMap` correctly maps original → half indices
+- `classifyInternals`: grainline on left → halfA; majority-of-path sampling assigns L-shaped internal correctly; dart type uses apex
 - `classifyDarts`: dart apex on left → dartsA; dart apex on right → dartsB
 - `applyPivotSpread`: 45° rotation matches expected coords; 0° returns identical; negative angle reverses
 - `applyParallelSpread`: perpendicular translation correct; direction matches slash orientation
-- `mergeSpreadHalves`: straight fill produces line segments; smooth fill produces beziers; merged outline is closed; G1 continuity at junctions
-- `rebuildSemanticEdges`: edge ranges correctly shifted after gap insertion
+- `mergeSpreadHalves`: straight fill produces line segments; smooth fill produces beziers; merged outline is closed; G1 continuity at junctions; returns correct `gapCommandCount`
+- `rebuildSemanticEdges`: edges on static half retain original ranges; edges on spread half offset by gap count; edge split by slash produces two sub-edges
 - `buildSpreadPiece`: full round-trip preserves id/name, correct outline, internals rotated, darts rotated, edges rebuilt, linkedPieceId cleared
+- **Area conservation**: `area(spread_piece) ≈ area(original_piece) + area(gap)` within floating-point tolerance
 
 ### Hook — `src/components/PatternEditor/__tests__/useSlashAndSpreadTool.test.ts`
 
 - State transitions: click → DRAWING_SLASH → click → SLASH_COMPLETE → etc.
-- Escape at any state → IDLE (including during SPREADING → discard preview)
+- Escape at any state → IDLE
+- SPREAD_PREVIEW: Escape → back to AWAITING_DRAG; Enter → commits and dispatches updatePiece
 - Tab toggles mode between pivot/parallel
 - Full flow dispatches updatePiece with spread piece
 
 ### Copilot — `src/copilot/action/tools/definitions/__tests__/slashAndSpreadTool.test.ts`
 
-- Valid params → success, piece updated
+- Valid params with edge names → success, piece updated
 - Nonexistent pieceId → error result
-- Slash line doesn't intersect outline at 2 points → error result
+- Invalid edge name → error result
+- Default t values (0.5) produce midpoint slash → success
 
 ## Files Created
 
