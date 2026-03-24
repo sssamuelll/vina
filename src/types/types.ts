@@ -446,6 +446,7 @@ export type Tool2D =
   | 'pomMeasure'    // points of measure tool
   | 'walkSeam'      // walk seam verification
   | 'scissors'     // split pattern pieces
+  | 'slashAndSpread' // slash and spread for fullness
   | 'merge'        // merge adjacent pattern pieces
   | 'freesewing'   // free sewing between edges
   | 'offsetOutline' // offset piece outline inward/outward

@@ -19,6 +19,7 @@ import { nearestSegment } from './nodeEditorUtils';
 import { useMeasureTool } from './useMeasureTool';
 import { useTransformTool } from './useTransformTool';
 import { useScissorsTool } from './useScissorsTool';
+import { useSlashAndSpreadTool } from './useSlashAndSpreadTool';
 import { useMergeTool } from './useMergeTool';
 import { useSegmentSewingTool } from './useSegmentSewingTool';
 import { useTopstitchTool } from './useTopstitchTool';
@@ -110,6 +111,7 @@ export default function PatternEditor() {
   const nodeEditor = useEditCurve(zoom2D, pan2D);
   const editPatternTool = useEditPattern(zoom2D, pan2D);
   const scissorsTool = useScissorsTool(zoom2D, pan2D);
+  const slashAndSpreadTool = useSlashAndSpreadTool(zoom2D, pan2D);
   const mergeTool = useMergeTool(zoom2D, pan2D);
   const measureTool = useMeasureTool(zoom2D, pan2D);
   const segmentSewingTool = useSegmentSewingTool(zoom2D, pan2D, pieces);
@@ -347,7 +349,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, elasticTool,
     });
 
   const handleZoomToFit = useCallback(() => {
@@ -460,6 +462,17 @@ export default function PatternEditor() {
             scissorsEndPoint={scissorsTool.endPoint}
             scissorsHoveredEdgePoint={scissorsTool.hoveredEdgePoint}
             scissorsPreviewValid={scissorsTool.previewValid}
+            ssPhase={slashAndSpreadTool.phase}
+            ssTargetPieceId={slashAndSpreadTool.targetPieceId}
+            ssStartPoint={slashAndSpreadTool.startPoint}
+            ssEndPoint={slashAndSpreadTool.endPoint}
+            ssHalfA={slashAndSpreadTool.halfA}
+            ssHalfB={slashAndSpreadTool.halfB}
+            ssSelectedHalf={slashAndSpreadTool.selectedHalf}
+            ssHoveredHalf={slashAndSpreadTool.hoveredHalf}
+            ssPivotPoint={slashAndSpreadTool.pivotPoint}
+            ssSpreadAmount={slashAndSpreadTool.spreadAmount}
+            ssPreviewPiece={slashAndSpreadTool.previewPiece}
             mergePieceIdA={mergeTool.pieceIdA}
             mergePieceIdB={mergeTool.pieceIdB}
             mergeSharedEdgeFound={mergeTool.sharedEdgeFound}
