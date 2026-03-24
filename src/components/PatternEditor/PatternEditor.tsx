@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
+import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
@@ -34,8 +34,18 @@ import SeamRenderer from './renderers/SeamRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
 import HintText from './renderers/HintText';
 import ConstructionOverlay from './renderers/ConstructionOverlay';
+import ReferenceImageLayer from './renderers/ReferenceImageLayer';
+import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
+import CalibrationModal from './CalibrationModal';
+import ReferenceImageSettings from '../DisplayBar2D/ReferenceImageSettings';
+import { computePixelsPerMm } from '../../utils/geometry/calibration';
+import { importReferenceImage } from '../../utils/import/imageImporter';
+import { storeImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
 import './PatternEditor.css';
+
+// Module-level map: imageId → blob URL (outside Redux for non-serializable data)
+const objectUrlMap = new Map<string, string>();
 
 export default function PatternEditor() {
   const dispatch = useDispatch();
@@ -46,6 +56,10 @@ export default function PatternEditor() {
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
   const groups = useSelector((s: RootState) => s.project.groups);
+  const referenceImages = useSelector((s: RootState) => s.project.referenceImages);
+  const showReferenceImages = useSelector((s: RootState) => s.editor.showReferenceImages);
+  const selectedReferenceImageId = useSelector((s: RootState) => s.editor.selectedReferenceImageId);
+  const calibrationMode = useSelector((s: RootState) => s.editor.calibrationMode);
 
   // Compute piece ID -> group color mapping for 2D visual indicators
   const groupColors = useMemo(() => {
@@ -58,6 +72,15 @@ export default function PatternEditor() {
     return map;
   }, [groups]);
   
+  // Calibration modal local state
+  const [showCalibrationModal, setShowCalibrationModal] = useState(false);
+  const [calibrationPixelDist, setCalibrationPixelDist] = useState(0);
+  const [calibrationSecondPoint, setCalibrationSecondPoint] = useState<{ x: number; y: number } | null>(null);
+
+  // Cursor position for CalibrationOverlay (in SVG/pattern space, tracked via ref to avoid re-renders)
+  const cursorPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const [cursorPosition, setCursorPosition] = useState<{ x: number; y: number } | null>(null);
+
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
 
@@ -342,7 +365,7 @@ export default function PatternEditor() {
     setEditingPieceNameId(null);
   }, []);
 
-  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
+  const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
       pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool,
     });
@@ -357,6 +380,118 @@ export default function PatternEditor() {
       dispatch(setPan2D(fit.pan));
     }
   }, [pieces, dispatch, svgRef]);
+
+  // ─── Reference image import ───────────────────────────────────────────────
+  const handleImageImport = useCallback(async (file: File) => {
+    const result = await importReferenceImage(file);
+    const id = `ref-img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    // Store blob URL in module-level map for rendering
+    objectUrlMap.set(id, result.objectUrl);
+    // Persist blob to IndexedDB
+    await storeImageBlob(id, result.imageBlob);
+    // Add to Redux state
+    dispatch(addReferenceImage({
+      id,
+      filename: result.filename,
+      width: result.width,
+      height: result.height,
+      position: { x: 0, y: 0 },
+      scale: 1,
+      rotation: 0,
+      opacity: 0.5,
+      locked: false,
+      visible: true,
+      pixelsPerMm: null,
+    }));
+  }, [dispatch]);
+
+  // ─── Reference image action callbacks ────────────────────────────────────
+  const handleCalibrate = useCallback((imageId: string) => {
+    dispatch(startCalibration({ imageId }));
+  }, [dispatch]);
+
+  const handleToggleVisible = useCallback((imageId: string) => {
+    const img = referenceImages.find(i => i.id === imageId);
+    if (img) dispatch(updateReferenceImage({ id: imageId, visible: !img.visible }));
+  }, [referenceImages, dispatch]);
+
+  const handleToggleLocked = useCallback((imageId: string) => {
+    const img = referenceImages.find(i => i.id === imageId);
+    if (img) dispatch(updateReferenceImage({ id: imageId, locked: !img.locked }));
+  }, [referenceImages, dispatch]);
+
+  const handleOpacityChange = useCallback((imageId: string, opacity: number) => {
+    dispatch(updateReferenceImage({ id: imageId, opacity }));
+  }, [dispatch]);
+
+  const handleRemoveImage = useCallback((imageId: string) => {
+    // Remove blob URL from map
+    const url = objectUrlMap.get(imageId);
+    if (url) {
+      URL.revokeObjectURL(url);
+      objectUrlMap.delete(imageId);
+    }
+    dispatch(removeReferenceImage(imageId));
+  }, [dispatch]);
+
+  // ─── Calibration modal confirm ────────────────────────────────────────────
+  const handleCalibrationConfirm = useCallback((realWorldMm: number) => {
+    if (!calibrationMode || !calibrationMode.point1 || !calibrationSecondPoint) return;
+    const pxPerMm = computePixelsPerMm(calibrationMode.point1, calibrationSecondPoint, realWorldMm);
+    dispatch(updateReferenceImage({ id: calibrationMode.imageId, pixelsPerMm: pxPerMm }));
+    dispatch(cancelCalibration());
+    setShowCalibrationModal(false);
+    setCalibrationSecondPoint(null);
+  }, [calibrationMode, calibrationSecondPoint, dispatch]);
+
+  const handleCalibrationCancel = useCallback(() => {
+    dispatch(cancelCalibration());
+    setShowCalibrationModal(false);
+    setCalibrationSecondPoint(null);
+  }, [dispatch]);
+
+  // ─── Wrapped mouse handlers with calibration intercept ───────────────────
+  const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (calibrationMode) {
+      const svgEl = svgRef.current;
+      if (!svgEl) return;
+      const rect = svgEl.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
+      const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+      const pt = { x: canvasX, y: canvasY };
+
+      if (!calibrationMode.point1) {
+        // First click: set point1
+        dispatch(setCalibrationPoint1(pt));
+      } else {
+        // Second click: compute pixel distance, show modal
+        const dx = pt.x - calibrationMode.point1.x;
+        const dy = pt.y - calibrationMode.point1.y;
+        const pixelDist = Math.sqrt(dx * dx + dy * dy);
+        setCalibrationPixelDist(pixelDist);
+        setCalibrationSecondPoint(pt);
+        setShowCalibrationModal(true);
+      }
+      return; // don't pass to tool handlers
+    }
+    editorHandleMouseDown(e);
+  }, [calibrationMode, pan2D, zoom2D, dispatch, svgRef, editorHandleMouseDown]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    // Track cursor position in pattern space for CalibrationOverlay
+    const svgEl = svgRef.current;
+    if (svgEl) {
+      const rect = svgEl.getBoundingClientRect();
+      const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
+      const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+      const pos = { x: canvasX, y: canvasY };
+      cursorPositionRef.current = pos;
+      if (calibrationMode) {
+        setCursorPosition(pos);
+      }
+    }
+    editorHandleMouseMove(e);
+  }, [pan2D, zoom2D, svgRef, calibrationMode, editorHandleMouseMove]);
 
   return (
     <div className="pattern-editor">
@@ -376,6 +511,12 @@ export default function PatternEditor() {
         <GridLayer zoom2D={zoom2D} pan2D={pan2D} gridSize={gridSize} />
 
         <g data-pan-zoom-group transform={`translate(${pan2D.x}, ${pan2D.y}) scale(${zoom2D})`}>
+          <ReferenceImageLayer
+            referenceImages={referenceImages}
+            showReferenceImages={showReferenceImages}
+            selectedReferenceImageId={selectedReferenceImageId}
+            objectUrlMap={objectUrlMap}
+          />
           <PieceRenderer
             pieces={pieces}
             selectedPieceIds={selectedPieceIds}
@@ -502,6 +643,13 @@ export default function PatternEditor() {
               zoom2D={zoom2D}
             />
           )}
+          {calibrationMode && (
+            <CalibrationOverlay
+              zoom2D={zoom2D}
+              calibrationMode={calibrationMode}
+              cursorPosition={cursorPosition}
+            />
+          )}
         </g>
 
         <HintText
@@ -523,6 +671,22 @@ export default function PatternEditor() {
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
+      />
+      {showCalibrationModal && (
+        <CalibrationModal
+          pixelDistance={calibrationPixelDist}
+          onConfirm={handleCalibrationConfirm}
+          onCancel={handleCalibrationCancel}
+        />
+      )}
+      <ReferenceImageSettings
+        referenceImages={referenceImages}
+        onImport={handleImageImport}
+        onCalibrate={handleCalibrate}
+        onToggleVisible={handleToggleVisible}
+        onToggleLocked={handleToggleLocked}
+        onOpacityChange={handleOpacityChange}
+        onRemove={handleRemoveImage}
       />
     </div>
   );
