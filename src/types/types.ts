@@ -138,7 +138,46 @@ export interface InternalLine {
   path: PathCommand[];
   notchOptions?: NotchOptions;
   topstitchOptions?: TopstitchOptions;
+  foldOptions?: FoldOptions;
 }
+
+// ─── Fold Options ───
+
+export interface FoldOptions {
+  direction: 'mountain' | 'valley';
+  creaseAngleDeg: number;
+  pleatId?: string;
+}
+
+// ─── Pleats ───
+
+export type PleatType = 'knife' | 'box' | 'accordion' | 'invertedBox';
+
+export interface Pleat {
+  id: string;
+  pieceId: string;
+  edgeName: string;
+  type: PleatType;
+  depth: number;
+  spacing: number;
+  count: number;
+  direction: 'left' | 'right';
+  tStart: number;
+  tEnd: number;
+  generatedLineIds: string[];
+}
+
+export const PLEAT_DEFAULTS: Omit<Pleat, 'id' | 'pieceId' | 'edgeName' | 'generatedLineIds'> = {
+  type: 'accordion',
+  depth: 15,
+  spacing: 20,
+  count: 4,
+  direction: 'left',
+  tStart: 0,
+  tEnd: 1,
+};
+
+export const MAX_PLEAT_COUNT = 50;
 
 // ─── Piece Classification ───
 
