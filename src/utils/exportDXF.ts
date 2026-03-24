@@ -10,6 +10,7 @@ import { preparePieces } from './export/pipeline';
  *   NOTCH — notch marks
  *   GRAINLINE — grain direction arrows
  *   LABEL — piece names
+ *   ANNOTATION — production annotations (cutting/sewing/QC notes)
  * 
  * Units: millimeters (1 SVG unit = 1mm)
  * DXF version: R12 (maximum compatibility with plotters)
@@ -185,6 +186,16 @@ LABEL
 0
 62
 5
+6
+CONTINUOUS
+0
+LAYER
+2
+ANNOTATION
+70
+0
+62
+3
 6
 CONTINUOUS
 0
@@ -376,6 +387,12 @@ export function generateDXFLegacy(pieces: PatternPiece[], opts: DxfExportOptions
     const centerX = (bb.minX + bb.maxX) / 2;
     const centerY = (bb.minY + bb.maxY) / 2;
     dxf += textToDXF(piece.name, centerX, centerY, offsetX, offsetY, 5, 'LABEL');
+
+    // Annotations
+    const annotations = piece.annotations || [];
+    for (let i = 0; i < annotations.length; i++) {
+      dxf += textToDXF(annotations[i].text, centerX, centerY + 10 + i * 5, offsetX, offsetY, 3, 'ANNOTATION');
+    }
   }
 
   dxf += dxfFooter();

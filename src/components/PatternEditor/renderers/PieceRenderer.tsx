@@ -7,6 +7,7 @@ import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
 import { extractNodes } from '../nodeEditorUtils';
 import { getOutlineColor } from '../../../utils/layerColors';
+import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 
 /** Compute bounding box extents of a path outline. */
 function getOutlineBounds(outline: PathCommand[]): { minX: number; minY: number; maxX: number; maxY: number } {
@@ -334,6 +335,23 @@ const SinglePiece = memo(function SinglePiece({
           );
         }
       })()}
+
+      {(piece.annotations || []).map((ann, i) => (
+        <text
+          key={ann.id}
+          x={cx}
+          y={cy + (12 + i * 10) / zoom2D}
+          fontSize={8 / zoom2D}
+          fill={ANNOTATION_CATEGORY_COLORS[ann.category] || '#808080'}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          pointerEvents="none"
+          fontFamily="Inter, sans-serif"
+          opacity={0.85}
+        >
+          {ann.text}
+        </text>
+      ))}
 
       {piece.locked && (() => {
         const { cx, cy } = piece.outline?.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer } from '../../store/projectSlice';
+import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation } from '../../store/projectSlice';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType } from '../../types/types';
 import type { PatternPiece } from '../../types/types';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
+import { ANNOTATION_TEMPLATES } from '../../utils/annotationTemplates';
 import PropertySection from './PropertySection';
 
 interface PiecePropertiesProps {
@@ -21,6 +22,27 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
   const [notchSettings, setNotchSettings] = useState<NotchOptions>({
     shape: 'slit', subType: 'straightforward', length: 8, width: 3, angle: 0, count: 1,
   });
+  const [selectedTemplate, setSelectedTemplate] = useState('');
+  const [customText, setCustomText] = useState('');
+
+  const handleAddTemplate = () => {
+    const tpl = ANNOTATION_TEMPLATES.find(t => t.text === selectedTemplate);
+    if (!tpl) return;
+    dispatch(addAnnotation({
+      pieceId: piece.id,
+      annotation: { id: 'ann-' + Date.now(), text: tpl.text, position: 'center', category: tpl.category, fontSize: 8 },
+    }));
+    setSelectedTemplate('');
+  };
+
+  const handleAddCustom = () => {
+    if (!customText.trim()) return;
+    dispatch(addAnnotation({
+      pieceId: piece.id,
+      annotation: { id: 'ann-' + Date.now(), text: customText.trim(), position: 'center', category: 'general', fontSize: 8 },
+    }));
+    setCustomText('');
+  };
 
   const handleDeletePiece = () => {
     dispatch(removePiece(piece.id));
@@ -142,6 +164,27 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           </button>
         </div>
       )}
+      {/* Annotations */}
+      <div className="panel-section-title" style={{ marginTop: 12 }}>ANNOTATIONS</div>
+      {(piece.annotations || []).map(ann => (
+        <div key={ann.id} className="panel-field" style={{ justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11 }}>{ann.text}</span>
+          <button className="panel-btn-sm" style={{ fontSize: 10, padding: '1px 4px' }}
+            onClick={() => dispatch(removeAnnotation({ pieceId: piece.id, annotationId: ann.id }))}>✕</button>
+        </div>
+      ))}
+      <div className="panel-field" style={{ gap: 4 }}>
+        <select className="panel-input" style={{ flex: 1 }} value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}>
+          <option value="">Template...</option>
+          {ANNOTATION_TEMPLATES.map((t, i) => <option key={i} value={t.text}>{t.text}</option>)}
+        </select>
+        <button className="panel-btn-sm" onClick={handleAddTemplate} disabled={!selectedTemplate}>+</button>
+      </div>
+      <div className="panel-field" style={{ gap: 4 }}>
+        <input className="panel-input" style={{ flex: 1 }} placeholder="Custom..." value={customText} onChange={e => setCustomText(e.target.value)} />
+        <button className="panel-btn-sm" onClick={handleAddCustom} disabled={!customText.trim()}>+</button>
+      </div>
+
       <button className="panel-delete" onClick={handleDeletePiece}>
         Delete Piece
       </button>
