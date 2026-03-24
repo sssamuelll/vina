@@ -328,9 +328,32 @@ const ruleNoPOMs: Rule = (data) => {
   return [];
 };
 
+// ─── Geometry rules ───────────────────────────────────────────────────────────
+
+const ruleTinyPiece: Rule = (data) => {
+  const TINY_PIECE_THRESHOLD_MM2 = 1000; // 10 cm2
+  const isTiny = data.piece.area < TINY_PIECE_THRESHOLD_MM2;
+  const hasActiveSeams = data.seams.some((s) => s.active !== false);
+
+  if (isTiny && !hasActiveSeams) {
+    return [
+      {
+        severity: 'warning',
+        category: 'geometry',
+        message: `Orphaned tiny piece detected (${Math.round(data.piece.area)} mm²)`,
+        detail:
+          'Small orphaned scraps can cause simulation jitter and are typically residues of edit operations. Consider deleting this piece.',
+      },
+    ];
+  }
+  return [];
+};
+
 // ─── Rule registry ────────────────────────────────────────────────────────────
 
 const RULES: Rule[] = [
+  // geometry
+  ruleTinyPiece,
   // fabric
   ruleNoFabric,
   ruleFabricHeavyWeight,

@@ -50,6 +50,15 @@ function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): A
           });
         }
         break;
+      case 'geometry':
+        if (d.message.includes('Orphaned tiny piece')) {
+          suggestions.push({
+            description: 'Remove this orphaned tiny piece',
+            impact: 'Improves simulation stability and cleanliness',
+            toolCall: { name: 'removePiece', params: { pieceId: data.piece.id } },
+          });
+        }
+        break;
     }
   }
 

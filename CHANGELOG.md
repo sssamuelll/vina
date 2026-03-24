@@ -3,7 +3,33 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.7.0] — 2026-03-06 (Current)
+## [0.8.0] — 2026-03-24 (Current)
+
+### Added
+- **Layer System (v1)** — Professional layer management matching CLO3D parity. Includes layer ordering, sublayers, superimpose (over/under), and layer cloning. Piece arrangement now respects layer index for complex garment construction (#372, #379).
+- **Security Audit Compliance** — 100% resolution of March 2024 security audit. Replaced Base64 obfuscation with **AES-GCM encryption** in `SecureStorage`. Eliminated API key persistence to `localStorage` (#394, #399, #416).
+- **Runtime Data Validation** — Strict `projectValidator` integrated at all data contract boundaries (load/import). Features automated repair for out-of-range simulation parameters and orphaned piece identity mapping (#397, #413).
+- **Plugin Sandbox** — Full Web Worker isolation for community plugins with a capability-gated bridge, preventing unauthorized access to workspace state (#393, #410).
+- **Professional Dart Enhancements** — Support for segmented darts, shaped dart caps (roof/cup), and intelligent intake distribution for high-end tailoring (#366).
+- **WebGPU/TSL Surface Modes** — Shaded, Shaded-Wire, Textured-Wire, Flat, and X-Ray modes now fully functional on the WebGPU/NodeMaterial rendering path (#392).
+- **Diagnostic Inspector UI** — High-visibility error badges and red dashed outlines for pieces failing validation. New `ruleUnresolvedPoints` diagnostic rule for broken geometry detection (#396).
+- **POM Measurement System** — Persistent, named measurements (circumferences, heights, surface tapes) that update in real-time with the 3D simulation (#367).
+- **Cut and Sew Logic** — Automated sewing creation on scissor-cut edges, significantly speeding up pattern manipulation (#364).
+- **Rendering Enhancements** — Custom resolution exports, HDRI environment lighting, and high-fidelity PBR material properties (per-piece opacity + emission) (#377, #374).
+
+### Fixed
+- **3D Scene Scale** — Resolved "miniature effect" by recalibrating FOV (50°) and natural scene distance (3.0). Ground plane and environment now match human scale (#328, #329).
+- **Undo System Stability** — Migrated to `structuredClone` for safe deep-cloning of simulation state, preventing reference leakage between history states (#400, #414).
+- **Camera Orbit Pivot** — Locked 3D orbit pivot to the avatar center to prevent camera "wandering" during inspection (#346, #347).
+- **Circular Chunk Dependencies** — Resolved Three.js/WebGPU TDZ (Temporal Dead Zone) errors by consolidating core and addon chunks (#309, #313).
+- **TypeScript Build Compliance** — Fixed all strict type errors in the simulation and inspector modules for CI/CD green-light.
+
+### Stats
+- ~142,000 LOC across 512 TypeScript source files.
+- 1585 automated tests passing (100%).
+- 52 professional-grade CAD tools.
+
+## [0.7.0] — 2026-03-06
 
 ### Added
 - **Linked Editing** — Real-time propagation between symmetric pieces via Redux middleware. Supports `instance` (identical) and `symmetry` (mirrored) link modes with automatic partner sync.

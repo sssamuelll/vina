@@ -337,4 +337,62 @@ describe('evaluateRules', () => {
     // fabric error, seam warning, internals:no-grainline warning, internals:no-notches info
     expect(diags.length).toBeGreaterThanOrEqual(4);
   });
+
+  // ── Geometry rules ────────────────────────────────────────────────────────
+
+  describe('ruleTinyPiece', () => {
+    it('does not fire warning for a large piece (2500 mm2)', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 2500 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'geometry' && d.message.includes('tiny piece'))).toBe(false);
+    });
+
+    it('fires warning for an orphaned tiny piece (100 mm2)', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'geometry' && d.severity === 'warning')).toBe(true);
+    });
+
+    it('does not fire warning for a tiny piece (100 mm2) with an active seam', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [
+          {
+            id: 's1',
+            partnerPieceId: 'p2',
+            partnerPieceName: 'Back',
+            edgeName: 'side',
+            type: 'plain',
+            active: true,
+          },
+        ],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'geometry')).toBe(false);
+    });
+
+    it('fires warning for a tiny piece (100 mm2) with only inactive seams', () => {
+      const data = makeData({
+        piece: { ...makeData().piece, area: 100 },
+        seams: [
+          {
+            id: 's1',
+            partnerPieceId: 'p2',
+            partnerPieceName: 'Back',
+            edgeName: 'side',
+            type: 'plain',
+            active: false,
+          },
+        ],
+      });
+      const diags = evaluateRules(data);
+      expect(diags.some(d => d.category === 'geometry' && d.severity === 'warning')).toBe(true);
+    });
+  });
 });
