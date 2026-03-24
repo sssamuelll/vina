@@ -1,19 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import projectReducer, { addPiece, addSeam, addPOM, removePieces } from '../projectSlice';
-import { ProjectState } from '../../types/types';
 
-const initialState: ProjectState = {
-  projectName: 'Test Project',
-  pieces: [],
-  seams: [],
-  poms: [],
-  groups: [],
-  layers: [{ id: 0, name: 'Lining' }, { id: 1, name: 'Shell' }],
-  layerNames: {},
-  arrangementOverrides: {},
-  avatar: { measurements: {}, modelUrl: '' },
-  isDirty: false,
-};
+const initialState = projectReducer(undefined, { type: '@@INIT' });
 
 describe('projectSlice batch operations', () => {
   it('removePieces deletes multiple pieces and cascades to seams and POMs', () => {
