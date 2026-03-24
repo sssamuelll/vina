@@ -5,11 +5,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
 [![Rust](https://img.shields.io/badge/Rust-WASM-DEA584?logo=rust&logoColor=white)](crates/xpbd-wasm)
-[![Tests](https://img.shields.io/badge/Tests-3354_passing-success?logo=vitest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-1585_passing-success?logo=vitest&logoColor=white)](tests/)
 
 **The Cognitive Design Engine for Professional Fashion Engineering.**
 
-> **Status (March 18, 2026):** Shipped **Click'n'Go Expert Mode** (#268) and **Diagnostic Inspector** (#32). Power users can now skip confirmations and auto-apply remembered tool settings. Right-click any piece to get instant diagnostics, AI-powered analysis, and one-click fixes. See our [Roadmap](ROADMAP.md).
+> **Status (March 24, 2026):** Released **v0.8.x** — Shipped **Layer System (v1)** (#372), **Professional Darts** (#366), and **Security Audit Compliance** (#397). The engine now features real-time data contract validation and AES-GCM encrypted storage. All 52 professional tools are now E2E verified. See our [Roadmap](ROADMAP.md).
 
 OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Next-Gen WebGPU Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
 
@@ -17,14 +17,15 @@ OpenClo.ai is a high-performance, browser-based ecosystem that transcends tradit
 
 ![OpenClo.ai Interface](docs/screenshots/editor.png)
 
-## 🚀 Recent Milestones (v0.7.x)
-- **Diagnostic Inspector** (#32): Right-click any piece to get instant data, 13 deterministic diagnostic checks, and AI-powered analysis with one-click fix suggestions.
-- **Click'n'Go Expert Mode** (#268): Expert mode toggle reduces confirmations, auto-applies last-used tool settings, per-tool overrides via Shift+right-click.
-- **Walk Seam Verification**: Interactive tool for verifying seam length matching and ease distribution with <0.1mm Gauss-Legendre precision.
-- **High-Precision Measurement**: Gauss-Legendre quadrature engine for arc-length and ease comparison tools.
-- **WebGPU / TSL Engine**: Massive 10–50x performance boost via **Zero-copy Rendering** and shared compute buffers.
+## 🚀 Recent Milestones (v0.8.x)
+- **Layer System (#372, #390):** Professional layer management with sublayers, superimpose, and layer-based arrangement.
+- **Security Audit (March 2026):** 100% compliance with [Data Security Audit](docs/research/SECURITY_AUDIT.md). Features AES-GCM encryption, Plugin Sandboxing (Web Workers), and API-key-less storage.
+- **Runtime Validation (#397, #413):** Strict `projectValidator` at all data contract boundaries with automated repair/clamp logic for simulation parameters.
+- **Professional Darts (#366):** Segmented darts, shaped dart caps, and intelligent intake distribution.
+- **Diagnostic Inspector (#32):** Right-click any piece to get instant data, 13 deterministic diagnostic checks, and AI-powered analysis with one-click fix suggestions.
+- **Click'n'Go Expert Mode (#268):** Expert mode toggle reduces confirmations, auto-applies last-used tool settings, per-tool overrides.
+- **WebGPU / TSL Engine**: Zero-copy Rendering and shared compute buffers for massive physics performance.
 - **3D Interaction Suite**: Professional **Mesh Grab (O-Key)**, **Steam/Press Brush**, and **Per-piece Freeze** functionality.
-- **Agentic Copilot Loop**: Fully autonomous design iterations with 3,350+ automated test cases.
 
 ## Core Pillars
 

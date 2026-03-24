@@ -17,6 +17,8 @@ import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clip
 import { samplePathAtIntervals } from './geometry/arcLength';
 import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
 import { linePolylineIntersections } from './geometry/lineIntersect';
+import { findSlashIntersections, buildSpreadPiece } from './geometry/slashAndSpread';
+export { buildSpreadPiece } from './geometry/slashAndSpread';
 
 let _counter = 0;
 function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
@@ -322,14 +324,15 @@ export function addFacing(
   });
 }
 
-// ─── slashAndSpread ───────────────────────────────────────────────────────────
+// ─── slashAndSpread (delegated to geometry module) ────────────────────────────
 
 /**
- * Slash and spread: cut piece vertically and spread by an amount.
- * Creates fullness by opening a wedge.
+ * Slash and spread: simplified backward-compatible API.
+ * Slashes vertically at slashX and spreads by spreadAmount mm (parallel mode).
+ * For full control (pivot, angles, gap fill), use buildSpreadPiece directly.
  *
  * @param piece - Source piece
- * @param slashX - X position of the slash line
+ * @param slashX - X position of the vertical slash line
  * @param spreadAmount - Amount to spread in mm
  */
 export function slashAndSpread(
@@ -337,29 +340,16 @@ export function slashAndSpread(
   slashX: number,
   spreadAmount: number,
 ): PatternPiece {
-  const result = clonePiece(piece, { edges: undefined });
+  // Compute bounding box to extend the slash line beyond the piece
+  const bbox = outlineBBox(piece.outline);
+  const start = { x: slashX, y: bbox.minY - 10 };
+  const end = { x: slashX, y: bbox.maxY + 10 };
 
-  // Shift all points to the right of slashX by spreadAmount
-  for (const cmd of result.outline) {
-    for (let i = 0; i < cmd.values.length; i += 2) {
-      if (cmd.values[i] > slashX) {
-        cmd.values[i] += spreadAmount;
-      }
-    }
-  }
-
-  // Also shift internals
-  for (const int of result.internals) {
-    for (const cmd of int.path) {
-      for (let i = 0; i < cmd.values.length; i += 2) {
-        if (cmd.values[i] > slashX) {
-          cmd.values[i] += spreadAmount;
-        }
-      }
-    }
-  }
-
-  return result;
+  const [hit1, hit2] = findSlashIntersections(piece.outline, start, end);
+  // halfA is the segment between hit1 and hit2 going forward along the outline,
+  // which for a vertical slash at slashX is the right-hand side of the piece.
+  // We spread halfA (the right half) to preserve backward-compatible behaviour.
+  return buildSpreadPiece(piece, hit1, hit2, 'A', 'start', spreadAmount, 'parallel', 'straight');
 }
 
 // ─── transferDart ─────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -35,7 +35,7 @@ export const elasticTool: ToolDefinition = {
     ],
     keywords: ['elastic', 'gather', 'shirr', 'ruffle', 'stretch', 'contract', 'waistband', 'cuff', 'smocking'],
     requiresSelection: 'edge',
-    produces: 'seam',
+    produces: 'elastic',
     undoable: true,
   },
 };
