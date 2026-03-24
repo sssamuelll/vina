@@ -1,5 +1,5 @@
 
-import { memo, useMemo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { PatternPiece, PathCommand } from '../../../types/types';
@@ -194,6 +194,51 @@ const SinglePiece = memo(function SinglePiece({
         const isNotch = line.type === 'notch';
         const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
         const isLineSelected = isInternalLineSelected && selectedLineId === line.id;
+
+        // Compute fold direction markers for fold lines with foldOptions
+        const foldMarkers: React.ReactElement[] = [];
+        if (line.type === 'fold' && line.foldOptions) {
+          const firstCmd = line.path[0];
+          const lastCmd = line.path[line.path.length - 1];
+          if (firstCmd?.type === 'M' && firstCmd.values.length >= 2 &&
+              lastCmd?.type === 'L' && lastCmd.values.length >= 2) {
+            const x1 = firstCmd.values[0], y1 = firstCmd.values[1];
+            const x2 = lastCmd.values[0], y2 = lastCmd.values[1];
+            const dx = x2 - x1, dy = y2 - y1;
+            const lineLen = Math.sqrt(dx * dx + dy * dy);
+            if (lineLen > 0) {
+              const isMountain = line.foldOptions.direction === 'mountain';
+              const markerColor = isMountain ? '#9c27b0' : '#3F51B5';
+              const interval = 20 / zoom2D;
+              const triSize = 3 / zoom2D;
+              const tx = dx / lineLen, ty = dy / lineLen;   // unit tangent
+              const nx = -ty, ny = tx;                       // unit normal (left of direction)
+              const sign = isMountain ? -1 : 1;              // mountain: points toward -normal, valley: +normal
+              const count = Math.max(1, Math.floor(lineLen / interval));
+              for (let i = 1; i <= count; i++) {
+                const t = i / (count + 1);
+                const mx = x1 + t * dx;
+                const my = y1 + t * dy;
+                // Equilateral triangle: apex in sign*normal direction, base perpendicular
+                const apex = { x: mx + sign * nx * triSize * 1.5, y: my + sign * ny * triSize * 1.5 };
+                const base1 = { x: mx - tx * triSize + (-sign) * nx * triSize * 0.5,
+                                y: my - ty * triSize + (-sign) * ny * triSize * 0.5 };
+                const base2 = { x: mx + tx * triSize + (-sign) * nx * triSize * 0.5,
+                                y: my + ty * triSize + (-sign) * ny * triSize * 0.5 };
+                foldMarkers.push(
+                  <polygon
+                    key={`fm-${i}`}
+                    points={`${apex.x},${apex.y} ${base1.x},${base1.y} ${base2.x},${base2.y}`}
+                    fill={markerColor}
+                    opacity={0.8}
+                    pointerEvents="none"
+                  />
+                );
+              }
+            }
+          }
+        }
+
         return (
           <g key={line.id}>
             <path
@@ -218,6 +263,7 @@ const SinglePiece = memo(function SinglePiece({
               }
               opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.7}
             />
+            {foldMarkers.length > 0 && <g className="fold-direction-markers">{foldMarkers}</g>}
             {isLineSelected && (() => {
               const first = line.path[0];
               const last = line.path[line.path.length - 1];

@@ -27,6 +27,7 @@ import { useWalkSeamTool } from './useWalkSeamTool';
 import { useOffsetTool } from './useOffsetTool';
 import { useExtendTrimTool } from './useExtendTrimTool';
 import { usePolyPenTool } from './usePolyPenTool';
+import { usePleatTool } from '../../hooks/usePleatTool';
 import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
@@ -139,6 +140,7 @@ export default function PatternEditor() {
   }, [selectedPieceIds, pieces, dispatch]);
 
   const polyPenTool = usePolyPenTool(zoom2D, pan2D, handlePieceComplete, handlePolyPenCompleteInternalLine, polyPenMode, polyPenLineType);
+  const pleatTool = usePleatTool(zoom2D, pan2D);
   const elasticTool = useElasticTool(zoom2D, pan2D, pieces);
 
   // Context menu handlers for patternOps
@@ -349,7 +351,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown, handleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
     });
 
   const handleZoomToFit = useCallback(() => {
