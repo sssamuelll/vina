@@ -241,5 +241,17 @@ describe('generatePleatFoldLines', () => {
         expect(lineCmd!.values[1]).toBeGreaterThan(0);
       }
     });
+
+    it('generates fold lines within partial tStart/tEnd range', () => {
+      const piece = makeSquarePiece([topEdge]);
+      const pleat = makePleat({ type: 'knife', count: 2, tStart: 0.25, tEnd: 0.75 });
+      const lines = generatePleatFoldLines(pleat, piece);
+      expect(lines).toHaveLength(2);
+      // Fold lines should exist (partial range produces fewer/repositioned lines)
+      for (const line of lines) {
+        expect(line.type).toBe('fold');
+        expect(line.foldOptions?.direction).toBe('mountain');
+      }
+    });
   });
 });

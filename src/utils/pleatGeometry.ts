@@ -196,11 +196,9 @@ export function generatePleatFoldLines(
           dirB = 'mountain';
           break;
         case 'accordion':
-          // Even-indexed repeat: A=mountain, B=valley
-          // Odd-indexed repeat: A=mountain, B=valley (just shifts phase)
-          // Global index-based: line 0=mountain,1=valley,2=mountain,3=valley...
-          dirA = i % 2 === 0 ? 'mountain' : 'mountain';
-          dirB = i % 2 === 0 ? 'valley' : 'valley';
+          // Each repeat pair is mountain then valley — produces alternating M/V sequence
+          dirA = 'mountain';
+          dirB = 'valley';
           break;
         case 'invertedBox':
           dirA = 'valley';
