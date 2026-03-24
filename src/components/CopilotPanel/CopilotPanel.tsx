@@ -26,12 +26,13 @@ import CopilotInput from './CopilotInput';
 import { ProgressMessage } from './ProgressMessage';
 import './CopilotPanel.css';
 import type { ChatMessage, ProviderToolDef } from '../../copilot/providers/types';
+import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 
 function loadAgentConfig(): AgentConfig {
   try {
-    const saved = localStorage.getItem(AGENT_STORAGE_KEY);
+    const saved = safeGetItem(AGENT_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch { /* ignore */ }
   return { type: 'builtin', name: 'Built-in (Templates)' };
@@ -39,7 +40,7 @@ function loadAgentConfig(): AgentConfig {
 
 function saveAgentConfig(config: AgentConfig) {
   import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'agent-config', config); });
-  try { localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+  safeSetItem(AGENT_STORAGE_KEY, JSON.stringify(config));
 }
 
 function getProvider(config: ProviderConfig) {

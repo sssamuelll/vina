@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
 import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
+import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
 export interface JointRotation {
   x: number;  // degrees
@@ -194,7 +195,7 @@ const POSES_STORAGE_KEY = 'openclo-saved-poses';
 function loadSavedPoses(): SavedPose[] {
   // Sync fallback for initial state — async migration happens in loadSavedPosesFromStorage
   try {
-    const raw = localStorage.getItem(POSES_STORAGE_KEY);
+    const raw = safeGetItem(POSES_STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
@@ -204,7 +205,7 @@ function persistPoses(poses: SavedPose[]) {
   import('../utils/storage').then(({ storageSet }) => {
     storageSet('avatars', 'saved-poses', poses);
   });
-  try { localStorage.setItem(POSES_STORAGE_KEY, JSON.stringify(poses)); } catch { /* ignore */ }
+  safeSetItem(POSES_STORAGE_KEY, JSON.stringify(poses));
 }
 
 const initialState: AvatarState = {
