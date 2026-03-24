@@ -241,6 +241,10 @@ describe('AgenticLoop', () => {
     // Tool should NOT have been executed with empty args
     expect(mockRegistry.execute).not.toHaveBeenCalled();
 
+    // Should NOT emit tool:start (tool never started)
+    const startEvents = events.filter(e => e.type === 'tool:start');
+    expect(startEvents).toHaveLength(0);
+
     // Should emit tool:error event
     const errorEvents = events.filter(e => e.type === 'tool:error');
     expect(errorEvents).toHaveLength(1);

@@ -145,8 +145,6 @@ export class AgenticLoop {
           parseError = err instanceof Error ? err.message : String(err);
         }
 
-        onEvent({ type: 'tool:start', name: toolCall.name, args });
-
         const start = performance.now();
         let result: unknown;
         let isMetaTool = false;
@@ -156,6 +154,7 @@ export class AgenticLoop {
           result = { success: false, error: parseError };
           toolError = parseError;
         } else {
+          onEvent({ type: 'tool:start', name: toolCall.name, args });
           try {
             const metaTool = this.metaTools.get(toolCall.name);
             if (metaTool) {
