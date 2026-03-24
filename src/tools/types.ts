@@ -14,7 +14,7 @@ export interface CopilotToolMetadata {
   /** Does this tool require something to be selected first? */
   requiresSelection?: 'piece' | 'edge' | 'point' | 'seam' | 'internalLine' | 'none';
   /** What does this tool produce or modify? */
-  produces?: 'piece' | 'seam' | 'point' | 'measurement' | 'simulation' | 'view' | 'internalLine' | 'modification' | 'none';
+  produces?: 'piece' | 'seam' | 'elastic' | 'point' | 'measurement' | 'simulation' | 'view' | 'internalLine' | 'modification' | 'none';
   /** Can actions from this tool be undone? */
   undoable?: boolean;
   /** Is this a destructive action that needs confirmation? */
