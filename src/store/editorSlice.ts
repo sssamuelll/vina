@@ -39,6 +39,7 @@ const editorSlice = createSlice({
     },
     selectPiece(state, action: PayloadAction<string>) {
       state.selectedPieceIds = [action.payload];
+      state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
