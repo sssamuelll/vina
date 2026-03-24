@@ -20,6 +20,7 @@ import type {
   ViewAction,
   ProjectAction,
 } from './actionTypes';
+import { validateName } from '../../utils/sanitizeName';
 
 // ============================================================================
 // Validation Result
@@ -127,7 +128,7 @@ function validateSelectionAction(action: SelectionAction, state: RootState): Val
 
 function validatePieceAction(action: PieceAction, state: RootState): ValidationResult {
   switch (action.action) {
-    case 'create_piece':
+    case 'create_piece': {
       if (action.shape === 'rectangle') {
         if (!action.params.width || !action.params.height) {
           return fail('Rectangle requires width and height');
@@ -144,7 +145,14 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
           return fail('from_outline requires a valid outline');
         }
       }
+      // Validate optional name if provided
+      if (action.params.name != null) {
+        const nameResult = validateName(action.params.name);
+        if (!nameResult.valid) return fail(...nameResult.errors);
+        action.params.name = nameResult.sanitized;
+      }
       return ok();
+    }
 
     case 'duplicate_piece':
       if (!pieceExists(state, action.pieceId)) {
@@ -166,14 +174,19 @@ function validatePieceAction(action: PieceAction, state: RootState): ValidationR
       return ok();
     }
 
-    case 'rename_piece':
+    case 'rename_piece': {
       if (!pieceExists(state, action.pieceId)) {
         return fail(`Piece "${action.pieceId}" not found`);
       }
-      if (!action.name || action.name.trim().length === 0) {
+      if (!action.name) {
         return fail('Name cannot be empty');
       }
+      const nameResult = validateName(action.name);
+      if (!nameResult.valid) return fail(...nameResult.errors);
+      // Replace with sanitized version (strips control chars, truncates)
+      action.name = nameResult.sanitized;
       return ok();
+    }
 
     case 'mirror_piece':
       if (!pieceExists(state, action.pieceId)) {
