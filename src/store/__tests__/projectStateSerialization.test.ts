@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import type { PatternPiece, Seam, Avatar, Fabric } from '../../types/types';
+import type { CollisionBody } from '../../types/collisionBody';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -132,6 +133,23 @@ function buildRealisticProjectState() {
   };
 }
 
+function makeCollisionBody(id: string): CollisionBody {
+  return {
+    id,
+    name: `Body ${id}`,
+    meshUrl: `/models/${id}.glb`,
+    format: 'glb',
+    transform: {
+      position: [0, 0.9, 0],
+      rotation: [0, 0, 0],
+      scale: [1, 1, 1],
+    },
+    collision: { enabled: true, friction: 0.3, offset: 0.005 },
+    animation: { clipIndex: null, playing: false, time: 0, loop: true },
+    visible: true,
+  };
+}
+
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe('Undo round-trip serialization', () => {
@@ -178,6 +196,16 @@ describe('Undo round-trip serialization', () => {
     expect(original.pieces[0].name).toBe('Piece p1');
     expect(original.avatar.measurements.chest).toBe(92);
     expect(original.seams[0].tension).toBe(100);
+  });
+
+  it('preserves CollisionBody data through round-trip (excluded path: collisionBody.bodies)', () => {
+    const bodies = [makeCollisionBody('mannequin'), makeCollisionBody('table')];
+    const roundTripped = JSON.parse(JSON.stringify(bodies));
+
+    expect(roundTripped).toEqual(bodies);
+    expect(roundTripped[0].transform.position).toEqual([0, 0.9, 0]);
+    expect(roundTripped[1].collision.friction).toBe(0.3);
+    expect(roundTripped[0].animation.clipIndex).toBeNull();
   });
 
   it('round-trip handles edge cases: empty arrays, optional undefined fields', () => {
