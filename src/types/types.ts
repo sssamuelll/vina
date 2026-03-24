@@ -76,6 +76,14 @@ export interface PatternPiece {
 
 // ─── Rich Dart Entity ───
 
+/** Dart cap shape at the apex */
+export type DartCapShape = 'pointed' | 'curved' | 'flat' | 'diamond';
+
+/** Options stored on InternalLine for dart-specific metadata */
+export interface DartOptions {
+  capShape?: DartCapShape;
+}
+
 /** A dart with full geometric and semantic data */
 export interface Dart {
   id: string;
@@ -91,6 +99,8 @@ export interface Dart {
   foldDirection: 'left' | 'right' | 'toward-center';
   /** Dart depth (length from edge to apex) in mm */
   depth?: number;
+  /** Cap shape at the apex */
+  capShape?: DartCapShape;
 }
 
 // ─── GrainLine Semantics ───
@@ -138,6 +148,7 @@ export interface InternalLine {
   path: PathCommand[];
   notchOptions?: NotchOptions;
   topstitchOptions?: TopstitchOptions;
+  dartOptions?: DartOptions;
 }
 
 // ─── Piece Classification ───
