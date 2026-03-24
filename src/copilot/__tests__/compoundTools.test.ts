@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // Updated after #79-#82 copilot epic completion + #142 3D interaction tools + snapshot tools + #322 elastic tools
-      expect(registry.size).toBe(181); // 178 + 3 elastic tools (#322)
+      // 178 base + 2 dart enhancement tools + 3 elastic tools (#322)
+      expect(registry.size).toBe(183);
     });
   });
 });

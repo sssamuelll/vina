@@ -9,6 +9,7 @@
 
 import type { NSID } from './nsid';
 import type { RegisteredSkill, TriggerPreference } from './registryTypes';
+import { safeGetItem, safeRemoveItem } from '../../../utils/safeStorage';
 
 const DB_NAME = 'openclo_skills_v1';
 const DB_VERSION = 1;
@@ -204,7 +205,7 @@ export class SkillPersistence {
     let count = 0;
 
     try {
-      const raw = localStorage.getItem(INSTALLED_SKILLS_KEY);
+      const raw = safeGetItem(INSTALLED_SKILLS_KEY);
       if (!raw) return 0;
 
       const parsed = JSON.parse(raw);
@@ -229,7 +230,7 @@ export class SkillPersistence {
       }
 
       // Clear old storage after successful migration
-      localStorage.removeItem(INSTALLED_SKILLS_KEY);
+      safeRemoveItem(INSTALLED_SKILLS_KEY);
     } catch {
       // Migration failure is non-fatal
     }

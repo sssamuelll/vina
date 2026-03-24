@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
+import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
 export interface WorkflowState {
   expertMode: boolean;
@@ -26,12 +27,8 @@ const initialState: WorkflowState = {
  * Silently swallows errors (e.g. private browsing, storage full).
  */
 export function persistWorkflow(state: WorkflowState): void {
-  try {
-    const envelope: PersistedEnvelope = { version: STORAGE_VERSION, data: state };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
-  } catch {
-    // Ignore
-  }
+  const envelope: PersistedEnvelope = { version: STORAGE_VERSION, data: state };
+  safeSetItem(STORAGE_KEY, JSON.stringify(envelope));
 }
 
 /**
@@ -40,7 +37,7 @@ export function persistWorkflow(state: WorkflowState): void {
  */
 export function loadWorkflow(): WorkflowState | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeGetItem(STORAGE_KEY);
     if (!raw) return null;
     const envelope = JSON.parse(raw) as PersistedEnvelope;
     if (envelope.version !== STORAGE_VERSION || !envelope.data) return null;

@@ -22,6 +22,7 @@ import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
 import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting } from '../../store/simulationSlice';
+import { safeGetItem } from '../../utils/safeStorage';
 import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
 import { extractMeshData } from '../../utils/cloth/avatarMeshExtractor';
@@ -74,11 +75,7 @@ interface UseSimulationLifecycleResult {
 
 /** Check localStorage feature flag. Default: true (WebGPU enabled). */
 function isWebGPUFeatureEnabled(): boolean {
-  try {
-    return localStorage.getItem('webclo-use-webgpu') !== 'false';
-  } catch {
-    return true;
-  }
+  return safeGetItem('webclo-use-webgpu') !== 'false';
 }
 
 /** Race a promise against a timeout */
