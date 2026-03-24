@@ -31,6 +31,7 @@ import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
 import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
 import SeamRenderer from './renderers/SeamRenderer';
+import ElasticRenderer from './renderers/ElasticRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
 import HintText from './renderers/HintText';
 import ConstructionOverlay from './renderers/ConstructionOverlay';
@@ -401,6 +402,7 @@ export default function PatternEditor() {
               selectedSeamId={editor.selectedSeamId}
             />
           )}
+          <ElasticRenderer zoom2D={zoom2D} />
           <ToolOverlay
             activeTool={activeTool}
             zoom2D={zoom2D}
