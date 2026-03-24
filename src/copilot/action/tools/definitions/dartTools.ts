@@ -132,4 +132,105 @@ export const tools: ToolDefinition[] = [
       };
     },
   },
+  {
+    name: 'segmentDart',
+    description: 'Split a dart into multiple evenly-spaced smaller darts along its base edge. / Dividir una pinza en múltiples pinzas más pequeñas distribuidas uniformemente.',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'ID of the piece containing the dart' },
+        dartId: { type: 'string', description: 'ID of the internal line (dart) to segment' },
+        segments: { type: 'number', description: 'Number of segments (2–6)' },
+      },
+      required: ['pieceId', 'dartId', 'segments'],
+    },
+    execute: async (
+      params: Record<string, unknown>,
+      dispatch: AppDispatch,
+      getState: () => RootState,
+    ): Promise<ToolResult> => {
+      const { segmentDart } = await import('../../../../utils/dartEntity');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+      const dartId = params.dartId as string;
+      const segments = params.segments as number;
+      const dartLine = piece.internals.find((l: { id: string }) => l.id === dartId);
+      if (!dartLine) return { success: false, error: `Dart "${dartId}" not found on piece "${piece.id}"` };
+
+      // Snapshot piece for rollback
+      const snapshot = { ...piece };
+
+      const newDarts = segmentDart(piece, dartId, segments);
+
+      // Remove original dart
+      dispatch({ type: 'project/removeInternalLine', payload: { pieceId: piece.id, lineId: dartId } });
+
+      // Add each new segment
+      const newIds: string[] = [];
+      for (const dart of newDarts) {
+        dispatch({ type: 'project/addInternalLine', payload: { pieceId: piece.id, line: dart } });
+        newIds.push(dart.id);
+      }
+
+      return {
+        success: true,
+        data: {
+          pieceId: piece.id,
+          originalDartId: dartId,
+          segments,
+          newDartIds: newIds,
+        },
+        rollback: () => dispatch({ type: 'project/updatePiece', payload: snapshot }),
+      };
+    },
+  },
+  {
+    name: 'shapeDartCap',
+    description: 'Change the shape of a dart tip (pointed, curved, flat, diamond). / Cambiar la forma de la punta de una pinza (punteada, curva, plana, diamante).',
+    parameters: {
+      type: 'object',
+      properties: {
+        pieceId: { type: 'string', description: 'ID of the piece containing the dart' },
+        dartId: { type: 'string', description: 'ID of the internal line (dart) to reshape' },
+        capShape: { type: 'string', enum: ['pointed', 'curved', 'flat', 'diamond'], description: 'Desired cap shape' },
+      },
+      required: ['pieceId', 'dartId', 'capShape'],
+    },
+    execute: async (
+      params: Record<string, unknown>,
+      dispatch: AppDispatch,
+      getState: () => RootState,
+    ): Promise<ToolResult> => {
+      const { extractDartFromInternal, shapeDartCap } = await import('../../../../utils/dartEntity');
+      const state = getState();
+      const piece = state.project.pieces.find(p => p.id === params.pieceId);
+      if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+      const dartId = params.dartId as string;
+      const capShape = params.capShape as 'pointed' | 'curved' | 'flat' | 'diamond';
+      const dartLine = piece.internals.find((l: { id: string }) => l.id === dartId);
+      if (!dartLine) return { success: false, error: `Dart "${dartId}" not found on piece "${piece.id}"` };
+
+      const dart = extractDartFromInternal(dartLine);
+      if (!dart) return { success: false, error: `Line "${dartId}" is not a valid dart` };
+
+      const snapshot = { ...piece };
+      const newPath = shapeDartCap(dart, capShape);
+
+      const updatedInternals = piece.internals.map((l: { id: string }) =>
+        l.id === dartId
+          ? { ...dartLine, path: newPath, dartOptions: { ...dartLine.dartOptions, capShape } }
+          : l,
+      );
+      dispatch({ type: 'project/updatePiece', payload: { ...piece, internals: updatedInternals } });
+
+      return {
+        success: true,
+        data: { pieceId: piece.id, dartId, capShape },
+        rollback: () => dispatch({ type: 'project/updatePiece', payload: snapshot }),
+      };
+    },
+  },
 ];

@@ -7,7 +7,7 @@
  * @module dartEntity
  */
 
-import type { PatternPiece, Dart, InternalLine, Point2D, SemanticEdge } from '../types/types';
+import type { PatternPiece, Dart, InternalLine, Point2D, SemanticEdge, PathCommand, DartCapShape } from '../types/types';
 
 let _dartCounter = 0;
 function dartId(): string { return `dart-${++_dartCounter}`; }
@@ -146,4 +146,188 @@ export function adjustDartIntake(dart: Dart, deltaMm: number): Dart {
     intake: Math.round((dart.intake + deltaMm) * 100) / 100,
     legs: [newLeg1, newLeg2],
   };
+}
+
+// ─── Segment Darts ──────────────────────────────────────────────────────────
+
+/**
+ * Split a dart into N evenly spaced smaller darts along its base line.
+ * Returns N new InternalLine entries to replace the original.
+ */
+export function segmentDart(
+  piece: PatternPiece,
+  dartId: string,
+  segments: number,
+): InternalLine[] {
+  if (segments < 2 || segments > 6) throw new Error(`segments must be 2–6, got ${segments}`);
+
+  const dartLine = piece.internals.find(l => l.id === dartId && l.type === 'dart');
+  if (!dartLine) throw new Error(`dart ${dartId} not found`);
+
+  const dart = extractDartFromInternal(dartLine, piece.edges);
+  if (!dart) throw new Error(`could not parse dart ${dartId}`);
+
+  const leg1Base = dart.legs[0][0];
+  const leg2Base = dart.legs[1][dart.legs[1].length - 1];
+
+  // Base direction vector
+  const baseDx = leg2Base.x - leg1Base.x;
+  const baseDy = leg2Base.y - leg1Base.y;
+  const baseLen = Math.sqrt(baseDx * baseDx + baseDy * baseDy);
+  if (baseLen < 0.01) return [dartLine]; // degenerate
+
+  const nx = baseDx / baseLen;
+  const ny = baseDy / baseLen;
+
+  // Dart axis: direction from base midpoint to apex
+  const midBase: Point2D = { x: (leg1Base.x + leg2Base.x) / 2, y: (leg1Base.y + leg2Base.y) / 2 };
+  const axisDx = dart.apex.x - midBase.x;
+  const axisDy = dart.apex.y - midBase.y;
+  const axisLen = Math.sqrt(axisDx * axisDx + axisDy * axisDy);
+
+  const segIntake = baseLen / segments;
+  // Scale depth proportionally: smaller darts are shallower
+  const segDepth = axisLen * (segIntake / baseLen);
+
+  // Total span including gaps: spread darts evenly across 80% of original base width
+  const spreadFactor = 0.8;
+  const totalSpread = baseLen * spreadFactor;
+  const spacing = totalSpread / segments;
+  const startOffset = (baseLen - totalSpread) / 2 + spacing / 2;
+
+  const results: InternalLine[] = [];
+
+  for (let i = 0; i < segments; i++) {
+    const centerT = startOffset + i * spacing;
+    const center: Point2D = {
+      x: leg1Base.x + nx * centerT,
+      y: leg1Base.y + ny * centerT,
+    };
+
+    const halfW = segIntake / 2;
+    const b1: Point2D = { x: center.x - nx * halfW, y: center.y - ny * halfW };
+    const b2: Point2D = { x: center.x + nx * halfW, y: center.y + ny * halfW };
+    const apex: Point2D = {
+      x: center.x + (axisDx / axisLen) * segDepth,
+      y: center.y + (axisDy / axisLen) * segDepth,
+    };
+
+    const path: PathCommand[] = [
+      { type: 'M', values: [b1.x, b1.y] },
+      { type: 'L', values: [apex.x, apex.y] },
+      { type: 'L', values: [b2.x, b2.y] },
+    ];
+
+    results.push({
+      id: `${dartId}-seg${i + 1}`,
+      type: 'dart',
+      path,
+      dartOptions: dartLine.dartOptions,
+    });
+  }
+
+  return results;
+}
+
+// ─── Shape Dart Cap ─────────────────────────────────────────────────────────
+
+/**
+ * Generate a new dart path with the specified cap shape at the apex.
+ */
+export function shapeDartCap(dart: Dart, capShape: DartCapShape): PathCommand[] {
+  const leg1Base = dart.legs[0][0];
+  const leg2Base = dart.legs[1][dart.legs[1].length - 1];
+  const { apex } = dart;
+
+  switch (capShape) {
+    case 'pointed':
+      return [
+        { type: 'M', values: [leg1Base.x, leg1Base.y] },
+        { type: 'L', values: [apex.x, apex.y] },
+        { type: 'L', values: [leg2Base.x, leg2Base.y] },
+      ];
+
+    case 'curved': {
+      // Replace apex with a cubic bezier. Control points are offset perpendicular
+      // to the dart axis, creating a smooth rounded cap.
+      const midBase: Point2D = { x: (leg1Base.x + leg2Base.x) / 2, y: (leg1Base.y + leg2Base.y) / 2 };
+      const axisDx = apex.x - midBase.x;
+      const axisDy = apex.y - midBase.y;
+      const axisLen = Math.sqrt(axisDx * axisDx + axisDy * axisDy);
+      if (axisLen < 0.01) return shapeDartCap(dart, 'pointed');
+
+      // Points 70% toward apex on each leg
+      const near1: Point2D = {
+        x: leg1Base.x + (apex.x - leg1Base.x) * 0.7,
+        y: leg1Base.y + (apex.y - leg1Base.y) * 0.7,
+      };
+      const near2: Point2D = {
+        x: leg2Base.x + (apex.x - leg2Base.x) * 0.7,
+        y: leg2Base.y + (apex.y - leg2Base.y) * 0.7,
+      };
+
+      // Control points push outward along dart axis for roundness
+      const cpOffset = axisLen * 0.4;
+      const axNx = axisDx / axisLen;
+      const axNy = axisDy / axisLen;
+      const cp1: Point2D = { x: near1.x + axNx * cpOffset, y: near1.y + axNy * cpOffset };
+      const cp2: Point2D = { x: near2.x + axNx * cpOffset, y: near2.y + axNy * cpOffset };
+
+      return [
+        { type: 'M', values: [leg1Base.x, leg1Base.y] },
+        { type: 'L', values: [near1.x, near1.y] },
+        { type: 'C', values: [cp1.x, cp1.y, cp2.x, cp2.y, near2.x, near2.y] },
+        { type: 'L', values: [leg2Base.x, leg2Base.y] },
+      ];
+    }
+
+    case 'flat': {
+      // Replace apex with a flat segment perpendicular to dart axis
+      const midBase: Point2D = { x: (leg1Base.x + leg2Base.x) / 2, y: (leg1Base.y + leg2Base.y) / 2 };
+      const axisDx = apex.x - midBase.x;
+      const axisDy = apex.y - midBase.y;
+      const axisLen = Math.sqrt(axisDx * axisDx + axisDy * axisDy);
+      if (axisLen < 0.01) return shapeDartCap(dart, 'pointed');
+
+      const intake = Math.sqrt((leg2Base.x - leg1Base.x) ** 2 + (leg2Base.y - leg1Base.y) ** 2);
+      const flatWidth = intake * 0.3;
+
+      // Perpendicular to dart axis (= along base direction)
+      const baseDx = leg2Base.x - leg1Base.x;
+      const baseDy = leg2Base.y - leg1Base.y;
+      const baseLen = Math.sqrt(baseDx * baseDx + baseDy * baseDy);
+      const pnx = baseLen > 0.01 ? baseDx / baseLen : 1;
+      const pny = baseLen > 0.01 ? baseDy / baseLen : 0;
+
+      const flatL: Point2D = { x: apex.x - pnx * flatWidth / 2, y: apex.y - pny * flatWidth / 2 };
+      const flatR: Point2D = { x: apex.x + pnx * flatWidth / 2, y: apex.y + pny * flatWidth / 2 };
+
+      return [
+        { type: 'M', values: [leg1Base.x, leg1Base.y] },
+        { type: 'L', values: [flatL.x, flatL.y] },
+        { type: 'L', values: [flatR.x, flatR.y] },
+        { type: 'L', values: [leg2Base.x, leg2Base.y] },
+      ];
+    }
+
+    case 'diamond': {
+      // Add side vertices at 60% depth for a diamond shape
+      const mid1: Point2D = {
+        x: leg1Base.x + (apex.x - leg1Base.x) * 0.6,
+        y: leg1Base.y + (apex.y - leg1Base.y) * 0.6,
+      };
+      const mid2: Point2D = {
+        x: leg2Base.x + (apex.x - leg2Base.x) * 0.6,
+        y: leg2Base.y + (apex.y - leg2Base.y) * 0.6,
+      };
+
+      return [
+        { type: 'M', values: [leg1Base.x, leg1Base.y] },
+        { type: 'L', values: [mid1.x, mid1.y] },
+        { type: 'L', values: [apex.x, apex.y] },
+        { type: 'L', values: [mid2.x, mid2.y] },
+        { type: 'L', values: [leg2Base.x, leg2Base.y] },
+      ];
+    }
+  }
 }
