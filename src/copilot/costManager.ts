@@ -10,6 +10,8 @@
  * @module costManager
  */
 
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../utils/safeStorage';
+
 // ─── Pricing Table ──────────────────────────────────────────────────────────
 
 /**
@@ -231,13 +233,11 @@ export class CostManager {
    * @returns Budget in USD
    */
   getBudget(): number {
-    try {
-      const saved = localStorage.getItem(BUDGET_STORAGE_KEY);
-      if (saved) {
-        const value = parseFloat(saved);
-        if (isFinite(value) && value >= 0) return value;
-      }
-    } catch { /* ignore */ }
+    const saved = safeGetItem(BUDGET_STORAGE_KEY);
+    if (saved) {
+      const value = parseFloat(saved);
+      if (isFinite(value) && value >= 0) return value;
+    }
     return DEFAULT_BUDGET;
   }
 
@@ -248,9 +248,7 @@ export class CostManager {
    */
   setBudget(amount: number): void {
     if (!isFinite(amount) || amount < 0) return;
-    try {
-      localStorage.setItem(BUDGET_STORAGE_KEY, String(amount));
-    } catch { /* ignore */ }
+    safeSetItem(BUDGET_STORAGE_KEY, String(amount));
   }
 
   /**
@@ -278,9 +276,7 @@ export class CostManager {
   clearProjectUsage(): void {
     this.projectRecords = [];
     this.sessionRecords = [];
-    try {
-      localStorage.removeItem(USAGE_STORAGE_PREFIX + this.projectId);
-    } catch { /* ignore */ }
+    safeRemoveItem(USAGE_STORAGE_PREFIX + this.projectId);
   }
 
   // ─── Private ──────────────────────────────────────────────────────────
@@ -314,7 +310,7 @@ export class CostManager {
   private loadProjectUsage(): void {
     try {
       const key = USAGE_STORAGE_PREFIX + this.projectId;
-      const saved = localStorage.getItem(key);
+      const saved = safeGetItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -328,12 +324,10 @@ export class CostManager {
    * Save project usage to localStorage.
    */
   private saveProjectUsage(): void {
-    try {
-      const key = USAGE_STORAGE_PREFIX + this.projectId;
-      // Keep only last 500 records to avoid quota issues
-      const trimmed = this.projectRecords.slice(-500);
-      localStorage.setItem(key, JSON.stringify(trimmed));
-    } catch { /* ignore */ }
+    const key = USAGE_STORAGE_PREFIX + this.projectId;
+    // Keep only last 500 records to avoid quota issues
+    const trimmed = this.projectRecords.slice(-500);
+    safeSetItem(key, JSON.stringify(trimmed));
   }
 }
 

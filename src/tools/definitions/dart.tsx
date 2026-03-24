@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
 
@@ -47,6 +47,27 @@ export const dartTool: ToolDefinition = {
       max: 300,
       step: 5,
     },
+    {
+      id: 'capShape',
+      label: 'Cap Shape',
+      type: 'select',
+      value: 'pointed',
+      choices: [
+        { label: 'Pointed', value: 'pointed' },
+        { label: 'Curved', value: 'curved' },
+        { label: 'Flat', value: 'flat' },
+        { label: 'Diamond', value: 'diamond' },
+      ],
+    },
+    {
+      id: 'segments',
+      label: 'Segments',
+      type: 'number',
+      value: 1,
+      min: 1,
+      max: 6,
+      step: 1,
+    },
   ],
   copilot: {
     description:
@@ -67,6 +88,10 @@ export const dartTool: ToolDefinition = {
       'shoulder dart',
       'contour',
       'tailoring',
+      'segment dart',
+      'dart cap',
+      'split dart',
+      'distribute dart',
     ],
     requiresSelection: 'piece',
     produces: 'piece',
@@ -75,6 +100,10 @@ export const dartTool: ToolDefinition = {
     parameterHints: {
       dartWidth: 'Width of the dart opening at the edge in millimeters',
       dartDepth: 'How deep the dart extends into the pattern piece in millimeters',
+      capShape:
+        'Shape of the dart tip: pointed (default V), curved (rounded), flat (blunt), diamond (faceted)',
+      segments:
+        'Number of darts to split into (1 = no split, 2-6 = distribute intake across multiple darts)',
     },
   },
 };

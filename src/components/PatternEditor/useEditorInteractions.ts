@@ -198,6 +198,10 @@ interface ToolHooks {
     handleKeyDown: (e: KeyboardEvent) => void;
     handleDoubleClick: () => void;
   };
+  elasticTool: {
+    handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void;
+    handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void;
+  };
 }
 
 export function useEditorInteractions(
@@ -220,7 +224,7 @@ export function useEditorInteractions(
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, elasticTool } = tools;
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -383,6 +387,7 @@ export function useEditorInteractions(
     if (activeTool === 'offsetOutline') { offsetTool.handleMouseDown(e); return; }
     if (activeTool === 'extendTrim') { extendTrimTool.handleMouseDown(e); return; }
     if (activeTool === 'polyPen') { polyPenTool.handleMouseDown(e); return; }
+    if (activeTool === 'elastic') { elasticTool.handleMouseDown(e); return; }
     if (activeTool === 'transform') {
       const handled = transformTool.handleMouseDown(e);
       if (handled) return;
@@ -501,7 +506,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, elasticTool]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -612,7 +617,8 @@ export function useEditorInteractions(
     if (activeTool === 'offsetOutline') offsetTool.handleMouseMove(e);
     if (activeTool === 'extendTrim') extendTrimTool.handleMouseMove(e);
     if (activeTool === 'polyPen') polyPenTool.handleMouseMove(e);
-  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool]);
+    if (activeTool === 'elastic') elasticTool.handleMouseMove(e);
+  }, [activeTool, zoom2D, pan2D, pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, nodeEditor, pieces, dispatch, setSelectMarquee, offsetTool, extendTrimTool, polyPenTool, elasticTool]);
 
   const handleMouseUp = useCallback((e?: React.MouseEvent<SVGSVGElement>) => {
     // Resolve marquee selection
@@ -711,6 +717,7 @@ export function useEditorInteractions(
       case 'topstitchEdit': return 'default';
       case 'offsetOutline': return offsetTool.getCursor();
       case 'extendTrim': return extendTrimTool.getCursor();
+      case 'elastic': return 'crosshair';
       default: return 'crosshair';
     }
   };

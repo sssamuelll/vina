@@ -15,6 +15,7 @@ import type {
   ValidationResult,
 } from './types';
 import { ALL_PLUGIN_PERMISSIONS } from './types';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../../utils/safeStorage';
 
 /** Current OpenClo version — used for plugin compatibility checks */
 const OPENCLO_VERSION = '0.4.0';
@@ -443,7 +444,7 @@ export function getPluginStorageKey(pluginId: string): string {
  */
 export function readPluginStorage(pluginId: string): Record<string, unknown> | null {
   try {
-    const raw = localStorage.getItem(getPluginStorageKey(pluginId));
+    const raw = safeGetItem(getPluginStorageKey(pluginId));
     if (!raw) return null;
     return JSON.parse(raw) as Record<string, unknown>;
   } catch {
@@ -459,7 +460,7 @@ export function readPluginStorage(pluginId: string): Record<string, unknown> | n
  */
 export function writePluginStorage(pluginId: string, data: Record<string, unknown>): void {
   import('../../utils/storage').then(({ storageSet }) => { storageSet('plugins', `plugin:${pluginId}`, data); }).catch(() => {});
-  try { localStorage.setItem(getPluginStorageKey(pluginId), JSON.stringify(data)); } catch { /* ignore */ }
+  safeSetItem(getPluginStorageKey(pluginId), JSON.stringify(data));
 }
 
 /**
@@ -469,5 +470,5 @@ export function writePluginStorage(pluginId: string, data: Record<string, unknow
  */
 export function clearPluginStorage(pluginId: string): void {
   import('../../utils/storage').then(({ storageDel }) => { storageDel('plugins', `plugin:${pluginId}`); }).catch(() => {});
-  try { localStorage.removeItem(getPluginStorageKey(pluginId)); } catch { /* ignore */ }
+  safeRemoveItem(getPluginStorageKey(pluginId));
 }

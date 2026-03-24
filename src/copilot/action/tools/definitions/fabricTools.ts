@@ -484,6 +484,118 @@ const getMaterialPropertiesTool: ToolDefinition = {
   },
 };
 
+const setFabricCodeTool: ToolDefinition = {
+  name: 'setFabricCode',
+  description:
+    'Assign a production fabric code (SELF, LINING, INTERLINING, etc.) to one or more pattern pieces. ' +
+    '/ Asignar código de tela de producción a una o más piezas.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of piece (for single piece)' },
+      pieceIds: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'IDs of pieces (for batch)',
+      },
+      fabricCode: {
+        type: 'string',
+        description:
+          'Fabric code: SELF, LINING, INTERLINING, CONTRAST-1, CONTRAST-2, FUSIBLE, or custom',
+      },
+    },
+    required: ['fabricCode'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const fabricCode = params.fabricCode as string;
+
+    // Support both single and batch
+    const ids: string[] = [];
+    if (params.pieceIds && Array.isArray(params.pieceIds)) {
+      ids.push(...(params.pieceIds as string[]));
+    } else if (params.pieceId) {
+      ids.push(params.pieceId as string);
+    } else {
+      return { success: false, error: 'Provide pieceId or pieceIds' };
+    }
+
+    // Validate all pieces exist
+    const missing = ids.filter(
+      (id) => !state.project.pieces.find((p: { id: string }) => p.id === id),
+    );
+    if (missing.length > 0) {
+      return { success: false, error: `Pieces not found: ${missing.join(', ')}` };
+    }
+
+    // Snapshot for rollback
+    const oldCodes = ids.map((id) => ({
+      id,
+      code: (
+        state.project.pieces.find((p: { id: string }) => p.id === id) as {
+          id: string;
+          fabricCode?: string;
+        }
+      )?.fabricCode,
+    }));
+
+    if (ids.length === 1) {
+      dispatch({ type: 'project/setFabricCode', payload: { pieceId: ids[0], fabricCode } });
+    } else {
+      dispatch({
+        type: 'project/batchSetFabricCode',
+        payload: { pieceIds: ids, fabricCode },
+      });
+    }
+
+    return {
+      success: true,
+      data: { pieceIds: ids, fabricCode },
+      rollback: () => {
+        // Group by original code to minimize dispatches
+        const byCode = new Map<string, string[]>();
+        for (const { id, code } of oldCodes) {
+          const c = code || 'SELF';
+          if (!byCode.has(c)) byCode.set(c, []);
+          byCode.get(c)!.push(id);
+        }
+        for (const [code, pieceIds] of byCode) {
+          if (pieceIds.length === 1) {
+            dispatch({ type: 'project/setFabricCode', payload: { pieceId: pieceIds[0], fabricCode: code } });
+          } else {
+            dispatch({ type: 'project/batchSetFabricCode', payload: { pieceIds, fabricCode: code } });
+          }
+        }
+      },
+    };
+  },
+};
+
+const getFabricCodesTool: ToolDefinition = {
+  name: 'getFabricCodes',
+  description:
+    'List all pattern pieces grouped by their fabric code. ' +
+    '/ Listar todas las piezas agrupadas por código de tela.',
+  parameters: {
+    type: 'object',
+    properties: {},
+    required: [],
+  },
+  execute: async (_params, _dispatch, getState): Promise<ToolResult> => {
+    const pieces = getState().project.pieces;
+    const grouped: Record<string, string[]> = {};
+    for (const p of pieces as { id: string; name?: string; fabricCode?: string }[]) {
+      const code = p.fabricCode || 'SELF';
+      if (!grouped[code]) grouped[code] = [];
+      grouped[code].push(`${p.name ?? p.id} (${p.id})`);
+    }
+    return {
+      success: true,
+      data: { fabricCodes: grouped, totalPieces: pieces.length },
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   searchFabricsTool,
   getFabricDetailsTool,
@@ -492,4 +604,6 @@ export const tools: ToolDefinition[] = [
   setPieceOpacityTool,
   setPieceEmissionTool,
   getMaterialPropertiesTool,
+  setFabricCodeTool,
+  getFabricCodesTool,
 ];
