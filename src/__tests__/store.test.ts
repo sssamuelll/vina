@@ -330,6 +330,72 @@ describe('undoMiddleware', () => {
     expect(canRedo()).toBe(false);
   });
 
+  it('undo/redo works for normal pattern editing operations', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+
+    // Add piece → move → rename: three undo-able actions
+    store.dispatch(addPiece(makePiece('p1')));
+    store.dispatch(movePiece({ id: 'p1', x: 50, y: 100 }));
+    store.dispatch(setProjectName('Edited'));
+
+    expect(store.getState().project.pieces[0].position).toEqual({ x: 50, y: 100 });
+    expect(store.getState().project.name).toBe('Edited');
+
+    // Undo rename
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.name).toBe('Test');
+    expect(store.getState().project.pieces[0].position).toEqual({ x: 50, y: 100 });
+
+    // Undo move
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces[0].position).toEqual({ x: 0, y: 0 });
+
+    // Undo add
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces).toHaveLength(0);
+
+    // Redo all three
+    store.dispatch({ type: 'editor/redo' });
+    expect(store.getState().project.pieces).toHaveLength(1);
+    store.dispatch({ type: 'editor/redo' });
+    expect(store.getState().project.pieces[0].position).toEqual({ x: 50, y: 100 });
+    store.dispatch({ type: 'editor/redo' });
+    expect(store.getState().project.name).toBe('Edited');
+
+    expect(canRedo()).toBe(false);
+  });
+
+  it('preserves NaN in piece state through undo snapshot (structuredClone fix)', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+
+    // Add a piece with a NaN value (simulates unset optional numeric field)
+    const piece = makePiece('p1');
+    piece.rotation = NaN;
+    store.dispatch(addPiece(piece));
+    expect(store.getState().project.pieces[0].rotation).toBeNaN();
+
+    // Move the piece — this creates a new undo snapshot of the state containing NaN
+    store.dispatch(movePiece({ id: 'p1', x: 99, y: 99 }));
+
+    // Undo the move — restores the snapshot that should still have NaN
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces[0].rotation).toBeNaN();
+    expect(store.getState().project.pieces[0].position).toEqual({ x: 0, y: 0 });
+
+    // Redo — current state at the time of undo also had NaN, should survive
+    store.dispatch({ type: 'editor/redo' });
+    expect(store.getState().project.pieces[0].rotation).toBeNaN();
+    expect(store.getState().project.pieces[0].position).toEqual({ x: 99, y: 99 });
+  });
+
   it('does not track editor actions', () => {
     const store = createStore();
     store.dispatch(loadProject({
