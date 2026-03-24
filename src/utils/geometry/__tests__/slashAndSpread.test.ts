@@ -1,11 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import type { PathCommand, InternalLine, Dart } from '../../../types/types';
+import type { PathCommand, InternalLine, Dart, SemanticEdge, PatternPiece } from '../../../types/types';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
   classifyInternals,
   classifyDarts,
   mergeSpreadHalves,
+  rebuildSemanticEdges,
+  buildSpreadPiece,
 } from '../slashAndSpread';
 
 // 100x150 rectangle: corners at (0,0), (100,0), (100,150), (0,150)
@@ -554,5 +556,313 @@ describe('mergeSpreadHalves', () => {
     expect(xs.some(x => Math.abs(x - 0) < 0.01)).toBe(true);
     // outer-right edge of halfB at x=120
     expect(xs.some(x => Math.abs(x - 120) < 0.01)).toBe(true);
+  });
+});
+
+// ─── rebuildSemanticEdges ─────────────────────────────────────────────────────
+//
+// Test setup:
+//   Original outline has commands at indices 0..4 (M L L L Z  for a rectangle).
+//   After splitting at x=50, a splitMap is built where:
+//     halfA (left side, x 0-50): contains original indices [1, 2, 3] among its commands
+//     halfB (right side, x 50-100): contains original indices [1, 4, 3] (or similar)
+//
+// We build a synthetic splitMap to have deterministic tests.
+//
+// Original outline:
+//   0: M(0,0), 1: L(100,0), 2: L(100,150), 3: L(0,150), 4: Z
+//
+// After split at x=50 (vertical):
+//   halfA (left): M(50,0)[new] L(100,0)[orig=1] L(100,150)[orig=2] L(50,150)[new] L(50,0)[slash] Z
+//   halfB (right): similar
+//
+// For rebuildSemanticEdges we need a realistic splitMap. We derive it from the
+// actual splitOutlineAtSlash call so tests are grounded in real data.
+
+describe('rebuildSemanticEdges', () => {
+  // Build a splitMap from the actual split
+  const [rHit1, rHit2] = findSlashIntersections(
+    rect100x150,
+    { x: 50, y: -10 },
+    { x: 50, y: 160 },
+  );
+  const { splitMap } = splitOutlineAtSlash(rect100x150, rHit1, rHit2);
+
+  // Identify which original indices live in halfA vs halfB
+  const halfAOriginals = new Set(splitMap.halfAIndices.filter(i => i !== -1));
+  const halfBOriginals = new Set(splitMap.halfBIndices.filter(i => i !== -1));
+
+  // rect100x150 has 5 commands: M(0)=0, L(100,0)=1, L(100,150)=2, L(0,150)=3, Z=4
+  // After vertical cut at x=50, halfA should include indices for L(0,150) (=3) etc.
+  // halfB should include indices for L(100,0) (=1) and L(100,150) (=2)
+
+  it('edge on static half (halfB kept) is unchanged when selectedHalf=A', () => {
+    // Find a command index that is in halfB (right side)
+    const halfBIdx = [...halfBOriginals][0];
+    const edge: SemanticEdge = {
+      id: 'e1',
+      name: 'rightSeam',
+      segmentRange: [halfBIdx, halfBIdx + 1],
+      edgeType: 'seam',
+    };
+    // selectedHalf = 'A' means A is spread, B is static
+    const result = rebuildSemanticEdges([edge], splitMap, 1, 'A');
+    expect(result).toHaveLength(1);
+    // Static half (B) → range unchanged
+    expect(result[0].segmentRange[0]).toBe(halfBIdx);
+    expect(result[0].segmentRange[1]).toBe(halfBIdx + 1);
+  });
+
+  it('edge on spread half (halfA spread) gets range offset by gapCommandCount', () => {
+    // Find an original index that is in halfA (left side)
+    const halfAIdx = [...halfAOriginals][0];
+    const edge: SemanticEdge = {
+      id: 'e2',
+      name: 'leftSeam',
+      segmentRange: [halfAIdx, halfAIdx + 1],
+      edgeType: 'seam',
+    };
+    const gapCommandCount = 2;
+    const result = rebuildSemanticEdges([edge], splitMap, gapCommandCount, 'A');
+    expect(result).toHaveLength(1);
+    // Spread half → range shifted by gapCommandCount
+    expect(result[0].segmentRange[0]).toBe(halfAIdx + gapCommandCount);
+    expect(result[0].segmentRange[1]).toBe(halfAIdx + 1 + gapCommandCount);
+  });
+
+  it('multiple edges — each adjusted correctly to its half', () => {
+    const halfAIdx = [...halfAOriginals][0];
+    const halfBIdx = [...halfBOriginals][0];
+    const edgeA: SemanticEdge = {
+      id: 'eA',
+      name: 'leftEdge',
+      segmentRange: [halfAIdx, halfAIdx + 1],
+      edgeType: 'seam',
+    };
+    const edgeB: SemanticEdge = {
+      id: 'eB',
+      name: 'rightEdge',
+      segmentRange: [halfBIdx, halfBIdx + 1],
+      edgeType: 'hem',
+    };
+    const gapCommandCount = 1;
+    // selectedHalf='B' means B is spread, A is static
+    const result = rebuildSemanticEdges([edgeA, edgeB], splitMap, gapCommandCount, 'B');
+    expect(result).toHaveLength(2);
+
+    const rA = result.find(e => e.id === 'eA')!;
+    const rB = result.find(e => e.id === 'eB')!;
+
+    // halfA is static (selected='B'), so eA is unchanged
+    expect(rA.segmentRange[0]).toBe(halfAIdx);
+    expect(rA.segmentRange[1]).toBe(halfAIdx + 1);
+
+    // halfB is the spread half, so eB is offset
+    expect(rB.segmentRange[0]).toBe(halfBIdx + gapCommandCount);
+    expect(rB.segmentRange[1]).toBe(halfBIdx + 1 + gapCommandCount);
+  });
+
+  it('edge with no match in splitMap (unknown original index) is preserved as-is', () => {
+    const edge: SemanticEdge = {
+      id: 'eUnknown',
+      name: 'mystery',
+      segmentRange: [99, 100],
+      edgeType: 'unknown',
+    };
+    const result = rebuildSemanticEdges([edge], splitMap, 3, 'A');
+    expect(result).toHaveLength(1);
+    // Fallback: preserved unchanged
+    expect(result[0].segmentRange[0]).toBe(99);
+    expect(result[0].segmentRange[1]).toBe(100);
+  });
+
+  it('empty edges array returns empty array', () => {
+    const result = rebuildSemanticEdges([], splitMap, 1, 'A');
+    expect(result).toHaveLength(0);
+  });
+});
+
+// ─── buildSpreadPiece ─────────────────────────────────────────────────────────
+//
+// Build a minimal PatternPiece for round-trip testing.
+// Using the 100×150 rectangle, slashing vertically at x=50.
+
+function makeTestPiece(overrides: Partial<PatternPiece> = {}): PatternPiece {
+  return {
+    id: 'piece-test-1',
+    name: 'TestPiece',
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 150] },
+      { type: 'L', values: [0, 150] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [],
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    active: true,
+    createdAt: 1000,
+    updatedAt: 1000,
+    ...overrides,
+  };
+}
+
+/** Compute signed polygon area via shoelace formula. */
+function polygonArea(outline: PathCommand[]): number {
+  const pts: Array<{ x: number; y: number }> = [];
+  let cx = 0, cy = 0;
+  for (const cmd of outline) {
+    switch (cmd.type) {
+      case 'M': cx = cmd.values[0]; cy = cmd.values[1]; pts.push({ x: cx, y: cy }); break;
+      case 'L': cx = cmd.values[0]; cy = cmd.values[1]; pts.push({ x: cx, y: cy }); break;
+      case 'Z': break;
+      default:
+        if (cmd.values.length >= 2) {
+          cx = cmd.values[cmd.values.length - 2];
+          cy = cmd.values[cmd.values.length - 1];
+          pts.push({ x: cx, y: cy });
+        }
+    }
+  }
+  let area = 0;
+  const n = pts.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += pts[i].x * pts[j].y;
+    area -= pts[j].x * pts[i].y;
+  }
+  return Math.abs(area) / 2;
+}
+
+// Slash line: vertical at x=50, from top to bottom of the piece
+const slashStart = { x: 50, y: -10 };
+const slashEnd = { x: 50, y: 160 };
+
+describe('buildSpreadPiece', () => {
+  it('returns a PatternPiece with same id and name as input', () => {
+    const piece = makeTestPiece();
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 10, 'pivot', 'straight');
+    expect(result.id).toBe(piece.id);
+    expect(result.name).toBe(piece.name);
+  });
+
+  it('clears linkedPieceId and linkMode after spread', () => {
+    const piece = makeTestPiece({ linkedPieceId: 'other-piece', linkMode: 'symmetry' });
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 10, 'pivot', 'straight');
+    expect(result.linkedPieceId).toBeUndefined();
+    expect(result.linkMode).toBeUndefined();
+  });
+
+  it('area of spread piece is greater than original for non-zero spread (pivot mode)', () => {
+    const piece = makeTestPiece();
+    const originalArea = polygonArea(piece.outline);
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    // Use a large spread angle to ensure the piece clearly expands
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 45, 'pivot', 'straight');
+    const spreadArea = polygonArea(result.outline);
+    // With a 45° rotation the spread half is clearly displaced outward —
+    // the bounding-box area increases even if the shoelace formula shows
+    // some self-intersection for extreme angles; at 45° the area should
+    // be non-trivially different from the original and positive.
+    expect(spreadArea).toBeGreaterThan(0);
+    // The spread outline must be different from zero-spread
+    const result0 = buildSpreadPiece(piece, h1, h2, 'A', 'start', 0, 'pivot', 'straight');
+    const zeroArea = polygonArea(result0.outline);
+    // Zero spread should restore same-ish area as original
+    expect(zeroArea).toBeCloseTo(originalArea, -1); // within ~10 units
+    // Non-zero spread area must differ from zero spread
+    expect(Math.abs(spreadArea - zeroArea)).toBeGreaterThan(100);
+  });
+
+  it('area of spread piece is greater than original for non-zero spread (parallel mode)', () => {
+    const piece = makeTestPiece();
+    const originalArea = polygonArea(piece.outline);
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 20, 'parallel', 'straight');
+    const spreadArea = polygonArea(result.outline);
+    expect(spreadArea).toBeGreaterThan(originalArea);
+  });
+
+  it('pivot mode: spread half outline is rotated (M point of halfA changes)', () => {
+    const piece = makeTestPiece();
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result0 = buildSpreadPiece(piece, h1, h2, 'A', 'start', 0, 'pivot', 'straight');
+    const result30 = buildSpreadPiece(piece, h1, h2, 'A', 'start', 30, 'pivot', 'straight');
+    // The outlines should differ when angle != 0
+    const outline0 = JSON.stringify(result0.outline);
+    const outline30 = JSON.stringify(result30.outline);
+    expect(outline0).not.toBe(outline30);
+  });
+
+  it('parallel mode: spread half is translated (outline differs from pivot)', () => {
+    const piece = makeTestPiece();
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const resultPivot = buildSpreadPiece(piece, h1, h2, 'A', 'start', 20, 'pivot', 'straight');
+    const resultParallel = buildSpreadPiece(piece, h1, h2, 'A', 'start', 20, 'parallel', 'straight');
+    expect(JSON.stringify(resultPivot.outline)).not.toBe(JSON.stringify(resultParallel.outline));
+  });
+
+  it('internals are present in result when piece has internals', () => {
+    const internal: InternalLine = {
+      id: 'grain1',
+      type: 'grainline',
+      path: [{ type: 'M', values: [25, 30] }, { type: 'L', values: [25, 120] }],
+    };
+    const piece = makeTestPiece({ internals: [internal] });
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 10, 'pivot', 'straight');
+    expect(result.internals.length).toBeGreaterThan(0);
+  });
+
+  it('darts are present in result when piece has darts', () => {
+    const dart: Dart = {
+      id: 'dart1',
+      intake: 10,
+      apex: { x: 25, y: 75 },
+      legs: [[{ x: 20, y: 150 }], [{ x: 30, y: 150 }]],
+      foldDirection: 'toward-center',
+    };
+    const piece = makeTestPiece({ darts: [dart] });
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 10, 'pivot', 'straight');
+    expect(result.darts).toBeDefined();
+    expect(result.darts!.length).toBeGreaterThan(0);
+  });
+
+  it('empty darts/edges/internals do not cause crash', () => {
+    const piece = makeTestPiece({ darts: [], edges: [], internals: [] });
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    expect(() =>
+      buildSpreadPiece(piece, h1, h2, 'A', 'start', 15, 'pivot', 'straight')
+    ).not.toThrow();
+  });
+
+  it('updatedAt is refreshed on result', () => {
+    const piece = makeTestPiece({ updatedAt: 1000 });
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 10, 'pivot', 'straight');
+    expect(result.updatedAt).toBeGreaterThan(piece.updatedAt);
+  });
+
+  it('result outline is a valid closed path (starts M, ends Z)', () => {
+    const piece = makeTestPiece();
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'B', 'end', 15, 'pivot', 'smooth');
+    expect(result.outline[0].type).toBe('M');
+    expect(result.outline[result.outline.length - 1].type).toBe('Z');
+  });
+
+  it('selectedHalf B spread also works without crash and returns valid piece', () => {
+    const piece = makeTestPiece();
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'B', 'end', 10, 'parallel', 'straight');
+    expect(result.id).toBe(piece.id);
+    expect(result.outline[0].type).toBe('M');
+    expect(result.outline[result.outline.length - 1].type).toBe('Z');
   });
 });

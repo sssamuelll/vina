@@ -1,4 +1,4 @@
-import type { PathCommand, Point2D, InternalLine, Dart } from '../../types/types';
+import type { PathCommand, Point2D, InternalLine, Dart, SemanticEdge, PatternPiece } from '../../types/types';
 import {
   findOutlineIntersections,
   splitOutlineAtPoints,
@@ -819,5 +819,185 @@ export function mergeSpreadHalves(
   return {
     outline,
     gapCommandCount: gap1.length,
+  };
+}
+
+// --------------------------------------------------------------------------
+// rebuildSemanticEdges
+// --------------------------------------------------------------------------
+
+/**
+ * Rebuild semantic edge segment ranges after a slash-and-spread operation.
+ *
+ * The split produces two halves.  The "static" half keeps the same outline
+ * indices as before.  The "spread" half has its commands shifted in the
+ * merged outline because the gap-fill commands were inserted between the two
+ * halves — so every original index in the spread half must be offset by
+ * `gapCommandCount`.
+ *
+ * Classification strategy:
+ * - An edge is considered to belong to halfA if the first index of its
+ *   segmentRange appears among the original-command indices recorded in
+ *   `splitMap.halfAIndices` (excluding -1 entries which are inserted).
+ * - Similarly for halfB via `splitMap.halfBIndices`.
+ * - If neither half claims the edge (the index doesn't appear in either set),
+ *   the edge is returned unchanged (fallback / out-of-range graceful preserve).
+ *
+ * @param originalEdges  - SemanticEdge[] from the original piece
+ * @param splitMap       - SplitMap produced by splitOutlineAtSlash
+ * @param gapCommandCount - Number of commands inserted per gap (from MergeResult)
+ * @param selectedHalf   - Which half was spread ('A' or 'B')
+ * @returns New SemanticEdge[] with adjusted segmentRange values
+ */
+export function rebuildSemanticEdges(
+  originalEdges: SemanticEdge[],
+  splitMap: SplitMap,
+  gapCommandCount: number,
+  selectedHalf: 'A' | 'B',
+): SemanticEdge[] {
+  // Build sets of original command indices present in each half.
+  // We exclude -1 (inserted commands) because they have no original counterpart.
+  const halfAOriginals = new Set(splitMap.halfAIndices.filter(i => i !== -1));
+  const halfBOriginals = new Set(splitMap.halfBIndices.filter(i => i !== -1));
+
+  // The "spread" half is the one the user moved; the "static" half stayed put.
+  const spreadOriginals = selectedHalf === 'A' ? halfAOriginals : halfBOriginals;
+
+  return originalEdges.map(edge => {
+    const [start, end] = edge.segmentRange;
+
+    // Determine membership using the start index of the range.
+    // If the start index is in the spread half → offset the range.
+    if (spreadOriginals.has(start)) {
+      return {
+        ...edge,
+        segmentRange: [start + gapCommandCount, end + gapCommandCount] as [number, number],
+      };
+    }
+
+    // Static half or not found in either half → preserve as-is.
+    return edge;
+  });
+}
+
+// --------------------------------------------------------------------------
+// buildSpreadPiece
+// --------------------------------------------------------------------------
+
+/**
+ * Top-level orchestrator: apply a slash-and-spread operation to a pattern
+ * piece and return a new PatternPiece with all geometry updated.
+ *
+ * Algorithm:
+ * 1. Split the outline at the two hit points.
+ * 2. Classify internals and darts into each half.
+ * 3. Determine static vs. moving half based on `selectedHalf`.
+ * 4. Apply the spread transform to the moving half.
+ * 5. Merge the static and spread results back into a single outline.
+ * 6. Rebuild semantic edge ranges.
+ * 7. Return a new PatternPiece (same id) with all updated fields.
+ *
+ * @param piece         - Source pattern piece
+ * @param hit1          - First slash intersection
+ * @param hit2          - Second slash intersection
+ * @param selectedHalf  - Which half to spread ('A' or 'B')
+ * @param pivotEnd      - Which hit to use as pivot ('start' = hit1, 'end' = hit2)
+ * @param spreadAmount  - Degrees (pivot) or mm (parallel)
+ * @param mode          - 'pivot' or 'parallel'
+ * @param gapFill       - 'straight' or 'smooth' gap bridging
+ * @returns New PatternPiece with spread applied
+ */
+export function buildSpreadPiece(
+  piece: PatternPiece,
+  hit1: OutlineHit,
+  hit2: OutlineHit,
+  selectedHalf: 'A' | 'B',
+  pivotEnd: 'start' | 'end',
+  spreadAmount: number,
+  mode: 'pivot' | 'parallel',
+  gapFill: 'straight' | 'smooth',
+): PatternPiece {
+  // ── Step 1: Split ──────────────────────────────────────────────────────────
+  const { halfA, halfB, splitMap } = splitOutlineAtSlash(piece.outline, hit1, hit2);
+
+  // ── Step 2: Classify internals ────────────────────────────────────────────
+  const { internalsA, internalsB } = classifyInternals(piece.internals, halfA, halfB);
+
+  // ── Step 3: Classify darts ────────────────────────────────────────────────
+  const { dartsA, dartsB } = classifyDarts(piece.darts ?? [], halfA, halfB);
+
+  // ── Step 4: Determine static vs. moving halves ────────────────────────────
+  let staticHalf: PathCommand[];
+  let moveHalf: PathCommand[];
+  let staticInternals: InternalLine[];
+  let moveInternals: InternalLine[];
+  let staticDarts: Dart[];
+  let moveDarts: Dart[];
+
+  if (selectedHalf === 'A') {
+    staticHalf = halfB;
+    moveHalf = halfA;
+    staticInternals = internalsB;
+    moveInternals = internalsA;
+    staticDarts = dartsB;
+    moveDarts = dartsA;
+  } else {
+    staticHalf = halfA;
+    moveHalf = halfB;
+    staticInternals = internalsA;
+    moveInternals = internalsB;
+    staticDarts = dartsA;
+    moveDarts = dartsB;
+  }
+
+  // ── Step 5: Apply spread transform ───────────────────────────────────────
+  let spreadResult: SpreadHalfResult;
+
+  if (mode === 'pivot') {
+    // Pivot point: hit1 = 'start', hit2 = 'end'
+    const pivot: Point2D = pivotEnd === 'start' ? hit1.point : hit2.point;
+    spreadResult = applyPivotSpread(moveHalf, moveInternals, moveDarts, pivot, spreadAmount);
+  } else {
+    // Parallel: compute slash direction from hit1 → hit2
+    const slashDir: Point2D = {
+      x: hit2.point.x - hit1.point.x,
+      y: hit2.point.y - hit1.point.y,
+    };
+    spreadResult = applyParallelSpread(moveHalf, moveInternals, moveDarts, slashDir, spreadAmount);
+  }
+
+  // ── Step 6: Merge halves ──────────────────────────────────────────────────
+  // Static half is halfA in the merge call, spread result is halfB.
+  // This ordering ensures the merged outline starts at the static-half cut point.
+  const { outline: mergedOutline, gapCommandCount } = mergeSpreadHalves(
+    staticHalf,
+    spreadResult.outline,
+    gapFill,
+  );
+
+  // ── Step 7: Rebuild semantic edges ────────────────────────────────────────
+  const newEdges = rebuildSemanticEdges(
+    piece.edges ?? [],
+    splitMap,
+    gapCommandCount,
+    selectedHalf,
+  );
+
+  // ── Step 8: Assemble result piece ─────────────────────────────────────────
+  return {
+    ...piece,
+    // Same identity
+    id: piece.id,
+    name: piece.name,
+    // Updated geometry
+    outline: mergedOutline,
+    internals: [...staticInternals, ...spreadResult.internals],
+    darts: [...staticDarts, ...spreadResult.darts],
+    edges: newEdges.length > 0 ? newEdges : piece.edges,
+    // Break symmetry/instance link — spread creates a standalone piece
+    linkedPieceId: undefined,
+    linkMode: undefined,
+    // Refresh timestamp
+    updatedAt: Date.now(),
   };
 }
