@@ -46,8 +46,10 @@ export interface PatternPiece {
   side?: PieceSide;
   /** Named semantic edges (armhole, shoulder, hemline, etc.) */
   edges?: SemanticEdge[];
-  /** Fabric assignment */
+  /** Fabric assignment (links to PhysicalFabric for simulation) */
   fabricId?: string;
+  /** Production fabric code classification (SELF, LINING, etc.) */
+  fabricCode?: string;
   /** Link to construction piece (for overlay alignment) */
   constructionPieceId?: string;
   /** ID of the linked partner piece (bidirectional) */

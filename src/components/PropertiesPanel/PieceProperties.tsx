@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer } from '../../store/projectSlice';
+import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, setFabricCode } from '../../store/projectSlice';
+import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType } from '../../types/types';
 import type { PatternPiece } from '../../types/types';
@@ -76,6 +77,18 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           <option value="">None</option>
           {fabrics.map(f => (
             <option key={f.id} value={f.id}>{f.name}</option>
+          ))}
+        </select>
+      </div>
+      <div className="panel-field">
+        <label>Fabric Code</label>
+        <select
+          className="panel-input"
+          value={piece.fabricCode || 'SELF'}
+          onChange={e => dispatch(setFabricCode({ pieceId: piece.id, fabricCode: e.target.value }))}
+        >
+          {STANDARD_FABRIC_CODES.map(code => (
+            <option key={code} value={code}>{code}</option>
           ))}
         </select>
       </div>
