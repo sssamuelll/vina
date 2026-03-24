@@ -9,7 +9,7 @@ import reducer, {
 
 function stateWith(pieces: { id: string }[], groups: { id: string; name: string; pieceIds: string[]; color: string }[] = []) {
   return {
-    id: 'test', name: 'Test', pieces: pieces as any, seams: [], fabrics: [],
+    id: 'test', name: 'Test', pieces: pieces as any, seams: [], elastics: [], fabrics: [],
     avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} } as any,
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
     arrangementOverrides: {}, seamGroups: [], groups: groups.map(g => ({ ...g, createdAt: 0, updatedAt: 0 })),

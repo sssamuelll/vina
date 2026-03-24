@@ -1,4 +1,5 @@
 import type { DebugStore } from './DebugStore';
+import { safeSetItem } from '../../utils/safeStorage';
 
 export interface DebugAPI {
   getRecords: () => ReturnType<DebugStore['getAll']>;
@@ -19,7 +20,7 @@ export function createDebugAPI(store: DebugStore): DebugAPI {
     getRecent: (limit = 10) => store.getRecent(limit),
     exportJSON: () => store.exportAsJSON(),
     clear: () => store.clear(),
-    enable: () => localStorage.setItem('openclo-debug-bridge', 'true'),
-    disable: () => localStorage.setItem('openclo-debug-bridge', 'false'),
+    enable: () => safeSetItem('openclo-debug-bridge', 'true'),
+    disable: () => safeSetItem('openclo-debug-bridge', 'false'),
   };
 }

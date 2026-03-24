@@ -40,6 +40,7 @@ import { edit3dTool } from './definitions/edit3d';
 import { avatarTool } from './definitions/avatar';
 import { tapeMeasureCircTool, tapeMeasureLinearTool } from './definitions/avatarTape';
 import { scissorsTool } from './definitions/scissors';
+import { slashAndSpreadTool } from './definitions/slashAndSpread';
 import { mergeTool } from './definitions/merge';
 import { dartTool } from './definitions/dart';
 import { circleTool } from './definitions/circle';
@@ -80,6 +81,7 @@ const allTools = [
 
   // 2D Tools — Pattern Editing
   scissorsTool,
+  slashAndSpreadTool,
   mergeTool,
   mirrorTool,
   duplicateTool,

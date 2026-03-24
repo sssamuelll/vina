@@ -1,6 +1,7 @@
 // src/store/animationSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { AnimationTrack, Keyframe, PlaybackState, FpsOption, InterpolationType } from '../utils/animation/types';
+import { NEW_PROJECT } from './actions';
 
 interface AnimationState {
   duration: number;
@@ -148,6 +149,9 @@ const animationSlice = createSlice({
     resetAnimation() {
       return initialState;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

@@ -153,6 +153,15 @@ export class WasmSolverClient {
   }
 
   /**
+   * Set elastic constraints on the WASM solver (applied in JS-side substep loop).
+   *
+   * @param elastics - Array of Elastic objects (active ones only)
+   */
+  setElastics(elastics: import('../../../types/types').Elastic[]): void {
+    this.worker?.postMessage({ type: 'setElastics', elastics });
+  }
+
+  /**
    * Set pinned vertices with target positions.
    * @param pins Array of { vertexIndex, position: [x, y, z] }
    */

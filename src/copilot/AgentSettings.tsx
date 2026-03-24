@@ -15,10 +15,11 @@
  * @module AgentSettings
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ProviderConfig,
   loadProviderConfig,
+  loadProviderConfigSync,
   saveProviderConfig,
   PROVIDER_OPTIONS,
   MODEL_OPTIONS,
@@ -104,17 +105,27 @@ export default function AgentSettings({
   budget,
   onBudgetChange,
 }: AgentSettingsProps) {
-  const existingConfig = loadProviderConfig();
   const ollamaConfig = loadOllamaConfig();
+  const syncConfig = loadProviderConfigSync();
 
   const [provider, setProvider] = useState<ProviderConfig['provider']>(
-    existingConfig?.provider ?? 'anthropic'
+    syncConfig?.provider ?? 'anthropic'
   );
-  const [apiKey, setApiKey] = useState(existingConfig?.apiKey ?? '');
-  const [model, setModel] = useState(existingConfig?.model ?? 'claude-sonnet-4-20250514');
+  const [apiKey, setApiKey] = useState('');
+  const [model, setModel] = useState(syncConfig?.model ?? 'claude-sonnet-4-20250514');
+
+  // Hydrate API key asynchronously (SecureStorage uses Web Crypto)
+  useEffect(() => {
+    loadProviderConfig().then((cfg) => {
+      if (cfg) setApiKey(cfg.apiKey);
+    });
+  }, []);
   const [teachingMode, setTeachingModeState] = useState(isTeachingModeEnabled);
   const [language, setLanguage] = useState<LanguagePreference>(loadLanguagePreference);
   const [budgetValue, setBudgetValue] = useState(budget ?? 5);
+
+  // Guard against stale async resolutions when switching providers rapidly
+  const providerSwitchId = useRef(0);
 
   // Ollama state
   const [ollamaUrl, setOllamaUrl] = useState(ollamaConfig.url);
@@ -142,14 +153,17 @@ export default function AgentSettings({
     setProvider(p);
     const opt = PROVIDER_OPTIONS.find(o => o.value === p);
     if (opt) setModel(opt.defaultModel);
-    // Load API key from SecureStorage for the selected provider
+    // Load API key from SecureStorage for the selected provider (async)
+    // Use a monotonic counter to discard stale resolutions from rapid switching
     if (p !== 'ollama') {
-      const storedKey = SecureStorage.get(`${p}-apikey`) ?? '';
-      setApiKey(storedKey);
+      const id = ++providerSwitchId.current;
+      SecureStorage.get(`${p}-apikey`).then((storedKey) => {
+        if (providerSwitchId.current === id) setApiKey(storedKey ?? '');
+      });
     }
   }, []);
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     // Save teaching mode
     setTeachingMode(teachingMode);
     saveLanguagePreference(language);
@@ -161,7 +175,7 @@ export default function AgentSettings({
         model: 'claude-code',
         baseUrl: apiKey.trim() || undefined, // Reuse API key field for bridge URL
       };
-      saveProviderConfig(config);
+      await saveProviderConfig(config);
       onSave(config);
     } else if (provider === 'ollama') {
       saveOllamaConfig({ url: ollamaUrl, model, autoDetect: true });
@@ -171,11 +185,11 @@ export default function AgentSettings({
         model,
         baseUrl: ollamaUrl,
       };
-      saveProviderConfig(config);
+      await saveProviderConfig(config);
       onSave(config);
     } else if (apiKey.trim()) {
       const config: ProviderConfig = { provider, apiKey, model };
-      saveProviderConfig(config);
+      await saveProviderConfig(config);
       onSave(config);
     } else {
       onSave(null);

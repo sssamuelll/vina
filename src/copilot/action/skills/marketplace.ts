@@ -11,6 +11,7 @@
 import type { CommunitySkill } from './communityFormat';
 import { validateCommunitySkill } from './communityFormat';
 import type { PatternSkill } from './types';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../../../utils/safeStorage';
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -26,11 +27,7 @@ const INSTALLED_SKILLS_KEY = 'openclo_installed_community_skills';
  * @returns The registry URL, or empty string if not configured
  */
 export function getSkillRegistryUrl(): string {
-  try {
-    return localStorage.getItem(REGISTRY_URL_KEY) ?? '';
-  } catch {
-    return '';
-  }
+  return safeGetItem(REGISTRY_URL_KEY) ?? '';
 }
 
 /**
@@ -39,7 +36,7 @@ export function getSkillRegistryUrl(): string {
  * @param url - The registry URL (empty string to disable community features)
  */
 export function setSkillRegistryUrl(url: string): void {
-  localStorage.setItem(REGISTRY_URL_KEY, url);
+  safeSetItem(REGISTRY_URL_KEY, url);
 }
 
 // ─── Fetching ───────────────────────────────────────────────────────────────
@@ -108,7 +105,7 @@ export async function fetchAvailableSkills(query?: string): Promise<CommunitySki
  */
 export function loadInstalledCommunitySkills(): CommunitySkill[] {
   try {
-    const raw = localStorage.getItem(INSTALLED_SKILLS_KEY);
+    const raw = safeGetItem(INSTALLED_SKILLS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -124,7 +121,7 @@ export function loadInstalledCommunitySkills(): CommunitySkill[] {
  * @param skills - Array of CommunitySkill objects to persist
  */
 function saveInstalledCommunitySkills(skills: CommunitySkill[]): void {
-  localStorage.setItem(INSTALLED_SKILLS_KEY, JSON.stringify(skills));
+  safeSetItem(INSTALLED_SKILLS_KEY, JSON.stringify(skills));
 }
 
 /**
@@ -184,6 +181,6 @@ export function getInstalledSkillsAsPatternSkills(): PatternSkill[] {
  * Reset marketplace state (for testing).
  */
 export function resetMarketplace(): void {
-  localStorage.removeItem(REGISTRY_URL_KEY);
-  localStorage.removeItem(INSTALLED_SKILLS_KEY);
+  safeRemoveItem(REGISTRY_URL_KEY);
+  safeRemoveItem(INSTALLED_SKILLS_KEY);
 }
