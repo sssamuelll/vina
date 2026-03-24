@@ -32,6 +32,51 @@ export interface ImportResult {
   warnings: string[];
 }
 
+export interface ImportLimits {
+  /** Maximum file size in bytes before parsing (default: 50MB) */
+  maxFileSizeBytes: number;
+  /** Maximum vertex count after parsing (default: 500_000) */
+  maxVertexCount: number;
+  /** Maximum triangle count after parsing (default: 1_000_000) */
+  maxTriangleCount: number;
+}
+
+export const DEFAULT_IMPORT_LIMITS: ImportLimits = {
+  maxFileSizeBytes: 50 * 1024 * 1024, // 50 MB
+  maxVertexCount: 500_000,
+  maxTriangleCount: 1_000_000,
+};
+
+export type ImportLimitViolation =
+  | { kind: 'fileSize'; actualBytes: number; limitBytes: number }
+  | { kind: 'vertexCount'; actual: number; limit: number }
+  | { kind: 'triangleCount'; actual: number; limit: number };
+
+export class MeshImportLimitError extends Error {
+  public readonly violation: ImportLimitViolation;
+
+  constructor(violation: ImportLimitViolation) {
+    const msg = MeshImportLimitError.formatMessage(violation);
+    super(msg);
+    this.name = 'MeshImportLimitError';
+    this.violation = violation;
+  }
+
+  private static formatMessage(v: ImportLimitViolation): string {
+    switch (v.kind) {
+      case 'fileSize': {
+        const actualMB = (v.actualBytes / (1024 * 1024)).toFixed(1);
+        const limitMB = (v.limitBytes / (1024 * 1024)).toFixed(1);
+        return `File size ${actualMB} MB exceeds limit of ${limitMB} MB`;
+      }
+      case 'vertexCount':
+        return `Vertex count ${v.actual.toLocaleString('en-US')} exceeds limit of ${v.limit.toLocaleString('en-US')}`;
+      case 'triangleCount':
+        return `Triangle count ${v.actual.toLocaleString('en-US')} exceeds limit of ${v.limit.toLocaleString('en-US')}`;
+    }
+  }
+}
+
 export interface ImportOptions {
   /** Target height in mm (default: 1800 = 180cm). Set to 0 to skip auto-scale. */
   targetHeightMm?: number;
@@ -39,6 +84,22 @@ export interface ImportOptions {
   forceUnit?: ScaleUnit;
   /** Auto-fix flipped normals */
   fixNormals?: boolean;
+  /**
+   * Mesh size/complexity limits. Defaults to `DEFAULT_IMPORT_LIMITS`.
+   * Pass `false` to programmatically disable all limit checks (e.g. internal pipeline).
+   */
+  limits?: Partial<ImportLimits> | false;
+  /**
+   * Skip limit checks on retry after the user acknowledged a limit warning.
+   * Use this instead of `limits: false` when the user explicitly chose to proceed.
+   */
+  skipLimits?: boolean;
+  /**
+   * Known file size in bytes. Pass `File.size` from the file picker to avoid
+   * a redundant HEAD request or blob fetch. When set, the URL-based size
+   * detection is skipped entirely.
+   */
+  fileSizeBytes?: number;
 }
 
 // ─── Format Detection ───────────────────────────────────────────────────────
@@ -157,11 +218,113 @@ async function loadGLTF(url: string): Promise<THREE.Group> {
   });
 }
 
+// ─── Scene Cleanup ─────────────────────────────────────────────────────────
+
+function disposeScene(scene: THREE.Group): void {
+  scene.traverse(obj => {
+    if (obj instanceof THREE.Mesh) {
+      obj.geometry?.dispose();
+      if (Array.isArray(obj.material)) {
+        obj.material.forEach(m => m.dispose());
+      } else {
+        obj.material?.dispose();
+      }
+    }
+  });
+}
+
+// ─── Limit Helpers ─────────────────────────────────────────────────────────
+
+function resolveLimits(options: ImportOptions): ImportLimits | null {
+  if (options.skipLimits || options.limits === false) return null;
+  if (!options.limits) return DEFAULT_IMPORT_LIMITS;
+  return { ...DEFAULT_IMPORT_LIMITS, ...options.limits };
+}
+
+async function checkFileSize(
+  url: string,
+  limits: ImportLimits,
+  knownSizeBytes?: number,
+): Promise<void> {
+  let sizeBytes: number | null = knownSizeBytes ?? null;
+
+  // If caller already provided the size (e.g. File.size), skip URL-based detection.
+  if (sizeBytes == null && url.startsWith('blob:')) {
+    // Blob URLs: can't determine size without fetching the entire blob into memory,
+    // which defeats the purpose. Callers should pass fileSizeBytes instead.
+    return;
+  } else if (sizeBytes == null && url.startsWith('data:')) {
+    // data URLs: estimate from base64 length
+    const commaIdx = url.indexOf(',');
+    if (commaIdx !== -1) {
+      const b64 = url.slice(commaIdx + 1);
+      sizeBytes = Math.ceil(b64.length * 0.75);
+    }
+  } else if (sizeBytes == null) {
+    try {
+      const resp = await fetch(url, { method: 'HEAD' });
+      const cl = resp.headers.get('Content-Length');
+      if (cl) sizeBytes = parseInt(cl, 10);
+    } catch {
+      // Network issue on HEAD — skip check, let loader handle it
+      return;
+    }
+  }
+
+  if (sizeBytes != null && sizeBytes > limits.maxFileSizeBytes) {
+    throw new MeshImportLimitError({
+      kind: 'fileSize',
+      actualBytes: sizeBytes,
+      limitBytes: limits.maxFileSizeBytes,
+    });
+  }
+}
+
+function checkGeometryLimits(
+  scene: THREE.Group,
+  limits: ImportLimits,
+): void {
+  let vertexCount = 0;
+  let triangleCount = 0;
+
+  scene.traverse(obj => {
+    if (obj instanceof THREE.Mesh && obj.geometry) {
+      vertexCount += obj.geometry.attributes.position?.count || 0;
+      const idx = obj.geometry.index;
+      if (idx) {
+        triangleCount += idx.count / 3;
+      } else {
+        triangleCount += (obj.geometry.attributes.position?.count || 0) / 3;
+      }
+    }
+  });
+
+  if (vertexCount > limits.maxVertexCount) {
+    throw new MeshImportLimitError({
+      kind: 'vertexCount',
+      actual: vertexCount,
+      limit: limits.maxVertexCount,
+    });
+  }
+
+  if (triangleCount > limits.maxTriangleCount) {
+    throw new MeshImportLimitError({
+      kind: 'triangleCount',
+      actual: triangleCount,
+      limit: limits.maxTriangleCount,
+    });
+  }
+}
+
 // ─── Main Import Function ───────────────────────────────────────────────────
 
 /**
  * Import a 3D mesh from any supported format.
  * Returns a normalized THREE.Group ready for use as an avatar/collision body.
+ *
+ * Enforces configurable size/complexity limits by default.
+ * Throws `MeshImportLimitError` when a limit is exceeded — callers can
+ * catch it, present a warning, and retry with `{ skipLimits: true }`.
  */
 export async function importMesh(
   url: string,
@@ -174,11 +337,17 @@ export async function importMesh(
     fixNormals: doFixNormals = true,
   } = options;
 
+  const limits = resolveLimits(options);
   const format = detectFormat(filename);
   const warnings: string[] = [];
 
   if (format === 'unknown') {
     throw new Error(`Unsupported format: ${filename}. Supported: .obj, .fbx, .glb, .gltf, .vrm`);
+  }
+
+  // Pre-parse: check file size
+  if (limits) {
+    await checkFileSize(url, limits, options.fileSizeBytes);
   }
 
   // Load based on format
@@ -203,6 +372,21 @@ export async function importMesh(
       break;
     default:
       throw new Error(`Unsupported format: ${format}`);
+  }
+
+  // Post-parse: check vertex/triangle counts.
+  // NOTE: This is defense-in-depth for files that are small on disk but dense in
+  // geometry (e.g. compressed GLB with millions of vertices). The file size check
+  // above is the primary OOM defense — Three.js loaders don't support streaming,
+  // so by this point the geometry buffers are already allocated.
+  if (limits) {
+    try {
+      checkGeometryLimits(scene, limits);
+    } catch (err) {
+      // Dispose GPU-resident geometry/material buffers before propagating
+      disposeScene(scene);
+      throw err;
+    }
   }
 
   // Compute bounding box

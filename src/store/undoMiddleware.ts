@@ -139,6 +139,28 @@ function getActionLabel(actionType: string): string {
   return ACTION_LABELS[actionType] || actionType.replace('project/', '').replace(/([A-Z])/g, ' $1').trim();
 }
 
+// ─── Safe deep clone ─────────────────────────────────────────────────────────
+
+/**
+ * Deep-clone a value using structuredClone (handles undefined, NaN, Infinity,
+ * typed arrays, etc.). Falls back to JSON round-trip if structuredClone throws
+ * (e.g. functions in state). Returns null on total failure so callers can skip
+ * the snapshot rather than crash.
+ */
+function safeClone<T>(value: T): T | null {
+  try {
+    return structuredClone(value);
+  } catch {
+    console.warn('[undoMiddleware] structuredClone failed, falling back to JSON (may lose NaN/undefined)');
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (err) {
+    console.error('[undoMiddleware] Failed to clone state for undo snapshot', err);
+    return null;
+  }
+}
+
 // ─── Middleware ──────────────────────────────────────────────────────────────
 
 export const undoMiddleware: Middleware = (store) => (next) => (action: any) => {
@@ -147,7 +169,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   if (actionType === 'editor/undo') {
     if (undoState.past.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
-    undoState.future.push(JSON.parse(JSON.stringify(currentProject)));
+    const snapshot = safeClone(currentProject);
+    if (!snapshot) return; // abort undo — can't save current state for redo
+    undoState.future.push(snapshot);
     const entry = undoState.pastEntries.pop();
     if (entry) undoState.futureEntries.push(entry);
     const previous = undoState.past.pop()!;
@@ -164,7 +188,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
   if (actionType === 'editor/redo') {
     if (undoState.future.length === 0) return;
     const currentProject = (store.getState() as RootState).project;
-    undoState.past.push(JSON.parse(JSON.stringify(currentProject)));
+    const snapshot = safeClone(currentProject);
+    if (!snapshot) return; // abort redo — can't save current state for undo
+    undoState.past.push(snapshot);
     const entry = undoState.futureEntries.pop();
     if (entry) undoState.pastEntries.push(entry);
     const nextState = undoState.future.pop()!;
@@ -187,7 +213,9 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step
     if (!(isSameAction && isRecent)) {
       const currentProject = (store.getState() as RootState).project;
-      undoState.past.push(JSON.parse(JSON.stringify(currentProject)));
+      const snapshot = safeClone(currentProject);
+      if (!snapshot) return next(action); // skip snapshot on clone failure — don't corrupt history
+      undoState.past.push(snapshot);
       undoState.pastEntries.push({
         label: getActionLabel(actionType),
         actionType,
