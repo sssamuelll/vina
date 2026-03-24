@@ -205,7 +205,10 @@ export async function loadProviderConfig(): Promise<ProviderConfig | null> {
  */
 export async function saveProviderConfig(config: ProviderConfig): Promise<void> {
   // Store apiKey securely in SecureStorage (AES-GCM encrypted)
-  await SecureStorage.set(`${config.provider}-apikey`, config.apiKey);
+  const stored = await SecureStorage.set(`${config.provider}-apikey`, config.apiKey);
+  if (!stored) {
+    console.warn('[SecureStorage] API key could not be stored; it may be lost on page refresh');
+  }
   // Store non-secret config in localStorage
   const storedConfig: StoredProviderConfig = {
     provider: config.provider,

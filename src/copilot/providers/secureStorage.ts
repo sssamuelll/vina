@@ -23,7 +23,11 @@ function getSessionKey(): Promise<CryptoKey> {
       { name: 'AES-GCM', length: 256 },
       false, // non-extractable
       ['encrypt', 'decrypt'],
-    );
+    ).catch((err) => {
+      // Reset so the next call can retry (e.g. after navigating to HTTPS)
+      sessionKeyPromise = null;
+      throw err;
+    });
   }
   return sessionKeyPromise;
 }
@@ -69,9 +73,9 @@ export class SecureStorage {
    */
   static async set(key: string, value: string): Promise<boolean> {
     try {
-      cache.set(key, value);
       const encrypted = await encryptValue(value);
       sessionStorage.setItem(PREFIX + key, encrypted);
+      cache.set(key, value); // only cache after storage succeeds
       return true;
     } catch (err) {
       console.warn('[SecureStorage] Failed to store key:', key, err);

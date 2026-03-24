@@ -333,8 +333,13 @@ export async function clearLegacyFallbackKeys(): Promise<void> {
 
     if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
       // Migrate API key to SecureStorage for the current session (encrypted)
-      await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
-      // Re-save without the API key
+      const stored = await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
+      if (!stored) {
+        // Encryption failed — keep the key in localStorage rather than losing it
+        console.warn('[Security] Could not encrypt legacy API key; leaving it in localStorage for now');
+        return;
+      }
+      // Re-save without the API key (safe — SecureStorage has the encrypted copy)
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { apiKey: _removed, ...rest } = parsed;
       localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
