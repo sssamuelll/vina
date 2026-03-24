@@ -46,8 +46,10 @@ export interface PatternPiece {
   side?: PieceSide;
   /** Named semantic edges (armhole, shoulder, hemline, etc.) */
   edges?: SemanticEdge[];
-  /** Fabric assignment */
+  /** Fabric assignment (links to PhysicalFabric for simulation) */
   fabricId?: string;
+  /** Production fabric code classification (SELF, LINING, etc.) */
+  fabricCode?: string;
   /** Link to construction piece (for overlay alignment) */
   constructionPieceId?: string;
   /** ID of the linked partner piece (bidirectional) */
@@ -76,6 +78,14 @@ export interface PatternPiece {
 
 // ─── Rich Dart Entity ───
 
+/** Dart cap shape at the apex */
+export type DartCapShape = 'pointed' | 'curved' | 'flat' | 'diamond';
+
+/** Options stored on InternalLine for dart-specific metadata */
+export interface DartOptions {
+  capShape?: DartCapShape;
+}
+
 /** A dart with full geometric and semantic data */
 export interface Dart {
   id: string;
@@ -91,6 +101,8 @@ export interface Dart {
   foldDirection: 'left' | 'right' | 'toward-center';
   /** Dart depth (length from edge to apex) in mm */
   depth?: number;
+  /** Cap shape at the apex */
+  capShape?: DartCapShape;
 }
 
 // ─── GrainLine Semantics ───
@@ -139,6 +151,7 @@ export interface InternalLine {
   notchOptions?: NotchOptions;
   topstitchOptions?: TopstitchOptions;
   foldOptions?: FoldOptions;
+  dartOptions?: DartOptions;
 }
 
 // ─── Fold Options ───
@@ -228,6 +241,35 @@ export interface Seam {
   taped: boolean;
   /** Width of tape in mm (default 10) */
   tapeWidth: number;
+}
+
+// ─── Elastics (edge-based elastic/gathering) ───
+
+export type ElasticType = 'band' | 'shirring' | 'drawstring';
+
+export interface Elastic {
+  id: string;
+  pieceId: string;
+  edgeName: string;
+  stretchRatio: number;   // 0.1–2.0
+  width: number;          // mm
+  type: ElasticType;
+  tStart: number;         // 0.0–1.0
+  tEnd: number;           // 0.0–1.0
+  active: boolean;
+}
+
+export const ELASTIC_DEFAULTS: Omit<Elastic, 'id' | 'pieceId' | 'edgeName'> = {
+  stretchRatio: 0.5,
+  width: 12,
+  type: 'band',
+  tStart: 0,
+  tEnd: 1,
+  active: true,
+};
+
+export function clampStretchRatio(v: number): number {
+  return Math.max(0.1, Math.min(2.0, v));
 }
 
 /** A seam group connects multiple edge segments between two sets of edges */
@@ -443,6 +485,7 @@ export type Tool2D =
   | 'pomMeasure'    // points of measure tool
   | 'walkSeam'      // walk seam verification
   | 'scissors'     // split pattern pieces
+  | 'slashAndSpread' // slash and spread for fullness
   | 'merge'        // merge adjacent pattern pieces
   | 'freesewing'   // free sewing between edges
   | 'offsetOutline' // offset piece outline inward/outward
@@ -460,6 +503,7 @@ export interface EditorState {
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
+  selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;

@@ -163,6 +163,19 @@ export class CopilotActionExecutor {
       };
     }
 
+    // Apply sanitized values from validation (e.g. name sanitization)
+    if (validation.sanitized) {
+      for (const [path, value] of Object.entries(validation.sanitized)) {
+        const parts = path.split('.');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let target: any = action;
+        for (let i = 0; i < parts.length - 1; i++) {
+          target = target[parts[i]];
+        }
+        target[parts[parts.length - 1]] = value;
+      }
+    }
+
     // 2. Execute (undo checkpoint is created automatically by undoMiddleware)
     try {
       const result = await this.executeAction(action, state);

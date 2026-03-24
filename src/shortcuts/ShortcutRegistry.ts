@@ -7,6 +7,8 @@
  * User overrides are persisted to localStorage and restored on construction.
  */
 
+import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ShortcutContext = 'global' | '2d' | '3d' | 'copilot';
@@ -156,7 +158,7 @@ export class ShortcutRegistry {
 
   private loadOverrides(): void {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = safeGetItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Record<string, KeyCombo>;
         for (const [id, combo] of Object.entries(parsed)) {
@@ -164,19 +166,15 @@ export class ShortcutRegistry {
         }
       }
     } catch {
-      // Ignore corrupt localStorage
+      // Ignore corrupt data
     }
   }
 
   private saveOverrides(): void {
-    try {
-      const obj: Record<string, KeyCombo> = {};
-      for (const [id, combo] of this.overrides) {
-        obj[id] = combo;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
-    } catch {
-      // Ignore write failures
+    const obj: Record<string, KeyCombo> = {};
+    for (const [id, combo] of this.overrides) {
+      obj[id] = combo;
     }
+    safeSetItem(STORAGE_KEY, JSON.stringify(obj));
   }
 }

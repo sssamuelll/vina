@@ -1,6 +1,6 @@
 # OpenClo Roadmap — Path to v1.0
 
-**OpenClo** is currently in **Phase 3: Precision & Professional Tools (v0.7.x)**.
+**OpenClo** is currently in **Phase 4: Collaboration & Security (v0.8.x)**.
 Our goal is to reach **v1.0.0 (Production Ready)** by Q2 2026.
 
 ---
@@ -21,7 +21,7 @@ Our goal is to reach **v1.0.0 (Production Ready)** by Q2 2026.
 - [x] **Skill Marketplace SDK**: Namespacing, guardrails, SkillBuilder API.
 - [x] **32+ Fabric Presets**: Expanded physical fabric library.
 
-## [Current] v0.7.x — Precision & Professional Tools (March 2026)
+## [Completed] v0.7.x — Precision & Professional Tools (March 2026)
 
 - [x] **Linked Editing**: Symmetric pattern propagation (instance + mirror modes) with middleware.
 - [x] **Segment Sewing**: Multi-seam type tool (standard, french, flat-felled, overlock).
@@ -35,18 +35,21 @@ Our goal is to reach **v1.0.0 (Production Ready)** by Q2 2026.
 - [x] **Geometry Reference Stability**: Deterministic edge IDs (`pieceId:name`), edge-name seam references.
 - [x] **Agentic Copilot Loop**: Unified AgenticLoop replacing old Planner/Executor/Reasoner pattern.
 - [x] **Skill Authoring**: SkillBuilder class with preview, validation, and export.
-- [ ] **BVH Collision**: Accelerated collision detection (dependency added, design complete).
-- [ ] **Live Link 2D-3D**: Warm-start re-simulation on 2D edits (edit classifier done).
-- [ ] **2D Editor Performance**: Ongoing optimization for high-frequency interactions.
+- [x] **BVH Collision**: Accelerated collision detection via linearized BVH and TSL kernel.
+- [x] **Live Link 2D-3D**: Warm-start re-simulation on 2D edits.
+- [x] **2D Editor Performance**: Optimization for high-frequency interactions completed.
 
-## [Next] v0.8.x — Collaboration & Enterprise (April 2026)
+## [Current] v0.8.x — Collaboration & Security (March-April 2026)
 
+- [x] **Security Audit Compliance**: 100% resolution of March 2024 security audit issues (#397).
+- [x] **Plugin Sandboxing**: Secure Web Worker isolation with capability-gated bridge (#393).
+- [x] **Runtime Data Validation**: Strict `projectValidator` at all boundary points (#413).
+- [x] **Layer System (v1)**: Professional layer management with sublayers and superimpose (#372).
+- [x] **Professional Darts**: Segmented darts and shaped dart caps (#366).
 - [ ] **Multi-User Sync**: Real-time collaborative drafting (Figma-style).
 - [ ] **Advanced Fabric Lab**: Calibration tool for real-world fabric physical data.
 - [ ] **Avatar Morphing**: Full parametric avatar with auto-grading integration.
 - [ ] **Plugin Marketplace Beta**: Community-contributed skills with backend registry.
-- [ ] **Nesting Layout Tool**: Marker creation and fabric optimization.
-- [ ] **Trim Tools**: Zippers, buttons, snaps integrated into patterns.
 
 ## [The Milestone] v1.0.0 — Production Ready (Q2 2026)
 

@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest';
-import { detectFormat, detectUnit, isSupportedFormat, SUPPORTED_EXTENSIONS } from '../meshImporter';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  detectFormat,
+  detectUnit,
+  isSupportedFormat,
+  SUPPORTED_EXTENSIONS,
+  DEFAULT_IMPORT_LIMITS,
+  MeshImportLimitError,
+  importMesh,
+} from '../meshImporter';
 import * as THREE from 'three';
 
 describe('detectFormat', () => {
@@ -42,5 +50,170 @@ describe('SUPPORTED_EXTENSIONS', () => {
     expect(SUPPORTED_EXTENSIONS).toContain('.glb');
     expect(SUPPORTED_EXTENSIONS).toContain('.gltf');
     expect(SUPPORTED_EXTENSIONS).toContain('.vrm');
+  });
+});
+
+// ─── Import Limits ─────────────────────────────────────────────────────────
+
+describe('DEFAULT_IMPORT_LIMITS', () => {
+  it('has sensible defaults', () => {
+    expect(DEFAULT_IMPORT_LIMITS.maxFileSizeBytes).toBe(50 * 1024 * 1024);
+    expect(DEFAULT_IMPORT_LIMITS.maxVertexCount).toBe(500_000);
+    expect(DEFAULT_IMPORT_LIMITS.maxTriangleCount).toBe(1_000_000);
+  });
+});
+
+describe('MeshImportLimitError', () => {
+  it('formats file size violation', () => {
+    const err = new MeshImportLimitError({
+      kind: 'fileSize',
+      actualBytes: 100 * 1024 * 1024,
+      limitBytes: 50 * 1024 * 1024,
+    });
+    expect(err.name).toBe('MeshImportLimitError');
+    expect(err.message).toContain('100.0 MB');
+    expect(err.message).toContain('50.0 MB');
+    expect(err.violation.kind).toBe('fileSize');
+  });
+
+  it('formats vertex count violation', () => {
+    const err = new MeshImportLimitError({
+      kind: 'vertexCount',
+      actual: 600_000,
+      limit: 500_000,
+    });
+    expect(err.message).toContain('600,000');
+    expect(err.message).toContain('500,000');
+    expect(err.violation.kind).toBe('vertexCount');
+  });
+
+  it('formats triangle count violation', () => {
+    const err = new MeshImportLimitError({
+      kind: 'triangleCount',
+      actual: 2_000_000,
+      limit: 1_000_000,
+    });
+    expect(err.message).toContain('2,000,000');
+    expect(err.message).toContain('1,000,000');
+    expect(err.violation.kind).toBe('triangleCount');
+  });
+
+  it('is instanceof Error', () => {
+    const err = new MeshImportLimitError({ kind: 'vertexCount', actual: 1, limit: 0 });
+    expect(err).toBeInstanceOf(Error);
+    expect(err).toBeInstanceOf(MeshImportLimitError);
+  });
+});
+
+describe('importMesh — file size limit', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it('rejects files exceeding size limit via HEAD Content-Length', async () => {
+    // Mock fetch HEAD returning large Content-Length
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      headers: new Headers({ 'Content-Length': String(100 * 1024 * 1024) }),
+    }) as typeof fetch;
+
+    await expect(
+      importMesh('https://example.com/huge.obj', 'huge.obj', {
+        limits: { maxFileSizeBytes: 10 * 1024 * 1024 },
+      }),
+    ).rejects.toThrow(MeshImportLimitError);
+
+    // Verify HEAD request was made
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://example.com/huge.obj',
+      { method: 'HEAD' },
+    );
+  });
+
+  it('rejects data URL exceeding size limit', async () => {
+    // Create a data URL with known base64 size (75% decode ratio)
+    // 40 base64 chars → 30 bytes
+    const data = 'data:application/octet-stream;base64,' + 'A'.repeat(40);
+
+    await expect(
+      importMesh(data, 'tiny.obj', {
+        limits: { maxFileSizeBytes: 10 }, // 10 bytes limit, file is ~30 bytes
+      }),
+    ).rejects.toThrow(MeshImportLimitError);
+  });
+
+  it('skips size check when skipLimits is true', async () => {
+    // This will fail on the loader (no real OBJ), but should NOT throw MeshImportLimitError
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      headers: new Headers({ 'Content-Length': String(100 * 1024 * 1024) }),
+    }) as typeof fetch;
+
+    await expect(
+      importMesh('https://example.com/huge.obj', 'huge.obj', { skipLimits: true }),
+    ).rejects.not.toThrow(MeshImportLimitError);
+  });
+
+  it('skips size check when limits is false', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      headers: new Headers({ 'Content-Length': String(100 * 1024 * 1024) }),
+    }) as typeof fetch;
+
+    await expect(
+      importMesh('https://example.com/huge.obj', 'huge.obj', { limits: false }),
+    ).rejects.not.toThrow(MeshImportLimitError);
+  });
+
+  it('passes when file is within limits', async () => {
+    // File is 1MB, limit is 50MB — size check passes but loader will fail (no real file)
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      headers: new Headers({ 'Content-Length': String(1 * 1024 * 1024) }),
+    }) as typeof fetch;
+
+    // Should not throw MeshImportLimitError — will fail on loader instead
+    try {
+      await importMesh('https://example.com/small.obj', 'small.obj');
+    } catch (err) {
+      expect(err).not.toBeInstanceOf(MeshImportLimitError);
+    }
+  });
+
+  it('skips size check when HEAD request fails', async () => {
+    globalThis.fetch = vi.fn().mockRejectedValue(new Error('network error')) as typeof fetch;
+
+    // Should not throw MeshImportLimitError — will fail on loader instead
+    try {
+      await importMesh('https://example.com/model.obj', 'model.obj');
+    } catch (err) {
+      expect(err).not.toBeInstanceOf(MeshImportLimitError);
+    }
+  });
+
+  it('rejects via fileSizeBytes option without any fetch', async () => {
+    const fetchSpy = vi.fn();
+    globalThis.fetch = fetchSpy as typeof fetch;
+
+    await expect(
+      importMesh('blob:http://localhost/abc', 'model.obj', {
+        fileSizeBytes: 100 * 1024 * 1024,
+        limits: { maxFileSizeBytes: 50 * 1024 * 1024 },
+      }),
+    ).rejects.toThrow(MeshImportLimitError);
+
+    // No fetch should have been made — size was known upfront
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('skips blob URL size check when fileSizeBytes not provided', async () => {
+    // Blob URLs without fileSizeBytes skip the size check entirely.
+    // The import will still fail (no real blob), but NOT with MeshImportLimitError.
+    try {
+      await importMesh('blob:http://localhost/abc', 'model.obj', {
+        limits: { maxFileSizeBytes: 1 }, // tiny limit — would reject if checked
+      });
+    } catch (err) {
+      expect(err).not.toBeInstanceOf(MeshImportLimitError);
+    }
   });
 });

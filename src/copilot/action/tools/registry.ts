@@ -46,6 +46,7 @@ import { tools as pomToolDefs } from './definitions/pomTools';
 import { tools as sewingEnhancementToolDefs } from './definitions/sewingEnhancementTools';
 import { tools as renderToolDefs } from './definitions/renderTools';
 import { tools as pleatToolDefs } from './definitions/pleatTools';
+import { tools as elasticToolDefs } from './definitions/elasticTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -369,6 +370,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   sewingEnhancementToolDefs,
   renderToolDefs,
   pleatToolDefs,
+  elasticToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
