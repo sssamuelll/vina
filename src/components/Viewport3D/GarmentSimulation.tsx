@@ -686,18 +686,18 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     tslMaterial.transparent = isXray || effectiveOpacity < 1;
     tslMaterial.depthWrite = !isXray;
 
-    // Color & emission
+    // Color & emission (mutate in-place to avoid GC pressure)
     if (isFlat) {
-      tslMaterial.color = new THREE.Color('#000000');
-      tslMaterial.emissive = new THREE.Color(effectiveTint || '#ffffff');
+      tslMaterial.color.set('#000000');
+      tslMaterial.emissive.set(effectiveTint || '#ffffff');
       tslMaterial.emissiveIntensity = 1;
     } else {
-      tslMaterial.color = new THREE.Color(effectiveTint || '#ffffff');
+      tslMaterial.color.set(effectiveTint || '#ffffff');
       if (effectiveEmission) {
-        tslMaterial.emissive = new THREE.Color(effectiveEmission);
+        tslMaterial.emissive.set(effectiveEmission);
         tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
       } else {
-        tslMaterial.emissive = new THREE.Color(0x000000);
+        tslMaterial.emissive.setHex(0x000000);
         tslMaterial.emissiveIntensity = 0;
       }
     }
