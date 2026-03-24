@@ -82,15 +82,35 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       </div>
       <div className="panel-field">
         <label>Fabric Code</label>
-        <select
-          className="panel-input"
-          value={piece.fabricCode || 'SELF'}
-          onChange={e => dispatch(setFabricCode({ pieceId: piece.id, fabricCode: e.target.value }))}
-        >
-          {STANDARD_FABRIC_CODES.map(code => (
-            <option key={code} value={code}>{code}</option>
-          ))}
-        </select>
+        {(() => {
+          const current = piece.fabricCode || 'SELF';
+          const isCustom = !STANDARD_FABRIC_CODES.includes(current as typeof STANDARD_FABRIC_CODES[number]);
+          return isCustom ? (
+            <input
+              className="panel-input"
+              value={current}
+              onChange={e => dispatch(setFabricCode({ pieceId: piece.id, fabricCode: e.target.value }))}
+              onBlur={e => { if (!e.target.value.trim()) dispatch(setFabricCode({ pieceId: piece.id, fabricCode: 'SELF' })); }}
+            />
+          ) : (
+            <select
+              className="panel-input"
+              value={current}
+              onChange={e => {
+                if (e.target.value === '__custom__') {
+                  dispatch(setFabricCode({ pieceId: piece.id, fabricCode: 'CUSTOM' }));
+                } else {
+                  dispatch(setFabricCode({ pieceId: piece.id, fabricCode: e.target.value }));
+                }
+              }}
+            >
+              {STANDARD_FABRIC_CODES.map(code => (
+                <option key={code} value={code}>{code}</option>
+              ))}
+              <option value="__custom__">Custom...</option>
+            </select>
+          );
+        })()}
       </div>
       <div className="panel-field">
         <label>Interfacing</label>

@@ -316,9 +316,9 @@ const SinglePiece = memo(function SinglePiece({
           return (
             <g transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}>
               <circle
-                cx={cx - (piece.name.length * 3.2) / zoom2D - 6 / zoom2D}
-                cy={cy}
-                r={4 / zoom2D}
+                cx={cx}
+                cy={cy - 10 / zoom2D}
+                r={3.5 / zoom2D}
                 fill={getFabricCodeColor(piece.fabricCode)}
                 stroke="none"
                 opacity={0.9}

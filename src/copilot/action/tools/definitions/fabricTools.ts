@@ -552,11 +552,19 @@ const setFabricCodeTool: ToolDefinition = {
       success: true,
       data: { pieceIds: ids, fabricCode },
       rollback: () => {
+        // Group by original code to minimize dispatches
+        const byCode = new Map<string, string[]>();
         for (const { id, code } of oldCodes) {
-          dispatch({
-            type: 'project/setFabricCode',
-            payload: { pieceId: id, fabricCode: code || 'SELF' },
-          });
+          const c = code || 'SELF';
+          if (!byCode.has(c)) byCode.set(c, []);
+          byCode.get(c)!.push(id);
+        }
+        for (const [code, pieceIds] of byCode) {
+          if (pieceIds.length === 1) {
+            dispatch({ type: 'project/setFabricCode', payload: { pieceId: pieceIds[0], fabricCode: code } });
+          } else {
+            dispatch({ type: 'project/batchSetFabricCode', payload: { pieceIds, fabricCode: code } });
+          }
         }
       },
     };
