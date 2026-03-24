@@ -612,20 +612,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tslSolverRef.current, staticGeometry]);
 
-  // Update TSL material opacity/emission without recreating it
-  useEffect(() => {
-    if (!tslMaterial) return;
-    tslMaterial.opacity = effectiveOpacity;
-    if (effectiveEmission) {
-      tslMaterial.emissive = new THREE.Color(effectiveEmission);
-      tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
-    } else {
-      tslMaterial.emissive = new THREE.Color(0x000000);
-      tslMaterial.emissiveIntensity = 0;
-    }
-    tslMaterial.needsUpdate = true;
-  }, [tslMaterial, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity]);
-
   // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {
     for (const p of activePieces) {
@@ -686,6 +672,53 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
     });
   }, [textures, effectiveUV.repeatX, effectiveUV.repeatY, effectiveUV.rotation]);
+
+  // Update TSL material properties for surface mode, opacity, emission, and textures
+  useEffect(() => {
+    if (!tslMaterial) return;
+
+    const isFlat = surfaceMode3D === 'flat';
+    const isXray = surfaceMode3D === 'xray';
+    const stripTextures = surfaceMode3D === 'shaded' || surfaceMode3D === 'shaded-wire';
+
+    // Opacity
+    tslMaterial.opacity = isXray ? 0.1 : effectiveOpacity;
+    tslMaterial.transparent = isXray || effectiveOpacity < 1;
+    tslMaterial.depthWrite = !isXray;
+
+    // Color & emission
+    if (isFlat) {
+      tslMaterial.color = new THREE.Color('#000000');
+      tslMaterial.emissive = new THREE.Color(effectiveTint || '#ffffff');
+      tslMaterial.emissiveIntensity = 1;
+    } else {
+      tslMaterial.color = new THREE.Color(effectiveTint || '#ffffff');
+      if (effectiveEmission) {
+        tslMaterial.emissive = new THREE.Color(effectiveEmission);
+        tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
+      } else {
+        tslMaterial.emissive = new THREE.Color(0x000000);
+        tslMaterial.emissiveIntensity = 0;
+      }
+    }
+
+    // Roughness
+    tslMaterial.roughness = isFlat ? 1 : renderParams.roughness;
+
+    // Textures — strip for shaded/shaded-wire modes, apply for textured modes
+    if (stripTextures || fitMapMode !== 'none') {
+      tslMaterial.map = null;
+      tslMaterial.normalMap = null;
+      tslMaterial.roughnessMap = null;
+    } else {
+      tslMaterial.map = textures.map;
+      tslMaterial.normalMap = textures.normalMap;
+      tslMaterial.roughnessMap = textures.roughnessMap;
+    }
+    tslMaterial.aoMap = textures.aoMap;
+
+    tslMaterial.needsUpdate = true;
+  }, [tslMaterial, surfaceMode3D, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity, effectiveTint, renderParams.roughness, fitMapMode, textures]);
 
   // Pin tool: click handler to find nearest vertex and add pin
   const handleMeshClick = useCallback((e: ThreeEvent<MouseEvent>) => {
