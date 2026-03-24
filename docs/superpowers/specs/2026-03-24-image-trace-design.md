@@ -119,10 +119,12 @@ async function clearAllImageBlobs(): Promise<void>
 ### Project Save (base64 embedding)
 
 On project save/export:
-1. For each reference image, read blob from IndexedDB
-2. Convert to base64 string
+1. For each reference image, read **original file bytes** from IndexedDB (stored as-is, not re-encoded from decoded bitmap — preserves original compression)
+2. Convert to base64 via `FileReader.readAsDataURL()` or chunked `btoa()` in a Web Worker to avoid main-thread freeze on large images
 3. Embed in project JSON under `referenceImageData: Record<string, string>` (imageId → base64)
 4. This makes .zprj files self-contained and portable
+
+**Size note:** 10 images × 20MB = 200MB raw → ~267MB base64. The async encoding (Web Worker) prevents main-thread freeze. In practice, most reference images are 1–5MB scans, producing manageable project files.
 
 On project load:
 1. Read `referenceImageData` from project JSON
@@ -131,9 +133,13 @@ On project load:
 4. Store objectUrl in module-level map
 5. Dispatch `addReferenceImage` for each
 
-### On NEW_PROJECT
+### IndexedDB Lifecycle & Undo Safety
 
-Clear all reference images from IndexedDB and module-level map.
+**On `removeReferenceImage`:** Do NOT delete the blob from IndexedDB or the module-level objectUrl map. The undo middleware may restore the metadata, and the blob must still be available. The objectUrl map entry is also preserved.
+
+**Garbage collection:** On `NEW_PROJECT` or `loadProject`, run a GC pass: compare IndexedDB keys against the current `project.referenceImages` ids, delete any orphaned blobs. This cleans up after undone-then-redone removes without breaking undo.
+
+**On `NEW_PROJECT`:** Clear all reference images from IndexedDB and module-level map (GC pass removes everything since the new project has no reference images).
 
 ## Scale Calibration — Two-Click Ruler
 
@@ -297,7 +303,7 @@ Register in `src/copilot/action/tools/registry.ts` via `ALL_TOOL_MODULES`.
 | `src/types/types.ts` | Add `ReferenceImage` interface |
 | `src/store/projectSlice.ts` | Add `referenceImages` state + actions + reducer |
 | `src/store/editorSlice.ts` | Add calibration state + selectedReferenceImageId + showReferenceImages |
-| `src/store/index.ts` | Add `project.referenceImages` to serializableCheck ignoredPaths |
+| `src/store/index.ts` | No change needed — referenceImages is fully JSON-serializable |
 | `src/utils/import/imageImporter.ts` | New: image import + validation + resize |
 | `src/utils/import/referenceImageStore.ts` | New: IndexedDB storage for blobs |
 | `src/utils/geometry/calibration.ts` | New: computePixelsPerMm pure function |
