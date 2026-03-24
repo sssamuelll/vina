@@ -72,8 +72,23 @@ export interface PatternPiece {
   interfacingType?: InterfacingType;
   /** Solidify factor (0-1) for extra stiffness */
   solidifyFactor?: number;
+  /** Production annotations (cutting instructions, QC notes, etc.) */
+  annotations?: PieceAnnotation[];
   createdAt: number;
   updatedAt: number;
+}
+
+// ─── Annotations ───
+
+export type AnnotationCategory = 'cutting' | 'sewing' | 'qc' | 'general';
+export type AnnotationPosition = 'center';
+
+export interface PieceAnnotation {
+  id: string;
+  text: string;
+  position: AnnotationPosition;
+  category: AnnotationCategory;
+  fontSize?: number;
 }
 
 // ─── Rich Dart Entity ───

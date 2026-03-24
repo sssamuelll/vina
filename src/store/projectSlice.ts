@@ -274,6 +274,35 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    // ─── Annotations ───
+    addAnnotation(state, action: PayloadAction<{ pieceId: string; annotation: import('../types/types').PieceAnnotation }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        if (!piece.annotations) piece.annotations = [];
+        piece.annotations.push(action.payload.annotation);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    removeAnnotation(state, action: PayloadAction<{ pieceId: string; annotationId: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece && piece.annotations) {
+        piece.annotations = piece.annotations.filter(a => a.id !== action.payload.annotationId);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    updateAnnotation(state, action: PayloadAction<{ pieceId: string; annotationId: string; updates: Partial<import('../types/types').PieceAnnotation> }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece && piece.annotations) {
+        const ann = piece.annotations.find(a => a.id === action.payload.annotationId);
+        if (ann) {
+          Object.assign(ann, action.payload.updates);
+          piece.updatedAt = Date.now();
+          state.isDirty = true;
+        }
+      }
+    },
     rotatePiece(state, action: PayloadAction<{ id: string; rotation: number }>) {
       const piece = state.pieces.find(p => p.id === action.payload.id);
       if (piece) {
@@ -933,6 +962,7 @@ export const {
   restoreState, loadProject, clearLoadDiagnostics, setProjectName,
   addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
+  addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,

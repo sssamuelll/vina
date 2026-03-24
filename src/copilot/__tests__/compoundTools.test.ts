@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 187 + 3 pleat tools (createPleat, removePleat, updatePleat)
-      expect(registry.size).toBe(190);
+      // 190 + 3 annotation tools
+      expect(registry.size).toBe(193);
     });
   });
 });
