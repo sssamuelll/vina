@@ -12,6 +12,7 @@ import { claudeBridgeProvider } from '../../copilot/providers/claudeBridge';
 import {
   ProviderConfig,
   loadProviderConfig,
+  loadProviderConfigSync,
   PROVIDER_OPTIONS,
 } from '../../copilot/providers/types';
 import { ProjectMemory } from '../../copilot/memory';
@@ -26,12 +27,13 @@ import CopilotInput from './CopilotInput';
 import { ProgressMessage } from './ProgressMessage';
 import './CopilotPanel.css';
 import type { ChatMessage, ProviderToolDef } from '../../copilot/providers/types';
+import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
 
 const AGENT_STORAGE_KEY = 'openclo-agent-config';
 
 function loadAgentConfig(): AgentConfig {
   try {
-    const saved = localStorage.getItem(AGENT_STORAGE_KEY);
+    const saved = safeGetItem(AGENT_STORAGE_KEY);
     if (saved) return JSON.parse(saved);
   } catch { /* ignore */ }
   return { type: 'builtin', name: 'Built-in (Templates)' };
@@ -39,7 +41,7 @@ function loadAgentConfig(): AgentConfig {
 
 function saveAgentConfig(config: AgentConfig) {
   import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'agent-config', config); });
-  try { localStorage.setItem(AGENT_STORAGE_KEY, JSON.stringify(config)); } catch { /* ignore */ }
+  safeSetItem(AGENT_STORAGE_KEY, JSON.stringify(config));
 }
 
 function getProvider(config: ProviderConfig) {
@@ -68,7 +70,10 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [agentConfig, setAgentConfig] = useState<AgentConfig>(loadAgentConfig);
-  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfig);
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfigSync);
+
+  // Hydrate API key asynchronously (SecureStorage uses Web Crypto)
+  useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
   const [isMobile, setIsMobile] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
   const [sessionCostLabel, setSessionCostLabel] = useState('');

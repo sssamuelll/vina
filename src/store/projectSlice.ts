@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Elastic, clampStretchRatio } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
@@ -51,6 +51,7 @@ interface ProjectState {
   name: string;
   pieces: PatternPiece[];
   seams: Seam[];
+  elastics: Elastic[];
   fabrics: Fabric[];
   avatar: Avatar;
   avatarMode: AvatarMode;
@@ -79,6 +80,7 @@ const initialState: ProjectState = {
   name: 'Untitled Project',
   pieces: [],
   seams: [],
+  elastics: [],
   fabrics: [defaultFabric],
   avatar: defaultAvatar,
   avatarMode: 'model',
@@ -179,6 +181,7 @@ const projectSlice = createSlice({
       state.seams = state.seams.filter(
         s => s.pieceA.pieceId !== action.payload && s.pieceB.pieceId !== action.payload
       );
+      if (state.elastics) state.elastics = state.elastics.filter(e => e.pieceId !== action.payload);
       delete state.arrangementOverrides[action.payload];
       // Auto-remove from all groups
       for (const group of state.groups) {
@@ -423,6 +426,41 @@ const projectSlice = createSlice({
         seam.pieceB = temp;
         state.isDirty = true;
       }
+    },
+
+    // ─── Elastics ───
+    addElastic(state, action: PayloadAction<Elastic>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const edge = piece.edges?.find(e => e.name === action.payload.edgeName);
+      if (!edge) return;
+      if (action.payload.tStart >= action.payload.tEnd) return;
+      state.elastics.push({
+        ...action.payload,
+        stretchRatio: clampStretchRatio(action.payload.stretchRatio),
+      });
+      state.isDirty = true;
+    },
+    removeElastic(state, action: PayloadAction<string>) {
+      state.elastics = state.elastics.filter(e => e.id !== action.payload);
+      state.isDirty = true;
+    },
+    updateElastic(state, action: PayloadAction<Partial<Elastic> & { id: string }>) {
+      const idx = state.elastics.findIndex(e => e.id === action.payload.id);
+      if (idx === -1) return;
+      // Validate piece/edge if being changed
+      if (action.payload.pieceId || action.payload.edgeName) {
+        const pId = action.payload.pieceId ?? state.elastics[idx].pieceId;
+        const eName = action.payload.edgeName ?? state.elastics[idx].edgeName;
+        const piece = state.pieces.find(p => p.id === pId);
+        if (!piece) return;
+        const edge = piece.edges?.find(e => e.name === eName);
+        if (!edge) return;
+      }
+      const updated = { ...state.elastics[idx], ...action.payload };
+      updated.stretchRatio = clampStretchRatio(updated.stretchRatio);
+      state.elastics[idx] = updated;
+      state.isDirty = true;
     },
 
     // ─── Points of Measure (POM) ───
@@ -821,6 +859,7 @@ export const {
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
   addSeamGroup, removeSeamGroup,
+  addElastic, removeElastic, updateElastic,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,

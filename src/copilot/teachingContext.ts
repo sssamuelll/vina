@@ -8,6 +8,7 @@
  */
 
 import type { AgentLanguage } from './perception/languageDetection';
+import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
 /**
  * A teaching snippet attached to a tool execution result.
@@ -30,11 +31,7 @@ const TEACHING_MODE_KEY = 'openclo-teaching-mode';
  * @returns Whether teaching mode is active
  */
 export function isTeachingModeEnabled(): boolean {
-  try {
-    return localStorage.getItem(TEACHING_MODE_KEY) !== 'false';
-  } catch {
-    return true; // default on
-  }
+  return safeGetItem(TEACHING_MODE_KEY) !== 'false';
 }
 
 /**
@@ -43,11 +40,7 @@ export function isTeachingModeEnabled(): boolean {
  * @param enabled - Whether to enable teaching mode
  */
 export function setTeachingMode(enabled: boolean): void {
-  try {
-    localStorage.setItem(TEACHING_MODE_KEY, String(enabled));
-  } catch {
-    // ignore storage errors
-  }
+  safeSetItem(TEACHING_MODE_KEY, String(enabled));
 }
 
 // ─── Teaching Content Database ──────────────────────────────────────────────

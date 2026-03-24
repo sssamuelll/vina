@@ -1,5 +1,6 @@
 import { PatternPiece, PathCommand } from '../types/types';
 import { preparePieces } from './export/pipeline';
+import { escapeDxfString } from './sanitizeName';
 
 /**
  * Export pattern pieces to DXF (AutoCAD Drawing Exchange Format).
@@ -335,7 +336,7 @@ ${(-(y + offsetY)).toFixed(4)}
 40
 ${height.toFixed(1)}
 1
-${text}
+${escapeDxfString(text)}
 72
 1
 11
