@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 178 base + 2 dart enhancement tools + 3 elastic tools (#322)
-      expect(registry.size).toBe(183);
+      // 183 (base + dart + elastic) + 2 fabric code tools (setFabricCode, getFabricCodes)
+      expect(registry.size).toBe(185);
     });
   });
 });

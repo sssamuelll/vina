@@ -163,6 +163,9 @@ const projectSlice = createSlice({
       if (piece.sublayer === undefined || piece.sublayer === null) {
         piece.sublayer = 0;
       }
+      if (!piece.fabricCode) {
+        piece.fabricCode = 'SELF';
+      }
       state.pieces.push(piece);
       state.isDirty = true;
     },
@@ -758,6 +761,24 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    setFabricCode(state, action: PayloadAction<{ pieceId: string; fabricCode: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        piece.fabricCode = action.payload.fabricCode;
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    batchSetFabricCode(state, action: PayloadAction<{ pieceIds: string[]; fabricCode: string }>) {
+      const idSet = new Set(action.payload.pieceIds);
+      for (const piece of state.pieces) {
+        if (idSet.has(piece.id)) {
+          piece.fabricCode = action.payload.fabricCode;
+          piece.updatedAt = Date.now();
+        }
+      }
+      if (idSet.size > 0) state.isDirty = true;
+    },
     setGroupFabric(state, action: PayloadAction<{ groupId: string; fabricId: string }>) {
       const group = state.groups.find(g => g.id === action.payload.groupId);
       if (group) {
@@ -850,6 +871,7 @@ export const {
   // Groups
   createGroup, renameGroup, deleteGroup, setGroupColor,
   addPiecesToGroup, removePiecesFromGroup,
+  setFabricCode, batchSetFabricCode,
   moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,

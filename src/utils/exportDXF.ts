@@ -11,7 +11,8 @@ import { escapeDxfString } from './sanitizeName';
  *   NOTCH — notch marks
  *   GRAINLINE — grain direction arrows
  *   LABEL — piece names
- * 
+ *   FABRIC_CODE — fabric code annotations
+ *
  * Units: millimeters (1 SVG unit = 1mm)
  * DXF version: R12 (maximum compatibility with plotters)
  */
@@ -186,6 +187,16 @@ LABEL
 0
 62
 5
+6
+CONTINUOUS
+0
+LAYER
+2
+FABRIC_CODE
+70
+0
+62
+6
 6
 CONTINUOUS
 0
@@ -377,6 +388,7 @@ export function generateDXFLegacy(pieces: PatternPiece[], opts: DxfExportOptions
     const centerX = (bb.minX + bb.maxX) / 2;
     const centerY = (bb.minY + bb.maxY) / 2;
     dxf += textToDXF(piece.name, centerX, centerY, offsetX, offsetY, 5, 'LABEL');
+    dxf += textToDXF(piece.fabricCode || 'SELF', centerX, centerY + 5, offsetX, offsetY, 5, 'FABRIC_CODE');
   }
 
   dxf += dxfFooter();
