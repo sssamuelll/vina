@@ -258,7 +258,7 @@ interface ElasticRendererProps {
 export default function ElasticRenderer({ zoom2D }: ElasticRendererProps) {
   const elastics = useSelector((s: RootState) => s.project.elastics);
   const pieces = useSelector((s: RootState) => s.project.pieces);
-  const selectedElasticId = useSelector((s: RootState) => (s.editor as { selectedElasticId?: string | null }).selectedElasticId ?? null);
+  const selectedElasticId = useSelector((s: RootState) => s.editor.selectedElasticId);
 
   return (
     <>

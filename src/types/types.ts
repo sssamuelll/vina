@@ -207,6 +207,19 @@ export interface Elastic {
   active: boolean;
 }
 
+export const ELASTIC_DEFAULTS: Omit<Elastic, 'id' | 'pieceId' | 'edgeName'> = {
+  stretchRatio: 0.5,
+  width: 12,
+  type: 'band',
+  tStart: 0,
+  tEnd: 1,
+  active: true,
+};
+
+export function clampStretchRatio(v: number): number {
+  return Math.max(0.1, Math.min(2.0, v));
+}
+
 /** A seam group connects multiple edge segments between two sets of edges */
 export interface SeamGroup {
   id: string;
@@ -436,6 +449,7 @@ export interface EditorState {
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
+  selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;

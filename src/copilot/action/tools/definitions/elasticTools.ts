@@ -11,6 +11,7 @@ import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
 import { addElastic, removeElastic, updateElastic } from '../../../../store/projectSlice';
 import type { Elastic } from '../../../../types/types';
+import { ELASTIC_DEFAULTS, clampStretchRatio } from '../../../../types/types';
 import { uid } from '../../../../utils/pathHelpers';
 
 // ─── addElastic ──────────────────────────────────────────────────────────────
@@ -19,13 +20,13 @@ const addElasticTool: ToolDefinition = {
   name: 'addElastic',
   description:
     'Add an elastic band, shirring, or drawstring to a specific edge of a pattern piece. ' +
-    'stretchRatio controls how much the elastic stretches (0.1–2.0, default 0.7). ' +
-    'width is the elastic width in mm (default 25). ' +
+    'stretchRatio controls how much the elastic stretches (0.1–2.0, default 0.5). ' +
+    'width is the elastic width in mm (default 12). ' +
     'type can be "band", "shirring", or "drawstring" (default "band"). ' +
     'tStart/tEnd define the parametric range along the edge (0–1, defaults 0 and 1). ' +
     '/ Agregar un elástico, fruncido o cordón a un borde específico de una pieza de patrón. ' +
-    'stretchRatio controla el estiramiento (0.1–2.0, defecto 0.7). ' +
-    'width es el ancho del elástico en mm (defecto 25). ' +
+    'stretchRatio controla el estiramiento (0.1–2.0, defecto 0.5). ' +
+    'width es el ancho del elástico en mm (defecto 12). ' +
     'type puede ser "band", "shirring" o "drawstring" (defecto "band"). ' +
     'tStart/tEnd definen el rango paramétrico a lo largo del borde (0–1, defecto 0 y 1).',
   parameters: {
@@ -35,11 +36,11 @@ const addElasticTool: ToolDefinition = {
       edgeName: { type: 'string', description: 'Edge name on the piece / Nombre del borde en la pieza' },
       stretchRatio: {
         type: 'number',
-        description: 'Stretch ratio (0.1–2.0, default 0.7). Values <1 gather, >1 stretch. / Ratio de estiramiento (0.1–2.0, defecto 0.7).',
+        description: 'Stretch ratio (0.1–2.0, default 0.5). Values <1 gather, >1 stretch. / Ratio de estiramiento (0.1–2.0, defecto 0.5).',
       },
       width: {
         type: 'number',
-        description: 'Elastic width in mm (default 25) / Ancho del elástico en mm (defecto 25)',
+        description: 'Elastic width in mm (default 12) / Ancho del elástico en mm (defecto 12)',
       },
       type: {
         type: 'string',
@@ -69,15 +70,17 @@ const addElasticTool: ToolDefinition = {
     const edge = piece.edges?.find(e => e.name === params.edgeName);
     if (!edge) return { success: false, error: `Edge "${params.edgeName}" not found on piece "${params.pieceId}"` };
 
-    const stretchRatio = (params.stretchRatio as number | undefined) ?? 0.7;
-    const width = (params.width as number | undefined) ?? 25;
-    const type = (params.type as 'band' | 'shirring' | 'drawstring' | undefined) ?? 'band';
-    const tStart = (params.tStart as number | undefined) ?? 0;
-    const tEnd = (params.tEnd as number | undefined) ?? 1;
+    const stretchRatio = (params.stretchRatio as number | undefined) ?? ELASTIC_DEFAULTS.stretchRatio;
+    const width = (params.width as number | undefined) ?? ELASTIC_DEFAULTS.width;
+    const type = (params.type as 'band' | 'shirring' | 'drawstring' | undefined) ?? ELASTIC_DEFAULTS.type;
+    const tStart = (params.tStart as number | undefined) ?? ELASTIC_DEFAULTS.tStart;
+    const tEnd = (params.tEnd as number | undefined) ?? ELASTIC_DEFAULTS.tEnd;
+
+    if (tStart >= tEnd) return { success: false, error: 'tStart must be less than tEnd' };
 
     const id = uid();
 
-    dispatch(addElastic({
+    const elastic: Elastic = {
       id,
       pieceId: params.pieceId as string,
       edgeName: params.edgeName as string,
@@ -87,7 +90,9 @@ const addElasticTool: ToolDefinition = {
       tStart,
       tEnd,
       active: true,
-    }));
+    };
+
+    dispatch(addElastic(elastic));
 
     return {
       success: true,
@@ -95,7 +100,7 @@ const addElasticTool: ToolDefinition = {
         elasticId: id,
         pieceId: params.pieceId,
         edgeName: params.edgeName,
-        stretchRatio: Math.max(0.1, Math.min(2.0, stretchRatio)),
+        stretchRatio: clampStretchRatio(stretchRatio),
         width,
         type,
         tStart,

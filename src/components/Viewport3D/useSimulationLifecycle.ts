@@ -52,6 +52,7 @@ export interface PlacedMesh {
 interface UseSimulationLifecycleProps {
   placedMeshes: PlacedMesh[];
   seamInitData: SeamInitData[];
+  elastics: import('../../types/types').Elastic[];
   fabricId: string;
   /** Ref populated by this hook with stretching constraint IDs (for warm-start) */
   stretchingIdsRef: React.MutableRefObject<Int32Array | null>;
@@ -166,6 +167,7 @@ async function loadCollision(
 export function useSimulationLifecycle({
   placedMeshes,
   seamInitData,
+  elastics,
   fabricId,
   stretchingIdsRef,
 }: UseSimulationLifecycleProps): UseSimulationLifecycleResult {
@@ -197,6 +199,8 @@ export function useSimulationLifecycle({
   avatarModelUrlRef.current = avatarModelUrl;
   const avatarHeightRef = useRef(avatarHeight);
   avatarHeightRef.current = avatarHeight;
+  const elasticsRef = useRef(elastics);
+  elasticsRef.current = elastics;
 
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
@@ -328,6 +332,8 @@ export function useSimulationLifecycle({
                 // Push pre-existing wind config — the separate wind useEffect
                 // fires on mount before wasmClientRef is set, so it's a no-op.
                 if (windEnabled) wasmClient.setWind(windForce);
+                // Push pre-existing elastic constraints
+                if (elasticsRef.current.length > 0) wasmClient.setElastics(elasticsRef.current);
               }
               return;
             } else if (!cancelled) {
@@ -360,7 +366,11 @@ export function useSimulationLifecycle({
             // Load collision BEFORE starting (prevents explosion)
             await loadCollision(client, avatarModelUrlRef.current, avatarHeightRef.current, collisionBodiesRef.current, dispatch, cancelFlag, false);
 
-            if (!cancelled) client.start();
+            if (!cancelled) {
+              client.start();
+              // Push pre-existing elastic constraints
+              if (elasticsRef.current.length > 0) client.setElastics(elasticsRef.current);
+            }
             return;
           } catch (e) {
             console.warn('[SimLifecycle] CPU worker failed, falling back to Neural Drape:', e);
@@ -486,6 +496,19 @@ export function useSimulationLifecycle({
     if (!gpuClientRef.current) return;
     gpuClientRef.current.freezePieces(frozenPieceIds);
   }, [frozenPieceIds]);
+
+  // ─── Push elastic constraints to active solver ──────────────────────────────
+  // Runs when elastics change or when a solver client becomes available.
+  // GPU solver does not support elastics yet — only WASM and CPU paths.
+  useEffect(() => {
+    const wasmClient = wasmClientRef.current;
+    const cpuClient = clientRef.current;
+    if (wasmClient) {
+      wasmClient.setElastics(elastics);
+    } else if (cpuClient) {
+      cpuClient.setElastics(elastics);
+    }
+  }, [elastics]);
 
   return {
     clients: {

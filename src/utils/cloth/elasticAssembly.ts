@@ -71,6 +71,8 @@ export function buildElasticConstraints(
       const bx = positions[b * 3], by = positions[b * 3 + 1];
       const dist = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2);
 
+      if (dist < 1e-6) continue;
+
       constraints.push({
         vertexA: a,
         vertexB: b,

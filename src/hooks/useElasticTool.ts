@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { addElastic } from '../store/projectSlice';
 import type { PatternPiece, Point2D, Elastic } from '../types/types';
+import { ELASTIC_DEFAULTS } from '../types/types';
 import { uid } from '../utils/pathHelpers';
 import { screenToPattern, resolveEdgeName, EDGE_HIT_THRESHOLD } from '../components/PatternEditor/sewingUtils';
 import { getEdgeEndpoints } from '../utils/geometry/path';
@@ -166,12 +167,7 @@ export function useElasticTool(
           id: `elastic-${uid()}`,
           pieceId: edge.pieceId,
           edgeName,
-          stretchRatio: 0.5,
-          width: 12,
-          type: 'band',
-          tStart: 0,
-          tEnd: 1,
-          active: true,
+          ...ELASTIC_DEFAULTS,
         };
         dispatch(addElastic(newElastic));
         setSelectedElasticId(newElastic.id);

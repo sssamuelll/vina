@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Elastic } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Elastic, clampStretchRatio } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
@@ -431,9 +431,10 @@ const projectSlice = createSlice({
       if (!piece) return;
       const edge = piece.edges?.find(e => e.name === action.payload.edgeName);
       if (!edge) return;
+      if (action.payload.tStart >= action.payload.tEnd) return;
       state.elastics.push({
         ...action.payload,
-        stretchRatio: Math.max(0.1, Math.min(2.0, action.payload.stretchRatio)),
+        stretchRatio: clampStretchRatio(action.payload.stretchRatio),
       });
       state.isDirty = true;
     },
@@ -444,8 +445,17 @@ const projectSlice = createSlice({
     updateElastic(state, action: PayloadAction<Partial<Elastic> & { id: string }>) {
       const idx = state.elastics.findIndex(e => e.id === action.payload.id);
       if (idx === -1) return;
+      // Validate piece/edge if being changed
+      if (action.payload.pieceId || action.payload.edgeName) {
+        const pId = action.payload.pieceId ?? state.elastics[idx].pieceId;
+        const eName = action.payload.edgeName ?? state.elastics[idx].edgeName;
+        const piece = state.pieces.find(p => p.id === pId);
+        if (!piece) return;
+        const edge = piece.edges?.find(e => e.name === eName);
+        if (!edge) return;
+      }
       const updated = { ...state.elastics[idx], ...action.payload };
-      updated.stretchRatio = Math.max(0.1, Math.min(2.0, updated.stretchRatio));
+      updated.stretchRatio = clampStretchRatio(updated.stretchRatio);
       state.elastics[idx] = updated;
       state.isDirty = true;
     },

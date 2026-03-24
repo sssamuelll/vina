@@ -158,6 +158,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const seamGroups = useSelector((s: RootState) => s.project.seamGroups);
+  const elastics = useSelector((s: RootState) => s.project.elastics);
   const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
@@ -299,9 +300,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 
+  const activeElastics = useMemo(() => elastics.filter(e => e.active !== false), [elastics]);
+
   const { clients, positionsRef, edgeDataRef, onFrame, tslSolverRef } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
+    elastics: activeElastics,
     fabricId,
     stretchingIdsRef,
   });
