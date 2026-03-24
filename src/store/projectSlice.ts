@@ -205,6 +205,10 @@ const projectSlice = createSlice({
       state.poms = state.poms.filter(
         pom => !ids.has(pom.pointA.pieceId) && !ids.has(pom.pointB.pieceId)
       );
+      // Remove seamGroups referencing deleted pieces
+      state.seamGroups = state.seamGroups.filter(
+        g => !g.edgesA.some(e => ids.has(e.pieceId)) && !g.edgesB.some(e => ids.has(e.pieceId))
+      );
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
