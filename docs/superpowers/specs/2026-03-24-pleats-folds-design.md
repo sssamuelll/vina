@@ -23,7 +23,7 @@ export interface Pleat {
   type: PleatType;
   depth: number;              // fold depth in mm (perpendicular to edge)
   spacing: number;            // distance between pleat centers in mm
-  count: number;              // number of pleat repeats
+  count: number;              // number of pleat repeats (1–50)
   direction: 'left' | 'right'; // knife pleat fold direction (ignored for symmetric types)
   tStart: number;             // 0–1 parametric start on edge (default 0)
   tEnd: number;               // 0–1 parametric end on edge (default 1)
@@ -95,9 +95,10 @@ Takes a `Pleat` entity and the `PatternPiece` it belongs to. Samples the named e
 ### Edge Cases
 
 - `count = 0`: returns empty array.
+- `count > 50`: clamped to 50 to prevent reducer blocking.
 - Edge not found: returns empty array.
 - `spacing` too large for edge length: generates as many pleats as fit, silently reduces count.
-- `depth > piece width`: allowed — fold lines extend beyond piece outline (user's responsibility).
+- `depth` clamped to piece bounding box height to prevent fold lines extending beyond the piece.
 
 ## Redux State
 
@@ -120,11 +121,12 @@ Added to `ProjectState` interface and `initialState` (as `[]`).
 
 **`updatePleat(state, action: PayloadAction<Partial<Pleat> & { id: string }>)`:**
 1. Find existing pleat.
-2. Remove old generated fold lines from `piece.internals` (by `generatedLineIds`).
-3. Merge updates into pleat.
-4. Recompute fold lines via `generatePleatFoldLines`.
-5. Add new fold lines to `piece.internals`.
-6. Update `generatedLineIds`.
+2. Rebuild ownership: scan `piece.internals` for lines with `foldOptions.pleatId === pleatId` to find current owned lines (not `generatedLineIds`, which may be stale if the user manually deleted a fold line).
+3. Remove owned fold lines from `piece.internals`.
+4. Merge updates into pleat.
+5. Recompute fold lines via `generatePleatFoldLines`.
+6. Add new fold lines to `piece.internals`.
+7. Update `generatedLineIds` from the newly generated line IDs.
 
 **`removePleat(state, action: PayloadAction<string>)`:**
 1. Find pleat by ID.
@@ -134,6 +136,14 @@ Added to `ProjectState` interface and `initialState` (as `[]`).
 ### Cascades
 
 **`removePiece`:** Extended to filter `state.pleats` by `pieceId` (fold lines already removed since they're in `piece.internals`).
+
+### Fold Line Ownership
+
+`generatedLineIds` on the `Pleat` entity is a convenience cache, not the source of truth. The authoritative ownership signal is `foldOptions.pleatId` on each `InternalLine`.
+
+**If the user manually deletes a pleat-generated fold line** (via `removeInternalLine`), the pleat's `generatedLineIds` becomes stale — it references a deleted ID. This is harmless: `updatePleat` rebuilds ownership by scanning `piece.internals` for `foldOptions.pleatId === pleatId`, so it finds the correct current set regardless of manual deletions.
+
+**If the user manually adds a fold line** with the same `pleatId` (unlikely but possible via copilot), it will be claimed by the pleat on next update and replaced. This is acceptable — manual fold lines should use `pleatId: undefined`.
 
 ### NEW_PROJECT
 
@@ -165,9 +175,9 @@ The existing `addFoldLine` copilot tool is upgraded to accept `direction` and `c
 
 Fold lines already render as purple dashed lines in `PieceRenderer.tsx` (line ~200). Enhancements:
 
-**Mountain fold markers:** Small upward triangles (▲) placed every ~15mm along the fold line. Color: purple (#9c27b0).
+**Mountain fold markers:** Small upward triangles (▲) placed every ~20 screen pixels along the fold line (zoom-aware spacing). Color: purple (#9c27b0).
 
-**Valley fold markers:** Small downward triangles (▼) placed every ~15mm along the fold line. Color: blue (#3F51B5).
+**Valley fold markers:** Small downward triangles (▼) placed every ~20 screen pixels along the fold line (zoom-aware spacing). Color: blue (#3F51B5).
 
 **Pleat grouping indicator:** When multiple fold lines belong to the same pleat, a thin connecting bracket runs along the edge between the first and last fold line. Color: gray, 0.4 opacity.
 
