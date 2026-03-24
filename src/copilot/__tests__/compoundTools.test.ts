@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 183 (base + dart + elastic) + 2 fabric code tools (setFabricCode, getFabricCodes) + 1 slashAndSpreadSimple
-      expect(registry.size).toBe(186);
+      // 186 + 1 texture tiling tool (setTextureRepeat)
+      expect(registry.size).toBe(187);
     });
   });
 });

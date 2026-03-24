@@ -630,7 +630,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const uv = pieceUVTransforms[p.id];
       if (uv) return uv;
     }
-    return { repeatX: renderParams.mapRepeat[0], repeatY: renderParams.mapRepeat[1], rotation: renderParams.mapRotation };
+    return { repeatX: renderParams.mapRepeat[0], repeatY: renderParams.mapRepeat[1], rotation: renderParams.mapRotation, offsetX: 0, offsetY: 0 };
   }, [activePieces, pieceUVTransforms, renderParams.mapRepeat, renderParams.mapRotation]);
 
   // ─── Texture loading ───────────────────────────────────────────────────────
@@ -665,17 +665,20 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     return () => { cancelled = true; };
   }, [fabricId]);
 
-  // Apply UV repeat/rotation from effective UV (responds to Redux slider changes)
+  // Apply UV repeat/rotation/offset from effective UV (responds to Redux slider changes)
   useEffect(() => {
     const rotRad = (effectiveUV.rotation ?? 0) * Math.PI / 180;
+    const ox = effectiveUV.offsetX ?? 0;
+    const oy = effectiveUV.offsetY ?? 0;
     [textures.map, textures.normalMap, textures.roughnessMap, textures.aoMap].forEach(tex => {
       if (tex) {
         tex.repeat.set(effectiveUV.repeatX, effectiveUV.repeatY);
+        tex.offset.set(ox, oy);
         tex.rotation = rotRad;
         tex.needsUpdate = true;
       }
     });
-  }, [textures, effectiveUV.repeatX, effectiveUV.repeatY, effectiveUV.rotation]);
+  }, [textures, effectiveUV.repeatX, effectiveUV.repeatY, effectiveUV.rotation, effectiveUV.offsetX, effectiveUV.offsetY]);
 
   // Update TSL material properties for surface mode, opacity, emission, and textures
   useEffect(() => {
