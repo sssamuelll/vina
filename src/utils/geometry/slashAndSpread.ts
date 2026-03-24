@@ -619,3 +619,205 @@ export function classifyDarts(
 
   return { dartsA, dartsB };
 }
+
+// --------------------------------------------------------------------------
+// mergeSpreadHalves
+// --------------------------------------------------------------------------
+
+/**
+ * Result returned by `mergeSpreadHalves`.
+ */
+export interface MergeResult {
+  /** The merged closed outline (starts with M, ends with Z). */
+  outline: PathCommand[];
+  /** How many new commands were inserted at each gap. */
+  gapCommandCount: number;
+}
+
+/**
+ * Get the endpoint of a PathCommand given the current cursor position.
+ * Returns { x, y } of the endpoint.
+ */
+function cmdEndpoint(cmd: PathCommand, cx: number, cy: number, sx: number, sy: number): Point2D {
+  switch (cmd.type) {
+    case 'M':
+    case 'L':
+      return { x: cmd.values[0], y: cmd.values[1] };
+    case 'H':
+      return { x: cmd.values[0], y: cy };
+    case 'V':
+      return { x: cx, y: cmd.values[0] };
+    case 'C':
+      return { x: cmd.values[4], y: cmd.values[5] };
+    case 'S':
+      return { x: cmd.values[2], y: cmd.values[3] };
+    case 'Q':
+      return { x: cmd.values[2], y: cmd.values[3] };
+    case 'T':
+      return { x: cmd.values[0], y: cmd.values[1] };
+    case 'A':
+      return { x: cmd.values[5], y: cmd.values[6] };
+    case 'Z':
+      return { x: sx, y: sy };
+    default:
+      if (cmd.values.length >= 2) {
+        return { x: cmd.values[cmd.values.length - 2], y: cmd.values[cmd.values.length - 1] };
+      }
+      return { x: cx, y: cy };
+  }
+}
+
+/**
+ * Extract the "body" edge commands from a closed split half, stripping the
+ * opening M, the trailing Z, and the last edge command (the slash-line
+ * closing segment that returns from the last body point back to M).
+ *
+ * A split half has the structure:
+ *   M(cutPoint) [body edges…] L(cutPoint) Z
+ *
+ * We remove:
+ * - commands[0]  — the M
+ * - commands[n-1] — the Z
+ * - commands[n-2] — the slash-line closer (last L back to M)
+ *
+ * Returns also the start point (M coords) and the point just before the
+ * slash-line closer (the last body point), which are the two gap endpoints
+ * for this half.
+ */
+function extractBodyEdges(half: PathCommand[]): {
+  bodyEdges: PathCommand[];
+  startPt: Point2D;   // M point (= one gap endpoint)
+  endPt: Point2D;     // point just before slash-close (= other gap endpoint)
+  prevEndPt: Point2D; // point two steps before slash-close (for tangent)
+} {
+  const mCmd = half[0];
+  const startPt: Point2D = { x: mCmd.values[0], y: mCmd.values[1] };
+
+  // Edge commands are indices 1 … n-3 (strip M at 0, slash-closer at n-2, Z at n-1)
+  // n-2 is the slash-line closer; n-3 and earlier are body edges.
+  const bodyEdges = half.slice(1, half.length - 2);
+
+  // Walk to find the endpoint of the last body edge (endPt) and the one before
+  // it (prevEndPt), needed for Catmull-Rom tangents.
+  let cx = startPt.x;
+  let cy = startPt.y;
+  let prevX = cx;
+  let prevY = cy;
+
+  for (const cmd of bodyEdges) {
+    const ep = cmdEndpoint(cmd, cx, cy, startPt.x, startPt.y);
+    prevX = cx;
+    prevY = cy;
+    cx = ep.x;
+    cy = ep.y;
+  }
+
+  return {
+    bodyEdges,
+    startPt,
+    endPt: { x: cx, y: cy },
+    prevEndPt: { x: prevX, y: prevY },
+  };
+}
+
+/**
+ * Build gap-fill commands from `fromPt` to `toPt` using the given strategy.
+ *
+ * For `'straight'`: single `L` command.
+ * For `'smooth'`: Catmull-Rom → cubic bezier.
+ *   p0 = prevFrom (the point before fromPt, provides outgoing tangent)
+ *   p1 = fromPt
+ *   p2 = toPt
+ *   p3 = nextTo (the point after toPt, provides incoming tangent)
+ *
+ * Catmull-Rom control points:
+ *   cp1 = p1 + (p2 - p0) / 6
+ *   cp2 = p2 - (p3 - p1) / 6
+ */
+function buildGapFill(
+  fromPt: Point2D,
+  toPt: Point2D,
+  prevFrom: Point2D,
+  nextTo: Point2D,
+  gapFill: 'straight' | 'smooth',
+): PathCommand[] {
+  if (gapFill === 'straight') {
+    return [{ type: 'L', values: [toPt.x, toPt.y] }];
+  }
+
+  // Smooth: Catmull-Rom → cubic bezier
+  const cp1x = fromPt.x + (toPt.x - prevFrom.x) / 6;
+  const cp1y = fromPt.y + (toPt.y - prevFrom.y) / 6;
+  const cp2x = toPt.x - (nextTo.x - fromPt.x) / 6;
+  const cp2y = toPt.y - (nextTo.y - fromPt.y) / 6;
+
+  return [
+    {
+      type: 'C',
+      values: [cp1x, cp1y, cp2x, cp2y, toPt.x, toPt.y],
+    },
+  ];
+}
+
+/**
+ * Merge two spread halves back into a single closed outline, filling the two
+ * gaps with either straight lines or smooth cubic bezier curves.
+ *
+ * Each half must be a closed PathCommand[] in the form:
+ *   M(cutPoint) [body edges…] L(cutPoint) Z
+ *
+ * Algorithm:
+ * 1. Extract body edges from each half (remove M, slash-closer L, and Z).
+ * 2. Identify the four gap endpoints:
+ *      gap 1: halfA.endPt → halfB.startPt
+ *      gap 2: halfB.endPt → halfA.startPt
+ * 3. Build:  M(halfA.startPt) body-A gap-fill-1 body-B gap-fill-2 Z
+ *
+ * @param halfA    First closed half (starts with M, ends with Z)
+ * @param halfB    Second closed half (starts with M, ends with Z)
+ * @param gapFill  'straight' for L commands, 'smooth' for C commands
+ */
+export function mergeSpreadHalves(
+  halfA: PathCommand[],
+  halfB: PathCommand[],
+  gapFill: 'straight' | 'smooth',
+): MergeResult {
+  const a = extractBodyEdges(halfA);
+  const b = extractBodyEdges(halfB);
+
+  // Gap 1: from end of halfA body → start of halfB body
+  // Gap 2: from end of halfB body → start of halfA body (closes the loop)
+
+  // For Catmull-Rom tangents we need neighbouring points:
+  //   gap-1 incoming: the point just before a.endPt → a.prevEndPt
+  //   gap-1 outgoing: the first endpoint of halfB body edges after b.startPt
+  //   gap-2 incoming: the point just before b.endPt → b.prevEndPt
+  //   gap-2 outgoing: the first endpoint of halfA body edges after a.startPt
+
+  // Compute the point after b.startPt in halfB body (for smooth gap-1)
+  const nextToGap1 = b.bodyEdges.length > 0
+    ? cmdEndpoint(b.bodyEdges[0], b.startPt.x, b.startPt.y, b.startPt.x, b.startPt.y)
+    : b.endPt;
+
+  // Compute the point after a.startPt in halfA body (for smooth gap-2)
+  const nextToGap2 = a.bodyEdges.length > 0
+    ? cmdEndpoint(a.bodyEdges[0], a.startPt.x, a.startPt.y, a.startPt.x, a.startPt.y)
+    : a.endPt;
+
+  const gap1 = buildGapFill(a.endPt, b.startPt, a.prevEndPt, nextToGap1, gapFill);
+  const gap2 = buildGapFill(b.endPt, a.startPt, b.prevEndPt, nextToGap2, gapFill);
+
+  const outline: PathCommand[] = [
+    { type: 'M', values: [a.startPt.x, a.startPt.y] },
+    ...a.bodyEdges,
+    ...gap1,
+    ...b.bodyEdges,
+    ...gap2,
+    { type: 'Z', values: [] },
+  ];
+
+  return {
+    outline,
+    gapCommandCount: gap1.length,
+  };
+}

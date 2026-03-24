@@ -5,6 +5,7 @@ import {
   splitOutlineAtSlash,
   classifyInternals,
   classifyDarts,
+  mergeSpreadHalves,
 } from '../slashAndSpread';
 
 // 100x150 rectangle: corners at (0,0), (100,0), (100,150), (0,150)
@@ -466,5 +467,92 @@ describe('applyParallelSpread', () => {
     // leg (45,100) → (70,100)
     expect(result.darts[0].legs[0][0].x).toBeCloseTo(70, 5);
     expect(result.darts[0].legs[0][0].y).toBeCloseTo(100, 5);
+  });
+});
+
+// ─── mergeSpreadHalves ────────────────────────────────────────────────────────
+//
+// Test setup: a 100×100 square split vertically at x=50.
+// After splitting:
+//   halfA (left):  M(50,0) L(50,100) L(0,100) L(0,0) L(50,0)[slash close] Z
+//   halfB (right, shifted +20 in x):
+//                  M(70,100) L(70,0) L(120,0) L(120,100) L(70,100)[slash close] Z
+//
+// The slash-line closing segment in each half is the last L before Z.
+//
+
+const splitHalfA: PathCommand[] = [
+  { type: 'M', values: [50, 0] },
+  { type: 'L', values: [50, 100] },
+  { type: 'L', values: [0, 100] },
+  { type: 'L', values: [0, 0] },
+  { type: 'L', values: [50, 0] }, // slash-line closing segment
+  { type: 'Z', values: [] },
+];
+
+// right half of 100×100 square, shifted right by 20
+const splitHalfB: PathCommand[] = [
+  { type: 'M', values: [70, 100] },
+  { type: 'L', values: [70, 0] },
+  { type: 'L', values: [120, 0] },
+  { type: 'L', values: [120, 100] },
+  { type: 'L', values: [70, 100] }, // slash-line closing segment
+  { type: 'Z', values: [] },
+];
+
+describe('mergeSpreadHalves', () => {
+  it('straight fill produces closed outline', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'straight');
+    const { outline } = result;
+    expect(outline[0].type).toBe('M');
+    expect(outline[outline.length - 1].type).toBe('Z');
+    expect(outline.length).toBeGreaterThan(splitHalfA.length);
+    expect(outline.length).toBeGreaterThan(splitHalfB.length);
+  });
+
+  it('straight fill has gapCommandCount > 0', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'straight');
+    expect(result.gapCommandCount).toBeGreaterThan(0);
+  });
+
+  it('smooth fill produces bezier curves (C commands)', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'smooth');
+    const hasCubic = result.outline.some(cmd => cmd.type === 'C');
+    expect(hasCubic).toBe(true);
+  });
+
+  it('merged outline is closed — last L before Z returns to M start point', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'straight');
+    const { outline } = result;
+    const mCmd = outline[0];
+    // The command just before Z closes back to M
+    const lastEdge = outline[outline.length - 2];
+    expect(lastEdge.type).toBe('L');
+    expect(lastEdge.values[0]).toBeCloseTo(mCmd.values[0], 3);
+    expect(lastEdge.values[1]).toBeCloseTo(mCmd.values[1], 3);
+  });
+
+  it('gapCommandCount for straight fill is 1 (one L per gap)', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'straight');
+    expect(result.gapCommandCount).toBe(1);
+  });
+
+  it('smooth fill outline starts with M and ends with Z', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'smooth');
+    const { outline } = result;
+    expect(outline[0].type).toBe('M');
+    expect(outline[outline.length - 1].type).toBe('Z');
+  });
+
+  it('merged outline contains body edges from both halves', () => {
+    const result = mergeSpreadHalves(splitHalfA, splitHalfB, 'straight');
+    const { outline } = result;
+    const xs = outline
+      .filter(c => c.type === 'L' || c.type === 'M')
+      .map(c => c.values[0]);
+    // outer-left edge of halfA at x=0
+    expect(xs.some(x => Math.abs(x - 0) < 0.01)).toBe(true);
+    // outer-right edge of halfB at x=120
+    expect(xs.some(x => Math.abs(x - 120) < 0.01)).toBe(true);
   });
 });
