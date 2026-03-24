@@ -102,6 +102,22 @@ describe('findSlashIntersections', () => {
       ),
     ).toThrow();
   });
+
+  it('throws on invalid outline (no M/Z)', () => {
+    const invalid: PathCommand[] = [
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 150] },
+    ];
+    expect(() =>
+      findSlashIntersections(invalid, { x: 50, y: -10 }, { x: 50, y: 160 }),
+    ).toThrow(/Invalid outline/);
+  });
+
+  it('throws on empty outline', () => {
+    expect(() =>
+      findSlashIntersections([], { x: 50, y: -10 }, { x: 50, y: 160 }),
+    ).toThrow(/Invalid outline/);
+  });
 });
 
 describe('splitOutlineAtSlash', () => {
@@ -786,6 +802,23 @@ describe('buildSpreadPiece', () => {
     const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', 20, 'parallel', 'straight');
     const spreadArea = polygonArea(result.outline);
     expect(spreadArea).toBeGreaterThan(originalArea);
+  });
+
+  it('area conservation (parallel): spread area ≈ original + gap rectangle', () => {
+    const piece = makeTestPiece();
+    const originalArea = polygonArea(piece.outline);
+    const spreadAmount = 20;
+    const [h1, h2] = findSlashIntersections(piece.outline, slashStart, slashEnd);
+    const result = buildSpreadPiece(piece, h1, h2, 'A', 'start', spreadAmount, 'parallel', 'straight');
+    const spreadArea = polygonArea(result.outline);
+    // For parallel spread, the gap is a rectangle: spreadAmount × slashLineLength
+    // Slash line is vertical at x=50, crossing a 100×150 rect → length = 150
+    const slashLength = Math.sqrt(
+      (h2.point.x - h1.point.x) ** 2 + (h2.point.y - h1.point.y) ** 2,
+    );
+    const expectedGapArea = spreadAmount * slashLength;
+    // Allow 5% tolerance for floating-point and merge-gap-fill artifacts
+    expect(spreadArea).toBeCloseTo(originalArea + expectedGapArea, -2);
   });
 
   it('pivot mode: spread half outline is rotated (M point of halfA changes)', () => {
