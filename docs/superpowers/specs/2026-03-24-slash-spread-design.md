@@ -4,167 +4,246 @@
 
 ## Overview
 
-The Slash and Spread tool lets users cut a piece along an arbitrary line and spread one half around a pivot point, inserting a wedge-shaped gap to add fullness (e.g., flared skirt from straight). The operation modifies the piece in place — the result is one piece with a wider silhouette, not two separate pieces. This matches CLO3D behavior and standard pattern drafting practice.
+The Slash and Spread tool lets users cut a piece along an arbitrary line and spread one half to add fullness (e.g., flared skirt from straight). The operation modifies the piece in place — the result is one piece with a wider silhouette, not two separate pieces. This matches CLO3D behavior and standard pattern drafting practice.
+
+Two spread modes are supported:
+
+- **Pivot mode** — one half rotates around a chosen endpoint of the slash line, opening a wedge-shaped gap. The amount is expressed in degrees.
+- **Parallel mode** — one half translates perpendicular to the slash line, opening a parallel gap. The amount is expressed in millimetres.
 
 ## Core Geometry
 
-### Function Signature
+The geometry module lives at `src/utils/geometry/slashAndSpread.ts`. All functions are pure and exported for both UI and copilot use.
 
-Replaces the existing `slashAndSpread()` in `src/utils/patternOps.ts`. Returns `PatternPiece | null` — null indicates invalid input (slash line doesn't cross piece properly).
+### Exported Functions
+
+| Function | Purpose |
+|----------|---------|
+| `findSlashIntersections` | Find the two points where a slash line crosses a closed outline |
+| `splitOutlineAtSlash` | Split the outline into `halfA` / `halfB` and return a `SplitMap` |
+| `pointInPolygon` | Ray-casting point-in-polygon test (used for half selection) |
+| `flattenPathToPoints` | Flatten a `PathCommand[]` to `Point2D[]` (used internally) |
+| `classifyInternals` | Assign internal lines to the half containing the majority of 5 arc-length samples |
+| `classifyDarts` | Assign darts to the half containing the dart apex |
+| `applyPivotSpread` | Rotate a half (outline + internals + darts) around a pivot point |
+| `applyParallelSpread` | Translate a half perpendicular to the slash direction |
+| `mergeSpreadHalves` | Stitch the two halves back into a single closed outline with gap fill |
+| `rebuildSemanticEdges` | Re-index semantic edge `segmentRange` values after the merge |
+| `buildSpreadPiece` | Top-level orchestrator: all steps → returns new `PatternPiece` |
+
+### `buildSpreadPiece` Signature
 
 ```typescript
-function slashAndSpread(
+function buildSpreadPiece(
   piece: PatternPiece,
-  slashStart: Point2D,    // first outline intersection point
-  slashEnd: Point2D,      // second outline intersection point
-  pivotEnd: 'start' | 'end',  // which intersection is the pivot
-  spreadAngleDeg: number, // spread angle in degrees (positive = open)
-  smooth: boolean,        // blend curves at wedge gap edges
-): PatternPiece | null
+  hit1: OutlineHit,
+  hit2: OutlineHit,
+  selectedHalf: 'A' | 'B',         // which half moves
+  pivotEnd: 'start' | 'end',        // pivot = hit1 ('start') or hit2 ('end')
+  spreadAmount: number,             // degrees (pivot) or mm (parallel)
+  mode: 'pivot' | 'parallel',
+  gapFill: 'straight' | 'smooth',
+): PatternPiece
 ```
 
 ### Algorithm
 
-1. **Find intersections:** Use `findOutlineIntersections()` from `splitOutline.ts` to locate the two points where the slash line crosses the piece outline. If not exactly 2 intersections, return `null`.
-2. **Split outline:** Use `splitOutlineAtPoints()` to divide the outline into two halves at the intersection points.
-3. **Identify halves:** The pivot point is `slashStart` (if `pivotEnd === 'start'`) or `slashEnd` (if `pivotEnd === 'end'`). The half whose outline midpoint is farther from the pivot is the **moving half**. The other half stays fixed.
-4. **Rotate moving half:** Rotate all points of the moving half by `spreadAngleDeg` around the pivot point. This opens a wedge-shaped gap.
-5. **Fill the wedge gap:** Connect the rotated half back to the fixed half:
-   - If `smooth = false`: two straight line segments bridge the gap (raw wedge).
-   - If `smooth = true`: cubic bezier curves blend the gap edges for a smooth flared silhouette. Control points are computed from the tangent directions at the gap endpoints.
-6. **Transform internal lines:** Classify each internal line to a half, then rotate those in the moving half by the same angle around the pivot:
-   - **Darts:** classified by apex position (the apex determines which half the dart belongs to).
-   - **Other internals (grainline, notch, fold, pleat, topstitch, reference):** classified by centroid of all path points.
-   - **Internals crossing the slash line** (centroid in one half, some points in the other): assigned to the half containing the centroid. Points in the other half get rotated, which may distort the line — acceptable for this operation.
-7. **Rebuild semantic edges:** Call `detectSemanticEdges()` on the result piece to regenerate `piece.edges` from the new outline. Old edge data is discarded. This means seams referencing old edge names may become dangling (shared issue with audit Finding #05).
-8. **Return:** A new `PatternPiece` with the modified outline, adjusted internals, and refreshed edges. ID and metadata are preserved.
+1. **Split** — `splitOutlineAtSlash` wraps `splitOutlineAtPoints` and also builds a `SplitMap` that records, for each command in each half, the index of the originating command in the original outline (or -1 for commands inserted at the cut points).
+2. **Classify internals** — each `InternalLine` is sampled at 5 arc-length-evenly-spaced points; the half receiving more samples claims the line.
+3. **Classify darts** — each dart is assigned to the half containing its apex point.
+4. **Apply spread** — the chosen half is transformed:
+   - Pivot mode: `applyPivotSpread` rotates all coordinates counter-clockwise around the pivot by `spreadAmount` degrees.
+   - Parallel mode: `applyParallelSpread` translates all coordinates perpendicular to the slash direction by `spreadAmount` mm.
+5. **Merge** — `mergeSpreadHalves` strips the synthetic boundary edges from each half and stitches them together:
+   - `'straight'` gap fill inserts a single `L` command at each of the two gaps.
+   - `'smooth'` gap fill inserts a cubic bezier `C` command computed via Catmull-Rom tangents from the neighbouring body edges.
+6. **Rebuild semantic edges** — `rebuildSemanticEdges` uses the `SplitMap` to offset `segmentRange` indices for commands that shifted position in the merged outline due to gap-fill commands being inserted.
+7. **Return** — a new `PatternPiece` with the same `id`, updated `outline`, `internals`, `darts`, and `edges`.
+
+### `SplitMap` and `OutlineHit` Types
+
+```typescript
+export interface SplitMap {
+  halfAIndices: number[]; // new index → original command index (-1 = inserted)
+  halfBIndices: number[];
+  hit1: OutlineHit;
+  hit2: OutlineHit;
+}
+```
+
+`OutlineHit` is re-exported from `splitOutline.ts` (unchanged).
+
+### Gap Fill Detail
+
+`'straight'` inserts `L(toPt)` — one line per gap.
+
+`'smooth'` inserts a single `C` (cubic bezier) using Catmull-Rom control points:
+```
+cp1 = fromPt + (toPt  - prevFrom) / 6
+cp2 = toPt   - (nextTo - fromPt)  / 6
+```
+where `prevFrom` is the body-edge point immediately before the gap start, and `nextTo` is the body-edge point immediately after the gap end.
 
 ### Edge Cases
 
-- **0° spread:** Returns the piece unchanged (no-op, not null).
-- **Slash line tangent to outline (1 intersection):** Returns `null`.
-- **Slash line outside piece (0 intersections):** Returns `null`.
-- **Large angles (>180°):** Allowed — produces extreme fullness. The outline may self-intersect, which is valid for pattern drafting.
-
-### Dependencies
-
-Reuses existing geometry from:
-- `src/utils/geometry/splitOutline.ts` — `findOutlineIntersections`, `splitOutlineAtPoints`
-- `src/utils/geometry/lineIntersect.ts` — line-polyline intersections
-- `src/utils/pathHelpers.ts` — path command utilities
-- `src/utils/semanticEdges.ts` — `detectSemanticEdges`
+- **0° / 0 mm spread** — `buildSpreadPiece` still executes all steps and returns a piece that is geometrically identical to the input (no early-out; the identity transform produces the correct outline).
+- **Slash line with exactly 2 intersections required** — `findSlashIntersections` throws if it finds anything other than exactly 2 intersection points. The callers (hook and copilot tools) catch this and report the error.
+- **Large angles (>180°)** — allowed; produces extreme fullness and may create self-intersecting outlines, which are valid for pattern drafting.
+- **Bezier outlines** — `rotateCommands` and `translateCommands` treat every consecutive pair of values as an `(x, y)` coordinate, so cubic bezier control points and endpoints are all transformed correctly.
 
 ## UI Interaction
 
 ### Hook: `useSlashAndSpreadTool`
 
-Located at `src/hooks/useSlashAndSpreadTool.ts`. The hook import already exists in `PatternEditor.tsx` but the file is missing.
+Located at `src/components/PatternEditor/useSlashAndSpreadTool.ts`. Implements the interaction as a pure state machine with all transition logic extracted into exported pure functions (`transitionMouseDown`, `transitionMouseMove`, `transitionMouseUp`, `transitionKeyDown`) for testability. The React hook wires these to SVG mouse/keyboard events and dispatches Redux actions for side effects.
 
-### Two-Step Flow
+### 8-Phase State Machine
 
-**Step 1 — Draw slash line:**
-1. User activates the slash-and-spread tool from the toolbar.
-2. User clicks a point on a piece's outline — this becomes `slashStart`. The click snaps to the nearest outline point.
-3. A dashed red preview line follows the cursor from `slashStart`.
-4. User clicks a second point on the same piece's outline — this becomes `slashEnd`.
-5. The slash line is validated: it must produce exactly 2 intersections with the piece outline. If invalid (e.g., line runs along an edge), the second click is rejected and the user retries.
+```
+idle → drawingSlash → slashComplete → selectingHalf →
+halfConfirmed → awaitingDrag → spreading → spreadPreview → (apply → idle)
+```
 
-**Step 2 — Drag from pivot to spread:**
-1. After the slash line is confirmed, the two intersection endpoints are highlighted as clickable handles.
-2. User click-drags from one end — that end becomes the pivot (`pivotEnd`). The half farther from the pivot is the moving half.
-3. The spread angle is computed from the drag: the angle between the slash line and the line from the pivot to the current cursor position. Dragging perpendicular to the slash opens the spread; dragging parallel keeps it near 0°.
-4. During drag, the preview updates live: the moving half is shown rotated at the current angle, the wedge gap is rendered with semi-transparent fill, and a label shows `12.5° / 45mm` (angle + arc length at widest point).
-5. On mouse-up, the operation is committed: `updatePiece` is dispatched with the result of `slashAndSpread()`.
+| Phase | Description |
+|-------|-------------|
+| `idle` | No active operation. Click on a selected piece's outline snaps to it and starts `drawingSlash`. |
+| `drawingSlash` | Start point is locked; a live line follows the cursor. Second click on the outline (with optional snap) sets the end point and calls `findSlashIntersections` + `splitOutlineAtSlash`. On success → `slashComplete`. On error → stays in `drawingSlash` with error message. |
+| `slashComplete` | Outline is split; both halves are available. Mouse-move highlights the hovered half. Click inside a half → `selectingHalf` with `selectedHalf` set. |
+| `selectingHalf` | Same as `slashComplete` + `selectedHalf` is set. Click → `halfConfirmed`. |
+| `halfConfirmed` | Selected half is highlighted. The two slash endpoints are shown as pivot candidates. Click within `PIVOT_THRESHOLD` (15 px / zoom) of either endpoint sets `pivotPoint` + `pivotEnd` and transitions to `awaitingDrag`. |
+| `awaitingDrag` | Pivot is chosen. Mouse-move begins computing `spreadAmount` and building a live `previewPiece` via `buildSpreadPiece`. Phase transitions to `spreading` on first move. |
+| `spreading` | Live drag. Each `mouseMove` recomputes `spreadAmount` (angle or distance depending on `mode`) and rebuilds `previewPiece`. `mouseUp` → `spreadPreview`. |
+| `spreadPreview` | Drag complete. Preview piece is frozen. **Enter** commits (`updatePiece` dispatched, resets to idle). **Escape** reverts to `awaitingDrag`. |
 
-### Cancellation
+### Keyboard Shortcuts
 
-- **Escape** at any step resets the tool to idle.
-- **Right-click** cancels the current step (goes back to step 1 if in step 2, or resets if in step 1).
+| Key | Phase(s) active | Effect |
+|-----|----------------|--------|
+| `Escape` | Any | Full reset to `idle` (or to `awaitingDrag` if in `spreadPreview`) |
+| `Enter` | `spreadPreview` | Commit and apply the spread |
+| `Tab` | `halfConfirmed`, `awaitingDrag`, `spreading`, `spreadPreview` | Toggle between `pivot` and `parallel` mode |
 
-### Tool Options
+### Snap Thresholds
 
-- `smooth: boolean` (default `true`) — accessible via the tool options panel (shift+right-click context menu, following the existing pattern). Controls whether the wedge gap is blended with curves or left as straight edges.
+- **Outline snap** (`SNAP_THRESHOLD = 8` screen pixels) — used during `idle` and `drawingSlash` to snap the cursor to the nearest point on the piece outline.
+- **Pivot snap** (`PIVOT_THRESHOLD = 15` screen pixels) — used during `halfConfirmed` to detect a click near either slash endpoint.
+
+### Tool Options (Redux `toolSlice`)
+
+Stored under `toolOptions.slashAndSpread`:
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `mode` | `'pivot' \| 'parallel'` | `'pivot'` | Spread mode (Tab toggles in-session) |
+| `gapFill` | `'straight' \| 'smooth'` | `'straight'` | Gap bridging strategy |
+
+### Cursor Mapping
+
+| Phase | Cursor |
+|-------|--------|
+| `idle`, `drawingSlash` | `crosshair` |
+| `slashComplete`, `selectingHalf`, `halfConfirmed` | `pointer` |
+| `awaitingDrag` | `grab` |
+| `spreading` | `grabbing` |
+| `spreadPreview` | `default` |
 
 ## Visual Preview
 
-### SlashSpreadPreview Component
+### `SlashAndSpreadOverlay` Component
 
-New component at `src/components/PatternEditor/renderers/SlashSpreadPreview.tsx`.
+Located at `src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx`. Rendered as a sibling inside the PatternEditor SVG tree with `pointerEvents="none"`.
 
-Renders during the slash-and-spread interaction:
+All stroke widths and radii are divided by `zoom2D` to remain constant in screen pixels.
 
-**Step 1 preview:**
-- Dashed red line from `slashStart` to cursor
-- Snapping indicator (circle) when cursor is near the piece outline
+| Phase | Rendered elements |
+|-------|------------------|
+| `drawingSlash` | Dashed orange line from start to cursor; orange circle (snap indicator) at start point |
+| `slashComplete`, `selectingHalf` | Solid orange slash line; hovered half filled light blue (`rgba(173,216,230,0.3)`); orange dots at slash endpoints |
+| `halfConfirmed`, `awaitingDrag` | Solid orange slash line; selected half filled semi-transparent yellow (`rgba(255,215,0,0.3)`) with gold stroke; slash endpoint dots (green when pivot confirmed, orange otherwise); active pivot highlighted with a larger green ring |
+| `spreading`, `spreadPreview` | Original piece outline faded dashed (`#999`, 50% opacity); preview piece outline in orange with 10% yellow fill; green pivot dot; arc indicator showing `spreadAmount` in degrees; text label showing `{value}°` (pivot mode) or `{value} mm` (parallel mode) centred between the slash endpoints |
 
-**Step 2 preview:**
-- The moving half of the outline, rotated to current angle (stroke only, thin gray)
-- Wedge gap filled with semi-transparent blue (#3B82F6, opacity 0.15)
-- Arc indicator at the pivot point showing the spread angle
-- Text label: `{angle}° / {arcLength}mm` positioned near the widest point of the wedge
-
-Rendered as a sibling to other renderers in the PatternEditor SVG tree, with `pointerEvents="none"`.
+The arc is built using the SVG arc command. For pivot mode the arc radius is `20 / zoom2D`.
 
 ## Copilot Tools
 
-### Upgraded `slashAndSpread` Tool
+Both tools are defined in `src/copilot/action/tools/definitions/patternOpsTools.ts` and call into `src/utils/geometry/slashAndSpread.ts` via dynamic import.
 
-Replace the existing tool in `src/copilot/action/tools/definitions/patternOpsTools.ts`:
+### `slashAndSpread`
+
+Full control: slash line defined by edge names and parametric positions.
 
 ```typescript
 slashAndSpread(
   pieceId: string,
-  slashStartX: number, slashStartY: number,
-  slashEndX: number, slashEndY: number,
-  pivotEnd: 'start' | 'end',  // default 'start'
-  spreadAngleDeg: number,
-  smooth?: boolean,            // default true
+  fromEdge: string,         // semantic edge name where slash starts
+  fromT?: number,           // parametric position on fromEdge (default 0.5)
+  toEdge: string,           // semantic edge name where slash ends
+  toT?: number,             // parametric position on toEdge (default 0.5)
+  selectedHalf: 'A' | 'B', // which half to spread
+  pivotEnd?: 'from' | 'to', // pivot end (default 'from' = start hit)
+  spreadAmount: number,     // degrees (pivot) or mm (parallel)
+  mode?: 'pivot' | 'parallel', // default 'pivot'
+  gapFill?: 'straight' | 'smooth', // default 'straight'
 )
 ```
 
-Validates piece exists, calls `slashAndSpread()`. If the function returns `null`, returns `{ success: false, error: 'Slash line does not cross the piece outline at exactly 2 points' }`. Otherwise dispatches `updatePiece`.
+Required parameters: `pieceId`, `fromEdge`, `toEdge`, `selectedHalf`, `spreadAmount`.
 
-### Convenience Tool: `slashAndSpreadSimple`
+Internally: resolves edge names to `SemanticEdge` objects, computes `fromPt`/`toPt` at the parametric positions via `getPointOnEdge`, calls `findSlashIntersections` and `buildSpreadPiece`, then dispatches `updatePiece`. Does not provide rollback.
 
-For common copilot use cases ("slash at the hip and spread 15°"):
+### `slashAndSpreadSimple`
+
+Simplified API for common copilot use cases ("slash horizontally at 50% and spread 15°"). Always uses pivot mode; always spreads half B; supports optional smooth gap fill.
 
 ```typescript
 slashAndSpreadSimple(
   pieceId: string,
-  position: number,         // 0–1 parametric along piece's bounding box height (0=top, 1=bottom)
+  position: number,          // 0=top, 1=bottom, 0.5=middle of bounding box
   spreadAngleDeg: number,
-  pivotEnd?: 'start' | 'end',  // default 'start' (top)
-  smooth?: boolean,
+  pivotEnd?: 'start' | 'end', // default 'start'
+  smooth?: boolean,           // default true (smooth gap fill)
 )
 ```
 
-Computes a horizontal slash line in piece-local coordinates at the Y position derived from the piece's bounding box (accounting for `piece.rotation` — the bounding box is computed on the rotated outline, so `position` is always relative to the piece's visual top-to-bottom, not world Y). Then calls the full `slashAndSpread`.
+Required parameters: `pieceId`, `position` (0–1), `spreadAngleDeg`.
 
-## Known Limitations / Follow-ups
+Internally: computes the piece's bounding box from `piece.outline`, derives a horizontal slash at `slashY = minY + position * (maxY - minY)`, extends the line 10 units beyond the bounding box on each side, calls `findSlashIntersections` + `buildSpreadPiece`. Provides rollback via a deep-cloned snapshot of the original piece.
+
+## Known Limitations
 
 | Item | Notes |
 |------|-------|
-| Multiple slashes on one piece | Apply sequentially — each slash modifies the piece, then the next slash operates on the already-spread piece. No batch UI in this PR. |
-| Rotate mode (separate from spread) | Spread and rotate are the same operation geometrically (rotation around pivot). The `spreadAngleDeg` parameter covers both. No separate mode needed. |
-| Undo | Handled by existing undo middleware — `updatePiece` is already undoable. |
-| Seam/elastic cascade | Semantic edges are rebuilt via `detectSemanticEdges()` after spread. Seams referencing old edge names may become dangling (audit Finding #05). |
-| TSL/GPU solver | No simulation changes in this PR — spread modifies 2D pattern only. |
+| Multiple slashes on one piece | Apply sequentially — each slash operates on the already-spread piece. No batch UI in this PR. |
+| Undo | Handled by existing undo middleware — `updatePiece` is undoable. `slashAndSpreadSimple` additionally provides an explicit `rollback` function in the tool result. `slashAndSpread` does not. |
+| Semantic edges after spread | `rebuildSemanticEdges` re-indexes `segmentRange` values using the `SplitMap`. Edges fully within the spread half get their ranges shifted by `gapCommandCount`. Edges that straddle the slash cut may become inaccurate — not addressed in this PR. |
+| Bezier subdivision at cut | When a bezier segment is cut at an intersection, the subdivided fragment may not exactly match any original command. `buildSplitMap` records these as -1 (inserted). The affected edge may lose its semantic label if its start index falls on a subdivided fragment. |
+| TSL/GPU solver | No simulation changes — spread modifies 2D pattern only. |
+| Rotation not bounding-box-relative in `slashAndSpreadSimple` | `position` is relative to the piece outline's raw bounding box (no `piece.rotation` compensation). |
 
-## Files Created/Modified
+## Files
 
-| Action | File | Purpose |
-|--------|------|---------|
-| Modify | `src/utils/patternOps.ts` | Replace `slashAndSpread` with full implementation |
-| Create | `src/hooks/useSlashAndSpreadTool.ts` | Two-step interaction hook |
-| Create | `src/components/PatternEditor/renderers/SlashSpreadPreview.tsx` | Preview SVG rendering |
-| Modify | `src/components/PatternEditor/PatternEditor.tsx` | Wire hook (import exists, needs instantiation) |
-| Modify | `src/components/PatternEditor/useEditorInteractions.ts` | Wire handlers (reference exists) |
-| Modify | `src/copilot/action/tools/definitions/patternOpsTools.ts` | Upgrade + add convenience tool |
-| Create | `src/utils/__tests__/slashAndSpread.test.ts` | Geometry tests |
+| File | Purpose |
+|------|---------|
+| `src/utils/geometry/slashAndSpread.ts` | All geometry: 7 exported functions + `buildSpreadPiece` orchestrator |
+| `src/components/PatternEditor/useSlashAndSpreadTool.ts` | 8-phase state machine hook + pure transition functions |
+| `src/components/PatternEditor/renderers/overlays/SlashAndSpreadOverlay.tsx` | SVG overlay component |
+| `src/copilot/action/tools/definitions/patternOpsTools.ts` | `slashAndSpread` and `slashAndSpreadSimple` copilot tool definitions |
 
-## Testing Strategy
+## Testing
 
-- **Geometry tests:** Rectangle slash produces correct wedge angle, pivot start vs end, 0° = no change, smooth vs raw output, internal lines rotated correctly, invalid slash returns null, semantic edges rebuilt
-- **Copilot tool tests:** Validate parameter checking, piece existence, null result → error response
-- **Type check:** `tsc --noEmit`
-- **Existing tests:** No regressions in patternOps, splitOutline, seam tools
+- **Geometry unit tests** — target `src/utils/geometry/slashAndSpread.ts`:
+  - `findSlashIntersections`: throws for 0 or 1 intersections; returns ordered tuple for valid slash
+  - `splitOutlineAtSlash`: produces two closed halves; `splitMap` indices map back to original commands
+  - `pointInPolygon`: correctly classifies interior vs exterior points
+  - `classifyInternals` / `classifyDarts`: correct half assignment
+  - `applyPivotSpread` / `applyParallelSpread`: correct rotation / translation; internals and darts transformed
+  - `mergeSpreadHalves`: straight and smooth gap fill produce valid closed outlines
+  - `rebuildSemanticEdges`: spread-half ranges shifted by `gapCommandCount`; static-half ranges unchanged
+  - `buildSpreadPiece`: full round-trip on a rectangle; 0° spread = unchanged outline
+- **Hook unit tests** — target pure transition functions in `useSlashAndSpreadTool.ts`:
+  - Phase progression for each event in order
+  - `Escape` resets at every phase
+  - `Enter` in `spreadPreview` sets `_applyPiece`
+  - `Tab` toggles mode in eligible phases
+- **Type check** — `npx tsc --noEmit`
+- **Existing test suite** — no regressions in `splitOutline`, `patternOps`, seam tools
