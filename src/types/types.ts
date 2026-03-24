@@ -191,6 +191,22 @@ export interface Seam {
   tapeWidth: number;
 }
 
+// ─── Elastics (edge-based elastic/gathering) ───
+
+export type ElasticType = 'band' | 'shirring' | 'drawstring';
+
+export interface Elastic {
+  id: string;
+  pieceId: string;
+  edgeName: string;
+  stretchRatio: number;   // 0.1–2.0
+  width: number;          // mm
+  type: ElasticType;
+  tStart: number;         // 0.0–1.0
+  tEnd: number;           // 0.0–1.0
+  active: boolean;
+}
+
 /** A seam group connects multiple edge segments between two sets of edges */
 export interface SeamGroup {
   id: string;
