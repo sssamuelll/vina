@@ -34,6 +34,9 @@ export type SurfaceMode3D =
   | 'flat' | 'xray' | 'shaded'
   | 'shaded-wire' | 'textured-wire';
 
+/** Default UV transform for per-piece tiling. */
+export const DEFAULT_UV_TRANSFORM = { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 } as const;
+
 /** Pin strength determines how firmly the vertex is held. */
 export type PinStrength = 'weak' | 'medium' | 'strong';
 
@@ -483,7 +486,7 @@ const simulationSlice = createSlice({
         delete state.pieceTextureOverrides[pieceId][slot];
       }
     },
-    /** Set per-piece UV transform (partial merge with defaults). */
+    /** Set per-piece UV transform (partial merge with defaults, clamped). */
     setPieceUVTransform(state, action: PayloadAction<{
       pieceId: string;
       repeatX?: number;
@@ -493,10 +496,17 @@ const simulationSlice = createSlice({
       offsetY?: number;
     }>) {
       const { pieceId, ...transform } = action.payload;
-      state.pieceUVTransforms[pieceId] = {
-        ...(state.pieceUVTransforms[pieceId] ?? { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 }),
+      const merged = {
+        ...(state.pieceUVTransforms[pieceId] ?? DEFAULT_UV_TRANSFORM),
         ...transform,
       };
+      // Clamp to valid ranges
+      merged.repeatX = Math.max(0.1, Math.min(20, merged.repeatX));
+      merged.repeatY = Math.max(0.1, Math.min(20, merged.repeatY));
+      merged.rotation = ((merged.rotation % 360) + 360) % 360;
+      merged.offsetX = Math.max(0, Math.min(1, merged.offsetX));
+      merged.offsetY = Math.max(0, Math.min(1, merged.offsetY));
+      state.pieceUVTransforms[pieceId] = merged;
     },
 
     // ─── Opacity & Emission ──────────────────────────────────────────────────

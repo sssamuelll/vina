@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride, setPieceOpacity, setPieceEmission, clearPieceEmission } from '../../store/simulationSlice';
+import { setFabric, setPieceTint, setPieceUVTransform, setPieceTextureOverride, setPieceOpacity, setPieceEmission, clearPieceEmission, DEFAULT_UV_TRANSFORM } from '../../store/simulationSlice';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 
 // Note: Drag-drop textures use blob URLs which are session-scoped and won't
@@ -89,7 +89,7 @@ export default function MaterialTab() {
   const fabricId = pieceFabrics[selectedPieceId] || defaultFabricId;
   const fabric = getPhysicalFabric(fabricId);
   const tint = pieceTints[selectedPieceId] || '#ffffff';
-  const uv = pieceUVTransforms[selectedPieceId] || { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 };
+  const uv = pieceUVTransforms[selectedPieceId] || DEFAULT_UV_TRANSFORM;
   const currentOpacity = pieceOpacity[selectedPieceId] ?? 1.0;
   const currentEmission = pieceEmission[selectedPieceId] || null;
   const currentEmissionIntensity = pieceEmissionIntensity[selectedPieceId] ?? 0;

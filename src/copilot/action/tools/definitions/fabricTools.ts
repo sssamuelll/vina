@@ -508,7 +508,8 @@ const setTextureRepeatTool: ToolDefinition = {
     if (!piece) return { success: false, error: `Piece "${pieceId}" not found` };
 
     // Snapshot for rollback
-    const oldUV = state.simulation.pieceUVTransforms[pieceId] || { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 };
+    const { DEFAULT_UV_TRANSFORM } = await import('../../../../store/simulationSlice');
+    const oldUV = state.simulation.pieceUVTransforms[pieceId] || DEFAULT_UV_TRANSFORM;
 
     const update: Record<string, unknown> = { pieceId };
     if (params.repeatX !== undefined) update.repeatX = params.repeatX;
