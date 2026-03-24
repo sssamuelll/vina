@@ -3,6 +3,21 @@
  */
 import type { AnnotationCategory } from '../types/types';
 
+const MAX_ANNOTATION_LENGTH = 50;
+
+/** Generate a unique annotation ID. */
+export function annotationId(): string {
+  return 'ann-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+}
+
+/** Sanitize annotation text: strip control chars, enforce length limit. */
+export function sanitizeAnnotationText(text: string): string {
+  // Strip control characters (except space)
+  // eslint-disable-next-line no-control-regex
+  const cleaned = text.replace(/[\x00-\x1F\x7F]/g, '').trim();
+  return cleaned.slice(0, MAX_ANNOTATION_LENGTH);
+}
+
 export interface AnnotationTemplate {
   text: string;
   category: AnnotationCategory;

@@ -9,7 +9,7 @@ const addAnnotationTool: ToolDefinition = {
       pieceId: { type: 'string', description: 'ID of the piece' },
       text: { type: 'string', description: 'Annotation text (e.g. "CUT 2 ON FOLD", "INTERFACE")' },
       category: { type: 'string', enum: ['cutting', 'sewing', 'qc', 'general'], description: 'Category (default: general)' },
-      position: { type: 'string', enum: ['center', 'top', 'bottom'], description: 'Position on piece (default: center)' },
+      position: { type: 'string', enum: ['center'], description: 'Position on piece (currently only center supported)' },
     },
     required: ['pieceId', 'text'],
   },
@@ -17,10 +17,11 @@ const addAnnotationTool: ToolDefinition = {
     const piece = getState().project.pieces.find((p: { id: string }) => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
 
+    const { annotationId, sanitizeAnnotationText } = await import('../../../../utils/annotationTemplates');
     const annotation = {
-      id: 'ann-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-      text: params.text as string,
-      position: (params.position as string) || 'center',
+      id: annotationId(),
+      text: sanitizeAnnotationText(params.text as string),
+      position: 'center' as const,
       category: (params.category as string) || 'general',
       fontSize: 8,
     };

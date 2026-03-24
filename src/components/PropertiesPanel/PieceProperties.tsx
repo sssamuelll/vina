@@ -6,7 +6,7 @@ import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType } from '../../types/types';
 import type { PatternPiece } from '../../types/types';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
-import { ANNOTATION_TEMPLATES } from '../../utils/annotationTemplates';
+import { ANNOTATION_TEMPLATES, annotationId, sanitizeAnnotationText } from '../../utils/annotationTemplates';
 import PropertySection from './PropertySection';
 
 interface PiecePropertiesProps {
@@ -30,7 +30,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
     if (!tpl) return;
     dispatch(addAnnotation({
       pieceId: piece.id,
-      annotation: { id: 'ann-' + Date.now(), text: tpl.text, position: 'center', category: tpl.category, fontSize: 8 },
+      annotation: { id: annotationId(), text: tpl.text, position: 'center', category: tpl.category, fontSize: 8 },
     }));
     setSelectedTemplate('');
   };
@@ -39,7 +39,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
     if (!customText.trim()) return;
     dispatch(addAnnotation({
       pieceId: piece.id,
-      annotation: { id: 'ann-' + Date.now(), text: customText.trim(), position: 'center', category: 'general', fontSize: 8 },
+      annotation: { id: annotationId(), text: sanitizeAnnotationText(customText), position: 'center', category: 'general', fontSize: 8 },
     }));
     setCustomText('');
   };

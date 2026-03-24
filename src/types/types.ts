@@ -79,7 +79,7 @@ export interface PatternPiece {
 // ─── Annotations ───
 
 export type AnnotationCategory = 'cutting' | 'sewing' | 'qc' | 'general';
-export type AnnotationPosition = 'center' | 'top' | 'bottom' | { x: number; y: number };
+export type AnnotationPosition = 'center';
 
 export interface PieceAnnotation {
   id: string;
