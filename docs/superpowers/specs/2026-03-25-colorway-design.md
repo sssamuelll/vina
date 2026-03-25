@@ -64,13 +64,13 @@ Added to `ProjectState` interface and `initialState` (as `[]` and `null`).
 ### Reducers
 
 **`addColorway(state, action: PayloadAction<Omit<Colorway, 'id'>>)`:**
-Generates ID via `uid()`, pushes to `state.colorways`. If it's the first colorway, sets `activeColorwayId` to its ID.
+Validates name is unique (rejects duplicate names). Generates ID via `uid()`, pushes to `state.colorways`. If it's the first colorway, sets `activeColorwayId` to its ID.
 
 **`removeColorway(state, action: PayloadAction<string>)`:**
 Removes by ID. If the removed colorway was active, sets `activeColorwayId` to the first remaining colorway's ID (or `null` if none left).
 
 **`updateColorway(state, action: PayloadAction<Partial<Colorway> & { id: string }>)`:**
-Merges updates. For `overrides`, deep-merges with existing overrides (so updating one fabricCode doesn't wipe others).
+Merges updates. For `overrides`, deep-merges with existing overrides (so updating one fabricCode doesn't wipe others). Setting an override value to `null` deletes that fabricCode entry: `overrides: { LINING: null }` removes the LINING override.
 
 **`setActiveColorway(state, action: PayloadAction<string | null>)`:**
 Sets `activeColorwayId`. Validates the ID exists in `state.colorways` (or is `null`).
@@ -79,7 +79,7 @@ Sets `activeColorwayId`. Validates the ID exists in `state.colorways` (or is `nu
 Deep-clones the source colorway with a new ID and name, pushes to array.
 
 **`renameColorway(state, action: PayloadAction<{ id: string; name: string }>)`:**
-Updates the colorway's name.
+Validates new name is unique. Updates the colorway's name.
 
 ### Cascades
 
@@ -114,9 +114,11 @@ function resolveColorway(
 **Resolution order:**
 1. If `activeColorwayId` is null → return base material (no override).
 2. Find active colorway by ID. If not found → return base material.
-3. Look up `piece.fabricCode` in `colorway.overrides`. If no override for this fabricCode → return base material.
-4. Apply override fields (color, fabricId, textureUrl) on top of base material. Only non-undefined fields override.
-5. Return resolved material with `isOverridden: true`.
+3. Resolve fabricCode: use `piece.fabricCode ?? 'SELF'` (treat undefined fabricCode as `'SELF'` so old projects without fabricCode still work with colorways).
+4. Look up resolved fabricCode in `colorway.overrides`. If no override → return base material.
+5. Validate override fields: if `override.fabricId` is set but doesn't exist in the fabric library, ignore it (fall back to base fabricId) and log a warning.
+6. Apply valid override fields (color, fabricId, textureUrl) on top of base material. Only non-undefined fields override.
+7. Return resolved material with `isOverridden: true`.
 
 **Base material resolution:**
 The base color/fabricId comes from the piece's existing fabric assignment:
@@ -144,11 +146,14 @@ Implementation: A `useEffect` in a new `useColorwaySync` hook watches `activeCol
 
 ### File: `src/hooks/useColorwaySync.ts`
 
-Small hook that:
-1. Reads `pieces`, `colorways`, `activeColorwayId` from Redux.
-2. On change, computes which pieces need fabric reassignment.
-3. Dispatches `setFabric({ pieceId, fabricId })` for each overridden piece.
-4. When colorway is deactivated (null), restores base fabric assignments.
+Small hook that syncs colorway fabric overrides to the simulation layer. No snapshot of "base" state is needed — the base fabricId is always computable from `piece.fabricId` or `pieceFabrics[pieceId]`.
+
+1. Reads `pieces`, `colorways`, `activeColorwayId`, `pieceFabrics` from Redux.
+2. On `activeColorwayId` change, calls `resolveColorway` for each piece.
+3. Dispatches `setFabric({ pieceId, fabricId })` for each piece whose resolved fabricId differs from `pieceFabrics[pieceId]`.
+4. When colorway is deactivated (null), resolveColorway returns the base fabricId for each piece, and `setFabric` restores it.
+
+This is stateless — no useRef snapshot, no stored "previous" state. Each render recomputes the correct fabric assignment from the current colorway + base data.
 
 ## Copilot Tools
 
