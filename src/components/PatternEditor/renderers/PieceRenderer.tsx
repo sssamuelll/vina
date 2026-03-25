@@ -5,6 +5,7 @@ import { RootState } from '../../../store';
 import { PatternPiece, PathCommand } from '../../../types/types';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
+import { generateSeamAllowanceWithCorners } from '../../../utils/seam/cornerTypes';
 import { extractNodes } from '../nodeEditorUtils';
 import { getOutlineColor } from '../../../utils/layerColors';
 
@@ -156,15 +157,23 @@ const SinglePiece = memo(function SinglePiece({
         strokeLinejoin="round"
       />
 
-      {showSeamAllowance && (piece.seamAllowance > 0 || defaultSeamAllowanceWidth > 0) && (
-        <path
-          d={pathToSVG(generateSeamAllowance(piece.outline, piece.seamAllowance || defaultSeamAllowanceWidth))}
-          fill="none"
-          stroke="rgba(74, 158, 255, 0.4)"
-          strokeWidth={0.8 / zoom2D}
-          strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
-        />
-      )}
+      {showSeamAllowance && (piece.seamAllowance > 0 || defaultSeamAllowanceWidth > 0) && (() => {
+        const saWidth = piece.seamAllowance || defaultSeamAllowanceWidth;
+        const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
+          || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
+        const saPath = hasCustomCorners
+          ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {})
+          : generateSeamAllowance(piece.outline, saWidth);
+        return saPath.length > 0 ? (
+          <path
+            d={pathToSVG(saPath)}
+            fill="none"
+            stroke="rgba(74, 158, 255, 0.4)"
+            strokeWidth={0.8 / zoom2D}
+            strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
+          />
+        ) : null;
+      })()}
 
       {groupColor && (
         <path
