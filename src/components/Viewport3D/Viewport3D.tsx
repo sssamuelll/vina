@@ -40,6 +40,7 @@ import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
+import { useColorwaySync } from '../../hooks/useColorwaySync';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
@@ -148,6 +149,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
+  useColorwaySync();
 
   const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
