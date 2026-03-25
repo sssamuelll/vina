@@ -73,6 +73,9 @@ ${nextHandle()}
     { name: AAMA_LAYERS.GRAINLINE, color: 3, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.DRAW, color: 4, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.INTCUT, color: 6, lt: 'DASHED' },
+    { name: AAMA_LAYERS.FABRIC_CODE, color: 5, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.ANNOTATION, color: 2, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.FOLD_DIR, color: 6, lt: 'CONTINUOUS' },
   ];
   for (const l of layers) {
     s += `0
@@ -296,6 +299,13 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
         line.path[1].values[0], line.path[1].values[1],
         layer,
       );
+
+      // Fold direction annotation — placed at midpoint of fold line
+      if (line.type === 'fold') {
+        const midX = (line.path[0].values[0] + line.path[1].values[0]) / 2;
+        const midY = (line.path[0].values[1] + line.path[1].values[1]) / 2;
+        s += textToDXF('FOLD', midX, -(midY), 1.5, AAMA_LAYERS.FOLD_DIR);
+      }
     }
   }
 
@@ -304,6 +314,10 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
   const cx = (bb.minX + bb.maxX) / 2;
   const cy = (bb.minY + bb.maxY) / 2;
   s += textToDXF(piece.name, cx, -(cy), 2.5, AAMA_LAYERS.DRAW);
+
+  // Fabric code — placed 4mm below the piece name
+  const fabricCode = piece.fabricId || 'MAIN';
+  s += textToDXF(fabricCode, cx, -(cy + 4), 2.0, AAMA_LAYERS.FABRIC_CODE);
 
   return s;
 }
@@ -554,6 +568,9 @@ ${nextHandle()}
     { name: AAMA_LAYERS.GRAINLINE, color: 3, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.DRAW, color: 4, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.INTCUT, color: 6, lt: 'DASHED' },
+    { name: AAMA_LAYERS.FABRIC_CODE, color: 5, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.ANNOTATION, color: 2, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.FOLD_DIR, color: 6, lt: 'CONTINUOUS' },
   ];
   for (const l of layers) {
     s += `0
