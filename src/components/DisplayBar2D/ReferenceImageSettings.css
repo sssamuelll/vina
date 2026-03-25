@@ -1,0 +1,135 @@
+.ref-img-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px;
+  min-width: 200px;
+}
+
+.ref-img-import-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 5px 8px;
+  background: rgba(74, 158, 255, 0.12);
+  border: 1px solid rgba(74, 158, 255, 0.3);
+  border-radius: 5px;
+  color: var(--accent, #4a9eff);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ref-img-import-btn:hover:not(:disabled) {
+  background: rgba(74, 158, 255, 0.22);
+}
+
+.ref-img-import-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ref-img-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ref-img-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 5px;
+  padding: 5px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ref-img-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ref-img-row-top {
+  justify-content: space-between;
+}
+
+.ref-img-name {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.ref-img-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.ref-img-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.4);
+  transition: background 0.1s, color 0.1s;
+  padding: 0;
+}
+
+.ref-img-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.ref-img-btn.active {
+  color: var(--accent, #4a9eff);
+}
+
+.ref-img-btn-calibrate:hover {
+  color: #f0c040;
+}
+
+.ref-img-btn-remove:hover {
+  color: #ff5a5a;
+}
+
+.ref-img-row-opacity {
+  gap: 6px;
+}
+
+.ref-img-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.ref-img-slider {
+  flex: 1;
+  min-width: 0;
+  height: 2px;
+  accent-color: var(--accent, #4a9eff);
+  cursor: pointer;
+}
+
+.ref-img-value {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  width: 26px;
+  text-align: right;
+  flex-shrink: 0;
+}

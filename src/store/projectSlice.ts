@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
 import { generatePleatFoldLines } from '../utils/pleatGeometry';
@@ -67,6 +67,8 @@ interface ProjectState {
   arrangementOverrides: Record<string, [number, number, number]>;
   /** Points of measure */
   poms: PointOfMeasure[];
+  /** Reference images for tracing in the 2D pattern editor */
+  referenceImages: ReferenceImage[];
   /** Custom layer names (layer number → display name) */
   layerNames: Record<number, string>;
   /** Layer lock state (layer number → locked) */
@@ -93,6 +95,7 @@ const initialState: ProjectState = {
   seamGroups: [],
   arrangementOverrides: {},
   poms: [],
+  referenceImages: [],
   layerNames: {},
   layerLocked: {},
   loadDiagnostics: [] as ValidationDiagnostic[],
@@ -147,6 +150,8 @@ const projectSlice = createSlice({
       // Backfill layer metadata from older projects
       state.layerNames = (p as any).layerNames ?? {};
       state.layerLocked = (p as any).layerLocked ?? {};
+      // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
+      state.referenceImages = (p as any).referenceImages ?? [];
     },
     clearLoadDiagnostics(state) {
       state.loadDiagnostics = [];
@@ -541,6 +546,24 @@ const projectSlice = createSlice({
       for (const { id, value } of action.payload) {
         const pom = state.poms.find(p => p.id === id);
         if (pom) pom.value = value;
+      }
+    },
+
+    // ─── Reference Images ───
+    addReferenceImage(state, action: PayloadAction<ReferenceImage>) {
+      if (state.referenceImages.length >= 10) return; // max 10 images
+      state.referenceImages.push(action.payload);
+      state.isDirty = true;
+    },
+    removeReferenceImage(state, action: PayloadAction<string>) {
+      state.referenceImages = state.referenceImages.filter(i => i.id !== action.payload);
+      state.isDirty = true;
+    },
+    updateReferenceImage(state, action: PayloadAction<{ id: string } & Partial<ReferenceImage>>) {
+      const idx = state.referenceImages.findIndex(i => i.id === action.payload.id);
+      if (idx !== -1) {
+        Object.assign(state.referenceImages[idx], action.payload);
+        state.isDirty = true;
       }
     },
 
@@ -985,6 +1008,8 @@ export const {
   moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
+  // Reference Images
+  addReferenceImage, removeReferenceImage, updateReferenceImage,
 } = projectSlice.actions;
 
 const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };

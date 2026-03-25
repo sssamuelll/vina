@@ -42,6 +42,7 @@ function emptyState() {
     seamGroups: [],
     arrangementOverrides: {},
     poms: [],
+    referenceImages: [],
     layerNames: {},
     layerLocked: {},
     loadDiagnostics: [],

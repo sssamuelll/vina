@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 190 + 3 annotation tools
-      expect(registry.size).toBe(193);
+      // 193 (main) + 3 reference image tools
+      expect(registry.size).toBe(196);
     });
   });
 });

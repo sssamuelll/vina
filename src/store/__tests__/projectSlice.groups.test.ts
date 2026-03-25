@@ -14,6 +14,7 @@ function stateWith(pieces: { id: string }[], groups: { id: string; name: string;
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
     arrangementOverrides: {}, seamGroups: [], groups: groups.map(g => ({ ...g, createdAt: 0, updatedAt: 0 })),
     poms: [],
+    referenceImages: [],
     layerNames: {},
     layerLocked: {},
     loadDiagnostics: [],

@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece } from '../types/types';
 import { NEW_PROJECT } from './actions';
+import { removeReferenceImage } from './projectSlice';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -25,6 +26,9 @@ const initialState: EditorState = {
   units: 'mm',
   clipboard: null,
   superimposePickMode: null,
+  showReferenceImages: true,
+  selectedReferenceImageId: null,
+  calibrationMode: null,
 };
 
 const editorSlice = createSlice({
@@ -109,6 +113,26 @@ const editorSlice = createSlice({
     toggleSewingLines(state) {
       state.showSewingLines = !state.showSewingLines;
     },
+    toggleReferenceImages(state) {
+      state.showReferenceImages = !state.showReferenceImages;
+    },
+    setShowReferenceImages(state, action: PayloadAction<boolean>) {
+      state.showReferenceImages = action.payload;
+    },
+    setSelectedReferenceImage(state, action: PayloadAction<string | null>) {
+      state.selectedReferenceImageId = action.payload;
+    },
+    startCalibration(state, action: PayloadAction<{ imageId: string }>) {
+      state.calibrationMode = { imageId: action.payload.imageId, point1: null };
+    },
+    setCalibrationPoint1(state, action: PayloadAction<Point2D>) {
+      if (state.calibrationMode) {
+        state.calibrationMode.point1 = action.payload;
+      }
+    },
+    cancelCalibration(state) {
+      state.calibrationMode = null;
+    },
     setRenderMode2D(state, action: PayloadAction<'textured' | 'translucent' | 'wireframe'>) {
       state.renderMode2D = action.payload;
     },
@@ -145,6 +169,11 @@ const editorSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
+    builder.addCase(removeReferenceImage, (state, action) => {
+      if (state.selectedReferenceImageId === action.payload) {
+        state.selectedReferenceImageId = null;
+      }
+    });
   },
 });
 
@@ -154,6 +183,8 @@ export const {
   setZoom2D, setPan2D,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
+  toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
+  startCalibration, setCalibrationPoint1, cancelCalibration,
   setUnits,
   copyPieces, clearClipboard,
   enterSuperimposePickMode, exitSuperimposePickMode,

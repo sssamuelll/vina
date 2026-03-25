@@ -91,6 +91,23 @@ export interface PieceAnnotation {
   fontSize?: number;
 }
 
+// ─── Reference Images (2D pattern workspace background) ───
+
+/** A background reference image imported into the 2D pattern editor for tracing. */
+export interface ReferenceImage {
+  id: string;
+  filename: string;
+  width: number;              // natural image width in px
+  height: number;             // natural image height in px
+  position: Point2D;          // position in pattern space (mm)
+  scale: number;              // uniform scale factor
+  rotation: number;           // degrees
+  opacity: number;            // 0.0–1.0
+  locked: boolean;
+  visible: boolean;
+  pixelsPerMm: number | null; // set by calibration, null = uncalibrated
+}
+
 // ─── Rich Dart Entity ───
 
 /** Dart cap shape at the apex */
@@ -444,6 +461,10 @@ export interface OpenCloProject {
   poms?: PointOfMeasure[];
   /** Named seam groups (optional for backward compat) */
   seamGroups?: SeamGroup[];
+  /** Reference images for 2D tracing (optional for backward compat) */
+  referenceImages?: ReferenceImage[];
+  /** Base64-encoded image blobs keyed by imageId (present in .openclo.json files only) */
+  referenceImageData?: Record<string, string>;
   createdAt: number;
   updatedAt: number;
 }
@@ -542,5 +563,14 @@ export interface EditorState {
     active: boolean;
     sourcePieceId: string | null;
     mode: 'over' | 'under' | 'side' | null;
+  } | null;
+  /** Global toggle for reference image overlays */
+  showReferenceImages: boolean;
+  /** ID of the currently selected reference image (for highlight) */
+  selectedReferenceImageId: string | null;
+  /** Two-click calibration flow: active when user is setting scale ruler */
+  calibrationMode: {
+    imageId: string;
+    point1: Point2D | null;  // first click; null = awaiting
   } | null;
 }
