@@ -607,3 +607,19 @@ describe('Triangle collision (BVH)', () => {
     expect(positions[7]).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('XPBDClothSolver — constraint validation', () => {
+  it('throws when triangle IDs reference out-of-bounds particles', () => {
+    // 2 vertices but triangle references particle ID 999
+    const mesh: ClothMeshData = {
+      vertices: new Float32Array([0, 0, 0, 1, 0, 0]),
+      triIds: new Int32Array([0, 1, 999]), // 999 is out of bounds
+    };
+    expect(() => new XPBDClothSolver(mesh)).toThrow(/out of bounds/i);
+  });
+
+  it('accepts valid mesh without throwing', () => {
+    const mesh = makeSquareMesh();
+    expect(() => new XPBDClothSolver(mesh)).not.toThrow();
+  });
+});

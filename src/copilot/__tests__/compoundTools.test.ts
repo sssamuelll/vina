@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // Updated after #79-#82 copilot epic completion + #142 3D interaction tools + snapshot tools + #265 colorway tools
-      expect(registry.size).toBe(184); // 178 (prev total) + 6 colorway tools
+      // 184 (colorway branch) + 20 (main: garmentInfo+annotation+pleat+elastic+referenceImage)
+      expect(registry.size).toBe(204);
     });
   });
 });

@@ -6,7 +6,8 @@
 
 import { extractStretchConstraints, extractBendConstraints } from '../gpu/gpuBuffers';
 import { mergeMeshes, buildSeamConstraints } from '../seamAssembly';
-import type { PathCommand } from '../../../types/types';
+import { buildElasticConstraints, type ElasticConstraintSet } from '../elasticAssembly';
+import type { PathCommand, Elastic, SemanticEdge } from '../../../types/types';
 import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 
@@ -74,6 +75,14 @@ interface WorkerCollisionBody {
 }
 let collisionBodies: WorkerCollisionBody[] = [];
 
+/** Elastic constraints solved in JS (Rust solver has no native elastic support) */
+let elasticConstraintSet: ElasticConstraintSet | null = null;
+/** Cached outline + edge data for rebuilding elastic constraints */
+let wasmCachedOutlines: Map<string, PathCommand[]> | null = null;
+let wasmCachedPieceEdges: Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }> | null = null;
+/** Cached merged mesh reference for elastic constraint building */
+let wasmCachedMergedMesh: { vertices: Float32Array; indices: Uint32Array; pieceOffsets: Map<string, { vertexOffset: number; indexOffset: number }> } | null = null;
+
 /** Number of outer substeps managed by JS (collision applied between each) */
 let jsSubsteps = 15;
 /** Pre-allocated inverse mass array for collision solver (avoids GC pressure) */
@@ -124,6 +133,27 @@ function simulationLoop(): void {
       const posView = new Float32Array(mem.buffer, posPtr, n3);
       const velView = new Float32Array(mem.buffer, velPtr, n3);
       const prevView = new Float32Array(mem.buffer, prevPtr, n3);
+
+      // Solve elastic constraints in JS (Rust solver has no native elastic support)
+      if (elasticConstraintSet) {
+        for (const c of elasticConstraintSet.constraints) {
+          const i3 = c.vertexA * 3, j3 = c.vertexB * 3;
+          const dx = posView[j3] - posView[i3];
+          const dy = posView[j3 + 1] - posView[i3 + 1];
+          const dz = posView[j3 + 2] - posView[i3 + 2];
+          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+          if (dist < 1e-8) continue;
+          const alpha = c.compliance / (sdt * sdt);
+          const correction = (dist - c.restLength) / (2.0 + alpha);
+          const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+          posView[i3] += correction * nx;
+          posView[i3 + 1] += correction * ny;
+          posView[i3 + 2] += correction * nz;
+          posView[j3] -= correction * nx;
+          posView[j3 + 1] -= correction * ny;
+          posView[j3 + 2] -= correction * nz;
+        }
+      }
 
       // Save positions before collision for velocity correction
       preCollisionBuf.set(posView);
@@ -199,6 +229,30 @@ function simulationLoop(): void {
   } else {
     // No collision bodies — run all substeps at once (original path)
     solver.step(1 / 60);
+
+    // Solve elastic constraints in JS (no-collision path)
+    if (elasticConstraintSet && wasmExports?.memory) {
+      const sdt = 1 / (60 * jsSubsteps);
+      const posPtr = solver.positions_ptr();
+      const posView = new Float32Array(wasmExports.memory.buffer, posPtr, n * 3);
+      for (const c of elasticConstraintSet.constraints) {
+        const i3 = c.vertexA * 3, j3 = c.vertexB * 3;
+        const dx = posView[j3] - posView[i3];
+        const dy = posView[j3 + 1] - posView[i3 + 1];
+        const dz = posView[j3 + 2] - posView[i3 + 2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < 1e-8) continue;
+        const alpha = c.compliance / (sdt * sdt);
+        const correction = (dist - c.restLength) / (2.0 + alpha);
+        const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+        posView[i3] += correction * nx;
+        posView[i3 + 1] += correction * ny;
+        posView[i3 + 2] += correction * nz;
+        posView[j3] -= correction * nx;
+        posView[j3 + 1] -= correction * ny;
+        posView[j3 + 2] -= correction * nz;
+      }
+    }
 
     // Clamp velocity even without collision — Rust solver has no internal clamp
     if (wasmExports?.memory) {
@@ -302,13 +356,25 @@ self.onmessage = async (event: MessageEvent) => {
         // Pass triangle indices for air drag calculation
         solver.set_triangles(triangles);
 
+        // Cache outline and edge data for elastic constraint building
+        const outlines = new Map<string, PathCommand[]>();
+        const pieceEdges = new Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const p of msg.pieces as any[]) {
+          if (p.outline) outlines.set(p.pieceId, p.outline);
+          if (p.edges) pieceEdges.set(p.pieceId, { edges: p.edges });
+        }
+        wasmCachedOutlines = outlines;
+        wasmCachedPieceEdges = pieceEdges;
+        // Convert MergedMesh.pieces[] to the Map format expected by buildElasticConstraints
+        const pieceOffsetsMap = new Map<string, { vertexOffset: number; indexOffset: number }>();
+        for (const p of merged.pieces) {
+          pieceOffsetsMap.set(p.pieceId, { vertexOffset: p.vertexOffset, indexOffset: p.triangleOffset });
+        }
+        wasmCachedMergedMesh = { vertices: merged.vertices, indices: new Uint32Array(merged.triIds), pieceOffsets: pieceOffsetsMap };
+
         // Seam constraints
         if (msg.seams && msg.seams.length > 0) {
-          const outlines = new Map<string, PathCommand[]>();
-          for (const p of msg.pieces) {
-            if (p.outline) outlines.set(p.pieceId, p.outline);
-          }
-
           const seamConstraints = buildSeamConstraints(msg.seams, outlines, merged);
           if (seamConstraints.count > 0) {
             console.log('[WasmWorker] Adding seam constraints:', seamConstraints.count);
@@ -444,6 +510,24 @@ self.onmessage = async (event: MessageEvent) => {
       case 'setWind': {
         if (solver) {
           solver.set_wind(msg.wind[0], msg.wind[1], msg.wind[2]);
+        }
+        break;
+      }
+
+      case 'setElastics': {
+        if (wasmCachedMergedMesh && wasmCachedOutlines && wasmCachedPieceEdges) {
+          const activeElastics = (msg.elastics as Elastic[]).filter(e => e.active !== false);
+          if (activeElastics.length > 0) {
+            elasticConstraintSet = buildElasticConstraints(
+              activeElastics,
+              wasmCachedOutlines,
+              wasmCachedMergedMesh,
+              wasmCachedPieceEdges,
+            );
+            console.log('[WasmWorker] Elastic constraints set:', elasticConstraintSet.constraints.length);
+          } else {
+            elasticConstraintSet = null;
+          }
         }
         break;
       }

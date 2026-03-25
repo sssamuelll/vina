@@ -7,7 +7,7 @@
  * @module projectIO
  */
 
-import type { PieceGroup } from '../types/types';
+import type { PieceGroup, ReferenceImage } from '../types/types';
 import { OpenCloProject } from '../types/types';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 
@@ -22,6 +22,8 @@ interface ProjectState {
   avatarModelUrl?: string | null;
   isDirty?: boolean;
   groups?: PieceGroup[];
+  garmentInfo?: import('../types/types').GarmentInfo;
+  referenceImages?: ReferenceImage[];
 }
 
 // ─── Serialization ──────────────────────────────────────────────────────────
@@ -62,6 +64,8 @@ function stateToProject(state: ProjectState): Record<string, unknown> {
     fabrics: state.fabrics,
     avatar: state.avatar,
     groups: state.groups ?? [],
+    garmentInfo: state.garmentInfo || {},
+    referenceImages: state.referenceImages ?? [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

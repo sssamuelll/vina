@@ -46,6 +46,11 @@ import { tools as pomToolDefs } from './definitions/pomTools';
 import { tools as sewingEnhancementToolDefs } from './definitions/sewingEnhancementTools';
 import { tools as renderToolDefs } from './definitions/renderTools';
 import { tools as colorwayToolDefs } from './definitions/colorwayTools';
+import { tools as garmentInfoToolDefs } from './definitions/garmentInfoTools';
+import { tools as annotationToolDefs } from './definitions/annotationTools';
+import { tools as pleatToolDefs } from './definitions/pleatTools';
+import { tools as elasticToolDefs } from './definitions/elasticTools';
+import { tools as referenceImageToolDefs } from './definitions/referenceImageTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -369,6 +374,11 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   sewingEnhancementToolDefs,
   renderToolDefs,
   colorwayToolDefs,
+  garmentInfoToolDefs,
+  annotationToolDefs,
+  pleatToolDefs,
+  elasticToolDefs,
+  referenceImageToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

@@ -12,6 +12,7 @@
 import { PatternPiece, PathCommand } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
+import { escapeDxfString } from '../sanitizeName';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -73,6 +74,9 @@ ${nextHandle()}
     { name: AAMA_LAYERS.GRAINLINE, color: 3, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.DRAW, color: 4, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.INTCUT, color: 6, lt: 'DASHED' },
+    { name: AAMA_LAYERS.FABRIC_CODE, color: 5, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.ANNOTATION, color: 2, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.FOLD_DIR, color: 6, lt: 'CONTINUOUS' },
   ];
   for (const l of layers) {
     s += `0
@@ -296,6 +300,14 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
         line.path[1].values[0], line.path[1].values[1],
         layer,
       );
+
+      // Fold direction annotation — placed at midpoint of fold line
+      if (line.type === 'fold') {
+        const midX = (line.path[0].values[0] + line.path[1].values[0]) / 2;
+        const midY = (line.path[0].values[1] + line.path[1].values[1]) / 2;
+        const dir = line.foldOptions?.direction === 'valley' ? 'VAL' : 'MTN';
+        s += textToDXF(dir, midX, -(midY), 1.5, AAMA_LAYERS.FOLD_DIR);
+      }
     }
   }
 
@@ -304,6 +316,19 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
   const cx = (bb.minX + bb.maxX) / 2;
   const cy = (bb.minY + bb.maxY) / 2;
   s += textToDXF(piece.name, cx, -(cy), 2.5, AAMA_LAYERS.DRAW);
+
+  // Fabric code — production classification (SELF, LINING, etc.), not simulation material ID
+  const fabricCode = piece.fabricCode || 'SELF';
+  s += textToDXF(fabricCode, cx, -(cy + 4), 2.0, AAMA_LAYERS.FABRIC_CODE);
+
+  // Annotations — placed below fabric code, stacked
+  if (piece.annotations?.length) {
+    let annotY = cy + 8;
+    for (const ann of piece.annotations) {
+      s += textToDXF(ann.text, cx, -(annotY), 1.8, AAMA_LAYERS.ANNOTATION);
+      annotY += 3;
+    }
+  }
 
   return s;
 }
@@ -486,7 +511,7 @@ ${y.toFixed(4)}
 40
 ${height.toFixed(1)}
 1
-${text}
+${escapeDxfString(text)}
 `;
 }
 
@@ -554,6 +579,9 @@ ${nextHandle()}
     { name: AAMA_LAYERS.GRAINLINE, color: 3, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.DRAW, color: 4, lt: 'CONTINUOUS' },
     { name: AAMA_LAYERS.INTCUT, color: 6, lt: 'DASHED' },
+    { name: AAMA_LAYERS.FABRIC_CODE, color: 5, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.ANNOTATION, color: 2, lt: 'CONTINUOUS' },
+    { name: AAMA_LAYERS.FOLD_DIR, color: 6, lt: 'CONTINUOUS' },
   ];
   for (const l of layers) {
     s += `0

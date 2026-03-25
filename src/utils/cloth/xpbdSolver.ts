@@ -334,6 +334,9 @@ export class XPBDClothSolver {
   /** Seam constraints for multi-piece sewing */
   private seamConstraints: SeamConstraintSet | null = null;
 
+  /** Elastic band constraints */
+  private elasticConstraints: import('./elasticAssembly').ElasticConstraintSet | null = null;
+
   /** Spatial hash grid for self-collision */
   private spatialHash: SpatialHashGrid;
   /** Triangle adjacency for self-collision neighbor skipping */
@@ -422,6 +425,9 @@ export class XPBDClothSolver {
     this.stretchingLengths = new Float32Array(this.stretchingIds.length / 2);
     this.bendingLengths = new Float32Array(this.bendingIds.length / 4);
 
+    // Validate constraint IDs are within particle bounds
+    this.validateConstraintIds();
+
     this.grads = new Float32Array(4 * 3);
 
     this.initPhysics();
@@ -429,6 +435,34 @@ export class XPBDClothSolver {
     // Self-collision setup
     this.spatialHash = new SpatialHashGrid(this.config.clothThickness * 2);
     this.adjacency = buildAdjacency(this.triIds, this.numParticles);
+  }
+
+  /**
+   * Validate that all constraint particle IDs are within bounds.
+   * Throws a diagnostic error if invalid IDs are found (instead of silent NaN propagation).
+   */
+  private validateConstraintIds(): void {
+    const n = this.numParticles;
+
+    for (let i = 0; i < this.stretchingIds.length; i++) {
+      const id = this.stretchingIds[i];
+      if (id < 0 || id >= n) {
+        throw new Error(
+          `Invalid stretch constraint: particle ID ${id} at index ${i} is out of bounds ` +
+          `(numParticles=${n}). Mesh data may be corrupted.`,
+        );
+      }
+    }
+
+    for (let i = 0; i < this.bendingIds.length; i++) {
+      const id = this.bendingIds[i];
+      if (id < 0 || id >= n) {
+        throw new Error(
+          `Invalid bend constraint: particle ID ${id} at index ${i} is out of bounds ` +
+          `(numParticles=${n}). Mesh data may be corrupted.`,
+        );
+      }
+    }
   }
 
   /**
@@ -706,6 +740,15 @@ export class XPBDClothSolver {
   }
 
   /**
+   * Set elastic band constraints for garment elastics simulation.
+   *
+   * @param elasticSet - Elastic constraint set from buildElasticConstraints(), or null to clear
+   */
+  setElasticConstraints(elasticSet: import('./elasticAssembly').ElasticConstraintSet | null): void {
+    this.elasticConstraints = elasticSet;
+  }
+
+  /**
    * Set directional wind force.
    *
    * @param force - Wind force vector [x, y, z] in N/m²
@@ -918,6 +961,32 @@ export class XPBDClothSolver {
     if (this.seamConstraints) {
       solveSeamConstraints(this.pos, this.invMass, this.seamConstraints, sdt);
     }
+
+    // Solve elastic constraints
+    if (this.elasticConstraints) {
+      const pos = this.pos;
+      const dt = sdt;
+      for (const c of this.elasticConstraints.constraints) {
+        const i = c.vertexA, j = c.vertexB;
+        const dx = pos[j * 3] - pos[i * 3];
+        const dy = pos[j * 3 + 1] - pos[i * 3 + 1];
+        const dz = pos[j * 3 + 2] - pos[i * 3 + 2];
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist < 1e-10) continue;
+        const C = dist - c.restLength;
+        const alpha = c.compliance / (dt * dt);
+        const denom = 2.0 + alpha;
+        const lambda = -C / denom;
+        const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+        pos[i * 3] -= lambda * nx;
+        pos[i * 3 + 1] -= lambda * ny;
+        pos[i * 3 + 2] -= lambda * nz;
+        pos[j * 3] += lambda * nx;
+        pos[j * 3 + 1] += lambda * ny;
+        pos[j * 3 + 2] += lambda * nz;
+      }
+    }
+
     this.solveCollisions();
 
     if (this.config.selfCollision) {

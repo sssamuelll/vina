@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * User Preferences — Track and learn from user behavior.
  *
@@ -10,6 +10,8 @@
  *
  * @module userPreferences
  */
+
+import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
 
 // ============================================================================
 // Types
@@ -378,10 +380,7 @@ export class PreferenceManager {
    */
   private loadFromStorage(): UserPreferences | null {
     try {
-      if (typeof window === 'undefined' || !window.localStorage) {
-        return null;
-      }
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const stored = safeGetItem(STORAGE_KEY);
       if (!stored) return null;
 
       const parsed = JSON.parse(stored) as UserPreferences;
@@ -402,14 +401,7 @@ export class PreferenceManager {
    * Save preferences to storage.
    */
   private persist(): void {
-    try {
-      if (typeof window === 'undefined' || !window.localStorage) {
-        return;
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.preferences));
-    } catch {
-      // Ignore storage errors
-    }
+    safeSetItem(STORAGE_KEY, JSON.stringify(this.preferences));
   }
 
   // === Listeners ===
