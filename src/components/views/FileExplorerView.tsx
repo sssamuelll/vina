@@ -8,7 +8,9 @@ import {
   garbageCollect,
 } from '../../utils/import/referenceImageStore';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA } from '../../utils/dxf';
-import type { DXFDocument } from '../../utils/dxf/types';
+import { detectDXFFormat } from '../../utils/dxf/formatDetector';
+import type { DXFDocument, DetectionResult, FormatId, FormatProfile } from '../../utils/dxf/types';
+import { setDxfPreferredFormat } from '../../store/workflowSlice';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
 import ImportDXFDialog from '../ImportDXFDialog/ImportDXFDialog';
@@ -72,9 +74,12 @@ export default function FileExplorerView() {
   const gerberInputRef = useRef<HTMLInputElement>(null);
   const projectInputRef = useRef<HTMLInputElement>(null);
 
+  const dxfPreferredFormat = useSelector((s: RootState) => s.workflow.dxfPreferredFormat);
+
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
   const [showExportSkillModal, setShowExportSkillModal] = useState(false);
   const [dxfDialogDoc, setDxfDialogDoc] = useState<DXFDocument | null>(null);
+  const [dxfDetectionResults, setDxfDetectionResults] = useState<DetectionResult[]>([]);
 
   // ─── Cutting Layout State ───
   const [clPaperSize, setClPaperSize] = useState<PaperSize>('A0');
@@ -96,6 +101,8 @@ export default function FileExplorerView() {
       if (!file) return;
       const text = await file.text();
       const doc = parseDXF(text);
+      const detectionResults = detectDXFFormat(doc);
+      setDxfDetectionResults(detectionResults);
       setDxfDialogDoc(doc);
       if (dxfInputRef.current) dxfInputRef.current.value = '';
     },
@@ -103,7 +110,7 @@ export default function FileExplorerView() {
   );
 
   const handleDXFDialogImport = useCallback(
-    (options: ImportDXFOptions) => {
+    (options: ImportDXFOptions & { formatProfile?: FormatProfile }) => {
       if (!dxfDialogDoc) return;
       const dxfPieces = dxfToPatternPieces(dxfDialogDoc, {
         unit: options.unit,
@@ -111,6 +118,7 @@ export default function FileExplorerView() {
         importNotches: options.importNotches,
         importGrainlines: options.importGrainlines,
         importInternalLines: options.importInternalLines,
+        formatProfile: options.formatProfile,
       });
       if (options.loadType === 'open') {
         dispatch(loadProject({
@@ -365,6 +373,7 @@ export default function FileExplorerView() {
       // Clear persisted project and reset all Redux slices
       import('../../utils/projectIO').then(m => m.clearStorageProject());
       import('../../utils/import/referenceImageStore').then(m => m.clearAllImageBlobs()).catch(() => {});
+      import('../../utils/dxf/parser').then(m => m.clearLastParsedDoc());
       import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
     }
   }, [dispatch]);
@@ -573,8 +582,12 @@ export default function FileExplorerView() {
       {dxfDialogDoc && (
         <ImportDXFDialog
           doc={dxfDialogDoc}
+          detectionResults={dxfDetectionResults}
+          rememberedFormat={dxfPreferredFormat}
           onImport={handleDXFDialogImport}
           onCancel={() => setDxfDialogDoc(null)}
+          onAlwaysUse={(id: FormatId) => dispatch(setDxfPreferredFormat(id))}
+          onClearRemembered={() => dispatch(setDxfPreferredFormat(null))}
         />
       )}
 

@@ -21,7 +21,9 @@ import {
   deserializeReferenceImages,
   garbageCollect,
 } from '../../utils/import/referenceImageStore';
-import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF } from '../../utils/dxf';
+import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF, detectDXFFormat } from '../../utils/dxf';
+import type { DetectionResult, FormatId, FormatProfile } from '../../utils/dxf/types';
+import { setDxfPreferredFormat } from '../../store/workflowSlice';
 import type { DXFDocument } from '../../utils/dxf/types';
 import { downloadPDF } from '../../utils/exportPDF';
 import { downloadOBJ } from '../../utils/export/exportOBJ';
@@ -113,6 +115,8 @@ export default function ProjectView() {
   const [lastExport, setLastExport] = useState<{ filename: string; date: string } | null>(null);
   const [showExportSkillModal, setShowExportSkillModal] = useState(false);
   const [dxfDialogDoc, setDxfDialogDoc] = useState<DXFDocument | null>(null);
+  const [dxfDetectionResults, setDxfDetectionResults] = useState<DetectionResult[]>([]);
+  const dxfPreferredFormat = useSelector((s: RootState) => s.workflow.dxfPreferredFormat);
 
   // Piece visibility/lock (local UI state)
   const [pieceUI, setPieceUI] = useState<Record<string, PieceUIState>>({});
@@ -225,6 +229,7 @@ export default function ProjectView() {
       if (!file) return;
       const text = await file.text();
       const doc = parseDXF(text);
+      setDxfDetectionResults(detectDXFFormat(doc));
       setDxfDialogDoc(doc);
       if (dxfInputRef.current) dxfInputRef.current.value = '';
     },
@@ -232,7 +237,7 @@ export default function ProjectView() {
   );
 
   const handleDXFDialogImport = useCallback(
-    (options: ImportDXFOptions) => {
+    (options: ImportDXFOptions & { formatProfile?: FormatProfile }) => {
       if (!dxfDialogDoc) return;
       const dxfPieces = dxfToPatternPieces(dxfDialogDoc, {
         unit: options.unit,
@@ -240,6 +245,7 @@ export default function ProjectView() {
         importNotches: options.importNotches,
         importGrainlines: options.importGrainlines,
         importInternalLines: options.importInternalLines,
+        formatProfile: options.formatProfile,
       });
       if (options.loadType === 'open') {
         dispatch(loadProject({
@@ -512,6 +518,7 @@ export default function ProjectView() {
       // Clear persisted project and reset all Redux slices
       import('../../utils/projectIO').then(m => m.clearStorageProject());
       import('../../utils/import/referenceImageStore').then(m => m.clearAllImageBlobs()).catch(() => {});
+      import('../../utils/dxf/parser').then(m => m.clearLastParsedDoc());
       import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
     }
   }, [dispatch]);
@@ -948,8 +955,12 @@ export default function ProjectView() {
       {dxfDialogDoc && (
         <ImportDXFDialog
           doc={dxfDialogDoc}
+          detectionResults={dxfDetectionResults}
+          rememberedFormat={dxfPreferredFormat}
           onImport={handleDXFDialogImport}
           onCancel={() => setDxfDialogDoc(null)}
+          onAlwaysUse={(id: FormatId) => dispatch(setDxfPreferredFormat(id))}
+          onClearRemembered={() => dispatch(setDxfPreferredFormat(null))}
         />
       )}
 

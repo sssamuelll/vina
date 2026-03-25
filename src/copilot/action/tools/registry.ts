@@ -52,6 +52,7 @@ import { tools as annotationToolDefs } from './definitions/annotationTools';
 import { tools as pleatToolDefs } from './definitions/pleatTools';
 import { tools as elasticToolDefs } from './definitions/elasticTools';
 import { tools as referenceImageToolDefs } from './definitions/referenceImageTools';
+import { tools as dxfToolDefs } from './definitions/dxfTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -381,6 +382,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   pleatToolDefs,
   elasticToolDefs,
   referenceImageToolDefs,
+  dxfToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

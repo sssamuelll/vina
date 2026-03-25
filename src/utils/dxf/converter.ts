@@ -7,6 +7,7 @@ import {
   DXFLWPolylineData, DXFPolylineData, DXFSplineData,
   DXFArcData, DXFCircleData, DXFTextData, layerRole,
 } from './types';
+import type { FormatProfile, LayerRole } from './types';
 
 // ─── Entity → PathCommand[] conversion ───
 
@@ -222,6 +223,7 @@ export interface DXFImportOptions {
   importNotches?: boolean;
   importGrainlines?: boolean;
   importInternalLines?: boolean;
+  formatProfile?: FormatProfile;
 }
 
 const UNIT_FACTORS: Record<string, number> = { mm: 1, cm: 10, inch: 25.4 };
@@ -264,13 +266,23 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
         ? insert.data as DXFInsertData
         : { blockName, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
 
-      const piece = entitiesToPiece(block.entities, blockName, insertData);
-      if (piece) pieces.push(piece);
+      let piece = entitiesToPiece(block.entities, blockName, insertData, options?.formatProfile);
+      if (piece) {
+        if (options?.formatProfile?.convertHook) {
+          piece = options.formatProfile.convertHook(piece, block.entities);
+        }
+        pieces.push(piece);
+      }
     }
   } else {
     // No blocks: group by entities, treat as single piece
-    const piece = entitiesToPiece(doc.entities, 'Imported Piece', null);
-    if (piece) pieces.push(piece);
+    let piece = entitiesToPiece(doc.entities, 'Imported Piece', null, options?.formatProfile);
+    if (piece) {
+      if (options?.formatProfile?.convertHook) {
+        piece = options.formatProfile.convertHook(piece, doc.entities);
+      }
+      pieces.push(piece);
+    }
   }
 
   // Apply scale and unit
@@ -308,10 +320,22 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
   return pieces;
 }
 
+function resolveLayerRole(layerName: string, profile?: FormatProfile): LayerRole {
+  const normalized = layerName.toUpperCase();
+  if (profile) {
+    if (profile.layerMap[normalized]) return profile.layerMap[normalized];
+    for (const { pattern, role } of profile.layerPatterns) {
+      if (pattern.test(layerName)) return role;
+    }
+  }
+  return layerRole(layerName);
+}
+
 function entitiesToPiece(
   entities: DXFEntity[],
   defaultName: string,
   insertData: DXFInsertData | null,
+  profile?: FormatProfile,
 ): PatternPiece | null {
   let outline: PathCommand[] = [];
   const internals: InternalLine[] = [];
@@ -339,7 +363,7 @@ function entitiesToPiece(
 
   // Extract notch points from TEXT entities on notch layer (AAMA layer 4)
   for (const e of entities) {
-    if ((e.type === 'TEXT' || e.type === 'MTEXT') && layerRole(e.layer) === 'notch') {
+    if ((e.type === 'TEXT' || e.type === 'MTEXT') && resolveLayerRole(e.layer, profile) === 'notch') {
       const td = e.data as DXFTextData;
       let nx = td.x, ny = td.y;
       if (insertData) {
@@ -361,7 +385,7 @@ function entitiesToPiece(
   // Group geometry entities by layer role
   for (const e of entities) {
     if (e.type === 'TEXT' || e.type === 'MTEXT' || e.type === 'INSERT') continue;
-    const role = layerRole(e.layer);
+    const role = resolveLayerRole(e.layer, profile);
     let path = entityToPath(e);
     if (path.length === 0) continue;
 

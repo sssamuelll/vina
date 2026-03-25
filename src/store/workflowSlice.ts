@@ -1,11 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import type { FormatId } from '../utils/dxf/types';
 
 export interface WorkflowState {
   expertMode: boolean;
   confirmOverrides: Record<string, 'default' | 'always' | 'never'>;
   toolMemory: Record<string, Record<string, unknown>>;
+  dxfPreferredFormat: FormatId | null;
 }
 
 const STORAGE_KEY = 'openclo-workflow';
@@ -20,6 +22,7 @@ const initialState: WorkflowState = {
   expertMode: false,
   confirmOverrides: {},
   toolMemory: {},
+  dxfPreferredFormat: null,
 };
 
 /**
@@ -74,10 +77,15 @@ const workflowSlice = createSlice({
       state.toolMemory = {};
     },
 
+    setDxfPreferredFormat(state, action: PayloadAction<FormatId | null>) {
+      state.dxfPreferredFormat = action.payload;
+    },
+
     rehydrateWorkflow(state, action: PayloadAction<WorkflowState>) {
       state.expertMode = action.payload.expertMode;
       state.confirmOverrides = action.payload.confirmOverrides;
       state.toolMemory = action.payload.toolMemory;
+      state.dxfPreferredFormat = action.payload.dxfPreferredFormat ?? null;
     },
   },
 
@@ -94,6 +102,7 @@ export const {
   setConfirmOverride,
   updateToolMemory,
   clearToolMemory,
+  setDxfPreferredFormat,
   rehydrateWorkflow,
 } = workflowSlice.actions;
 

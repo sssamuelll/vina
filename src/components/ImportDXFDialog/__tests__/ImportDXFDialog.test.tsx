@@ -21,17 +21,19 @@ function makeDoc(): DXFDocument {
 }
 
 describe('ImportDXFDialog', () => {
+  const defaultDetectionResults = [{ profileId: 'aama' as const, name: 'AAMA', confidence: 95 }];
+
   it('renders piece summary from DXFDocument', () => {
     const onImport = vi.fn();
     const onCancel = vi.fn();
-    render(<ImportDXFDialog doc={makeDoc()} onImport={onImport} onCancel={onCancel} />);
+    render(<ImportDXFDialog doc={makeDoc()} detectionResults={defaultDetectionResults} rememberedFormat={null} onImport={onImport} onCancel={onCancel} onAlwaysUse={() => {}} onClearRemembered={() => {}} />);
     expect(screen.getByText(/2 pieces detected/i)).toBeTruthy();
   });
 
   it('calls onCancel when Cancel is clicked', () => {
     const onImport = vi.fn();
     const onCancel = vi.fn();
-    render(<ImportDXFDialog doc={makeDoc()} onImport={onImport} onCancel={onCancel} />);
+    render(<ImportDXFDialog doc={makeDoc()} detectionResults={defaultDetectionResults} rememberedFormat={null} onImport={onImport} onCancel={onCancel} onAlwaysUse={() => {}} onClearRemembered={() => {}} />);
     fireEvent.click(screen.getByText('Cancel'));
     expect(onCancel).toHaveBeenCalled();
   });
@@ -39,7 +41,7 @@ describe('ImportDXFDialog', () => {
   it('calls onImport with default options when Import is clicked', () => {
     const onImport = vi.fn();
     const onCancel = vi.fn();
-    render(<ImportDXFDialog doc={makeDoc()} onImport={onImport} onCancel={onCancel} />);
+    render(<ImportDXFDialog doc={makeDoc()} detectionResults={defaultDetectionResults} rememberedFormat={null} onImport={onImport} onCancel={onCancel} onAlwaysUse={() => {}} onClearRemembered={() => {}} />);
     fireEvent.click(screen.getByText('Import'));
     expect(onImport).toHaveBeenCalledWith(expect.objectContaining({
       loadType: 'add',
@@ -56,7 +58,7 @@ describe('ImportDXFDialog', () => {
     doc.header.set('$INSUNITS', 1); // inches
     const onImport = vi.fn();
     const onCancel = vi.fn();
-    render(<ImportDXFDialog doc={doc} onImport={onImport} onCancel={onCancel} />);
+    render(<ImportDXFDialog doc={doc} detectionResults={defaultDetectionResults} rememberedFormat={null} onImport={onImport} onCancel={onCancel} onAlwaysUse={() => {}} onClearRemembered={() => {}} />);
     expect(screen.getAllByText(/inch/i).length).toBeGreaterThan(0);
   });
 });

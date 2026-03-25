@@ -16,6 +16,7 @@ import editorReducer from '../../../store/editorSlice';
 // We need to provide the construction slice so `construction.points` is available.
 import constructionReducer from '../../../store/constructionSlice';
 import markerReducer from '../../../store/markerSlice';
+import workflowReducer from '../../../store/workflowSlice';
 
 import FileExplorerView from '../FileExplorerView';
 
@@ -75,6 +76,7 @@ function createTestStore() {
       editor: editorReducer,
       construction: constructionReducer,
       marker: markerReducer,
+      workflow: workflowReducer,
     },
     middleware: (getDefault) => getDefault({ serializableCheck: false }),
   });

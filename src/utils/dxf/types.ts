@@ -1,5 +1,7 @@
 // ─── DXF Type Definitions ───
 
+import type { PatternPiece } from '../../types/types';
+
 export interface DXFDocument {
   header: Map<string, string | number>;
   layers: DXFLayer[];
@@ -111,8 +113,10 @@ export const AAMA_LAYERS = {
   FOLD_DIR: '15',         // fold direction markers (mountain/valley)
 } as const;
 
+export type LayerRole = 'cut' | 'notch' | 'grainline' | 'draw' | 'intcut' | 'label' | 'seam' | 'unknown';
+
 /** Map AAMA numbered layers and named layers to semantic roles */
-export function layerRole(layerName: string): 'cut' | 'notch' | 'grainline' | 'draw' | 'intcut' | 'label' | 'seam' | 'unknown' {
+export function layerRole(layerName: string): LayerRole {
   const n = layerName.trim();
   switch (n) {
     case '1': case 'CUT': return 'cut';
@@ -124,6 +128,25 @@ export function layerRole(layerName: string): 'cut' | 'notch' | 'grainline' | 'd
     case 'LABEL': return 'label';
     default: return 'unknown';
   }
+}
+
+// ─── Format Detection Types ───
+
+export type FormatId = 'aama' | 'astm' | 'gerber' | 'lectra' | 'standard';
+
+export interface DetectionResult {
+  profileId: FormatId;
+  name: string;
+  confidence: number; // 0-100
+}
+
+export interface FormatProfile {
+  id: FormatId;
+  name: string;
+  layerMap: Record<string, LayerRole>;
+  layerPatterns: Array<{ pattern: RegExp; role: LayerRole }>;
+  detectHook?: (doc: DXFDocument) => number;
+  convertHook?: (piece: PatternPiece, blockEntities: DXFEntity[]) => PatternPiece;
 }
 
 export interface DXFExportOptions {

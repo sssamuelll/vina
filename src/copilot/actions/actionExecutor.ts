@@ -31,6 +31,9 @@ import {
 } from '../../store/projectSlice';
 import { parseDXF } from '../../utils/dxf/parser';
 import { dxfToPatternPieces } from '../../utils/dxf/converter';
+import { detectDXFFormat } from '../../utils/dxf/formatDetector';
+import { getProfile } from '../../utils/dxf/formatProfiles';
+import type { FormatProfile, FormatId } from '../../utils/dxf/types';
 import {
   selectPiece,
   clearSelection,
@@ -911,11 +914,23 @@ export class CopilotActionExecutor {
           unit?: 'mm' | 'cm' | 'inch' | 'auto';
           scale?: number;
           loadType?: 'open' | 'add';
+          autoDetect?: boolean;
+          format?: string;
         };
         const doc = parseDXF(importAction.fileContent);
+
+        let formatProfile: FormatProfile | undefined;
+        if (importAction.format) {
+          formatProfile = getProfile(importAction.format as FormatId);
+        } else if (importAction.autoDetect !== false) {
+          const results = detectDXFFormat(doc);
+          if (results.length > 0) formatProfile = getProfile(results[0].profileId);
+        }
+
         const importedPieces = dxfToPatternPieces(doc, {
           unit: importAction.unit,
           scale: importAction.scale,
+          formatProfile,
         });
 
         if (importAction.loadType === 'open') {

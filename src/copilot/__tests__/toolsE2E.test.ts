@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 207 tools registered', () => {
-      expect(registry.size).toBe(207); // 205 + 2 corner type tools
+    it('has 208 tools registered', () => {
+      expect(registry.size).toBe(208); // 207 (main) + 1 detectDXFFormat
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(207); // 205 + 2 corner type tools
+      expect(names.length).toBe(208); // 207 (main) + 1 detectDXFFormat
 
       // Key tools from every category
       const expected = [
@@ -428,6 +428,7 @@ describe('Tools E2E', () => {
         'modifyDimension',
         'setLayer', 'cloneToLayer', 'superimpose', 'getLayerInfo',
         'createPOM', 'getPOMs', 'updatePOM', 'removePOM',
+        'detectDXFFormat',
       ];
       for (const name of expected) {
         expect(names).toContain(name);
