@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
@@ -44,7 +44,7 @@ import CalibrationModal from './CalibrationModal';
 import ReferenceImageSettings from '../DisplayBar2D/ReferenceImageSettings';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
-import { storeImageBlob } from '../../utils/import/referenceImageStore';
+import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
 import './PatternEditor.css';
 
@@ -64,6 +64,19 @@ export default function PatternEditor() {
   const showReferenceImages = useSelector((s: RootState) => s.editor.showReferenceImages);
   const selectedReferenceImageId = useSelector((s: RootState) => s.editor.selectedReferenceImageId);
   const calibrationMode = useSelector((s: RootState) => s.editor.calibrationMode);
+
+  // Hydrate objectUrlMap from IndexedDB for images loaded from autosave / project file
+  useEffect(() => {
+    for (const img of referenceImages) {
+      if (!objectUrlMap.has(img.id)) {
+        loadImageBlob(img.id).then(blob => {
+          if (blob && !objectUrlMap.has(img.id)) {
+            objectUrlMap.set(img.id, URL.createObjectURL(blob));
+          }
+        }).catch(() => {});
+      }
+    }
+  }, [referenceImages]);
 
   // Compute piece ID -> group color mapping for 2D visual indicators
   const groupColors = useMemo(() => {
@@ -432,12 +445,8 @@ export default function PatternEditor() {
   }, [dispatch]);
 
   const handleRemoveImage = useCallback((imageId: string) => {
-    // Remove blob URL from map
-    const url = objectUrlMap.get(imageId);
-    if (url) {
-      URL.revokeObjectURL(url);
-      objectUrlMap.delete(imageId);
-    }
+    // Do NOT revoke objectUrl or delete from map here — undo may restore the image.
+    // Cleanup is deferred to garbageCollect() on NEW_PROJECT / loadProject.
     dispatch(removeReferenceImage(imageId));
   }, [dispatch]);
 

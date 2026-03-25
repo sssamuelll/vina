@@ -509,6 +509,7 @@ export default function ProjectView() {
     if (window.confirm('Create a new project? Unsaved changes will be lost.')) {
       // Clear persisted project and reset all Redux slices
       import('../../utils/projectIO').then(m => m.clearStorageProject());
+      import('../../utils/import/referenceImageStore').then(m => m.clearAllImageBlobs()).catch(() => {});
       import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
     }
   }, [dispatch]);

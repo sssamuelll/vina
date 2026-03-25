@@ -1,6 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece } from '../types/types';
 import { NEW_PROJECT } from './actions';
+import { removeReferenceImage } from './projectSlice';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -168,6 +169,11 @@ const editorSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => initialState);
+    builder.addCase(removeReferenceImage, (state, action) => {
+      if (state.selectedReferenceImageId === action.payload) {
+        state.selectedReferenceImageId = null;
+      }
+    });
   },
 });
 
