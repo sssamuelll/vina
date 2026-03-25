@@ -7,6 +7,7 @@ import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { parseDXF } from '../parser';
 import { dxfToPatternPieces } from '../converter';
+import { getProfile } from '../formatProfiles';
 
 const DXF_PATH = join(process.env.HOME ?? '', 'Downloads/CAD/DXF AAMA/5000.dxf');
 const hasTestFile = existsSync(DXF_PATH);
@@ -64,5 +65,185 @@ describe.skipIf(!hasTestFile)('DXF-AAMA Import (model 5000)', () => {
       const nonZero = allValues.filter(v => Math.abs(v) > 1);
       expect(nonZero.length).toBeGreaterThan(10);
     }
+  });
+});
+
+// ─── Minimal synthetic DXF helpers ───
+
+/**
+ * Build a minimal DXF string with a single LWPOLYLINE (closed rectangle)
+ * on the given layer, plus no blocks (so it lands in the flat entity path).
+ */
+function buildMinimalDXF(layer: string): string {
+  return [
+    '  0', 'SECTION',
+    '  2', 'HEADER',
+    '  0', 'ENDSEC',
+    '  0', 'SECTION',
+    '  2', 'ENTITIES',
+    '  0', 'LWPOLYLINE',
+    '  8', layer,
+    ' 90', '4',       // vertex count
+    ' 70', '1',       // closed flag
+    ' 10', '0.0',
+    ' 20', '0.0',
+    ' 42', '0.0',
+    ' 10', '100.0',
+    ' 20', '0.0',
+    ' 42', '0.0',
+    ' 10', '100.0',
+    ' 20', '100.0',
+    ' 42', '0.0',
+    ' 10', '0.0',
+    ' 20', '100.0',
+    ' 42', '0.0',
+    '  0', 'ENDSEC',
+    '  0', 'EOF',
+  ].join('\n');
+}
+
+/**
+ * Build a minimal DXF string with two LWPOLYLINE entities:
+ * - one on outlineLayer (closed rectangle, the piece boundary)
+ * - one on internalLayer (a line segment, e.g. grainline)
+ */
+function buildMinimalDXFWithTwo(outlineLayer: string, internalLayer: string): string {
+  return [
+    '  0', 'SECTION',
+    '  2', 'HEADER',
+    '  0', 'ENDSEC',
+    '  0', 'SECTION',
+    '  2', 'ENTITIES',
+    // Closed rectangle on outlineLayer
+    '  0', 'LWPOLYLINE',
+    '  8', outlineLayer,
+    ' 90', '4',
+    ' 70', '1',
+    ' 10', '0.0',
+    ' 20', '0.0',
+    ' 42', '0.0',
+    ' 10', '100.0',
+    ' 20', '0.0',
+    ' 42', '0.0',
+    ' 10', '100.0',
+    ' 20', '100.0',
+    ' 42', '0.0',
+    ' 10', '0.0',
+    ' 20', '100.0',
+    ' 42', '0.0',
+    // Open line on internalLayer (grainline / other internal)
+    '  0', 'LWPOLYLINE',
+    '  8', internalLayer,
+    ' 90', '2',
+    ' 70', '0',
+    ' 10', '20.0',
+    ' 20', '50.0',
+    ' 42', '0.0',
+    ' 10', '80.0',
+    ' 20', '50.0',
+    ' 42', '0.0',
+    '  0', 'ENDSEC',
+    '  0', 'EOF',
+  ].join('\n');
+}
+
+// ─── Profile-aware conversion tests ───
+
+describe('Profile-aware conversion — Lectra IBA', () => {
+  it('CONTOUR layer produces a piece outline with lectra profile', () => {
+    const dxfStr = buildMinimalDXF('CONTOUR');
+    const doc = parseDXF(dxfStr);
+    const lectraProfile = getProfile('lectra');
+    const pieces = dxfToPatternPieces(doc, { formatProfile: lectraProfile });
+
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outline.length).toBeGreaterThan(0);
+    const hasMove = pieces[0].outline.some(c => c.type === 'M');
+    expect(hasMove).toBe(true);
+  });
+
+  it('CONTOUR layer without profile falls back to unknown (still produces outline)', () => {
+    // Without a profile, "CONTOUR" maps to 'unknown' which also accumulates as outline
+    const dxfStr = buildMinimalDXF('CONTOUR');
+    const doc = parseDXF(dxfStr);
+    const pieces = dxfToPatternPieces(doc);
+
+    // unknown role still adds to outline in the converter
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outline.length).toBeGreaterThan(0);
+  });
+
+  it('DROIT_FIL layer produces grainline internal with lectra profile', () => {
+    // Need a CONTOUR outline entity so entitiesToPiece returns a piece,
+    // plus a DROIT_FIL entity that should map to grainline.
+    const dxfStr = buildMinimalDXFWithTwo('CONTOUR', 'DROIT_FIL');
+    const doc = parseDXF(dxfStr);
+    const lectraProfile = getProfile('lectra');
+    const pieces = dxfToPatternPieces(doc, { formatProfile: lectraProfile });
+
+    // DROIT_FIL should map to 'grainline' via lectra layerMap
+    expect(pieces.length).toBe(1);
+    const grainlines = pieces[0].internals.filter(i => i.type === 'grainline');
+    expect(grainlines.length).toBeGreaterThan(0);
+  });
+
+  it('DROIT_FIL without profile is unknown (no grainline internal)', () => {
+    // Without profile, DROIT_FIL is 'unknown' → goes into outline, not grainline internal.
+    // CONTOUR is also 'unknown' without a profile, so both end up as outline.
+    const dxfStr = buildMinimalDXFWithTwo('CONTOUR', 'DROIT_FIL');
+    const doc = parseDXF(dxfStr);
+    const pieces = dxfToPatternPieces(doc);
+
+    expect(pieces.length).toBe(1);
+    const grainlines = pieces[0].internals.filter(i => i.type === 'grainline');
+    expect(grainlines.length).toBe(0);
+  });
+
+  it('lectra profile pattern match (lowercase contour) resolves to cut', () => {
+    // layerMap stores 'CONTOUR' (uppercase), but layerPatterns use /contour/i
+    // A layer named 'contour_ext' should match via pattern
+    const dxfStr = buildMinimalDXF('contour_ext');
+    const doc = parseDXF(dxfStr);
+    const lectraProfile = getProfile('lectra');
+    const pieces = dxfToPatternPieces(doc, { formatProfile: lectraProfile });
+
+    // The pattern /contour/i should match 'contour_ext' → 'cut' → outline
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outline.length).toBeGreaterThan(0);
+  });
+
+  it('getProfile returns correct lectra profile object', () => {
+    const profile = getProfile('lectra');
+    expect(profile.id).toBe('lectra');
+    expect(profile.layerMap['CONTOUR']).toBe('cut');
+    expect(profile.layerMap['DROIT_FIL']).toBe('grainline');
+    expect(profile.layerMap['CRAN']).toBe('notch');
+  });
+
+  it('existing AAMA behavior unchanged when no profile provided', () => {
+    // Layer '1' (AAMA cut) should still map to cut without a profile
+    const dxfStr = buildMinimalDXF('1');
+    const doc = parseDXF(dxfStr);
+    const pieces = dxfToPatternPieces(doc);
+
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outline.length).toBeGreaterThan(0);
+  });
+
+  it('convertHook is called when present in profile', () => {
+    const dxfStr = buildMinimalDXF('CONTOUR');
+    const doc = parseDXF(dxfStr);
+    let hookCalled = false;
+    const profileWithHook = {
+      ...getProfile('lectra'),
+      convertHook: (piece: import('../../types/types').PatternPiece) => {
+        hookCalled = true;
+        return { ...piece, name: 'hook-modified' };
+      },
+    };
+
+    const pieces = dxfToPatternPieces(doc, { formatProfile: profileWithHook });
+    expect(hookCalled).toBe(true);
+    expect(pieces[0].name).toBe('hook-modified');
   });
 });
