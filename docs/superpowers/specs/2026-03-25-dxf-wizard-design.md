@@ -48,8 +48,8 @@ function detectDXFFormat(doc: DXFDocument): DetectionResult[]
 **Layer name collection:** Scans **both** `doc.layers` (TABLES section) **and** unique `.layer` strings from all entities in `doc.entities` and `doc.blocks`. This handles DXF files that omit the TABLES section (valid per DXF spec, common in Gerber exports).
 
 **Scoring algorithm:**
-1. Build the union of all layer names (from `doc.layers` + entity `.layer` fields)
-2. For each format profile, count how many layer names match its `layerMap` (exact) or `layerPatterns` (regex)
+1. Build the union of all layer names (from `doc.layers` + entity `.layer` fields). **Normalize all layer names to uppercase** before matching to handle mixed-case DXF exports.
+2. For each format profile, count how many layer names match its `layerMap` (exact, keys stored uppercase) or `layerPatterns` (regex, use `/i` flag)
 3. Compute base score: `baseScore = (matchedLayers / profile's expected layer count) * 100`
 4. Run `detectHook` if present. Hook must return a number; if it throws or returns `NaN`, treat as `0`. Clamp to `[-50, +50]`.
 5. Final confidence: `clamp(baseScore + hookBonus, 0, 100)`
@@ -94,8 +94,9 @@ function dxfToPatternPieces(
 
 ```typescript
 function resolveLayerRole(layerName: string, profile?: FormatProfile): LayerRole {
+  const normalized = layerName.toUpperCase();
   if (profile) {
-    if (profile.layerMap[layerName]) return profile.layerMap[layerName];
+    if (profile.layerMap[normalized]) return profile.layerMap[normalized];
     for (const { pattern, role } of profile.layerPatterns) {
       if (pattern.test(layerName)) return role;
     }
@@ -106,13 +107,18 @@ function resolveLayerRole(layerName: string, profile?: FormatProfile): LayerRole
 
 The `profile` is threaded from `dxfToPatternPieces()` through to every `entitiesToPiece()` call. The existing `layerRole()` function in `types.ts` remains unchanged as the AAMA fallback.
 
-**Per-format `convertHook`** runs after each piece is assembled in `entitiesToPiece()`. It receives the built `PatternPiece` and the block's `DXFEntity[]` (or `doc.entities` for the no-blocks path):
+**Per-format `convertHook`** runs after each piece is assembled in `entitiesToPiece()`. It receives the built `PatternPiece` and the entities that were consumed to build that piece:
+
+- **Block-based DXF:** passes the block's `DXFEntity[]` (scoped to the current piece)
+- **No-blocks DXF:** passes only the entities that the converter consumed for the current piece (the converter already tracks which entities it groups per piece via layer role assignment)
 
 ```typescript
 if (profile?.convertHook) {
-  piece = profile.convertHook(piece, blockEntities);
+  piece = profile.convertHook(piece, consumedEntities);
 }
 ```
+
+**Note:** For no-blocks DXF files with overlapping geometry (rare), the consumed entity set may include false positives. `convertHook` should be defensive. Most professional CAD exports (AAMA, ASTM, Gerber) use blocks, where entity scoping is exact.
 
 **No existing behavior changes** — the default path (no `formatProfile`) is identical to today.
 
@@ -135,9 +141,13 @@ const detectionResults = detectDXFFormat(doc);
 detectionResults: DetectionResult[]
 ```
 
-The dialog renders based on top result confidence:
+The dialog renders based on top result confidence. The threshold is a named constant:
 
-**Confident (>=80%):** Info banner at the top of existing dialog.
+```typescript
+const CONFIDENT_THRESHOLD = 80; // extract to top of DetectedFormatBanner.tsx
+```
+
+**Confident (>=CONFIDENT_THRESHOLD):** Info banner at the top of existing dialog.
 
 ```
 ┌─────────────────────────────────────────┐
@@ -195,6 +205,8 @@ dxfPreferredFormat: FormatId | null;  // default null
 
 This is a **user preference**, not per-project state, so it must NOT be cleared on `NEW_PROJECT`. Adding a dedicated field (rather than using `toolMemory`) ensures it survives project resets. Persisted alongside existing workflow state to `localStorage` key `'openclo-workflow'`.
 
+**Important:** The `workflowSlice` partial reset handler for `NEW_PROJECT` must explicitly preserve `dxfPreferredFormat` alongside `expertMode` and `confirmOverrides`. Add it to the preservation list in the `extraReducers` handler.
+
 On subsequent imports:
 - If `dxfPreferredFormat` is set, auto-detection is skipped
 - Banner shows "Remembered: AAMA" with a "Clear" link
@@ -208,24 +220,34 @@ On subsequent imports:
 
 This tool lives in the bridge-mode tool registry (`src/copilot/action/tools/`), separate from the `actionExecutor.ts` action system.
 
+**Design constraint:** The LLM cannot pass raw DXF file content as a tool parameter (files can be 10-100MB, exceeding token limits). Instead, the tool operates on the **most recently parsed DXF document**, cached in a module-level variable set during the import flow.
+
+**Module-level cache** in `src/utils/dxf/parser.ts`:
+
+```typescript
+let lastParsedDoc: DXFDocument | null = null;
+export function getLastParsedDoc(): DXFDocument | null { return lastParsedDoc; }
+// Set inside parseDXF() before returning:
+// lastParsedDoc = doc;
+```
+
+**Tool definition:**
+
 ```typescript
 {
   name: 'detectDXFFormat',
-  description: 'Detect the format of a DXF file (AAMA, ASTM, Gerber, Lectra, standard)',
-  parameters: {
-    type: 'object',
-    properties: {
-      fileContent: { type: 'string', description: 'DXF file content as string' }
-    },
-    required: ['fileContent']
-  },
-  execute: async (params) => {
-    const doc = parseDXF(params.fileContent);
+  description: 'Detect the format of the most recently imported DXF file (AAMA, ASTM, Gerber, Lectra, standard). Must import a DXF file first.',
+  parameters: { type: 'object', properties: {}, required: [] },
+  execute: async (_params, _dispatch, getState) => {
+    const doc = getLastParsedDoc();
+    if (!doc) return { success: false, error: 'No DXF file has been imported yet' };
     const results = detectDXFFormat(doc);
     return { success: true, data: { formats: results } };
   }
 }
 ```
+
+This mirrors the pattern used for reference images (`objectUrlMap` — module-level state set during import, consumed by tools).
 
 Registered in `ALL_TOOL_MODULES` in `registry.ts`.
 
@@ -294,6 +316,7 @@ interface ImportDXFAction {
 
 ### Modified Files
 - `src/utils/dxf/types.ts` — add `FormatProfile`, `FormatId`, `DetectionResult`, `LayerRole` types
+- `src/utils/dxf/parser.ts` — cache last parsed doc in module-level variable for copilot tool
 - `src/utils/dxf/converter.ts` — add `formatProfile` option, replace `layerRole()` calls with `resolveLayerRole()`
 - `src/components/ImportDXFDialog/ImportDXFDialog.tsx` — add `detectionResults` prop, integrate `DetectedFormatBanner`
 - `src/components/views/FileExplorerView.tsx` — call `detectDXFFormat()` after parse, pass results to dialog
