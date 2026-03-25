@@ -8,6 +8,13 @@ import {
   DXFCircleData, DXFTextData, DXFInsertData, DXFPolylineData,
 } from './types';
 
+let lastParsedDoc: DXFDocument | null = null;
+
+/** Returns the most recently parsed DXF document (for copilot tool). */
+export function getLastParsedDoc(): DXFDocument | null {
+  return lastParsedDoc;
+}
+
 // ─── Group Code Pair ───
 
 interface GroupPair {
@@ -322,10 +329,12 @@ export function parseDXF(content: string): DXFDocument {
   const pairs = parseGroupPairs(lines);
   const sections = splitSections(pairs);
 
-  return {
+  const doc: DXFDocument = {
     header: parseHeader(sections.header),
     layers: parseLayers(sections.tables),
     blocks: parseBlocks(sections.blocks),
     entities: parseEntityList(sections.entities),
   };
+  lastParsedDoc = doc;
+  return doc;
 }
