@@ -366,6 +366,21 @@ export interface Fabric {
   friction: number;     // 0-1
 }
 
+// ─── Colorways ───
+
+export interface ColorwayOverride {
+  color?: string;
+  fabricId?: string;
+  textureUrl?: string;
+}
+
+export interface Colorway {
+  id: string;
+  name: string;
+  overrides: Record<string, ColorwayOverride | null>;
+  isDefault?: boolean;
+}
+
 // ─── Body Measurements ───
 
 export interface BodyMeasurements {
