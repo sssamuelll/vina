@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 198 tools registered', () => {
-      expect(registry.size).toBe(198); // 196 + 2 garment info tools
+    it('has 199 tools registered', () => {
+      expect(registry.size).toBe(199); // 196 + 2 garment info tools + 1 detectDXFFormat
     });
 
     it('every tool has name, description, parameters, execute', () => {

@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 196 (main) + 2 garment info tools
-      expect(registry.size).toBe(198);
+      // 196 (main) + 2 garment info tools + 1 detectDXFFormat
+      expect(registry.size).toBe(199);
     });
   });
 });
