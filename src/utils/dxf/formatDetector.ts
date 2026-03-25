@@ -73,15 +73,21 @@ function scoreProfile(
     if (keyMatched || patternMatched) matchedRoles++;
   }
 
-  // Use min(allRoles, docLayers) as denominator:
-  // When the document is a subset of the profile's vocabulary the score
-  // reflects precision (all doc layers recognised) rather than recall
-  // (all profile roles present). This avoids penalising documents that
-  // legitimately omit optional profile layers.
-  const denominator = Math.min(allRoles.size, layerNames.size);
-  if (denominator === 0) return 0;
+  // Denominator uses the profile's total roles (recall-based) to prevent
+  // inflated confidence when a DXF has very few layers. A 2-layer file
+  // matching 2 of 10 expected roles should not score 100%.
+  const baseScore = (matchedRoles / allRoles.size) * 100;
 
-  return (matchedRoles / denominator) * 100;
+  // Bonus: if ALL document layers are recognised by this profile (high
+  // precision), boost score — but cap at 80% when less than half the
+  // profile's roles are matched (weak evidence).
+  const precision = layerNames.size > 0 ? matchedRoles / layerNames.size : 0;
+  const precisionBonus = precision >= 1.0 ? 15 : 0;
+  const cappedScore = matchedRoles < allRoles.size / 2
+    ? Math.min(baseScore + precisionBonus, 80)
+    : baseScore + precisionBonus;
+
+  return cappedScore;
 }
 
 export function detectDXFFormat(doc: DXFDocument): DetectionResult[] {

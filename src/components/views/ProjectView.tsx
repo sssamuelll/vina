@@ -512,6 +512,7 @@ export default function ProjectView() {
       // Clear persisted project and reset all Redux slices
       import('../../utils/projectIO').then(m => m.clearStorageProject());
       import('../../utils/import/referenceImageStore').then(m => m.clearAllImageBlobs()).catch(() => {});
+      import('../../utils/dxf/parser').then(m => m.clearLastParsedDoc());
       import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
     }
   }, [dispatch]);

@@ -15,6 +15,11 @@ export function getLastParsedDoc(): DXFDocument | null {
   return lastParsedDoc;
 }
 
+/** Clear the cached doc. Called on NEW_PROJECT to prevent cross-project leaks. */
+export function clearLastParsedDoc(): void {
+  lastParsedDoc = null;
+}
+
 // ─── Group Code Pair ───
 
 interface GroupPair {
