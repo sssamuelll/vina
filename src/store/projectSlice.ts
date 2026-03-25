@@ -837,7 +837,7 @@ const projectSlice = createSlice({
       if (state.colorways.some(c => c.name === action.payload.newName)) return;
       const id = uid();
       state.colorways.push({
-        ...JSON.parse(JSON.stringify(source)),
+        ...structuredClone(source),
         id,
         name: action.payload.newName,
         isDefault: false,
