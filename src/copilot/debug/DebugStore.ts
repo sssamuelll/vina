@@ -1,4 +1,5 @@
 import type { AgenticRecord } from './types';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../../utils/safeStorage';
 
 const STORAGE_KEY = 'openclo-debug-records';
 const MAX_RECORDS = 100;
@@ -10,7 +11,7 @@ export class DebugStore {
   private ensureLoaded(): void {
     if (this.loaded) return;
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = safeGetItem(STORAGE_KEY);
       this.records = raw ? JSON.parse(raw) : [];
     } catch {
       this.records = [];
@@ -19,14 +20,10 @@ export class DebugStore {
   }
 
   private persist(): void {
-    try {
-      if (this.records.length > MAX_RECORDS) {
-        this.records = this.records.slice(-MAX_RECORDS);
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.records));
-    } catch {
-      // localStorage may be full or unavailable
+    if (this.records.length > MAX_RECORDS) {
+      this.records = this.records.slice(-MAX_RECORDS);
     }
+    safeSetItem(STORAGE_KEY, JSON.stringify(this.records));
   }
 
   save(record: AgenticRecord): void {
@@ -58,11 +55,7 @@ export class DebugStore {
   clear(): void {
     this.records = [];
     this.loaded = true;
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      // ignore
-    }
+    safeRemoveItem(STORAGE_KEY);
   }
 
   pruneOlderThan(days: number): void {

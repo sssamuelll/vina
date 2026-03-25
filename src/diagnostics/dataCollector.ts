@@ -9,6 +9,8 @@
 
 import type { RootState } from '../store';
 import { getPhysicalFabric } from '../utils/cloth/physicalFabric';
+import { flattenPath } from '../utils/seam';
+import type { Point2D } from '../types/types';
 import type {
   InspectionTarget,
   InspectionData,
@@ -19,6 +21,25 @@ import type {
   InspectionConstructionPointData,
   InspectionSimulationData,
 } from './types';
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+/**
+ * Compute the area of a polygon using the Shoelace formula.
+ * The input points are assumed to be a closed loop in mm.
+ *
+ * @param points Array of Point2D coordinates
+ * @returns Area in mm2
+ */
+function computeShoelaceArea(points: Point2D[]): number {
+  let area = 0;
+  for (let i = 0; i < points.length; i++) {
+    const p1 = points[i];
+    const p2 = points[(i + 1) % points.length];
+    area += p1.x * p2.y - p2.x * p1.y;
+  }
+  return Math.abs(area) / 2;
+}
 
 // ─── Main export ─────────────────────────────────────────────────────────────
 
@@ -35,6 +56,9 @@ export function collectInspectionData(
   const piece = state.project.pieces.find(p => p.id === target.pieceId);
 
   // ─── Fallback when piece is not found ────────────────────────────────────
+  // Stub data for a missing piece. area: 0 with empty seams[] would normally
+  // trigger ruleTinyPiece, but this is harmless — the stub represents a deleted
+  // or orphaned reference, and surfacing a "tiny piece" warning is appropriate.
   if (!piece) {
     return {
       target,
@@ -45,6 +69,7 @@ export function collectInspectionData(
         position: { x: 0, y: 0 },
         rotation: 0,
         seamAllowance: 0,
+        area: 0,
       },
       seams: [],
       internals: [],
@@ -52,12 +77,15 @@ export function collectInspectionData(
   }
 
   // ─── Piece metadata ───────────────────────────────────────────────────────
+  const area = computeShoelaceArea(flattenPath(piece.outline));
+
   const pieceData: InspectionPieceData = {
     id: piece.id,
     name: piece.name,
     position: piece.position ?? { x: 0, y: 0 },
     rotation: piece.rotation ?? 0,
     seamAllowance: piece.seamAllowance ?? 0,
+    area,
     category: piece.category,
     interfacingType: piece.interfacingType,
   };

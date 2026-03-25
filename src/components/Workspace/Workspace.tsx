@@ -28,6 +28,7 @@ import BottomPanel from '../BottomPanel/BottomPanel';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { createCopilotKeyHandler } from '../../copilot/keyboardShortcuts';
 import { saveToStorage, loadFromStorage } from '../../utils/projectIO';
+import { garbageCollect } from '../../utils/import/referenceImageStore';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { downloadDXF } from '../../utils/exportDXF';
 import { downloadPDF } from '../../utils/exportPDF';
@@ -164,9 +165,12 @@ export default function Workspace() {
   }, [dispatch]);
 
   useEffect(() => {
-    loadFromStorage().then(saved => {
+    loadFromStorage().then(async saved => {
       if (saved) {
         dispatch(loadProject(saved));
+        // Garbage-collect orphaned IndexedDB image blobs after load
+        const activeIds = (saved.referenceImages ?? []).map(i => i.id);
+        garbageCollect(activeIds).catch(() => {});
         // Auto-center 2D viewport on loaded pieces
         if (saved.pieces?.length > 0) {
           requestAnimationFrame(() => {

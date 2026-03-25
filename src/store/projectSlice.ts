@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
+import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
@@ -51,6 +52,8 @@ interface ProjectState {
   name: string;
   pieces: PatternPiece[];
   seams: Seam[];
+  pleats: Pleat[];
+  elastics: Elastic[];
   fabrics: Fabric[];
   avatar: Avatar;
   avatarMode: AvatarMode;
@@ -64,6 +67,8 @@ interface ProjectState {
   arrangementOverrides: Record<string, [number, number, number]>;
   /** Points of measure */
   poms: PointOfMeasure[];
+  /** Reference images for tracing in the 2D pattern editor */
+  referenceImages: ReferenceImage[];
   /** Custom layer names (layer number → display name) */
   layerNames: Record<number, string>;
   /** Layer lock state (layer number → locked) */
@@ -81,6 +86,8 @@ const initialState: ProjectState = {
   name: 'Untitled Project',
   pieces: [],
   seams: [],
+  pleats: [],
+  elastics: [],
   fabrics: [defaultFabric],
   avatar: defaultAvatar,
   avatarMode: 'model',
@@ -90,6 +97,7 @@ const initialState: ProjectState = {
   seamGroups: [],
   arrangementOverrides: {},
   poms: [],
+  referenceImages: [],
   layerNames: {},
   layerLocked: {},
   garmentInfo: {},
@@ -145,6 +153,8 @@ const projectSlice = createSlice({
       // Backfill layer metadata from older projects
       state.layerNames = (p as any).layerNames ?? {};
       state.layerLocked = (p as any).layerLocked ?? {};
+      // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
+      state.referenceImages = (p as any).referenceImages ?? [];
     },
     clearLoadDiagnostics(state) {
       state.loadDiagnostics = [];
@@ -175,6 +185,9 @@ const projectSlice = createSlice({
       if (piece.sublayer === undefined || piece.sublayer === null) {
         piece.sublayer = 0;
       }
+      if (!piece.fabricCode) {
+        piece.fabricCode = 'SELF';
+      }
       state.pieces.push(piece);
       state.isDirty = true;
     },
@@ -186,19 +199,46 @@ const projectSlice = createSlice({
       }
     },
     removePiece(state, action: PayloadAction<string>) {
-      state.pieces = state.pieces.filter(p => p.id !== action.payload);
+      const id = action.payload;
+      state.pieces = state.pieces.filter(p => p.id !== id);
       state.seams = state.seams.filter(
-        s => s.pieceA.pieceId !== action.payload && s.pieceB.pieceId !== action.payload
+        s => s.pieceA.pieceId !== id && s.pieceB.pieceId !== id
       );
-      delete state.arrangementOverrides[action.payload];
+      if (state.elastics) state.elastics = state.elastics.filter(e => e.pieceId !== id);
+      delete state.arrangementOverrides[id];
       // Auto-remove from all groups
       for (const group of state.groups) {
-        group.pieceIds = group.pieceIds.filter(id => id !== action.payload);
+        group.pieceIds = group.pieceIds.filter(pid => pid !== id);
       }
       // Remove POMs referencing deleted piece
       state.poms = state.poms.filter(
-        pom => pom.pointA.pieceId !== action.payload && pom.pointB.pieceId !== action.payload
+        pom => pom.pointA.pieceId !== id && pom.pointB.pieceId !== id
       );
+      state.isDirty = true;
+    },
+    removePieces(state, action: PayloadAction<string[]>) {
+      const ids = new Set(action.payload);
+      state.pieces = state.pieces.filter(p => !ids.has(p.id));
+      state.seams = state.seams.filter(
+        s => !ids.has(s.pieceA.pieceId) && !ids.has(s.pieceB.pieceId)
+      );
+      if (state.elastics) state.elastics = state.elastics.filter(e => !ids.has(e.pieceId));
+      for (const id of ids) {
+        delete state.arrangementOverrides[id];
+      }
+      // Auto-remove from all groups
+      for (const group of state.groups) {
+        group.pieceIds = group.pieceIds.filter(pid => !ids.has(pid));
+      }
+      // Remove POMs referencing deleted pieces
+      state.poms = state.poms.filter(
+        pom => !ids.has(pom.pointA.pieceId) && !ids.has(pom.pointB.pieceId)
+      );
+      // Remove seamGroups referencing deleted pieces
+      state.seamGroups = state.seamGroups.filter(
+        g => !g.edgesA.some(e => ids.has(e.pieceId)) && !g.edgesB.some(e => ids.has(e.pieceId))
+      );
+      state.pleats = state.pleats.filter(p => !ids.has(p.pieceId));
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
@@ -251,6 +291,35 @@ const projectSlice = createSlice({
         piece.internals = piece.internals.filter(l => l.type !== action.payload.line.type);
         piece.internals.push(action.payload.line);
         state.isDirty = true;
+      }
+    },
+    // ─── Annotations ───
+    addAnnotation(state, action: PayloadAction<{ pieceId: string; annotation: import('../types/types').PieceAnnotation }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        if (!piece.annotations) piece.annotations = [];
+        piece.annotations.push(action.payload.annotation);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    removeAnnotation(state, action: PayloadAction<{ pieceId: string; annotationId: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece && piece.annotations) {
+        piece.annotations = piece.annotations.filter(a => a.id !== action.payload.annotationId);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    updateAnnotation(state, action: PayloadAction<{ pieceId: string; annotationId: string; updates: Partial<import('../types/types').PieceAnnotation> }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece && piece.annotations) {
+        const ann = piece.annotations.find(a => a.id === action.payload.annotationId);
+        if (ann) {
+          Object.assign(ann, action.payload.updates);
+          piece.updatedAt = Date.now();
+          state.isDirty = true;
+        }
       }
     },
     rotatePiece(state, action: PayloadAction<{ id: string; rotation: number }>) {
@@ -436,6 +505,41 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Elastics ───
+    addElastic(state, action: PayloadAction<Elastic>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const edge = piece.edges?.find(e => e.name === action.payload.edgeName);
+      if (!edge) return;
+      if (action.payload.tStart >= action.payload.tEnd) return;
+      state.elastics.push({
+        ...action.payload,
+        stretchRatio: clampStretchRatio(action.payload.stretchRatio),
+      });
+      state.isDirty = true;
+    },
+    removeElastic(state, action: PayloadAction<string>) {
+      state.elastics = state.elastics.filter(e => e.id !== action.payload);
+      state.isDirty = true;
+    },
+    updateElastic(state, action: PayloadAction<Partial<Elastic> & { id: string }>) {
+      const idx = state.elastics.findIndex(e => e.id === action.payload.id);
+      if (idx === -1) return;
+      // Validate piece/edge if being changed
+      if (action.payload.pieceId || action.payload.edgeName) {
+        const pId = action.payload.pieceId ?? state.elastics[idx].pieceId;
+        const eName = action.payload.edgeName ?? state.elastics[idx].edgeName;
+        const piece = state.pieces.find(p => p.id === pId);
+        if (!piece) return;
+        const edge = piece.edges?.find(e => e.name === eName);
+        if (!edge) return;
+      }
+      const updated = { ...state.elastics[idx], ...action.payload };
+      updated.stretchRatio = clampStretchRatio(updated.stretchRatio);
+      state.elastics[idx] = updated;
+      state.isDirty = true;
+    },
+
     // ─── Points of Measure (POM) ───
     addPOM(state, action: PayloadAction<PointOfMeasure>) {
       state.poms.push(action.payload);
@@ -459,6 +563,24 @@ const projectSlice = createSlice({
       }
     },
 
+    // ─── Reference Images ───
+    addReferenceImage(state, action: PayloadAction<ReferenceImage>) {
+      if (state.referenceImages.length >= 10) return; // max 10 images
+      state.referenceImages.push(action.payload);
+      state.isDirty = true;
+    },
+    removeReferenceImage(state, action: PayloadAction<string>) {
+      state.referenceImages = state.referenceImages.filter(i => i.id !== action.payload);
+      state.isDirty = true;
+    },
+    updateReferenceImage(state, action: PayloadAction<{ id: string } & Partial<ReferenceImage>>) {
+      const idx = state.referenceImages.findIndex(i => i.id === action.payload.id);
+      if (idx !== -1) {
+        Object.assign(state.referenceImages[idx], action.payload);
+        state.isDirty = true;
+      }
+    },
+
     // ─── Seam Groups (M:N sewing) ───
     addSeamGroup(state, action: PayloadAction<SeamGroup>) {
       state.seamGroups.push(action.payload);
@@ -466,6 +588,55 @@ const projectSlice = createSlice({
     },
     removeSeamGroup(state, action: PayloadAction<string>) {
       state.seamGroups = state.seamGroups.filter(g => g.id !== action.payload);
+      state.isDirty = true;
+    },
+
+    // ─── Pleats ───
+    addPleat(state, action: PayloadAction<Omit<Pleat, 'generatedLineIds'>>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const edge = piece.edges?.find(e => e.name === action.payload.edgeName);
+      if (!edge) return;
+      const pleat: Pleat = {
+        ...action.payload,
+        count: Math.min(action.payload.count, MAX_PLEAT_COUNT),
+        generatedLineIds: [],
+      };
+      const lines = generatePleatFoldLines(pleat, piece);
+      lines.forEach(l => piece.internals.push(l));
+      pleat.generatedLineIds = lines.map(l => l.id);
+      state.pleats.push(pleat);
+      state.isDirty = true;
+    },
+    removePleat(state, action: PayloadAction<string>) {
+      const pleat = state.pleats.find(p => p.id === action.payload);
+      if (!pleat) return;
+      const piece = state.pieces.find(p => p.id === pleat.pieceId);
+      if (piece) {
+        piece.internals = piece.internals.filter(l => l.foldOptions?.pleatId !== pleat.id);
+      }
+      state.pleats = state.pleats.filter(p => p.id !== action.payload);
+      state.isDirty = true;
+    },
+    updatePleat(state, action: PayloadAction<Partial<Pleat> & { id: string }>) {
+      const idx = state.pleats.findIndex(p => p.id === action.payload.id);
+      if (idx === -1) return;
+      const pleat = state.pleats[idx];
+      const piece = state.pieces.find(p => p.id === pleat.pieceId);
+      if (!piece) return;
+      // Remove old lines by pleatId scan (handles manual deletions)
+      piece.internals = piece.internals.filter(l => l.foldOptions?.pleatId !== pleat.id);
+      // Merge updates
+      const updated: Pleat = {
+        ...pleat,
+        ...action.payload,
+        count: Math.min((action.payload.count ?? pleat.count), MAX_PLEAT_COUNT),
+      };
+      // Recompute fold lines
+      const lines = generatePleatFoldLines(updated, piece);
+      lines.forEach(l => piece.internals.push(l));
+      updated.generatedLineIds = lines.map(l => l.id);
+      state.pleats[idx] = updated;
       state.isDirty = true;
     },
 
@@ -734,6 +905,24 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    setFabricCode(state, action: PayloadAction<{ pieceId: string; fabricCode: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        piece.fabricCode = action.payload.fabricCode;
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    batchSetFabricCode(state, action: PayloadAction<{ pieceIds: string[]; fabricCode: string }>) {
+      const idSet = new Set(action.payload.pieceIds);
+      for (const piece of state.pieces) {
+        if (idSet.has(piece.id)) {
+          piece.fabricCode = action.payload.fabricCode;
+          piece.updatedAt = Date.now();
+        }
+      }
+      if (idSet.size > 0) state.isDirty = true;
+    },
     setGroupFabric(state, action: PayloadAction<{ groupId: string; fabricId: string }>) {
       const group = state.groups.find(g => g.id === action.payload.groupId);
       if (group) {
@@ -808,12 +997,16 @@ const projectSlice = createSlice({
 
 export const {
   restoreState, loadProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
-  addPiece, updatePiece, removePiece, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
+  addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
+  addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
   addSeamGroup, removeSeamGroup,
+  // Pleats
+  addPleat, removePleat, updatePleat,
+  addElastic, removeElastic, updateElastic,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,
@@ -825,9 +1018,12 @@ export const {
   // Groups
   createGroup, renameGroup, deleteGroup, setGroupColor,
   addPiecesToGroup, removePiecesFromGroup,
+  setFabricCode, batchSetFabricCode,
   moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
+  // Reference Images
+  addReferenceImage, removeReferenceImage, updateReferenceImage,
 } = projectSlice.actions;
 
 const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };

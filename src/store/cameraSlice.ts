@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NEW_PROJECT } from './actions';
 
 export type ViewPreset =
   | 'front' | 'back'
@@ -32,6 +33,9 @@ const cameraSlice = createSlice({
       state.pendingPreset = null;
       state.pendingFocusPieceId = null;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

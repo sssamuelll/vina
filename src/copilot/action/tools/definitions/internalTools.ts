@@ -294,7 +294,8 @@ const addNotchTool: ToolDefinition = {
 const addFoldLineTool: ToolDefinition = {
   name: 'addFoldLine',
   description:
-    'Add a fold line to a pattern piece. / Agregar una línea de doblez a una pieza de patrón.',
+    'Add a fold line to a pattern piece. ' +
+    '/ Agregar una línea de doblez a una pieza de patrón.',
   parameters: {
     type: 'object',
     properties: {
@@ -303,6 +304,15 @@ const addFoldLineTool: ToolDefinition = {
       startY: { type: 'number', description: 'Start Y in mm / Y de inicio en mm' },
       endX: { type: 'number', description: 'End X in mm / X de fin en mm' },
       endY: { type: 'number', description: 'End Y in mm / Y de fin en mm' },
+      direction: {
+        type: 'string',
+        enum: ['mountain', 'valley'],
+        description: 'Fold direction (default mountain) / Dirección del doblez (defecto mountain)',
+      },
+      creaseAngleDeg: {
+        type: 'number',
+        description: 'Crease angle in degrees (default 180 = flat fold) / Ángulo del doblez en grados (defecto 180 = doblez plano)',
+      },
     },
     required: ['pieceId', 'startX', 'startY', 'endX', 'endY'],
   },
@@ -318,6 +328,10 @@ const addFoldLineTool: ToolDefinition = {
         M(params.startX as number, params.startY as number),
         L(params.endX as number, params.endY as number),
       ],
+      foldOptions: {
+        direction: (params.direction as 'mountain' | 'valley') ?? 'mountain',
+        creaseAngleDeg: (params.creaseAngleDeg as number) ?? 180,
+      },
     };
 
     dispatch(addInternalLine({ pieceId: params.pieceId as string, line: foldLine }));

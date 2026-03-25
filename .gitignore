@@ -12,7 +12,6 @@ crates/*/target/
 coverage/
 
 # Worktrees
-.worktrees/
 
 # Tool artifacts
 .copyclip/
