@@ -91,6 +91,12 @@ interface SimulationSliceState {
   pinnedVertices: Record<string, PinData>;
   /** Currently selected pin ID (for editing/dragging) */
   selectedPinId: string | null;
+  /** 3D mesh selection — selected vertex indices */
+  selectedVertices: number[];
+  /** Active box-select drag (screen coords) */
+  selectBox3D: { startX: number; startY: number; currentX: number; currentY: number } | null;
+  /** Active lasso-select polygon (screen coords) */
+  selectLasso3D: { x: number; y: number }[] | null;
   /** 3D visibility: show garment pieces */
   showGarment: boolean;
   /** 3D visibility: show seam connection lines */
@@ -182,6 +188,9 @@ const initialState: SimulationSliceState = {
   arrangementSnapshot: null,
   pinnedVertices: {},
   selectedPinId: null,
+  selectedVertices: [],
+  selectBox3D: null,
+  selectLasso3D: null,
   showGarment: true,
   showSeamlines3D: true,
   showInternalLines3D: true,
@@ -352,6 +361,26 @@ const simulationSlice = createSlice({
       if (pin) {
         pin.strength = action.payload.strength;
       }
+    },
+
+    // ─── 3D Mesh Selection ──────────────────────────────────────────────────
+
+    setSelectedVertices(state, action: PayloadAction<number[]>) {
+      state.selectedVertices = action.payload;
+    },
+    addSelectedVertices(state, action: PayloadAction<number[]>) {
+      const set = new Set(state.selectedVertices);
+      for (const v of action.payload) set.add(v);
+      state.selectedVertices = Array.from(set);
+    },
+    clearSelectedVertices(state) {
+      state.selectedVertices = [];
+    },
+    setSelectBox3D(state, action: PayloadAction<{ startX: number; startY: number; currentX: number; currentY: number } | null>) {
+      state.selectBox3D = action.payload;
+    },
+    setSelectLasso3D(state, action: PayloadAction<{ x: number; y: number }[] | null>) {
+      state.selectLasso3D = action.payload;
     },
 
     // ─── 3D Display Toggles ──────────────────────────────────────────────────
@@ -652,6 +681,12 @@ export const {
   clearAllPins,
   selectPin,
   setPinStrength,
+  // 3D mesh selection
+  setSelectedVertices,
+  addSelectedVertices,
+  clearSelectedVertices,
+  setSelectBox3D,
+  setSelectLasso3D,
   // 3D display
   toggleGarment,
   toggleSeamlines3D,

@@ -44,7 +44,8 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals } from '../../store/simulationSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals, setSelectBox3D } from '../../store/simulationSlice';
+import SelectionOverlay from './SelectionOverlay';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { setArrangement3D, clearArrangementOverrides, setLayer, setSublayer, cloneToLayer } from '../../store/projectSlice';
@@ -260,11 +261,18 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const rightDownRef = useRef<{ x: number; y: number } | null>(null);
 
   // Right-click context menu: distinguish drag (orbit) from click (menu)
+  const boxSelectStart = useRef<{ x: number; y: number } | null>(null);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button === 2) {
       rightDownRef.current = { x: e.clientX, y: e.clientY };
     }
-  }, []);
+    if (e.button === 0 && activeTool3D === 'meshSelectBox') {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      boxSelectStart.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      dispatch(setSelectBox3D({ startX: boxSelectStart.current.x, startY: boxSelectStart.current.y, currentX: boxSelectStart.current.x, currentY: boxSelectStart.current.y }));
+    }
+  }, [activeTool3D, dispatch]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -519,12 +527,32 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       ref={containerRef}
       style={{ position: 'relative', cursor: toolCursor }}
       onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
-      onPointerMove={onPanPointerMove}
-      onPointerUp={onPanPointerUp}
+      onPointerMove={(e) => {
+        onPanPointerMove(e);
+        if (boxSelectStart.current && activeTool3D === 'meshSelectBox') {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          dispatch(setSelectBox3D({
+            startX: boxSelectStart.current.x,
+            startY: boxSelectStart.current.y,
+            currentX: e.clientX - rect.left,
+            currentY: e.clientY - rect.top,
+          }));
+        }
+      }}
+      onPointerUp={(e) => {
+        onPanPointerUp(e);
+        if (boxSelectStart.current) {
+          boxSelectStart.current = null;
+          // Clear the visual box — vertex selection is finalized via
+          // a useEffect in GarmentSimulation that watches selectBox3D
+          dispatch(setSelectBox3D(null));
+        }
+      }}
       onContextMenu={handleContextMenu}
     >
       <SimModeToggle />
       <SimulationStatusOverlay />
+      <SelectionOverlay />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
         shadows={!nodeMaterialActive}

@@ -123,7 +123,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       frameTimeMs: 0,
       particleCount: 0,
       bodyCollision: false, viewMode3D: 'arrange' as const, arrangementSnapshot: null,
-      pinnedVertices: {}, selectedPinId: null,
+      pinnedVertices: {}, selectedPinId: null, selectedVertices: [], selectBox3D: null, selectLasso3D: null,
       showGarment: true, showSeamlines3D: true, showInternalLines3D: true, surfaceMode3D: 'textured' as const,
       snapshots: [], activeSnapshotId: null,
       isWarmStarting: false,

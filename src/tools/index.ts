@@ -52,6 +52,7 @@ import { pinTool } from './definitions/pin';
 import { simulateTool } from './definitions/simulate';
 import { steamBrushTool } from './definitions/steamBrush';
 import { meshGrabTool } from './definitions/meshGrab';
+import { meshSelectBoxTool, meshSelectLassoTool } from './definitions/meshSelect';
 import { pomMeasureTool } from './definitions/pomMeasure';
 import { offsetOutlineTool } from './definitions/offsetOutline';
 import { extendTrimTool } from './definitions/extendTrim';
@@ -121,6 +122,8 @@ const allTools = [
   // 3D Tools — Arrangement
   arrangementTool,
   pinTool,
+  meshSelectBoxTool,
+  meshSelectLassoTool,
   
   // 3D Tools — Editing
   edit3dTool,
