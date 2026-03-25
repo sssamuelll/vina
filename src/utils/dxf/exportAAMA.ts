@@ -305,7 +305,8 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
       if (line.type === 'fold') {
         const midX = (line.path[0].values[0] + line.path[1].values[0]) / 2;
         const midY = (line.path[0].values[1] + line.path[1].values[1]) / 2;
-        s += textToDXF('FOLD', midX, -(midY), 1.5, AAMA_LAYERS.FOLD_DIR);
+        const dir = line.foldOptions?.direction === 'valley' ? 'VAL' : 'MTN';
+        s += textToDXF(dir, midX, -(midY), 1.5, AAMA_LAYERS.FOLD_DIR);
       }
     }
   }
@@ -319,6 +320,15 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
   // Fabric code — placed 4mm below the piece name
   const fabricCode = piece.fabricId || 'MAIN';
   s += textToDXF(fabricCode, cx, -(cy + 4), 2.0, AAMA_LAYERS.FABRIC_CODE);
+
+  // Annotations — placed below fabric code, stacked
+  if (piece.annotations?.length) {
+    let annotY = cy + 8;
+    for (const ann of piece.annotations) {
+      s += textToDXF(ann.text, cx, -(annotY), 1.8, AAMA_LAYERS.ANNOTATION);
+      annotY += 3;
+    }
+  }
 
   return s;
 }
