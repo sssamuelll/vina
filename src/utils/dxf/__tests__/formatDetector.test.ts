@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 import { detectDXFFormat } from '../formatDetector';
 import type { DXFDocument } from '../types';

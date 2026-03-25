@@ -340,7 +340,7 @@ export async function clearLegacyFallbackKeys(): Promise<void> {
       return;
     }
     // Re-save without the API key (safe — SecureStorage has the encrypted copy)
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+     
     const { apiKey: _removed, ...rest } = parsed;
     safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
     console.info('[Security] Migrated legacy API key from localStorage to SecureStorage');
@@ -351,7 +351,7 @@ export async function clearLegacyFallbackKeys(): Promise<void> {
     try {
       const idbConfig = await storageGet("settings", "fallback-provider");
       if (idbConfig && typeof idbConfig === 'object' && 'apiKey' in idbConfig) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         const { apiKey: _removed, ...rest } = idbConfig as Record<string, unknown>;
         await storageSet("settings", "fallback-provider", rest);
         console.info('[Security] Cleared legacy API key from IndexedDB');

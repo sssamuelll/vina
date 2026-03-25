@@ -5,7 +5,7 @@ import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../util
 import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, Point2D, PathCommand, CornerType } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
@@ -46,10 +46,31 @@ import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
 import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
+import CornerTypeMenu from './CornerTypeMenu';
 import './PatternEditor.css';
 
 // Module-level map: imageId → blob URL (outside Redux for non-serializable data)
 const objectUrlMap = new Map<string, string>();
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function findNearestVertex(
+  outline: PathCommand[],
+  point: Point2D,
+  snapDist: number,
+): { index: number; dist: number } | null {
+  let best: { index: number; dist: number } | null = null;
+  for (let i = 0; i < outline.length; i++) {
+    const cmd = outline[i];
+    if (cmd.type !== 'M' && cmd.type !== 'L') continue;
+    const vx = cmd.values[0], vy = cmd.values[1];
+    const d = Math.sqrt((vx - point.x) ** 2 + (vy - point.y) ** 2);
+    if (d <= snapDist && (!best || d < best.dist)) {
+      best = { index: i, dist: d };
+    }
+  }
+  return best;
+}
 
 export default function PatternEditor() {
   const dispatch = useDispatch();
@@ -105,6 +126,13 @@ export default function PatternEditor() {
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>({
     visible: false, x: 0, y: 0, pieceId: null,
   });
+
+  // Corner type menu state (seamAllowance tool + right-click on vertex)
+  const [cornerMenu, setCornerMenu] = useState<{
+    position: { x: number; y: number };
+    pieceId: string;
+    vertexIndex: number;
+  } | null>(null);
 
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
@@ -213,6 +241,31 @@ export default function PatternEditor() {
     }
   }, [pieces, dispatch]);
 
+  const handleCornerTypeSelect = useCallback((type: CornerType) => {
+    if (!cornerMenu) return;
+    const piece = pieces.find(p => p.id === cornerMenu.pieceId);
+    if (!piece) return;
+    dispatch(updatePiece({
+      ...piece,
+      cornerTypes: { ...(piece.cornerTypes ?? {}), [cornerMenu.vertexIndex]: type },
+      updatedAt: Date.now(),
+    }));
+    setCornerMenu(null);
+  }, [cornerMenu, pieces, dispatch]);
+
+  const handleSetAllCorners = useCallback((type: CornerType) => {
+    if (!cornerMenu) return;
+    const piece = pieces.find(p => p.id === cornerMenu.pieceId);
+    if (!piece) return;
+    dispatch(updatePiece({
+      ...piece,
+      defaultCornerType: type,
+      cornerTypes: {},
+      updatedAt: Date.now(),
+    }));
+    setCornerMenu(null);
+  }, [cornerMenu, pieces, dispatch]);
+
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     // Determine which piece (if any) is under the cursor
@@ -220,6 +273,25 @@ export default function PatternEditor() {
     const rect = svg.getBoundingClientRect();
     const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
     const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+
+    // ── SeamAllowance tool: open CornerTypeMenu when near a vertex ──
+    if (activeTool === 'seamAllowance') {
+      const snapDist = 10 / zoom2D;
+      for (const piece of pieces) {
+        if (!piece.outline?.length) continue;
+        const localX = canvasX - (piece.position?.x ?? 0);
+        const localY = canvasY - (piece.position?.y ?? 0);
+        const hit = findNearestVertex(piece.outline, { x: localX, y: localY }, snapDist);
+        if (hit) {
+          setCornerMenu({
+            position: { x: e.clientX, y: e.clientY },
+            pieceId: piece.id,
+            vertexIndex: hit.index,
+          });
+          return;
+        }
+      }
+    }
 
     // Hit-test: find piece whose bounding box contains the point
     let hitPiece: typeof pieces[0] | null = null;
@@ -700,6 +772,19 @@ export default function PatternEditor() {
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
       />
+      {cornerMenu && (() => {
+        const piece = pieces.find(p => p.id === cornerMenu.pieceId);
+        const currentType: CornerType = piece?.cornerTypes?.[cornerMenu.vertexIndex] ?? piece?.defaultCornerType ?? 'mitered';
+        return (
+          <CornerTypeMenu
+            position={cornerMenu.position}
+            currentType={currentType}
+            onSelectType={handleCornerTypeSelect}
+            onSetAll={handleSetAllCorners}
+            onClose={() => setCornerMenu(null)}
+          />
+        );
+      })()}
       {showCalibrationModal && (
         <CalibrationModal
           pixelDistance={calibrationPixelDist}

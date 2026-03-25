@@ -491,7 +491,7 @@ const VALID_MEASUREMENTS = new Set([
   'knee', 'calf', 'ankle', 'wrist', 'upperArm', 'forearm',
 ]);
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function validateAvatarAction(action: AvatarAction, _state: RootState): ValidationResult {
   switch (action.action) {
     case 'set_avatar_measurement':
@@ -572,7 +572,7 @@ function validateViewAction(action: ViewAction, state: RootState): ValidationRes
 // Project Validators
 // ============================================================================
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function validateProjectAction(action: ProjectAction, _state: RootState): ValidationResult {
   switch (action.action) {
     case 'save_project':

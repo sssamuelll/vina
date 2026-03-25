@@ -335,7 +335,7 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
 
 // ─── Path → DXF entities ───
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
+ 
 function pathToEntities(commands: PathCommand[], layer: string, _opts: DXFExportOptions): string {
   let s = '';
   const straightPoints: { x: number; y: number }[] = [];
