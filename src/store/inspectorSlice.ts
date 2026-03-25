@@ -13,6 +13,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { AppDispatch } from './index';
 import { setBottomPanelTab } from './layoutSlice';
+import { NEW_PROJECT } from './actions';
 import type {
   InspectionTarget,
   InspectionData,
@@ -123,6 +124,9 @@ const inspectorSlice = createSlice({
     clearInspection() {
       return initialState;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

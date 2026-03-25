@@ -22,6 +22,8 @@ export interface InspectionPieceData {
   position: { x: number; y: number };
   rotation: number;
   seamAllowance: number;
+  /** Total surface area in mm2 */
+  area: number;
   /** Piece type classification */
   category?: PieceCategory;
   /** Interfacing type applied to this piece */
