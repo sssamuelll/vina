@@ -1,6 +1,7 @@
 import type { PathCommand, Point2D } from '../../types/types';
 import type { CornerType } from '../../types/types';
 import { Clipper, Paths64, Path64, Point64 } from 'clipper2-js';
+import { flattenPath } from './index';
 
 // Clipper2 scale: integer coords at 100x for 0.01mm precision (same as index.ts)
 const CLIPPER_SCALE = 100;
@@ -518,13 +519,10 @@ export function generateSeamAllowanceWithCorners(
   // ── Guard: degenerate inputs ──────────────────────────────────────────────
   if (saWidth <= 0) return [];
 
-  // ── Step 1: Extract vertices (M and L commands only; skip Z) ──────────────
-  const vertices: Point2D[] = [];
-  for (const cmd of outline) {
-    if (cmd.type === 'M' || cmd.type === 'L') {
-      vertices.push({ x: cmd.values[0], y: cmd.values[1] });
-    }
-  }
+  // ── Step 1: Flatten curves to line segments, then extract vertices ────────
+  // flattenPath linearizes C/Q/A commands into Point2D[] so the edge-walk
+  // handles curved outlines correctly (armholes, necklines, hems).
+  const vertices: Point2D[] = flattenPath(outline);
 
   // Remove closing duplicate if present
   if (vertices.length >= 2) {

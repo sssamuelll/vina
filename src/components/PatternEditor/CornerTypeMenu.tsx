@@ -23,13 +23,13 @@ export interface CornerTypeMenuProps {
 
 // ─── Corner type labels ───────────────────────────────────────────────────────
 
-const CORNER_TYPES: { type: CornerType; label: string }[] = [
+const CORNER_TYPES: { type: CornerType; label: string; disabled?: boolean }[] = [
   { type: 'mitered',       label: 'Mitered' },
   { type: 'doubleMitered', label: 'Double Mitered' },
   { type: 'envelope',      label: 'Envelope' },
   { type: 'squared',       label: 'Squared' },
   { type: 'slant',         label: 'Slant' },
-  { type: 'match',         label: 'Match' },
+  { type: 'match',         label: 'Match (coming soon)', disabled: true },
   { type: 'trimMirrored',  label: 'Trim Mirrored' },
 ];
 
@@ -120,10 +120,11 @@ export default function CornerTypeMenu({
       <div style={{ height: 1, background: '#3a3a3a', margin: '2px 8px' }} />
 
       {/* Individual corner type items */}
-      {CORNER_TYPES.map(({ type, label }) => (
+      {CORNER_TYPES.map(({ type, label, disabled }) => (
         <button
           key={type}
-          onClick={() => onSelectType(type)}
+          onClick={() => !disabled && onSelectType(type)}
+          disabled={disabled}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -131,13 +132,14 @@ export default function CornerTypeMenu({
             padding: '6px 12px',
             border: 'none',
             background: 'transparent',
-            color: '#e0e0e0',
-            cursor: 'pointer',
+            color: disabled ? '#666' : '#e0e0e0',
+            cursor: disabled ? 'default' : 'pointer',
             fontSize: 13,
             textAlign: 'left',
             gap: 8,
+            opacity: disabled ? 0.5 : 1,
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#3a3a3a')}
+          onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = '#3a3a3a'; }}
           onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
         >
           <span style={{ width: 20, textAlign: 'center', fontSize: 14 }}>
