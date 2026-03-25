@@ -26,6 +26,8 @@ function baseState(overrides: Record<string, any> = {}) {
     layerNames: {}, layerLocked: {},
     loadDiagnostics: [],
     loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
+    colorways: [],
+    activeColorwayId: null,
     ...overrides,
   };
 }

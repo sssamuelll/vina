@@ -40,6 +40,7 @@ import CustomLights from './CustomLights';
 import { useAvatarTape } from './useAvatarTape';
 import { useCameraPresets, DEFAULT_TARGET, DEFAULT_POSITION } from './useCameraPresets';
 import { useAnimationPlayback } from '../../hooks/useAnimationPlayback';
+import { useColorwaySync } from '../../hooks/useColorwaySync';
 import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
@@ -47,6 +48,7 @@ import { setActiveTool3D } from '../../store/toolSlice';
 import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
+import { resolveColorway } from '../../utils/colorwayResolver';
 import { setArrangement3D, clearArrangementOverrides, setLayer, setSublayer, cloneToLayer } from '../../store/projectSlice';
 import { setCopilotOpen, setSidebarTab } from '../../store/layoutSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
@@ -140,11 +142,14 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
   const flippedPieceIds = useSelector((s: RootState) => s.simulation.flippedPieceIds);
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
+  const colorways = useSelector((s: RootState) => s.project.colorways);
+  const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
   const { groundVisible, shadowOpacity, shadowBlur } = useSelector((s: RootState) => s.renderSettings);
   const playbackState = useSelector((s: RootState) => s.animation.playbackState);
   const useClothSim = simulationState !== 'idle';
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
+  useColorwaySync();
 
   const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
@@ -579,8 +584,16 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
             const placements = placeGarmentPieces(pieces, avatar.measurements);
             return pieces.map((piece, i) => {
               if (hiddenPieceIds.includes(piece.id)) return null;
-              const fabricId = pieceFabrics[piece.id] || defaultFabricId;
-              const fabric = FABRIC_LIBRARY[fabricId];
+              const baseFabricId = pieceFabrics[piece.id] || defaultFabricId;
+              const baseFabric = FABRIC_LIBRARY[baseFabricId];
+              const resolved = resolveColorway(
+                piece,
+                colorways,
+                activeColorwayId,
+                { [piece.fabricId ?? 'SELF']: { color: baseFabric?.color || '#cccccc', fabricId: baseFabricId } },
+                new Set(Object.keys(FABRIC_LIBRARY)),
+              );
+              const fabric = FABRIC_LIBRARY[resolved.fabricId] || baseFabric;
               return (
               <DraggablePiece
                 key={piece.id}
@@ -595,7 +608,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 onSelect={(id, shift) => dispatch(shift ? togglePieceSelection(id) : selectPiece(id))}
                 onDragEnd={(id, pos) => dispatch(setArrangement3D({ pieceId: id, position: pos }))}
                 setOrbitEnabled={setOrbitEnabled}
-                fabricColor={fabric?.color}
+                fabricColor={resolved.color}
                 fabricRoughness={fabric?.roughness}
               />
             ); });
