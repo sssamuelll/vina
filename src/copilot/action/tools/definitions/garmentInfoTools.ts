@@ -5,7 +5,7 @@
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
-import { setGarmentInfo, setGarmentInfoBulk } from '../../../../store/projectSlice';
+import { setGarmentInfoBulk } from '../../../../store/projectSlice';
 import type { GarmentInfo } from '../../../../types/types';
 
 const GARMENT_INFO_FIELDS = ['brand', 'season', 'styleNumber', 'designer', 'date', 'notes', 'description'] as const;
@@ -32,11 +32,10 @@ const setGarmentInfoTool: ToolDefinition = {
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const oldInfo: GarmentInfo = { ...getState().project.garmentInfo };
 
-    // Update each provided field
+    // Build update object
     const updated: Record<string, string> = {};
     for (const field of GARMENT_INFO_FIELDS) {
       if (params[field] !== undefined) {
-        dispatch(setGarmentInfo({ field, value: params[field] as string }));
         updated[field] = params[field] as string;
       }
     }
@@ -47,6 +46,9 @@ const setGarmentInfoTool: ToolDefinition = {
         error: 'No fields provided. Specify at least one of: brand, season, styleNumber, designer, date, notes, description.',
       };
     }
+
+    // Single atomic dispatch
+    dispatch(setGarmentInfoBulk({ ...oldInfo, ...updated }));
 
     return {
       success: true,

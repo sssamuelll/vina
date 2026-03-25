@@ -155,6 +155,8 @@ const projectSlice = createSlice({
       state.isDirty = true;
     },
     setGarmentInfo(state, action: PayloadAction<{ field: string; value: string }>) {
+      const VALID_FIELDS = new Set(['brand', 'season', 'styleNumber', 'designer', 'date', 'notes', 'description']);
+      if (!VALID_FIELDS.has(action.payload.field)) return;
       if (!state.garmentInfo) state.garmentInfo = {};
       (state.garmentInfo as Record<string, string>)[action.payload.field] = action.payload.value;
       state.isDirty = true;
