@@ -494,6 +494,8 @@ export interface ImportDXFAction {
   unit?: 'mm' | 'cm' | 'inch' | 'auto';
   scale?: number;
   loadType?: 'open' | 'add';
+  autoDetect?: boolean;   // default true
+  format?: string;        // FormatId override
 }
 
 export type ProjectAction =
