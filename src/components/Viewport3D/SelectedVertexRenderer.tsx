@@ -13,9 +13,18 @@ export default function SelectedVertexRenderer({ livePositions }: Props) {
 
   const geometry = useMemo(() => {
     if (!livePositions || selectedVertices.length === 0) return null;
-    const positions = new Float32Array(selectedVertices.length * 3);
-    for (let i = 0; i < selectedVertices.length; i++) {
-      const vi = selectedVertices[i];
+    const maxIdx = livePositions.length / 3;
+
+    // Sentinel: [-1] means select all valid vertices
+    const isSelectAll = selectedVertices.length === 1 && selectedVertices[0] === -1;
+    const indices = isSelectAll
+      ? Array.from({ length: maxIdx }, (_, i) => i)
+      : selectedVertices.filter(vi => vi >= 0 && vi < maxIdx);
+
+    if (indices.length === 0) return null;
+    const positions = new Float32Array(indices.length * 3);
+    for (let i = 0; i < indices.length; i++) {
+      const vi = indices[i];
       positions[i * 3] = livePositions[vi * 3];
       positions[i * 3 + 1] = livePositions[vi * 3 + 1];
       positions[i * 3 + 2] = livePositions[vi * 3 + 2];
