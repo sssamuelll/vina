@@ -32,6 +32,7 @@ function baseState(overrides: Record<string, any> = {}) {
     arrangementOverrides: {}, groups: [], seamGroups: [], poms: [] as any[],
     pleats: [], elastics: [],
     referenceImages: [] as ReferenceImage[],
+    colorways: [], activeColorwayId: null,
     layerNames: {}, layerLocked: {},
     loadDiagnostics: [],
     loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },

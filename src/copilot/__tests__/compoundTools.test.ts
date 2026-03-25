@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 198 + 1 mesh selection tool (selectVerticesInRegion)
-      expect(registry.size).toBe(199);
+      // 204 + 1 mesh selection tool
+      expect(registry.size).toBe(205);
     });
   });
 });
