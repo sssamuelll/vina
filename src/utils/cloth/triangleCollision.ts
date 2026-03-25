@@ -103,6 +103,24 @@ export class TriangleSpatialHash {
   private readonly out: Int32Array;
 
   constructor(mesh: CollisionMeshData, cellSize: number) {
+    if (mesh.triCount < 0) {
+      throw new Error(`Invalid collision mesh: triCount must be non-negative, got ${mesh.triCount}`);
+    }
+    const requiredVerts = mesh.triCount * 9;
+    if (mesh.vertices.length < requiredVerts) {
+      throw new Error(
+        `Invalid collision mesh: vertices.length (${mesh.vertices.length}) < triCount * 9 (${requiredVerts}). ` +
+        `Mesh data is truncated or triCount is wrong.`,
+      );
+    }
+    const requiredNormals = mesh.triCount * 3;
+    if (mesh.normals.length < requiredNormals) {
+      throw new Error(
+        `Invalid collision mesh: normals.length (${mesh.normals.length}) < triCount * 3 (${requiredNormals}). ` +
+        `Mesh data is truncated or triCount is wrong.`,
+      );
+    }
+
     this.cellInv = 1.0 / cellSize;
 
     let bMinX = Infinity, bMinY = Infinity, bMinZ = Infinity;

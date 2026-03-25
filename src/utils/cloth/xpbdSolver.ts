@@ -425,6 +425,9 @@ export class XPBDClothSolver {
     this.stretchingLengths = new Float32Array(this.stretchingIds.length / 2);
     this.bendingLengths = new Float32Array(this.bendingIds.length / 4);
 
+    // Validate constraint IDs are within particle bounds
+    this.validateConstraintIds();
+
     this.grads = new Float32Array(4 * 3);
 
     this.initPhysics();
@@ -432,6 +435,34 @@ export class XPBDClothSolver {
     // Self-collision setup
     this.spatialHash = new SpatialHashGrid(this.config.clothThickness * 2);
     this.adjacency = buildAdjacency(this.triIds, this.numParticles);
+  }
+
+  /**
+   * Validate that all constraint particle IDs are within bounds.
+   * Throws a diagnostic error if invalid IDs are found (instead of silent NaN propagation).
+   */
+  private validateConstraintIds(): void {
+    const n = this.numParticles;
+
+    for (let i = 0; i < this.stretchingIds.length; i++) {
+      const id = this.stretchingIds[i];
+      if (id < 0 || id >= n) {
+        throw new Error(
+          `Invalid stretch constraint: particle ID ${id} at index ${i} is out of bounds ` +
+          `(numParticles=${n}). Mesh data may be corrupted.`,
+        );
+      }
+    }
+
+    for (let i = 0; i < this.bendingIds.length; i++) {
+      const id = this.bendingIds[i];
+      if (id < 0 || id >= n) {
+        throw new Error(
+          `Invalid bend constraint: particle ID ${id} at index ${i} is out of bounds ` +
+          `(numParticles=${n}). Mesh data may be corrupted.`,
+        );
+      }
+    }
   }
 
   /**
