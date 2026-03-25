@@ -209,6 +209,10 @@ const projectSlice = createSlice({
       state.seamGroups = state.seamGroups.filter(
         g => !g.edgesA.some(e => ids.has(e.pieceId)) && !g.edgesB.some(e => ids.has(e.pieceId))
       );
+      // Remove elastics and pleats referencing deleted pieces (fields added by #424/#431)
+      const s = state as unknown as Record<string, Array<{ pieceId: string }>>;
+      if (s.elastics) { s.elastics = s.elastics.filter(e => !ids.has(e.pieceId)); }
+      if (s.pleats) { s.pleats = s.pleats.filter(p => !ids.has(p.pieceId)); }
       state.isDirty = true;
     },
     /** Set a 3D arrangement position override for a piece. */
