@@ -7,7 +7,7 @@
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import { updatePiece, addSeam, removeSeam } from '../../../../store/projectSlice';
-import type { Seam } from '../../../../types/types';
+import type { Seam, CornerType } from '../../../../types/types';
 
 // ─── setSeamAllowance ───────────────────────────────────────────────────────
 
@@ -178,6 +178,83 @@ const removeSeamTool: ToolDefinition = {
   },
 };
 
+// ─── setCornerType ───────────────────────────────────────────────────────────
+
+const setCornerTypeTool: ToolDefinition = {
+  name: 'setCornerType',
+  description:
+    'Set seam corner type for a specific vertex on a piece outline. ' +
+    'Types: mitered, doubleMitered, envelope, squared, slant, match, trimMirrored. ' +
+    '/ Establecer tipo de esquina para un vértice específico.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Piece ID' },
+      vertexIndex: { type: 'number', description: 'Outline command index (0-based) of the vertex' },
+      cornerType: {
+        type: 'string',
+        enum: ['mitered', 'doubleMitered', 'envelope', 'squared', 'slant', 'match', 'trimMirrored'],
+        description: 'Corner type',
+      },
+    },
+    required: ['pieceId', 'vertexIndex', 'cornerType'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const piece = state.project.pieces.find(p => p.id === params.pieceId);
+    if (!piece) return { success: false, error: 'Piece not found' };
+
+    const idx = params.vertexIndex as number;
+    if (idx < 0 || idx >= piece.outline.length) {
+      return {
+        success: false,
+        error: `Vertex index ${idx} out of bounds (outline has ${piece.outline.length} commands)`,
+      };
+    }
+
+    dispatch(updatePiece({
+      ...piece,
+      cornerTypes: { ...(piece.cornerTypes ?? {}), [idx]: params.cornerType as CornerType },
+      updatedAt: Date.now(),
+    }));
+    return { success: true, data: { pieceId: piece.id, vertexIndex: idx, cornerType: params.cornerType } };
+  },
+};
+
+// ─── setAllCorners ───────────────────────────────────────────────────────────
+
+const setAllCornersTool: ToolDefinition = {
+  name: 'setAllCorners',
+  description:
+    'Set default corner type for all vertices of a piece, clearing per-vertex overrides. ' +
+    '/ Establecer tipo de esquina predeterminado para todos los vértices.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Piece ID' },
+      cornerType: {
+        type: 'string',
+        enum: ['mitered', 'doubleMitered', 'envelope', 'squared', 'slant', 'match', 'trimMirrored'],
+        description: 'Corner type to apply to all vertices',
+      },
+    },
+    required: ['pieceId', 'cornerType'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const piece = state.project.pieces.find(p => p.id === params.pieceId);
+    if (!piece) return { success: false, error: 'Piece not found' };
+
+    dispatch(updatePiece({
+      ...piece,
+      defaultCornerType: params.cornerType as CornerType,
+      cornerTypes: {},
+      updatedAt: Date.now(),
+    }));
+    return { success: true, data: { pieceId: piece.id, cornerType: params.cornerType } };
+  },
+};
+
 // ─── Export ─────────────────────────────────────────────────────────────────
 
 export const tools: ToolDefinition[] = [
@@ -185,4 +262,6 @@ export const tools: ToolDefinition[] = [
   auditSeamAllowancesTool,
   createSeamTool,
   removeSeamTool,
+  setCornerTypeTool,
+  setAllCornersTool,
 ];

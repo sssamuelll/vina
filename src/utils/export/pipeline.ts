@@ -9,6 +9,7 @@
 import type { PatternPiece, PathCommand, Point2D } from '../../types/types';
 import { generateSeamAllowance, flattenPath } from '../seam/index';
 import type { SeamJoinType } from '../seam/index';
+import { generateSeamAllowanceWithCorners } from '../seam/cornerTypes';
 
 // ─── Types ───
 
@@ -103,7 +104,11 @@ export function preparePiece(
   let flatSeamOutline: Point2D[] = [];
 
   if (piece.seamAllowance > 0) {
-    seamOutline = generateSeamAllowance(piece.outline, piece.seamAllowance, joinType);
+    const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
+      || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
+    seamOutline = hasCustomCorners
+      ? generateSeamAllowanceWithCorners(piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {})
+      : generateSeamAllowance(piece.outline, piece.seamAllowance, joinType);
     if (seamOutline.length > 0) {
       flatSeamOutline = flattenPath(seamOutline, resolution);
     }
