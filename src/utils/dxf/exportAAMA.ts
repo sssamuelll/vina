@@ -317,8 +317,8 @@ function pieceEntities(piece: PatternPiece, seamOutline: PathCommand[], opts: DX
   const cy = (bb.minY + bb.maxY) / 2;
   s += textToDXF(piece.name, cx, -(cy), 2.5, AAMA_LAYERS.DRAW);
 
-  // Fabric code — placed 4mm below the piece name
-  const fabricCode = piece.fabricId || 'MAIN';
+  // Fabric code — production classification (SELF, LINING, etc.), not simulation material ID
+  const fabricCode = piece.fabricCode || 'SELF';
   s += textToDXF(fabricCode, cx, -(cy + 4), 2.0, AAMA_LAYERS.FABRIC_CODE);
 
   // Annotations — placed below fabric code, stacked

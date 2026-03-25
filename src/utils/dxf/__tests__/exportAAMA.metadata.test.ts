@@ -26,19 +26,16 @@ function makePiece(overrides?: Partial<PatternPiece>): PatternPiece {
 
 describe('AAMA DXF metadata layers', () => {
   describe('FABRIC_CODE layer (13)', () => {
-    it('writes fabricId when present', () => {
-      const dxf = generateDXFAAMA([makePiece({ fabricId: 'SILK-001' })]);
-      expect(dxf).toContain('SILK-001');
+    it('writes fabricCode when present', () => {
+      const dxf = generateDXFAAMA([makePiece({ fabricCode: 'LINING' } as Partial<PatternPiece>)]);
+      expect(dxf).toContain('LINING');
       // On layer 13
       expect(dxf).toContain('8\n13');
     });
 
-    it('writes MAIN when fabricId is absent', () => {
+    it('writes SELF when fabricCode is absent', () => {
       const dxf = generateDXFAAMA([makePiece()]);
-      // DXF TEXT entity has layer on group code 8, text on group code 1
-      // The MAIN text should appear in a TEXT entity on layer 13
-      expect(dxf).toContain('MAIN');
-      // Layer 13 should have at least one TEXT entity
+      expect(dxf).toContain('SELF');
       expect(dxf).toContain('8\n13');
     });
   });
