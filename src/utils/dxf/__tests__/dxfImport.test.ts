@@ -236,7 +236,7 @@ describe('Profile-aware conversion — Lectra IBA', () => {
     let hookCalled = false;
     const profileWithHook = {
       ...getProfile('lectra'),
-      convertHook: (piece: import('../../types/types').PatternPiece) => {
+      convertHook: (piece: import('../../../types/types').PatternPiece) => {
         hookCalled = true;
         return { ...piece, name: 'hook-modified' };
       },

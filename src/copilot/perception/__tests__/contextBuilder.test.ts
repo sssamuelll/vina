@@ -293,6 +293,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       expertMode: false,
       confirmOverrides: {},
       toolMemory: {},
+      dxfPreferredFormat: null,
     },
     inspector: {
       target: null,

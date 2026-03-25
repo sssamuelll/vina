@@ -221,6 +221,7 @@ describe('workflowSlice', () => {
         expertMode: true,
         confirmOverrides: { deletePattern: 'never' },
         toolMemory: { seam: { width: 2.0 } },
+        dxfPreferredFormat: null,
       };
       const state = workflowReducer(getInitialState(), rehydrateWorkflow(saved));
       expect(state.expertMode).toBe(true);
@@ -238,6 +239,7 @@ describe('workflowSlice', () => {
         expertMode: false,
         confirmOverrides: {},
         toolMemory: {},
+        dxfPreferredFormat: null,
       };
       state = workflowReducer(state, rehydrateWorkflow(restored));
       expect(state.expertMode).toBe(false);
@@ -255,6 +257,7 @@ describe('workflowSlice', () => {
         expertMode: true,
         confirmOverrides: { op: 'never' },
         toolMemory: { seam: { width: 1.5 } },
+        dxfPreferredFormat: null,
       };
       persistWorkflow(wf);
       expect(localStorage.setItem).toHaveBeenCalledWith(
@@ -302,6 +305,7 @@ describe('workflowSlice', () => {
         expertMode: true,
         confirmOverrides: { op: 'always' },
         toolMemory: { hem: { depth: 3.0 } },
+        dxfPreferredFormat: null,
       };
       persistWorkflow(wf);
       const loaded = loadWorkflow();
