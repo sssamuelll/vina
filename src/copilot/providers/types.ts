@@ -159,16 +159,36 @@ export interface StoredProviderConfig {
 }
 
 /**
- * Load provider config from localStorage + apiKey from SecureStorage.
- * @returns ProviderConfig or null if not set
+ * Load provider config synchronously from localStorage only (no API key).
+ * Returns config with `apiKey: ''`. Use for initial render to avoid flash;
+ * call `loadProviderConfig()` to hydrate the encrypted API key.
  */
-export function loadProviderConfig(): ProviderConfig | null {
+export function loadProviderConfigSync(): ProviderConfig | null {
   try {
     const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
     if (!saved) return null;
     const config: StoredProviderConfig = JSON.parse(saved);
-    // Retrieve apiKey from SecureStorage
-    const apiKey = SecureStorage.get(`${config.provider}-apikey`) ?? '';
+    return {
+      provider: config.provider as ProviderConfig['provider'],
+      model: config.model ?? '',
+      baseUrl: config.baseUrl,
+      apiKey: '', // async hydration needed
+    };
+  } catch { /* ignore */ }
+  return null;
+}
+
+/**
+ * Load provider config from localStorage + apiKey from SecureStorage.
+ * @returns ProviderConfig or null if not set
+ */
+export async function loadProviderConfig(): Promise<ProviderConfig | null> {
+  try {
+    const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
+    if (!saved) return null;
+    const config: StoredProviderConfig = JSON.parse(saved);
+    // Retrieve apiKey from SecureStorage (encrypted, async)
+    const apiKey = (await SecureStorage.get(`${config.provider}-apikey`)) ?? '';
     return {
       provider: config.provider as ProviderConfig['provider'],
       model: config.model ?? '',
@@ -183,9 +203,12 @@ export function loadProviderConfig(): ProviderConfig | null {
  * Save provider config to localStorage (no secrets) + apiKey to SecureStorage.
  * @param config - Provider configuration to save
  */
-export function saveProviderConfig(config: ProviderConfig): void {
-  // Store apiKey securely in SecureStorage
-  SecureStorage.set(`${config.provider}-apikey`, config.apiKey);
+export async function saveProviderConfig(config: ProviderConfig): Promise<void> {
+  // Store apiKey securely in SecureStorage (AES-GCM encrypted)
+  const stored = await SecureStorage.set(`${config.provider}-apikey`, config.apiKey);
+  if (!stored) {
+    console.warn('[SecureStorage] API key could not be stored; it may be lost on page refresh');
+  }
   // Store non-secret config in localStorage
   const storedConfig: StoredProviderConfig = {
     provider: config.provider,

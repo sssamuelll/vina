@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NEW_PROJECT } from './actions';
 
 export type TapeType = 'circumference' | 'linear';
 
@@ -54,6 +55,9 @@ const avatarTapeSlice = createSlice({
       state.tapes = [];
       state.pendingTape = null;
     },
+  },
+  extraReducers: (builder) => {
+    builder.addCase(NEW_PROJECT, () => initialState);
   },
 });
 

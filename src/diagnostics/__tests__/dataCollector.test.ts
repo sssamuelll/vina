@@ -14,6 +14,7 @@ function makePiece(overrides: Partial<{
   fabricId: string;
   edges: Array<{ id: string; name: string; edgeType: string; length?: number }>;
   internals: Array<{ id: string; type: string; path: unknown[] }>;
+  outline: Array<{ type: string; values: number[] }>;
 }> = {}) {
   return {
     id: 'piece-1',
@@ -346,10 +347,52 @@ describe('collectInspectionData', () => {
 
     expect(result.piece.name).toBe('Unknown');
     expect(result.piece.id).toBe('piece-1');
+    expect(result.piece.area).toBe(0);
     expect(result.fabric).toBeUndefined();
     expect(result.edge).toBeUndefined();
     expect(result.seams).toEqual([]);
     expect(result.internals).toEqual([]);
     expect(result.constructionPoint).toBeUndefined();
+  });
+
+  // ── Area computation via Shoelace formula ──────────────────────────────
+
+  it('computes area for a 50×20mm rectangle (1000 mm²)', () => {
+    const piece = makePiece({
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [50, 0] },
+        { type: 'L', values: [50, 20] },
+        { type: 'L', values: [0, 20] },
+        { type: 'Z', values: [] },
+      ],
+    });
+    const state = makeState({ pieces: [piece] });
+    const result = collectInspectionData(baseTarget, state);
+
+    expect(result.piece.area).toBe(1000);
+  });
+
+  it('computes area for a right triangle (0,0)-(100,0)-(0,50) = 2500 mm²', () => {
+    const piece = makePiece({
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [100, 0] },
+        { type: 'L', values: [0, 50] },
+        { type: 'Z', values: [] },
+      ],
+    });
+    const state = makeState({ pieces: [piece] });
+    const result = collectInspectionData(baseTarget, state);
+
+    expect(result.piece.area).toBe(2500);
+  });
+
+  it('computes area = 0 for an empty outline', () => {
+    const piece = makePiece({ outline: [] });
+    const state = makeState({ pieces: [piece] });
+    const result = collectInspectionData(baseTarget, state);
+
+    expect(result.piece.area).toBe(0);
   });
 });

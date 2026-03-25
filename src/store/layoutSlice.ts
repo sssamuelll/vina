@@ -1,4 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
 export type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector' | 'poms';
 
@@ -37,23 +38,19 @@ const LAYOUT_DEFAULTS: LayoutState = {
 // Load from localStorage, merging with defaults to handle new fields
 function loadLayoutFromStorage(): LayoutState {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = safeGetItem(STORAGE_KEY);
     if (stored) {
       return { ...LAYOUT_DEFAULTS, ...JSON.parse(stored) };
     }
   } catch {
-    // Ignore errors
+    // Ignore JSON.parse errors
   }
   return { ...LAYOUT_DEFAULTS };
 }
 
 // Save to localStorage
 function saveLayoutToStorage(state: LayoutState) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  } catch {
-    // Ignore errors
-  }
+  safeSetItem(STORAGE_KEY, JSON.stringify(state));
 }
 
 const initialState: LayoutState = loadLayoutFromStorage();

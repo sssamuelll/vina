@@ -6,6 +6,7 @@ import { toolRegistry } from '../../tools';
 import type { ToolDefinition } from '../../tools/types';
 import ToolTooltip from './ToolTooltip';
 import './Toolbar3D.css';
+import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
 
 interface Toolbar3DProps {
   avatarPanelOpen: boolean;
@@ -17,7 +18,7 @@ const SUBTOOL_STORAGE_KEY = 'openclo:primarySubTools';
 
 function getPrimarySubTools(): Record<string, string> {
   try {
-    return JSON.parse(localStorage.getItem(SUBTOOL_STORAGE_KEY) || '{}');
+    return JSON.parse(safeGetItem(SUBTOOL_STORAGE_KEY) || '{}');
   } catch {
     return {};
   }
@@ -26,7 +27,7 @@ function getPrimarySubTools(): Record<string, string> {
 function setPrimarySubTool(parentId: string, subToolId: string) {
   const current = getPrimarySubTools();
   current[parentId] = subToolId;
-  localStorage.setItem(SUBTOOL_STORAGE_KEY, JSON.stringify(current));
+  safeSetItem(SUBTOOL_STORAGE_KEY, JSON.stringify(current));
 }
 
 export default function Toolbar3D({ avatarPanelOpen, onToggleAvatarPanel }: Toolbar3DProps) {

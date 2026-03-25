@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // Updated after #79-#82 copilot epic completion + #142 3D interaction tools + snapshot tools
-      expect(registry.size).toBe(179); // 178 + 1 mesh selection tool (selectVerticesInRegion)
+      // 198 + 1 mesh selection tool (selectVerticesInRegion)
+      expect(registry.size).toBe(199);
     });
   });
 });

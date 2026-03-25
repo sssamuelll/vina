@@ -89,6 +89,10 @@ const ruleSeamAllowanceTooSmall: Rule = (data) => {
 
 const ruleNoSeamConnections: Rule = (data) => {
   if (data.seams.length === 0) {
+    // Skip for tiny pieces — ruleTinyPiece already provides a more actionable
+    // diagnostic ("delete this scrap") and the no-seam warning is redundant noise.
+    if (data.piece.area < TINY_PIECE_THRESHOLD_MM2) return [];
+
     return [
       {
         severity: 'warning',
@@ -328,9 +332,39 @@ const ruleNoPOMs: Rule = (data) => {
   return [];
 };
 
+// ─── Geometry constants ──────────────────────────────────────────────────────
+
+/** Area threshold below which a piece is considered a scrap (10 cm²). */
+export const TINY_PIECE_THRESHOLD_MM2 = 1000;
+
+/** Stable prefix shared with agentAnalyzer for suggestion matching. */
+export const TINY_PIECE_MESSAGE_PREFIX = 'Orphaned tiny piece detected';
+
+// ─── Geometry rules ───────────────────────────────────────────────────────────
+
+const ruleTinyPiece: Rule = (data) => {
+  const isTiny = data.piece.area < TINY_PIECE_THRESHOLD_MM2;
+  const hasActiveSeams = data.seams.some((s) => s.active !== false);
+
+  if (isTiny && !hasActiveSeams) {
+    return [
+      {
+        severity: 'warning',
+        category: 'geometry',
+        message: `${TINY_PIECE_MESSAGE_PREFIX} (${Math.round(data.piece.area)} mm²)`,
+        detail:
+          'Small orphaned scraps can cause simulation jitter and are typically residues of edit operations. Consider deleting this piece.',
+      },
+    ];
+  }
+  return [];
+};
+
 // ─── Rule registry ────────────────────────────────────────────────────────────
 
 const RULES: Rule[] = [
+  // geometry
+  ruleTinyPiece,
   // fabric
   ruleNoFabric,
   ruleFabricHeavyWeight,
