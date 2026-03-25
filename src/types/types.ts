@@ -36,6 +36,10 @@ export interface PatternPiece {
   mirrored: boolean;
   /** Seam allowance in mm (0 = none) */
   seamAllowance: number;
+  /** Default corner type for all vertices. Default 'mitered'. */
+  defaultCornerType?: CornerType;
+  /** Per-vertex corner type overrides. Key = outline command index. */
+  cornerTypes?: Record<number, CornerType>;
   /** Rich grainline */
   grainLine?: GrainLine;
   /** Rich dart entities */
@@ -237,6 +241,17 @@ export interface PointOfMeasure {
 // ─── Interfacing ───
 
 export type InterfacingType = 'none' | 'fusible-light' | 'fusible-medium' | 'fusible-heavy' | 'sew-in-light' | 'sew-in-heavy' | 'canvas';
+
+// ─── Seam Allowance Corner Types ───
+
+export type CornerType =
+  | 'mitered'
+  | 'doubleMitered'
+  | 'envelope'
+  | 'squared'
+  | 'slant'
+  | 'match'
+  | 'trimMirrored';
 
 // ─── Fabrics ───
 
