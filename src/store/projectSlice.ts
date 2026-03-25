@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Colorway } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
+import { uid } from '../utils/pathHelpers';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
   lining: 0, facing: 0,
@@ -72,6 +73,8 @@ interface ProjectState {
   loadDiagnostics: ValidationDiagnostic[];
   /** Entities quarantined (removed) during the last loadProject call */
   loadQuarantine: Quarantine;
+  colorways: Colorway[];
+  activeColorwayId: string | null;
 }
 
 const initialState: ProjectState = {
@@ -92,6 +95,8 @@ const initialState: ProjectState = {
   layerLocked: {},
   loadDiagnostics: [] as ValidationDiagnostic[],
   loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] } as Quarantine,
+  colorways: [],
+  activeColorwayId: null,
 };
 
 const projectSlice = createSlice({
@@ -783,6 +788,69 @@ const projectSlice = createSlice({
       state.avatarModelUrl = action.payload;
       if (action.payload) state.avatarMode = 'model';
     },
+
+    // ─── Colorways ───
+    addColorway(state, action: PayloadAction<Omit<Colorway, 'id'>>) {
+      // Reject duplicate names
+      if (state.colorways.some(c => c.name === action.payload.name)) return;
+      const id = uid();
+      state.colorways.push({ ...action.payload, id });
+      // Auto-activate first colorway
+      if (state.colorways.length === 1) state.activeColorwayId = id;
+      state.isDirty = true;
+    },
+    removeColorway(state, action: PayloadAction<string>) {
+      state.colorways = state.colorways.filter(c => c.id !== action.payload);
+      if (state.activeColorwayId === action.payload) {
+        state.activeColorwayId = state.colorways[0]?.id ?? null;
+      }
+      state.isDirty = true;
+    },
+    updateColorway(state, action: PayloadAction<Partial<Colorway> & { id: string }>) {
+      const idx = state.colorways.findIndex(c => c.id === action.payload.id);
+      if (idx === -1) return;
+      const existing = state.colorways[idx];
+      // Deep-merge overrides; null values delete the entry
+      if (action.payload.overrides) {
+        const merged = { ...existing.overrides };
+        for (const [key, val] of Object.entries(action.payload.overrides)) {
+          if (val === null) {
+            delete merged[key];
+          } else {
+            merged[key] = { ...(merged[key] || {}), ...val };
+          }
+        }
+        state.colorways[idx] = { ...existing, ...action.payload, overrides: merged };
+      } else {
+        state.colorways[idx] = { ...existing, ...action.payload };
+      }
+      state.isDirty = true;
+    },
+    setActiveColorway(state, action: PayloadAction<string | null>) {
+      if (action.payload === null || state.colorways.some(c => c.id === action.payload)) {
+        state.activeColorwayId = action.payload;
+      }
+    },
+    duplicateColorway(state, action: PayloadAction<{ sourceId: string; newName: string }>) {
+      const source = state.colorways.find(c => c.id === action.payload.sourceId);
+      if (!source) return;
+      if (state.colorways.some(c => c.name === action.payload.newName)) return;
+      const id = uid();
+      state.colorways.push({
+        ...JSON.parse(JSON.stringify(source)),
+        id,
+        name: action.payload.newName,
+        isDefault: false,
+      });
+      state.isDirty = true;
+    },
+    renameColorway(state, action: PayloadAction<{ id: string; name: string }>) {
+      const cw = state.colorways.find(c => c.id === action.payload.id);
+      if (!cw) return;
+      if (state.colorways.some(c => c.name === action.payload.name && c.id !== action.payload.id)) return;
+      cw.name = action.payload.name;
+      state.isDirty = true;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => ({
@@ -814,6 +882,8 @@ export const {
   moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
+  // Colorways
+  addColorway, removeColorway, updateColorway, setActiveColorway, duplicateColorway, renameColorway,
 } = projectSlice.actions;
 
 const DEFAULT_LAYER_NAMES: Record<number, string> = { 0: 'Lining', 1: 'Shell', 2: 'Trims' };

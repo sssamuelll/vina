@@ -86,6 +86,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
       layerNames: {}, layerLocked: {},
       loadDiagnostics: [], loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
+      colorways: [], activeColorwayId: null,
     },
     editor: {
       viewMode: 'split',
@@ -373,6 +374,7 @@ describe('buildAgentContext', () => {
         isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
         layerNames: {}, layerLocked: {},
         loadDiagnostics: [], loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
+        colorways: [], activeColorwayId: null,
       },
     });
     const context = buildAgentContext(state);
@@ -410,6 +412,7 @@ describe('serializeContext', () => {
         isDirty: false, groups: [], seamGroups: [], arrangementOverrides: {}, poms: [],
         layerNames: {}, layerLocked: {},
         loadDiagnostics: [], loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
+        colorways: [], activeColorwayId: null,
       },
     });
     const context = buildAgentContext(state);

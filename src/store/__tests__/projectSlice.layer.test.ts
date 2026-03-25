@@ -44,6 +44,8 @@ function emptyState() {
     layerLocked: {},
     loadDiagnostics: [],
     loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
+    colorways: [],
+    activeColorwayId: null,
   };
 }
 
