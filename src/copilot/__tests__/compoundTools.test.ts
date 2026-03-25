@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 204 (main) + 1 detectDXFFormat
-      expect(registry.size).toBe(205);
+      // 204 + 1 mesh selection tool + 1 detectDXFFormat
+      expect(registry.size).toBe(206);
     });
   });
 });
