@@ -1,5 +1,9 @@
-import type { Point2D } from '../../types/types';
+import type { PathCommand, Point2D } from '../../types/types';
 import type { CornerType } from '../../types/types';
+import { Clipper, Paths64, Path64, Point64 } from 'clipper2-js';
+
+// Clipper2 scale: integer coords at 100x for 0.01mm precision (same as index.ts)
+const CLIPPER_SCALE = 100;
 
 export interface Line2D {
   start: Point2D;
@@ -448,6 +452,199 @@ export function cornerTrimMirrored(
     { x: miter.x - perpX * trimAmount, y: miter.y - perpY * trimAmount },
     { x: miter.x + perpX * trimAmount, y: miter.y + perpY * trimAmount },
   ];
+}
+
+// ─── shiftCornerTypes ─────────────────────────────────────────────────────
+
+/**
+ * Shift corner type keys after an insert (+1) or remove (-1) operation on the
+ * piece outline at `editIndex`.
+ *
+ * - Insert (delta = +1): keys >= editIndex are incremented by 1.
+ * - Remove (delta = -1): the key at editIndex is dropped, keys > editIndex
+ *   are decremented by 1.
+ *
+ * Keys below editIndex are left unchanged in both cases.
+ */
+export function shiftCornerTypes(
+  cornerTypes: Record<number, CornerType>,
+  editIndex: number,
+  delta: number,
+): Record<number, CornerType> {
+  const result: Record<number, CornerType> = {};
+  for (const [keyStr, value] of Object.entries(cornerTypes)) {
+    const key = Number(keyStr);
+    if (delta < 0 && key === editIndex) continue; // remove: skip deleted key
+    if (key >= editIndex) {
+      result[key + delta] = value;
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+// ─── generateSeamAllowanceWithCorners ─────────────────────────────────────
+
+/**
+ * Generate a seam allowance outline using an edge-walk algorithm with per-vertex
+ * corner types. This replaces Clipper2's ClipperOffset for pieces that need
+ * custom corner styles.
+ *
+ * Algorithm:
+ *  1. Extract vertices from outline (M/L commands; skip Z).
+ *  2. Build edges between consecutive vertex pairs (wrapping around).
+ *  3. Offset each edge outward by saWidth (left-perpendicular).
+ *  4. At each vertex, resolve the corner type and call the corner function to
+ *     get the geometry points that join the two adjacent offset edges.
+ *  5. Assemble the full outline: for each edge, emit the offset edge start
+ *     followed by the corner geometry. Close with Z.
+ *  6. Run Clipper2 SimplifyPaths to clean up any self-intersecting regions
+ *     that can arise from concave corners.
+ *
+ * @param outline           Source path (M/L/Z commands)
+ * @param saWidth           Seam allowance width in mm (must be > 0)
+ * @param defaultCornerType Corner type used when a vertex has no explicit override
+ * @param cornerTypes       Per-vertex overrides (key = vertex index in outline)
+ * @param seamLookup        Optional seam lookup for 'match' corner resolution (unused at this level)
+ */
+export function generateSeamAllowanceWithCorners(
+  outline: PathCommand[],
+  saWidth: number,
+  defaultCornerType: CornerType,
+  cornerTypes: Record<number, CornerType>,
+  _seamLookup?: (vertexIndex: number) => { pieceId: string; vertexIndex: number } | null,
+): PathCommand[] {
+  // ── Guard: degenerate inputs ──────────────────────────────────────────────
+  if (saWidth <= 0) return [];
+
+  // ── Step 1: Extract vertices (M and L commands only; skip Z) ──────────────
+  const vertices: Point2D[] = [];
+  for (const cmd of outline) {
+    if (cmd.type === 'M' || cmd.type === 'L') {
+      vertices.push({ x: cmd.values[0], y: cmd.values[1] });
+    }
+  }
+
+  // Remove closing duplicate if present
+  if (vertices.length >= 2) {
+    const first = vertices[0];
+    const last = vertices[vertices.length - 1];
+    if (Math.abs(first.x - last.x) < 1e-6 && Math.abs(first.y - last.y) < 1e-6) {
+      vertices.pop();
+    }
+  }
+
+  if (vertices.length < 3) return [];
+
+  const n = vertices.length;
+
+  // ── Step 2: Build edges (each consecutive pair; polygon wraps) ────────────
+  const edges: Line2D[] = [];
+  for (let i = 0; i < n; i++) {
+    edges.push({
+      start: vertices[i],
+      end: vertices[(i + 1) % n],
+    });
+  }
+
+  // ── Step 3: Offset each edge outward by saWidth ────────────────────────────
+  const offsetEdges: Line2D[] = edges.map((e) => offsetEdge(e, saWidth));
+
+  // ── Step 4 + 5: Assemble the SA outline ──────────────────────────────────
+  // For each vertex i, the corner is between offsetEdges[i-1] (prev) and
+  // offsetEdges[i] (next). The corner function returns geometry points.
+  const resultPoints: Point2D[] = [];
+
+  for (let i = 0; i < n; i++) {
+    const prevOffsetEdge = offsetEdges[(i + n - 1) % n];
+    const nextOffsetEdge = offsetEdges[i];
+    const vertex = vertices[i];
+
+    // Resolve corner type (per-vertex override or default)
+    const type: CornerType = cornerTypes[i] ?? defaultCornerType;
+    const cornerFn = getCornerFunction(type);
+
+    // Compute interior angle for corner functions that need it
+    const prevEdge = edges[(i + n - 1) % n];
+    const nextEdge = edges[i];
+    const angle = interiorAngle(prevEdge, nextEdge);
+
+    // Get corner geometry points
+    const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, angle);
+
+    // Emit the start of the offset edge for the NEXT edge (i.e., nextOffsetEdge.start),
+    // then the corner geometry points.
+    // The start of nextOffsetEdge is the offset vertex on the incoming side.
+    resultPoints.push({ ...nextOffsetEdge.start });
+    for (const pt of cornerPts) {
+      resultPoints.push(pt);
+    }
+  }
+
+  if (resultPoints.length < 3) return [];
+
+  // ── Step 6: Self-intersection cleanup via Clipper2 SimplifyPaths ──────────
+  // Convert to Clipper2 integer path
+  const clipperPath = new Path64();
+  for (const pt of resultPoints) {
+    clipperPath.push(new Point64(
+      Math.round(pt.x * CLIPPER_SCALE),
+      Math.round(pt.y * CLIPPER_SCALE),
+    ));
+  }
+
+  const inputPaths = new Paths64();
+  inputPaths.push(clipperPath);
+
+  // SimplifyPaths removes self-intersecting regions and collapses degenerate edges
+  const simplified = Clipper.simplifyPaths(inputPaths, 0.01 * CLIPPER_SCALE, true);
+
+  if (simplified.length === 0) {
+    // Fallback: return raw assembled path without cleanup
+    const commands: PathCommand[] = [
+      { type: 'M', values: [resultPoints[0].x, resultPoints[0].y] },
+    ];
+    for (let i = 1; i < resultPoints.length; i++) {
+      commands.push({ type: 'L', values: [resultPoints[i].x, resultPoints[i].y] });
+    }
+    commands.push({ type: 'Z', values: [] });
+    return commands;
+  }
+
+  // Take the largest path by area (outermost polygon)
+  let largest = simplified[0];
+  let largestArea = 0;
+  for (const path of simplified) {
+    let area = 0;
+    for (let i = 0, len = path.length; i < len; i++) {
+      const j = (i + 1) % len;
+      area += Number(path[i].x) * Number(path[j].y);
+      area -= Number(path[j].x) * Number(path[i].y);
+    }
+    area = Math.abs(area);
+    if (area > largestArea) {
+      largestArea = area;
+      largest = path;
+    }
+  }
+
+  // Convert back to PathCommand[]
+  const commands: PathCommand[] = [
+    {
+      type: 'M',
+      values: [Number(largest[0].x) / CLIPPER_SCALE, Number(largest[0].y) / CLIPPER_SCALE],
+    },
+  ];
+  for (let i = 1; i < largest.length; i++) {
+    commands.push({
+      type: 'L',
+      values: [Number(largest[i].x) / CLIPPER_SCALE, Number(largest[i].y) / CLIPPER_SCALE],
+    });
+  }
+  commands.push({ type: 'Z', values: [] });
+
+  return commands;
 }
 
 // ─── getCornerFunction dispatcher ─────────────────────────────────────────

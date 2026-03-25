@@ -12,8 +12,11 @@ import {
   cornerMatch,
   cornerTrimMirrored,
   getCornerFunction,
+  shiftCornerTypes,
+  generateSeamAllowanceWithCorners,
 } from '../cornerTypes';
 import type { Line2D } from '../cornerTypes';
+import type { CornerType, PathCommand } from '../../../types/types';
 
 // ─── offsetEdge ──────────────────────────────────────────────────────────────
 
@@ -364,6 +367,104 @@ describe('cornerTrimMirrored', () => {
     const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
     // Total distance between the two points should be 2 * saWidth * 0.2
     expect(dist).toBeCloseTo(2 * SA * 0.2, 5);
+  });
+});
+
+// ─── shiftCornerTypes ────────────────────────────────────────────────────────
+
+describe('shiftCornerTypes', () => {
+  it('insert at index 2: keys >= 2 shift by +1', () => {
+    const ct = { 1: 'squared' as CornerType, 3: 'envelope' as CornerType };
+    expect(shiftCornerTypes(ct, 2, 1)).toEqual({ 1: 'squared', 4: 'envelope' });
+  });
+  it('remove at index 2: key 2 deleted, keys > 2 shift by -1', () => {
+    const ct = { 1: 'squared' as CornerType, 2: 'slant' as CornerType, 4: 'envelope' as CornerType };
+    expect(shiftCornerTypes(ct, 2, -1)).toEqual({ 1: 'squared', 3: 'envelope' });
+  });
+  it('insert at 0: all keys shift', () => {
+    const ct = { 0: 'squared' as CornerType, 2: 'envelope' as CornerType };
+    expect(shiftCornerTypes(ct, 0, 1)).toEqual({ 1: 'squared', 3: 'envelope' });
+  });
+  it('empty record returns empty', () => {
+    expect(shiftCornerTypes({}, 5, 1)).toEqual({});
+  });
+});
+
+// ─── generateSeamAllowanceWithCorners ────────────────────────────────────────
+
+describe('generateSeamAllowanceWithCorners', () => {
+  const square: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [100, 0] },
+    { type: 'L', values: [100, 100] },
+    { type: 'L', values: [0, 100] },
+    { type: 'Z', values: [] },
+  ];
+
+  it('all mitered produces valid SA outline', () => {
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    expect(sa.length).toBeGreaterThan(0);
+    expect(sa[0].type).toBe('M');
+    expect(sa[sa.length - 1].type).toBe('Z');
+  });
+
+  it('mixed corner types produces valid SA outline', () => {
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 1: 'squared', 2: 'envelope' });
+    expect(sa.length).toBeGreaterThan(0);
+    // squared adds 2 extra points, envelope adds 3 extra points vs mitered (1 point each)
+    const allMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    expect(sa.length).toBeGreaterThan(allMitered.length);
+  });
+
+  it('returns empty for zero width', () => {
+    expect(generateSeamAllowanceWithCorners(square, 0, 'mitered', {})).toEqual([]);
+  });
+
+  it('returns empty for negative width', () => {
+    expect(generateSeamAllowanceWithCorners(square, -5, 'mitered', {})).toEqual([]);
+  });
+
+  it('returns empty for outline with < 3 vertices', () => {
+    const line: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'Z', values: [] },
+    ];
+    expect(generateSeamAllowanceWithCorners(line, 10, 'mitered', {})).toEqual([]);
+  });
+
+  it('handles L-shape (concave corner) without crash', () => {
+    const lShape: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 50] },
+      { type: 'L', values: [50, 50] },
+      { type: 'L', values: [50, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const sa = generateSeamAllowanceWithCorners(lShape, 10, 'mitered', {});
+    expect(sa.length).toBeGreaterThan(0);
+  });
+
+  it('all-mitered result starts with M and ends with Z', () => {
+    const sa = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    expect(sa[0].type).toBe('M');
+    expect(sa[sa.length - 1].type).toBe('Z');
+  });
+
+  it('per-vertex corner type overrides defaultCornerType', () => {
+    // vertex 0 = squared, rest = mitered
+    const saOverride = generateSeamAllowanceWithCorners(square, 10, 'mitered', { 0: 'squared' });
+    const saAllMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    // squared adds 2 extra pts vs 1 for miter at that vertex
+    expect(saOverride.length).toBeGreaterThan(saAllMitered.length);
+  });
+
+  it('all-squared default corner type produces more points than all-mitered', () => {
+    const saSquared = generateSeamAllowanceWithCorners(square, 10, 'squared', {});
+    const saMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
+    expect(saSquared.length).toBeGreaterThan(saMitered.length);
   });
 });
 

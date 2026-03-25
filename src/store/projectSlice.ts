@@ -365,6 +365,8 @@ const projectSlice = createSlice({
         // Update only geometry, preserve everything else
         piece.outline = outline;
         piece.position = position;
+        // Full outline replacement invalidates all vertex indices — clear corner types
+        piece.cornerTypes = undefined;
         piece.updatedAt = Date.now();
         state.isDirty = true;
       } else {
@@ -387,6 +389,8 @@ const projectSlice = createSlice({
         if (piece) {
           piece.outline = outline;
           piece.position = position;
+          // Full outline replacement invalidates all vertex indices — clear corner types
+          piece.cornerTypes = undefined;
           piece.updatedAt = now;
         }
       }
