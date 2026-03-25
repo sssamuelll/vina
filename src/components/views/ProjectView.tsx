@@ -21,7 +21,7 @@ import {
   deserializeReferenceImages,
   garbageCollect,
 } from '../../utils/import/referenceImageStore';
-import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF, detectDXFFormat, getProfile } from '../../utils/dxf';
+import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF, detectDXFFormat } from '../../utils/dxf';
 import type { DetectionResult, FormatId, FormatProfile } from '../../utils/dxf/types';
 import { setDxfPreferredFormat } from '../../store/workflowSlice';
 import type { DXFDocument } from '../../utils/dxf/types';
