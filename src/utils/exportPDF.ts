@@ -1,5 +1,6 @@
 import { PatternPiece, PathCommand } from '../types/types';
 import { preparePieces } from './export/pipeline';
+import { escapePdfString } from './sanitizeName';
 
 /**
  * Export pattern pieces to PDF at 1:1 scale.
@@ -153,7 +154,7 @@ export function generatePDF(pieces: PatternPiece[]): string {
     const labelX = ((bb.minX + bb.maxX) / 2 + ox) * MM_TO_PT;
     const labelY = (totalH - ((bb.minY + bb.maxY) / 2 + oy)) * MM_TO_PT;
     stream += '0 0 0 RG\n';
-    stream += `BT /F1 ${(3 * MM_TO_PT).toFixed(1)} Tf ${labelX.toFixed(2)} ${labelY.toFixed(2)} Td (${piece.name}) Tj ET\n`;
+    stream += `BT /F1 ${(3 * MM_TO_PT).toFixed(1)} Tf ${labelX.toFixed(2)} ${labelY.toFixed(2)} Td (${escapePdfString(piece.name)}) Tj ET\n`;
   }
 
   // Build minimal PDF

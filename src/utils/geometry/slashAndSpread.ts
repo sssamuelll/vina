@@ -46,6 +46,16 @@ export function findSlashIntersections(
   startPoint: Point2D,
   endPoint: Point2D,
 ): [OutlineHit, OutlineHit] {
+  if (
+    outline.length < 3 ||
+    outline[0].type !== 'M' ||
+    outline[outline.length - 1].type !== 'Z'
+  ) {
+    throw new Error(
+      'Invalid outline: must be a closed path starting with M and ending with Z (at least 3 commands).',
+    );
+  }
+
   const hits = findOutlineIntersections(outline, startPoint, endPoint);
 
   if (hits.length !== 2) {

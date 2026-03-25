@@ -133,6 +133,15 @@ export class ClothWorkerClient {
   }
 
   /**
+   * Set elastic constraints on the solver.
+   *
+   * @param elastics - Array of Elastic objects (active ones only)
+   */
+  setElastics(elastics: import('../../types/types').Elastic[]): void {
+    this.postMessage({ type: 'setElastics', elastics } as WorkerInMessage);
+  }
+
+  /**
    * Start the simulation loop.
    */
   start(): void {

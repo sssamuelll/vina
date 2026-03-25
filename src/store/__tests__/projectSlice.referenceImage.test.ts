@@ -30,6 +30,7 @@ function baseState(overrides: Record<string, any> = {}) {
     avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} } as any,
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
     arrangementOverrides: {}, groups: [], seamGroups: [], poms: [] as any[],
+    pleats: [], elastics: [],
     referenceImages: [] as ReferenceImage[],
     layerNames: {}, layerLocked: {},
     loadDiagnostics: [],

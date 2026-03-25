@@ -158,6 +158,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshGrab = useSelector((s: RootState) => s.simulation.meshGrab);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const seamGroups = useSelector((s: RootState) => s.project.seamGroups);
+  const elastics = useSelector((s: RootState) => s.project.elastics);
   const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
@@ -299,9 +300,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 
+  const activeElastics = useMemo(() => elastics.filter(e => e.active !== false), [elastics]);
+
   const { clients, positionsRef, edgeDataRef, onFrame, tslSolverRef } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
+    elastics: activeElastics,
     fabricId,
     stretchingIdsRef,
   });
@@ -612,20 +616,6 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tslSolverRef.current, staticGeometry]);
 
-  // Update TSL material opacity/emission without recreating it
-  useEffect(() => {
-    if (!tslMaterial) return;
-    tslMaterial.opacity = effectiveOpacity;
-    if (effectiveEmission) {
-      tslMaterial.emissive = new THREE.Color(effectiveEmission);
-      tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
-    } else {
-      tslMaterial.emissive = new THREE.Color(0x000000);
-      tslMaterial.emissiveIntensity = 0;
-    }
-    tslMaterial.needsUpdate = true;
-  }, [tslMaterial, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity]);
-
   // Effective tint: first active piece with a custom tint, or fallback to fabric color
   const effectiveTint = useMemo(() => {
     for (const p of activePieces) {
@@ -640,7 +630,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const uv = pieceUVTransforms[p.id];
       if (uv) return uv;
     }
-    return { repeatX: renderParams.mapRepeat[0], repeatY: renderParams.mapRepeat[1], rotation: renderParams.mapRotation };
+    return { repeatX: renderParams.mapRepeat[0], repeatY: renderParams.mapRepeat[1], rotation: renderParams.mapRotation, offsetX: 0, offsetY: 0 };
   }, [activePieces, pieceUVTransforms, renderParams.mapRepeat, renderParams.mapRotation]);
 
   // ─── Texture loading ───────────────────────────────────────────────────────
@@ -675,17 +665,67 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     return () => { cancelled = true; };
   }, [fabricId]);
 
-  // Apply UV repeat/rotation from effective UV (responds to Redux slider changes)
+  // Apply UV repeat/rotation/offset from effective UV (responds to Redux slider changes)
   useEffect(() => {
     const rotRad = (effectiveUV.rotation ?? 0) * Math.PI / 180;
+    const ox = effectiveUV.offsetX ?? 0;
+    const oy = effectiveUV.offsetY ?? 0;
     [textures.map, textures.normalMap, textures.roughnessMap, textures.aoMap].forEach(tex => {
       if (tex) {
         tex.repeat.set(effectiveUV.repeatX, effectiveUV.repeatY);
+        tex.offset.set(ox, oy);
         tex.rotation = rotRad;
         tex.needsUpdate = true;
       }
     });
-  }, [textures, effectiveUV.repeatX, effectiveUV.repeatY, effectiveUV.rotation]);
+  }, [textures, effectiveUV.repeatX, effectiveUV.repeatY, effectiveUV.rotation, effectiveUV.offsetX, effectiveUV.offsetY]);
+
+  // Update TSL material properties for surface mode, opacity, emission, and textures
+  useEffect(() => {
+    if (!tslMaterial) return;
+
+    const isFlat = surfaceMode3D === 'flat';
+    const isXray = surfaceMode3D === 'xray';
+    const stripTextures = surfaceMode3D === 'shaded' || surfaceMode3D === 'shaded-wire';
+
+    // Opacity
+    tslMaterial.opacity = isXray ? 0.1 : effectiveOpacity;
+    tslMaterial.transparent = isXray || effectiveOpacity < 1;
+    tslMaterial.depthWrite = !isXray;
+
+    // Color & emission (mutate in-place to avoid GC pressure)
+    if (isFlat) {
+      tslMaterial.color.set('#000000');
+      tslMaterial.emissive.set(effectiveTint || '#ffffff');
+      tslMaterial.emissiveIntensity = 1;
+    } else {
+      tslMaterial.color.set(effectiveTint || '#ffffff');
+      if (effectiveEmission) {
+        tslMaterial.emissive.set(effectiveEmission);
+        tslMaterial.emissiveIntensity = effectiveEmissionIntensity;
+      } else {
+        tslMaterial.emissive.setHex(0x000000);
+        tslMaterial.emissiveIntensity = 0;
+      }
+    }
+
+    // Roughness
+    tslMaterial.roughness = isFlat ? 1 : renderParams.roughness;
+
+    // Textures — strip for shaded/shaded-wire modes, apply for textured modes
+    if (stripTextures || fitMapMode !== 'none') {
+      tslMaterial.map = null;
+      tslMaterial.normalMap = null;
+      tslMaterial.roughnessMap = null;
+    } else {
+      tslMaterial.map = textures.map;
+      tslMaterial.normalMap = textures.normalMap;
+      tslMaterial.roughnessMap = textures.roughnessMap;
+    }
+    tslMaterial.aoMap = textures.aoMap;
+
+    tslMaterial.needsUpdate = true;
+  }, [tslMaterial, surfaceMode3D, effectiveOpacity, effectiveEmission, effectiveEmissionIntensity, effectiveTint, renderParams.roughness, fitMapMode, textures]);
 
   // Pin tool: click handler to find nearest vertex and add pin
   const handleMeshClick = useCallback((e: ThreeEvent<MouseEvent>) => {
