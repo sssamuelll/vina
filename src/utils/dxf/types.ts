@@ -106,6 +106,9 @@ export const AAMA_LAYERS = {
   GRAINLINE: '7',
   DRAW: '8',
   INTCUT: '11',
+  FABRIC_CODE: '13',      // fabric type/code per piece
+  ANNOTATION: '14',       // annotation text per piece
+  FOLD_DIR: '15',         // fold direction markers (mountain/valley)
 } as const;
 
 /** Map AAMA numbered layers and named layers to semantic roles */
