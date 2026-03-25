@@ -18,13 +18,16 @@ function makePOM(id: string, overrides: Partial<PointOfMeasure> = {}): PointOfMe
 
 function baseState(overrides: Record<string, any> = {}) {
   return {
-    id: 'test', name: 'Test', pieces: [] as any[], seams: [], fabrics: [],
+    id: 'test', name: 'Test', pieces: [] as any[], seams: [], pleats: [], elastics: [], fabrics: [],
     avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} } as any,
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
     arrangementOverrides: {}, groups: [], seamGroups: [], poms: [] as PointOfMeasure[],
+    referenceImages: [],
     layerNames: {}, layerLocked: {},
     loadDiagnostics: [],
     loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] },
+    colorways: [],
+    activeColorwayId: null,
     ...overrides,
   };
 }

@@ -49,6 +49,40 @@ describe('pointToTriangleDist', () => {
   });
 });
 
+describe('TriangleSpatialHash — validation', () => {
+  it('throws when vertices.length < triCount * 9', () => {
+    const mesh: CollisionMeshData = {
+      vertices: new Float32Array([0, 0, 0, 1, 0, 0]), // only 6 floats, need 9
+      normals: new Float32Array([0, 0, 1]),
+      triCount: 1,
+    };
+    expect(() => new TriangleSpatialHash(mesh, 0.5)).toThrow(/vertices/i);
+  });
+
+  it('throws when normals.length < triCount * 3', () => {
+    const mesh: CollisionMeshData = {
+      vertices: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      normals: new Float32Array([0, 0]), // only 2 floats, need 3
+      triCount: 1,
+    };
+    expect(() => new TriangleSpatialHash(mesh, 0.5)).toThrow(/normals/i);
+  });
+
+  it('throws when triCount is negative', () => {
+    const mesh: CollisionMeshData = {
+      vertices: new Float32Array(9),
+      normals: new Float32Array(3),
+      triCount: -1,
+    };
+    expect(() => new TriangleSpatialHash(mesh, 0.5)).toThrow(/triCount/i);
+  });
+
+  it('accepts valid mesh with exact minimum sizes', () => {
+    const mesh = makeFloorTriangle();
+    expect(() => new TriangleSpatialHash(mesh, 0.5)).not.toThrow();
+  });
+});
+
 describe('TriangleSpatialHash', () => {
   it('returns triangle index for nearby query', () => {
     const mesh = makeFloorTriangle();

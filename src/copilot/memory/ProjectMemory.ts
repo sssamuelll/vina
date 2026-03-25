@@ -9,6 +9,7 @@
  */
 
 import { storageGet, storageSet } from '../../utils/storage';
+import { safeGetItem, safeSetItem, safeRemoveItem, safeStorageLength, safeKey } from '../../utils/safeStorage';
 
 // ─── Message types ───────────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ export class ProjectMemory {
 
   private _load(): void {
     try {
-      const raw = localStorage.getItem(`${STORAGE_PREFIX}${this.projectId}`);
+      const raw = safeGetItem(`${STORAGE_PREFIX}${this.projectId}`);
       if (raw) {
         const data = JSON.parse(raw);
         this.messages = data.messages || [];
@@ -82,14 +83,10 @@ export class ProjectMemory {
   }
 
   save(): void {
-    try {
-      localStorage.setItem(
-        `${STORAGE_PREFIX}${this.projectId}`,
-        JSON.stringify({ messages: this.messages, decisions: this.decisions, summary: this.summary })
-      );
-    } catch {
-      // quota exceeded, ignore
-    }
+    safeSetItem(
+      `${STORAGE_PREFIX}${this.projectId}`,
+      JSON.stringify({ messages: this.messages, decisions: this.decisions, summary: this.summary })
+    );
   }
 
   clear(): void {
@@ -100,11 +97,7 @@ export class ProjectMemory {
 
   delete(): void {
     this.clear();
-    try {
-      localStorage.removeItem(`${STORAGE_PREFIX}${this.projectId}`);
-    } catch {
-      // ignore
-    }
+    safeRemoveItem(`${STORAGE_PREFIX}${this.projectId}`);
   }
 
   toJSON() {
@@ -129,15 +122,12 @@ export class ProjectMemory {
 
 export function listProjectMemories(): string[] {
   const ids: string[] = [];
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith(STORAGE_PREFIX)) {
-        ids.push(key.slice(STORAGE_PREFIX.length));
-      }
+  const len = safeStorageLength();
+  for (let i = 0; i < len; i++) {
+    const key = safeKey(i);
+    if (key?.startsWith(STORAGE_PREFIX)) {
+      ids.push(key.slice(STORAGE_PREFIX.length));
     }
-  } catch {
-    // ignore
   }
   return ids;
 }

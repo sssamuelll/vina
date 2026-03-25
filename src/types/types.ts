@@ -50,8 +50,10 @@ export interface PatternPiece {
   side?: PieceSide;
   /** Named semantic edges (armhole, shoulder, hemline, etc.) */
   edges?: SemanticEdge[];
-  /** Fabric assignment */
+  /** Fabric assignment (links to PhysicalFabric for simulation) */
   fabricId?: string;
+  /** Production fabric code classification (SELF, LINING, etc.) */
+  fabricCode?: string;
   /** Link to construction piece (for overlay alignment) */
   constructionPieceId?: string;
   /** ID of the linked partner piece (bidirectional) */
@@ -74,11 +76,51 @@ export interface PatternPiece {
   interfacingType?: InterfacingType;
   /** Solidify factor (0-1) for extra stiffness */
   solidifyFactor?: number;
+  /** Production annotations (cutting instructions, QC notes, etc.) */
+  annotations?: PieceAnnotation[];
   createdAt: number;
   updatedAt: number;
 }
 
+// ─── Annotations ───
+
+export type AnnotationCategory = 'cutting' | 'sewing' | 'qc' | 'general';
+export type AnnotationPosition = 'center';
+
+export interface PieceAnnotation {
+  id: string;
+  text: string;
+  position: AnnotationPosition;
+  category: AnnotationCategory;
+  fontSize?: number;
+}
+
+// ─── Reference Images (2D pattern workspace background) ───
+
+/** A background reference image imported into the 2D pattern editor for tracing. */
+export interface ReferenceImage {
+  id: string;
+  filename: string;
+  width: number;              // natural image width in px
+  height: number;             // natural image height in px
+  position: Point2D;          // position in pattern space (mm)
+  scale: number;              // uniform scale factor
+  rotation: number;           // degrees
+  opacity: number;            // 0.0–1.0
+  locked: boolean;
+  visible: boolean;
+  pixelsPerMm: number | null; // set by calibration, null = uncalibrated
+}
+
 // ─── Rich Dart Entity ───
+
+/** Dart cap shape at the apex */
+export type DartCapShape = 'pointed' | 'curved' | 'flat' | 'diamond';
+
+/** Options stored on InternalLine for dart-specific metadata */
+export interface DartOptions {
+  capShape?: DartCapShape;
+}
 
 /** A dart with full geometric and semantic data */
 export interface Dart {
@@ -95,6 +137,8 @@ export interface Dart {
   foldDirection: 'left' | 'right' | 'toward-center';
   /** Dart depth (length from edge to apex) in mm */
   depth?: number;
+  /** Cap shape at the apex */
+  capShape?: DartCapShape;
 }
 
 // ─── GrainLine Semantics ───
@@ -142,7 +186,47 @@ export interface InternalLine {
   path: PathCommand[];
   notchOptions?: NotchOptions;
   topstitchOptions?: TopstitchOptions;
+  foldOptions?: FoldOptions;
+  dartOptions?: DartOptions;
 }
+
+// ─── Fold Options ───
+
+export interface FoldOptions {
+  direction: 'mountain' | 'valley';
+  creaseAngleDeg: number;
+  pleatId?: string;
+}
+
+// ─── Pleats ───
+
+export type PleatType = 'knife' | 'box' | 'accordion' | 'invertedBox';
+
+export interface Pleat {
+  id: string;
+  pieceId: string;
+  edgeName: string;
+  type: PleatType;
+  depth: number;
+  spacing: number;
+  count: number;
+  direction: 'left' | 'right';
+  tStart: number;
+  tEnd: number;
+  generatedLineIds: string[];
+}
+
+export const PLEAT_DEFAULTS: Omit<Pleat, 'id' | 'pieceId' | 'edgeName' | 'generatedLineIds'> = {
+  type: 'accordion',
+  depth: 15,
+  spacing: 20,
+  count: 4,
+  direction: 'left',
+  tStart: 0,
+  tEnd: 1,
+};
+
+export const MAX_PLEAT_COUNT = 50;
 
 // ─── Piece Classification ───
 
@@ -193,6 +277,35 @@ export interface Seam {
   taped: boolean;
   /** Width of tape in mm (default 10) */
   tapeWidth: number;
+}
+
+// ─── Elastics (edge-based elastic/gathering) ───
+
+export type ElasticType = 'band' | 'shirring' | 'drawstring';
+
+export interface Elastic {
+  id: string;
+  pieceId: string;
+  edgeName: string;
+  stretchRatio: number;   // 0.1–2.0
+  width: number;          // mm
+  type: ElasticType;
+  tStart: number;         // 0.0–1.0
+  tEnd: number;           // 0.0–1.0
+  active: boolean;
+}
+
+export const ELASTIC_DEFAULTS: Omit<Elastic, 'id' | 'pieceId' | 'edgeName'> = {
+  stretchRatio: 0.5,
+  width: 12,
+  type: 'band',
+  tStart: 0,
+  tEnd: 1,
+  active: true,
+};
+
+export function clampStretchRatio(v: number): number {
+  return Math.max(0.1, Math.min(2.0, v));
 }
 
 /** A seam group connects multiple edge segments between two sets of edges */
@@ -266,6 +379,21 @@ export interface Fabric {
   stretch: number;      // 0-1 (0 = no stretch, 1 = full stretch)
   stiffness: number;    // 0-1 (0 = silk, 1 = denim)
   friction: number;     // 0-1
+}
+
+// ─── Colorways ───
+
+export interface ColorwayOverride {
+  color?: string;
+  fabricId?: string;
+  textureUrl?: string;
+}
+
+export interface Colorway {
+  id: string;
+  name: string;
+  overrides: Record<string, ColorwayOverride | null>;
+  isDefault?: boolean;
 }
 
 // ─── Body Measurements ───
@@ -347,6 +475,18 @@ export interface Avatar {
   measurements: BodyMeasurements;
 }
 
+// ─── Garment Info ───
+
+export interface GarmentInfo {
+  brand?: string;
+  season?: string;
+  styleNumber?: string;
+  designer?: string;
+  date?: string;
+  notes?: string;
+  description?: string;
+}
+
 // ─── Project ───
 
 export interface OpenCloProject {
@@ -363,6 +503,12 @@ export interface OpenCloProject {
   poms?: PointOfMeasure[];
   /** Named seam groups (optional for backward compat) */
   seamGroups?: SeamGroup[];
+  /** Garment metadata (brand, season, style, etc.) */
+  garmentInfo?: GarmentInfo;
+  /** Reference images for 2D tracing (optional for backward compat) */
+  referenceImages?: ReferenceImage[];
+  /** Base64-encoded image blobs keyed by imageId (present in .openclo.json files only) */
+  referenceImageData?: Record<string, string>;
   createdAt: number;
   updatedAt: number;
 }
@@ -425,6 +571,7 @@ export type Tool2D =
   | 'offsetOutline' // offset piece outline inward/outward
   | 'extendTrim'   // extend or trim edges
   | 'polyPen'      // combined straight + bezier pen
+  | 'pleat'        // add/edit pleats along piece edges
   | 'hand'         // pan
   | 'zoom';
 
@@ -436,6 +583,7 @@ export interface EditorState {
   selectedPieceIds: string[];
   selectedSeamId: string | null;
   selectedPOMId: string | null;
+  selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;
@@ -459,5 +607,14 @@ export interface EditorState {
     active: boolean;
     sourcePieceId: string | null;
     mode: 'over' | 'under' | 'side' | null;
+  } | null;
+  /** Global toggle for reference image overlays */
+  showReferenceImages: boolean;
+  /** ID of the currently selected reference image (for highlight) */
+  selectedReferenceImageId: string | null;
+  /** Two-click calibration flow: active when user is setting scale ruler */
+  calibrationMode: {
+    imageId: string;
+    point1: Point2D | null;  // first click; null = awaiting
   } | null;
 }

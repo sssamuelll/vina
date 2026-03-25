@@ -9,12 +9,18 @@ import {
   updateAvatar,
   updateMeasurements,
   setProjectName,
+  setGarmentInfo,
   createGroup,
   renameGroup,
   deleteGroup,
   setGroupColor,
   removePiecesFromGroup,
 } from '../../store/projectSlice';
+import {
+  serializeReferenceImages,
+  deserializeReferenceImages,
+  garbageCollect,
+} from '../../utils/import/referenceImageStore';
 import { parseDXF, dxfToPatternPieces, downloadDXFAAMA, downloadMultiSizeDXF } from '../../utils/dxf';
 import type { DXFDocument } from '../../utils/dxf/types';
 import { downloadPDF } from '../../utils/exportPDF';
@@ -87,6 +93,8 @@ export default function ProjectView() {
   const projectId = useSelector((s: RootState) => s.project.id);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
   const groups = useSelector((s: RootState) => s.project.groups);
+  const garmentInfo = useSelector((s: RootState) => s.project.garmentInfo) || {};
+  const referenceImages = useSelector((s: RootState) => s.project.referenceImages);
   const construction = useSelector((s: RootState) => s.construction);
 
   // Check if construction has data for skill export
@@ -443,8 +451,9 @@ export default function ProjectView() {
 
   // ─── Project Save / Load / New ───
 
-  const handleSaveProject = useCallback(() => {
-    const project: OpenCloProject = {
+  const handleSaveProject = useCallback(async () => {
+    const imageData = await serializeReferenceImages(referenceImages.map(i => i.id));
+    const project = {
       id: projectId,
       name: projectName,
       pieces,
@@ -452,6 +461,8 @@ export default function ProjectView() {
       fabrics,
       avatar,
       groups,
+      referenceImages,
+      referenceImageData: imageData,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -467,7 +478,7 @@ export default function ProjectView() {
       filename: `${projectName || 'project'}.openclo.json`,
       date: new Date().toLocaleString(),
     });
-  }, [projectId, projectName, pieces, seams, fabrics, avatar, groups]);
+  }, [projectId, projectName, pieces, seams, fabrics, avatar, groups, referenceImages]);
 
   const handleLoadProject = useCallback(() => {
     projectInputRef.current?.click();
@@ -479,8 +490,15 @@ export default function ProjectView() {
       if (!file) return;
       try {
         const text = await file.text();
-        const project = JSON.parse(text) as OpenCloProject;
-        dispatch(loadProject(project));
+        const raw = JSON.parse(text) as OpenCloProject & { referenceImageData?: Record<string, string> };
+        dispatch(loadProject(raw));
+        // Restore reference image blobs from base64 data embedded in the project file
+        if (raw.referenceImageData && Object.keys(raw.referenceImageData).length > 0) {
+          await deserializeReferenceImages(raw.referenceImageData);
+        }
+        // Garbage-collect orphaned IndexedDB entries
+        const activeIds = (raw.referenceImages ?? []).map((i) => i.id);
+        await garbageCollect(activeIds);
       } catch (err) {
         console.error('Failed to load project:', err);
       }
@@ -493,6 +511,7 @@ export default function ProjectView() {
     if (window.confirm('Create a new project? Unsaved changes will be lost.')) {
       // Clear persisted project and reset all Redux slices
       import('../../utils/projectIO').then(m => m.clearStorageProject());
+      import('../../utils/import/referenceImageStore').then(m => m.clearAllImageBlobs()).catch(() => {});
       import('../../store/actions').then(m => dispatch(m.NEW_PROJECT()));
     }
   }, [dispatch]);
@@ -557,6 +576,31 @@ export default function ProjectView() {
                 style={{ width: '100%', marginTop: 2 }}
               />
             </label>
+            <div className="panel-section-title" style={{ marginTop: 12 }}>GARMENT INFO</div>
+            <div className="panel-field">
+              <label>Brand</label>
+              <input className="panel-input" value={garmentInfo.brand || ''} onChange={e => dispatch(setGarmentInfo({ field: 'brand', value: e.target.value }))} />
+            </div>
+            <div className="panel-field">
+              <label>Season</label>
+              <input className="panel-input" value={garmentInfo.season || ''} onChange={e => dispatch(setGarmentInfo({ field: 'season', value: e.target.value }))} />
+            </div>
+            <div className="panel-field">
+              <label>Style Number</label>
+              <input className="panel-input" value={garmentInfo.styleNumber || ''} onChange={e => dispatch(setGarmentInfo({ field: 'styleNumber', value: e.target.value }))} />
+            </div>
+            <div className="panel-field">
+              <label>Designer</label>
+              <input className="panel-input" value={garmentInfo.designer || ''} onChange={e => dispatch(setGarmentInfo({ field: 'designer', value: e.target.value }))} />
+            </div>
+            <div className="panel-field">
+              <label>Date</label>
+              <input className="panel-input" value={garmentInfo.date || ''} onChange={e => dispatch(setGarmentInfo({ field: 'date', value: e.target.value }))} />
+            </div>
+            <div className="panel-field">
+              <label>Notes</label>
+              <textarea className="panel-input" rows={3} value={garmentInfo.notes || ''} onChange={e => dispatch(setGarmentInfo({ field: 'notes', value: e.target.value }))} />
+            </div>
             <button className="sidebar-btn sidebar-btn-primary sidebar-btn-full" onClick={handleSaveProject}>
               Save Project
             </button>

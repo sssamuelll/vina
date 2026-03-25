@@ -15,6 +15,7 @@
 
 import type { ProviderConfig } from './providers/types';
 import { SecureStorage } from './providers/secureStorage';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../utils/safeStorage';
 
 // ─── Error Classification ───────────────────────────────────────────────────
 
@@ -315,34 +316,34 @@ const FALLBACK_APIKEY_SECURE_KEY = 'fallback-apikey';
  * Idempotent — safe to call on every startup. No-ops if no apiKey field exists.
  * Call once on app startup to migrate away from insecure storage.
  */
-export function clearLegacyFallbackKeys(): void {
+export async function clearLegacyFallbackKeys(): Promise<void> {
   // Clean localStorage
-  try {
-    const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
-    if (!saved) return;
+  const saved = safeGetItem(FALLBACK_PROVIDER_KEY);
+  if (!saved) return;
 
-    let parsed: Record<string, unknown>;
-    try {
-      parsed = JSON.parse(saved);
-    } catch (parseErr) {
-      // Corrupted data — remove the entire key to be safe (may contain a key in raw text)
-      console.warn('[Security] Failed to parse legacy fallback config, removing entire key:', parseErr);
-      localStorage.removeItem(FALLBACK_PROVIDER_KEY);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(saved);
+  } catch (parseErr) {
+    // Corrupted data — remove the entire key to be safe (may contain a key in raw text)
+    console.warn('[Security] Failed to parse legacy fallback config, removing entire key:', parseErr);
+    safeRemoveItem(FALLBACK_PROVIDER_KEY);
+    return;
+  }
+
+  if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
+    // Migrate API key to SecureStorage for the current session (encrypted)
+    const stored = await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
+    if (!stored) {
+      // Encryption failed — keep the key in localStorage rather than losing it
+      console.warn('[Security] Could not encrypt legacy API key; leaving it in localStorage for now');
       return;
     }
-
-    if (parsed && typeof parsed.apiKey === 'string' && parsed.apiKey.length > 0) {
-      // Migrate API key to SecureStorage for the current session
-      SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, parsed.apiKey as string);
-      // Re-save without the API key
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { apiKey: _removed, ...rest } = parsed;
-      localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
-      console.info('[Security] Migrated legacy API key from localStorage to SecureStorage');
-    }
-  } catch (err) {
-    // Storage itself is inaccessible — log but do not crash app
-    console.error('[Security] Failed to clear legacy API keys from localStorage:', err);
+    // Re-save without the API key (safe — SecureStorage has the encrypted copy)
+     
+    const { apiKey: _removed, ...rest } = parsed;
+    safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest));
+    console.info('[Security] Migrated legacy API key from localStorage to SecureStorage');
   }
 
   // Clean IndexedDB (async, fire-and-forget but with logging)
@@ -350,7 +351,7 @@ export function clearLegacyFallbackKeys(): void {
     try {
       const idbConfig = await storageGet("settings", "fallback-provider");
       if (idbConfig && typeof idbConfig === 'object' && 'apiKey' in idbConfig) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+         
         const { apiKey: _removed, ...rest } = idbConfig as Record<string, unknown>;
         await storageSet("settings", "fallback-provider", rest);
         console.info('[Security] Cleared legacy API key from IndexedDB');
@@ -372,13 +373,13 @@ export function clearLegacyFallbackKeys(): void {
  *
  * @returns Fallback provider config, or null if not configured
  */
-export function loadFallbackProvider(): ProviderConfig | null {
+export async function loadFallbackProvider(): Promise<ProviderConfig | null> {
   try {
-    const saved = localStorage.getItem(FALLBACK_PROVIDER_KEY);
+    const saved = safeGetItem(FALLBACK_PROVIDER_KEY);
     if (!saved) return null;
     const config = JSON.parse(saved);
-    // Retrieve API key from SecureStorage (never from localStorage)
-    const apiKey = SecureStorage.get(FALLBACK_APIKEY_SECURE_KEY) ?? '';
+    // Retrieve API key from SecureStorage (encrypted, async)
+    const apiKey = (await SecureStorage.get(FALLBACK_APIKEY_SECURE_KEY)) ?? '';
     return {
       provider: config.provider,
       model: config.model ?? '',
@@ -398,9 +399,9 @@ export function loadFallbackProvider(): ProviderConfig | null {
  *
  * @param config - Fallback provider configuration
  */
-export function saveFallbackProvider(config: ProviderConfig): void {
-  // Store API key in SecureStorage (sessionStorage, cleared on tab close)
-  const stored = SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
+export async function saveFallbackProvider(config: ProviderConfig): Promise<void> {
+  // Store API key in SecureStorage (AES-GCM encrypted, sessionStorage)
+  const stored = await SecureStorage.set(FALLBACK_APIKEY_SECURE_KEY, config.apiKey);
   if (!stored) {
     console.warn('[errorRecovery] API key could not be stored securely; fallback provider may not work after page refresh');
   }
@@ -413,11 +414,7 @@ export function saveFallbackProvider(config: ProviderConfig): void {
   import("../utils/storage")
     .then(({ storageSet }) => { storageSet("settings", "fallback-provider", storedConfig); })
     .catch((err) => { console.warn('[errorRecovery] storageSet for fallback provider failed:', err); });
-  try {
-    localStorage.setItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig));
-  } catch (err) {
-    console.warn('[errorRecovery] localStorage write for fallback provider failed:', err);
-  }
+  safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig));
 }
 
 /**
@@ -426,8 +423,8 @@ export function saveFallbackProvider(config: ProviderConfig): void {
  * @param currentProvider - The provider that just failed
  * @returns Whether a fallback provider is configured
  */
-export function hasFallbackProvider(currentProvider: string): boolean {
-  const fallback = loadFallbackProvider();
+export async function hasFallbackProvider(currentProvider: string): Promise<boolean> {
+  const fallback = await loadFallbackProvider();
   if (!fallback) return false;
   return fallback.provider !== currentProvider && fallback.apiKey.length > 0;
 }
