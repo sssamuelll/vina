@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 184 (colorway branch) + 20 (main: garmentInfo+annotation+pleat+elastic+referenceImage)
-      expect(registry.size).toBe(204);
+      // 204 + 1 mesh selection tool
+      expect(registry.size).toBe(205);
     });
   });
 });

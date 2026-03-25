@@ -45,6 +45,7 @@ import { tools as layerToolDefs } from './definitions/layerTools';
 import { tools as pomToolDefs } from './definitions/pomTools';
 import { tools as sewingEnhancementToolDefs } from './definitions/sewingEnhancementTools';
 import { tools as renderToolDefs } from './definitions/renderTools';
+import { tools as meshSelectionToolDefs } from './definitions/meshSelectionTools';
 import { tools as colorwayToolDefs } from './definitions/colorwayTools';
 import { tools as garmentInfoToolDefs } from './definitions/garmentInfoTools';
 import { tools as annotationToolDefs } from './definitions/annotationTools';
@@ -373,6 +374,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   pomToolDefs,
   sewingEnhancementToolDefs,
   renderToolDefs,
+  meshSelectionToolDefs,
   colorwayToolDefs,
   garmentInfoToolDefs,
   annotationToolDefs,

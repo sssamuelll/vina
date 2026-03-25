@@ -45,7 +45,7 @@ import type { ViewPreset } from '../../store/cameraSlice';
 import { selectPiece, clearSelection, togglePieceSelection, enterSuperimposePickMode } from '../../store/editorSlice';
 import { toggleIK, resetPose } from '../../store/avatarSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
-import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals } from '../../store/simulationSlice';
+import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins, toggleHide3D, showAll3D, toggleFlipNormal, clearFlippedNormals, setSelectedVertices } from '../../store/simulationSlice';
 
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { resolveColorway } from '../../utils/colorwayResolver';
@@ -265,11 +265,22 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const rightDownRef = useRef<{ x: number; y: number } | null>(null);
 
   // Right-click context menu: distinguish drag (orbit) from click (menu)
+  const boxSelectStart = useRef<{ x: number; y: number } | null>(null);
+  const boxSelectEnd = useRef<{ x: number; y: number } | null>(null);
+  const boxOverlayRef = useRef<HTMLDivElement>(null);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button === 2) {
       rightDownRef.current = { x: e.clientX, y: e.clientY };
     }
-  }, []);
+    if (e.button === 0 && activeTool3D === 'meshSelectBox') {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      boxSelectStart.current = { x, y };
+      boxSelectEnd.current = { x, y };
+    }
+  }, [activeTool3D]);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -524,12 +535,77 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       ref={containerRef}
       style={{ position: 'relative', cursor: toolCursor }}
       onPointerDown={(e) => { handlePointerDown(e); onPanPointerDown(e); }}
-      onPointerMove={onPanPointerMove}
-      onPointerUp={onPanPointerUp}
+      onPointerMove={(e) => {
+        onPanPointerMove(e);
+        if (boxSelectStart.current && activeTool3D === 'meshSelectBox') {
+          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+          boxSelectEnd.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+          // Update overlay div directly (no Redux dispatch per frame)
+          const el = boxOverlayRef.current;
+          if (el && boxSelectStart.current) {
+            const s = boxSelectStart.current;
+            const c = boxSelectEnd.current;
+            el.style.display = 'block';
+            el.style.left = `${Math.min(s.x, c.x)}px`;
+            el.style.top = `${Math.min(s.y, c.y)}px`;
+            el.style.width = `${Math.abs(c.x - s.x)}px`;
+            el.style.height = `${Math.abs(c.y - s.y)}px`;
+          }
+        }
+      }}
+      onPointerUp={(e) => {
+        onPanPointerUp(e);
+        if (boxSelectStart.current && boxSelectEnd.current && activeTool3D === 'meshSelectBox') {
+          // Hide overlay
+          if (boxOverlayRef.current) boxOverlayRef.current.style.display = 'none';
+          // Project vertices to screen space and select those inside the box
+          const camera = orbitRef.current?.object as THREE.Camera | undefined;
+          const simHandle = simRef.current;
+          if (camera && simHandle) {
+            const positions = simHandle.getPositions?.();
+            if (positions) {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              const w = rect.width;
+              const h = rect.height;
+              const s = boxSelectStart.current;
+              const c = boxSelectEnd.current;
+              const minX = Math.min(s.x, c.x);
+              const maxX = Math.max(s.x, c.x);
+              const minY = Math.min(s.y, c.y);
+              const maxY = Math.max(s.y, c.y);
+              const mvp = new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+              const v = new THREE.Vector4();
+              const selected: number[] = [];
+              const numVerts = positions.length / 3;
+              for (let i = 0; i < numVerts; i++) {
+                v.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2], 1);
+                v.applyMatrix4(mvp);
+                if (v.w <= 0) continue; // behind camera
+                const sx = (v.x / v.w * 0.5 + 0.5) * w;
+                const sy = (1 - (v.y / v.w * 0.5 + 0.5)) * h;
+                if (sx >= minX && sx <= maxX && sy >= minY && sy <= maxY) {
+                  selected.push(i);
+                }
+              }
+              dispatch(setSelectedVertices(selected));
+            }
+          }
+          boxSelectStart.current = null;
+          boxSelectEnd.current = null;
+        } else if (boxSelectStart.current) {
+          boxSelectStart.current = null;
+          boxSelectEnd.current = null;
+          if (boxOverlayRef.current) boxOverlayRef.current.style.display = 'none';
+        }
+      }}
       onContextMenu={handleContextMenu}
     >
       <SimModeToggle />
       <SimulationStatusOverlay />
+      <div ref={boxOverlayRef} style={{
+        display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
+        backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
+      }} />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
         shadows={!nodeMaterialActive}

@@ -106,6 +106,7 @@ export interface GarmentSimulationHandle {
   saveSnapshot: (id: string) => void;
   restoreSnapshot: (id: string) => void;
   deleteSnapshot: (id: string) => void;
+  getPositions?: () => Float32Array | null;
 }
 
 interface GarmentSimulationProps {
@@ -353,7 +354,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       clients.cpu?.deleteSnapshot(id);
       clients.wasm?.deleteSnapshot(id);
     },
-  }), [clients]);
+    getPositions: () => positionsRef.current ?? null,
+  }), [clients, positionsRef]);
 
   // Geometric preview: instant vertex displacement on dimension edits
   useGeometricPreview({
