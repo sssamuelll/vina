@@ -73,6 +73,8 @@ interface ProjectState {
   layerNames: Record<number, string>;
   /** Layer lock state (layer number → locked) */
   layerLocked: Record<number, boolean>;
+  /** Garment metadata (brand, season, style, etc.) */
+  garmentInfo?: import('../types/types').GarmentInfo;
   /** Diagnostics produced during the last loadProject call */
   loadDiagnostics: ValidationDiagnostic[];
   /** Entities quarantined (removed) during the last loadProject call */
@@ -98,6 +100,7 @@ const initialState: ProjectState = {
   referenceImages: [],
   layerNames: {},
   layerLocked: {},
+  garmentInfo: {},
   loadDiagnostics: [] as ValidationDiagnostic[],
   loadQuarantine: { pieces: [], seams: [], poms: [], seamGroups: [] } as Quarantine,
 };
@@ -159,6 +162,17 @@ const projectSlice = createSlice({
     },
     setProjectName(state, action: PayloadAction<string>) {
       state.name = action.payload;
+      state.isDirty = true;
+    },
+    setGarmentInfo(state, action: PayloadAction<{ field: string; value: string }>) {
+      const VALID_FIELDS = new Set(['brand', 'season', 'styleNumber', 'designer', 'date', 'notes', 'description']);
+      if (!VALID_FIELDS.has(action.payload.field)) return;
+      if (!state.garmentInfo) state.garmentInfo = {};
+      (state.garmentInfo as Record<string, string>)[action.payload.field] = action.payload.value;
+      state.isDirty = true;
+    },
+    setGarmentInfoBulk(state, action: PayloadAction<import('../types/types').GarmentInfo>) {
+      state.garmentInfo = action.payload;
       state.isDirty = true;
     },
 
@@ -982,7 +996,7 @@ const projectSlice = createSlice({
 });
 
 export const {
-  restoreState, loadProject, clearLoadDiagnostics, setProjectName,
+  restoreState, loadProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
   addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addAnnotation, removeAnnotation, updateAnnotation,
