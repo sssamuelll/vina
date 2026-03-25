@@ -12,6 +12,7 @@
 import { PatternPiece, PathCommand } from '../../types/types';
 import { AAMA_LAYERS, DXFExportOptions } from './types';
 import { preparePieces, computeBBox } from '../export/pipeline';
+import { escapeDxfString } from '../sanitizeName';
 
 const DEFAULT_OPTIONS: DXFExportOptions = { version: 'R2000', aamaLayers: true };
 
@@ -500,7 +501,7 @@ ${y.toFixed(4)}
 40
 ${height.toFixed(1)}
 1
-${text}
+${escapeDxfString(text)}
 `;
 }
 

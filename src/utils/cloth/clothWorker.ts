@@ -10,6 +10,8 @@
 import { XPBDClothSolver, type ClothSimConfig, type ClothMeshData, type SphereCollider, type CapsuleCollider } from './xpbdSolver';
 import { getComplianceForFabric } from './fabricLibrary';
 import { mergeMeshes, buildSeamConstraints, type MergedMesh } from './seamAssembly';
+import { buildElasticConstraints } from './elasticAssembly';
+import type { Elastic, PathCommand, SemanticEdge } from '../../types/types';
 
 // ─── Message Protocol ───────────────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ export type WorkerInMessage =
   | { type: 'init'; meshData: { vertices: Float32Array; triIds: Int32Array }; config?: Partial<ClothSimConfig> }
   | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }>; stiffnessMultiplier?: number }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
   | { type: 'setSeams'; seams: SeamInitData[] }
+  | { type: 'setElastics'; elastics: Elastic[] }
   | { type: 'start' }
   | { type: 'stop' }
   | { type: 'reset' }
@@ -230,6 +233,34 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
           }
           const seamSet = buildSeamConstraints(seams, outlineMap, cachedMergedMesh, cachedPieceEdges ?? undefined);
           solver.setSeamConstraints(seamSet);
+        }
+        break;
+      }
+
+      case 'setElastics': {
+        if (solver && cachedMergedMesh && cachedOutlines && cachedPieceEdges) {
+          const activeElastics = msg.elastics.filter((e: Elastic) => e.active !== false);
+          if (activeElastics.length > 0) {
+            const outlineMap = new Map<string, PathCommand[]>();
+            for (const [id, cmds] of cachedOutlines) {
+              outlineMap.set(id, cmds as PathCommand[]);
+            }
+            // Convert MergedMesh.pieces[] to the Map format expected by buildElasticConstraints
+            const pieceOffsets = new Map<string, { vertexOffset: number; indexOffset: number }>();
+            for (const p of cachedMergedMesh.pieces) {
+              pieceOffsets.set(p.pieceId, { vertexOffset: p.vertexOffset, indexOffset: p.triangleOffset });
+            }
+            const elasticSet = buildElasticConstraints(
+              activeElastics,
+              outlineMap,
+              { vertices: cachedMergedMesh.vertices, indices: new Uint32Array(cachedMergedMesh.triIds), pieceOffsets },
+              cachedPieceEdges as Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>,
+            );
+            solver.setElasticConstraints(elasticSet);
+            console.log('[ClothWorker] Elastic constraints set:', elasticSet.constraints.length);
+          } else {
+            solver.setElasticConstraints(null);
+          }
         }
         break;
       }
