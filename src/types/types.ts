@@ -332,6 +332,18 @@ export interface Avatar {
   measurements: BodyMeasurements;
 }
 
+// ─── Garment Info ───
+
+export interface GarmentInfo {
+  brand?: string;
+  season?: string;
+  styleNumber?: string;
+  designer?: string;
+  date?: string;
+  notes?: string;
+  description?: string;
+}
+
 // ─── Project ───
 
 export interface OpenCloProject {
@@ -348,6 +360,8 @@ export interface OpenCloProject {
   poms?: PointOfMeasure[];
   /** Named seam groups (optional for backward compat) */
   seamGroups?: SeamGroup[];
+  /** Garment metadata (brand, season, style, etc.) */
+  garmentInfo?: GarmentInfo;
   createdAt: number;
   updatedAt: number;
 }

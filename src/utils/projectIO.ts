@@ -22,6 +22,7 @@ interface ProjectState {
   avatarModelUrl?: string | null;
   isDirty?: boolean;
   groups?: PieceGroup[];
+  garmentInfo?: import('../types/types').GarmentInfo;
 }
 
 // ─── Serialization ──────────────────────────────────────────────────────────
@@ -62,6 +63,7 @@ function stateToProject(state: ProjectState): Record<string, unknown> {
     fabrics: state.fabrics,
     avatar: state.avatar,
     groups: state.groups ?? [],
+    garmentInfo: state.garmentInfo || {},
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
