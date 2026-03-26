@@ -1,4 +1,4 @@
-import { FileText, Layers, Play, Plug, Settings, SlidersHorizontal, History, User, MessageSquare, SquareStack } from 'lucide-react';
+import { FileText, Layers, Palette, Play, Plug, Settings, SlidersHorizontal, History, User, MessageSquare, SquareStack } from 'lucide-react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { toggleCopilot } from '../../store/layoutSlice';
@@ -14,6 +14,7 @@ export type SidebarView =
   | 'parametric'
   | 'history'
   | 'plugins'
+  | 'colorways'
   | 'settings';
 
 interface ActivityBarProps {
@@ -35,6 +36,7 @@ const items: ActivityItem[] = [
   { id: 'parametric', label: 'Parametric', position: 'top', icon: <SlidersHorizontal size={20} /> },
   { id: 'grading', label: 'Grading', position: 'top', icon: <Layers size={20} /> },
   { id: 'layers', label: 'Layers', position: 'top', icon: <SquareStack size={20} /> },
+  { id: 'colorways', label: 'Colorways', position: 'top', icon: <Palette size={20} /> },
   { id: 'history', label: 'History', position: 'top', icon: <History size={20} /> },
   { id: 'plugins', label: 'Plugins', position: 'bottom', icon: <Plug size={20} /> },
   { id: 'settings', label: 'Settings', position: 'bottom', icon: <Settings size={20} /> },

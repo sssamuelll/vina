@@ -85,6 +85,8 @@ interface SinglePieceProps {
   isLayerLocked?: boolean;
   /** Whether the piece has unresolved construction points */
   hasResolutionErrors?: boolean;
+  /** Active colorway override color for this piece (from resolveColorway) */
+  colorwayColor?: string;
   onPieceNameDoubleClick?: (pieceId: string) => void;
   onPieceNameSave?: (pieceId: string, newName: string) => void;
   onPieceNameCancel?: () => void;
@@ -106,6 +108,7 @@ const SinglePiece = memo(function SinglePiece({
   layerColor,
   isLayerLocked,
   hasResolutionErrors,
+  colorwayColor,
   onPieceNameDoubleClick,
   onPieceNameSave,
   onPieceNameCancel,
@@ -150,6 +153,8 @@ const SinglePiece = memo(function SinglePiece({
         d={pathToSVG(piece.outline)}
         fill={
           renderMode2D === 'wireframe' ? 'none'
+          : colorwayColor
+          ? (isSelected ? colorwayColor + '40' : colorwayColor + '25') // hex alpha: 25% / 15%
           : renderMode2D === 'translucent'
           ? (isSelected ? 'rgba(255, 215, 0, 0.08)' : 'rgba(74, 158, 255, 0.03)')
           : (isSelected ? 'rgba(255, 215, 0, 0.18)' : 'rgba(74, 158, 255, 0.08)')
@@ -499,6 +504,11 @@ export default function PieceRenderer({
   const layerOutlineColors = useSelector((s: RootState) => s.simulation.layerOutlineColors);
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
+  // Colorway selectors
+  const colorways = useSelector((s: RootState) => s.project.colorways);
+  const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
+  const activeColorway = activeColorwayId ? colorways.find(c => c.id === activeColorwayId) : null;
+
   // Construction resolution error selectors
   const constructionPoints = useSelector((s: RootState) => s.construction.points);
   const pieceIdentityMap = useSelector((s: RootState) => s.construction.pieceIdentityMap);
@@ -543,6 +553,7 @@ export default function PieceRenderer({
           layerColor={getOutlineColor(piece.layer ?? 1, layerOutlineColors)}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}
+          colorwayColor={activeColorway ? (activeColorway.overrides[piece.fabricCode || 'SELF'] as { color?: string } | null)?.color : undefined}
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}

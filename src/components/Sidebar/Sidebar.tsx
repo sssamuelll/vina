@@ -11,6 +11,7 @@ import SimulationView from './SimulationView';
 import ParametricView from './ParametricView';
 import HistoryView from '../views/HistoryView';
 import LayerPanel from '../LayerPanel/LayerPanel';
+import ColorwayView from '../views/ColorwayView';
 import '../views/views.css';
 import './Sidebar.css';
 
@@ -29,6 +30,7 @@ const viewTitles: Record<SidebarView, string> = {
   simulation: 'Simulation',
   parametric: 'Parametric',
   history: 'History',
+  colorways: 'Colorways',
 };
 
 export default function Sidebar({ activeView, onClose }: SidebarProps) {
@@ -54,6 +56,7 @@ export default function Sidebar({ activeView, onClose }: SidebarProps) {
             {activeView === 'parametric' && <ParametricView />}
             {activeView === 'history' && <HistoryView />}
             {activeView === 'layers' && <LayerPanel />}
+            {activeView === 'colorways' && <ColorwayView />}
           </div>
         </>
       )}
