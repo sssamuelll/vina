@@ -17,7 +17,8 @@ export default function ColorwayView() {
   const activeColorway = colorways.find(c => c.id === activeColorwayId);
 
   const handleAdd = () => {
-    const name = String.fromCharCode(65 + colorways.length); // A, B, C...
+    const idx = colorways.length;
+    const name = idx < 26 ? String.fromCharCode(65 + idx) : `Colorway ${idx + 1}`;
     dispatch(addColorway({ name, overrides: {}, isDefault: colorways.length === 0 }));
   };
 

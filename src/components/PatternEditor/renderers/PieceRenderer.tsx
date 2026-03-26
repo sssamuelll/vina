@@ -10,6 +10,8 @@ import { extractNodes } from '../nodeEditorUtils';
 import { getOutlineColor } from '../../../utils/layerColors';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 import { getFabricCodeColor } from '../../../utils/fabricCodes';
+import { resolveColorway } from '../../../utils/colorwayResolver';
+import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
 
 /** Compute bounding box extents of a path outline. */
 function getOutlineBounds(outline: PathCommand[]): { minX: number; minY: number; maxX: number; maxY: number } {
@@ -504,10 +506,15 @@ export default function PieceRenderer({
   const layerOutlineColors = useSelector((s: RootState) => s.simulation.layerOutlineColors);
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
-  // Colorway selectors
+  // Colorway selectors + resolver
   const colorways = useSelector((s: RootState) => s.project.colorways);
   const activeColorwayId = useSelector((s: RootState) => s.project.activeColorwayId);
-  const activeColorway = activeColorwayId ? colorways.find(c => c.id === activeColorwayId) : null;
+  const fabricLibraryIds = useMemo(() => new Set(PHYSICAL_FABRIC_LIBRARY.map(f => f.id)), []);
+  const baseFabrics = useMemo(() => {
+    const map: Record<string, { color: string; fabricId: string }> = {};
+    map['SELF'] = { color: '#ffffff', fabricId: 'cotton-poplin' };
+    return map;
+  }, []);
 
   // Construction resolution error selectors
   const constructionPoints = useSelector((s: RootState) => s.construction.points);
@@ -553,7 +560,11 @@ export default function PieceRenderer({
           layerColor={getOutlineColor(piece.layer ?? 1, layerOutlineColors)}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}
-          colorwayColor={activeColorway ? (activeColorway.overrides[piece.fabricCode || 'SELF'] as { color?: string } | null)?.color : undefined}
+          colorwayColor={(() => {
+            if (!activeColorwayId) return undefined;
+            const resolved = resolveColorway(piece, colorways, activeColorwayId, baseFabrics, fabricLibraryIds);
+            return resolved.isOverridden ? resolved.color : undefined;
+          })()}
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}
