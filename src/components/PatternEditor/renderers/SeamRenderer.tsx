@@ -41,10 +41,15 @@ function directionArrow(
   return `M${tip.x},${tip.y} L${left.x},${left.y} L${right.x},${right.y} Z`;
 }
 
+const SEAM_PALETTE = [
+  '#4a9eff', '#ff6b9d', '#6bffa6', '#ffa64a', '#9d6bff',
+  '#ff4a4a', '#4affc8', '#ffd54a', '#c84aff', '#4affe5',
+];
+
 export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: SeamRendererProps) {
   return (
     <>
-      {seams.map(seam => {
+      {seams.map((seam, seamIndex) => {
         const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
         if (!pieceA || !pieceB) return null;
@@ -80,7 +85,8 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
 
         const isSelected = selectedSeamId === seam.id;
         const isInactive = seam.active === false;
-        const baseColor = isInactive ? '#666' : hasMismatch ? '#ff9944' : isSelected ? '#ff6b6b' : '#e74c3c';
+        const paletteColor = SEAM_PALETTE[seamIndex % SEAM_PALETTE.length];
+        const baseColor = isInactive ? '#666' : isSelected ? '#ffffff' : hasMismatch ? '#ff9944' : paletteColor;
         const edgeDash = isInactive ? `${4 / zoom2D} ${3 / zoom2D}` : undefined;
         const edgeWidth = (seam.taped ? 4 : 2.5) / zoom2D;
 

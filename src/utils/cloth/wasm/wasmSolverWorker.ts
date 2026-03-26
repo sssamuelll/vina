@@ -375,7 +375,7 @@ self.onmessage = async (event: MessageEvent) => {
 
         // Seam constraints
         if (msg.seams && msg.seams.length > 0) {
-          const seamConstraints = buildSeamConstraints(msg.seams, outlines, merged);
+          const seamConstraints = buildSeamConstraints(msg.seams, outlines, merged, pieceEdges);
           if (seamConstraints.count > 0) {
             console.log('[WasmWorker] Adding seam constraints:', seamConstraints.count);
             // Convert pairs to Uint32Array for Wasm

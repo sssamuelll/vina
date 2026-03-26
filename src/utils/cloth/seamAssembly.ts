@@ -84,7 +84,7 @@ export interface MergedMesh {
 
 /** Default seam constraint configuration. */
 export const DEFAULT_SEAM_CONFIG: SeamConstraintConfig = {
-  shrinkFactor: 0.995,
+  shrinkFactor: 0.97,
   sewedThreshold: 1e-6,
   compliance: {
     standard: 0.0001,
@@ -366,11 +366,35 @@ export function buildSeamConstraints(
     const offsetB = mergedMesh.pieces.find(p => p.pieceId === seam.pieceB.pieceId);
     if (!offsetA || !offsetB) continue;
 
-    // Resolve edge names to segment ranges
+    // Resolve edge names to segment ranges (semantic lookup + "edge-N" fallback)
     const pieceAData = pieces?.get(seam.pieceA.pieceId);
     const pieceBData = pieces?.get(seam.pieceB.pieceId);
-    const edgeADef = pieceAData?.edges?.find(e => e.name === seam.pieceA.edgeName);
-    const edgeBDef = pieceBData?.edges?.find(e => e.name === seam.pieceB.edgeName);
+    let edgeADef = pieceAData?.edges?.find(e => e.name === seam.pieceA.edgeName);
+    let edgeBDef = pieceBData?.edges?.find(e => e.name === seam.pieceB.edgeName);
+
+    // Fallback: parse "edge-N" pattern to extract segment index
+    // segmentRange uses indices into the flattened outline (same as parameterizeEdge expects)
+    if (!edgeADef) {
+      const match = seam.pieceA.edgeName.match(/^edge-(\d+)$/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        const numSegments = flattenPath(outlineA).length;
+        if (idx < numSegments) {
+          edgeADef = { name: seam.pieceA.edgeName, segmentRange: [idx, (idx + 1) % numSegments] };
+        }
+      }
+    }
+    if (!edgeBDef) {
+      const match = seam.pieceB.edgeName.match(/^edge-(\d+)$/);
+      if (match) {
+        const idx = parseInt(match[1], 10);
+        const numSegments = flattenPath(outlineB).length;
+        if (idx < numSegments) {
+          edgeBDef = { name: seam.pieceB.edgeName, segmentRange: [idx, (idx + 1) % numSegments] };
+        }
+      }
+    }
+
     if (!edgeADef || !edgeBDef) continue;
 
     // Default maxEdgeLength is 15 in CDT, but we should ideally pass this from config
