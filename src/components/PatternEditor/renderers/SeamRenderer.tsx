@@ -9,7 +9,7 @@
  */
 
 import { PatternPiece, Seam } from '../../../types/types';
-import { getEdgeEndpoints, getEdgeLength } from '../../../utils/geometry/path';
+import { getEdgeEndpoints, getEdgeLength, getEdgePathD } from '../../../utils/geometry/path';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -54,11 +54,20 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
         if (!pieceA || !pieceB) return null;
 
-        // Resolve semantic edge name to segment index
+        // Resolve semantic edge name to segment index (with edge-N fallback)
         const semEdgeA = pieceA.edges?.find(e => e.name === seam.pieceA.edgeName);
         const semEdgeB = pieceB.edges?.find(e => e.name === seam.pieceB.edgeName);
-        const segIdxA = semEdgeA?.segmentRange[0] ?? 1;
-        const segIdxB = semEdgeB?.segmentRange[0] ?? 1;
+        let segIdxA = semEdgeA?.segmentRange[0] ?? -1;
+        let segIdxB = semEdgeB?.segmentRange[0] ?? -1;
+        // Fallback: parse "edge-N" pattern
+        if (segIdxA < 0) {
+          const m = seam.pieceA.edgeName.match(/^edge-(\d+)$/);
+          segIdxA = m ? parseInt(m[1], 10) + 1 : 1; // +1: command index (skip M)
+        }
+        if (segIdxB < 0) {
+          const m = seam.pieceB.edgeName.match(/^edge-(\d+)$/);
+          segIdxB = m ? parseInt(m[1], 10) + 1 : 1;
+        }
 
         const epA = getEdgeEndpoints(pieceA.outline, segIdxA);
         const epB = getEdgeEndpoints(pieceB.outline, segIdxB);
@@ -66,6 +75,10 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
 
         const offA = pieceA.position;
         const offB = pieceB.position;
+
+        // SVG path data following curves (not straight lines)
+        const pathDA = getEdgePathD(pieceA.outline, segIdxA, offA.x, offA.y);
+        const pathDB = getEdgePathD(pieceB.outline, segIdxB, offB.x, offB.y);
 
         const midA = {
           x: (epA.start.x + epA.end.x) / 2 + offA.x,
@@ -96,24 +109,40 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
 
         return (
           <g key={seam.id} className="seam-connection" opacity={isInactive ? 0.5 : 1}>
-            {/* Edge A highlight */}
-            <line
-              x1={epA.start.x + offA.x} y1={epA.start.y + offA.y}
-              x2={epA.end.x + offA.x} y2={epA.end.y + offA.y}
-              stroke={baseColor}
-              strokeWidth={edgeWidth}
-              strokeLinecap="round"
-              strokeDasharray={edgeDash}
-            />
-            {/* Edge B highlight */}
-            <line
-              x1={epB.start.x + offB.x} y1={epB.start.y + offB.y}
-              x2={epB.end.x + offB.x} y2={epB.end.y + offB.y}
-              stroke={baseColor}
-              strokeWidth={edgeWidth}
-              strokeLinecap="round"
-              strokeDasharray={edgeDash}
-            />
+            {/* Edge A highlight (follows curves) */}
+            {pathDA ? (
+              <path
+                d={pathDA}
+                fill="none"
+                stroke={baseColor}
+                strokeWidth={edgeWidth}
+                strokeLinecap="round"
+                strokeDasharray={edgeDash}
+              />
+            ) : (
+              <line
+                x1={epA.start.x + offA.x} y1={epA.start.y + offA.y}
+                x2={epA.end.x + offA.x} y2={epA.end.y + offA.y}
+                stroke={baseColor} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
+              />
+            )}
+            {/* Edge B highlight (follows curves) */}
+            {pathDB ? (
+              <path
+                d={pathDB}
+                fill="none"
+                stroke={baseColor}
+                strokeWidth={edgeWidth}
+                strokeLinecap="round"
+                strokeDasharray={edgeDash}
+              />
+            ) : (
+              <line
+                x1={epB.start.x + offB.x} y1={epB.start.y + offB.y}
+                x2={epB.end.x + offB.x} y2={epB.end.y + offB.y}
+                stroke={baseColor} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
+              />
+            )}
             {/* Connection line (dotted) */}
             <line
               x1={midA.x} y1={midA.y}
