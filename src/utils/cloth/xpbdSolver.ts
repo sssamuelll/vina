@@ -289,6 +289,8 @@ export class XPBDClothSolver {
   invMass: Float32Array;
   /** Per-particle pressure in Pascals (0 = no pressure) */
   particlePressure: Float32Array;
+  /** Per-triangle normal sign: +1 or -1, computed from rest positions to ensure consistent outward direction */
+  private triNormalSign: Float32Array;
 
   /** Stretching constraint edge pairs [id0, id1, ...] */
   private stretchingIds: Int32Array;
@@ -389,6 +391,7 @@ export class XPBDClothSolver {
     this.invMass = new Float32Array(this.numParticles);
     this.particlePressure = new Float32Array(this.numParticles); // all zero = no pressure
     this.triIds = new Int32Array(meshData.triIds);
+    this.triNormalSign = new Float32Array(this.triIds.length / 3);
     this.uvs = meshData.uvs;
 
     // Build constraints from mesh topology
@@ -960,6 +963,8 @@ export class XPBDClothSolver {
 
   /**
    * Set per-piece pressure values. Maps piece vertex ranges to pressure.
+   * Also computes per-triangle normal signs from rest positions to ensure
+   * consistent outward force direction regardless of winding order.
    */
   setPiecePressures(
     pieceOffsets: Array<{ vertexOffset: number; vertexCount: number }>,
@@ -973,6 +978,44 @@ export class XPBDClothSolver {
         if (i < this.particlePressure.length) {
           this.particlePressure[i] = pressures[p];
         }
+      }
+    }
+
+    // Compute per-triangle normal sign from rest positions.
+    // For each piece, the average rest-position normal Y component
+    // determines "outward" (positive Y = outward for garments on avatar).
+    // If a triangle's rest normal points opposite to the piece average,
+    // we flip it to ensure consistent outward inflation.
+    const numTris = this.triIds.length / 3;
+    this.triNormalSign.fill(1);
+    for (let pi = 0; pi < pieceOffsets.length; pi++) {
+      if ((pressures[pi] ?? 0) <= 0) continue;
+      const { vertexOffset, vertexCount } = pieceOffsets[pi];
+      const lastVert = vertexOffset + vertexCount;
+
+      // Compute average normal for this piece's triangles from rest positions
+      let avgNx = 0, avgNy = 0, avgNz = 0;
+      for (let t = 0; t < numTris; t++) {
+        const i0 = this.triIds[t * 3], i1 = this.triIds[t * 3 + 1], i2 = this.triIds[t * 3 + 2];
+        if (i0 < vertexOffset || i0 >= lastVert) continue;
+        const r = this.restPos;
+        const ax = r[i1 * 3] - r[i0 * 3], ay = r[i1 * 3 + 1] - r[i0 * 3 + 1], az = r[i1 * 3 + 2] - r[i0 * 3 + 2];
+        const bx = r[i2 * 3] - r[i0 * 3], by = r[i2 * 3 + 1] - r[i0 * 3 + 1], bz = r[i2 * 3 + 2] - r[i0 * 3 + 2];
+        avgNx += ay * bz - az * by;
+        avgNy += az * bx - ax * bz;
+        avgNz += ax * by - ay * bx;
+      }
+
+      // Set per-triangle sign: flip if triangle normal opposes piece average
+      for (let t = 0; t < numTris; t++) {
+        const i0 = this.triIds[t * 3], i1 = this.triIds[t * 3 + 1], i2 = this.triIds[t * 3 + 2];
+        if (i0 < vertexOffset || i0 >= lastVert) continue;
+        const r = this.restPos;
+        const ax = r[i1 * 3] - r[i0 * 3], ay = r[i1 * 3 + 1] - r[i0 * 3 + 1], az = r[i1 * 3 + 2] - r[i0 * 3 + 2];
+        const bx = r[i2 * 3] - r[i0 * 3], by = r[i2 * 3 + 1] - r[i0 * 3 + 1], bz = r[i2 * 3 + 2] - r[i0 * 3 + 2];
+        const nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+        const dot = nx * avgNx + ny * avgNy + nz * avgNz;
+        this.triNormalSign[t] = dot >= 0 ? 1 : -1;
       }
     }
   }
@@ -1015,9 +1058,13 @@ export class XPBDClothSolver {
       const area = normalLen * 0.5;
       const invLen = 1.0 / normalLen;
 
+      // Apply consistent outward direction from rest-position normal analysis
+      const sign = this.triNormalSign[t] || 1;
+
       // Force = pressure * area, distributed to 3 vertices along outward normal
-      // Scale pressure from Pa to simulation units (0.001 for mm→m conversion)
-      const forcePerVertex = avgPressure * 0.001 * area / 3;
+      // PA_TO_SIM: empirically tuned for mm-based simulation (not physical Pa→N/m² conversion)
+      const PA_TO_SIM = 0.001;
+      const forcePerVertex = avgPressure * PA_TO_SIM * area * sign / 3;
 
       const nnx = nx * invLen;
       const nny = ny * invLen;
