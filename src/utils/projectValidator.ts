@@ -13,6 +13,7 @@
 
 import type { OpenCloProject, PatternPiece, Seam, SeamGroup, PointOfMeasure } from '../types/types';
 import { PHYSICAL_FABRIC_LIBRARY } from './cloth/physicalFabric';
+import { getEdgeEndpoints } from './geometry/path';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +57,23 @@ const BUILT_IN_FABRIC_IDS: Set<string> = (() => {
     return new Set<string>();
   }
 })();
+
+function isValidEdgeReference(piece: PatternPiece, edgeName: string): boolean {
+  if (!edgeName) return true;
+
+  const hasSemanticEdges = Array.isArray(piece.edges) && piece.edges.length > 0;
+  if (!hasSemanticEdges) return true;
+
+  const semanticEdges = new Set(piece.edges!.map((e) => e.name));
+  if (semanticEdges.has(edgeName)) return true;
+
+  const fallbackMatch = edgeName.match(/^edge-(\d+)$/);
+  if (!fallbackMatch) return false;
+
+  const fallbackIndex = Number.parseInt(fallbackMatch[1], 10);
+  const commandIndex = fallbackIndex + 1;
+  return getEdgeEndpoints(piece.outline, commandIndex) !== null;
+}
 
 // ─── Main validator ──────────────────────────────────────────────────────────
 
@@ -137,14 +155,6 @@ export function validateAndRepairProject(project: OpenCloProject): ValidationRes
 
   const pieceIds = new Set(p.pieces.map((piece) => piece.id));
 
-  // Build per-piece edge name index for seam edge name checks
-  const pieceEdgeNames = new Map<string, Set<string>>();
-  for (const piece of p.pieces) {
-    if (Array.isArray(piece.edges)) {
-      pieceEdgeNames.set(piece.id, new Set(piece.edges.map((e) => e.name)));
-    }
-  }
-
   // Built-in fabric IDs from physicalFabric library
   const builtInFabricIds = BUILT_IN_FABRIC_IDS;
   // Build project-level fabric ID set
@@ -166,17 +176,15 @@ export function validateAndRepairProject(project: OpenCloProject): ValidationRes
       orphaned = true;
       reason = `pieceB.pieceId "${seam.pieceB.pieceId}" not found in pieces`;
     } else {
-      // Check edge names only when the piece has an edges array and the edge name is non-empty
-      const edgesA = pieceEdgeNames.get(seam.pieceA.pieceId);
-      if (edgesA && seam.pieceA.edgeName && !edgesA.has(seam.pieceA.edgeName)) {
+      const pieceA = p.pieces.find((piece) => piece.id === seam.pieceA.pieceId)!;
+      const pieceB = p.pieces.find((piece) => piece.id === seam.pieceB.pieceId)!;
+
+      if (!isValidEdgeReference(pieceA, seam.pieceA.edgeName)) {
         orphaned = true;
-        reason = `pieceA.edgeName "${seam.pieceA.edgeName}" not found in piece "${seam.pieceA.pieceId}" edges`;
-      } else {
-        const edgesB = pieceEdgeNames.get(seam.pieceB.pieceId);
-        if (edgesB && seam.pieceB.edgeName && !edgesB.has(seam.pieceB.edgeName)) {
-          orphaned = true;
-          reason = `pieceB.edgeName "${seam.pieceB.edgeName}" not found in piece "${seam.pieceB.pieceId}" edges`;
-        }
+        reason = `pieceA.edgeName "${seam.pieceA.edgeName}" is not a valid semantic edge or edge-N fallback for piece "${seam.pieceA.pieceId}"`;
+      } else if (!isValidEdgeReference(pieceB, seam.pieceB.edgeName)) {
+        orphaned = true;
+        reason = `pieceB.edgeName "${seam.pieceB.edgeName}" is not a valid semantic edge or edge-N fallback for piece "${seam.pieceB.pieceId}"`;
       }
     }
 
