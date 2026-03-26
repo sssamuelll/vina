@@ -44,6 +44,12 @@ interface UndoState {
   futureEntries: HistoryEntry[];
   lastSnapshotTime: number;
   batchingAction: string | null;
+  /** When > 0, snapshot creation is suppressed (explicit batch grouping) */
+  batchDepth: number;
+  /** Snapshot taken at the start of the outermost batch */
+  batchSnapshot: unknown | null;
+  /** Label for the batched undo entry */
+  batchLabel: string | null;
 }
 
 const undoState: UndoState = {
@@ -53,6 +59,9 @@ const undoState: UndoState = {
   futureEntries: [],
   lastSnapshotTime: 0,
   batchingAction: null,
+  batchDepth: 0,
+  batchSnapshot: null,
+  batchLabel: null,
 };
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -76,6 +85,30 @@ export function jumpToIndex(index: number, store: any): void {
   if (stepsBack <= 0) return;
   for (let i = 0; i < stepsBack; i++) {
     store.dispatch({ type: 'editor/undo' });
+  }
+}
+
+/**
+ * Execute a function inside an undo batch. All project/* dispatches within
+ * the callback produce a single undo entry instead of one per dispatch.
+ *
+ * Usage:
+ *   batchUndo(dispatch, 'Segment Dart', () => {
+ *     dispatch(removeInternalLine(...));
+ *     dispatch(addInternalLine(...));
+ *     dispatch(addInternalLine(...));
+ *   });
+ */
+export function batchUndo(
+  dispatch: (action: { type: string; payload?: unknown }) => void,
+  label: string,
+  fn: () => void,
+): void {
+  dispatch({ type: 'undo/startBatch', payload: label });
+  try {
+    fn();
+  } finally {
+    dispatch({ type: 'undo/endBatch' });
   }
 }
 
@@ -198,6 +231,41 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     return next({ type: 'project/restoreState', payload: nextState });
   }
 
+  // ─── Explicit batch grouping ──────────────────────────────────────────────
+  if (actionType === 'undo/startBatch') {
+    if (undoState.batchDepth === 0) {
+      // Take snapshot at the start of the outermost batch
+      const currentProject = (store.getState() as RootState).project;
+      undoState.batchSnapshot = safeClone(currentProject);
+      undoState.batchLabel = (action.payload as string) || 'Batch Operation';
+    }
+    undoState.batchDepth++;
+    return; // Don't pass through
+  }
+
+  if (actionType === 'undo/endBatch') {
+    if (undoState.batchDepth > 0) undoState.batchDepth--;
+    if (undoState.batchDepth === 0 && undoState.batchSnapshot) {
+      // Push the pre-batch snapshot as a single undo entry
+      undoState.past.push(undoState.batchSnapshot);
+      undoState.pastEntries.push({
+        label: undoState.batchLabel || 'Batch Operation',
+        actionType: 'batch',
+        timestamp: Date.now(),
+      });
+      if (undoState.past.length > MAX_HISTORY) {
+        undoState.past.shift();
+        undoState.pastEntries.shift();
+      }
+      undoState.future.length = 0;
+      undoState.futureEntries.length = 0;
+      undoState.batchSnapshot = null;
+      undoState.batchLabel = null;
+      bumpRevision();
+    }
+    return; // Don't pass through
+  }
+
   // Track project actions (except restoreState and loadProject)
   if (actionType.startsWith('project/') && actionType !== 'project/restoreState' && actionType !== 'project/loadProject') {
     const now = Date.now();
@@ -211,6 +279,16 @@ export const undoMiddleware: Middleware = (store) => (next) => (action: any) => 
     }
 
     // Batch rapid identical actions (e.g. slider-driven updatePiece) into one undo step
+    // Skip snapshot if inside an explicit batch (handled by startBatch/endBatch)
+    if (undoState.batchDepth > 0) {
+      // Inside batch — suppress snapshot, just clear redo and pass through
+      undoState.future.length = 0;
+      undoState.futureEntries.length = 0;
+      undoState.lastSnapshotTime = now;
+      undoState.batchingAction = actionType;
+      bumpRevision();
+      return next(action);
+    }
     if (!(isSameAction && isRecent)) {
       const currentProject = (store.getState() as RootState).project;
       const snapshot = safeClone(currentProject);

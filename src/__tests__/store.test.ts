@@ -14,7 +14,7 @@ import editorReducer, {
   toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid,
   copyPieces, clearClipboard, createPastedPieces,
 } from '../store/editorSlice';
-import { undoMiddleware, canUndo, canRedo } from '../store/undoMiddleware';
+import { undoMiddleware, canUndo, canRedo, batchUndo, getUndoLength } from '../store/undoMiddleware';
 import { PatternPiece } from '../types/types';
 
 function makePiece(id: string): PatternPiece {
@@ -444,5 +444,73 @@ describe('clipboard (editorSlice)', () => {
     expect(store.getState().editor.clipboard).not.toBeNull();
     store.dispatch(clearClipboard());
     expect(store.getState().editor.clipboard).toBeNull();
+  });
+});
+
+// ─── Undo Batching ─────────────────────────────────────────────────────────
+
+describe('Undo batch grouping', () => {
+  it('multiple dispatches inside batchUndo create a single undo entry', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+
+    const undoBefore = getUndoLength();
+
+    batchUndo(store.dispatch, 'Add 3 Pieces', () => {
+      store.dispatch(addPiece(makePiece('b1')));
+      store.dispatch(addPiece(makePiece('b2')));
+      store.dispatch(addPiece(makePiece('b3')));
+    });
+
+    expect(store.getState().project.pieces).toHaveLength(3);
+    // Should have exactly 1 new undo entry (not 3)
+    expect(getUndoLength()).toBe(undoBefore + 1);
+
+    // Single undo reverts all 3 pieces
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces).toHaveLength(0);
+  });
+
+  it('redo after batched undo restores all changes', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+
+    batchUndo(store.dispatch, 'Batch Add', () => {
+      store.dispatch(addPiece(makePiece('r1')));
+      store.dispatch(addPiece(makePiece('r2')));
+    });
+
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces).toHaveLength(0);
+
+    store.dispatch({ type: 'editor/redo' });
+    expect(store.getState().project.pieces).toHaveLength(2);
+  });
+
+  it('nested batches only create one undo entry', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [], seams: [], fabrics: [],
+      avatar: store.getState().project.avatar, createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+
+    const undoBefore = getUndoLength();
+
+    batchUndo(store.dispatch, 'Outer', () => {
+      store.dispatch(addPiece(makePiece('n1')));
+      batchUndo(store.dispatch, 'Inner', () => {
+        store.dispatch(addPiece(makePiece('n2')));
+      });
+      store.dispatch(addPiece(makePiece('n3')));
+    });
+
+    expect(store.getState().project.pieces).toHaveLength(3);
+    expect(getUndoLength()).toBe(undoBefore + 1);
   });
 });
