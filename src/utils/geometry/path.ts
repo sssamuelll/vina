@@ -47,6 +47,45 @@ export function getEdgeEndpoints(
   return { start, end };
 }
 
+/**
+ * Get the SVG path `d` attribute for a single edge at edgeIndex.
+ * Preserves curves (C/Q commands) instead of drawing a straight line.
+ * The returned path starts with M(start) followed by the original command.
+ */
+export function getEdgePathD(
+  commands: PathCommand[],
+  edgeIndex: number,
+  offsetX: number = 0,
+  offsetY: number = 0,
+): string | null {
+  const ep = getEdgeEndpoints(commands, edgeIndex);
+  if (!ep) return null;
+
+  const cmd = commands[edgeIndex];
+  const sx = ep.start.x + offsetX;
+  const sy = ep.start.y + offsetY;
+
+  switch (cmd.type) {
+    case 'L':
+      return `M${sx},${sy} L${cmd.values[0] + offsetX},${cmd.values[1] + offsetY}`;
+    case 'H':
+      return `M${sx},${sy} L${cmd.values[0] + offsetX},${sy}`;
+    case 'V':
+      return `M${sx},${sy} L${sx},${cmd.values[0] + offsetY}`;
+    case 'C':
+      return `M${sx},${sy} C${cmd.values[0] + offsetX},${cmd.values[1] + offsetY},${cmd.values[2] + offsetX},${cmd.values[3] + offsetY},${cmd.values[4] + offsetX},${cmd.values[5] + offsetY}`;
+    case 'Q':
+      return `M${sx},${sy} Q${cmd.values[0] + offsetX},${cmd.values[1] + offsetY},${cmd.values[2] + offsetX},${cmd.values[3] + offsetY}`;
+    case 'Z': {
+      const m = commands[0];
+      if (m.type === 'M') return `M${sx},${sy} L${m.values[0] + offsetX},${m.values[1] + offsetY}`;
+      return null;
+    }
+    default:
+      return null;
+  }
+}
+
 /** Compute the straight-line length of an edge. */
 export function getEdgeLength(commands: PathCommand[], edgeIndex: number): number {
   const ep = getEdgeEndpoints(commands, edgeIndex);
