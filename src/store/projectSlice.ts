@@ -503,6 +503,35 @@ const projectSlice = createSlice({
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (piece) { piece.active = action.payload.active; state.isDirty = true; }
     },
+    // ─── Edge Reference Cascade ───
+    cascadeEdgeRename(state, action: PayloadAction<{ pieceId: string; oldName: string; newName: string }>) {
+      const { pieceId, oldName, newName } = action.payload;
+      // Seams
+      for (const s of state.seams) {
+        if (s.pieceA.pieceId === pieceId && s.pieceA.edgeName === oldName) s.pieceA.edgeName = newName;
+        if (s.pieceB.pieceId === pieceId && s.pieceB.edgeName === oldName) s.pieceB.edgeName = newName;
+      }
+      // Elastics
+      if (state.elastics) for (const e of state.elastics) {
+        if (e.pieceId === pieceId && e.edgeName === oldName) e.edgeName = newName;
+      }
+      // Pleats
+      if (state.pleats) for (const p of state.pleats) {
+        if (p.pieceId === pieceId && p.edgeName === oldName) p.edgeName = newName;
+      }
+      state.isDirty = true;
+    },
+    cascadeEdgeRemove(state, action: PayloadAction<{ pieceId: string; edgeName: string }>) {
+      const { pieceId, edgeName } = action.payload;
+      state.seams = state.seams.filter(s =>
+        !(s.pieceA.pieceId === pieceId && s.pieceA.edgeName === edgeName) &&
+        !(s.pieceB.pieceId === pieceId && s.pieceB.edgeName === edgeName),
+      );
+      if (state.elastics) state.elastics = state.elastics.filter(e => !(e.pieceId === pieceId && e.edgeName === edgeName));
+      if (state.pleats) state.pleats = state.pleats.filter(p => !(p.pieceId === pieceId && p.edgeName === edgeName));
+      state.isDirty = true;
+    },
+
     /** Reverse sewing direction — swap pieceA and pieceB */
     reverseSeam(state, action: PayloadAction<string>) {
       const seam = state.seams.find(s => s.id === action.payload);
@@ -1074,7 +1103,7 @@ export const {
   addAnnotation, removeAnnotation, updateAnnotation,
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,
-  addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
+  addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam, cascadeEdgeRename, cascadeEdgeRemove,
   addSeamGroup, removeSeamGroup,
   // Pleats
   addPleat, removePleat, updatePleat,

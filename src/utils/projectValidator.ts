@@ -24,7 +24,9 @@ export type ValidationCode =
   | 'SEAM_ORPHANED_EDGE'
   | 'SEAMGROUP_ORPHANED'
   | 'FABRIC_ID_UNKNOWN'
-  | 'POM_ORPHANED_PIECE';
+  | 'POM_ORPHANED_PIECE'
+  | 'ELASTIC_DANGLING_EDGE'
+  | 'PLEAT_DANGLING_EDGE';
 
 export interface ValidationDiagnostic {
   severity: 'error' | 'warning' | 'info';
@@ -286,6 +288,74 @@ export function validateAndRepairProject(project: OpenCloProject): ValidationRes
   }
 
   p.poms = cleanPoms;
+
+  // ── Elastic cross-reference ────────────────────────────────────────────────
+  const elastics = (p as unknown as Record<string, unknown>).elastics as Array<{ id: string; pieceId: string; edgeName: string }> | undefined;
+  if (elastics && Array.isArray(elastics)) {
+    const cleanElastics: typeof elastics = [];
+    for (const elastic of elastics) {
+      let orphaned = false;
+      let reason = '';
+
+      if (!pieceIds.has(elastic.pieceId)) {
+        orphaned = true;
+        reason = `pieceId "${elastic.pieceId}" not found`;
+      } else {
+        const piece = p.pieces.find((pc) => pc.id === elastic.pieceId)!;
+        if (!isValidEdgeReference(piece, elastic.edgeName)) {
+          orphaned = true;
+          reason = `edgeName "${elastic.edgeName}" is not a valid edge on piece "${elastic.pieceId}"`;
+        }
+      }
+
+      if (orphaned) {
+        diagnostics.push({
+          severity: 'warning',
+          code: 'ELASTIC_DANGLING_EDGE',
+          message: `Elastic "${elastic.id}" references a missing piece or edge (${reason}) and was removed.`,
+          pieceId: elastic.pieceId,
+        });
+        console.warn(`[projectValidator] ELASTIC_DANGLING_EDGE: ${reason}`);
+        continue;
+      }
+      cleanElastics.push(elastic);
+    }
+    (p as unknown as Record<string, unknown>).elastics = cleanElastics;
+  }
+
+  // ── Pleat cross-reference ──────────────────────────────────────────────────
+  const pleats = (p as unknown as Record<string, unknown>).pleats as Array<{ id: string; pieceId: string; edgeName: string }> | undefined;
+  if (pleats && Array.isArray(pleats)) {
+    const cleanPleats: typeof pleats = [];
+    for (const pleat of pleats) {
+      let orphaned = false;
+      let reason = '';
+
+      if (!pieceIds.has(pleat.pieceId)) {
+        orphaned = true;
+        reason = `pieceId "${pleat.pieceId}" not found`;
+      } else {
+        const piece = p.pieces.find((pc) => pc.id === pleat.pieceId)!;
+        if (!isValidEdgeReference(piece, pleat.edgeName)) {
+          orphaned = true;
+          reason = `edgeName "${pleat.edgeName}" is not a valid edge on piece "${pleat.pieceId}"`;
+        }
+      }
+
+      if (orphaned) {
+        diagnostics.push({
+          severity: 'warning',
+          code: 'PLEAT_DANGLING_EDGE',
+          message: `Pleat "${pleat.id}" references a missing piece or edge (${reason}) and was removed.`,
+          pieceId: pleat.pieceId,
+        });
+        console.warn(`[projectValidator] PLEAT_DANGLING_EDGE: ${reason}`);
+        continue;
+      }
+      cleanPleats.push(pleat);
+    }
+    (p as unknown as Record<string, unknown>).pleats = cleanPleats;
+  }
 
   return { project: p, diagnostics, quarantine };
 }
