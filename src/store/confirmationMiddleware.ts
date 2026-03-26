@@ -17,34 +17,52 @@ import { persistWorkflow, updateToolMemory, type WorkflowState } from './workflo
 /** Maps Redux action type → logical operation name */
 const DESTRUCTIVE_ACTIONS: Record<string, string> = {
   'project/removePiece': 'removePiece',
+  'project/removePieces': 'removePieces',
   'project/removeSeam': 'removeSeam',
   'construction/removePoint': 'removePoint',
 };
 
 /** Human-readable dialog titles */
-const TITLES: Record<string, string> = {
-  removePiece: 'Remove Pattern Piece',
-  removeSeam: 'Remove Seam',
-  removePoint: 'Remove Construction Point',
-};
+function getTitle(type: string, payload: unknown): string {
+  if (type === 'removePieces' && Array.isArray(payload) && payload.length > 1) {
+    return `Remove ${payload.length} Pattern Pieces`;
+  }
+  const TITLES: Record<string, string> = {
+    removePiece: 'Remove Pattern Piece',
+    removePieces: 'Remove Pattern Piece',
+    removeSeam: 'Remove Seam',
+    removePoint: 'Remove Construction Point',
+  };
+  return TITLES[type] ?? 'Confirm Action';
+}
 
 /** Consequence bullets shown in the confirmation dialog */
-const CONSEQUENCES: Record<string, string[]> = {
-  removePiece: [
-    'The pattern piece will be permanently deleted.',
-    'Any seams attached to this piece will also be removed.',
-    'This action cannot be undone without using undo history.',
-  ],
-  removeSeam: [
-    'The seam connection between pieces will be permanently deleted.',
-    'This action cannot be undone without using undo history.',
-  ],
-  removePoint: [
-    'The construction point will be permanently deleted.',
-    'Any lines or curves that reference this point may break.',
-    'This action cannot be undone without using undo history.',
-  ],
-};
+function getConsequences(type: string, payload: unknown): string[] {
+  if (type === 'removePieces' && Array.isArray(payload) && payload.length > 1) {
+    return [
+      `${payload.length} pattern pieces will be permanently deleted.`,
+      'All seams attached to these pieces will also be removed.',
+      'This action cannot be undone without using undo history.',
+    ];
+  }
+  const CONSEQUENCES: Record<string, string[]> = {
+    removePiece: [
+      'The pattern piece will be permanently deleted.',
+      'Any seams attached to this piece will also be removed.',
+      'This action cannot be undone without using undo history.',
+    ],
+    removeSeam: [
+      'The seam connection between pieces will be permanently deleted.',
+      'This action cannot be undone without using undo history.',
+    ],
+    removePoint: [
+      'The construction point will be permanently deleted.',
+      'Any lines or curves that reference this point may break.',
+      'This action cannot be undone without using undo history.',
+    ],
+  };
+  return CONSEQUENCES[type] ?? ['This action is permanent.'];
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -138,9 +156,9 @@ export function createConfirmationMiddleware(): Middleware {
           storeApi.dispatch(
             showConfirmation({
               source: 'middleware',
-              title: TITLES[opName],
+              title: getTitle(opName, action.payload),
               description: `This action will ${opName}. Please confirm you want to proceed.`,
-              consequences: CONSEQUENCES[opName],
+              consequences: getConsequences(opName, action.payload),
               destructive: true,
               reduxAction: { type: action.type, payload: action.payload },
             })

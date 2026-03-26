@@ -337,6 +337,83 @@ describe('validateAndRepairProject', () => {
       expect(out.seams).toHaveLength(1);
       expect(diagnostics).toHaveLength(0);
     });
+
+    it('keeps a seam with edge-0 fallback when the outline resolves to a real edge', () => {
+      const p1 = makePiece('p1', makeValidOutline());
+      (p1 as PatternPiece).edges = [
+        { id: 'e1', name: 'sideSeam', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const p2 = makePiece('p2', makeValidOutline());
+      (p2 as PatternPiece).edges = [
+        { id: 'e2', name: 'sideSeam', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const seam = makeSeam('s1', 'p1', 'p2', 'edge-0', 'edge-0');
+      const project = makeProject({ pieces: [p1, p2], seams: [seam] });
+
+      const { project: out, diagnostics, quarantine } = validateAndRepairProject(project);
+
+      expect(out.seams).toHaveLength(1);
+      expect(out.seams[0].id).toBe('s1');
+      expect(diagnostics).toHaveLength(0);
+      expect(quarantine.seams).toHaveLength(0);
+    });
+
+    it('keeps a seam with edge-N fallback even when piece.edges does not contain that literal name', () => {
+      const p1 = makePiece('p1', makeValidOutline());
+      (p1 as PatternPiece).edges = [
+        { id: 'e1', name: 'neckline', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const p2 = makePiece('p2', makeValidOutline());
+      (p2 as PatternPiece).edges = [
+        { id: 'e2', name: 'armhole', segmentRange: [2, 2], edgeType: 'seam' },
+      ];
+      const seam = makeSeam('s1', 'p1', 'p2', 'edge-1', 'edge-2');
+      const project = makeProject({ pieces: [p1, p2], seams: [seam] });
+
+      const { project: out, diagnostics } = validateAndRepairProject(project);
+
+      expect(out.seams).toHaveLength(1);
+      expect(diagnostics).toHaveLength(0);
+    });
+
+    it('removes a seam with out-of-range edge-N fallback', () => {
+      const p1 = makePiece('p1', makeValidOutline());
+      (p1 as PatternPiece).edges = [
+        { id: 'e1', name: 'sideSeam', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const p2 = makePiece('p2', makeValidOutline());
+      (p2 as PatternPiece).edges = [
+        { id: 'e2', name: 'sideSeam', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const seam = makeSeam('s1', 'p1', 'p2', 'edge-999', 'edge-0');
+      const project = makeProject({ pieces: [p1, p2], seams: [seam] });
+
+      const { project: out, diagnostics, quarantine } = validateAndRepairProject(project);
+
+      expect(out.seams).toHaveLength(0);
+      expect(quarantine.seams).toHaveLength(1);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0].code).toBe('SEAM_ORPHANED_EDGE');
+    });
+
+    it('removes a seam with malformed edge fallback name', () => {
+      const p1 = makePiece('p1', makeValidOutline());
+      (p1 as PatternPiece).edges = [
+        { id: 'e1', name: 'sideSeam', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const p2 = makePiece('p2', makeValidOutline());
+      (p2 as PatternPiece).edges = [
+        { id: 'e2', name: 'sideSeam', segmentRange: [1, 1], edgeType: 'seam' },
+      ];
+      const seam = makeSeam('s1', 'p1', 'p2', 'edge-x', 'edge-0');
+      const project = makeProject({ pieces: [p1, p2], seams: [seam] });
+
+      const { project: out, diagnostics } = validateAndRepairProject(project);
+
+      expect(out.seams).toHaveLength(0);
+      expect(diagnostics).toHaveLength(1);
+      expect(diagnostics[0].code).toBe('SEAM_ORPHANED_EDGE');
+    });
   });
 
   // ── Phase 2: SeamGroup cross-reference ─────────────────────────────────────

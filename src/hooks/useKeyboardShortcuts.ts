@@ -15,7 +15,7 @@ import { RootState } from '../store';
 import {
   setActiveTool,
   clearSelection,
-  selectAllPieces,
+  selectAllVisiblePieces,
   toggleSeamAllowance,
   undo,
   redo,
@@ -23,7 +23,7 @@ import {
   createPastedPieces,
 } from '../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
-import { removePiece, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
+import { removePieces, removeSeam, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
   resetSimulation,
@@ -61,33 +61,49 @@ export function useKeyboardShortcuts() {
   const projectState = useSelector((s: RootState) => s.project);
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
   const xrayMode = useSelector((s: RootState) => s.simulation.xrayMode);
+  const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   useEffect(() => {
     if (!registry) return;
+
+    // ─── Utilities ──────────────────────────────────────────────────────
+
+    const canFireShortcut = () => {
+      const el = document.activeElement;
+      if (!el) return true;
+      const tagName = el.tagName.toLowerCase();
+      const isInput = tagName === 'input' || tagName === 'textarea';
+      const isContentEditable = (el as HTMLElement).contentEditable === 'true';
+      return !isInput && !isContentEditable;
+    };
+
+    const wrapHandler = (handler: () => void) => () => {
+      if (canFireShortcut()) handler();
+    };
 
     // ─── Define all handlers ────────────────────────────────────────────
 
     const handlers: Array<[string, () => void]> = [
       // File
-      ['file.save', () => saveToLocalStorage(projectState)],
+      ['file.save', wrapHandler(() => saveToLocalStorage(projectState))],
 
       // Edit
-      ['edit.undo', () => dispatch(undo())],
-      ['edit.redo', () => dispatch(redo())],
-      ['edit.redoAlt', () => dispatch(redo())],
-      ['edit.copy', () => {
+      ['edit.undo', wrapHandler(() => dispatch(undo()))],
+      ['edit.redo', wrapHandler(() => dispatch(redo()))],
+      ['edit.redoAlt', wrapHandler(() => dispatch(redo()))],
+      ['edit.copy', wrapHandler(() => {
         if (selectedPieceIds.length > 0) {
           const selectedPieces = pieces.filter(p => selectedPieceIds.includes(p.id));
           if (selectedPieces.length > 0) dispatch(copyPieces({ pieces: selectedPieces }));
         }
-      }],
-      ['edit.paste', () => {
+      })],
+      ['edit.paste', wrapHandler(() => {
         if (clipboard) {
           const newPieces = createPastedPieces(clipboard);
           for (const p of newPieces) dispatch(addPiece(p));
         }
-      }],
-      ['edit.mirrorPaste', () => {
+      })],
+      ['edit.mirrorPaste', wrapHandler(() => {
         if (clipboard) {
           const newPieces = createPastedPieces(clipboard, true);
           for (const p of newPieces) {
@@ -95,27 +111,29 @@ export function useKeyboardShortcuts() {
             dispatch(flipPieceH(p.id));
           }
         }
-      }],
-      ['edit.duplicate', () => {
+      })],
+      ['edit.duplicate', wrapHandler(() => {
         for (const id of selectedPieceIds) dispatch(duplicatePiece(id));
-      }],
-      ['edit.delete', () => {
+      })],
+      ['edit.delete', wrapHandler(() => {
         if (selectedPieceIds.length > 0) {
-          selectedPieceIds.forEach(id => dispatch(removePiece(id)));
-          dispatch(clearSelection());
+          dispatch(removePieces(selectedPieceIds));
+        } else if (selectedSeamId) {
+          dispatch(removeSeam(selectedSeamId));
         }
-      }],
-      ['edit.deleteAlt', () => {
+      })],
+      ['edit.deleteAlt', wrapHandler(() => {
         if (selectedPieceIds.length > 0) {
-          selectedPieceIds.forEach(id => dispatch(removePiece(id)));
-          dispatch(clearSelection());
+          dispatch(removePieces(selectedPieceIds));
+        } else if (selectedSeamId) {
+          dispatch(removeSeam(selectedSeamId));
         }
-      }],
+      })],
 
       // Selection
-      ['selection.selectAll', () => dispatch(selectAllPieces(pieces.map(p => p.id)))],
-      ['selection.deselect', () => dispatch(clearSelection())],
-      ['selection.reverseSeam', () => { if (selectedSeamId) dispatch(reverseSeam(selectedSeamId)); }],
+      ['selection.selectAll', wrapHandler(() => dispatch(selectAllVisiblePieces({ pieces, layerLocked })))],
+      ['selection.deselect', wrapHandler(() => dispatch(clearSelection()))],
+      ['selection.reverseSeam', wrapHandler(() => { if (selectedSeamId) dispatch(reverseSeam(selectedSeamId)); })],
 
       // Simulation
       ['sim.hiRes', () => {
@@ -220,5 +238,5 @@ export function useKeyboardShortcuts() {
         registry.unregisterHandler(id);
       }
     };
-  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode]);
+  }, [registry, dispatch, pieces, selectedPieceIds, selectedSeamId, viewMode3D, fitMapMode, avatar, projectState, clipboard, xrayMode, layerLocked]);
 }
