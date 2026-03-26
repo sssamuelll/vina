@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { addColorway, removeColorway, setActiveColorway, updateColorway, duplicateColorway, renameColorway } from '../../store/projectSlice';
-import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 
 export default function ColorwayView() {
   const dispatch = useDispatch();
