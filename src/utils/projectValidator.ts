@@ -24,7 +24,9 @@ export type ValidationCode =
   | 'SEAM_ORPHANED_EDGE'
   | 'SEAMGROUP_ORPHANED'
   | 'FABRIC_ID_UNKNOWN'
-  | 'POM_ORPHANED_PIECE';
+  | 'POM_ORPHANED_PIECE'
+  | 'ELASTIC_DANGLING_EDGE'
+  | 'PLEAT_DANGLING_EDGE';
 
 export interface ValidationDiagnostic {
   severity: 'error' | 'warning' | 'info';
@@ -288,7 +290,7 @@ export function validateAndRepairProject(project: OpenCloProject): ValidationRes
   p.poms = cleanPoms;
 
   // ── Elastic cross-reference ────────────────────────────────────────────────
-  const elastics = (p as Record<string, unknown>).elastics as Array<{ id: string; pieceId: string; edgeName: string }> | undefined;
+  const elastics = (p as unknown as Record<string, unknown>).elastics as Array<{ id: string; pieceId: string; edgeName: string }> | undefined;
   if (elastics && Array.isArray(elastics)) {
     const cleanElastics: typeof elastics = [];
     for (const elastic of elastics) {
@@ -318,11 +320,11 @@ export function validateAndRepairProject(project: OpenCloProject): ValidationRes
       }
       cleanElastics.push(elastic);
     }
-    (p as Record<string, unknown>).elastics = cleanElastics;
+    (p as unknown as Record<string, unknown>).elastics = cleanElastics;
   }
 
   // ── Pleat cross-reference ──────────────────────────────────────────────────
-  const pleats = (p as Record<string, unknown>).pleats as Array<{ id: string; pieceId: string; edgeName: string }> | undefined;
+  const pleats = (p as unknown as Record<string, unknown>).pleats as Array<{ id: string; pieceId: string; edgeName: string }> | undefined;
   if (pleats && Array.isArray(pleats)) {
     const cleanPleats: typeof pleats = [];
     for (const pleat of pleats) {
@@ -352,7 +354,7 @@ export function validateAndRepairProject(project: OpenCloProject): ValidationRes
       }
       cleanPleats.push(pleat);
     }
-    (p as Record<string, unknown>).pleats = cleanPleats;
+    (p as unknown as Record<string, unknown>).pleats = cleanPleats;
   }
 
   return { project: p, diagnostics, quarantine };
