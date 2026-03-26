@@ -79,6 +79,25 @@ describe('confirmationMiddleware', () => {
     });
   });
 
+  it('shows confirmation for project/removePieces (plural) with dynamic title', () => {
+    const store = makeStore();
+    store.dispatch({ type: 'project/removePieces', payload: ['p1', 'p2', 'p3'] });
+
+    const confirmation = getPendingConfirmation(store);
+    expect(confirmation).not.toBeNull();
+    expect(confirmation!.title).toBe('Remove 3 Pattern Pieces');
+    expect(confirmation!.consequences[0]).toBe('3 pattern pieces will be permanently deleted.');
+  });
+
+  it('shows confirmation for project/removePieces (singular) with single piece', () => {
+    const store = makeStore();
+    store.dispatch({ type: 'project/removePieces', payload: ['p1'] });
+
+    const confirmation = getPendingConfirmation(store);
+    expect(confirmation).not.toBeNull();
+    expect(confirmation!.title).toBe('Remove Pattern Piece');
+  });
+
   it('shows confirmation for project/removeSeam in normal mode', () => {
     const store = makeStore();
     store.dispatch({ type: 'project/removeSeam', payload: 'seam-1' });

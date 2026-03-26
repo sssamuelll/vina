@@ -68,6 +68,15 @@ const editorSlice = createSlice({
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
+    selectAllVisiblePieces(state, action: PayloadAction<{ pieces: PatternPiece[]; layerLocked: Record<number, boolean> }>) {
+      const { pieces, layerLocked } = action.payload;
+      state.selectedPieceIds = pieces
+        .filter(p => p.active !== false && p.locked !== true && !layerLocked[p.layer ?? 1])
+        .map(p => p.id);
+      state.selectedSeamId = null;
+      state.selectedPOMId = null;
+      state.selectedInternalLine = null;
+    },
     selectSeam(state, action: PayloadAction<string>) {
       state.selectedSeamId = action.payload;
       state.selectedPOMId = null;
@@ -174,12 +183,22 @@ const editorSlice = createSlice({
         state.selectedReferenceImageId = null;
       }
     });
+    // Clear selection ONLY when pieces/seams are actually removed (Fix #3)
+    builder.addMatcher(
+      (action) => action.type === 'project/removePiece' || action.type === 'project/removePieces' || action.type === 'project/removeSeam',
+      (state) => {
+        state.selectedPieceIds = [];
+        state.selectedSeamId = null;
+        state.selectedPOMId = null;
+        state.selectedInternalLine = null;
+      }
+    );
   },
 });
 
 export const {
   setViewMode, setActiveTool,
-  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectSeam, selectPOM, selectInternalLine,
+  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine,
   setZoom2D, setPan2D,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
