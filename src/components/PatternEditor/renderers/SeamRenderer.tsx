@@ -100,7 +100,19 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const isInactive = seam.active === false;
         const paletteColor = SEAM_PALETTE[seamIndex % SEAM_PALETTE.length];
         const baseColor = isInactive ? '#666' : isSelected ? '#ffffff' : hasMismatch ? '#ff9944' : paletteColor;
-        const edgeDash = isInactive ? `${4 / zoom2D} ${3 / zoom2D}` : undefined;
+        // Type-specific line styles (CLO3D parity)
+        const z = zoom2D;
+        let edgeDash: string | undefined;
+        if (isInactive) {
+          edgeDash = `${4 / z} ${3 / z}`;
+        } else {
+          switch (seam.type) {
+            case 'french': edgeDash = `${6 / z} ${3 / z}`; break;                       // dashed
+            case 'overlock': edgeDash = `${2 / z} ${2 / z} ${6 / z} ${2 / z}`; break;   // dash-dot (zigzag feel)
+            case 'flat-felled': edgeDash = `${8 / z} ${2 / z} ${2 / z} ${2 / z}`; break; // long-short-short
+            default: edgeDash = undefined; break;                                         // solid (standard)
+          }
+        }
         const edgeWidth = (seam.taped ? 4 : 2.5) / zoom2D;
 
         // Direction arrows
