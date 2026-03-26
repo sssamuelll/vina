@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // 207 (main) + 1 detectDXFFormat
-      expect(registry.size).toBe(208);
+      expect(registry.size).toBe(209); // 208 + 1 setPiecePressure
     });
   });
 });

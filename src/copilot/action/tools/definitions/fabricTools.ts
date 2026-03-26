@@ -639,6 +639,31 @@ const getFabricCodesTool: ToolDefinition = {
   },
 };
 
+const setPiecePressureTool: ToolDefinition = {
+  name: 'setPiecePressure',
+  description: 'Set internal pressure (Pa) for a pattern piece to create inflation/puffer effect. / Establecer presión interna para efecto inflado.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'ID of the piece' },
+      pressurePa: { type: 'number', description: 'Pressure in Pascals (0=none, 50-500 typical for puffer)' },
+    },
+    required: ['pieceId', 'pressurePa'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const piece = getState().project.pieces.find((p: { id: string }) => p.id === params.pieceId);
+    if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+    const pressurePa = Math.max(0, Math.min(1000, params.pressurePa as number));
+    const oldPressure = (piece as { pressurePa?: number }).pressurePa ?? 0;
+    dispatch({ type: 'project/updatePiece', payload: { ...piece, pressurePa, updatedAt: Date.now() } });
+    return {
+      success: true,
+      data: { pieceId: params.pieceId, pressurePa, previous: oldPressure },
+      rollback: () => dispatch({ type: 'project/updatePiece', payload: { ...piece, pressurePa: oldPressure, updatedAt: Date.now() } }),
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   searchFabricsTool,
   getFabricDetailsTool,
@@ -650,4 +675,5 @@ export const tools: ToolDefinition[] = [
   setTextureRepeatTool,
   setFabricCodeTool,
   getFabricCodesTool,
+  setPiecePressureTool,
 ];

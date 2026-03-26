@@ -159,6 +159,16 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
         <span className="panel-value">{((piece.solidifyFactor ?? 0) * 100).toFixed(0)}%</span>
       </div>
+      <div className="panel-field">
+        <label>Pressure (Pa)</label>
+        <input
+          type="range"
+          min={0} max={500} step={10}
+          value={piece.pressurePa || 0}
+          onChange={e => dispatch(updatePiece({ ...piece, pressurePa: Number(e.target.value), updatedAt: Date.now() }))}
+        />
+        <span style={{ fontSize: 11, opacity: 0.7, minWidth: 35, textAlign: 'right' }}>{piece.pressurePa || 0}</span>
+      </div>
       {(piece.interfacingType && piece.interfacingType !== 'none' || (piece.solidifyFactor ?? 0) > 0) && (
         <div style={{ fontSize: 10, color: '#888', padding: '2px 0' }}>
           Effective stiffness: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x

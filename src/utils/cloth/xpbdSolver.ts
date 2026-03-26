@@ -287,6 +287,8 @@ export class XPBDClothSolver {
   vel: Float32Array;
   /** Inverse mass per particle (0 = pinned) */
   invMass: Float32Array;
+  /** Per-particle pressure in Pascals (0 = no pressure) */
+  particlePressure: Float32Array;
 
   /** Stretching constraint edge pairs [id0, id1, ...] */
   private stretchingIds: Int32Array;
@@ -385,6 +387,7 @@ export class XPBDClothSolver {
     this.restPos = new Float32Array(meshData.vertices);
     this.vel = new Float32Array(3 * this.numParticles);
     this.invMass = new Float32Array(this.numParticles);
+    this.particlePressure = new Float32Array(this.numParticles); // all zero = no pressure
     this.triIds = new Int32Array(meshData.triIds);
     this.uvs = meshData.uvs;
 
@@ -783,6 +786,9 @@ export class XPBDClothSolver {
     // Apply directional wind force
     this.applyWindForce(sdt);
 
+    // Apply internal pressure (inflation) forces
+    this.applyPressureForces(sdt);
+
     for (let i = 0; i < this.numParticles; i++) {
       if (this.invMass[i] === 0.0) continue;
 
@@ -948,6 +954,82 @@ export class XPBDClothSolver {
         this.vel[vi] += nnx * forcePerVertex * scale;
         this.vel[vi + 1] += nny * forcePerVertex * scale;
         this.vel[vi + 2] += nnz * forcePerVertex * scale;
+      }
+    }
+  }
+
+  /**
+   * Set per-piece pressure values. Maps piece vertex ranges to pressure.
+   */
+  setPiecePressures(
+    pieceOffsets: Array<{ vertexOffset: number; vertexCount: number }>,
+    pressures: number[],
+  ): void {
+    this.particlePressure.fill(0);
+    for (let p = 0; p < pieceOffsets.length && p < pressures.length; p++) {
+      if (pressures[p] <= 0) continue;
+      const { vertexOffset, vertexCount } = pieceOffsets[p];
+      for (let i = vertexOffset; i < vertexOffset + vertexCount; i++) {
+        if (i < this.particlePressure.length) {
+          this.particlePressure[i] = pressures[p];
+        }
+      }
+    }
+  }
+
+  /**
+   * Apply internal pressure forces per triangle.
+   * Force = pressure × area × outward normal, distributed to 3 vertices.
+   * Same math as wind force but uses per-particle pressure instead of global wind vector.
+   */
+  private applyPressureForces(sdt: number): void {
+    const numTris = this.triIds.length / 3;
+
+    for (let t = 0; t < numTris; t++) {
+      const i0 = this.triIds[t * 3];
+      const i1 = this.triIds[t * 3 + 1];
+      const i2 = this.triIds[t * 3 + 2];
+
+      // Average pressure of 3 vertices (skip if all zero)
+      const avgPressure = (this.particlePressure[i0] + this.particlePressure[i1] + this.particlePressure[i2]) / 3;
+      if (avgPressure <= 0) continue;
+
+      if (this.invMass[i0] === 0 && this.invMass[i1] === 0 && this.invMass[i2] === 0) continue;
+
+      const p0 = i0 * 3, p1 = i1 * 3, p2 = i2 * 3;
+
+      const ax = this.pos[p1] - this.pos[p0];
+      const ay = this.pos[p1 + 1] - this.pos[p0 + 1];
+      const az = this.pos[p1 + 2] - this.pos[p0 + 2];
+      const bx = this.pos[p2] - this.pos[p0];
+      const by = this.pos[p2 + 1] - this.pos[p0 + 1];
+      const bz = this.pos[p2 + 2] - this.pos[p0 + 2];
+
+      // Cross product = normal × 2*area
+      const nx = ay * bz - az * by;
+      const ny = az * bx - ax * bz;
+      const nz = ax * by - ay * bx;
+      const normalLen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      if (normalLen < 1e-8) continue;
+
+      const area = normalLen * 0.5;
+      const invLen = 1.0 / normalLen;
+
+      // Force = pressure * area, distributed to 3 vertices along outward normal
+      // Scale pressure from Pa to simulation units (0.001 for mm→m conversion)
+      const forcePerVertex = avgPressure * 0.001 * area / 3;
+
+      const nnx = nx * invLen;
+      const nny = ny * invLen;
+      const nnz = nz * invLen;
+
+      for (const idx of [i0, i1, i2]) {
+        if (this.invMass[idx] === 0) continue;
+        const vi = idx * 3;
+        const s = this.invMass[idx] * sdt;
+        this.vel[vi] += nnx * forcePerVertex * s;
+        this.vel[vi + 1] += nny * forcePerVertex * s;
+        this.vel[vi + 2] += nnz * forcePerVertex * s;
       }
     }
   }

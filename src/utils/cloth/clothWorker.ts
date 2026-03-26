@@ -207,6 +207,13 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
           solver.applyPieceStiffness(merged.pieces, multipliers);
         }
 
+        // Apply per-piece pressure (inflation)
+        const pressures = msg.pieces.map((p: { pressurePa?: number }) => p.pressurePa ?? 0);
+        const hasPressure = pressures.some((p: number) => p > 0);
+        if (hasPressure && merged.pieces) {
+          solver.setPiecePressures(merged.pieces, pressures);
+        }
+
         running = false;
         (self as unknown as Worker).postMessage({ type: 'ready' } satisfies WorkerOutMessage);
         break;

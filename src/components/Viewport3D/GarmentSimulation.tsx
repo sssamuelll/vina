@@ -295,7 +295,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
       const piece = activePieces[i];
       const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
-      return { ...pm, vertices: transformed, stiffnessMultiplier };
+      const pressurePa = piece?.pressurePa ?? 0;
+      return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa };
     });
   }, [pieceMeshes, activePieces, avatarMeasurements]);
 
