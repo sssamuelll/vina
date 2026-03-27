@@ -23,6 +23,18 @@ export const DEFAULT_ANNOTATION_FONT_SIZE = 8;
 export const DEFAULT_PRESSURE_PA = 0; // Pascals, 0 = no pressure
 export const MAX_PRESSURE_PA = 1000;
 
+// ─── Elastic Defaults ───────────────────────────────────────────────────────
+
+export const DEFAULT_ELASTIC_STRETCH_RATIO = 0.5; // 0.1–2.0
+export const DEFAULT_ELASTIC_WIDTH = 12; // mm
+export const DEFAULT_ELASTIC_TYPE = 'band' as const;
+
+// ─── UV Transform Defaults ──────────────────────────────────────────────────
+
+export const DEFAULT_UV_TRANSFORM = {
+  repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0,
+} as const;
+
 // ─── Fabric Code Default ────────────────────────────────────────────────────
 
 export const DEFAULT_FABRIC_CODE = 'SELF';
