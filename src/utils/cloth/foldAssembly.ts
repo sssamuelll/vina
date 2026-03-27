@@ -55,29 +55,19 @@ export function buildFoldConstraints(
     const { vertexOffset, vertexCount } = pieceOffset;
 
     // Compute piece centroid in 3D for reference
-    let cx = 0, cy = 0, cz = 0;
+    let cx = 0, _cy = 0, cz = 0;
     for (let i = vertexOffset; i < vertexOffset + vertexCount; i++) {
-      cx += verts[i * 3]; cy += verts[i * 3 + 1]; cz += verts[i * 3 + 2];
+      cx += verts[i * 3]; _cy += verts[i * 3 + 1]; cz += verts[i * 3 + 2];
     }
-    cx /= vertexCount; cy /= vertexCount; cz /= vertexCount;
+    cx /= vertexCount; _cy /= vertexCount; cz /= vertexCount;
 
     for (const foldLine of foldLines) {
       const opts = foldLine.foldOptions as FoldOptions;
       const foldPoints = extractLinePoints(foldLine.path);
       if (foldPoints.length < 2) continue;
 
-      // The fold line start point is on the piece outline.
-      // We need to find the mesh edge closest to this 2D point.
-      // Since 3D positions come from the placement pipeline (already transformed),
-      // we search for the closest EDGE (not just closest vertex pair).
-      const startPt = foldPoints[0];
-      const endPt = foldPoints[foldPoints.length - 1];
-
       // Find the mesh edge whose midpoint is closest to the fold line midpoint
       // projected onto XZ (pattern 2D → simulation 3D mapping: x→X, y→Z)
-      const foldMidX = (startPt.x + endPt.x) / 2;
-      const foldMidY = (startPt.y + endPt.y) / 2;
-
       let bestEdgeA = -1, bestEdgeB = -1;
       let bestEdgeDist = Infinity;
 

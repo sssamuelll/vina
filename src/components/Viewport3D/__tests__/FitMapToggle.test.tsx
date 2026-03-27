@@ -70,6 +70,7 @@ function createTestStore() {
         xrayMode: false,
         xrayActiveLayer: null,
         xrayOpacitySnapshot: null,
+        piecePressures: {},
       },
     },
   });
