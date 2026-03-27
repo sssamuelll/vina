@@ -49,6 +49,17 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, coll
         <span className="panel-value">{seam.tension}%</span>
       </div>
 
+      {/* Shrinkage / Gathering slider (CLO3D parity) */}
+      <div className="panel-field">
+        <label>Shrinkage</label>
+        <input
+          type="range" className="panel-slider"
+          min={0} max={90} value={Math.max(0, 100 - seam.tension)}
+          onChange={e => dispatch(setSeamTension({ seamId: seam.id, tension: 100 - Number(e.target.value) }))}
+        />
+        <span className="panel-value">{Math.max(0, 100 - seam.tension)}%</span>
+      </div>
+
       {/* Strength slider */}
       <div className="panel-field">
         <label>Strength</label>

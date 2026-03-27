@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // 207 (main) + 1 detectDXFFormat
-      expect(registry.size).toBe(212); // 209 + 3 placement rule tools
+      expect(registry.size).toBe(213); // 212 + 1 setSeamShrinkage
     });
   });
 });

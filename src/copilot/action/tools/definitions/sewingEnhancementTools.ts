@@ -453,6 +453,32 @@ const analyzeGatheringTool: ToolDefinition = {
 
 // ─── Export ──────────────────────────────────────────────────────────────────
 
+const setSeamShrinkageTool: ToolDefinition = {
+  name: 'setSeamShrinkage',
+  description: 'Set shrinkage/gathering percentage for a seam (0%=flat, 90%=max gathering). / Establecer porcentaje de fruncido para una costura.',
+  parameters: {
+    type: 'object',
+    properties: {
+      seamId: { type: 'string', description: 'ID of the seam' },
+      shrinkage: { type: 'number', description: 'Shrinkage percentage (0-90). 0=flat, 50=moderate gathering, 90=heavy gathering.' },
+    },
+    required: ['seamId', 'shrinkage'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const seam = (getState().project.seams as Array<{ id: string; tension: number }>).find(s => s.id === params.seamId);
+    if (!seam) return { success: false, error: `Seam "${params.seamId}" not found` };
+    const shrinkage = Math.max(0, Math.min(90, params.shrinkage as number));
+    const tension = 100 - shrinkage;
+    const oldTension = seam.tension;
+    dispatch({ type: 'project/setSeamTension', payload: { seamId: params.seamId, tension } });
+    return {
+      success: true,
+      data: { seamId: params.seamId, shrinkage, tension },
+      rollback: () => dispatch({ type: 'project/setSeamTension', payload: { seamId: params.seamId, tension: oldTension } }),
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   setSeamTensionTool,
   setSeamRangeTool,
@@ -462,4 +488,5 @@ export const tools: ToolDefinition[] = [
   createSeamGroupTool,
   getSeamInfoTool,
   analyzeGatheringTool,
+  setSeamShrinkageTool,
 ];
