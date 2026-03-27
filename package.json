@@ -5,14 +5,17 @@
   "type": "module",
   "description": "Cognitive Design Engine for Professional Fashion Engineering — Semantic Pattern Editor + XPBD Simulation + Situated AI Copilot",
   "bin": {
-    "openclo": "./dist-server/index.js"
+    "openclo": "./dist-cli/index.js",
+    "openclo-server": "./dist-server/index.js"
   },
   "scripts": {
     "dev": "vite",
     "dev:server": "npx tsx --watch server/index.ts",
+    "cli": "npx tsx cli/index.ts",
     "build": "tsc -b && vite build",
+    "build:cli": "tsc -p cli/tsconfig.json",
     "build:server": "tsc -p server/tsconfig.json",
-    "build:all": "npm run build && npm run build:server",
+    "build:all": "npm run build && npm run build:server && npm run build:cli",
     "start": "node dist-server/index.js",
     "lint": "eslint .",
     "preview": "vite preview",
