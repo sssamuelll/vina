@@ -65,6 +65,18 @@ public/
     └── xpbd_wasm_bg.wasm
 ```
 
+## Recent Major Features (v0.9.0)
+
+- **Seam System**: Pieces sew together in simulation. Color-coded pairs, curved edge rendering, type-specific line styles, shrinkage/gathering control.
+- **Pressure Simulation**: Per-piece inflation for puffer jackets, balloon sleeves (`pressurePa` on PatternPiece).
+- **Fold Constraints**: XPBD angular constraints for pleat/crease simulation in 3D.
+- **Undo Batching**: `batchUndo(dispatch, label, fn)` wraps N dispatches as single undo entry.
+- **Colorway UI**: Tab bar, per-fabricCode color overrides, 2D piece tinting.
+- **Pre-Marking Rules**: Production nesting constraints (atFold, atEdge, priority, grainTilt).
+- **213 Copilot Tools**: Every feature registered for AI agent access.
+- **Shared Defaults**: `src/utils/defaults.ts` — single source of truth for all feature constants.
+- **Error Tracker**: `src/utils/errorTracker.ts` — ring buffer for unhandled errors, `window.__OPENCLO_ERRORS__()`.
+
 ## Cloth Simulation Parameters
 
 ### ClothSimConfig
