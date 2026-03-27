@@ -8,7 +8,7 @@
 [![Tests](https://img.shields.io/badge/Tests-4232_passing-success?logo=vitest&logoColor=white)](tests/)
 [![Tools](https://img.shields.io/badge/Copilot_Tools-213-8B5CF6?logo=openai&logoColor=white)](src/copilot/action/tools/)
 
-**The Cognitive Design Engine for Professional Fashion Engineering.**
+**The Cognitive Design Engine for Collaborative Fashion Engineering.**
 
 > **Status (March 27, 2026):** Released **v0.9.0** — Seam system overhaul (pieces now sew together), **Pressure Simulation** for puffer jackets, **XPBD Fold Constraints** for pleats, **Colorway UI**, **Pre-Marking Rules** for nesting, **213 copilot tools**, and all audit findings resolved. See our [Changelog](CHANGELOG.md) and [Roadmap](ROADMAP.md).
 
