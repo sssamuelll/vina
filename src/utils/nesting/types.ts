@@ -10,6 +10,8 @@ export interface NestingOptions {
   rotationStep: number;
   allowMirror: boolean;
   sortStrategy: 'area-desc' | 'height-desc' | 'width-desc';
+  /** Per-piece placement rules keyed by pieceId */
+  placementRules?: Record<string, import('../../types/types').PlacementRule[]>;
 }
 
 export interface PlacedPiece {

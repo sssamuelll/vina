@@ -1,4 +1,4 @@
-import type { PatternPiece, Point2D, PathCommand } from '../../types/types';
+import type { PatternPiece, Point2D, PathCommand, PlacementRule } from '../../types/types';
 import type { NestingOptions, NestingResult, PlacedPiece, SkylineSegment } from './types';
 import { flattenPath } from '../seam/index';
 
@@ -248,7 +248,7 @@ export function nestPieces(
     return { placements: [], sheetsUsed: 0, utilization: 0, unplaced: [] };
   }
 
-  const { sheet, gap, rotationStep, allowMirror, sortStrategy } = options;
+  const { sheet, gap, rotationStep, allowMirror, sortStrategy, placementRules } = options;
   const { width: sheetW, height: sheetH, margin } = sheet;
 
   // Prepare pieces
@@ -272,6 +272,13 @@ export function nestPieces(
       break;
   }
 
+  // If placement rules are provided, re-sort by priority (lower number = first)
+  if (placementRules) {
+    const getPriority = (pieceId: string): number =>
+      placementRules[pieceId]?.find(r => r.type === 'priority')?.value ?? 999;
+    prepared.sort((a, b) => getPriority(a.id) - getPriority(b.id));
+  }
+
   // Sheets: each has a skyline
   const usableW = sheetW - 2 * margin;
   const sheets: SkylineSegment[][] = [];
@@ -288,11 +295,12 @@ export function nestPieces(
 
   for (const piece of prepared) {
     let placed = false;
+    const pieceRules = placementRules?.[piece.id];
 
     // Try each existing sheet
     for (let si = 0; si < sheets.length && !placed; si++) {
       const result = tryPlaceOnSheet(
-        piece, sheets[si], sheetW, sheetH, margin, gap, angles, allowMirror,
+        piece, sheets[si], sheetW, sheetH, margin, gap, angles, allowMirror, pieceRules,
       );
       if (result) {
         sheets[si] = result.skyline;
@@ -312,7 +320,7 @@ export function nestPieces(
       // Try new sheet
       const newSkyline: SkylineSegment[] = [{ x: margin, width: usableW, y: margin }];
       const result = tryPlaceOnSheet(
-        piece, newSkyline, sheetW, sheetH, margin, gap, angles, allowMirror,
+        piece, newSkyline, sheetW, sheetH, margin, gap, angles, allowMirror, pieceRules,
       );
       if (result) {
         sheets.push(result.skyline);
@@ -357,11 +365,30 @@ function tryPlaceOnSheet(
   gap: number,
   angles: number[],
   allowMirror: boolean,
+  rules?: PlacementRule[],
 ): { x: number; y: number; rotation: number; mirrored: boolean; skyline: SkylineSegment[] } | null {
   let best: { x: number; y: number; rotation: number; mirrored: boolean; w: number; h: number; score: number } | null = null;
 
+  // Derive constraint flags from placement rules
+  const hasAtFold = rules?.some(r => r.type === 'atFold') ?? false;
+  const atEdgeRule = rules?.find(r => r.type === 'atEdge');
+  const grainTiltRule = rules?.find(r => r.type === 'grainTilt');
+  const grainTiltLimit = grainTiltRule?.value ?? undefined;
+
+  // Build effective rotation angles, constrained by grainTilt if present
+  let effectiveAngles = angles;
+  if (grainTiltLimit !== undefined) {
+    effectiveAngles = angles.filter(a => {
+      // Normalise to [-180, 180) range for comparison
+      const norm = ((a + 180) % 360) - 180;
+      return Math.abs(norm) <= grainTiltLimit + 0.001;
+    });
+    // Ensure at least 0° is included
+    if (effectiveAngles.length === 0) effectiveAngles = [0];
+  }
+
   const variants: { angle: number; mirrored: boolean }[] = [];
-  for (const angle of angles) {
+  for (const angle of effectiveAngles) {
     variants.push({ angle, mirrored: false });
     if (allowMirror) {
       variants.push({ angle, mirrored: true });
@@ -374,8 +401,37 @@ function tryPlaceOnSheet(
     const rbbox = rotateBBox(pts, angle);
 
     const pos = findBestPosition(skyline, rbbox.width, rbbox.height, sheetW, sheetH, margin, gap);
-    if (pos && (!best || pos.score < best.score)) {
-      best = { x: pos.x, y: pos.y, rotation: angle, mirrored, w: rbbox.width, h: rbbox.height, score: pos.score };
+    if (!pos) continue;
+
+    let px = pos.x;
+    let py = pos.y;
+
+    // atFold: constrain Y to top edge (margin)
+    if (hasAtFold) {
+      py = margin;
+    }
+
+    // atEdge: constrain X to left or right edge
+    if (atEdgeRule) {
+      const edgeValue = atEdgeRule.value ?? 0;
+      if (edgeValue === 0) {
+        // Left edge
+        px = margin;
+      } else {
+        // Right edge
+        px = sheetW - margin - rbbox.width;
+      }
+    }
+
+    // Verify the constrained position still fits the sheet
+    if (px + rbbox.width > sheetW - margin + 0.001) continue;
+    if (py + rbbox.height > sheetH - margin + 0.001) continue;
+    if (px < margin - 0.001) continue;
+    if (py < margin - 0.001) continue;
+
+    const score = py + rbbox.height;
+    if (!best || score < best.score) {
+      best = { x: px, y: py, rotation: angle, mirrored, w: rbbox.width, h: rbbox.height, score };
     }
   }
 

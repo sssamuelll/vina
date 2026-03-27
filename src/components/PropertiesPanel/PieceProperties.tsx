@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode } from '../../store/projectSlice';
+import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule } from '../../store/projectSlice';
 import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType } from '../../types/types';
@@ -226,6 +226,44 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       <div className="panel-field" style={{ gap: 4 }}>
         <input className="panel-input" style={{ flex: 1 }} placeholder="Custom..." value={customText} onChange={e => setCustomText(e.target.value)} />
         <button className="panel-btn-sm" onClick={handleAddCustom} disabled={!customText.trim()}>+</button>
+      </div>
+
+      {/* Placement Rules */}
+      <div className="panel-section-title" style={{ marginTop: 12 }}>PLACEMENT RULES</div>
+      {(piece.placementRules || []).map((rule, idx) => (
+        <div key={idx} className="panel-field" style={{ justifyContent: 'space-between' }}>
+          <span style={{ fontSize: 11 }}>
+            {rule.type === 'atFold' ? '📐 At Fold' :
+             rule.type === 'atEdge' ? `📏 At ${rule.edge || 'left'} edge` :
+             rule.type === 'priority' ? `⬆️ Priority ${rule.value || 1}` :
+             rule.type === 'grainTilt' ? `↗️ Tilt ≤${rule.value || 5}°` :
+             rule.type === 'pairWith' ? `🔗 Pair` :
+             rule.type === 'minDistance' ? `↔️ Min ${rule.value || 10}mm` : rule.type}
+          </span>
+          <button className="panel-btn-sm" style={{ fontSize: 10, padding: '1px 4px' }}
+            onClick={() => dispatch(removePlacementRule({ pieceId: piece.id, ruleIndex: idx }))}>✕</button>
+        </div>
+      ))}
+      <div className="panel-field" style={{ gap: 4 }}>
+        <select className="panel-input" style={{ flex: 1 }} value="" onChange={e => {
+          if (!e.target.value) return;
+          const type = e.target.value as any;
+          const rule: any = { type };
+          if (type === 'priority') rule.value = 1;
+          if (type === 'grainTilt') rule.value = 5;
+          if (type === 'minDistance') rule.value = 10;
+          if (type === 'atEdge') rule.edge = 'left';
+          dispatch(addPlacementRule({ pieceId: piece.id, rule }));
+          e.target.value = '';
+        }}>
+          <option value="">Add rule...</option>
+          <option value="atFold">At Fold</option>
+          <option value="atEdge">At Edge</option>
+          <option value="priority">Priority</option>
+          <option value="grainTilt">Grain Tilt</option>
+          <option value="pairWith">Pair With</option>
+          <option value="minDistance">Min Distance</option>
+        </select>
       </div>
 
       <button className="panel-delete" onClick={handleDeletePiece}>
