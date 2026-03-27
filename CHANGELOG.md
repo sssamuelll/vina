@@ -3,7 +3,46 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.8.0] — 2026-03-24 (Current)
+## [0.9.0] — 2026-03-27 (Current)
+
+### Added
+- **Seam System Overhaul** — Pieces now actually sew together in simulation. Fixed silent edge name resolution, WASM solver data passing, and shrink speed. Color-coded seam pairs, curved edge rendering, type-specific line styles (French=dashed, overlock=dash-dot), green selection glow, shrinkage/gathering slider (#451, #452, #453, #454, #455, #456, #458, #459, #460, #461, #462).
+- **Pressure Simulation** — Internal inflation forces for puffer jackets, balloon sleeves, padded quilting. Per-triangle outward normal force with consistent winding detection (#382, #469).
+- **XPBD Fold Constraints** — 3D simulation of pleats and creases. Fold lines create angular constraints in the solver, causing fabric to fold during simulation (#429, #471).
+- **Undo Batch Grouping** — `batchUndo()` wraps N dispatches as a single undo entry. Eliminates the recurring N-dispatch partial-undo problem across all features (#437, #465).
+- **Colorway UI** — Tab bar for switching colorways, per-fabricCode color override editor, 2D piece tinting via resolveColorway() (#446, #467).
+- **Pre-Marking Placement Rules** — Production constraint system for nesting: atFold, atEdge, priority, grainTilt, pairWith, minDistance. Integrated into nesting engine (#262, #472).
+- **Annotation Library** — 14 built-in production annotation templates (CUT 2, INTERFACE, GRAIN, etc.) with category-colored rendering and DXF export (#266, #434).
+- **Fabric Codes on Pieces** — Production classification (SELF, LINING, INTERLINING, etc.) with color-coded 2D indicators and DXF export (#259, #425).
+- **Garment Information** — Metadata dialog for brand, season, style number, designer, date, notes. Persisted and copilot-accessible (#378, #445).
+- **Texture Tiling** — UV offset support, repeat presets (1x1/2x2/4x4/8x8), range sliders, lock aspect toggle, reducer clamping (#376, #427).
+- **3D Mesh Selection** — Box select tool for 3D vertex selection with screen-space overlay, vertex projection via camera MVP, SelectedVertexRenderer (#371, #447).
+- **Elastic Tool** — Full elastic data model, UI, simulation integration, and copilot tools for waistbands, cuffs, gathered edges (#322, #424).
+- **Slash and Spread** — Cut and spread/rotate for fullness with 8-phase geometric pipeline (#363, #426).
+- **Pleats & Folds** — Knife, box, accordion, inverted box pleat types with fold direction (mountain/valley) and crease angle (#260, #431).
+- **Image Trace** — Reference image layer for pattern tracing with calibration and opacity controls (#244, #435).
+- **Seam Corner Types** — 7 professional SA corner types (mitered, envelope, square, etc.) (#255, #449).
+- **DXF Wizard** — Auto-detect DXF format (AAMA, ASTM, legacy) on import (#264, #450).
+- **AAMA Export Metadata** — FABRIC_CODE, ANNOTATION, FOLD_DIR layers in AAMA DXF export (#439, #444).
+- **Global Error Tracker** — Ring buffer capturing unhandled errors + rejections, exposed via `window.__OPENCLO_ERRORS__()` (#441, #474).
+
+### Fixed
+- **Seam Root Cause** — Silent edge name resolution failure fixed: `buildSeamConstraints()` now parses `"edge-N"` fallback pattern. WASM worker was missing piece edge data (one-line fix). Shrink factor 0.995→0.97 (#451, #452, #453).
+- **Undo Deep-Clone** — Replaced `JSON.parse(JSON.stringify())` with `structuredClone()` + fallback. Abort on clone failure prevents array desync (#400, #414).
+- **Double Undo Bug** — Removed duplicate Cmd+Z handler in `useCopilotKeyboardShortcuts` that caused two undo dispatches per keypress (#414).
+- **Safe localStorage** — 24 files migrated to `safeStorage` wrapper with detection, in-memory fallback, per-key error logging. 9 bare calls wrapped (#401, #418).
+- **Edge Reference Cascade** — `cascadeEdgeRename`/`cascadeEdgeRemove` reducers update seams, elastics, pleats atomically when edges change. Validator extended for elastic/pleat cross-references (#436, #468).
+- **Shared Defaults** — `utils/defaults.ts` centralizes feature constants (seam allowance, tension, strength, elastic ratios, UV transform). UI hooks and copilot tools import from same source (#438, #470).
+- **Collision Mesh Validation** — Vertex/face count checks on mesh import, constraint ID validation (#407, #443).
+- **Name Sanitization** — Centralized `sanitizeName()` prevents export injection via control characters (#403, #420).
+
+### Stats
+- ~165,000 LOC across 580+ TypeScript source files.
+- 4,200+ automated tests passing.
+- 213 copilot tools registered.
+- 35+ E2E test cases.
+
+## [0.8.0] — 2026-03-24
 
 ### Added
 - **Layer System (v1)** — Professional layer management matching CLO3D parity. Includes layer ordering, sublayers, superimpose (over/under), and layer cloning. Piece arrangement now respects layer index for complex garment construction (#372, #379).
