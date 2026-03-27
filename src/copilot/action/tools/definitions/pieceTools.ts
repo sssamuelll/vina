@@ -12,6 +12,7 @@ import { addPiece, updatePiece, removePiece, movePiece, rotatePiece } from '../.
 import { selectPiece } from '../../../../store/editorSlice';
 import type { PatternPiece, PathCommand } from '../../../../types/types';
 import { uid } from '../../../../utils/pathHelpers';
+import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
 
 /** Compute bounding box from outline */
 function computeBounds(outline: PathCommand[]): { width: number; height: number } {
@@ -79,7 +80,7 @@ const createPieceTool: ToolDefinition = {
           position: (params.position as { x: number; y: number }) || { x: 50, y: 50 },
           rotation: 0,
           mirrored: (params.mirrored as boolean) || false,
-          seamAllowance: (params.seamAllowance as number) ?? 10,
+          seamAllowance: (params.seamAllowance as number) ?? DEFAULT_SEAM_ALLOWANCE,
           layer: 1,
           sublayer: 0,
           active: true,

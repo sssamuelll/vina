@@ -8,6 +8,7 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { updatePiece, addSeam, removeSeam } from '../../../../store/projectSlice';
 import type { Seam, CornerType } from '../../../../types/types';
+import { DEFAULT_SEAM_TENSION, DEFAULT_SEAM_STRENGTH } from '../../../../utils/defaults';
 
 // ─── setSeamAllowance ───────────────────────────────────────────────────────
 
@@ -143,8 +144,8 @@ const createSeamTool: ToolDefinition = {
       pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName },
       pieceB: { pieceId: params.pieceBId as string, edgeName: edgeBName },
       type: (params.seamType as Seam['type']) || 'standard',
-      tension: 100,
-      strength: 1.0,
+      tension: DEFAULT_SEAM_TENSION,
+      strength: DEFAULT_SEAM_STRENGTH,
       active: true,
       taped: false,
       tapeWidth: 10,

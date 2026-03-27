@@ -1,4 +1,5 @@
 import type { ToolDefinition, ToolResult } from '../registry';
+import { DEFAULT_ANNOTATION_FONT_SIZE } from '../../../../utils/defaults';
 
 const addAnnotationTool: ToolDefinition = {
   name: 'addPieceAnnotation',
@@ -23,7 +24,7 @@ const addAnnotationTool: ToolDefinition = {
       text: sanitizeAnnotationText(params.text as string),
       position: 'center' as const,
       category: (params.category as string) || 'general',
-      fontSize: 8,
+      fontSize: DEFAULT_ANNOTATION_FONT_SIZE,
     };
 
     dispatch({ type: 'project/addAnnotation', payload: { pieceId: params.pieceId, annotation } });

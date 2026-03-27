@@ -9,6 +9,7 @@ import { duplicatePiece } from '../../../../store/projectSlice';
 import { addInternalLine } from '../../../../store/projectSlice';
 import { setActiveTool, setViewMode, selectPiece, clearSelection } from '../../../../store/editorSlice';
 import type { InternalLine } from '../../../../types/types';
+import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
 
 export const tools: ToolDefinition[] = [
   {
@@ -94,7 +95,7 @@ export const tools: ToolDefinition[] = [
         internals: [],
         position: { x, y },
         rotation: 0,
-        seamAllowance: 10,
+        seamAllowance: DEFAULT_SEAM_ALLOWANCE,
       } as any));
       return { success: true, pieceId: id, name: params.name, width: w, height: h };
     },
