@@ -18,6 +18,7 @@ import { addPiece } from '../../../../store/projectSlice';
 import { selectPiece } from '../../../../store/editorSlice';
 import { buildPiece } from '../../../../utils/construction/pieceBuilder';
 import { resolveConstructionPoints } from '../../../../utils/construction/resolver';
+import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
 
 // ─── addConstructionPoint ───────────────────────────────────────────────────
 
@@ -220,7 +221,7 @@ const buildPieceFromConstructionTool: ToolDefinition = {
     dispatch(addConstructionPiece({
       name: cPieceName,
       nodes,
-      seamAllowance: (params.seamAllowance as number) ?? 10,
+      seamAllowance: (params.seamAllowance as number) ?? DEFAULT_SEAM_ALLOWANCE,
     }));
 
     // Build the actual PatternPiece
@@ -230,7 +231,7 @@ const buildPieceFromConstructionTool: ToolDefinition = {
       id: 'temp',
       name: cPieceName,
       nodes,
-      seamAllowance: (params.seamAllowance as number) ?? 10,
+      seamAllowance: (params.seamAllowance as number) ?? DEFAULT_SEAM_ALLOWANCE,
       closed: true,
     };
 

@@ -18,6 +18,7 @@ import {
   addSeamGroup,
 } from '../../../../store/projectSlice';
 import type { SeamGroup } from '../../../../types/types';
+import { DEFAULT_SEAM_TENSION, DEFAULT_SEAM_STRENGTH } from '../../../../utils/defaults';
 import { uid } from '../../../../utils/pathHelpers';
 
 // ─── setSeamTension ──────────────────────────────────────────────────────────
@@ -307,7 +308,7 @@ const createSeamGroupTool: ToolDefinition = {
       return { success: false, error: 'edgesB must contain at least one edge' };
     }
 
-    const tension = (params.tension as number | undefined) ?? 100;
+    const tension = (params.tension as number | undefined) ?? DEFAULT_SEAM_TENSION;
 
     const group: SeamGroup = {
       id: uid(),
@@ -315,7 +316,7 @@ const createSeamGroupTool: ToolDefinition = {
       edgesB,
       type: (params.type as SeamGroup['type']) ?? 'standard',
       tension: Math.max(10, Math.min(200, tension)),
-      strength: 1.0,
+      strength: DEFAULT_SEAM_STRENGTH,
       active: true,
       taped: false,
       tapeWidth: 10,

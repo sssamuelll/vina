@@ -34,8 +34,8 @@ export type SurfaceMode3D =
   | 'flat' | 'xray' | 'shaded'
   | 'shaded-wire' | 'textured-wire';
 
-/** Default UV transform for per-piece tiling. */
-export const DEFAULT_UV_TRANSFORM = { repeatX: 4, repeatY: 4, rotation: 0, offsetX: 0, offsetY: 0 } as const;
+/** Default UV transform for per-piece tiling. Re-exported from utils/defaults. */
+export { DEFAULT_UV_TRANSFORM } from '../utils/defaults';
 
 /** Pin strength determines how firmly the vertex is held. */
 export type PinStrength = 'weak' | 'medium' | 'strong';
