@@ -305,6 +305,12 @@ function mockState(overrides?: Partial<RootState>): RootState {
       agentError: null,
       unresolvedCount: 0,
     },
+    bom: {
+      entries: [],
+      currency: 'USD',
+      lastExtractedAt: null,
+      extractedProjectVersion: null,
+    },
   };
 
   if (overrides) {
