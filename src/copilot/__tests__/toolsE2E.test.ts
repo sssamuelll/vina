@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 208 tools registered', () => {
-      expect(registry.size).toBe(208); // 207 (main) + 1 detectDXFFormat
+    it('has 209 tools registered', () => {
+      expect(registry.size).toBe(209); // 208 + 1 setPiecePressure
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(208); // 207 (main) + 1 detectDXFFormat
+      expect(names.length).toBe(209); // 208 + 1 setPiecePressure
 
       // Key tools from every category
       const expected = [

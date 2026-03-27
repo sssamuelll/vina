@@ -76,6 +76,8 @@ export interface PatternPiece {
   interfacingType?: InterfacingType;
   /** Solidify factor (0-1) for extra stiffness */
   solidifyFactor?: number;
+  /** Internal pressure in Pascals (0 = none, 10-500 typical for puffer/balloon) */
+  pressurePa?: number;
   /** Production annotations (cutting instructions, QC notes, etc.) */
   annotations?: PieceAnnotation[];
   createdAt: number;

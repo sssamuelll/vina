@@ -120,6 +120,8 @@ interface SimulationSliceState {
   windEnabled: boolean;
   /** Drag coefficient (scales wind and air drag) */
   dragCoefficient: number;
+  /** Per-piece internal pressure in Pascals (puffer jacket inflation) */
+  piecePressures: Record<string, number>;
   /** IDs of pieces whose particles are frozen (zero velocity, skip solver) */
   frozenPieceIds: string[];
   /** Piece IDs hidden in 3D viewport (excluded from simulation and rendering) */
@@ -204,6 +206,7 @@ const initialState: SimulationSliceState = {
   windForce: [0, 0, 0],
   windEnabled: false,
   dragCoefficient: 1.0,
+  piecePressures: {},
   frozenPieceIds: [],
   hiddenPieceIds: [],
   flippedPieceIds: [],
@@ -441,6 +444,16 @@ const simulationSlice = createSlice({
     setDragCoefficient(state, action: PayloadAction<number>) {
       state.dragCoefficient = Math.max(0, Math.min(5, action.payload));
     },
+    /** Set internal pressure for a piece (Pa). 0 = no pressure. */
+    setPiecePressure(state, action: PayloadAction<{ pieceId: string; pressurePa: number }>) {
+      const { pieceId, pressurePa } = action.payload;
+      if (pressurePa <= 0) {
+        delete state.piecePressures[pieceId];
+      } else {
+        state.piecePressures[pieceId] = Math.min(pressurePa, 1000); // cap at 1000 Pa
+      }
+    },
+
     /** Toggle freeze state for a single piece (add if absent, remove if present). */
     toggleFreezePiece(state, action: PayloadAction<string>) {
       const idx = state.frozenPieceIds.indexOf(action.payload);
@@ -714,6 +727,7 @@ export const {
   setWindForce,
   setWindEnabled,
   setDragCoefficient,
+  setPiecePressure,
   toggleFreezePiece,
   unfreezeAllPieces,
   // 3D Arrangement: hide / flip
