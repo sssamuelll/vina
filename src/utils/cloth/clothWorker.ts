@@ -214,6 +214,23 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
           solver.setPiecePressures(merged.pieces, pressures);
         }
 
+        // Build fold constraints from piece internals
+        {
+          const { buildFoldConstraints } = await import('./foldAssembly');
+          const pieceInternals = new Map<string, import('../../types/types').InternalLine[]>();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const p of msg.pieces as any[]) {
+            if (p.internals && Array.isArray(p.internals)) {
+              pieceInternals.set(p.pieceId, p.internals);
+            }
+          }
+          const foldSpecs = buildFoldConstraints(pieceInternals, outlines, merged);
+          if (foldSpecs.length > 0) {
+            solver.setFoldConstraints(foldSpecs);
+            console.log(`[ClothWorker] Applied ${foldSpecs.length} fold constraints`);
+          }
+        }
+
         running = false;
         (self as unknown as Worker).postMessage({ type: 'ready' } satisfies WorkerOutMessage);
         break;

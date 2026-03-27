@@ -1193,6 +1193,52 @@ export class XPBDClothSolver {
    *
    * @param sdt - Substep time
    */
+  /**
+   * Apply fold constraints by modifying existing bending constraints.
+   * For each fold edge (pair of vertex indices on the fold line), finds
+   * the matching bending constraint and overrides its rest length to
+   * encode the target crease angle, with very low compliance (stiff fold).
+   *
+   * @param folds Array of { edgeA, edgeB, creaseAngleDeg, stiffness }
+   *   - edgeA, edgeB: vertex indices of the shared edge on the fold line
+   *   - creaseAngleDeg: target dihedral angle (180 = flat, 0 = fully folded)
+   *   - stiffness: 0-1 (0 = soft crease, 1 = razor sharp)
+   */
+  setFoldConstraints(
+    folds: Array<{ edgeA: number; edgeB: number; creaseAngleDeg: number; stiffness: number }>,
+  ): void {
+    // Build a lookup: "minIdx-maxIdx" → bending constraint index
+    const edgeToBendIdx = new Map<string, number>();
+    for (let i = 0; i < this.bendingIds.length / 4; i++) {
+      const a = this.bendingIds[4 * i];
+      const b = this.bendingIds[4 * i + 1];
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      edgeToBendIdx.set(key, i);
+    }
+
+    for (const fold of folds) {
+      const key = fold.edgeA < fold.edgeB
+        ? `${fold.edgeA}-${fold.edgeB}`
+        : `${fold.edgeB}-${fold.edgeA}`;
+      const bendIdx = edgeToBendIdx.get(key);
+      if (bendIdx === undefined) continue;
+
+      // Compute target rest length from crease angle.
+      // At 180° (flat): keep current rest length (no fold).
+      // At 0° (fully folded): rest length → 0 (opposite vertices touch).
+      // Linear interpolation: factor = creaseAngleDeg / 180
+      const angleFactor = Math.max(0, Math.min(1, fold.creaseAngleDeg / 180));
+      const currentRestLen = this.bendingLengths[bendIdx];
+      this.bendingLengths[bendIdx] = currentRestLen * angleFactor;
+
+      // Override compliance: stiff fold = very low compliance
+      // stiffness 1.0 → compliance 0.00001 (razor sharp)
+      // stiffness 0.0 → compliance 0.1 (soft crease)
+      const stiffness = Math.max(0, Math.min(1, fold.stiffness));
+      this.bendCompliances[bendIdx] = 0.1 * Math.pow(0.0001, stiffness);
+    }
+  }
+
   private solveBending(sdt: number): void {
     for (let i = 0; i < this.bendingLengths.length; i++) {
       const compliance = this.bendCompliances[i];
