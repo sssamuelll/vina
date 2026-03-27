@@ -101,4 +101,4 @@ npm test          # Run 4,200+ tests
 | Development Days | 28 |
 
 ---
-**OpenClo.ai** — Digitizing Fashion Intelligence. MIT Licensed.
+**OpenClo.ai** — Democratizing Fashion Intelligence. MIT Licensed.
