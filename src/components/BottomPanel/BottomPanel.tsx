@@ -8,6 +8,7 @@ import { runProactiveAnalysis, type ProactiveWarning } from '../../copilot/reaso
 import Timeline from '../Timeline/Timeline';
 import InspectorTab from './InspectorTab';
 import POMPanel from './POMPanel';
+import BOMTab from './BOMTab';
 import './BottomPanel.css';
 
 interface BottomPanelProps {
@@ -27,6 +28,7 @@ function buildTabs(problemCount: number, unresolvedCount: number): { id: BottomT
     { id: 'timeline', label: 'Timeline' },
     { id: 'inspector', label: unresolvedCount > 0 ? `Inspector (${unresolvedCount})` : 'Inspector' },
     { id: 'poms', label: 'POMs' },
+    { id: 'bom', label: 'BOM' },
   ];
 }
 
@@ -198,6 +200,7 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
           {activeTab === 'timeline' && <Timeline />}
           {activeTab === 'inspector' && <InspectorTab />}
           {activeTab === 'poms' && <POMPanel />}
+          {activeTab === 'bom' && <BOMTab />}
         </div>
       </div>
     </div>

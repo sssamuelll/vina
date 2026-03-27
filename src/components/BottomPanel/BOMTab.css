@@ -1,0 +1,218 @@
+/* ─── BOM Tab ────────────────────────────────────────────────────────────── */
+
+.bom-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+/* ─── Toolbar ────────────────────────────────────────────────────────────── */
+
+.bom-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.bom-toolbar button {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bom-toolbar button:hover {
+  background: var(--button-hover-bg, #3a3a3a);
+}
+
+.bom-toolbar select {
+  font-size: 11px;
+  padding: 3px 6px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.bom-stale-badge {
+  color: #f59e0b;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.bom-total {
+  margin-left: auto;
+  font-weight: 600;
+  color: var(--text-color, #ccc);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* ─── Colorway Tabs ──────────────────────────────────────────────────────── */
+
+.bom-colorway-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.bom-colorway-tab {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: transparent;
+  color: var(--text-muted, #999);
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.bom-colorway-tab:hover {
+  color: var(--text-color, #ccc);
+}
+
+.bom-colorway-tab.active {
+  color: var(--accent-color, #3b82f6);
+  border-bottom-color: var(--accent-color, #3b82f6);
+}
+
+/* ─── Table Container ────────────────────────────────────────────────────── */
+
+.bom-table-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ─── Table ──────────────────────────────────────────────────────────────── */
+
+.bom-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.bom-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-bg, #1e1e1e);
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color, #333);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.bom-table td {
+  padding: 3px 8px;
+  color: var(--text-color, #ccc);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-subtle, #2a2a2a);
+  white-space: nowrap;
+}
+
+/* ─── Category Headers ───────────────────────────────────────────────────── */
+
+.bom-category-header td {
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #999);
+  padding: 6px 8px 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bom-category-header td:hover {
+  color: var(--text-color, #ccc);
+}
+
+/* ─── Inline Edit Inputs ─────────────────────────────────────────────────── */
+
+.bom-row td input {
+  background: transparent;
+  color: var(--text-color, #ccc);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+  min-width: 40px;
+}
+
+.bom-row td input:focus {
+  border-color: var(--accent-color, #3b82f6);
+  background: var(--panel-bg, #1e1e1e);
+}
+
+.bom-row td input[type='number'] {
+  width: 70px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Lock Icon ──────────────────────────────────────────────────────────── */
+
+.bom-lock-icon {
+  color: var(--text-muted, #999);
+  font-size: 10px;
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* ─── Delete Button ──────────────────────────────────────────────────────── */
+
+.bom-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted, #999);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.bom-delete-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+
+/* ─── Grand Total Footer ─────────────────────────────────────────────────── */
+
+.bom-grand-total {
+  text-align: right;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-top: 2px solid var(--border-color, #333);
+  color: var(--text-color, #ccc);
+}
+
+/* ─── Empty State ────────────────────────────────────────────────────────── */
+
+.bom-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #999);
+  height: 100%;
+  padding: 20px;
+  text-align: center;
+}
