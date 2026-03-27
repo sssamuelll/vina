@@ -80,6 +80,8 @@ export interface PatternPiece {
   pressurePa?: number;
   /** Production annotations (cutting instructions, QC notes, etc.) */
   annotations?: PieceAnnotation[];
+  /** Pre-marking placement rules for nesting */
+  placementRules?: PlacementRule[];
   createdAt: number;
   updatedAt: number;
 }
@@ -95,6 +97,20 @@ export interface PieceAnnotation {
   position: AnnotationPosition;
   category: AnnotationCategory;
   fontSize?: number;
+}
+
+// ─── Placement Rules (Pre-Marking for Nesting) ───
+
+export type PlacementRuleType = 'atFold' | 'atEdge' | 'pairWith' | 'minDistance' | 'priority' | 'grainTilt';
+
+export interface PlacementRule {
+  type: PlacementRuleType;
+  /** Numeric value: priority (1=highest), minDistance (mm), grainTilt (degrees) */
+  value?: number;
+  /** Target piece ID for pairWith / minDistance rules */
+  targetPieceId?: string;
+  /** Edge constraint for atEdge rule */
+  edge?: 'left' | 'right';
 }
 
 // ─── Reference Images (2D pattern workspace background) ───

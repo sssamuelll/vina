@@ -532,6 +532,25 @@ const projectSlice = createSlice({
       state.isDirty = true;
     },
 
+    // ─── Placement Rules ───
+    addPlacementRule(state, action: PayloadAction<{ pieceId: string; rule: import('../types/types').PlacementRule }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        if (!piece.placementRules) piece.placementRules = [];
+        piece.placementRules.push(action.payload.rule);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+    removePlacementRule(state, action: PayloadAction<{ pieceId: string; ruleIndex: number }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece && piece.placementRules) {
+        piece.placementRules.splice(action.payload.ruleIndex, 1);
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
+
     /** Reverse sewing direction — swap pieceA and pieceB */
     reverseSeam(state, action: PayloadAction<string>) {
       const seam = state.seams.find(s => s.id === action.payload);
@@ -1104,6 +1123,7 @@ export const {
   // Reactive solver (parametric updates)
   upsertPieceOutline, upsertMultiplePieceOutlines,
   addSeam, removeSeam, updateSeam, setSeamTension, deactivateSeam, deactivatePiece, reverseSeam, cascadeEdgeRename, cascadeEdgeRemove,
+  addPlacementRule, removePlacementRule,
   addSeamGroup, removeSeamGroup,
   // Pleats
   addPleat, removePleat, updatePleat,
