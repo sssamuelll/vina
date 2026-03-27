@@ -308,6 +308,11 @@ export class XPBDClothSolver {
   /** Per-constraint compliance for anisotropic bending */
   private bendCompliances!: Float32Array;
 
+  /** Original bending rest lengths (before fold overrides) for reset */
+  private originalBendingLengths: Float32Array | null = null;
+  /** Original bending compliances (before fold overrides) for reset */
+  private originalBendCompliances: Float32Array | null = null;
+
   /** Optional UV coordinates for edge classification */
   private uvs: Float32Array | undefined;
 
@@ -1207,6 +1212,12 @@ export class XPBDClothSolver {
   setFoldConstraints(
     folds: Array<{ edgeA: number; edgeB: number; creaseAngleDeg: number; stiffness: number }>,
   ): void {
+    // Save originals for reset (only on first call)
+    if (!this.originalBendingLengths) {
+      this.originalBendingLengths = new Float32Array(this.bendingLengths);
+      this.originalBendCompliances = new Float32Array(this.bendCompliances);
+    }
+
     // Build a lookup: "minIdx-maxIdx" → bending constraint index
     const edgeToBendIdx = new Map<string, number>();
     for (let i = 0; i < this.bendingIds.length / 4; i++) {
@@ -1223,19 +1234,20 @@ export class XPBDClothSolver {
       const bendIdx = edgeToBendIdx.get(key);
       if (bendIdx === undefined) continue;
 
-      // Compute target rest length from crease angle.
-      // At 180° (flat): keep current rest length (no fold).
-      // At 0° (fully folded): rest length → 0 (opposite vertices touch).
-      // Linear interpolation: factor = creaseAngleDeg / 180
       const angleFactor = Math.max(0, Math.min(1, fold.creaseAngleDeg / 180));
-      const currentRestLen = this.bendingLengths[bendIdx];
-      this.bendingLengths[bendIdx] = currentRestLen * angleFactor;
+      const originalRestLen = this.originalBendingLengths[bendIdx];
+      this.bendingLengths[bendIdx] = originalRestLen * angleFactor;
 
-      // Override compliance: stiff fold = very low compliance
-      // stiffness 1.0 → compliance 0.00001 (razor sharp)
-      // stiffness 0.0 → compliance 0.1 (soft crease)
       const stiffness = Math.max(0, Math.min(1, fold.stiffness));
       this.bendCompliances[bendIdx] = 0.1 * Math.pow(0.0001, stiffness);
+    }
+  }
+
+  /** Reset all fold constraint overrides, restoring original bending behavior. */
+  clearFoldConstraints(): void {
+    if (this.originalBendingLengths && this.originalBendCompliances) {
+      this.bendingLengths.set(this.originalBendingLengths);
+      this.bendCompliances.set(this.originalBendCompliances);
     }
   }
 
