@@ -308,6 +308,11 @@ export class XPBDClothSolver {
   /** Per-constraint compliance for anisotropic bending */
   private bendCompliances!: Float32Array;
 
+  /** Original bending rest lengths (before fold overrides) for reset */
+  private originalBendingLengths: Float32Array | null = null;
+  /** Original bending compliances (before fold overrides) for reset */
+  private originalBendCompliances: Float32Array | null = null;
+
   /** Optional UV coordinates for edge classification */
   private uvs: Float32Array | undefined;
 
@@ -1193,6 +1198,59 @@ export class XPBDClothSolver {
    *
    * @param sdt - Substep time
    */
+  /**
+   * Apply fold constraints by modifying existing bending constraints.
+   * For each fold edge (pair of vertex indices on the fold line), finds
+   * the matching bending constraint and overrides its rest length to
+   * encode the target crease angle, with very low compliance (stiff fold).
+   *
+   * @param folds Array of { edgeA, edgeB, creaseAngleDeg, stiffness }
+   *   - edgeA, edgeB: vertex indices of the shared edge on the fold line
+   *   - creaseAngleDeg: target dihedral angle (180 = flat, 0 = fully folded)
+   *   - stiffness: 0-1 (0 = soft crease, 1 = razor sharp)
+   */
+  setFoldConstraints(
+    folds: Array<{ edgeA: number; edgeB: number; creaseAngleDeg: number; stiffness: number }>,
+  ): void {
+    // Save originals for reset (only on first call)
+    if (!this.originalBendingLengths) {
+      this.originalBendingLengths = new Float32Array(this.bendingLengths);
+      this.originalBendCompliances = new Float32Array(this.bendCompliances);
+    }
+
+    // Build a lookup: "minIdx-maxIdx" → bending constraint index
+    const edgeToBendIdx = new Map<string, number>();
+    for (let i = 0; i < this.bendingIds.length / 4; i++) {
+      const a = this.bendingIds[4 * i];
+      const b = this.bendingIds[4 * i + 1];
+      const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+      edgeToBendIdx.set(key, i);
+    }
+
+    for (const fold of folds) {
+      const key = fold.edgeA < fold.edgeB
+        ? `${fold.edgeA}-${fold.edgeB}`
+        : `${fold.edgeB}-${fold.edgeA}`;
+      const bendIdx = edgeToBendIdx.get(key);
+      if (bendIdx === undefined) continue;
+
+      const angleFactor = Math.max(0, Math.min(1, fold.creaseAngleDeg / 180));
+      const originalRestLen = this.originalBendingLengths[bendIdx];
+      this.bendingLengths[bendIdx] = originalRestLen * angleFactor;
+
+      const stiffness = Math.max(0, Math.min(1, fold.stiffness));
+      this.bendCompliances[bendIdx] = 0.1 * Math.pow(0.0001, stiffness);
+    }
+  }
+
+  /** Reset all fold constraint overrides, restoring original bending behavior. */
+  clearFoldConstraints(): void {
+    if (this.originalBendingLengths && this.originalBendCompliances) {
+      this.bendingLengths.set(this.originalBendingLengths);
+      this.bendCompliances.set(this.originalBendCompliances);
+    }
+  }
+
   private solveBending(sdt: number): void {
     for (let i = 0; i < this.bendingLengths.length; i++) {
       const compliance = this.bendCompliances[i];
