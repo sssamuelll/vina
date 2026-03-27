@@ -124,11 +124,9 @@ async function cmdExport(): Promise<void> {
   }
 
   const project = loadProject(projectPath);
-  const pieces = (project.pieces || []) as Array<{
-    id: string; name: string; outline: Array<{ type: string; values: number[] }>;
-    position: { x: number; y: number }; seamAllowance: number; fabricCode?: string;
-    annotations?: Array<{ text: string }>; internals?: unknown[];
-  }>;
+  // Import PatternPiece type — project JSON matches this structure
+  type Piece = import('../src/types/types').PatternPiece;
+  const pieces = (project.pieces || []) as Piece[];
 
   if (pieces.length === 0) {
     console.error('Error: project has no pieces to export.');
@@ -142,19 +140,17 @@ async function cmdExport(): Promise<void> {
   let content: string;
 
   if (format === 'dxf') {
-    // Dynamic import to avoid loading everything at startup
-    const { downloadDXF } = await import('../src/utils/exportDXF.js');
-    // generateDXF is not exported separately, but downloadDXF calls it internally
-    // For CLI, we need the raw string. Let's use the AAMA generator which IS pure.
-    const { generateDXFAAMA } = await import('../src/utils/dxf/exportAAMA.js');
-    content = generateDXFAAMA(pieces as never);
+    // Legacy DXF with all layers (CUT, SEAM, NOTCH, GRAINLINE, LABEL, etc.)
+    const { generateDXFLegacy } = await import('../src/utils/exportDXF.js');
+    content = generateDXFLegacy(pieces);
   } else if (format === 'aama') {
+    // AAMA/ASTM D6673 compliant DXF with numbered layers
     const { generateDXFAAMA } = await import('../src/utils/dxf/exportAAMA.js');
-    content = generateDXFAAMA(pieces as never);
+    content = generateDXFAAMA(pieces);
   } else {
     // PDF
     const { generatePDF } = await import('../src/utils/exportPDF.js');
-    content = generatePDF(pieces as never);
+    content = generatePDF(pieces);
   }
 
   fs.writeFileSync(outputPath, content, 'utf-8');
@@ -164,42 +160,24 @@ async function cmdExport(): Promise<void> {
 async function cmdValidate(): Promise<void> {
   const project = loadProject(projectPath);
 
+  // Use the shared projectValidator for full validation
+  type OpenCloProject = import('../src/types/types').OpenCloProject;
+  const { validateAndRepairProject } = await import('../src/utils/projectValidator.js');
+  const { diagnostics } = validateAndRepairProject(project as unknown as OpenCloProject);
+
   const pieces = (project.pieces || []) as unknown[];
   const seams = (project.seams || []) as unknown[];
-  let issues = 0;
 
-  // Basic structure checks
-  if (!project.id) { console.warn('  WARN: project missing id'); issues++; }
-  if (!project.name) { console.warn('  WARN: project missing name'); issues++; }
-  if (pieces.length === 0) { console.warn('  WARN: no pieces in project'); issues++; }
-
-  // Check each piece has required fields
-  for (const p of pieces as Array<{ id: string; name?: string; outline?: unknown[] }>) {
-    if (!p.id) { console.warn(`  ERROR: piece missing id`); issues++; }
-    if (!p.outline || (p.outline as unknown[]).length === 0) {
-      console.warn(`  ERROR: piece "${p.name || p.id}" has empty outline`);
-      issues++;
-    }
-  }
-
-  // Check seam references
-  const pieceIds = new Set((pieces as Array<{ id: string }>).map(p => p.id));
-  for (const s of seams as Array<{ id: string; pieceA: { pieceId: string }; pieceB: { pieceId: string } }>) {
-    if (!pieceIds.has(s.pieceA?.pieceId)) {
-      console.warn(`  ERROR: seam "${s.id}" references missing piece "${s.pieceA?.pieceId}"`);
-      issues++;
-    }
-    if (!pieceIds.has(s.pieceB?.pieceId)) {
-      console.warn(`  ERROR: seam "${s.id}" references missing piece "${s.pieceB?.pieceId}"`);
-      issues++;
-    }
-  }
-
-  if (issues === 0) {
+  if (diagnostics.length === 0) {
     console.log(`\n  ✓ Project valid — ${pieces.length} pieces, ${seams.length} seams, 0 issues\n`);
   } else {
-    console.log(`\n  ✗ ${issues} issue(s) found\n`);
-    process.exit(1);
+    for (const d of diagnostics) {
+      const icon = d.severity === 'error' ? '✗' : d.severity === 'warning' ? '⚠' : 'ℹ';
+      console.log(`  ${icon} [${d.code}] ${d.message}`);
+    }
+    console.log(`\n  ${diagnostics.length} issue(s) found\n`);
+    const hasErrors = diagnostics.some(d => d.severity === 'error');
+    if (hasErrors) process.exit(1);
   }
 }
 
