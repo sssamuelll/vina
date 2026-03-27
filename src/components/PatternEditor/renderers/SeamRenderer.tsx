@@ -99,7 +99,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const isSelected = selectedSeamId === seam.id;
         const isInactive = seam.active === false;
         const paletteColor = SEAM_PALETTE[seamIndex % SEAM_PALETTE.length];
-        const baseColor = isInactive ? '#666' : isSelected ? '#ffffff' : hasMismatch ? '#ff9944' : paletteColor;
+        const baseColor = isInactive ? '#666' : isSelected ? '#44ff88' : hasMismatch ? '#ff9944' : paletteColor;
         // Type-specific line styles (CLO3D parity)
         const z = zoom2D;
         let edgeDash: string | undefined;
@@ -113,7 +113,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
             default: edgeDash = undefined; break;                                         // solid (standard)
           }
         }
-        const edgeWidth = (seam.taped ? 4 : 2.5) / zoom2D;
+        const edgeWidth = (isSelected ? 4 : seam.taped ? 4 : 2.5) / zoom2D;
 
         // Direction arrows
         const arrowA = directionArrow(epA.start, epA.end, offA, zoom2D);
@@ -121,6 +121,13 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
 
         return (
           <g key={seam.id} className="seam-connection" opacity={isInactive ? 0.5 : 1}>
+            {/* Selection glow (wider semi-transparent behind main stroke) */}
+            {isSelected && pathDA && (
+              <path d={pathDA} fill="none" stroke="#44ff88" strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
+            )}
+            {isSelected && pathDB && (
+              <path d={pathDB} fill="none" stroke="#44ff88" strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
+            )}
             {/* Edge A highlight (follows curves) */}
             {pathDA ? (
               <path
