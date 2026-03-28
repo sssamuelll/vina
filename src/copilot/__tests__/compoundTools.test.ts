@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 213 + 8 BOM tools
-      expect(registry.size).toBe(221);
+      // 213 + 8 BOM + 5 trim tools
+      expect(registry.size).toBe(226);
     });
   });
 });
