@@ -35,7 +35,10 @@ export interface TrimPreset {
   tags: string[];
 }
 
-/** Default values for new trims */
+/** Default values for new trims — sourced from utils/defaults.ts */
+export { DEFAULT_TRIM_TYPE, DEFAULT_TRIM_MATERIAL, DEFAULT_TRIM_COLOR, DEFAULT_TRIM_SIZE, DEFAULT_TRIM_UNIT_COST } from '../utils/defaults';
+
+/** Convenience aggregate for all trim defaults */
 export const TRIM_DEFAULTS: Omit<Trim, 'id' | 'pieceId' | 'placement'> = {
   type: 'button',
   name: 'Trim',

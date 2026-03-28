@@ -38,3 +38,11 @@ export const DEFAULT_UV_TRANSFORM = {
 // ─── Fabric Code Default ────────────────────────────────────────────────────
 
 export const DEFAULT_FABRIC_CODE = 'SELF';
+
+// ─── Trim Defaults ─────────────────────────────────────────────────────────
+
+export const DEFAULT_TRIM_TYPE = 'button' as const;
+export const DEFAULT_TRIM_MATERIAL = 'plastic';
+export const DEFAULT_TRIM_COLOR = '#333333';
+export const DEFAULT_TRIM_SIZE = 15; // mm
+export const DEFAULT_TRIM_UNIT_COST = 0;
