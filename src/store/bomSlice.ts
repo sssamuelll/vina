@@ -1,45 +1,12 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 import type { BOMEntry, BOMEntryResolved, BOMCategory, BOMState } from '../types/bom';
 import type { RootState } from './index';
 
-// ─── Persistence ─────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'openclo-bom';
-const STORAGE_VERSION = 1;
-
-interface PersistedEnvelope {
-  version: number;
-  data: BOMState;
-}
-
-/**
- * Write the current BOM state to localStorage as a versioned envelope.
- * Silently swallows errors (e.g. private browsing, storage full).
- */
-export function persistBOM(state: BOMState): void {
-  const envelope: PersistedEnvelope = { version: STORAGE_VERSION, data: state };
-  safeSetItem(STORAGE_KEY, JSON.stringify(envelope));
-}
-
-/**
- * Read the BOM state from localStorage.
- * Returns null on missing key, parse errors, or version mismatches.
- */
-export function loadBOM(): BOMState | null {
-  try {
-    const raw = safeGetItem(STORAGE_KEY);
-    if (!raw) return null;
-    const envelope = JSON.parse(raw) as PersistedEnvelope;
-    if (envelope.version !== STORAGE_VERSION || !envelope.data) return null;
-    return envelope.data;
-  } catch {
-    return null;
-  }
-}
-
 // ─── Initial State ───────────────────────────────────────────────────────────
+// BOM is project-scoped derived data — not persisted to localStorage.
+// Re-extract on demand via "Refresh BOM". This avoids cross-project
+// contamination that would occur with a single-key localStorage approach.
 
 const initialState: BOMState = {
   entries: [],
@@ -63,7 +30,7 @@ const bomSlice = createSlice({
       state.entries = [...manualEntries, ...action.payload.entries];
       state.lastExtractedAt = Date.now();
       state.extractedProjectVersion = action.payload.projectVersion;
-      persistBOM(state as BOMState);
+
     },
 
     addManualEntry(
@@ -76,7 +43,7 @@ const bomSlice = createSlice({
         autoPopulated: false,
       };
       state.entries.push(entry);
-      persistBOM(state as BOMState);
+
     },
 
     updateEntry(
@@ -86,17 +53,17 @@ const bomSlice = createSlice({
       const entry = state.entries.find(e => e.id === action.payload.id);
       if (!entry) return;
       Object.assign(entry, action.payload.changes);
-      persistBOM(state as BOMState);
+
     },
 
     removeEntry(state, action: PayloadAction<string>) {
       state.entries = state.entries.filter(e => e.id !== action.payload);
-      persistBOM(state as BOMState);
+
     },
 
     setCurrency(state, action: PayloadAction<string>) {
       state.currency = action.payload;
-      persistBOM(state as BOMState);
+
     },
 
     setColorwayOverride(
@@ -110,7 +77,7 @@ const bomSlice = createSlice({
       const entry = state.entries.find(e => e.id === action.payload.entryId);
       if (!entry) return;
       entry.colorwayOverrides[action.payload.colorwayId] = action.payload.override;
-      persistBOM(state as BOMState);
+
     },
 
     clearBOM(state) {
@@ -118,15 +85,9 @@ const bomSlice = createSlice({
       state.currency = initialState.currency;
       state.lastExtractedAt = initialState.lastExtractedAt;
       state.extractedProjectVersion = initialState.extractedProjectVersion;
-      persistBOM(state as BOMState);
+
     },
 
-    rehydrateBOM(state, action: PayloadAction<BOMState>) {
-      state.entries = action.payload.entries;
-      state.currency = action.payload.currency;
-      state.lastExtractedAt = action.payload.lastExtractedAt;
-      state.extractedProjectVersion = action.payload.extractedProjectVersion;
-    },
   },
 
   extraReducers: (builder) => {
@@ -135,7 +96,7 @@ const bomSlice = createSlice({
       state.currency = initialState.currency;
       state.lastExtractedAt = initialState.lastExtractedAt;
       state.extractedProjectVersion = initialState.extractedProjectVersion;
-      persistBOM(state as BOMState);
+
     });
   },
 });
@@ -148,7 +109,6 @@ export const {
   setCurrency,
   setColorwayOverride,
   clearBOM,
-  rehydrateBOM,
 } = bomSlice.actions;
 
 // ─── Selectors ───────────────────────────────────────────────────────────────

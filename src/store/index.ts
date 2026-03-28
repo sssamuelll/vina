@@ -18,7 +18,7 @@ import renderSettingsReducer from './renderSettingsSlice';
 import animationReducer from './animationSlice';
 import workflowReducer, { loadWorkflow, rehydrateWorkflow } from './workflowSlice';
 import inspectorReducer from './inspectorSlice';
-import bomReducer, { loadBOM, rehydrateBOM } from './bomSlice';
+import bomReducer from './bomSlice';
 import { createConfirmationMiddleware } from './confirmationMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
@@ -76,11 +76,6 @@ store.dispatch(loadBlueprints(BUILTIN_BLUEPRINTS));
 const savedWorkflow = loadWorkflow();
 if (savedWorkflow) {
   store.dispatch(rehydrateWorkflow(savedWorkflow));
-}
-
-const savedBOM = loadBOM();
-if (savedBOM) {
-  store.dispatch(rehydrateBOM(savedBOM));
 }
 
 // Expose store for debugging (remove in production)

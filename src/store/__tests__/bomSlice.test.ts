@@ -1,17 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock localStorage before importing the slice
-const mockStorage: Record<string, string> = {};
-vi.stubGlobal('localStorage', {
-  getItem: vi.fn((key: string) => mockStorage[key] ?? null),
-  setItem: vi.fn((key: string, value: string) => {
-    mockStorage[key] = value;
-  }),
-  removeItem: vi.fn((key: string) => {
-    delete mockStorage[key];
-  }),
-});
-
 // Mock crypto.randomUUID
 let uuidCounter = 0;
 vi.stubGlobal('crypto', {
@@ -26,9 +14,6 @@ import bomReducer, {
   setCurrency,
   setColorwayOverride,
   clearBOM,
-  rehydrateBOM,
-  persistBOM,
-  loadBOM,
   selectBOMEntries,
   selectBOMByCategory,
   selectTotalCost,
@@ -69,7 +54,6 @@ function makeRootState(bomState: BOMState, projectUpdatedAt?: number) {
 
 describe('bomSlice', () => {
   beforeEach(() => {
-    for (const key of Object.keys(mockStorage)) delete mockStorage[key];
     vi.clearAllMocks();
     uuidCounter = 0;
   });
@@ -114,11 +98,6 @@ describe('bomSlice', () => {
       expect(state.entries.find(e => e.id === 'auto-1')).toBeUndefined();
     });
 
-    it('persists to localStorage', () => {
-      const entries = [makeBOMEntry()];
-      bomReducer(getInitialState(), populateBOM({ entries, projectVersion: 1 }));
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -148,23 +127,6 @@ describe('bomSlice', () => {
       expect(state.entries[0].category).toBe('trim');
     });
 
-    it('persists to localStorage', () => {
-      bomReducer(
-        getInitialState(),
-        addManualEntry({
-          category: 'label',
-          name: 'Brand Label',
-          description: '',
-          quantity: 1,
-          unit: 'pieces',
-          unitCost: 0.25,
-          currency: 'USD',
-          colorwayOverrides: {},
-          sourcePieceIds: [],
-        })
-      );
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -192,11 +154,6 @@ describe('bomSlice', () => {
       expect(state.entries[0].name).toBe('Cotton Poplin');
     });
 
-    it('persists to localStorage', () => {
-      const initial = { ...getInitialState(), entries: [makeBOMEntry({ id: 'e1' })] };
-      bomReducer(initial, updateEntry({ id: 'e1', changes: { name: 'Linen' } }));
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -220,11 +177,6 @@ describe('bomSlice', () => {
       expect(state.entries).toHaveLength(1);
     });
 
-    it('persists to localStorage', () => {
-      const initial = { ...getInitialState(), entries: [makeBOMEntry({ id: 'e1' })] };
-      bomReducer(initial, removeEntry('e1'));
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -237,10 +189,6 @@ describe('bomSlice', () => {
       expect(state.currency).toBe('EUR');
     });
 
-    it('persists to localStorage', () => {
-      bomReducer(getInitialState(), setCurrency('GBP'));
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -277,18 +225,6 @@ describe('bomSlice', () => {
       expect(state.entries[0].colorwayOverrides).toEqual({});
     });
 
-    it('persists to localStorage', () => {
-      const initial = { ...getInitialState(), entries: [makeBOMEntry({ id: 'e1' })] };
-      bomReducer(
-        initial,
-        setColorwayOverride({
-          entryId: 'e1',
-          colorwayId: 'cw-1',
-          override: { unitCost: 15 },
-        })
-      );
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -306,122 +242,6 @@ describe('bomSlice', () => {
       expect(state.extractedProjectVersion).toBeNull();
     });
 
-    it('persists to localStorage', () => {
-      bomReducer(getInitialState(), clearBOM());
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // rehydrateBOM
-  // -------------------------------------------------------------------------
-
-  describe('rehydrateBOM', () => {
-    it('restores full state from a saved snapshot', () => {
-      const saved: BOMState = {
-        entries: [makeBOMEntry({ id: 'saved-1' })],
-        currency: 'JPY',
-        lastExtractedAt: 999,
-        extractedProjectVersion: 7,
-      };
-      const state = bomReducer(getInitialState(), rehydrateBOM(saved));
-      expect(state.entries).toHaveLength(1);
-      expect(state.entries[0].id).toBe('saved-1');
-      expect(state.currency).toBe('JPY');
-      expect(state.lastExtractedAt).toBe(999);
-      expect(state.extractedProjectVersion).toBe(7);
-    });
-
-    it('overwrites existing state fully', () => {
-      let state = getInitialState();
-      state = { ...state, entries: [makeBOMEntry()], currency: 'EUR' };
-      const restored: BOMState = {
-        entries: [],
-        currency: 'USD',
-        lastExtractedAt: null,
-        extractedProjectVersion: null,
-      };
-      state = bomReducer(state, rehydrateBOM(restored));
-      expect(state.entries).toEqual([]);
-      expect(state.currency).toBe('USD');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // persistBOM / loadBOM
-  // -------------------------------------------------------------------------
-
-  describe('persistBOM', () => {
-    it('writes a versioned envelope to localStorage', () => {
-      const bomState: BOMState = {
-        entries: [makeBOMEntry()],
-        currency: 'USD',
-        lastExtractedAt: 100,
-        extractedProjectVersion: 3,
-      };
-      persistBOM(bomState);
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-      const stored = JSON.parse(mockStorage['openclo-bom']);
-      expect(stored.version).toBe(1);
-      expect(stored.data).toEqual(bomState);
-    });
-
-    it('does not throw when localStorage is unavailable', () => {
-      vi.stubGlobal('localStorage', {
-        getItem: vi.fn(() => null),
-        setItem: vi.fn(() => {
-          throw new Error('storage unavailable');
-        }),
-        removeItem: vi.fn(),
-      });
-      expect(() => persistBOM(getInitialState())).not.toThrow();
-      // Restore mock
-      vi.stubGlobal('localStorage', {
-        getItem: vi.fn((key: string) => mockStorage[key] ?? null),
-        setItem: vi.fn((key: string, value: string) => {
-          mockStorage[key] = value;
-        }),
-        removeItem: vi.fn((key: string) => {
-          delete mockStorage[key];
-        }),
-      });
-    });
-  });
-
-  describe('loadBOM', () => {
-    it('returns null when localStorage has no entry', () => {
-      expect(loadBOM()).toBeNull();
-    });
-
-    it('returns the saved state when the envelope is valid', () => {
-      const bomState: BOMState = {
-        entries: [makeBOMEntry()],
-        currency: 'EUR',
-        lastExtractedAt: 200,
-        extractedProjectVersion: 4,
-      };
-      persistBOM(bomState);
-      const loaded = loadBOM();
-      expect(loaded).toEqual(bomState);
-    });
-
-    it('returns null for corrupt JSON', () => {
-      mockStorage['openclo-bom'] = 'not-valid-json{{{';
-      expect(loadBOM()).toBeNull();
-    });
-
-    it('returns null when version does not match', () => {
-      mockStorage['openclo-bom'] = JSON.stringify({
-        version: 99,
-        data: { entries: [], currency: 'USD', lastExtractedAt: null, extractedProjectVersion: null },
-      });
-      expect(loadBOM()).toBeNull();
-    });
-
-    it('returns null when data field is missing', () => {
-      mockStorage['openclo-bom'] = JSON.stringify({ version: 1 });
-      expect(loadBOM()).toBeNull();
-    });
   });
 
   // -------------------------------------------------------------------------
@@ -439,11 +259,6 @@ describe('bomSlice', () => {
       expect(state.extractedProjectVersion).toBeNull();
     });
 
-    it('persists the reset state', () => {
-      const state = { ...getInitialState(), entries: [makeBOMEntry()] };
-      bomReducer(state, NEW_PROJECT());
-      expect(localStorage.setItem).toHaveBeenCalledWith('openclo-bom', expect.any(String));
-    });
   });
 
   // -------------------------------------------------------------------------
