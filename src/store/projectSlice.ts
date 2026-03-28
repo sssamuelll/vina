@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
+import type { Trim } from '../types/trim';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
 import { generatePleatFoldLines } from '../utils/pleatGeometry';
@@ -55,6 +56,7 @@ interface ProjectState {
   seams: Seam[];
   pleats: Pleat[];
   elastics: Elastic[];
+  trims: Trim[];
   fabrics: Fabric[];
   avatar: Avatar;
   avatarMode: AvatarMode;
@@ -91,6 +93,7 @@ const initialState: ProjectState = {
   seams: [],
   pleats: [],
   elastics: [],
+  trims: [],
   fabrics: [defaultFabric],
   avatar: defaultAvatar,
   avatarMode: 'model',
@@ -160,6 +163,7 @@ const projectSlice = createSlice({
       state.layerLocked = (p as any).layerLocked ?? {};
       // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
       state.referenceImages = (p as any).referenceImages ?? [];
+      state.trims = (p as any).trims ?? [];
     },
     clearLoadDiagnostics(state) {
       state.loadDiagnostics = [];
@@ -210,6 +214,7 @@ const projectSlice = createSlice({
         s => s.pieceA.pieceId !== id && s.pieceB.pieceId !== id
       );
       if (state.elastics) state.elastics = state.elastics.filter(e => e.pieceId !== id);
+      if (state.trims) state.trims = state.trims.filter(t => t.pieceId !== id);
       delete state.arrangementOverrides[id];
       // Auto-remove from all groups
       for (const group of state.groups) {
@@ -228,6 +233,7 @@ const projectSlice = createSlice({
         s => !ids.has(s.pieceA.pieceId) && !ids.has(s.pieceB.pieceId)
       );
       if (state.elastics) state.elastics = state.elastics.filter(e => !ids.has(e.pieceId));
+      if (state.trims) state.trims = state.trims.filter(t => !ids.has(t.pieceId));
       for (const id of ids) {
         delete state.arrangementOverrides[id];
       }
@@ -519,6 +525,12 @@ const projectSlice = createSlice({
       if (state.pleats) for (const p of state.pleats) {
         if (p.pieceId === pieceId && p.edgeName === oldName) p.edgeName = newName;
       }
+      // Trims (edge-mode only)
+      if (state.trims) for (const t of state.trims) {
+        if (t.pieceId === pieceId && t.placement.mode === 'edge' && t.placement.edgeName === oldName) {
+          (t.placement as { mode: 'edge'; edgeName: string; tStart: number; tEnd: number }).edgeName = newName;
+        }
+      }
       state.isDirty = true;
     },
     cascadeEdgeRemove(state, action: PayloadAction<{ pieceId: string; edgeName: string }>) {
@@ -529,6 +541,9 @@ const projectSlice = createSlice({
       );
       if (state.elastics) state.elastics = state.elastics.filter(e => !(e.pieceId === pieceId && e.edgeName === edgeName));
       if (state.pleats) state.pleats = state.pleats.filter(p => !(p.pieceId === pieceId && p.edgeName === edgeName));
+      if (state.trims) state.trims = state.trims.filter(t =>
+        !(t.pieceId === pieceId && t.placement.mode === 'edge' && (t.placement as { edgeName: string }).edgeName === edgeName),
+      );
       state.isDirty = true;
     },
 
@@ -594,6 +609,34 @@ const projectSlice = createSlice({
       const updated = { ...state.elastics[idx], ...action.payload };
       updated.stretchRatio = clampStretchRatio(updated.stretchRatio);
       state.elastics[idx] = updated;
+      state.isDirty = true;
+    },
+
+    // ─── Trims ───
+    addTrim(state, action: PayloadAction<Trim>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const { placement } = action.payload;
+      if (placement.mode === 'edge') {
+        const edge = piece.edges?.find(e => e.name === placement.edgeName);
+        if (!edge) return;
+        if (placement.tStart >= placement.tEnd) return;
+      }
+      state.trims.push(action.payload);
+      state.isDirty = true;
+    },
+    removeTrim(state, action: PayloadAction<string>) {
+      state.trims = state.trims.filter(t => t.id !== action.payload);
+      state.isDirty = true;
+    },
+    updateTrim(state, action: PayloadAction<Partial<Trim> & { id: string }>) {
+      const idx = state.trims.findIndex(t => t.id === action.payload.id);
+      if (idx === -1) return;
+      if (action.payload.pieceId) {
+        const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+        if (!piece) return;
+      }
+      state.trims[idx] = { ...state.trims[idx], ...action.payload };
       state.isDirty = true;
     },
 
@@ -1128,6 +1171,7 @@ export const {
   // Pleats
   addPleat, removePleat, updatePleat,
   addElastic, removeElastic, updateElastic,
+  addTrim, removeTrim, updateTrim,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,
