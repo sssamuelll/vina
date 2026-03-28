@@ -3,18 +3,17 @@
  *
  * Covers:
  * - Non-destructive actions pass through
- * - Normal mode: removePiece / removeSeam / construction/removePoint → modal
- * - Expert mode: destructive actions pass through
- * - Override 'always': shows confirmation even in expert mode
- * - Override 'never': passes through even in normal mode
- * - meta.skipConfirmation: bypasses gate in normal mode
+ * - Default mode: destructive actions pass through (undoable via Ctrl+Z)
+ * - Override 'always': shows confirmation modal
+ * - Override 'never': passes through even with 'always' would block
+ * - meta.skipConfirmation: bypasses gate regardless
  * - tools/setToolOption mirrors into workflow.toolMemory
  * - tools/setToolOption with meta.fromToolMemory does NOT mirror
  */
 
 import { describe, it, expect } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import workflowReducer, { setExpertMode, setConfirmOverride } from '../workflowSlice';
+import workflowReducer, { setConfirmOverride } from '../workflowSlice';
 import copilotUIReducer from '../copilotUISlice';
 import projectReducer from '../projectSlice';
 import constructionReducer from '../constructionSlice';
@@ -22,8 +21,8 @@ import { createConfirmationMiddleware } from '../confirmationMiddleware';
 
 // ─── Store factory ────────────────────────────────────────────────────────────
 
-function makeStore(expertMode = false) {
-  const store = configureStore({
+function makeStore() {
+  return configureStore({
     reducer: {
       workflow: workflowReducer,
       copilotUI: copilotUIReducer,
@@ -35,8 +34,6 @@ function makeStore(expertMode = false) {
         createConfirmationMiddleware()
       ),
   });
-  if (expertMode) store.dispatch(setExpertMode(true));
-  return store;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,10 +59,37 @@ describe('confirmationMiddleware', () => {
     expect(getPendingConfirmation(store)).toBeNull();
   });
 
-  // ── Normal mode: destructive actions trigger modal ────────────────────────
+  // ── Default: destructive actions pass through (undoable) ─────────────────
 
-  it('shows confirmation for project/removePiece in normal mode', () => {
+  it('passes through removePiece by default (undoable via Ctrl+Z)', () => {
     const store = makeStore();
+    store.dispatch({ type: 'project/removePiece', payload: 'piece-1' });
+    expect(getPendingConfirmation(store)).toBeNull();
+  });
+
+  it('passes through removePieces by default', () => {
+    const store = makeStore();
+    store.dispatch({ type: 'project/removePieces', payload: ['p1', 'p2'] });
+    expect(getPendingConfirmation(store)).toBeNull();
+  });
+
+  it('passes through removeSeam by default', () => {
+    const store = makeStore();
+    store.dispatch({ type: 'project/removeSeam', payload: 'seam-1' });
+    expect(getPendingConfirmation(store)).toBeNull();
+  });
+
+  it('passes through construction/removePoint by default', () => {
+    const store = makeStore();
+    store.dispatch({ type: 'construction/removePoint', payload: 'pt-1' });
+    expect(getPendingConfirmation(store)).toBeNull();
+  });
+
+  // ── Override 'always': shows modal ──────────────────────────────────────
+
+  it("override 'always' shows confirmation for removePiece", () => {
+    const store = makeStore();
+    store.dispatch(setConfirmOverride({ operation: 'removePiece', value: 'always' }));
     store.dispatch({ type: 'project/removePiece', payload: 'piece-1' });
 
     const confirmation = getPendingConfirmation(store);
@@ -79,57 +103,28 @@ describe('confirmationMiddleware', () => {
     });
   });
 
-  it('shows confirmation for project/removePieces (plural) with dynamic title', () => {
+  it("override 'always' shows confirmation for removeSeam", () => {
     const store = makeStore();
+    store.dispatch(setConfirmOverride({ operation: 'removeSeam', value: 'always' }));
+    store.dispatch({ type: 'project/removeSeam', payload: 'seam-1' });
+
+    expect(getPendingConfirmation(store)).not.toBeNull();
+  });
+
+  it("override 'always' shows confirmation for removePieces with dynamic title", () => {
+    const store = makeStore();
+    store.dispatch(setConfirmOverride({ operation: 'removePieces', value: 'always' }));
     store.dispatch({ type: 'project/removePieces', payload: ['p1', 'p2', 'p3'] });
 
     const confirmation = getPendingConfirmation(store);
     expect(confirmation).not.toBeNull();
     expect(confirmation!.title).toBe('Remove 3 Pattern Pieces');
-    expect(confirmation!.consequences[0]).toBe('3 pattern pieces will be permanently deleted.');
+    expect(confirmation!.consequences[0]).toBe('3 pattern pieces will be deleted.');
   });
 
-  it('shows confirmation for project/removePieces (singular) with single piece', () => {
+  it("override 'always' includes consequences", () => {
     const store = makeStore();
-    store.dispatch({ type: 'project/removePieces', payload: ['p1'] });
-
-    const confirmation = getPendingConfirmation(store);
-    expect(confirmation).not.toBeNull();
-    expect(confirmation!.title).toBe('Remove Pattern Piece');
-  });
-
-  it('shows confirmation for project/removeSeam in normal mode', () => {
-    const store = makeStore();
-    store.dispatch({ type: 'project/removeSeam', payload: 'seam-1' });
-
-    const confirmation = getPendingConfirmation(store);
-    expect(confirmation).not.toBeNull();
-    expect(confirmation!.source).toBe('middleware');
-    expect(confirmation!.title).toBe('Remove Seam');
-    expect(confirmation!.destructive).toBe(true);
-    expect(confirmation!.reduxAction).toEqual({
-      type: 'project/removeSeam',
-      payload: 'seam-1',
-    });
-  });
-
-  it('shows confirmation for construction/removePoint in normal mode', () => {
-    const store = makeStore();
-    store.dispatch({ type: 'construction/removePoint', payload: 'pt-1' });
-
-    const confirmation = getPendingConfirmation(store);
-    expect(confirmation).not.toBeNull();
-    expect(confirmation!.source).toBe('middleware');
-    expect(confirmation!.title).toBe('Remove Construction Point');
-    expect(confirmation!.destructive).toBe(true);
-    expect(confirmation!.reduxAction).toEqual({
-      type: 'construction/removePoint',
-      payload: 'pt-1',
-    });
-  });
-
-  it('includes non-empty consequences array in confirmation', () => {
-    const store = makeStore();
+    store.dispatch(setConfirmOverride({ operation: 'removePiece', value: 'always' }));
     store.dispatch({ type: 'project/removePiece', payload: 'piece-1' });
 
     const confirmation = getPendingConfirmation(store);
@@ -137,11 +132,8 @@ describe('confirmationMiddleware', () => {
     expect(confirmation!.consequences.length).toBeGreaterThan(0);
   });
 
-  // ── Blocked actions do not mutate state ──────────────────────────────────
-
-  it('does NOT dispatch removePiece to project reducer when blocked', () => {
+  it("override 'always' blocks the action from reaching the reducer", () => {
     const store = makeStore();
-    // Add a piece first using a raw payload that project reducer understands
     store.dispatch({
       type: 'project/restoreState',
       payload: {
@@ -156,83 +148,25 @@ describe('confirmationMiddleware', () => {
       },
     });
 
+    store.dispatch(setConfirmOverride({ operation: 'removePiece', value: 'always' }));
     store.dispatch({ type: 'project/removePiece', payload: 'p1' });
 
     // Piece should still be present — action was blocked
     expect(store.getState().project.pieces).toHaveLength(1);
   });
 
-  // ── Expert mode: destructive actions pass through ─────────────────────────
+  // ── Override 'never': always passes through ─────────────────────────────
 
-  it('passes through removePiece in expert mode without modal', () => {
-    const store = makeStore(true /* expertMode */);
-    store.dispatch({ type: 'project/removePiece', payload: 'piece-1' });
-    expect(getPendingConfirmation(store)).toBeNull();
-  });
-
-  it('passes through removeSeam in expert mode without modal', () => {
-    const store = makeStore(true);
-    store.dispatch({ type: 'project/removeSeam', payload: 'seam-1' });
-    expect(getPendingConfirmation(store)).toBeNull();
-  });
-
-  it('passes through construction/removePoint in expert mode without modal', () => {
-    const store = makeStore(true);
-    store.dispatch({ type: 'construction/removePoint', payload: 'pt-1' });
-    expect(getPendingConfirmation(store)).toBeNull();
-  });
-
-  // ── Override 'always': shows modal even in expert mode ───────────────────
-
-  it("override 'always' shows confirmation even in expert mode", () => {
-    const store = makeStore(true /* expertMode */);
-    store.dispatch(setConfirmOverride({ operation: 'removePiece', value: 'always' }));
-    store.dispatch({ type: 'project/removePiece', payload: 'piece-1' });
-
-    const confirmation = getPendingConfirmation(store);
-    expect(confirmation).not.toBeNull();
-    expect(confirmation!.source).toBe('middleware');
-  });
-
-  it("override 'always' shows confirmation in normal mode too", () => {
-    const store = makeStore();
-    store.dispatch(setConfirmOverride({ operation: 'removeSeam', value: 'always' }));
-    store.dispatch({ type: 'project/removeSeam', payload: 'seam-1' });
-
-    expect(getPendingConfirmation(store)).not.toBeNull();
-  });
-
-  // ── Override 'never': passes through even in normal mode ─────────────────
-
-  it("override 'never' passes through in normal mode without modal", () => {
+  it("override 'never' passes through without modal", () => {
     const store = makeStore();
     store.dispatch(setConfirmOverride({ operation: 'removePiece', value: 'never' }));
     store.dispatch({ type: 'project/removePiece', payload: 'piece-1' });
-
-    expect(getPendingConfirmation(store)).toBeNull();
-  });
-
-  it("override 'never' passes through in expert mode without modal", () => {
-    const store = makeStore(true);
-    store.dispatch(setConfirmOverride({ operation: 'removePoint', value: 'never' }));
-    store.dispatch({ type: 'construction/removePoint', payload: 'pt-1' });
-
     expect(getPendingConfirmation(store)).toBeNull();
   });
 
   // ── meta.skipConfirmation bypass ─────────────────────────────────────────
 
-  it('passes through when meta.skipConfirmation is true (normal mode)', () => {
-    const store = makeStore();
-    store.dispatch({
-      type: 'project/removePiece',
-      payload: 'piece-1',
-      meta: { skipConfirmation: true },
-    });
-    expect(getPendingConfirmation(store)).toBeNull();
-  });
-
-  it('passes through when meta.skipConfirmation is true (override always)', () => {
+  it('meta.skipConfirmation bypasses even override always', () => {
     const store = makeStore();
     store.dispatch(setConfirmOverride({ operation: 'removePiece', value: 'always' }));
     store.dispatch({
