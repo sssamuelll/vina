@@ -55,6 +55,7 @@ import { tools as referenceImageToolDefs } from './definitions/referenceImageToo
 import { tools as dxfToolDefs } from './definitions/dxfTools';
 import { tools as placementRuleToolDefs } from './definitions/placementRuleTools';
 import { tools as bomToolDefs } from './definitions/bomTools';
+import { tools as trimToolDefs } from './definitions/trimTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -387,6 +388,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   dxfToolDefs,
   placementRuleToolDefs,
   bomToolDefs,
+  trimToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

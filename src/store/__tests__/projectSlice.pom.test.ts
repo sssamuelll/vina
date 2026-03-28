@@ -18,7 +18,7 @@ function makePOM(id: string, overrides: Partial<PointOfMeasure> = {}): PointOfMe
 
 function baseState(overrides: Record<string, any> = {}) {
   return {
-    id: 'test', name: 'Test', pieces: [] as any[], seams: [], pleats: [], elastics: [], fabrics: [],
+    id: 'test', name: 'Test', pieces: [] as any[], seams: [], pleats: [], elastics: [], trims: [], fabrics: [],
     avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} } as any,
     avatarMode: 'model' as const, avatarModelUrl: null, isDirty: false,
     arrangementOverrides: {}, groups: [], seamGroups: [], poms: [] as PointOfMeasure[],

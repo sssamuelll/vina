@@ -8,6 +8,7 @@
  */
 
 import type { PieceGroup, ReferenceImage } from '../types/types';
+import type { Trim } from '../types/trim';
 import { OpenCloProject } from '../types/types';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 
@@ -24,6 +25,7 @@ interface ProjectState {
   groups?: PieceGroup[];
   garmentInfo?: import('../types/types').GarmentInfo;
   referenceImages?: ReferenceImage[];
+  trims?: Trim[];
 }
 
 // ─── Serialization ──────────────────────────────────────────────────────────
@@ -66,6 +68,7 @@ function stateToProject(state: ProjectState): Record<string, unknown> {
     groups: state.groups ?? [],
     garmentInfo: state.garmentInfo || {},
     referenceImages: state.referenceImages ?? [],
+    trims: state.trims ?? [],
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };

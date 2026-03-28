@@ -525,6 +525,8 @@ export interface OpenCloProject {
   garmentInfo?: GarmentInfo;
   /** Reference images for 2D tracing (optional for backward compat) */
   referenceImages?: ReferenceImage[];
+  /** Trim placements (optional for backward compat) */
+  trims?: import('./trim').Trim[];
   /** Base64-encoded image blobs keyed by imageId (present in .openclo.json files only) */
   referenceImageData?: Record<string, string>;
   createdAt: number;
