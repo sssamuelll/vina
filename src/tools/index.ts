@@ -37,6 +37,7 @@ import { handTool } from './definitions/hand';
 import { zoomTool } from './definitions/zoom';
 import { cameraTool } from './definitions/camera';
 import { edit3dTool } from './definitions/edit3d';
+import { sew3dTool } from './definitions/sew3d';
 // pose tool removed — pose controls are inside AvatarPanel
 import { avatarTool } from './definitions/avatar';
 import { tapeMeasureCircTool, tapeMeasureLinearTool } from './definitions/avatarTape';
@@ -131,6 +132,7 @@ const allTools = [
   
   // 3D Tools — Editing
   edit3dTool,
+  sew3dTool,
   
   // 3D Tools — Avatar (pose is inside AvatarPanel)
   avatarTool,
