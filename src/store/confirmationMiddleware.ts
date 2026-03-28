@@ -40,28 +40,22 @@ function getTitle(type: string, payload: unknown): string {
 function getConsequences(type: string, payload: unknown): string[] {
   if (type === 'removePieces' && Array.isArray(payload) && payload.length > 1) {
     return [
-      `${payload.length} pattern pieces will be permanently deleted.`,
-      'All seams attached to these pieces will also be removed.',
-      'This action cannot be undone without using undo history.',
+      `${payload.length} pattern pieces will be deleted.`,
+      'All seams and trims attached to these pieces will also be removed.',
     ];
   }
   const CONSEQUENCES: Record<string, string[]> = {
     removePiece: [
-      'The pattern piece will be permanently deleted.',
-      'Any seams attached to this piece will also be removed.',
-      'This action cannot be undone without using undo history.',
+      'Any seams and trims attached to this piece will also be removed.',
     ],
     removeSeam: [
-      'The seam connection between pieces will be permanently deleted.',
-      'This action cannot be undone without using undo history.',
+      'The seam connection between pieces will be removed.',
     ],
     removePoint: [
-      'The construction point will be permanently deleted.',
       'Any lines or curves that reference this point may break.',
-      'This action cannot be undone without using undo history.',
     ],
   };
-  return CONSEQUENCES[type] ?? ['This action is permanent.'];
+  return CONSEQUENCES[type] ?? [];
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -143,13 +137,11 @@ export function createConfirmationMiddleware(): Middleware {
       // Allow caller to bypass the guard (e.g. when the user already confirmed)
       if (!action.meta?.skipConfirmation) {
         const state = storeApi.getState() as StoreState;
-        const workflow = state.workflow;
-        const expertMode = workflow?.expertMode ?? false;
-        const override = workflow?.confirmOverrides?.[opName] ?? 'default';
+        const override = state.workflow?.confirmOverrides?.[opName] ?? 'default';
 
-        const shouldConfirm =
-          override === 'always' ||
-          (override === 'default' && !expertMode);
+        // All "destructive" actions are undoable (Ctrl+Z), so don't confirm
+        // by default. Only confirm if the user explicitly set override to 'always'.
+        const shouldConfirm = override === 'always';
 
         if (shouldConfirm) {
           // Block the action and show the confirmation dialog instead
@@ -157,7 +149,7 @@ export function createConfirmationMiddleware(): Middleware {
             showConfirmation({
               source: 'middleware',
               title: getTitle(opName, action.payload),
-              description: `This action will ${opName}. Please confirm you want to proceed.`,
+              description: 'Please confirm you want to proceed.',
               consequences: getConsequences(opName, action.payload),
               destructive: true,
               reduxAction: { type: action.type, payload: action.payload },

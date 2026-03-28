@@ -86,7 +86,7 @@ export default function CopilotConfirmDialog({ onConfirm, onDismiss }: CopilotCo
 
         {confirmation.destructive && (
           <p className="copilot-confirm-warning">
-            This action cannot be undone.
+            You can undo this with Ctrl+Z.
           </p>
         )}
 
