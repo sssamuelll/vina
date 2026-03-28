@@ -4,8 +4,7 @@ import { RootState } from '../../store';
 import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule } from '../../store/projectSlice';
 import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
-import type { NotchShape, NotchOptions, InterfacingType } from '../../types/types';
-import type { PatternPiece } from '../../types/types';
+import type { NotchShape, NotchOptions, InterfacingType, PatternPiece, PlacementRule, PlacementRuleType } from '../../types/types';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import { ANNOTATION_TEMPLATES, annotationId, sanitizeAnnotationText } from '../../utils/annotationTemplates';
 import PropertySection from './PropertySection';
@@ -247,8 +246,8 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       <div className="panel-field" style={{ gap: 4 }}>
         <select className="panel-input" style={{ flex: 1 }} value="" onChange={e => {
           if (!e.target.value) return;
-          const type = e.target.value as any;
-          const rule: any = { type };
+          const type = e.target.value as PlacementRuleType;
+          const rule: PlacementRule = { type };
           if (type === 'priority') rule.value = 1;
           if (type === 'grainTilt') rule.value = 5;
           if (type === 'minDistance') rule.value = 10;

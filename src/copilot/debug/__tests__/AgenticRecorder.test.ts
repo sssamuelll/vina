@@ -187,4 +187,17 @@ describe('AgenticRecorder', () => {
     const record = recorder.finalize('done', true);
     expect(record.turns).toHaveLength(0);
   });
+
+  it('ignores turn-scoped records when no turn is active', () => {
+    recorder.start('idle');
+    recorder.recordLLMResponse('draft', undefined, [], undefined, 10);
+    recorder.recordTurnToolResult('noop', {}, { ok: true }, 1, false, 'ignored');
+    recorder.endTurn();
+
+    const record = recorder.finalize('done', true);
+    expect(record.turns).toHaveLength(0);
+    expect(record.toolCalls).toHaveLength(1);
+    expect(record.toolCalls[0].name).toBe('noop');
+    expect(record.toolCalls[0]).not.toHaveProperty('error');
+  });
 });

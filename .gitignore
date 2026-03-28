@@ -19,3 +19,11 @@ coverage/
 copyclip_metrics.jsonl
 snapshot-*.md
 screenshots/
+.claude/
+scripts/deploy.sh
+tiny-piece.patch
+bom-e2e-test.png
+test-*.png
+pr*.png
+docs/specs/APPLICATION-AUDIT-*.md
+docs/superpowers/

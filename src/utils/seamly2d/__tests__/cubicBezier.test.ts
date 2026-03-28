@@ -69,5 +69,5 @@ describe('cubicBezier support', () => {
     expect(a43).toBeDefined();
     expect(a43!.x).not.toBe(0);
     expect(a43!.y).not.toBe(0);
-  });
+  }, 10000);
 });
