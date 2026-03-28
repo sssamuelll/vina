@@ -20,6 +20,9 @@ copyclip_metrics.jsonl
 snapshot-*.md
 screenshots/
 .claude/
+.github/
+.husky/
+CLAUDE.md
 scripts/deploy.sh
 tiny-piece.patch
 bom-e2e-test.png
