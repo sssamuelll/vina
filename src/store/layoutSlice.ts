@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
-export type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector' | 'poms';
+export type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector' | 'poms' | 'bom';
 
 export interface LayoutState {
   /** Where the copilot panel lives */

@@ -18,6 +18,7 @@ import renderSettingsReducer from './renderSettingsSlice';
 import animationReducer from './animationSlice';
 import workflowReducer, { loadWorkflow, rehydrateWorkflow } from './workflowSlice';
 import inspectorReducer from './inspectorSlice';
+import bomReducer from './bomSlice';
 import { createConfirmationMiddleware } from './confirmationMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
@@ -45,6 +46,7 @@ export const store = configureStore({
     animation: animationReducer,
     workflow: workflowReducer,
     inspector: inspectorReducer,
+    bom: bomReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

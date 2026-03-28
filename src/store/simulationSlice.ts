@@ -11,6 +11,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
 import type { FitMapMode, FitMapConfig, FitMapStats } from '../utils/cloth/fitMaps';
 import type { SimulationMode } from '../utils/cloth/gpu/qualityPresets';
+import { DEFAULT_UV_TRANSFORM } from '../utils/defaults';
 
 /** Simulation lifecycle state. */
 export type SimulationState = 'idle' | 'running' | 'paused';

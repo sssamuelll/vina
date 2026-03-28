@@ -124,7 +124,7 @@ function simulationLoop(): void {
 /**
  * Handle messages from the main thread.
  */
-self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
+self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
   const msg = event.data;
 
   try {
@@ -208,7 +208,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
         }
 
         // Apply per-piece pressure (inflation)
-        const pressures = msg.pieces.map((p: { pressurePa?: number }) => p.pressurePa ?? 0);
+        const pressures = msg.pieces.map(p => (p as { pressurePa?: number }).pressurePa ?? 0);
         const hasPressure = pressures.some((p: number) => p > 0);
         if (hasPressure && merged.pieces) {
           solver.setPiecePressures(merged.pieces, pressures);
@@ -224,7 +224,7 @@ self.onmessage = (event: MessageEvent<WorkerInMessage>) => {
               pieceInternals.set(p.pieceId, p.internals);
             }
           }
-          const foldSpecs = buildFoldConstraints(pieceInternals, outlines, merged);
+          const foldSpecs = buildFoldConstraints(pieceInternals, outlines as Map<string, import('../../types/types').PathCommand[]>, merged);
           if (foldSpecs.length > 0) {
             solver.setFoldConstraints(foldSpecs);
             console.log(`[ClothWorker] Applied ${foldSpecs.length} fold constraints`);

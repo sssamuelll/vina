@@ -54,6 +54,7 @@ import { tools as elasticToolDefs } from './definitions/elasticTools';
 import { tools as referenceImageToolDefs } from './definitions/referenceImageTools';
 import { tools as dxfToolDefs } from './definitions/dxfTools';
 import { tools as placementRuleToolDefs } from './definitions/placementRuleTools';
+import { tools as bomToolDefs } from './definitions/bomTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -385,6 +386,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   referenceImageToolDefs,
   dxfToolDefs,
   placementRuleToolDefs,
+  bomToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;

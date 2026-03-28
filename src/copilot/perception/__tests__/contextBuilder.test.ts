@@ -153,6 +153,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       xrayMode: false,
       xrayActiveLayer: null,
       xrayOpacitySnapshot: null,
+      piecePressures: {},
     },
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
@@ -303,6 +304,12 @@ function mockState(overrides?: Partial<RootState>): RootState {
       agentStreaming: false,
       agentError: null,
       unresolvedCount: 0,
+    },
+    bom: {
+      entries: [],
+      currency: 'USD',
+      lastExtractedAt: null,
+      extractedProjectVersion: null,
     },
   };
 
