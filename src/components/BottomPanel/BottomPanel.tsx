@@ -10,6 +10,7 @@ import InspectorTab from './InspectorTab';
 import POMPanel from './POMPanel';
 import BOMTab from './BOMTab';
 import NestingTab from './NestingTab';
+import GradingTab from './GradingTab';
 import './BottomPanel.css';
 
 interface BottomPanelProps {
@@ -30,6 +31,7 @@ function buildTabs(problemCount: number, unresolvedCount: number): { id: BottomT
     { id: 'inspector', label: unresolvedCount > 0 ? `Inspector (${unresolvedCount})` : 'Inspector' },
     { id: 'poms', label: 'POMs' },
     { id: 'bom', label: 'BOM' },
+    { id: 'grading', label: 'Grading' },
   ];
 }
 
@@ -198,6 +200,7 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
           {activeTab === 'inspector' && <InspectorTab />}
           {activeTab === 'poms' && <POMPanel />}
           {activeTab === 'bom' && <BOMTab />}
+          {activeTab === 'grading' && <GradingTab />}
         </div>
       </div>
     </div>

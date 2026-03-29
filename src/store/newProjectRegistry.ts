@@ -31,6 +31,7 @@ export const SLICES_THAT_RESET: readonly string[] = [
   'workflowSlice', // partial reset: clears toolMemory, preserves expertMode/confirmOverrides
   'bomSlice',
   'nestingSlice',
+  'gradingSlice',
 ];
 
 /**
