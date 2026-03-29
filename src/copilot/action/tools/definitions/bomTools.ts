@@ -46,9 +46,9 @@ const refreshBOMTool: ToolDefinition = {
   },
   execute: async (_params, dispatch, getState): Promise<ToolResult> => {
     const state = getState();
-    const { pieces, fabrics, seams, elastics } = state.project;
+    const { pieces, fabrics, seams, elastics, trims } = state.project;
 
-    const entries = extractAll(pieces, fabrics, seams, elastics);
+    const entries = extractAll(pieces, fabrics, seams, elastics, trims);
     const projectVersion = Date.now();
 
     dispatch(populateBOM({ entries, projectVersion }));

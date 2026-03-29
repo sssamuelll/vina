@@ -6,7 +6,6 @@ import {
   extractThread,
   extractSeamTape,
   extractElastics,
-  extractTrims,
   extractAll,
 } from '../bomExtractor';
 
@@ -319,14 +318,6 @@ describe('extractElastics', () => {
     const types = entries.map((e) => e.name);
     expect(types.some((t) => t.includes('band'))).toBe(true);
     expect(types.some((t) => t.includes('shirring'))).toBe(true);
-  });
-});
-
-// ─── extractTrims ───
-
-describe('extractTrims', () => {
-  it('returns empty array (stub)', () => {
-    expect(extractTrims()).toEqual([]);
   });
 });
 
