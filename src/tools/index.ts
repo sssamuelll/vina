@@ -51,6 +51,7 @@ import { mirrorTool } from './definitions/mirror';
 import { traceTool } from './definitions/trace';
 import { autoTraceTool } from './definitions/autoTrace';
 import { freeSewingTool } from './definitions/freeSewing';
+import { trimPlaceTool } from './definitions/trimPlace';
 import { arrangementTool } from './definitions/arrangement';
 import { pinTool } from './definitions/pin';
 import { simulateTool } from './definitions/simulate';
@@ -107,7 +108,8 @@ const allTools = [
   elasticTool,
   pleatTool,
   freeSewingTool,
-  
+  trimPlaceTool,
+
   // 2D Tools — Annotation
   notchTool,
   grainlineTool,
