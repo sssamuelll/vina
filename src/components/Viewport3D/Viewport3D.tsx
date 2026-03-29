@@ -1,4 +1,4 @@
-import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback } from 'react';
+import { Component, Suspense, type ReactNode, useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, ContactShadows } from '@react-three/drei';
 import FloorGrid from './FloorGrid';
@@ -33,6 +33,7 @@ import AnchorPoints from './AnchorPoints';
 import AvatarTapes from './AvatarTapes';
 import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
+import Sew3DTool from './Sew3DTool';
 import { WindGizmo } from './WindGizmo';
 import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
@@ -150,6 +151,12 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
   const isArrangeMode = viewMode3D === 'arrange';
   const { handleAvatarClick, isTapeTool } = useAvatarTape(activeTool3D);
   useColorwaySync();
+
+  // Compute placements once — shared by DraggablePiece and Sew3DTool
+  const garmentPlacements = useMemo(
+    () => placeGarmentPieces(pieces, avatar.measurements),
+    [pieces, avatar.measurements],
+  );
 
   const simRef = useRef<GarmentSimulationHandle>(null);
   const cameraMode = activeTool3D === 'camera';
@@ -656,9 +663,7 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
             <GarmentSimulation ref={simRef} pieces={pieces} seams={seams} onFitMapStats={setFitMapStats} onInspect={setInspectedValue} />
           </SimulationErrorBoundary>
         ) : (
-          (() => {
-            const placements = placeGarmentPieces(pieces, avatar.measurements);
-            return pieces.map((piece, i) => {
+          pieces.map((piece, i) => {
               if (hiddenPieceIds.includes(piece.id)) return null;
               const baseFabricId = pieceFabrics[piece.id] || defaultFabricId;
               const baseFabric = FABRIC_LIBRARY[baseFabricId];
@@ -676,8 +681,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 piece={piece}
                 isSelected={selectedPieceIds.includes(piece.id)}
                 color={PIECE_COLORS[i % PIECE_COLORS.length]}
-                position={placements[i].position}
-                rotation={placements[i].rotation}
+                position={garmentPlacements[i].position}
+                rotation={garmentPlacements[i].rotation}
                 arrangementOverride={arrangementOverrides[piece.id]}
                 flippedPieceIds={flippedPieceIds}
                 canDrag={isArrangeMode}
@@ -687,9 +692,18 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
                 fabricColor={resolved.color}
                 fabricRoughness={fabric?.roughness}
               />
-            ); });
-          })()
+            ); })
         ))}
+
+        {/* 3D Sew Tool — click two edges to create a seam */}
+        {activeTool3D === 'sew3d' && !useClothSim && (
+          <Sew3DTool
+            pieces={pieces}
+            placements={garmentPlacements}
+            arrangementOverrides={arrangementOverrides}
+            flippedPieceIds={flippedPieceIds}
+          />
+        )}
 
         {/* ContactShadows uses a custom ShaderMaterial incompatible with NodeMaterial */}
         {!nodeMaterialActive && (
