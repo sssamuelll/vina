@@ -2,6 +2,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
+import type { PieceArtwork } from '../types/artwork';
 import { NEW_PROJECT } from './actions';
 import { validateAndRepairProject } from '../utils/projectValidator';
 import { generatePleatFoldLines } from '../utils/pleatGeometry';
@@ -640,6 +641,38 @@ const projectSlice = createSlice({
       state.isDirty = true;
     },
 
+    // ─── Artworks ───
+    addArtwork(state, action: PayloadAction<{ pieceId: string; artwork: PieceArtwork }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece) return;
+      const { artwork } = action.payload;
+      if (artwork.width <= 0 || artwork.height <= 0) return;
+      if (!piece.artworks) piece.artworks = [];
+      piece.artworks.push({
+        ...artwork,
+        opacity: Math.max(0, Math.min(1, artwork.opacity)),
+      });
+      state.isDirty = true;
+    },
+    updateArtwork(state, action: PayloadAction<{ pieceId: string; artworkId: string; changes: Partial<PieceArtwork> }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece?.artworks) return;
+      const idx = piece.artworks.findIndex(a => a.id === action.payload.artworkId);
+      if (idx === -1) return;
+      const changes = { ...action.payload.changes };
+      if (changes.width !== undefined && changes.width <= 0) return;
+      if (changes.height !== undefined && changes.height <= 0) return;
+      if (changes.opacity !== undefined) changes.opacity = Math.max(0, Math.min(1, changes.opacity));
+      piece.artworks[idx] = { ...piece.artworks[idx], ...changes };
+      state.isDirty = true;
+    },
+    removeArtwork(state, action: PayloadAction<{ pieceId: string; artworkId: string }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (!piece?.artworks) return;
+      piece.artworks = piece.artworks.filter(a => a.id !== action.payload.artworkId);
+      state.isDirty = true;
+    },
+
     // ─── Points of Measure (POM) ───
     addPOM(state, action: PayloadAction<PointOfMeasure>) {
       state.poms.push(action.payload);
@@ -1172,6 +1205,8 @@ export const {
   addPleat, removePleat, updatePleat,
   addElastic, removeElastic, updateElastic,
   addTrim, removeTrim, updateTrim,
+  // Artworks
+  addArtwork, updateArtwork, removeArtwork,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,

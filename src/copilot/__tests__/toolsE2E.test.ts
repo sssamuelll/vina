@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 226 tools registered', () => {
-      expect(registry.size).toBe(226); // 213 + 8 BOM + 5 trim
+    it('has 229 tools registered', () => {
+      expect(registry.size).toBe(229); // 213 + 8 BOM + 5 trim + 3 artwork
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(226); // 213 + 8 BOM + 5 trim
+      expect(names.length).toBe(229); // 213 + 8 BOM + 5 trim + 3 artwork
 
       // Key tools from every category
       const expected = [
@@ -432,6 +432,7 @@ describe('Tools E2E', () => {
         'refreshBOM', 'addBOMEntry', 'updateBOMEntry', 'removeBOMEntry',
         'setBOMCurrency', 'getBOM', 'getBOMCost', 'exportBOMCSV',
         'addTrim', 'removeTrim', 'updateTrim', 'listTrims', 'listTrimPresets',
+        'addArtwork', 'updateArtwork', 'removeArtwork',
       ];
       for (const name of expected) {
         expect(names).toContain(name);
