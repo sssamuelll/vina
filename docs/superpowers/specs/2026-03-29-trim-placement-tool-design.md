@@ -278,6 +278,10 @@ Resolves a parametric `t` (0–1) to an (x, y) position and tangent direction on
 4. Walk to `t * totalLength`, interpolating on the active segment (line or cubic bezier)
 5. Return point + tangent vector
 
+### Path representation consistency (diagnostic #1–2)
+
+Both `interpolateEdgePoint` and the distribute mode's edge length computation must use the same path representation. Use the same `flattenPath` + index approach as `edgeLengthMM` in the BOM extractor (`src/utils/export/bomExtractor.ts`). This is a known systemic `segmentRange` ambiguity shared with seam assembly, BOM extraction, and elastic assembly — this spec inherits it consistently rather than introducing a divergent interpretation.
+
 ---
 
 ## 9. Files Created / Modified
