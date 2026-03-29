@@ -1,0 +1,114 @@
+/* ─── Nesting Tab ────────────────────────────────────────────────────────── */
+
+.nesting-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+/* ─── Toolbar ────────────────────────────────────────────────────────────── */
+
+.nesting-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.nesting-toolbar button {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.nesting-toolbar button:hover {
+  background: var(--button-hover-bg, #3a3a3a);
+}
+
+.nesting-toolbar select {
+  font-size: 11px;
+  padding: 3px 6px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.nesting-toolbar label {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  white-space: nowrap;
+}
+
+.nesting-toolbar input[type='number'] {
+  width: 50px;
+  font-size: 11px;
+  padding: 2px 4px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.nesting-toolbar input[type='number']:focus {
+  border-color: var(--accent-color, #3b82f6);
+  outline: none;
+}
+
+/* ─── Stats ──────────────────────────────────────────────────────────────── */
+
+.nesting-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+}
+
+.nesting-stat {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  white-space: nowrap;
+}
+
+.nesting-stat strong {
+  color: var(--text-color, #ccc);
+  font-weight: 600;
+}
+
+/* ─── Canvas Container ───────────────────────────────────────────────────── */
+
+.nesting-canvas-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.nesting-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ─── Empty State ────────────────────────────────────────────────────────── */
+
+.nesting-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #999);
+  height: 100%;
+  padding: 20px;
+  text-align: center;
+}

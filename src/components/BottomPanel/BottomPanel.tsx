@@ -9,6 +9,7 @@ import Timeline from '../Timeline/Timeline';
 import InspectorTab from './InspectorTab';
 import POMPanel from './POMPanel';
 import BOMTab from './BOMTab';
+import NestingTab from './NestingTab';
 import './BottomPanel.css';
 
 interface BottomPanelProps {
@@ -192,11 +193,7 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
               <span>Output log</span>
             </div>
           )}
-          {activeTab === 'nesting-preview' && (
-            <div className="bottom-panel-pane bottom-panel-placeholder">
-              <span>Nesting preview will appear here</span>
-            </div>
-          )}
+          {activeTab === 'nesting-preview' && <NestingTab />}
           {activeTab === 'timeline' && <Timeline />}
           {activeTab === 'inspector' && <InspectorTab />}
           {activeTab === 'poms' && <POMPanel />}
