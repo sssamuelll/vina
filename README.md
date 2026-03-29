@@ -5,79 +5,84 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](tsconfig.json)
 [![WebGPU](https://img.shields.io/badge/WebGPU-TSL-6B4BFF?logo=webgpu&logoColor=white)](src/utils/cloth/gpu)
 [![Rust](https://img.shields.io/badge/Rust-WASM-DEA584?logo=rust&logoColor=white)](crates/xpbd-wasm)
-[![Tests](https://img.shields.io/badge/Tests-4232_passing-success?logo=vitest&logoColor=white)](tests/)
-[![Tools](https://img.shields.io/badge/Copilot_Tools-213-8B5CF6?logo=openai&logoColor=white)](src/copilot/action/tools/)
+[![Tests](https://img.shields.io/badge/Tests-4436_passing-success?logo=vitest&logoColor=white)](tests/)
+[![Tools](https://img.shields.io/badge/Copilot_Tools-231-8B5CF6?logo=openai&logoColor=white)](src/copilot/action/tools/)
 
 **The Cognitive Design Engine for Collaborative Fashion Engineering.**
 
-> **Status (March 27, 2026):** Released **v0.9.0** — Seam system overhaul (pieces now sew together), **Pressure Simulation** for puffer jackets, **XPBD Fold Constraints** for pleats, **Colorway UI**, **Pre-Marking Rules** for nesting, **213 copilot tools**, and all audit findings resolved. See our [Changelog](CHANGELOG.md) and [Roadmap](ROADMAP.md).
+> **Status (March 29, 2026):** Released **v0.10.0** — Full production pipeline from paper to factory. **Auto-Trace** converts scanned patterns to digital pieces. **3D Sewing Tool** lets you click edges to create seams. **Nesting** calculates fabric consumption. **BOM + Tech Pack** exports industry-standard production spec sheets. **Grading** scales patterns across sizes. **RAG-powered copilot** retrieves pattern-making knowledge before every interaction. See our [Changelog](CHANGELOG.md).
 
-OpenClo.ai is a high-performance, browser-based ecosystem that transcends traditional CAD. It combines a **Semantic Garment Engine** with an autonomous **Situated AI Copilot** and **Next-Gen WebGPU Physics** to provide a professional-grade environment for garment construction, grading, and 3D validation.
+OpenClo.ai is a browser-based garment CAD that combines a **Semantic Garment Engine** with a **Knowledge-Grounded AI Copilot** and **WebGPU Physics** to provide a complete design-to-production environment. No plugins. No installs. Just open your browser.
 
 **[Launch Workspace](https://openclo.sdar.dev)**
 
 ![OpenClo.ai Interface](docs/screenshots/editor.png)
 
-## 🚀 Recent Milestones (v0.9.0)
-- **Seam System Overhaul**: Pieces actually sew together. Color-coded pairs, curved edge rendering, type-specific line styles, shrinkage/gathering control.
-- **Pressure Simulation**: Internal inflation for puffer jackets, balloon sleeves, padded quilting.
-- **XPBD Fold Constraints**: 3D pleat/crease simulation — fold lines create angular constraints in the solver.
-- **Colorway Support**: Tab bar UI, per-fabricCode color overrides, 2D piece tinting, Gerber-compatible export.
-- **Pre-Marking Rules**: Production nesting constraints (atFold, atEdge, priority, grainTilt) integrated into the nesting engine.
-- **Undo Batch Grouping**: `batchUndo()` wraps N dispatches as a single undo entry — systemic fix for partial undo.
-- **213 Copilot Tools**: Every feature registered for AI agent access with rollback support.
-- **Elastic Tool**: Waistbands, cuffs, gathered edges with stretchRatio control and simulation integration.
-- **Slash and Spread**: Cut and spread/rotate for fullness with 8-phase geometric pipeline.
-- **All Audit Findings Resolved**: 15 original findings (2 BLOCKER, 5 HIGH, 6 MEDIUM, 2 LOW) — 100% closed.
+---
 
-## Core Pillars
+## What Makes OpenClo Different
 
-### Semantic Garment Engine
-Unlike legacy tools that treat patterns as static vectors, OpenClo.ai operates on a **Semantic Graph**. Every node and edge carries anatomical meaning (e.g., *ArmholeCurve*, *ShoulderSeam*), allowing the engine to maintain structural integrity and sewing compatibility automatically during complex transformations.
+### Paper to Production in One Tool
 
-### Situated AI Agency
-Our Copilot is a **Situated Fashion Agent** powered by a unified **Agentic Loop** architecture:
-- **Semantic Pattern Recognition**: Understands garment anatomy as intuitively as a master tailor.
-- **Durable Design Memory**: Learns your aesthetic preferences, fit standards, and style history.
-- **Agentic Loop**: Unified tool-use loop with meta-tools (read-only) and action tools (mutations).
+Most garment CAD tools handle one stage — pattern drafting OR 3D simulation OR production output. OpenClo covers the full pipeline:
 
-### Next-Gen WebGPU Physics
-Powered by **TSL (Three.js Shading Language)** and a **Rust-based WASM fallback**, OpenClo.ai provides real-time, physically accurate 3D draping.
-- **Zero-copy Rendering**: Simulated positions remain in GPU memory, eliminating CPU-GPU transfer overhead.
-- **Deterministic XPBD**: Stable, production-grade simulation even under extreme stress.
-- **Interactive Gizmos**: Wind force control with 3D UI gizmos and real-time visualization.
+```
+Paper Pattern → Auto-Trace → Digital Pattern → 3D Sewing → Simulation
+    → Trims & Artwork → Grading (S-XXL) → Nesting → BOM → Tech Pack PDF
+```
+
+Every step is connected. Change a measurement and the graded sizes, nested layout, and bill of materials all update.
+
+### AI That Knows Pattern Making
+
+The copilot isn't just a chatbot with buttons. It retrieves relevant pattern-making knowledge — drafting methods from Aldrich, Müller, and Gilewska, ease standards by fabric type, grading rules — and reasons over them before acting. Ask it to "draft a fitted bodice for these measurements" and it knows which construction method to use and why.
+
+### Runs in Your Browser
+
+WebGPU physics, XPBD cloth simulation, and Rust WASM solvers — all running client-side. No server required for design work. Your patterns stay on your machine.
+
+---
 
 ## Features
 
-### Professional 2D Drafting
-- **60+ professional tools** including segment sewing, topstitch (4 modes), scissors/split, merge, mirror, elastic, slash-and-spread, pleats, and 3D mesh selection.
-- **Advanced Measurement**: Walk-seam verification with ghost piece preview, POM measurements, and curve delta/ease comparison.
-- Advanced notch management (7 types), grainline control, dart manipulation (segment + cap shaping), and annotation library.
-- **Linked editing**: Symmetric pattern propagation (instance and mirror modes).
-- **Colorways**: Per-fabricCode color overrides with tab bar UI and 2D piece tinting.
+### Design
+- **60+ 2D Tools** — Pen, scissors, merge, mirror, slash-and-spread, dart manipulation, elastic, pleats
+- **3D Sewing Tool** — Click two edges in the 3D viewport to create seams (CLO3D-style)
+- **Auto-Trace** — Canny edge detection converts scanned patterns to vector outlines
+- **Artwork Placement** — Place logos, prints, and graphics on pieces with canvas compositing
+- **Trim & Hardware** — 22-preset library (buttons, zippers, snaps, rivets, buckles), click-to-place on pieces
+- **Colorways** — Per-piece color overrides with tab bar UI and 2D/3D preview
 
-### Industrial-Grade Simulation
-- **32+ Physical Fabric Profiles** — Denim, Silk, Wool, Jersey, etc., with real-world shear/stretch data.
-- **Seam Simulation**: Pieces sew together with tension, shrinkage/gathering, and type-specific behavior.
-- **Pressure & Folds**: Internal inflation for puffer jackets + XPBD fold constraints for pleats.
-- **Interactive Tools**: Grab and pull fabric during simulation, apply steam for local relaxation.
-- **Multi-Body Collision**: Avatar + imported meshes with per-body friction and offset controls.
+### Simulation
+- **XPBD Cloth Physics** — 32 fabric presets with real-world stretch, bend, and shear data
+- **WebGPU + WASM** — GPU solver via TSL, Rust WASM fallback, zero-copy rendering
+- **Seam Simulation** — Pieces sew together with tension, gathering, and type-specific behavior
+- **Pressure & Folds** — Puffer jacket inflation, XPBD fold constraints for pleats
+- **Interactive** — Grab fabric, apply steam, control wind with 3D gizmos
 
-### Production Engines
-- **Seam Allowance**: Intelligent polygon offset with 7 corner types (mitered, envelope, square, etc.).
-- **Nesting**: High-efficiency bin packing with pre-marking placement rules (atFold, priority, grainTilt).
-- **Grading**: Algorithmic multi-size scaling (XS-XXL) based on industrial grade rules.
-- **Fabric Codes**: Production classification (SELF, LINING, INTERLINING) with DXF/AAMA export.
-- **Annotations**: 14 built-in production templates with category-colored 2D rendering and DXF export.
+### Production
+- **Grading** — Scale patterns across EU/US/UK size systems (XS-XXL) with staleness detection
+- **Nesting** — Fabric roll mode with skyline algorithm, configurable width/gap, utilization stats
+- **Bill of Materials** — Auto-extracted fabrics, interfacing, thread, seam tape, elastics, trims with cost tracking
+- **Tech Pack PDF** — Multi-page production spec sheet with 3D views, measurements, BOM, construction notes
+- **DXF/AAMA Export** — Industry-standard format with multi-size blocks and production layers
+
+### Intelligence
+- **231 Copilot Tools** — Every feature accessible via natural language
+- **RAG Knowledge Base** — 65 chunks of pattern-making knowledge retrieved per interaction
+- **Agentic Loop** — LLM drives tool execution with read-only inspection and action tools
+- **Bilingual** — English and Spanish throughout tools and UI
 
 ## Interoperability
 
-| Format | Status | Role |
-|--------|--------|------|
-| **DXF (AAMA/ASTM)** | Full (High-Fidelity) | Industrial Interop with spline and layer support |
-| **Seamly2D (.val/.vit)** | Auto-Ingest | Legacy Library Absorption |
-| **OBJ/FBX/GLB/GLTF** | Full Support | 3D Mesh & Animation Pipeline |
-| **PDF / SVG** | Export | Physical Production & Vector Assets |
+| Format | Direction | Use Case |
+|--------|-----------|----------|
+| **DXF (AAMA/ASTM)** | Import + Export | Industrial pattern exchange |
+| **Seamly2D** | Import | 18 validated parametric patterns |
+| **OBJ/FBX/GLB/GLTF** | Import + Export | 3D mesh, animation, VR/AR |
+| **PDF** | Export | 1:1 patterns, cutting layouts, tech packs |
+| **PNG/JPG/SVG** | Import | Reference images, artwork, auto-trace |
+| **CSV** | Export | Bill of materials |
 
 ## Quick Start
 
@@ -85,20 +90,21 @@ Powered by **TSL (Three.js Shading Language)** and a **Rust-based WASM fallback*
 git clone https://github.com/sssamuelll/openclo.git
 cd openclo
 npm install
-npm run dev       # Workspace at http://localhost:5180
-npm test          # Run 4,200+ tests
+npm run dev       # Workspace at http://localhost:5173
+npm test          # Run 4,400+ tests
 ```
 
 ## Project Stats
 
 | Metric | Count |
 |--------|-------|
-| TypeScript Source Files | 580+ |
-| Unit/E2E Test Files | 275+ |
-| Total Automated Tests | 4,232 |
-| Copilot Tools | 213 |
-| Total LOC | ~165,000 |
-| Development Days | 28 |
+| TypeScript Source Files | 950+ |
+| Automated Tests | 4,436 |
+| Copilot Tools | 231 |
+| Knowledge Chunks (RAG) | 65 |
+| Fabric Presets | 32 |
+| Trim Presets | 22 |
 
 ---
-**OpenClo.ai** — Democratizing Fashion Intelligence. MIT Licensed.
+
+**OpenClo.ai** — From sketch to factory floor. MIT Licensed.

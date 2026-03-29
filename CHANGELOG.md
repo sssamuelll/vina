@@ -3,7 +3,29 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.9.0] — 2026-03-27 (Current)
+## [0.10.0] — 2026-03-29 (Current)
+
+### Added
+- **Tech Pack & BOM Generation** — Auto-populated Bill of Materials extracting fabrics, interfacing, thread, seam tape, elastics, and trims from the garment project. Multi-page tech pack PDF export with 3D views, measurements, BOM table, construction notes, and colorway swatches. Per-colorway cost comparison. 8 copilot tools (#225, PR #482).
+- **Trim & Hardware Library** — 22-preset library covering buttons, zippers, snaps, rivets, buckles, rings, hook & eye, and drawstring stops. Discriminated union placement model (edge, count, point modes). Redux CRUD with full cascade on piece/edge operations. BOM extraction. 10 copilot tools (#226, PR #484, #496).
+- **3D Sewing Tool** — Click two edges in the 3D viewport to create seams (CLO3D-style). Pure edge picker using local-space proximity, compatibility checks (same-piece rejection, already-seamed detection, length mismatch warning), arrange-mode only. Three.js Line highlights (#457, PR #487).
+- **Nesting & Fabric Consumption** — Fabric roll nesting with configurable width (90/112/150cm), gap control, and production metrics. Dynamic roll length calculation. Canvas preview in the bottom panel. Utilization and waste percentage display (#235, PR #488).
+- **Auto-Trace** — Custom Canny edge detection (zero dependencies, ~280 lines). Grayscale, Gaussian blur, Sobel gradients, non-max suppression, hysteresis threshold, Moore-Neighbor contour tracing, Douglas-Peucker simplification. Web Worker for non-blocking UI. Contours sorted by area for easy selection (#430, PR #490).
+- **Single-Axis Grading** — Size grading with EU/US/UK size systems. Redux state tracking active sizes, quantities, and staleness. Dedicated Grading layer (layer 10, hidden by default). Staleness middleware detects base piece changes. batchUndo for single-step undo of grade operations (#258, PR #491, #492).
+- **Artwork Import & Placement** — Place SVG/PNG/JPG artwork on garment pieces. Canvas-based compositor overlays artwork onto fabric texture (zero shader changes). SVG bitmap dimension handling. Artwork validates width/height > 0 and clamps opacity. 3 copilot tools (#237, PR #494).
+- **RAG Knowledge Base** — 65-chunk static knowledge index covering drafting methods (Aldrich, Müller, Gilewska), ease standards, grading rules, fabric properties, and Seamly2D patterns. Client-side cosine similarity search with keyword fallback. AgenticLoop retrieves top-5 relevant chunks and injects as "Reference Materials" in the LLM system prompt (#497, #498, PR #503, #504).
+- **2D Trim Placement Tool** — Click-to-place trims on pattern pieces. Trim Library Panel with search and type grouping. SVG trim markers on 2D canvas with type-specific icons. Edge-points interpolation for edge-placed trims (#483, PR #496).
+
+### Changed
+- **Confirmation Dialogs Removed** — Delete confirmations (removePiece, removeSeam, removePoint) no longer show by default since all actions are undoable via Ctrl+Z. Users can opt back in via override system. Dialog text changed from "cannot be undone" to "You can undo this with Ctrl+Z" (PR #485).
+
+### Stats
+- 4,436 automated tests passing across 289 files.
+- 231 copilot tools registered.
+- 65 RAG knowledge chunks indexed.
+- 22 trim presets, 32 fabric presets.
+
+## [0.9.0] — 2026-03-27
 
 ### Added
 - **Seam System Overhaul** — Pieces now actually sew together in simulation. Fixed silent edge name resolution, WASM solver data passing, and shrink speed. Color-coded seam pairs, curved edge rendering, type-specific line styles (French=dashed, overlock=dash-dot), green selection glow, shrinkage/gathering slider (#451, #452, #453, #454, #455, #456, #458, #459, #460, #461, #462).
