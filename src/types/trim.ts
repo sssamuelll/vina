@@ -4,7 +4,8 @@ export type TrimType = 'button' | 'zipper' | 'snap' | 'rivet' | 'buckle' | 'ring
 /** Placement mode — discriminated union */
 export type TrimPlacement =
   | { mode: 'edge'; edgeName: string; tStart: number; tEnd: number }
-  | { mode: 'count'; quantity: number };
+  | { mode: 'count'; quantity: number }
+  | { mode: 'point'; positions: { x: number; y: number }[] };
 
 /** A trim instance attached to a pattern piece */
 export interface Trim {

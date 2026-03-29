@@ -75,6 +75,11 @@ export function extractTrims(trims: Trim[], pieces: PatternPiece[]): TrimBOMEntr
       g.lengthMM += len;
       g.pieceIds.add(trim.pieceId);
       edgeGroups.set(key, g);
+    } else if (trim.placement.mode === 'point') {
+      const g = countGroups.get(key) ?? { quantity: 0, unitCost: trim.unitCost, pieceIds: new Set(), name: trim.name, type: trim.type };
+      g.quantity += trim.placement.positions.length;
+      g.pieceIds.add(trim.pieceId);
+      countGroups.set(key, g);
     }
   }
 
