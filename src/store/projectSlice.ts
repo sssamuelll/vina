@@ -623,6 +623,9 @@ const projectSlice = createSlice({
         if (!edge) return;
         if (placement.tStart >= placement.tEnd) return;
       }
+      if (placement.mode === 'point') {
+        if (!placement.positions || placement.positions.length === 0) return;
+      }
       state.trims.push(action.payload);
       state.isDirty = true;
     },

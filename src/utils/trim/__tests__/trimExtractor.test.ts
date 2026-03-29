@@ -158,4 +158,44 @@ describe('extractTrims', () => {
     // 200mm * 0.5 = 100mm = 0.1m
     expect(result[0].quantity).toBe(0.1);
   });
+
+  it('groups point-mode trims by type+name and sums position counts', () => {
+    const pieces = [makeRectPiece('p1'), makeRectPiece('p2')];
+    const trims: Trim[] = [
+      makeTrim({ id: 't1', pieceId: 'p1', type: 'rivet', name: 'Copper Rivet', unitCost: 0.05, placement: { mode: 'point', positions: [{ x: 10, y: 20 }, { x: 30, y: 40 }, { x: 50, y: 60 }] } }),
+      makeTrim({ id: 't2', pieceId: 'p2', type: 'rivet', name: 'Copper Rivet', unitCost: 0.05, placement: { mode: 'point', positions: [{ x: 5, y: 5 }, { x: 15, y: 15 }, { x: 25, y: 25 }, { x: 35, y: 35 }] } }),
+    ];
+
+    const result = extractTrims(trims, pieces);
+    expect(result).toHaveLength(1);
+    // 3 positions + 4 positions = 7
+    expect(result[0].quantity).toBe(7);
+    expect(result[0].unit).toBe('pieces');
+    expect(result[0].name).toBe('rivet \u2014 Copper Rivet');
+    expect(result[0].sourcePieceIds).toContain('p1');
+    expect(result[0].sourcePieceIds).toContain('p2');
+  });
+
+  it('handles mixed count, edge, and point trims', () => {
+    const pieces = [makeRectPiece('p1')];
+    const trims: Trim[] = [
+      makeTrim({ id: 't1', pieceId: 'p1', type: 'button', name: 'Flat', unitCost: 0.15, placement: { mode: 'count', quantity: 5 } }),
+      makeTrim({ id: 't2', pieceId: 'p1', type: 'zipper', name: 'Metal', unitCost: 2.50, placement: { mode: 'edge', edgeName: 'bottom', tStart: 0, tEnd: 1 } }),
+      makeTrim({ id: 't3', pieceId: 'p1', type: 'rivet', name: 'Brass', unitCost: 0.10, placement: { mode: 'point', positions: [{ x: 10, y: 10 }, { x: 20, y: 20 }] } }),
+    ];
+
+    const result = extractTrims(trims, pieces);
+    expect(result).toHaveLength(3);
+
+    const countEntry = result.find(e => e.name === 'button \u2014 Flat')!;
+    expect(countEntry.unit).toBe('pieces');
+    expect(countEntry.quantity).toBe(5);
+
+    const edgeEntry = result.find(e => e.name === 'zipper \u2014 Metal')!;
+    expect(edgeEntry.unit).toBe('meters');
+
+    const pointEntry = result.find(e => e.name === 'rivet \u2014 Brass')!;
+    expect(pointEntry.unit).toBe('pieces');
+    expect(pointEntry.quantity).toBe(2);
+  });
 });

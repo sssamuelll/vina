@@ -111,6 +111,23 @@ describe('projectSlice — Trim CRUD', () => {
     expect(next.isDirty).toBe(true);
   });
 
+  it('addTrim point-mode success', () => {
+    const state = baseState({ pieces: [makePiece('p1')] });
+    const trim = makeTrim('t1', 'p1', { mode: 'point', positions: [{ x: 10, y: 20 }, { x: 30, y: 40 }] });
+    const next = reducer(state, addTrim(trim));
+    expect(next.trims).toHaveLength(1);
+    expect(next.trims[0].placement).toEqual({ mode: 'point', positions: [{ x: 10, y: 20 }, { x: 30, y: 40 }] });
+    expect(next.isDirty).toBe(true);
+  });
+
+  it('addTrim rejects point-mode with empty positions', () => {
+    const state = baseState({ pieces: [makePiece('p1')] });
+    const trim = makeTrim('t1', 'p1', { mode: 'point', positions: [] });
+    const next = reducer(state, addTrim(trim));
+    expect(next.trims).toHaveLength(0);
+    expect(next.isDirty).toBe(false);
+  });
+
   // ─── removeTrim ─────────────────────────────────────────────────────────
 
   it('removeTrim removes by ID', () => {
