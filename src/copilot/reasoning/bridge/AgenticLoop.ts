@@ -24,6 +24,8 @@ import type { MetaToolDefinition } from './meta-tools/types';
 import type { ToolRegistry } from '../../action/tools/registry';
 import type { AppDispatch, RootState } from '../../../store';
 import { buildDomainBootstrap } from './domainBootstrap';
+import { getKnowledgeStore } from '../../knowledge/KnowledgeStore';
+import type { KnowledgeSearchResult } from '../../knowledge/types';
 
 // ─── Event Types ─────────────────────────────────────────────────────────────
 
@@ -106,7 +108,9 @@ export class AgenticLoop {
   async run(userRequest: string, onEvent: AgenticEventHandler): Promise<string> {
     this.lastToolCalls = [];
 
-    const systemPrompt = this.buildSystemPrompt();
+    // Retrieve relevant knowledge for this request
+    const knowledge = await this.retrieveKnowledge(userRequest);
+    const systemPrompt = this.buildSystemPrompt(knowledge);
     const allToolDefs = this.buildAllToolDefs();
 
     const messages: ChatMessage[] = [
@@ -215,10 +219,38 @@ export class AgenticLoop {
   }
 
   /**
-   * Build the system prompt combining domain knowledge and tool descriptions.
+   * Retrieve relevant knowledge chunks for the user's request.
+   * Uses keyword search (v1) -- embedding search added when embeddings are computed.
    */
-  private buildSystemPrompt(): string {
+  private async retrieveKnowledge(userRequest: string): Promise<KnowledgeSearchResult[]> {
+    try {
+      const store = getKnowledgeStore();
+      return await store.search(userRequest, undefined, 5);
+    } catch {
+      // Knowledge retrieval is optional — don't block the loop on failure
+      return [];
+    }
+  }
+
+  /**
+   * Build the system prompt combining domain knowledge, retrieved knowledge,
+   * and tool descriptions.
+   */
+  private buildSystemPrompt(knowledge: KnowledgeSearchResult[] = []): string {
     const domain = buildDomainBootstrap();
+
+    // Build knowledge context from retrieved chunks
+    let knowledgeSection = '';
+    if (knowledge.length > 0) {
+      const chunks = knowledge
+        .map((r, i) => {
+          const meta = r.chunk.metadata;
+          const source = meta.sourceRef || meta.source;
+          return `[${i + 1}] (${meta.category}, source: ${source})\n${r.chunk.content}`;
+        })
+        .join('\n\n');
+      knowledgeSection = `\n\n## Reference Materials\nThe following pattern-making knowledge may be relevant to this request. Use it to inform your approach.\n\n${chunks}`;
+    }
 
     const metaToolList = Array.from(this.metaTools.values())
       .map((t) => `- **${t.name}** (read-only): ${t.description}`)
@@ -228,7 +260,7 @@ export class AgenticLoop {
       .map((t) => `- **${t.name}**: ${t.description}`)
       .join('\n');
 
-    return `${domain}
+    return `${domain}${knowledgeSection}
 
 ## Read-Only Tools (inspect garment state)
 ${metaToolList || 'None'}
