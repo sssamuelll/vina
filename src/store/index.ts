@@ -20,10 +20,12 @@ import workflowReducer, { loadWorkflow, rehydrateWorkflow } from './workflowSlic
 import inspectorReducer from './inspectorSlice';
 import bomReducer from './bomSlice';
 import nestingReducer from './nestingSlice';
+import gradingReducer from './gradingSlice';
 import { createConfirmationMiddleware } from './confirmationMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { createReactiveSolverMiddleware } from './reactiveSolverMiddleware';
+import { gradingStalenessMiddleware } from './gradingStalenessMiddleware';
 import { BUILTIN_BLUEPRINTS } from '../utils/construction/blueprints';
 
 export const store = configureStore({
@@ -49,6 +51,7 @@ export const store = configureStore({
     inspector: inspectorReducer,
     bom: bomReducer,
     nesting: nestingReducer,
+    grading: gradingReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -69,7 +72,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(createConfirmationMiddleware(), undoMiddleware, linkedEditingMiddleware, createReactiveSolverMiddleware()),
+    }).concat(createConfirmationMiddleware(), undoMiddleware, linkedEditingMiddleware, createReactiveSolverMiddleware(), gradingStalenessMiddleware),
 });
 
 // Load builtin recipes synchronously — must be available before first copilot turn

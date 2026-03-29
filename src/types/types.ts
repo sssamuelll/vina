@@ -70,6 +70,8 @@ export interface PatternPiece {
   bodyRegion?: string;
   /** When true, piece cannot be moved/edited interactively */
   locked?: boolean;
+  /** Size label for graded variants (e.g., 'S', 'L'). Undefined for base pieces. */
+  gradedSize?: string;
   /** Whether this piece participates in simulation. Default true. */
   active: boolean;
   /** Interfacing type applied to this piece */

@@ -318,6 +318,16 @@ function mockState(overrides?: Partial<RootState>): RootState {
       wastePercent: null,
       lastNestedAt: null,
     },
+    grading: {
+      enabled: false,
+      sizeSystem: 'eu-women',
+      baseSize: 'M',
+      activeSizes: [],
+      quantities: {},
+      generatedPieces: {},
+      stale: false,
+      lastGradedAt: null,
+    },
   };
 
   if (overrides) {
