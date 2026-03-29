@@ -311,6 +311,13 @@ function mockState(overrides?: Partial<RootState>): RootState {
       lastExtractedAt: null,
       extractedProjectVersion: null,
     },
+    nesting: {
+      config: { rollWidth: 1500, gap: 10, rotationStep: 180, allowMirror: false },
+      result: null,
+      usedLength: null,
+      wastePercent: null,
+      lastNestedAt: null,
+    },
   };
 
   if (overrides) {
