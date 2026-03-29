@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from 'react';
 import { ToolDefinition } from '../types';
+import { TRIM_LIBRARY } from '../../utils/trim/trimLibrary';
 
 const TrimPlaceIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   <svg
@@ -22,22 +23,78 @@ const TrimPlaceIcon: React.FC<{ size?: number }> = ({ size = 18 }) => (
   </svg>
 );
 
+// Build preset choices grouped by type
+const presetChoices = TRIM_LIBRARY.map(p => ({
+  label: `${p.name} (${p.size}mm)`,
+  value: p.id,
+}));
+
 export const trimPlaceTool: ToolDefinition = {
   id: 'trimPlace',
   name: 'Place Trim',
-  description: 'Click on pattern pieces to place trims (buttons, zippers, snaps)',
+  description: 'Click on pattern edges to place trims (buttons, zippers, snaps)',
   context: '2d',
   icon: TrimPlaceIcon,
   cursor: 'crosshair',
   group: 'sewing',
+  options: [
+    {
+      id: 'trimPreset',
+      label: 'Preset',
+      type: 'select',
+      value: TRIM_LIBRARY[0].id,
+      choices: presetChoices,
+    },
+    {
+      id: 'placementMode',
+      label: 'Mode',
+      type: 'select',
+      value: 'single',
+      choices: [
+        { label: 'Single', value: 'single' },
+        { label: 'Distribute', value: 'distribute' },
+      ],
+    },
+    {
+      id: 'distributeCount',
+      label: 'Count',
+      type: 'number',
+      value: 5,
+      min: 2,
+      max: 20,
+      step: 1,
+    },
+    {
+      id: 'startOffset',
+      label: 'Start Offset (mm)',
+      type: 'number',
+      value: 10,
+      min: 0,
+      max: 50,
+      step: 1,
+    },
+    {
+      id: 'endOffset',
+      label: 'End Offset (mm)',
+      type: 'number',
+      value: 10,
+      min: 0,
+      max: 50,
+      step: 1,
+    },
+  ],
   copilot: {
-    description: 'Place trims (buttons, zippers, snaps, rivets, buckles) on pattern pieces by clicking. Select a preset from the trim library, then click on pieces to place. / Colocar avios (botones, cremalleras, broches, remaches, hebillas) haciendo clic en las piezas del patron.',
+    description:
+      'Place trims (buttons, zippers, snaps, rivets, buckles) on pattern piece edges by clicking. ' +
+      'Select a preset from the trim library, then click on piece edges to place. ' +
+      'Use Distribute mode to evenly space N trims along an edge. ' +
+      '/ Colocar avios (botones, cremalleras, broches, remaches, hebillas) en los bordes de piezas del patron.',
     examples: [
-      'Place buttons on the front bodice',
-      'Add a zipper to the center front',
-      'Put snaps on the cuff',
+      'Place buttons on the front bodice center-front edge',
+      'Distribute 5 snaps along the waistband',
+      'Add a zipper to the center back',
     ],
-    keywords: ['trim', 'button', 'zipper', 'snap', 'rivet', 'buckle', 'place', 'attach'],
+    keywords: ['trim', 'button', 'zipper', 'snap', 'rivet', 'buckle', 'place', 'attach', 'distribute'],
     requiresSelection: 'none',
     produces: 'modification',
     undoable: true,

@@ -15,6 +15,8 @@ import type { Trim, TrimType } from '../../../../types/trim';
 import { TRIM_DEFAULTS } from '../../../../types/trim';
 import { getTrimPreset, searchTrimPresets, getTrimPresetsByType, TRIM_LIBRARY } from '../../../../utils/trim/trimLibrary';
 import { uid } from '../../../../utils/pathHelpers';
+import { computeEdgeLengthMM } from '../../../../utils/geometry/edgeInterpolation';
+import { batchUndo } from '../../../../store/undoMiddleware';
 
 // ─── addTrim ────────────────────────────────────────────────────────────────
 
@@ -33,8 +35,8 @@ const addTrimTool: ToolDefinition = {
       pieceId: { type: 'string', description: 'Piece ID / ID de la pieza' },
       placementMode: {
         type: 'string',
-        enum: ['edge', 'count'],
-        description: 'Placement mode: "edge" for edge-based, "count" for quantity-based / Modo de colocacion: "edge" por borde, "count" por cantidad',
+        enum: ['edge', 'edge-points', 'count'],
+        description: 'Placement mode: "edge" for edge range, "edge-points" for discrete positions along edge, "count" for quantity-based / Modo: "edge" rango, "edge-points" posiciones discretas, "count" cantidad',
       },
       presetId: {
         type: 'string',
@@ -67,6 +69,11 @@ const addTrimTool: ToolDefinition = {
         type: 'number',
         description: 'Quantity — required if placementMode is "count" / Cantidad — requerido si placementMode es "count"',
       },
+      positions: {
+        type: 'array',
+        items: { type: 'number' },
+        description: 'Parametric positions (0-1) along edge — required if placementMode is "edge-points" / Posiciones parametricas (0-1)',
+      },
     },
     required: ['pieceId', 'placementMode'],
   },
@@ -79,7 +86,7 @@ const addTrimTool: ToolDefinition = {
     const piece = state.project.pieces.find(p => p.id === params.pieceId);
     if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
 
-    const placementMode = params.placementMode as 'edge' | 'count';
+    const placementMode = params.placementMode as 'edge' | 'edge-points' | 'count';
 
     // Resolve preset defaults if provided
     const preset = params.presetId ? getTrimPreset(params.presetId as string) : undefined;
@@ -109,6 +116,15 @@ const addTrimTool: ToolDefinition = {
       if (tStart >= tEnd) return { success: false, error: 'tStart must be less than tEnd' };
 
       placement = { mode: 'edge', edgeName, tStart, tEnd };
+    } else if (placementMode === 'edge-points') {
+      const edgeName = params.edgeName as string | undefined;
+      if (!edgeName) return { success: false, error: 'edgeName is required when placementMode is "edge-points"' };
+      const edge = piece.edges?.find(e => e.name === edgeName);
+      if (!edge) return { success: false, error: `Edge "${edgeName}" not found on piece "${params.pieceId}"` };
+      const positions = params.positions as number[] | undefined;
+      if (!positions || positions.length === 0) return { success: false, error: 'positions array is required for edge-points mode' };
+      if (positions.some(t => t < 0 || t > 1)) return { success: false, error: 'All positions must be between 0 and 1' };
+      placement = { mode: 'edge-points', edgeName, positions };
     } else {
       const quantity = params.quantity as number | undefined;
       if (quantity === undefined || quantity === null) {
@@ -334,6 +350,178 @@ const listTrimPresetsTool: ToolDefinition = {
   },
 };
 
+// ─── distributeTrimAlongEdge ───────────────────────────────────────────────
+
+const distributeTrimAlongEdgeTool: ToolDefinition = {
+  name: 'distributeTrimAlongEdge',
+  description:
+    'Distribute N trims evenly along a named semantic edge. Creates a single trim with edge-points placement. ' +
+    '/ Distribuir N avios uniformemente a lo largo de un borde semantico nombrado.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Piece ID / ID de la pieza' },
+      edgeName: { type: 'string', description: 'Edge name / Nombre del borde' },
+      presetId: { type: 'string', description: 'Optional preset ID / ID de preset opcional' },
+      count: { type: 'number', description: 'Number of trims to distribute (2-20) / Cantidad de avios (2-20)' },
+      startOffset: { type: 'number', description: 'Start offset in mm (default 10) / Desplazamiento inicial en mm (defecto 10)' },
+      endOffset: { type: 'number', description: 'End offset in mm (default 10) / Desplazamiento final en mm (defecto 10)' },
+    },
+    required: ['pieceId', 'edgeName', 'count'],
+  },
+  execute: async (
+    params: Record<string, unknown>,
+    dispatch: AppDispatch,
+    getState: () => RootState,
+  ): Promise<ToolResult> => {
+    const state = getState();
+    const piece = state.project.pieces.find(p => p.id === params.pieceId);
+    if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+    const edgeName = params.edgeName as string;
+    const edge = piece.edges?.find(e => e.name === edgeName);
+    if (!edge) return { success: false, error: `Edge "${edgeName}" not found on piece "${params.pieceId}"` };
+
+    const count = params.count as number;
+    if (count < 2 || count > 20) return { success: false, error: 'count must be between 2 and 20' };
+
+    const startOffset = (params.startOffset as number | undefined) ?? 10;
+    const endOffset = (params.endOffset as number | undefined) ?? 10;
+
+    const edgeLen = computeEdgeLengthMM(piece, edgeName);
+    if (edgeLen <= 0) return { success: false, error: 'Edge has zero length' };
+
+    const tStart = Math.min(startOffset / edgeLen, 0.49);
+    const tEnd = Math.max(1 - endOffset / edgeLen, 0.51);
+
+    const positions: number[] = [];
+    for (let i = 0; i < count; i++) {
+      positions.push(count === 1 ? (tStart + tEnd) / 2 : tStart + i * (tEnd - tStart) / (count - 1));
+    }
+
+    const preset = params.presetId ? getTrimPreset(params.presetId as string) : undefined;
+    if (params.presetId && !preset) return { success: false, error: `Preset "${params.presetId}" not found` };
+
+    const id = uid();
+    const trim: Trim = {
+      id,
+      pieceId: params.pieceId as string,
+      type: preset?.type ?? TRIM_DEFAULTS.type,
+      presetId: params.presetId as string | undefined,
+      name: preset?.name ?? TRIM_DEFAULTS.name,
+      description: '',
+      placement: { mode: 'edge-points', edgeName, positions },
+      material: preset?.material ?? TRIM_DEFAULTS.material,
+      color: preset?.color ?? TRIM_DEFAULTS.color,
+      size: preset?.size ?? TRIM_DEFAULTS.size,
+      unitCost: preset?.unitCost ?? TRIM_DEFAULTS.unitCost,
+      active: true,
+    };
+
+    batchUndo(dispatch, 'Distribute trims along edge', () => {
+      dispatch(addTrim(trim));
+    });
+
+    return {
+      success: true,
+      data: { trimId: id, pieceId: params.pieceId, edgeName, count, positions },
+    };
+  },
+};
+
+// ─── mirrorTrimsToSymmetric ────────────────────────────────────────────────
+
+const mirrorTrimsToSymmetricTool: ToolDefinition = {
+  name: 'mirrorTrimsToSymmetric',
+  description:
+    'Mirror trims from a piece to its linked symmetric piece. ' +
+    'For edge-points trims, positions are mirrored (1-t). ' +
+    '/ Espejo de avios de una pieza a su pieza simetrica vinculada.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Source piece ID / ID de la pieza origen' },
+      trimId: { type: 'string', description: 'Optional: mirror only this trim / Opcional: solo espejar este avio' },
+    },
+    required: ['pieceId'],
+  },
+  execute: async (
+    params: Record<string, unknown>,
+    dispatch: AppDispatch,
+    getState: () => RootState,
+  ): Promise<ToolResult> => {
+    const state = getState();
+    const piece = state.project.pieces.find(p => p.id === params.pieceId);
+    if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+    if (!piece.linkedPieceId || piece.linkMode !== 'symmetry') {
+      return { success: false, error: 'Piece has no symmetric linked piece' };
+    }
+
+    const targetPiece = state.project.pieces.find(p => p.id === piece.linkedPieceId);
+    if (!targetPiece) return { success: false, error: `Linked piece "${piece.linkedPieceId}" not found` };
+
+    let trimsToMirror = state.project.trims.filter(t => t.pieceId === piece.id && t.active);
+    if (params.trimId) {
+      trimsToMirror = trimsToMirror.filter(t => t.id === params.trimId);
+      if (trimsToMirror.length === 0) return { success: false, error: `Trim "${params.trimId}" not found on piece` };
+    }
+
+    if (trimsToMirror.length === 0) return { success: false, error: 'No active trims to mirror' };
+
+    const mirroredIds: string[] = [];
+
+    batchUndo(dispatch, 'Mirror trims to symmetric piece', () => {
+      for (const trim of trimsToMirror) {
+        const srcPlacement = trim.placement;
+        let mirroredPlacement: typeof srcPlacement = srcPlacement;
+
+        if (srcPlacement.mode === 'edge-points') {
+          const targetEdge = targetPiece.edges?.find(e => e.name === srcPlacement.edgeName);
+          if (!targetEdge) return;
+          mirroredPlacement = {
+            mode: 'edge-points',
+            edgeName: srcPlacement.edgeName,
+            positions: srcPlacement.positions.map(t => 1 - t),
+          };
+        } else if (srcPlacement.mode === 'edge') {
+          const targetEdge = targetPiece.edges?.find(e => e.name === srcPlacement.edgeName);
+          if (!targetEdge) return;
+          mirroredPlacement = {
+            mode: 'edge',
+            edgeName: srcPlacement.edgeName,
+            tStart: 1 - srcPlacement.tEnd,
+            tEnd: 1 - srcPlacement.tStart,
+          };
+        }
+
+        const mirroredId = uid();
+        mirroredIds.push(mirroredId);
+
+        dispatch(addTrim({
+          ...trim,
+          id: mirroredId,
+          pieceId: targetPiece.id,
+          placement: mirroredPlacement,
+        }));
+      }
+    });
+
+    return {
+      success: true,
+      data: { mirroredCount: mirroredIds.length, mirroredIds, targetPieceId: targetPiece.id },
+    };
+  },
+};
+
 // ─── Export ──────────────────────────────────────────────────────────────────
 
-export const tools: ToolDefinition[] = [addTrimTool, removeTrimTool, updateTrimTool, listTrimsTool, listTrimPresetsTool];
+export const tools: ToolDefinition[] = [
+  addTrimTool,
+  removeTrimTool,
+  updateTrimTool,
+  listTrimsTool,
+  listTrimPresetsTool,
+  distributeTrimAlongEdgeTool,
+  mirrorTrimsToSymmetricTool,
+];

@@ -626,6 +626,12 @@ const projectSlice = createSlice({
       if (placement.mode === 'point') {
         if (!placement.positions || placement.positions.length === 0) return;
       }
+      if (placement.mode === 'edge-points') {
+        const edge = piece.edges?.find(e => e.name === placement.edgeName);
+        if (!edge) return;
+        if (!placement.positions || placement.positions.length === 0) return;
+        if (placement.positions.some(t => t < 0 || t > 1)) return;
+      }
       state.trims.push(action.payload);
       state.isDirty = true;
     },

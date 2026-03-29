@@ -37,7 +37,7 @@ const TOOL_GROUPS: string[][] = [
   ['flatten'],
   ['seamAllowance'],
   // ─── Sewing ───
-  ['seam', 'freesewing', 'elastic'],
+  ['seam', 'freesewing', 'elastic', 'trimPlace'],
   // ─── Annotation ───
   ['notch'],
   ['grainline'],
