@@ -1,0 +1,1370 @@
+{
+  "version": 1,
+  "model": "text-embedding-3-small",
+  "dimensions": 1536,
+  "chunks": [
+    {
+      "id": "fabric-001",
+      "content": "Fabric property definitions for pattern making and simulation: Weight (GSM / g/m2): mass per unit area. Lightweight < 150 GSM (chiffon, voile), medium 150-300 GSM (poplin, jersey), heavy > 300 GSM (denim, canvas). Thickness (mm): physical thickness affecting drape and seam bulk. Ranges from 0.1mm (chiffon) to 3.0mm (neoprene). Stretch (%): elongation under standard load in warp (along grain), weft (across grain), and bias (45 degrees) directions. Recovery rate (0-1): how much the fabric returns to original size after stretching. 1.0 = full elastic recovery (spandex), 0.1 = permanent deformation (cotton). Bending rigidity (mN.cm, Kawabata units): resistance to bending in warp and weft directions. Lower = more fluid drape.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:definitions-1",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "properties",
+          "GSM",
+          "stretch",
+          "bending",
+          "definitions"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "fabric-002",
+      "content": "Fabric surface and structural property definitions: Drape coefficient (0-1): 0 = stiff like cardboard (canvas, felt), 1 = fluid like water (chiffon, charmeuse). Determines how fabric falls and gathers. Shear stiffness (N/m): resistance to diagonal distortion. High values = fabric resists twisting (denim). Low values = fabric twists easily (jersey). Shear hysteresis (N/m): energy lost in a shear cycle. Higher values indicate greater wrinkle tendency. Friction: kinetic friction coefficient for fabric-on-fabric and fabric-on-body contact. Affects how layers slide over each other. Internal damping (0-1): 0 = fluid, oscillates freely (silk). 1 = heavy, settles quickly (felt). Controls how quickly fabric motion dampens. Surface roughness (0-1): 0 = smooth (satin, leather), 1 = rough (canvas, felt). Affects visual appearance and friction behavior. Tensile strength (N/5cm): force at break in warp and weft directions per ISO 13934. Tear strength (N) measured by Elmendorf test per ISO 13937.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:definitions-2",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "properties",
+          "drape",
+          "shear",
+          "friction",
+          "damping",
+          "strength"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "fabric-003",
+      "content": "Weave type classifications: Plain weave: most common, threads interlace over-under alternately. Examples: poplin, broadcloth, muslin, voile. Balanced, stable, tends to wrinkle. Twill weave: diagonal rib pattern, threads pass over 2+ then under 1. Examples: denim, gabardine, chino. More durable, slight stretch on bias. Satin weave: long float threads create smooth shiny surface. Examples: charmeuse, duchess satin. Slippery, prone to snagging. Knit jersey: single knit loop structure. Examples: cotton jersey, lycra. High stretch, rolls at edges. Knit rib: alternating face/back stitches create vertical ridges. Examples: 1x1 rib, 2x2 rib. Very high weft stretch, used for cuffs/collars. Knit interlock: double knit, face on both sides. Examples: ponte roma, scuba. More stable than jersey, less roll. Nonwoven: fibers bonded without weaving. Examples: felt, fusible interfacing. No grain direction, does not fray. Leather: natural or synthetic hide. No grain direction in traditional sense, does not fray, cannot be pressed. Mesh: open structure with holes. Examples: tulle, athletic mesh. Lightweight, breathable, sheer. Pile: raised surface fibers. Examples: velvet, fleece, terry. Nap direction matters for cutting. Technical: engineered fabrics. Examples: neoprene, ripstop, gore-tex. Specialized performance properties.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:weave-types",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "weave",
+          "plain",
+          "twill",
+          "satin",
+          "knit",
+          "nonwoven",
+          "leather",
+          "mesh"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "fabric-004",
+      "content": "Woven plain-weave fabrics in the library: Cotton Poplin (Popelina de Algodon): 100% Cotton, 130 GSM, 0.3mm thick. Low stretch (warp 2%, weft 3%, bias 12%). Moderate bending rigidity (0.8/0.5 mN.cm warp/weft), drape coefficient 0.45. Good for shirts, dresses, and structured garments. Cotton Broadcloth (Percal de Algodon): 100% Cotton, 115 GSM, 0.25mm thick. Similar to poplin but lighter and smoother. Drape coefficient 0.5. Good for dress shirts. Muslin/Toile (Muselina): 100% Cotton, 90 GSM, 0.2mm thick. Very low bending (0.3/0.2 mN.cm), drape 0.6. The standard fabric for prototype garments (toiles). Lightweight, inexpensive, easy to mark and alter. Cotton Voile (Voile de Algodon): 100% Cotton, 70 GSM, 0.15mm thick. Very light and semi-sheer. Excellent drape (0.7). Good for summer blouses, curtains, and overlays.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:woven-plain",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "woven",
+          "plain",
+          "cotton",
+          "poplin",
+          "broadcloth",
+          "muslin",
+          "voile"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-005",
+      "content": "Woven twill-weave fabrics in the library: Denim 12oz: 100% Cotton, 400 GSM, 0.9mm thick. Very low stretch (warp 1%, weft 2%), high bending rigidity (3.5/2.8 mN.cm). Drape coefficient 0.15 (very stiff). High friction (0.7). Used for jeans, jackets, bags. Requires wider seam allowances due to bulk. Stretch Denim: 98% Cotton 2% Elastane, 350 GSM, 0.8mm thick. Significant weft stretch (15%) with good recovery (0.85). More comfortable than rigid denim while maintaining similar appearance. Used for fitted jeans. Wool Gabardine (Gabardina de Lana): 100% Wool, 260 GSM, 0.6mm thick. Moderate stretch, drape 0.3. Classic suiting and trouser fabric. Presses well, holds creases. Suitable for tailored garments. Cotton Twill/Chino (Sarga de Algodon): 100% Cotton, 220 GSM, 0.5mm thick. Drape 0.35. Workwear and casual trousers. More durable than plain weave but less rigid than denim.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:woven-twill",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "woven",
+          "twill",
+          "denim",
+          "gabardine",
+          "chino",
+          "wool",
+          "cotton"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-006",
+      "content": "Satin-weave fabrics in the library: Silk Charmeuse (Charmeuse de Seda): 100% Silk, 75 GSM, 0.15mm thick. Moderate stretch (warp 4%, weft 6%, bias 18%). Extremely low bending rigidity (0.1/0.08 mN.cm), drape coefficient 0.9 (very fluid). Very low friction (0.25). The most fluid fabric in the library. Used for evening wear, linings, bias-cut dresses. Difficult to handle due to slipperiness. Duchess Satin (Satin Duquesa): 100% Polyester, 200 GSM, 0.5mm thick. Much stiffer than charmeuse. Bending 1.8/1.2 mN.cm, drape 0.35. Used for structured bridal gowns and evening wear. Holds shape better than charmeuse but maintains the characteristic satin sheen.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:satin",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "satin",
+          "silk",
+          "charmeuse",
+          "duchess",
+          "evening",
+          "bridal"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-007",
+      "content": "Knit fabrics in the library (jersey and interlock): Cotton Jersey (Jersey de Algodon): 100% Cotton, 180 GSM, 0.6mm thick. High weft stretch (40%) with moderate recovery (0.6). Low bending (0.2/0.15 mN.cm), drape 0.75. The standard t-shirt fabric. Rolls at edges, needs special needle and stitch types. Ponte Roma: 65% Rayon 30% Nylon 5% Spandex, 280 GSM, 0.8mm thick. Structured double knit with excellent recovery (0.9). Weft stretch 25%, drape 0.55. Used for dresses, trousers, and jackets. More stable than jersey, minimal edge rolling. Scuba Knit (Neopreno Textil): 95% Polyester 5% Spandex, 320 GSM, 1.2mm thick. Weft stretch 20%, drape 0.3 (structured). Holds shape well for architectural designs. Used for modern dresses and skirts.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:knit-jersey-interlock",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "knit",
+          "jersey",
+          "cotton",
+          "ponte",
+          "scuba",
+          "interlock"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-008",
+      "content": "Knit fabrics in the library (rib, lycra, athletic mesh): Rib Knit 2x2 (Punto Canale): 95% Cotton 5% Elastane, 220 GSM, 0.7mm thick. Extremely high weft stretch (80%) with excellent recovery (0.9). Used primarily for trims: collars, cuffs, waistbands, and neckline bindings. Not typically used for main garment body. Lycra/Spandex 4-way stretch (Licra): 80% Nylon 20% Spandex, 220 GSM, 0.5mm thick. Highest stretch in library (warp 60%, weft 80%). Near-perfect recovery (0.95), very low bending (0.05 mN.cm), drape 0.85. Used for swimwear, activewear, compression garments. Requires negative ease in pattern (body measurements minus 10-20%). Athletic Mesh (Malla Deportiva): 100% Polyester, 120 GSM, 0.4mm thick. Open mesh structure, highly breathable. Moderate stretch (weft 30%), drape 0.7. Used for sportswear panels and ventilation zones.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:knit-stretch",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "knit",
+          "rib",
+          "lycra",
+          "spandex",
+          "mesh",
+          "sportswear",
+          "stretch"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-009",
+      "content": "Sheer fabrics in the library: Organza: 100% Polyester, 55 GSM, 0.1mm thick. Very low stretch. Bending 0.3/0.2 mN.cm, drape 0.35. Crisp and stiff despite being sheer. Used for structured evening wear, ruffles, and overlays. Frays easily, needs French seams. Chiffon (Gasa): 100% Polyester, 45 GSM, 0.1mm thick. Very low bending (0.05/0.04 mN.cm), drape 0.92 (most fluid after charmeuse). The lightest woven fabric in the library. Extremely difficult to cut and sew due to shifting. Requires tissue paper backing when cutting. Used for evening wear, blouse overlays, scarves. Tulle (Tul): 100% Nylon, 30 GSM, 0.15mm thick. Open mesh structure, drape 0.8. The lightest fabric in the library. Used for bridal veils, ballet tutus, and decorative overlays. Does not fray due to mesh structure.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:sheer",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "sheer",
+          "organza",
+          "chiffon",
+          "tulle",
+          "lightweight",
+          "evening"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-010",
+      "content": "Natural fiber fabrics in the library: Linen (Lino): 100% Linen, 170 GSM, 0.4mm thick. Low stretch (warp 2%, weft 3%), low recovery (0.15 — wrinkles easily). Bending 1.5/1.0 mN.cm, drape 0.4. Crisp hand, iconic for summer garments. Requires pre-washing as it shrinks. Wool Crepe (Crepe de Lana): 100% Wool, 200 GSM, 0.5mm thick. Moderate stretch and recovery (0.5). Drape 0.55. Excellent for draped dresses and fluid suiting. The crepe twist gives a slightly textured surface. Wool Flannel (Franela de Lana): 100% Wool, 280 GSM, 0.8mm thick. Bending 1.8/1.3 mN.cm, drape 0.35. Brushed surface, soft hand, slightly structured. Classic for suiting, coats, and winter garments. Takes pressing well.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:natural",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "natural",
+          "linen",
+          "wool",
+          "crepe",
+          "flannel",
+          "summer",
+          "winter"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-011",
+      "content": "Heavy and structured fabrics in the library: Canvas 12oz (Lona 12oz): 100% Cotton, 500 GSM, 1.2mm thick. Minimal stretch (warp 1%, weft 1%). Highest bending rigidity in library (4.0/3.5 mN.cm), drape 0.08 (extremely stiff). Very high friction (0.7). Used for bags, upholstery, workwear. Requires heavy-duty needles and walking foot machine. Ripstop Nylon: 100% Nylon, 70 GSM, 0.1mm thick. Lightweight but extremely strong (tear strength 40N). Drape 0.65. The reinforced grid structure prevents tear propagation. Used for outdoor jackets, tents, kites, parachutes.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:heavy",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "heavy",
+          "canvas",
+          "ripstop",
+          "nylon",
+          "workwear",
+          "outdoor"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-012",
+      "content": "Leather and faux leather in the library: Lambskin Leather (Cuero de Cordero): Natural leather, 600 GSM, 0.8mm thick. Moderate stretch (warp 15%, weft 25%) but low recovery (0.2). Very high bending rigidity (5.0/4.0 mN.cm), drape 0.2, very high internal damping (0.8). Cannot be pinned (use clips), cannot be pressed with iron (use mallet). Seams are glued open, not pressed. Faux Leather PU (Cuero Sintetico): PU-coated Polyester, 450 GSM, 0.6mm thick. Lower stretch than real leather. Drape 0.25, high damping (0.75). More uniform than natural leather but does not age as well. Both leather types require specialized sewing techniques: longer stitch length, Teflon foot, no pinning, no topstitching do-overs.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:leather",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "leather",
+          "lambskin",
+          "faux-leather",
+          "PU",
+          "specialty"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "fabric-013",
+      "content": "Specialty fabrics in the library: Neoprene 3mm: CR/SBR Rubber + Nylon lining, 450 GSM, 3.0mm thick (thickest in library). Highest bending rigidity (8.0 mN.cm), drape 0.1. Stretch 15-20% with excellent recovery (0.85). Seams are often glued and blind-stitched rather than conventional stitching. Used for wetsuits and structured fashion pieces. Wool Felt (Fieltro de Lana): 100% Wool nonwoven, 350 GSM, 2.0mm thick. No grain direction, does not fray. Drape 0.1, highest internal damping in library (0.9). Cut edges do not require finishing. Used for hats, bags, and craft. Polar Fleece (Polar): 100% Polyester, 250 GSM, 2.5mm thick. Low bending (0.3), drape 0.55. Warm, lightweight, quick-drying. Does not fray. Used for casual outerwear and blankets. Silk Velvet (Terciopelo de Seda): 82% Rayon 18% Silk, 280 GSM, 1.0mm thick. Drape 0.65, high friction (0.7 — pile grips). Nap direction critical: all pieces must be cut in same direction. Used for evening wear.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:specialty",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "neoprene",
+          "felt",
+          "fleece",
+          "velvet",
+          "specialty",
+          "pile"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "fabric-014",
+      "content": "Linings and interfacings in the library: Polyester Lining (Forro de Poliester): 100% Polyester, 60 GSM, 0.1mm thick. Very low friction (0.15). Drape 0.85 (very fluid). Used inside jackets, coats, skirts to allow easy wear and prevent shell fabric from clinging to body. Lining patterns are typically cut 1cm shorter than shell pieces and with wider seam allowances at hems. Fusible Interfacing Medium (Entretela Termoadhesiva): Polyester nonwoven + adhesive, 90 GSM, 0.3mm thick. No stretch (1% all directions), drape 0.1 (very stiff). Fused to fabric with heat and pressure. Used to stabilize collar stands, cuffs, button stands, waistbands, and pocket openings. Must be pre-tested for bond quality and should not be used on heat-sensitive fabrics.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:lining-interfacing",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "lining",
+          "interfacing",
+          "fusible",
+          "structure",
+          "collar",
+          "cuff"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "collar"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "fabric-015",
+      "content": "Physical fabric to XPBD simulation parameter mapping: Stretch compliance: % elongation / 10 gives compliance value. Higher stretch = higher compliance = easier to stretch in simulation. Example: cotton poplin (2% warp) = 0.2 compliance; lycra (60% warp) = 6.0 compliance. Bend compliance: inverse of bending rigidity. formula: 1 / (bendingRigidity + 0.05), clamped minimum 0.05. Example: chiffon (0.05 mN.cm) = 10.0 compliance (very floppy); neoprene (8.0 mN.cm) = 0.124 compliance (very stiff). Shear compliance: 10 / (shearStiffness + 1). Example: jersey (10 N/m shear) = 0.91; denim (120 N/m shear) = 0.083. Damping: 0.95 + (weight/500) x 0.049, so heavier fabrics settle faster. Density for gravity: GSM / 1000 gives kg/m2. This affects how fast fabric falls under gravity.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "physicalFabric:simulation-mapping",
+        "category": "fabric-property",
+        "tags": [
+          "fabric",
+          "simulation",
+          "XPBD",
+          "compliance",
+          "solver",
+          "physics"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-001",
+      "content": "Male Shirt (Camisa Masculina): Full male dress shirt with yoke, sleeve, and collar construction. Category: tops. Gender: men. Complexity: advanced. Requires 7 measurements: chest, waist, hips, height, neckCirc, shoulder, armLength. This is one of the most complex patterns in the library, involving multiple pieces that must be precisely connected.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:male_shirt",
+        "category": "drafting-method",
+        "tags": [
+          "shirt",
+          "camisa",
+          "men",
+          "yoke",
+          "collar",
+          "sleeve"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "collar"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-002",
+      "content": "Men's Shirt Block (Bloque Base Camisa Masculina): Basic shirt block/sloper for men. Category: blocks. Gender: men. Complexity: basic. Requires 4 measurements: chest, waist, height, shoulder. A fundamental building block for all men's upper body garments. The sloper has no design ease, serving as a body-fitting template.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:mens_shirt_block",
+        "category": "drafting-method",
+        "tags": [
+          "block",
+          "sloper",
+          "shirt",
+          "men",
+          "base"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-003",
+      "content": "Blouse Pattern (Patron de Blusa): Women's blouse base pattern. Category: tops. Gender: women. Complexity: intermediate. Requires 3 measurements: chest, waist, height. A versatile base for women's blouse construction. Can be adapted for different necklines, sleeve types, and closures.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:patron_blusa",
+        "category": "drafting-method",
+        "tags": [
+          "blouse",
+          "blusa",
+          "women",
+          "top"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-004",
+      "content": "T-Shirt (Camiseta): Basic t-shirt pattern. Category: tops. Gender: unisex. Complexity: basic. Requires 2 measurements: chest, height. The simplest top pattern in the library. Suitable for beginners and rapid prototyping.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:tshirt_test",
+        "category": "drafting-method",
+        "tags": [
+          "tshirt",
+          "camiseta",
+          "casual",
+          "unisex",
+          "basic"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-005",
+      "content": "Pajama Top Wrap (Top de Pijama Cruzado): Wrap-style pajama top. Category: tops. Gender: unisex. Complexity: intermediate. Requires 3 measurements: chest, waist, height. Features a wrap front closure, suitable for sleepwear and loungewear construction.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:pajama_top_wrap2",
+        "category": "drafting-method",
+        "tags": [
+          "pajama",
+          "pijama",
+          "wrap",
+          "sleepwear",
+          "unisex"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-006",
+      "content": "Moulage Armhole and Neckline (Moulage Sisa y Escote): Moulage block focusing on armhole and neckline shaping. Category: blocks. Gender: women. Complexity: intermediate. Requires 3 measurements: chest, waist, height. A draping-based block specifically designed for studying and refining armhole and neckline fit. Used as an educational tool.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:moulage_05_armhole_neckline",
+        "category": "drafting-method",
+        "tags": [
+          "moulage",
+          "draping",
+          "armhole",
+          "neckline",
+          "women",
+          "block"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-007",
+      "content": "Trousers (Pantalon): Full trouser pattern with front and back pieces. Category: bottoms. Gender: unisex. Complexity: advanced. Requires 4 measurements: waist, hips, height, inseam. A complete trouser construction with separate front and back pieces, crotch curve, and fly extension.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:trousers",
+        "category": "drafting-method",
+        "tags": [
+          "trousers",
+          "pants",
+          "pantalon",
+          "unisex"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-008",
+      "content": "Base Trouser Eli (Pantalon Base Eli): Women's basic trouser block. Category: bottoms. Gender: women. Complexity: intermediate. Requires 3 measurements: waist, hips, height. A women's trouser sloper that serves as the foundation for all women's pant styles including straight leg, wide leg, and tapered.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:pantalon_base_Eli",
+        "category": "drafting-method",
+        "tags": [
+          "trouser",
+          "pants",
+          "pantalon",
+          "women",
+          "base"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-009",
+      "content": "Pants Size 52 (Pantalon Talla 52): Men's pants pattern, size 52/176. Category: bottoms. Gender: men. Complexity: intermediate. Requires 4 measurements: waist, hips, height, inseam. Pre-graded men's trouser for European size 52 (height 176cm).",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:pants1_52-176",
+        "category": "drafting-method",
+        "tags": [
+          "pants",
+          "pantalon",
+          "men",
+          "size-52"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-010",
+      "content": "Pants Size 40 Children (Pantalon Talla 40): Children's pants pattern, size 40/146. Category: bottoms. Gender: children. Complexity: intermediate. Requires 4 measurements: waist, hips, height, inseam. Children's trouser pattern with proportions adapted for child body shapes. Height 146cm corresponds roughly to age 10-12.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:pants2_40-146",
+        "category": "drafting-method",
+        "tags": [
+          "pants",
+          "pantalon",
+          "children",
+          "kids"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-011",
+      "content": "Steampunk Trousers (Pantalon Steampunk): Decorative steampunk-style trousers. Category: bottoms. Gender: unisex. Complexity: advanced. Requires 4 measurements: waist, hips, height, inseam. A costume/fashion trouser with decorative construction details inspired by the steampunk aesthetic.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:steampunk_trousers",
+        "category": "drafting-method",
+        "tags": [
+          "steampunk",
+          "trousers",
+          "costume",
+          "fashion"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-012",
+      "content": "Keiko Skirt (Falda Keiko): Keiko-style skirt pattern. Category: bottoms. Gender: women. Complexity: intermediate. Requires 3 measurements: waist, hips, height. A distinctive skirt design with unique paneling and shape.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:keiko_skirt",
+        "category": "drafting-method",
+        "tags": [
+          "skirt",
+          "falda",
+          "keiko",
+          "women"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-013",
+      "content": "Bra (Sujetador): Bra pattern with cup construction. Category: underwear. Gender: women. Complexity: advanced. Requires 3 measurements: highBust, chest (full bust), waist. Cup construction uses the difference between full bust and high bust to determine cup size. Requires specialized stretch fabrics and findings.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:bra",
+        "category": "drafting-method",
+        "tags": [
+          "bra",
+          "sujetador",
+          "lingerie",
+          "underwear",
+          "women",
+          "cup"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-014",
+      "content": "Jacket Size 52 (Chaqueta Talla 52): Men's jacket, size 52/176. Category: outerwear. Gender: men. Complexity: advanced. Requires 6 measurements: chest, waist, hips, height, shoulder, armLength. A full tailored jacket with multiple pieces including front, back, sleeve, collar, and facing. Requires careful fit adjustment.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:jacket1_52-176",
+        "category": "drafting-method",
+        "tags": [
+          "jacket",
+          "chaqueta",
+          "men",
+          "tailoring",
+          "outerwear"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "collar"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-015",
+      "content": "Gentleman's Jacket Tummy Fit (Chaqueta Caballero Ajuste Abdomen): Gentleman's jacket with tummy accommodation. Category: outerwear. Gender: men. Complexity: advanced. Requires 6 measurements: chest, waist, hips, height, shoulder, armLength. A specialized jacket pattern that accommodates a protruding abdomen through modified front dart placement and additional ease distribution at the front waist.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:gent_jacket_with_tummy",
+        "category": "drafting-method",
+        "tags": [
+          "jacket",
+          "chaqueta",
+          "gentleman",
+          "tummy",
+          "plus-size",
+          "men"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-016",
+      "content": "Women's Basic Block 2016 (Bloque Base Mujer 2016): Women's basic bodice block/sloper (2016 method). Category: blocks. Gender: women. Complexity: basic. Requires 4 measurements: chest, waist, hips, height. The foundational building block for all women's garments. A close-fitting body shell with no design ease, used as the starting point for all pattern manipulation.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:basic_block_women-2016",
+        "category": "drafting-method",
+        "tags": [
+          "block",
+          "sloper",
+          "base",
+          "women",
+          "bodice"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-017",
+      "content": "Armhole Adjustment Block (Bloque Ajuste de Sisa): Armhole adjustment block for bodice fitting. Category: blocks. Gender: women. Complexity: intermediate. Requires 3 measurements: chest, waist, height. A specialized block used to study and modify armhole fit. Essential for achieving comfortable sleeve insertion and arm movement range.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:07_armhole_adjustment_010",
+        "category": "drafting-method",
+        "tags": [
+          "armhole",
+          "adjustment",
+          "block",
+          "fitting",
+          "women"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "seamly-018",
+      "content": "Basic Sleeve (Manga Basica): Basic sleeve pattern. Category: sleeves. Gender: unisex. Complexity: basic. Requires 2 measurements: armLength, chest. A standard one-piece set-in sleeve. The cap shape must match the bodice armhole it will be set into, with appropriate cap ease added.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:sleeve",
+        "category": "drafting-method",
+        "tags": [
+          "sleeve",
+          "manga",
+          "basic",
+          "unisex"
+        ],
+        "garmentTypes": [
+          "sleeve"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-019",
+      "content": "European Women size table (all measurements in mm, converted to cm here for readability): XXS (EU 32-34): height 164, chest 78, waist 60, hips 84, shoulder 12.0, armLength 58, inseam 76, neckCirc 34, highBust 76, shoulderWidth 37. XS (EU 34-36): height 166, chest 82, waist 64, hips 88, shoulder 12.2, armLength 58.5, inseam 77, neckCirc 34.5, highBust 80, shoulderWidth 38. S (EU 36-38): height 168, chest 88, waist 70, hips 94, shoulder 12.5, armLength 59, inseam 78, neckCirc 35.5, highBust 86, shoulderWidth 39. M (EU 38-40): height 168, chest 92, waist 74, hips 98, shoulder 12.8, armLength 59.5, inseam 78, neckCirc 36.5, highBust 90, shoulderWidth 40. L (EU 40-42): height 168, chest 96, waist 78, hips 102, shoulder 13.2, armLength 60, inseam 78, neckCirc 37.5, highBust 94, shoulderWidth 41. XL (EU 42-44): height 168, chest 102, waist 85, hips 108, shoulder 13.6, armLength 60, inseam 78, neckCirc 39, highBust 100, shoulderWidth 42.5. XXL (EU 44-46): height 168, chest 108, waist 92, hips 114, shoulder 14.0, armLength 60, inseam 78, neckCirc 40, highBust 106, shoulderWidth 44. 3XL (EU 46-48): height 168, chest 114, waist 98, hips 120, shoulder 14.4, armLength 60, inseam 78, neckCirc 41, highBust 112, shoulderWidth 45.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:sizeTables:eu-women",
+        "category": "size-table",
+        "tags": [
+          "size-table",
+          "EU",
+          "women",
+          "measurements",
+          "standard-sizes"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-020",
+      "content": "European Men size table (all measurements in mm, converted to cm here for readability): XXS (EU 42-44): height 172, chest 86, waist 72, hips 88, shoulder 13.5, armLength 61, inseam 79, neckCirc 37, shoulderWidth 42. XS (EU 44-46): height 174, chest 90, waist 76, hips 92, shoulder 13.8, armLength 62, inseam 80, neckCirc 38, shoulderWidth 43. S (EU 46-48): height 176, chest 94, waist 80, hips 96, shoulder 14.2, armLength 63, inseam 81, neckCirc 39, shoulderWidth 44. M (EU 48-50): height 178, chest 98, waist 84, hips 100, shoulder 14.6, armLength 64, inseam 82, neckCirc 40, shoulderWidth 46. L (EU 50-52): height 180, chest 104, waist 90, hips 104, shoulder 15.0, armLength 65, inseam 83, neckCirc 41.5, shoulderWidth 47.5. XL (EU 52-54): height 180, chest 110, waist 97, hips 108, shoulder 15.4, armLength 65, inseam 83, neckCirc 43, shoulderWidth 49. XXL (EU 54-56): height 180, chest 116, waist 104, hips 114, shoulder 15.8, armLength 65, inseam 83, neckCirc 44.5, shoulderWidth 50.5. 3XL (EU 56-58): height 180, chest 122, waist 110, hips 120, shoulder 16.2, armLength 65, inseam 83, neckCirc 46, shoulderWidth 52.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:sizeTables:eu-men",
+        "category": "size-table",
+        "tags": [
+          "size-table",
+          "EU",
+          "men",
+          "measurements",
+          "standard-sizes"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-021",
+      "content": "European Children size table by height (all measurements in mm, converted to cm here for readability): XXS (104cm/~4y): height 104, chest 56, waist 52, hips 58, shoulder 8.5, armLength 37, inseam 44. XS (116cm/~6y): height 116, chest 60, waist 54, hips 62, shoulder 9.0, armLength 41, inseam 51. S (128cm/~8y): height 128, chest 64, waist 56, hips 66, shoulder 10.0, armLength 45, inseam 57. M (140cm/~10y): height 140, chest 68, waist 58, hips 72, shoulder 10.8, armLength 49, inseam 63. L (152cm/~12y): height 152, chest 74, waist 62, hips 78, shoulder 11.5, armLength 53, inseam 69. XL (164cm/~14y): height 164, chest 80, waist 66, hips 84, shoulder 12.2, armLength 56, inseam 74. XXL (176cm/~16y): height 176, chest 86, waist 70, hips 90, shoulder 13.0, armLength 58, inseam 79. Children sizes are organized by body height rather than circumference measurements. The height-to-age mapping is approximate.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:sizeTables:eu-children",
+        "category": "size-table",
+        "tags": [
+          "size-table",
+          "EU",
+          "children",
+          "kids",
+          "measurements",
+          "height-based"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "seamly-022",
+      "content": "Seamly2D pattern adapter architecture: The adapter converts Seamly2D pattern JSON files into the OpenClo construction engine format. The pipeline has 4 stages: 1. Resolve all construction steps to concrete (x, y) coordinates using measurements and formula evaluation. 2. Convert resolved points to CPoint objects (construction points with IDs and coordinates). 3. Convert spline definitions to CCurve objects (bezier curves connecting points). 4. Convert piece definitions to CPiece objects with ordered PieceNode arrays defining the outline. Each Seamly2D pattern declares required measurements with defaults, variables (computed formulas), a sequence of construction steps (point, line-angle, spline, etc.), and piece outlines referencing constructed geometry.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:adapter",
+        "category": "construction-step",
+        "tags": [
+          "seamly2d",
+          "adapter",
+          "construction",
+          "pipeline",
+          "architecture"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "seamly-023",
+      "content": "Seamly2D pattern structure: Each pattern JSON contains four sections. Measurements section declares required body measurements with default values (in mm). Variables section contains computed formulas that reference measurements and other variables (e.g., \"#sag_p = chest/4 + 1\"). Construction section lists steps that build the geometry: single points at absolute coordinates, endpoint-by-angle points, endpoint-by-length points, cubic bezier splines, and spline paths with multiple control points. Pieces section defines pattern pieces as ordered lists of nodes (points and curves) that form closed outlines, with seam allowance width per piece. The formula evaluator supports Seamly2D syntax including IncrementName references.",
+      "metadata": {
+        "source": "seamly2d",
+        "sourceRef": "seamly2d:pattern-structure",
+        "category": "construction-step",
+        "tags": [
+          "seamly2d",
+          "pattern",
+          "structure",
+          "json",
+          "formulas"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-001",
+      "content": "Bodice drafting methods available: Aldrich (UK, systematic block construction using chest, waist, and bust measurements with standard ease distribution), Muller (DE, German precision drafting with detailed proportional calculations and separate front/back construction), and Gilewska (FR, French approach emphasizing balance lines and proportional bust dart construction). All three methods start from chest, waist, bust, neck, and height measurements to produce front and back bodice pieces with darts, shoulder slope, and neckline shaping.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice",
+        "category": "drafting-method",
+        "tags": [
+          "bodice",
+          "torso",
+          "block",
+          "methods",
+          "aldrich",
+          "muller",
+          "gilewska"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-002",
+      "content": "Bodice formulas (Aldrich method): Back width = chest/4 + 1cm ease. Front width = chest/4 + 1cm + bust dart intake. Armhole depth = height x 0.12 + 5cm (proportional from height, or use measured armscye depth). Shoulder slope = 2cm drop from neck point over shoulder width. Back neck width = neckCirc/6 + 0.5cm. Front neck depth = neckCirc/6 + 1.5cm for front scoop. Bust dart width = (bust - chest) / 2, which is half the difference between bust and chest circumference. Front waist dart = ((chest - waist) / 4) x 0.6, taking 60% of quarter waist-to-chest difference. Back waist dart = ((chest - waist) / 4) x 0.4, taking 40% of quarter waist-to-chest difference.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice:aldrich",
+        "category": "construction-step",
+        "tags": [
+          "bodice",
+          "formulas",
+          "aldrich",
+          "dart",
+          "armhole",
+          "neckline"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-003",
+      "content": "Bodice formulas (Muller method): Back width = chest/4 + 0.5cm. Front width = chest/4 + 1.5cm + bust dart intake. Armhole depth = measured armscye depth + 2cm. Shoulder slope = 2.5cm (steeper than Aldrich). Back neck width = neckCirc/6 + 0.5cm. Front neck depth = neckCirc/6 + 2cm (deeper than Aldrich). Bust dart width = (bust - chest) / 2. Front waist dart = ((chest - waist) / 4) x 0.55. Back waist dart = ((chest - waist) / 4) x 0.45. The Muller method distributes dart intake more evenly between front and back than Aldrich.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice:muller",
+        "category": "construction-step",
+        "tags": [
+          "bodice",
+          "formulas",
+          "muller",
+          "german",
+          "precision"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-004",
+      "content": "Bodice formulas (Gilewska method): Back width = chest/4 + 1cm. Front width = chest/4 + 1cm + bust dart intake. Armhole depth = neckToWaistBack/2 + 1cm (derived from back length, not height). Shoulder slope = 1.5cm (gentler than other methods). Back neck width = neckCirc/6 + 0.5cm. Front neck depth = neckCirc/6 + 1.5cm. Bust dart width = (bust - chest) / 2. Front waist dart = ((chest - waist) / 4) x 0.6. Back waist dart = ((chest - waist) / 4) x 0.4. The Gilewska method uses neckToWaistBack for armhole depth, making it more body-proportional.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice:gilewska",
+        "category": "construction-step",
+        "tags": [
+          "bodice",
+          "formulas",
+          "gilewska",
+          "french"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-005",
+      "content": "Bodice ease standards by fabric type. Woven fabrics: chest +4cm, waist +2cm, hips +4cm, armhole depth +1.5cm, shoulder +0.5cm. Stretch fabrics: chest +2cm, waist +1cm, hips +2cm, armhole depth +1cm, shoulder +0cm. Jersey/knit: chest +0cm, waist +0cm, hips +0cm, armhole depth +0.5cm, shoulder +0cm (negative ease typical). Outerwear: chest +8cm, waist +6cm, hips +6cm, armhole depth +2cm, shoulder +1cm (extra ease for layering). Ease is added to body measurements before applying drafting formulas to account for comfort, movement, and the fabric behavior.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice:ease",
+        "category": "ease-standard",
+        "tags": [
+          "bodice",
+          "ease",
+          "woven",
+          "stretch",
+          "jersey",
+          "outerwear"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "skill-006",
+      "content": "Bodice construction steps (14-step sequence): 1. Draw back center line (vertical) at neckToWaistBack length. 2. Mark armhole depth from nape: (height x 0.12) + 5cm down. 3. Draw back width at bust level: chest/4 + 1cm. 4. Shape back neckline: width = neckCirc/6 + 0.5cm, depth = 2cm. 5. Draw shoulder line with 2cm slope from neck to shoulder point. 6. Shape back armhole curve from shoulder to side seam. 7. Add back waist darts: intake = ((chest - waist)/4) x 0.4, length = armhole depth - 3cm. Dart tip ends 2-3cm before bust point. 8. Create front piece with same armhole depth. 9. Shape front neckline: width = neckCirc/6 + 0.5cm, depth = neckCirc/6 + 1.5cm. 10. Add bust dart from side seam: width = (bust - chest)/2, tip 2-3cm before bust apex. 11. Add front waist darts: intake = ((chest - waist)/4) x 0.6. 12. Add grainlines (vertical, center front/back) to both pieces. 13. Add notches: single at front, double at back. 14. Set seam allowance: 10mm standard, 7mm at neckline and armhole.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice:steps",
+        "category": "construction-step",
+        "tags": [
+          "bodice",
+          "construction",
+          "steps",
+          "dart",
+          "neckline",
+          "armhole",
+          "seam-allowance"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-007",
+      "content": "Bodice grading rules (per-point shifts per size increment): Side bust point: +0.25cm X per cm chest change (width expansion). Side waist point: +0.25cm X per cm waist change. Side hem point: +0.25cm X per cm hip change. Shoulder-neck point: +0.08cm X per cm neck circumference change. Shoulder tip: +0.15cm X, -0.05cm Y per cm shoulder width change (moves out and slightly up). Center back waist: +0.25cm Y per cm back length change (lengthens). Armhole depth point: +0.15cm Y per cm chest change (deepens proportionally). Center front neck: +0.08cm Y per cm neck circumference change (drops slightly).",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:bodice:grading",
+        "category": "grading-rule",
+        "tags": [
+          "bodice",
+          "grading",
+          "sizing",
+          "scale"
+        ],
+        "garmentTypes": [
+          "bodice"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "skill-008",
+      "content": "Sleeve drafting methods available: Standard set-in (one-piece sleeve, cap height from armhole depth, default for most garments), Two-piece tailored (upper and under-sleeve with front and back seams for better fit around the arm bend, used for jackets and coats), and Raglan (sleeve runs from neckline to wrist, cap includes part of shoulder taken from bodice front and back). All methods require armhole measurement from the bodice, upper arm circumference, and arm length.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:sleeve",
+        "category": "drafting-method",
+        "tags": [
+          "sleeve",
+          "set-in",
+          "two-piece",
+          "raglan",
+          "cap"
+        ],
+        "garmentTypes": [
+          "sleeve"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-009",
+      "content": "Sleeve formulas: Cap height = armholeDepth/2 - 1cm for standard set-in (half armhole depth minus 1cm). For two-piece tailored: armholeDepth/2 - 0.5cm. For raglan: shoulderSlope + armholeDepth. Sleeve width = upperArmCirc + 4cm ease (standard); +6cm for tailored two-piece; +4cm for raglan. Cap width = armhole measurement / 2 (half the total armhole measurement for the cap spread). Elbow line = armLength x 0.6 (60% of total arm length from cap). Cap ease = 2.5cm for woven standard set-in; 3cm for two-piece tailored; 1.5cm for raglan. Wrist width = wristCirc + 2cm ease. Two-piece split: under-sleeve width = total sleeve width x 0.45; upper-sleeve width = total x 0.55.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:sleeve:formulas",
+        "category": "construction-step",
+        "tags": [
+          "sleeve",
+          "formulas",
+          "cap-height",
+          "elbow",
+          "wrist"
+        ],
+        "garmentTypes": [
+          "sleeve"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-010",
+      "content": "Sleeve ease standards by fabric type. Woven: upper arm +4cm, cap ease +3cm, wrist +2cm. Stretch: upper arm +2cm, cap ease +1.5cm, wrist +1cm. Jersey/knit: upper arm +0cm, cap ease +1cm, wrist +0cm. Outerwear: upper arm +8cm, cap ease +3cm, wrist +3cm. Cap ease is the extra length in the sleeve cap for easing into the armhole. More ease creates a rounder cap with more volume at the shoulder.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:sleeve:ease",
+        "category": "ease-standard",
+        "tags": [
+          "sleeve",
+          "ease",
+          "cap-ease",
+          "woven",
+          "stretch",
+          "jersey",
+          "outerwear"
+        ],
+        "garmentTypes": [
+          "sleeve"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "skill-011",
+      "content": "Sleeve construction steps (10-step sequence): 1. Measure the armhole from bodice front and back pieces (must be taken from actual pieces). 2. Draw vertical center line at full sleeve length (shoulder to wrist). 3. Mark cap height: armholeDepth/2 - 1cm from top. 4. Draw sleeve width at bicep line: upperArm + 4cm ease. 5. Shape the sleeve cap curve using 3-point bezier. Front cap slightly concave, back cap rounder. Cap curve length must equal armhole + ease (2.5cm for woven). 6. Mark elbow line at 60% of arm length from cap. 7. Taper from bicep to wrist width (wristCirc + 2cm). 8. Add elbow dart if fitted sleeve: 1-2cm intake at elbow level, pointing toward center of arm. 9. Add grainline (vertical, center of sleeve). 10. Add notches: 1 notch at front armhole, 2 notches at back armhole, 1 at cap center.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:sleeve:steps",
+        "category": "construction-step",
+        "tags": [
+          "sleeve",
+          "construction",
+          "steps",
+          "cap",
+          "elbow-dart",
+          "notches"
+        ],
+        "garmentTypes": [
+          "sleeve"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-012",
+      "content": "Sleeve grading rules (per-point shifts per size increment): Cap center: +0.15cm X, -0.05cm Y per cm shoulder width change (widens and rises slightly). Bicep front: -0.2cm X per cm upper arm change (widens toward front). Bicep back: +0.2cm X per cm upper arm change (widens toward back). Elbow front: -0.15cm X per cm upper arm change. Elbow back: +0.15cm X per cm upper arm change. Wrist front: -0.1cm X per cm wrist change. Wrist back: +0.1cm X per cm wrist change. Hem center: +0.25cm Y per cm arm length change (lengthens). Sleeve grading is always bilateral (front and back sides move symmetrically outward).",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:sleeve:grading",
+        "category": "grading-rule",
+        "tags": [
+          "sleeve",
+          "grading",
+          "sizing"
+        ],
+        "garmentTypes": [
+          "sleeve"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "skill-013",
+      "content": "Skirt drafting methods available: Straight skirt block (standard quarter panels with front and back darts, foundation for all skirt variations), A-line flare (adds 3-5cm flare per panel at hem with proportional reduction of dart intake), and Circle skirt (waist opening as a circle with radius = waist / 2pi, no darts needed, cut on bias for drape). The straight skirt block is the base pattern from which all other skirt styles are derived. Additional variations include half-circle (radius = waist / pi) and quarter-circle (radius = 2 x waist / pi).",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:skirt",
+        "category": "drafting-method",
+        "tags": [
+          "skirt",
+          "straight",
+          "a-line",
+          "circle",
+          "flare",
+          "block"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-014",
+      "content": "Skirt formulas: Waist panel = waist/4 + dart intake for each panel. Hip panel = hips/4 (quarter hip for each panel width at hip level). Front dart intake = ((hips - waist) / 4) x 0.6 (60% of quarter hip-waist difference). Back dart intake = ((hips - waist) / 4) x 0.4 (40% of quarter hip-waist difference). Hip line position = 20cm below waist (standard). Circle skirt waist radius = waist / (2 x pi). Hem radius = waist radius + skirt length. Half-circle radius = waist / pi. Quarter-circle radius = (2 x waist) / pi. A-line flare = 3-5cm per panel added at hem, subtracted from dart intake. Standard flare is 4cm.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:skirt:formulas",
+        "category": "construction-step",
+        "tags": [
+          "skirt",
+          "formulas",
+          "dart",
+          "circle",
+          "a-line",
+          "hip-line"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-015",
+      "content": "Skirt ease standards by fabric type. Woven: waist +1cm, hips +2cm. Stretch: waist +0cm, hips +0cm (body-hugging fit). Jersey/knit: waist +0cm, hips -2cm (negative ease for body-con fit). Outerwear: waist +2cm, hips +4cm (extra room for layering). Skirt ease is minimal compared to bodice ease because the lower body has less movement range. Negative ease in jersey indicates the fabric stretches to fit, creating a close silhouette.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:skirt:ease",
+        "category": "ease-standard",
+        "tags": [
+          "skirt",
+          "ease",
+          "woven",
+          "stretch",
+          "jersey",
+          "outerwear"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "skill-016",
+      "content": "Skirt construction steps (10-step sequence): 1. Draw back panel rectangle: width = hips/4, height = skirt length. 2. Mark hip line at 20cm from waist. 3. Shape waistline: reduce top edge to waist/4. 4. Draw hip curve from waist to hip line on side seam (smooth transition). 5. Add back dart(s): intake = ((hips-waist)/4) x 0.4, length 14-15cm, positioned at center of back panel. 6. Create front panel: same base rectangle, different dart placement. 7. Add front dart(s): intake = ((hips-waist)/4) x 0.6, length 10-11cm (shorter than back), positioned at bust point projection. 8. Add grainlines: vertical at center front and center back. 9. Add notches at side seam hip level and waist. 10. Set seam allowance: 10mm at side/waist seams, 30mm at hem (wider hem allowance).",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:skirt:steps",
+        "category": "construction-step",
+        "tags": [
+          "skirt",
+          "construction",
+          "steps",
+          "dart",
+          "hip-curve",
+          "hem"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-017",
+      "content": "Skirt grading rules (per-point shifts per size increment): Side waist: +0.25cm X per cm waist change. Side hip: +0.25cm X per cm hip change. Side hem: +0.25cm X per cm hip change (proportional to hip, not waist). Center waist: no X movement, no Y movement (fixed reference). Center hem: +0.25cm Y per cm hip change (skirt length may adjust). Dart center: +0.125cm X per cm waist change (dart position shifts proportionally). Skirt grading is primarily horizontal at waist and hip levels. The dart position shifts at half the rate of the side seam.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:skirt:grading",
+        "category": "grading-rule",
+        "tags": [
+          "skirt",
+          "grading",
+          "sizing"
+        ],
+        "garmentTypes": [
+          "skirt"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "skill-018",
+      "content": "Collar drafting methods available: Stand/Mandarin (CN, upright band that follows neck, simple rectangle with slight curve), Flat/Peter Pan (UK, lies flat on shoulders, drafted by tracing shoulder/neckline from bodice pieces, stand height = 0), Shirt collar (UK, two-part: stand/band + fall/upper collar, classic for dress shirts and blouses), Revere/Lapel (UK, tailored collar folding back to create lapel, requires precise roll line and gorge line), and Shawl (UK, continuous collar-lapel with no gorge seam, used for tuxedos, robes, and casual jackets). All collar types start from the neckline measurement extracted from the bodice front and back pieces.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:collar",
+        "category": "drafting-method",
+        "tags": [
+          "collar",
+          "mandarin",
+          "peter-pan",
+          "shirt-collar",
+          "lapel",
+          "shawl"
+        ],
+        "garmentTypes": [
+          "collar"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-019",
+      "content": "Collar formulas: Stand height = 3-4cm standard (0 for flat collars like Peter Pan, 3.5cm for mandarin). Collar width/fall = 6-8cm for shirt collar, 3cm for stand-only, variable for lapel. Standard is 7cm. Neckline measurement = front neckline length + back neckline length (extracted from bodice pieces). Collar length = neckline measurement + 2cm overlap for closure. Roll line = stand height x 0.6 (approximately 60% up the stand, where collar folds over). Button stand extension = 2cm beyond center front for button closure. Revere-specific: lapel width = 8cm, collar width = 7cm, gorge depth = 2cm, roll line angle = 30 degrees. Shawl-specific: collar width = 8cm, roll line angle = 25 degrees.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:collar:formulas",
+        "category": "construction-step",
+        "tags": [
+          "collar",
+          "formulas",
+          "stand",
+          "roll-line",
+          "button-stand"
+        ],
+        "garmentTypes": [
+          "collar"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-020",
+      "content": "Collar ease standards by fabric type. Woven: neck +1cm, stand height +0cm. Stretch: neck +0cm, stand height +0cm. Jersey/knit: neck -0.5cm (negative ease for snug fit), stand height +0cm. Outerwear: neck +2cm (extra for layering underneath), stand height +0.5cm. Collar ease is minimal since the neck circumference is a fixed reference. Negative ease in jersey ensures the collar sits close to the neck without gapping.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:collar:ease",
+        "category": "ease-standard",
+        "tags": [
+          "collar",
+          "ease",
+          "neck",
+          "woven",
+          "stretch",
+          "jersey"
+        ],
+        "garmentTypes": [
+          "collar"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "skill-021",
+      "content": "Collar construction steps (8-step sequence): 1. Extract neckline measurement from bodice front and back pieces (must be measured from actual bodice neckline edges). 2. For stand collar: draw rectangle width = neckline + 2cm, height = stand height (3-4cm). 3. Curve the upper edge slightly (0.5cm convex) for fit around neck. 4. For shirt collar: draft stand piece first, then collar fall on top. Stand height = 3cm, fall width = 7cm. 5. Mark roll line at 60% of stand height from the neckline seam. 6. Shape collar points (spread, button-down, cutaway) as desired. 7. Add grainline: horizontal for stand, on-bias for flat collars. 8. Add notches at center back and front overlap points. Set seam allowance = 7mm (neckline standard).",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:collar:steps",
+        "category": "construction-step",
+        "tags": [
+          "collar",
+          "construction",
+          "steps",
+          "stand",
+          "fall",
+          "roll-line"
+        ],
+        "garmentTypes": [
+          "collar"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-022",
+      "content": "Collar grading rules (per-point shifts per size increment): Collar end left: -0.08cm X per cm neck circumference change (extends left). Collar end right: +0.08cm X per cm neck circumference change (extends right). Center back top: -0.03cm Y per cm neck circumference change (rises slightly). Center back bottom: +0.03cm Y per cm neck circumference change (drops slightly). Collar grading is minimal compared to bodice or skirt because the collar shape changes primarily in length, not width. The stand height typically remains constant across sizes.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:collar:grading",
+        "category": "grading-rule",
+        "tags": [
+          "collar",
+          "grading",
+          "sizing",
+          "neck"
+        ],
+        "garmentTypes": [
+          "collar"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "skill-023",
+      "content": "Grading size systems available: EU Women (34-48): bust-based sizing, size number = bust/2, standard 2cm circumference increment per size. EU Men (44-56): chest-based, larger increments than women, straighter proportional changes. US Women (0-16): ASTM standard, even numbers, 2.5cm (approx 1-inch) bust increments between sizes. UK Women (6-20): even numbers, 2.5cm bust increments, similar to US but different base numbering. EU sizing is the most widely used international system. Size increments are applied per-measurement to maintain proportional relationships across the size range.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:grading",
+        "category": "drafting-method",
+        "tags": [
+          "grading",
+          "sizing",
+          "EU",
+          "US",
+          "UK",
+          "size-systems"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt",
+          "collar"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-024",
+      "content": "Grading increments per size (EU standard, per half-pattern): Bust/chest: +2cm per size (EU), +2.5cm (US/UK). Waist: +2cm per size (EU), +2.5cm (US/UK). Hips: +2cm (EU women), +1.5cm (EU men), +2.5cm (US/UK). Back length (neckToWaistBack): +0.5cm per size. Shoulder width: +0.3cm per size (EU women), +0.4cm (EU men). Armhole depth: +0.3cm per size. Arm length: +0.5cm per size. Neck circumference: +0.5cm per size. These increments are applied to the base size measurements to derive all sizes in the range.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:grading:increments",
+        "category": "grading-rule",
+        "tags": [
+          "grading",
+          "increments",
+          "EU",
+          "US",
+          "UK"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "intermediate"
+      }
+    },
+    {
+      "id": "skill-025",
+      "content": "EU Women size table (body measurements in cm): Size 34 (XXS): chest 80, waist 64, hips 88, shoulder 11.8, neckCirc 34, back length 39.5. Size 36 (XS): chest 84, waist 68, hips 92, shoulder 12.1, neckCirc 34.5, back length 40. Size 38 (S): chest 88, waist 72, hips 96, shoulder 12.4, neckCirc 35, back length 40.5. Size 40 (M): chest 92, waist 76, hips 100, shoulder 12.7, neckCirc 35.5, back length 41. Size 42 (L): chest 96, waist 80, hips 104, shoulder 13, neckCirc 36, back length 41.5. Size 44 (XL): chest 100, waist 84, hips 108, shoulder 13.3, neckCirc 36.5, back length 42. Size 46 (XXL): chest 104, waist 88, hips 112, shoulder 13.6, neckCirc 37, back length 42.5. Size 48 (3XL): chest 108, waist 92, hips 116, shoulder 13.9, neckCirc 37.5, back length 43.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:grading:eu-women-table",
+        "category": "size-table",
+        "tags": [
+          "grading",
+          "size-table",
+          "EU",
+          "women"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "basic"
+      }
+    },
+    {
+      "id": "skill-026",
+      "content": "Grading construction workflow (6-step process): 1. Identify base size from current measurements (match bust to size chart). 2. Select target size range (e.g. EU 36-44). 3. Calculate per-point increments using grade rules. Each pattern point has specific X/Y shifts tied to a measurement. 4. Apply grading to each pattern piece by scaling outline points using per-point rules. 5. Validate graded sizes: check that seam lengths match between connected pieces across all sizes (e.g. side seam of bodice front matches bodice back). 6. Cross-size validation: verify proportions stay reasonable. No proportion should exceed +/-15% from base size ratio. Check bust-waist ratio and armhole shape.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:grading:steps",
+        "category": "construction-step",
+        "tags": [
+          "grading",
+          "workflow",
+          "validation",
+          "sizing"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "advanced"
+      }
+    },
+    {
+      "id": "skill-027",
+      "content": "Multi-garment grading rules (per half-pattern point, all garment types): Bodice: center-back-neck (+0, +0), shoulder-neck (+0.042 X), shoulder-tip (+0.15 X, -0.05 Y), armhole-side (+0.25 X, +0.15 Y), side-bust (+0.25 X), side-waist (+0.25 X), side-hip (+0.25 X), center-front-neck (+0.042 Y), center-back-hem (+0.25 Y). Sleeve: cap (+0.15 X, -0.05 Y), bicep (+0.2 X), hem (+0.25 Y). Skirt: waist (+0.25 X), hip (+0.25 X), hem (+0.25 X). All delta values are in cm per size increment. X is horizontal (width), Y is vertical (length). Positive X moves outward, negative Y moves upward. These rules ensure proportional scaling across the full garment.",
+      "metadata": {
+        "source": "house-rules",
+        "sourceRef": "skill:grading:rules-all",
+        "category": "grading-rule",
+        "tags": [
+          "grading",
+          "grade-rules",
+          "bodice",
+          "sleeve",
+          "skirt",
+          "multi-garment"
+        ],
+        "garmentTypes": [
+          "bodice",
+          "sleeve",
+          "skirt"
+        ],
+        "difficulty": "advanced"
+      }
+    }
+  ],
+  "createdAt": "2026-03-29T12:39:14.928Z"
+}
