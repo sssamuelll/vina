@@ -49,6 +49,7 @@ import { circleTool } from './definitions/circle';
 import { polyPenTool } from './definitions/polyPen';
 import { mirrorTool } from './definitions/mirror';
 import { traceTool } from './definitions/trace';
+import { autoTraceTool } from './definitions/autoTrace';
 import { freeSewingTool } from './definitions/freeSewing';
 import { arrangementTool } from './definitions/arrangement';
 import { pinTool } from './definitions/pin';
@@ -79,6 +80,7 @@ const allTools = [
   rectangleTool,
   dartTool,
   traceTool,
+  autoTraceTool,
   circleTool,
   polyPenTool,
 
