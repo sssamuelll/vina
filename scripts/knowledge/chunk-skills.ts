@@ -1,0 +1,578 @@
+/**
+ * Knowledge Chunking: Skill Definitions
+ *
+ * Extracts pattern-making knowledge from the 5 skill files
+ * (bodice, sleeve, skirt, collar, grading) into KnowledgeChunk arrays.
+ *
+ * Run: npx tsx scripts/knowledge/chunk-skills.ts
+ * Output: scripts/knowledge/output/skill-chunks.json
+ */
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+import type { KnowledgeChunk, ChunkMetadata } from '../../src/copilot/knowledge/types';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const chunks: KnowledgeChunk[] = [];
+let nextId = 1;
+
+function addChunk(content: string, metadata: ChunkMetadata): void {
+  chunks.push({
+    id: `skill-${String(nextId++).padStart(3, '0')}`,
+    content,
+    metadata,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// BODICE SKILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+addChunk(
+  'Bodice drafting methods available: Aldrich (UK, systematic block construction using chest, waist, and bust measurements with standard ease distribution), ' +
+  'Muller (DE, German precision drafting with detailed proportional calculations and separate front/back construction), ' +
+  'and Gilewska (FR, French approach emphasizing balance lines and proportional bust dart construction). ' +
+  'All three methods start from chest, waist, bust, neck, and height measurements to produce front and back bodice pieces with darts, shoulder slope, and neckline shaping.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice',
+    category: 'drafting-method',
+    tags: ['bodice', 'torso', 'block', 'methods', 'aldrich', 'muller', 'gilewska'],
+    garmentTypes: ['bodice'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Bodice formulas (Aldrich method): ' +
+  'Back width = chest/4 + 1cm ease. ' +
+  'Front width = chest/4 + 1cm + bust dart intake. ' +
+  'Armhole depth = height x 0.12 + 5cm (proportional from height, or use measured armscye depth). ' +
+  'Shoulder slope = 2cm drop from neck point over shoulder width. ' +
+  'Back neck width = neckCirc/6 + 0.5cm. ' +
+  'Front neck depth = neckCirc/6 + 1.5cm for front scoop. ' +
+  'Bust dart width = (bust - chest) / 2, which is half the difference between bust and chest circumference. ' +
+  'Front waist dart = ((chest - waist) / 4) x 0.6, taking 60% of quarter waist-to-chest difference. ' +
+  'Back waist dart = ((chest - waist) / 4) x 0.4, taking 40% of quarter waist-to-chest difference.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice:aldrich',
+    category: 'construction-step',
+    tags: ['bodice', 'formulas', 'aldrich', 'dart', 'armhole', 'neckline'],
+    garmentTypes: ['bodice'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Bodice formulas (Muller method): ' +
+  'Back width = chest/4 + 0.5cm. ' +
+  'Front width = chest/4 + 1.5cm + bust dart intake. ' +
+  'Armhole depth = measured armscye depth + 2cm. ' +
+  'Shoulder slope = 2.5cm (steeper than Aldrich). ' +
+  'Back neck width = neckCirc/6 + 0.5cm. ' +
+  'Front neck depth = neckCirc/6 + 2cm (deeper than Aldrich). ' +
+  'Bust dart width = (bust - chest) / 2. ' +
+  'Front waist dart = ((chest - waist) / 4) x 0.55. ' +
+  'Back waist dart = ((chest - waist) / 4) x 0.45. ' +
+  'The Muller method distributes dart intake more evenly between front and back than Aldrich.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice:muller',
+    category: 'construction-step',
+    tags: ['bodice', 'formulas', 'muller', 'german', 'precision'],
+    garmentTypes: ['bodice'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Bodice formulas (Gilewska method): ' +
+  'Back width = chest/4 + 1cm. ' +
+  'Front width = chest/4 + 1cm + bust dart intake. ' +
+  'Armhole depth = neckToWaistBack/2 + 1cm (derived from back length, not height). ' +
+  'Shoulder slope = 1.5cm (gentler than other methods). ' +
+  'Back neck width = neckCirc/6 + 0.5cm. ' +
+  'Front neck depth = neckCirc/6 + 1.5cm. ' +
+  'Bust dart width = (bust - chest) / 2. ' +
+  'Front waist dart = ((chest - waist) / 4) x 0.6. ' +
+  'Back waist dart = ((chest - waist) / 4) x 0.4. ' +
+  'The Gilewska method uses neckToWaistBack for armhole depth, making it more body-proportional.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice:gilewska',
+    category: 'construction-step',
+    tags: ['bodice', 'formulas', 'gilewska', 'french'],
+    garmentTypes: ['bodice'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Bodice ease standards by fabric type. ' +
+  'Woven fabrics: chest +4cm, waist +2cm, hips +4cm, armhole depth +1.5cm, shoulder +0.5cm. ' +
+  'Stretch fabrics: chest +2cm, waist +1cm, hips +2cm, armhole depth +1cm, shoulder +0cm. ' +
+  'Jersey/knit: chest +0cm, waist +0cm, hips +0cm, armhole depth +0.5cm, shoulder +0cm (negative ease typical). ' +
+  'Outerwear: chest +8cm, waist +6cm, hips +6cm, armhole depth +2cm, shoulder +1cm (extra ease for layering). ' +
+  'Ease is added to body measurements before applying drafting formulas to account for comfort, movement, and the fabric behavior.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice:ease',
+    category: 'ease-standard',
+    tags: ['bodice', 'ease', 'woven', 'stretch', 'jersey', 'outerwear'],
+    garmentTypes: ['bodice'],
+    difficulty: 'basic',
+  },
+);
+
+addChunk(
+  'Bodice construction steps (14-step sequence): ' +
+  '1. Draw back center line (vertical) at neckToWaistBack length. ' +
+  '2. Mark armhole depth from nape: (height x 0.12) + 5cm down. ' +
+  '3. Draw back width at bust level: chest/4 + 1cm. ' +
+  '4. Shape back neckline: width = neckCirc/6 + 0.5cm, depth = 2cm. ' +
+  '5. Draw shoulder line with 2cm slope from neck to shoulder point. ' +
+  '6. Shape back armhole curve from shoulder to side seam. ' +
+  '7. Add back waist darts: intake = ((chest - waist)/4) x 0.4, length = armhole depth - 3cm. Dart tip ends 2-3cm before bust point. ' +
+  '8. Create front piece with same armhole depth. ' +
+  '9. Shape front neckline: width = neckCirc/6 + 0.5cm, depth = neckCirc/6 + 1.5cm. ' +
+  '10. Add bust dart from side seam: width = (bust - chest)/2, tip 2-3cm before bust apex. ' +
+  '11. Add front waist darts: intake = ((chest - waist)/4) x 0.6. ' +
+  '12. Add grainlines (vertical, center front/back) to both pieces. ' +
+  '13. Add notches: single at front, double at back. ' +
+  '14. Set seam allowance: 10mm standard, 7mm at neckline and armhole.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice:steps',
+    category: 'construction-step',
+    tags: ['bodice', 'construction', 'steps', 'dart', 'neckline', 'armhole', 'seam-allowance'],
+    garmentTypes: ['bodice'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Bodice grading rules (per-point shifts per size increment): ' +
+  'Side bust point: +0.25cm X per cm chest change (width expansion). ' +
+  'Side waist point: +0.25cm X per cm waist change. ' +
+  'Side hem point: +0.25cm X per cm hip change. ' +
+  'Shoulder-neck point: +0.08cm X per cm neck circumference change. ' +
+  'Shoulder tip: +0.15cm X, -0.05cm Y per cm shoulder width change (moves out and slightly up). ' +
+  'Center back waist: +0.25cm Y per cm back length change (lengthens). ' +
+  'Armhole depth point: +0.15cm Y per cm chest change (deepens proportionally). ' +
+  'Center front neck: +0.08cm Y per cm neck circumference change (drops slightly).',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:bodice:grading',
+    category: 'grading-rule',
+    tags: ['bodice', 'grading', 'sizing', 'scale'],
+    garmentTypes: ['bodice'],
+    difficulty: 'advanced',
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SLEEVE SKILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+addChunk(
+  'Sleeve drafting methods available: Standard set-in (one-piece sleeve, cap height from armhole depth, default for most garments), ' +
+  'Two-piece tailored (upper and under-sleeve with front and back seams for better fit around the arm bend, used for jackets and coats), ' +
+  'and Raglan (sleeve runs from neckline to wrist, cap includes part of shoulder taken from bodice front and back). ' +
+  'All methods require armhole measurement from the bodice, upper arm circumference, and arm length.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:sleeve',
+    category: 'drafting-method',
+    tags: ['sleeve', 'set-in', 'two-piece', 'raglan', 'cap'],
+    garmentTypes: ['sleeve'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Sleeve formulas: ' +
+  'Cap height = armholeDepth/2 - 1cm for standard set-in (half armhole depth minus 1cm). For two-piece tailored: armholeDepth/2 - 0.5cm. For raglan: shoulderSlope + armholeDepth. ' +
+  'Sleeve width = upperArmCirc + 4cm ease (standard); +6cm for tailored two-piece; +4cm for raglan. ' +
+  'Cap width = armhole measurement / 2 (half the total armhole measurement for the cap spread). ' +
+  'Elbow line = armLength x 0.6 (60% of total arm length from cap). ' +
+  'Cap ease = 2.5cm for woven standard set-in; 3cm for two-piece tailored; 1.5cm for raglan. ' +
+  'Wrist width = wristCirc + 2cm ease. ' +
+  'Two-piece split: under-sleeve width = total sleeve width x 0.45; upper-sleeve width = total x 0.55.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:sleeve:formulas',
+    category: 'construction-step',
+    tags: ['sleeve', 'formulas', 'cap-height', 'elbow', 'wrist'],
+    garmentTypes: ['sleeve'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Sleeve ease standards by fabric type. ' +
+  'Woven: upper arm +4cm, cap ease +3cm, wrist +2cm. ' +
+  'Stretch: upper arm +2cm, cap ease +1.5cm, wrist +1cm. ' +
+  'Jersey/knit: upper arm +0cm, cap ease +1cm, wrist +0cm. ' +
+  'Outerwear: upper arm +8cm, cap ease +3cm, wrist +3cm. ' +
+  'Cap ease is the extra length in the sleeve cap for easing into the armhole. More ease creates a rounder cap with more volume at the shoulder.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:sleeve:ease',
+    category: 'ease-standard',
+    tags: ['sleeve', 'ease', 'cap-ease', 'woven', 'stretch', 'jersey', 'outerwear'],
+    garmentTypes: ['sleeve'],
+    difficulty: 'basic',
+  },
+);
+
+addChunk(
+  'Sleeve construction steps (10-step sequence): ' +
+  '1. Measure the armhole from bodice front and back pieces (must be taken from actual pieces). ' +
+  '2. Draw vertical center line at full sleeve length (shoulder to wrist). ' +
+  '3. Mark cap height: armholeDepth/2 - 1cm from top. ' +
+  '4. Draw sleeve width at bicep line: upperArm + 4cm ease. ' +
+  '5. Shape the sleeve cap curve using 3-point bezier. Front cap slightly concave, back cap rounder. Cap curve length must equal armhole + ease (2.5cm for woven). ' +
+  '6. Mark elbow line at 60% of arm length from cap. ' +
+  '7. Taper from bicep to wrist width (wristCirc + 2cm). ' +
+  '8. Add elbow dart if fitted sleeve: 1-2cm intake at elbow level, pointing toward center of arm. ' +
+  '9. Add grainline (vertical, center of sleeve). ' +
+  '10. Add notches: 1 notch at front armhole, 2 notches at back armhole, 1 at cap center.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:sleeve:steps',
+    category: 'construction-step',
+    tags: ['sleeve', 'construction', 'steps', 'cap', 'elbow-dart', 'notches'],
+    garmentTypes: ['sleeve'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Sleeve grading rules (per-point shifts per size increment): ' +
+  'Cap center: +0.15cm X, -0.05cm Y per cm shoulder width change (widens and rises slightly). ' +
+  'Bicep front: -0.2cm X per cm upper arm change (widens toward front). ' +
+  'Bicep back: +0.2cm X per cm upper arm change (widens toward back). ' +
+  'Elbow front: -0.15cm X per cm upper arm change. ' +
+  'Elbow back: +0.15cm X per cm upper arm change. ' +
+  'Wrist front: -0.1cm X per cm wrist change. ' +
+  'Wrist back: +0.1cm X per cm wrist change. ' +
+  'Hem center: +0.25cm Y per cm arm length change (lengthens). ' +
+  'Sleeve grading is always bilateral (front and back sides move symmetrically outward).',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:sleeve:grading',
+    category: 'grading-rule',
+    tags: ['sleeve', 'grading', 'sizing'],
+    garmentTypes: ['sleeve'],
+    difficulty: 'advanced',
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SKIRT SKILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+addChunk(
+  'Skirt drafting methods available: Straight skirt block (standard quarter panels with front and back darts, foundation for all skirt variations), ' +
+  'A-line flare (adds 3-5cm flare per panel at hem with proportional reduction of dart intake), ' +
+  'and Circle skirt (waist opening as a circle with radius = waist / 2pi, no darts needed, cut on bias for drape). ' +
+  'The straight skirt block is the base pattern from which all other skirt styles are derived. ' +
+  'Additional variations include half-circle (radius = waist / pi) and quarter-circle (radius = 2 x waist / pi).',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:skirt',
+    category: 'drafting-method',
+    tags: ['skirt', 'straight', 'a-line', 'circle', 'flare', 'block'],
+    garmentTypes: ['skirt'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Skirt formulas: ' +
+  'Waist panel = waist/4 + dart intake for each panel. ' +
+  'Hip panel = hips/4 (quarter hip for each panel width at hip level). ' +
+  'Front dart intake = ((hips - waist) / 4) x 0.6 (60% of quarter hip-waist difference). ' +
+  'Back dart intake = ((hips - waist) / 4) x 0.4 (40% of quarter hip-waist difference). ' +
+  'Hip line position = 20cm below waist (standard). ' +
+  'Circle skirt waist radius = waist / (2 x pi). Hem radius = waist radius + skirt length. ' +
+  'Half-circle radius = waist / pi. Quarter-circle radius = (2 x waist) / pi. ' +
+  'A-line flare = 3-5cm per panel added at hem, subtracted from dart intake. Standard flare is 4cm.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:skirt:formulas',
+    category: 'construction-step',
+    tags: ['skirt', 'formulas', 'dart', 'circle', 'a-line', 'hip-line'],
+    garmentTypes: ['skirt'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Skirt ease standards by fabric type. ' +
+  'Woven: waist +1cm, hips +2cm. ' +
+  'Stretch: waist +0cm, hips +0cm (body-hugging fit). ' +
+  'Jersey/knit: waist +0cm, hips -2cm (negative ease for body-con fit). ' +
+  'Outerwear: waist +2cm, hips +4cm (extra room for layering). ' +
+  'Skirt ease is minimal compared to bodice ease because the lower body has less movement range. ' +
+  'Negative ease in jersey indicates the fabric stretches to fit, creating a close silhouette.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:skirt:ease',
+    category: 'ease-standard',
+    tags: ['skirt', 'ease', 'woven', 'stretch', 'jersey', 'outerwear'],
+    garmentTypes: ['skirt'],
+    difficulty: 'basic',
+  },
+);
+
+addChunk(
+  'Skirt construction steps (10-step sequence): ' +
+  '1. Draw back panel rectangle: width = hips/4, height = skirt length. ' +
+  '2. Mark hip line at 20cm from waist. ' +
+  '3. Shape waistline: reduce top edge to waist/4. ' +
+  '4. Draw hip curve from waist to hip line on side seam (smooth transition). ' +
+  '5. Add back dart(s): intake = ((hips-waist)/4) x 0.4, length 14-15cm, positioned at center of back panel. ' +
+  '6. Create front panel: same base rectangle, different dart placement. ' +
+  '7. Add front dart(s): intake = ((hips-waist)/4) x 0.6, length 10-11cm (shorter than back), positioned at bust point projection. ' +
+  '8. Add grainlines: vertical at center front and center back. ' +
+  '9. Add notches at side seam hip level and waist. ' +
+  '10. Set seam allowance: 10mm at side/waist seams, 30mm at hem (wider hem allowance).',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:skirt:steps',
+    category: 'construction-step',
+    tags: ['skirt', 'construction', 'steps', 'dart', 'hip-curve', 'hem'],
+    garmentTypes: ['skirt'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Skirt grading rules (per-point shifts per size increment): ' +
+  'Side waist: +0.25cm X per cm waist change. ' +
+  'Side hip: +0.25cm X per cm hip change. ' +
+  'Side hem: +0.25cm X per cm hip change (proportional to hip, not waist). ' +
+  'Center waist: no X movement, no Y movement (fixed reference). ' +
+  'Center hem: +0.25cm Y per cm hip change (skirt length may adjust). ' +
+  'Dart center: +0.125cm X per cm waist change (dart position shifts proportionally). ' +
+  'Skirt grading is primarily horizontal at waist and hip levels. The dart position shifts at half the rate of the side seam.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:skirt:grading',
+    category: 'grading-rule',
+    tags: ['skirt', 'grading', 'sizing'],
+    garmentTypes: ['skirt'],
+    difficulty: 'advanced',
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COLLAR SKILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+addChunk(
+  'Collar drafting methods available: Stand/Mandarin (CN, upright band that follows neck, simple rectangle with slight curve), ' +
+  'Flat/Peter Pan (UK, lies flat on shoulders, drafted by tracing shoulder/neckline from bodice pieces, stand height = 0), ' +
+  'Shirt collar (UK, two-part: stand/band + fall/upper collar, classic for dress shirts and blouses), ' +
+  'Revere/Lapel (UK, tailored collar folding back to create lapel, requires precise roll line and gorge line), ' +
+  'and Shawl (UK, continuous collar-lapel with no gorge seam, used for tuxedos, robes, and casual jackets). ' +
+  'All collar types start from the neckline measurement extracted from the bodice front and back pieces.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:collar',
+    category: 'drafting-method',
+    tags: ['collar', 'mandarin', 'peter-pan', 'shirt-collar', 'lapel', 'shawl'],
+    garmentTypes: ['collar'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Collar formulas: ' +
+  'Stand height = 3-4cm standard (0 for flat collars like Peter Pan, 3.5cm for mandarin). ' +
+  'Collar width/fall = 6-8cm for shirt collar, 3cm for stand-only, variable for lapel. Standard is 7cm. ' +
+  'Neckline measurement = front neckline length + back neckline length (extracted from bodice pieces). ' +
+  'Collar length = neckline measurement + 2cm overlap for closure. ' +
+  'Roll line = stand height x 0.6 (approximately 60% up the stand, where collar folds over). ' +
+  'Button stand extension = 2cm beyond center front for button closure. ' +
+  'Revere-specific: lapel width = 8cm, collar width = 7cm, gorge depth = 2cm, roll line angle = 30 degrees. ' +
+  'Shawl-specific: collar width = 8cm, roll line angle = 25 degrees.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:collar:formulas',
+    category: 'construction-step',
+    tags: ['collar', 'formulas', 'stand', 'roll-line', 'button-stand'],
+    garmentTypes: ['collar'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Collar ease standards by fabric type. ' +
+  'Woven: neck +1cm, stand height +0cm. ' +
+  'Stretch: neck +0cm, stand height +0cm. ' +
+  'Jersey/knit: neck -0.5cm (negative ease for snug fit), stand height +0cm. ' +
+  'Outerwear: neck +2cm (extra for layering underneath), stand height +0.5cm. ' +
+  'Collar ease is minimal since the neck circumference is a fixed reference. ' +
+  'Negative ease in jersey ensures the collar sits close to the neck without gapping.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:collar:ease',
+    category: 'ease-standard',
+    tags: ['collar', 'ease', 'neck', 'woven', 'stretch', 'jersey'],
+    garmentTypes: ['collar'],
+    difficulty: 'basic',
+  },
+);
+
+addChunk(
+  'Collar construction steps (8-step sequence): ' +
+  '1. Extract neckline measurement from bodice front and back pieces (must be measured from actual bodice neckline edges). ' +
+  '2. For stand collar: draw rectangle width = neckline + 2cm, height = stand height (3-4cm). ' +
+  '3. Curve the upper edge slightly (0.5cm convex) for fit around neck. ' +
+  '4. For shirt collar: draft stand piece first, then collar fall on top. Stand height = 3cm, fall width = 7cm. ' +
+  '5. Mark roll line at 60% of stand height from the neckline seam. ' +
+  '6. Shape collar points (spread, button-down, cutaway) as desired. ' +
+  '7. Add grainline: horizontal for stand, on-bias for flat collars. ' +
+  '8. Add notches at center back and front overlap points. Set seam allowance = 7mm (neckline standard).',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:collar:steps',
+    category: 'construction-step',
+    tags: ['collar', 'construction', 'steps', 'stand', 'fall', 'roll-line'],
+    garmentTypes: ['collar'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Collar grading rules (per-point shifts per size increment): ' +
+  'Collar end left: -0.08cm X per cm neck circumference change (extends left). ' +
+  'Collar end right: +0.08cm X per cm neck circumference change (extends right). ' +
+  'Center back top: -0.03cm Y per cm neck circumference change (rises slightly). ' +
+  'Center back bottom: +0.03cm Y per cm neck circumference change (drops slightly). ' +
+  'Collar grading is minimal compared to bodice or skirt because the collar shape changes primarily in length, not width. ' +
+  'The stand height typically remains constant across sizes.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:collar:grading',
+    category: 'grading-rule',
+    tags: ['collar', 'grading', 'sizing', 'neck'],
+    garmentTypes: ['collar'],
+    difficulty: 'advanced',
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRADING SKILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+addChunk(
+  'Grading size systems available: ' +
+  'EU Women (34-48): bust-based sizing, size number = bust/2, standard 2cm circumference increment per size. ' +
+  'EU Men (44-56): chest-based, larger increments than women, straighter proportional changes. ' +
+  'US Women (0-16): ASTM standard, even numbers, 2.5cm (approx 1-inch) bust increments between sizes. ' +
+  'UK Women (6-20): even numbers, 2.5cm bust increments, similar to US but different base numbering. ' +
+  'EU sizing is the most widely used international system. Size increments are applied per-measurement ' +
+  'to maintain proportional relationships across the size range.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:grading',
+    category: 'drafting-method',
+    tags: ['grading', 'sizing', 'EU', 'US', 'UK', 'size-systems'],
+    garmentTypes: ['bodice', 'sleeve', 'skirt', 'collar'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'Grading increments per size (EU standard, per half-pattern): ' +
+  'Bust/chest: +2cm per size (EU), +2.5cm (US/UK). ' +
+  'Waist: +2cm per size (EU), +2.5cm (US/UK). ' +
+  'Hips: +2cm (EU women), +1.5cm (EU men), +2.5cm (US/UK). ' +
+  'Back length (neckToWaistBack): +0.5cm per size. ' +
+  'Shoulder width: +0.3cm per size (EU women), +0.4cm (EU men). ' +
+  'Armhole depth: +0.3cm per size. ' +
+  'Arm length: +0.5cm per size. ' +
+  'Neck circumference: +0.5cm per size. ' +
+  'These increments are applied to the base size measurements to derive all sizes in the range.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:grading:increments',
+    category: 'grading-rule',
+    tags: ['grading', 'increments', 'EU', 'US', 'UK'],
+    garmentTypes: ['bodice', 'sleeve', 'skirt'],
+    difficulty: 'intermediate',
+  },
+);
+
+addChunk(
+  'EU Women size table (body measurements in cm): ' +
+  'Size 34 (XXS): chest 80, waist 64, hips 88, shoulder 11.8, neckCirc 34, back length 39.5. ' +
+  'Size 36 (XS): chest 84, waist 68, hips 92, shoulder 12.1, neckCirc 34.5, back length 40. ' +
+  'Size 38 (S): chest 88, waist 72, hips 96, shoulder 12.4, neckCirc 35, back length 40.5. ' +
+  'Size 40 (M): chest 92, waist 76, hips 100, shoulder 12.7, neckCirc 35.5, back length 41. ' +
+  'Size 42 (L): chest 96, waist 80, hips 104, shoulder 13, neckCirc 36, back length 41.5. ' +
+  'Size 44 (XL): chest 100, waist 84, hips 108, shoulder 13.3, neckCirc 36.5, back length 42. ' +
+  'Size 46 (XXL): chest 104, waist 88, hips 112, shoulder 13.6, neckCirc 37, back length 42.5. ' +
+  'Size 48 (3XL): chest 108, waist 92, hips 116, shoulder 13.9, neckCirc 37.5, back length 43.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:grading:eu-women-table',
+    category: 'size-table',
+    tags: ['grading', 'size-table', 'EU', 'women'],
+    garmentTypes: ['bodice', 'sleeve', 'skirt'],
+    difficulty: 'basic',
+  },
+);
+
+addChunk(
+  'Grading construction workflow (6-step process): ' +
+  '1. Identify base size from current measurements (match bust to size chart). ' +
+  '2. Select target size range (e.g. EU 36-44). ' +
+  '3. Calculate per-point increments using grade rules. Each pattern point has specific X/Y shifts tied to a measurement. ' +
+  '4. Apply grading to each pattern piece by scaling outline points using per-point rules. ' +
+  '5. Validate graded sizes: check that seam lengths match between connected pieces across all sizes (e.g. side seam of bodice front matches bodice back). ' +
+  '6. Cross-size validation: verify proportions stay reasonable. No proportion should exceed +/-15% from base size ratio. Check bust-waist ratio and armhole shape.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:grading:steps',
+    category: 'construction-step',
+    tags: ['grading', 'workflow', 'validation', 'sizing'],
+    garmentTypes: ['bodice', 'sleeve', 'skirt'],
+    difficulty: 'advanced',
+  },
+);
+
+addChunk(
+  'Multi-garment grading rules (per half-pattern point, all garment types): ' +
+  'Bodice: center-back-neck (+0, +0), shoulder-neck (+0.042 X), shoulder-tip (+0.15 X, -0.05 Y), armhole-side (+0.25 X, +0.15 Y), ' +
+  'side-bust (+0.25 X), side-waist (+0.25 X), side-hip (+0.25 X), center-front-neck (+0.042 Y), center-back-hem (+0.25 Y). ' +
+  'Sleeve: cap (+0.15 X, -0.05 Y), bicep (+0.2 X), hem (+0.25 Y). ' +
+  'Skirt: waist (+0.25 X), hip (+0.25 X), hem (+0.25 X). ' +
+  'All delta values are in cm per size increment. X is horizontal (width), Y is vertical (length). ' +
+  'Positive X moves outward, negative Y moves upward. These rules ensure proportional scaling across the full garment.',
+  {
+    source: 'house-rules',
+    sourceRef: 'skill:grading:rules-all',
+    category: 'grading-rule',
+    tags: ['grading', 'grade-rules', 'bodice', 'sleeve', 'skirt', 'multi-garment'],
+    garmentTypes: ['bodice', 'sleeve', 'skirt'],
+    difficulty: 'advanced',
+  },
+);
+
+// ─── Write output ────────────────────────────────────────────────────────────
+
+const outputDir = path.join(__dirname, 'output');
+fs.mkdirSync(outputDir, { recursive: true });
+fs.writeFileSync(
+  path.join(outputDir, 'skill-chunks.json'),
+  JSON.stringify(chunks, null, 2),
+);
+console.log(`Generated ${chunks.length} skill chunks → scripts/knowledge/output/skill-chunks.json`);
