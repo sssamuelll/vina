@@ -56,6 +56,7 @@ import { tools as dxfToolDefs } from './definitions/dxfTools';
 import { tools as placementRuleToolDefs } from './definitions/placementRuleTools';
 import { tools as bomToolDefs } from './definitions/bomTools';
 import { tools as trimToolDefs } from './definitions/trimTools';
+import { tools as artworkToolDefs } from './definitions/artworkTools';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -389,6 +390,7 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   placementRuleToolDefs,
   bomToolDefs,
   trimToolDefs,
+  artworkToolDefs,
 ];
 
 let _defaultRegistry: ToolRegistry | null = null;
