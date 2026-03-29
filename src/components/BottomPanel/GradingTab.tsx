@@ -24,6 +24,7 @@ import {
 import type { GradingState } from '../../store/gradingSlice';
 import { addPiece, removePieces, renameLayer } from '../../store/projectSlice';
 import { gradePiece } from '../../utils/grading/gradingEngine';
+import { batchUndo } from '../../store/undoMiddleware';
 import {
   getSizeSystems,
   getAvailableSizes,
@@ -164,52 +165,54 @@ export default function GradingTab() {
     if (!isSupportedSystem(sizeSystem)) return;
     if (basePieces.length === 0) return;
 
-    // Remove any prior generated pieces
-    removeGenerated();
-
     const baseMeas = sizeMeasurements[baseSize];
     if (!baseMeas) return;
 
-    // Convert mm to cm for gradePiece (it expects cm)
-    const baseCm: Record<string, number> = {};
-    for (const [k, v] of Object.entries(baseMeas)) {
-      baseCm[k] = (v as number) / 10;
-    }
+    batchUndo(dispatch, 'Grade pattern', () => {
+      // Remove any prior generated pieces
+      removeGenerated();
 
-    const generated: Record<string, string[]> = {};
-    const sizesToGrade = activeSizes.filter((s) => s !== baseSize);
-
-    for (const size of sizesToGrade) {
-      const targetMeas = sizeMeasurements[size];
-      if (!targetMeas) continue;
-
-      const targetCm: Record<string, number> = {};
-      for (const [k, v] of Object.entries(targetMeas)) {
-        targetCm[k] = (v as number) / 10;
+      // Convert mm to cm for gradePiece (it expects cm)
+      const baseCm: Record<string, number> = {};
+      for (const [k, v] of Object.entries(baseMeas)) {
+        baseCm[k] = (v as number) / 10;
       }
 
-      const pieceIds: string[] = [];
-      for (const piece of basePieces) {
-        const scaled = gradePiece(piece, baseCm, targetCm, 'chest');
-        const newId = generateId();
-        const gradedPiece = {
-          ...scaled,
-          id: newId,
-          name: `${piece.name} [${size}]`,
-          locked: true,
-          layer: GRADING_LAYER,
-          gradedSize: size,
-        };
-        dispatch(addPiece(gradedPiece));
-        pieceIds.push(newId);
-      }
-      generated[size] = pieceIds;
-    }
+      const generated: Record<string, string[]> = {};
+      const sizesToGrade = activeSizes.filter((s) => s !== baseSize);
 
-    // Ensure layer name is set
-    dispatch(renameLayer({ layer: GRADING_LAYER, name: 'Grading' }));
-    dispatch(setGradingResult({ generatedPieces: generated }));
-    dispatch(setEnabled(true));
+      for (const size of sizesToGrade) {
+        const targetMeas = sizeMeasurements[size];
+        if (!targetMeas) continue;
+
+        const targetCm: Record<string, number> = {};
+        for (const [k, v] of Object.entries(targetMeas)) {
+          targetCm[k] = (v as number) / 10;
+        }
+
+        const pieceIds: string[] = [];
+        for (const piece of basePieces) {
+          const scaled = gradePiece(piece, baseCm, targetCm, 'chest');
+          const newId = generateId();
+          const gradedPiece = {
+            ...scaled,
+            id: newId,
+            name: `${piece.name} [${size}]`,
+            locked: true,
+            layer: GRADING_LAYER,
+            gradedSize: size,
+          };
+          dispatch(addPiece(gradedPiece));
+          pieceIds.push(newId);
+        }
+        generated[size] = pieceIds;
+      }
+
+      // Ensure layer name is set
+      dispatch(renameLayer({ layer: GRADING_LAYER, name: 'Grading' }));
+      dispatch(setGradingResult({ generatedPieces: generated }));
+      dispatch(setEnabled(true));
+    });
   }, [
     dispatch,
     sizeSystem,
@@ -229,8 +232,10 @@ export default function GradingTab() {
   }, [runGrading]);
 
   const handleClear = useCallback(() => {
-    removeGenerated();
-    dispatch(clearGrading());
+    batchUndo(dispatch, 'Clear grading', () => {
+      removeGenerated();
+      dispatch(clearGrading());
+    });
   }, [dispatch, removeGenerated]);
 
   // ── Render ──────────────────────────────────────────────────────────────
