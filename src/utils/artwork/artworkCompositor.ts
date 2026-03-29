@@ -127,13 +127,18 @@ export async function compositeArtwork(
     const blob = artworkBlobs.get(artwork.imageId);
     if (!blob) continue;
 
-    const bitmap = await createImageBitmap(blob);
     const { cx, cy, width, height, rotationRad } = computeArtworkTransform(
       artwork,
       pieceWidth,
       pieceHeight,
       textureSize,
     );
+
+    // Force bitmap dimensions — fixes SVG blobs that lack explicit width/height
+    // attributes (which produce 0x0 or 300x150 bitmaps in some browsers).
+    const bitmapW = Math.max(1, Math.round(width));
+    const bitmapH = Math.max(1, Math.round(height));
+    const bitmap = await createImageBitmap(blob, { resizeWidth: bitmapW, resizeHeight: bitmapH });
 
     ctx.save();
     ctx.translate(cx, cy);

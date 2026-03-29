@@ -645,8 +645,13 @@ const projectSlice = createSlice({
     addArtwork(state, action: PayloadAction<{ pieceId: string; artwork: PieceArtwork }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (!piece) return;
+      const { artwork } = action.payload;
+      if (artwork.width <= 0 || artwork.height <= 0) return;
       if (!piece.artworks) piece.artworks = [];
-      piece.artworks.push(action.payload.artwork);
+      piece.artworks.push({
+        ...artwork,
+        opacity: Math.max(0, Math.min(1, artwork.opacity)),
+      });
       state.isDirty = true;
     },
     updateArtwork(state, action: PayloadAction<{ pieceId: string; artworkId: string; changes: Partial<PieceArtwork> }>) {
@@ -654,7 +659,11 @@ const projectSlice = createSlice({
       if (!piece?.artworks) return;
       const idx = piece.artworks.findIndex(a => a.id === action.payload.artworkId);
       if (idx === -1) return;
-      piece.artworks[idx] = { ...piece.artworks[idx], ...action.payload.changes };
+      const changes = { ...action.payload.changes };
+      if (changes.width !== undefined && changes.width <= 0) return;
+      if (changes.height !== undefined && changes.height <= 0) return;
+      if (changes.opacity !== undefined) changes.opacity = Math.max(0, Math.min(1, changes.opacity));
+      piece.artworks[idx] = { ...piece.artworks[idx], ...changes };
       state.isDirty = true;
     },
     removeArtwork(state, action: PayloadAction<{ pieceId: string; artworkId: string }>) {
