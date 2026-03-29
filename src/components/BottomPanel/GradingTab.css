@@ -1,0 +1,155 @@
+/* ─── Grading Tab ────────────────────────────────────────────────────────── */
+
+.grading-tab {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-size: 12px;
+}
+
+/* ─── Toolbar ────────────────────────────────────────────────────────────── */
+
+.grading-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color, #333);
+}
+
+.grading-toolbar button {
+  font-size: 11px;
+  padding: 3px 8px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.grading-toolbar button:hover {
+  background: var(--button-hover-bg, #3a3a3a);
+}
+
+.grading-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.grading-toolbar select {
+  font-size: 11px;
+  padding: 3px 6px;
+  background: var(--button-bg, #2a2a2a);
+  color: var(--text-color, #ccc);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.grading-stale-badge {
+  color: #f59e0b;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+/* ─── Table Container ────────────────────────────────────────────────────── */
+
+.grading-table-container {
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ─── Table ──────────────────────────────────────────────────────────────── */
+
+.grading-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.grading-table th {
+  position: sticky;
+  top: 0;
+  background: var(--panel-bg, #1e1e1e);
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  text-align: left;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-color, #333);
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.grading-table td {
+  padding: 3px 8px;
+  color: var(--text-color, #ccc);
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-subtle, #2a2a2a);
+  white-space: nowrap;
+}
+
+.grading-table td input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.grading-table td input[type='number'] {
+  background: transparent;
+  color: var(--text-color, #ccc);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 11px;
+  font-family: inherit;
+  outline: none;
+  width: 60px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.grading-table td input[type='number']:focus {
+  border-color: var(--accent-color, #3b82f6);
+  background: var(--panel-bg, #1e1e1e);
+}
+
+/* ─── Base Row Highlight ────────────────────────────────────────────────── */
+
+.grading-base-row {
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.grading-base-row td {
+  font-weight: 600;
+}
+
+/* ─── Stats Footer ──────────────────────────────────────────────────────── */
+
+.grading-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 10px;
+  border-top: 1px solid var(--border-color, #333);
+  font-size: 11px;
+  color: var(--text-muted, #999);
+}
+
+.grading-stats span {
+  white-space: nowrap;
+}
+
+/* ─── Empty State ────────────────────────────────────────────────────────── */
+
+.grading-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #999);
+  height: 100%;
+  padding: 20px;
+  text-align: center;
+}
