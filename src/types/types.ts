@@ -596,6 +596,7 @@ export type Tool2D =
   | 'extendTrim'   // extend or trim edges
   | 'polyPen'      // combined straight + bezier pen
   | 'pleat'        // add/edit pleats along piece edges
+  | 'trimPlace'    // place trims on piece edges
   | 'hand'         // pan
   | 'zoom';
 
