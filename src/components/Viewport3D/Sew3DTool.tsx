@@ -15,7 +15,7 @@
  *   - Red: blocked (same piece or already seamed)
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -73,9 +73,12 @@ interface PiecePickMeshProps {
 }
 
 function PiecePickMesh({ piece, position, rotation, flipped, onPointerMove, onClick }: PiecePickMeshProps) {
+  const prevGeoRef = useRef<THREE.BufferGeometry | null>(null);
   const geometry = useMemo(() => {
+    // Dispose previous geometry to avoid GPU memory leak
+    if (prevGeoRef.current) prevGeoRef.current.dispose();
     const shape = commandsToShape(piece.outline);
-    if (!shape) return null;
+    if (!shape) { prevGeoRef.current = null; return null; }
     const geo = new THREE.ShapeGeometry(shape, 32);
     geo.rotateX(Math.PI / 2);
     geo.computeBoundingBox();
@@ -84,8 +87,14 @@ function PiecePickMesh({ piece, position, rotation, flipped, onPointerMove, onCl
       geo.boundingBox.getCenter(center);
       geo.translate(-center.x, -center.y, -center.z);
     }
+    prevGeoRef.current = geo;
     return geo;
   }, [piece.outline]);
+
+  // Dispose on unmount
+  useEffect(() => {
+    return () => { if (prevGeoRef.current) prevGeoRef.current.dispose(); };
+  }, []);
 
   const finalRotation = useMemo((): [number, number, number] => {
     if (rotation) {
