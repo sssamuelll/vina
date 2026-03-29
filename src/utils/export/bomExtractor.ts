@@ -6,8 +6,10 @@
  */
 
 import type { PatternPiece, Fabric, Seam, Elastic, Point2D } from '../../types/types';
+import type { Trim } from '../../types/trim';
 import type { BOMEntry } from '../../types/bom';
 import { flattenPath } from '../seam/index';
+import { extractTrims as extractTrimsFn } from '../trim/trimExtractor';
 
 // ─── Geometry Helpers ───
 
@@ -354,14 +356,6 @@ export function extractElastics(elastics: Elastic[], pieces: PatternPiece[]): BO
 }
 
 /**
- * Extract trim BOM entries.
- * Stub — returns empty array (future: buttons, zippers, etc.).
- */
-export function extractTrims(): BOMEntry[] {
-  return [];
-}
-
-/**
  * Extract all BOM entries from project state.
  * Combines fabric, interfacing, thread, seam tape, elastic, and trim entries.
  */
@@ -370,6 +364,7 @@ export function extractAll(
   fabrics: Fabric[],
   seams: Seam[],
   elastics: Elastic[],
+  trims?: Trim[],
 ): BOMEntry[] {
   return [
     ...extractFabrics(pieces, fabrics),
@@ -377,6 +372,12 @@ export function extractAll(
     ...extractThread(seams, pieces),
     ...extractSeamTape(seams, pieces),
     ...extractElastics(elastics, pieces),
-    ...extractTrims(),
+    ...extractTrimsFromProject(trims ?? [], pieces),
   ];
+}
+
+/** Extract trim BOM entries — delegates to trimExtractor */
+function extractTrimsFromProject(trims: Trim[], pieces: PatternPiece[]): BOMEntry[] {
+  if (trims.length === 0) return [];
+  return extractTrimsFn(trims, pieces) as BOMEntry[];
 }

@@ -79,6 +79,7 @@ export default function BOMTab() {
   const fabrics = useSelector((s: RootState) => s.project.fabrics ?? []);
   const seams = useSelector((s: RootState) => s.project.seams);
   const elastics = useSelector((s: RootState) => s.project.elastics ?? []);
+  const trims = useSelector((s: RootState) => s.project.trims ?? []);
   const projectUpdatedAt = useSelector((s: RootState) => ((s.project as unknown as Record<string, unknown>).updatedAt as number) ?? 0);
 
   // Local state
@@ -122,9 +123,9 @@ export default function BOMTab() {
   // ─── Handlers ───────────────────────────────────────────────────────────
 
   const handleRefresh = useCallback(() => {
-    const extracted = extractAll(pieces, fabrics, seams, elastics);
+    const extracted = extractAll(pieces, fabrics, seams, elastics, trims);
     dispatch(populateBOM({ entries: extracted, projectVersion: projectUpdatedAt }));
-  }, [dispatch, pieces, fabrics, seams, elastics, projectUpdatedAt]);
+  }, [dispatch, pieces, fabrics, seams, elastics, trims, projectUpdatedAt]);
 
   const handleAddItem = useCallback(() => {
     dispatch(addManualEntry({
