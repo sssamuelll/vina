@@ -176,6 +176,34 @@ describe('extractTrims', () => {
     expect(result[0].sourcePieceIds).toContain('p2');
   });
 
+  it('groups edge-points trims by type+name and sums position counts', () => {
+    const pieces = [makeRectPiece('p1'), makeRectPiece('p2')];
+    const trims: Trim[] = [
+      makeTrim({
+        id: 't1',
+        pieceId: 'p1',
+        type: 'button',
+        name: 'Flat 20mm',
+        unitCost: 0.20,
+        placement: { mode: 'edge-points' as const, edgeName: 'side', positions: [0.2, 0.4, 0.6] },
+      }),
+      makeTrim({
+        id: 't2',
+        pieceId: 'p2',
+        type: 'button',
+        name: 'Flat 20mm',
+        unitCost: 0.20,
+        placement: { mode: 'edge-points' as const, edgeName: 'side', positions: [0.3, 0.7] },
+      }),
+    ];
+
+    const result = extractTrims(trims, pieces);
+    expect(result).toHaveLength(1);
+    expect(result[0].quantity).toBe(5);
+    expect(result[0].unit).toBe('pieces');
+    expect(result[0].name).toBe('button \u2014 Flat 20mm');
+  });
+
   it('handles mixed count, edge, and point trims', () => {
     const pieces = [makeRectPiece('p1')];
     const trims: Trim[] = [
