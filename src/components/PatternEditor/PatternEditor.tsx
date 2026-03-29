@@ -12,6 +12,7 @@ import { useLineTool } from './useLineTool';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { useNotchTool } from './useNotchTool';
+import { useTrimTool } from './useTrimTool';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
@@ -35,6 +36,7 @@ import GridLayer from './renderers/GridLayer';
 import PieceRenderer from './renderers/PieceRenderer';
 import SeamRenderer from './renderers/SeamRenderer';
 import ElasticRenderer from './renderers/ElasticRenderer';
+import TrimRenderer from './renderers/TrimRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
 import HintText from './renderers/HintText';
 import ConstructionOverlay from './renderers/ConstructionOverlay';
@@ -167,6 +169,7 @@ export default function PatternEditor() {
   }, [dispatch]);
 
   const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd);
+  const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
   const handleGrainlineSet = useCallback((pieceId: string, grainline: InternalLine) => {
     dispatch(setInternalLine({ pieceId, line: grainline }));
@@ -459,7 +462,7 @@ export default function PatternEditor() {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
     });
 
   const handleZoomToFit = useCallback(() => {
@@ -631,6 +634,7 @@ export default function PatternEditor() {
             />
           )}
           <ElasticRenderer zoom2D={zoom2D} />
+          <TrimRenderer zoom2D={zoom2D} />
           <ToolOverlay
             activeTool={activeTool}
             zoom2D={zoom2D}
@@ -732,6 +736,7 @@ export default function PatternEditor() {
                 ? pieces.find(p => p.id === editor.selectedPieceIds[0])?.position ?? null
                 : null
             }
+            trimHoveredEdge={trimTool.hoveredEdge}
             selectMarquee={selectMarquee}
           />
           {activeTool === 'polyPen' && (

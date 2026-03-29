@@ -21,6 +21,8 @@ import SegmentSewingOverlay from './overlays/SegmentSewingOverlay';
 import TopstitchOverlay from './overlays/TopstitchOverlay';
 import WalkSeamOverlay from './overlays/WalkSeamOverlay';
 import OffsetPreviewOverlay from './overlays/OffsetPreviewOverlay';
+import TrimToolOverlay from './overlays/TrimToolOverlay';
+import type { TrimHover } from '../useTrimTool';
 import type { SegmentSelection, SnapResult } from '../useSegmentSewingTool';
 import type { WalkSeamEdge, GhostTransform, MismatchSample, WalkSeamMetrics } from '../useWalkSeamTool';
 import type { FreeEdgeSelection } from '../sewingUtils';
@@ -66,6 +68,7 @@ interface ToolOverlayProps {
   seamHoveredEdge: FreeEdgeSelection | null;
   seamMode: 'free' | 'point';
   notchHoveredPoint: NotchHover | null;
+  trimHoveredEdge: TrimHover | null;
   grainlineIsDragging: boolean;
   grainlineStartPoint: Point2D | null;
   grainlineEndPoint: Point2D | null;
@@ -175,6 +178,10 @@ export default function ToolOverlay(props: ToolOverlayProps) {
 
       {activeTool === 'notch' && props.notchHoveredPoint && (
         <NotchToolOverlay zoom2D={zoom2D} notchHoveredPoint={props.notchHoveredPoint} />
+      )}
+
+      {activeTool === 'trimPlace' && props.trimHoveredEdge && (
+        <TrimToolOverlay zoom2D={zoom2D} hoveredEdge={props.trimHoveredEdge} />
       )}
 
       {activeTool === 'grainline' && props.grainlineIsDragging && props.grainlineStartPoint && props.grainlineEndPoint && props.grainlinePieceId && (
