@@ -8,6 +8,7 @@ import { validateAndRepairProject } from '../utils/projectValidator';
 import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 import { uid } from '../utils/pathHelpers';
+import { detectSemanticEdges } from '../utils/semanticEdges';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
   lining: 0, facing: 0,
@@ -151,6 +152,12 @@ const projectSlice = createSlice({
         if ((piece as any).interfacingType === undefined) piece.interfacingType = 'none';
         if ((piece as any).solidifyFactor === undefined) piece.solidifyFactor = 0;
       }
+      // Auto-detect semantic edges on pieces that lack them
+      for (const piece of state.pieces) {
+        if ((!piece.edges || piece.edges.length === 0) && piece.outline?.length >= 3) {
+          piece.edges = detectSemanticEdges(piece);
+        }
+      }
       // Backfill sewing enhancement fields for seams from older projects
       for (const seam of state.seams) {
         if ((seam as any).tension === undefined) seam.tension = 100;
@@ -197,6 +204,10 @@ const projectSlice = createSlice({
       }
       if (!piece.fabricCode) {
         piece.fabricCode = 'SELF';
+      }
+      // Auto-detect semantic edges if missing (guard against pieces without outline)
+      if ((!piece.edges || piece.edges.length === 0) && piece.outline?.length >= 3) {
+        piece.edges = detectSemanticEdges(piece);
       }
       state.pieces.push(piece);
       state.isDirty = true;
