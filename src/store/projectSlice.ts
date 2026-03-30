@@ -161,9 +161,16 @@ const projectSlice = createSlice({
       }
       // Auto-detect seams if none exist and pieces have edges
       if (state.seams.length === 0 && state.pieces.some(p => p.edges && p.edges.length > 0)) {
-        const result = autoSew(state.pieces, { minConfidence: 0.4 });
-        for (const proposed of result.seams) {
-          state.seams.push(proposed.seam);
+        const result = autoSew(state.pieces, { minConfidence: 0.6 });
+        if (result.seams.length > 0) {
+          for (const proposed of result.seams) {
+            state.seams.push(proposed.seam);
+          }
+          state.loadDiagnostics.push({
+            severity: 'info',
+            code: 'AUTO_SEAMS_DETECTED',
+            message: `Auto-detected ${result.seams.length} seam(s). Review in the 2D editor. Undo with Ctrl+Z if incorrect.`,
+          });
         }
       }
       // Backfill sewing enhancement fields for seams from older projects

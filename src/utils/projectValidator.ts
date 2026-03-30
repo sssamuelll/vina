@@ -26,7 +26,8 @@ export type ValidationCode =
   | 'FABRIC_ID_UNKNOWN'
   | 'POM_ORPHANED_PIECE'
   | 'ELASTIC_DANGLING_EDGE'
-  | 'PLEAT_DANGLING_EDGE';
+  | 'PLEAT_DANGLING_EDGE'
+  | 'AUTO_SEAMS_DETECTED';
 
 export interface ValidationDiagnostic {
   severity: 'error' | 'warning' | 'info';
