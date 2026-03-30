@@ -15,9 +15,10 @@ import {
   saveArrangementSnapshot,
   clearArrangementSnapshot,
 } from '../../store/simulationSlice';
+import { clearArrangementOverrides } from '../../store/projectSlice';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
-import { Move, Play, Square, RotateCcw } from 'lucide-react';
+import { Move, Play, Square, RotateCcw, Shirt } from 'lucide-react';
 
 export default function SimModeToggle() {
   const dispatch = useDispatch();
@@ -56,6 +57,28 @@ export default function SimModeToggle() {
     dispatch(clearArrangementSnapshot());
   }, [dispatch]);
 
+  const handleDressAvatar = useCallback(() => {
+    // Reset any existing state
+    if (isSimulating) {
+      dispatch(resetSimulation());
+    }
+    dispatch(clearArrangementOverrides());
+    dispatch(clearArrangementSnapshot());
+
+    // Auto-arrange pieces around avatar
+    const placements = placeGarmentPieces(pieces, avatar.measurements);
+    const snapshot: Record<string, [number, number, number]> = {};
+    pieces.forEach((p, i) => {
+      const pos = placements[i].position;
+      snapshot[p.id] = [pos[0], pos[1], pos[2]];
+    });
+    dispatch(saveArrangementSnapshot(snapshot));
+
+    // Switch to simulate mode
+    dispatch(setViewMode3D('simulate'));
+    dispatch(startSimulation());
+  }, [dispatch, isSimulating, pieces, avatar.measurements]);
+
   return (
     <div style={{
       position: 'absolute',
@@ -74,6 +97,30 @@ export default function SimModeToggle() {
       fontFamily: "'Inter', sans-serif",
       fontSize: 12,
     }}>
+      {/* Dress Avatar button */}
+      <button
+        onClick={handleDressAvatar}
+        disabled={pieces.length === 0}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 5,
+          padding: '5px 12px',
+          border: 'none',
+          borderRadius: 6,
+          background: '#2a5a3a',
+          color: pieces.length === 0 ? '#555' : '#8c8',
+          cursor: pieces.length === 0 ? 'default' : 'pointer',
+          fontWeight: 600,
+          fontSize: 12,
+          transition: 'all 0.15s',
+        }}
+        title="Dress Avatar — auto-arrange and simulate in one click"
+      >
+        <Shirt size={13} />
+        Dress
+      </button>
+
       {/* Arrange button */}
       <button
         onClick={() => { if (isSimulating) handleToggle(); }}
