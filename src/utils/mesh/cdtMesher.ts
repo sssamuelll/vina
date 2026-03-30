@@ -107,10 +107,13 @@ export function meshPieceOutline(
   }
 
   // Remove duplicate consecutive points
-  const cleanOutline = removeDuplicatePoints(outlinePoints);
+  let cleanOutline = removeDuplicatePoints(outlinePoints);
   if (cleanOutline.length < 3) {
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
   }
+
+  // Simplify dense outlines (300+ points from offset operations)
+  cleanOutline = simplifyOutline(cleanOutline, 200, 0.5);
 
   // 1. Convert to PSLG format with boundary subdivision
   const { points, edges } = convertToPSLG(cleanOutline, internalLines, config.curveResolution, config.maxEdgeLength);
@@ -170,7 +173,7 @@ export function meshPieceOutline(
  * @param tolerance - Distance tolerance for considering points identical
  * @returns Cleaned point array
  */
-function removeDuplicatePoints(points: Point2D[], tolerance: number = 0.001): Point2D[] {
+function removeDuplicatePoints(points: Point2D[], tolerance: number = 0.1): Point2D[] {
   if (points.length <= 1) return points;
 
   const result: Point2D[] = [points[0]];
@@ -195,13 +198,74 @@ function removeDuplicatePoints(points: Point2D[], tolerance: number = 0.001): Po
     const dx = last.x - first.x;
     const dy = last.y - first.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
+
     if (dist <= tolerance) {
       result.pop(); // Remove duplicate closing point
     }
   }
 
   return result;
+}
+
+/**
+ * Simplify a dense outline using Douglas-Peucker algorithm.
+ * Only simplifies if the outline has more points than the threshold.
+ */
+function simplifyOutline(points: Point2D[], maxPoints: number = 200, minEpsilon: number = 0.5): Point2D[] {
+  if (points.length <= maxPoints) return points;
+
+  // Adaptive epsilon: start small, increase until we're under maxPoints
+  let epsilon = minEpsilon;
+  let simplified = douglasPeucker(points, epsilon);
+
+  while (simplified.length > maxPoints && epsilon < 50) {
+    epsilon *= 1.5;
+    simplified = douglasPeucker(points, epsilon);
+  }
+
+  // Ensure we have at least 3 points
+  if (simplified.length < 3) return points.slice(0, maxPoints);
+  return simplified;
+}
+
+/**
+ * Douglas-Peucker polyline simplification.
+ */
+function douglasPeucker(points: Point2D[], epsilon: number): Point2D[] {
+  if (points.length <= 2) return points;
+
+  // Find the point with the maximum distance from the line between first and last
+  let maxDist = 0;
+  let maxIdx = 0;
+  const first = points[0];
+  const last = points[points.length - 1];
+
+  for (let i = 1; i < points.length - 1; i++) {
+    const dist = perpendicularDistance(points[i], first, last);
+    if (dist > maxDist) {
+      maxDist = dist;
+      maxIdx = i;
+    }
+  }
+
+  if (maxDist > epsilon) {
+    const left = douglasPeucker(points.slice(0, maxIdx + 1), epsilon);
+    const right = douglasPeucker(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+
+  return [first, last];
+}
+
+function perpendicularDistance(point: Point2D, lineStart: Point2D, lineEnd: Point2D): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.sqrt((point.x - lineStart.x) ** 2 + (point.y - lineStart.y) ** 2);
+  const t = Math.max(0, Math.min(1, ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lenSq));
+  const projX = lineStart.x + t * dx;
+  const projY = lineStart.y + t * dy;
+  return Math.sqrt((point.x - projX) ** 2 + (point.y - projY) ** 2);
 }
 
 /**
