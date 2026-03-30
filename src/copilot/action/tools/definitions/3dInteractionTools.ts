@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * #142 — Bridge 3D Interactive Tools to Copilot
  *
@@ -464,6 +464,58 @@ export const tools: ToolDefinition[] = [
       return {
         success: false,
         error: 'Provide either "view" (preset name) or "focusPieceId" (piece ID).',
+      };
+    },
+  },
+
+  // ─── Dress Avatar ───────────────────────────────────────────────────────
+
+  {
+    name: 'dressAvatar',
+    description:
+      'One-click dress avatar: auto-arrange all pattern pieces around the avatar and start simulation. ' +
+      'Pieces are positioned based on their category (bodice, sleeve, skirt, etc.) and the avatar measurements. ' +
+      '/ Vestir avatar: auto-acomodar piezas alrededor del avatar e iniciar simulación.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+    execute: async (_params, dispatch, getState) => {
+      const state = getState();
+      const pieces = state.project.pieces.filter(p => p.active);
+      if (pieces.length === 0) {
+        return { success: false, error: 'No active pattern pieces to simulate.' };
+      }
+
+      const { placeGarmentPieces } = await import('../../../../utils/cloth/garmentPlacement');
+      const { clearArrangementOverrides } = await import('../../../../store/projectSlice');
+      const { saveArrangementSnapshot, clearArrangementSnapshot } = await import('../../../../store/simulationSlice');
+
+      // Reset
+      dispatch(resetSimulation());
+      dispatch(clearArrangementOverrides());
+      dispatch(clearArrangementSnapshot());
+
+      // Arrange
+      const placements = placeGarmentPieces(pieces, state.project.avatar.measurements);
+      const snapshot: Record<string, [number, number, number]> = {};
+      pieces.forEach((p, i) => {
+        snapshot[p.id] = [placements[i].position[0], placements[i].position[1], placements[i].position[2]];
+      });
+      dispatch(saveArrangementSnapshot(snapshot));
+
+      // Simulate
+      dispatch(setViewMode3D('simulate'));
+      dispatch(startSimulation());
+
+      return {
+        success: true,
+        data: {
+          piecesArranged: pieces.length,
+          seamsActive: state.project.seams.filter(s => s.active).length,
+          message: `Dressing avatar with ${pieces.length} pieces and ${state.project.seams.filter(s => s.active).length} seams.`,
+        },
       };
     },
   },
