@@ -111,9 +111,21 @@ function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
     forceWebGL: !isWebGPUBackend,
   });
 
-  // Fire-and-forget — Three.js queues commands until the backend is ready
-  renderer.init().catch((err) => {
-    console.warn('[Viewport3D] WebGPURenderer.init() failed, frames may not render:', err);
+  // Suppress "render called before init" errors by gating early render calls.
+  // R3F calls .render() on the first frame before async init() completes.
+  let backendReady = false;
+  const originalRender = renderer.render.bind(renderer);
+  renderer.render = function (...args: Parameters<typeof originalRender>) {
+    if (!backendReady) return; // silently skip until init resolves
+    return originalRender(...args);
+  } as typeof renderer.render;
+
+  renderer.init().then(() => {
+    backendReady = true;
+  }).catch((err) => {
+    console.warn('[Viewport3D] WebGPURenderer.init() failed:', err);
+    // Allow render anyway — may work with degraded fallback
+    backendReady = true;
   });
 
   return renderer;
