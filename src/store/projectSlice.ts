@@ -9,6 +9,7 @@ import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 import { uid } from '../utils/pathHelpers';
 import { detectSemanticEdges } from '../utils/semanticEdges';
+import { autoSew } from '../utils/autoSew';
 
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
   lining: 0, facing: 0,
@@ -156,6 +157,13 @@ const projectSlice = createSlice({
       for (const piece of state.pieces) {
         if ((!piece.edges || piece.edges.length === 0) && piece.outline?.length >= 3) {
           piece.edges = detectSemanticEdges(piece);
+        }
+      }
+      // Auto-detect seams if none exist and pieces have edges
+      if (state.seams.length === 0 && state.pieces.some(p => p.edges && p.edges.length > 0)) {
+        const result = autoSew(state.pieces, { minConfidence: 0.4 });
+        for (const proposed of result.seams) {
+          state.seams.push(proposed.seam);
         }
       }
       // Backfill sewing enhancement fields for seams from older projects
