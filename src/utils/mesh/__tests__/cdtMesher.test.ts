@@ -780,6 +780,69 @@ describe('CDT Mesher', () => {
     });
   });
 
+  describe('Dense Outline Handling', () => {
+    test('handles dense outlines (300+ points)', () => {
+      // Generate a rectangle with 400+ points (simulating offset output)
+      const points: Point2D[] = [];
+      const n = 100;
+      // Top edge: 101 points
+      for (let i = 0; i <= n; i++) points.push({ x: i, y: 0 });
+      // Right edge: 100 points
+      for (let i = 1; i <= n; i++) points.push({ x: n, y: i * 2 });
+      // Bottom edge: 100 points
+      for (let i = n - 1; i >= 0; i--) points.push({ x: i, y: n * 2 });
+      // Left edge: 99 points
+      for (let i = n * 2 - 1; i > 0; i--) points.push({ x: 0, y: i });
+
+      expect(points.length).toBeGreaterThan(300);
+      const result = meshPieceOutline(points);
+      expect(result.vertices.length).toBeGreaterThan(0);
+      expect(result.triIds.length).toBeGreaterThan(0);
+    });
+
+    test('handles near-colinear points', () => {
+      // Rectangle with many colinear points on each edge
+      const points: Point2D[] = [];
+      for (let i = 0; i <= 50; i++) points.push({ x: i * 2, y: 0 });
+      for (let i = 0; i <= 50; i++) points.push({ x: 100, y: i * 4 });
+      for (let i = 50; i >= 0; i--) points.push({ x: i * 2, y: 200 });
+      for (let i = 50; i > 0; i--) points.push({ x: 0, y: i * 4 });
+
+      const result = meshPieceOutline(points);
+      expect(result.vertices.length).toBeGreaterThan(0);
+      expect(result.triIds.length).toBeGreaterThan(0);
+    });
+
+    test('returns empty for all-duplicate points', () => {
+      const result = meshPieceOutline([
+        { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 0 },
+      ]);
+      expect(result.vertices.length).toBe(0);
+    });
+
+    test('returns empty for degenerate input (less than 3 points)', () => {
+      const result = meshPieceOutline([{ x: 0, y: 0 }, { x: 1, y: 1 }]);
+      expect(result.vertices.length).toBe(0);
+      expect(result.triIds.length).toBe(0);
+    });
+
+    test('dense outline performance (< 500ms for 400 points)', () => {
+      const points: Point2D[] = [];
+      const n = 100;
+      for (let i = 0; i <= n; i++) points.push({ x: i, y: 0 });
+      for (let i = 1; i <= n; i++) points.push({ x: n, y: i * 2 });
+      for (let i = n - 1; i >= 0; i--) points.push({ x: i, y: n * 2 });
+      for (let i = n * 2 - 1; i > 0; i--) points.push({ x: 0, y: i });
+
+      const startTime = performance.now();
+      const result = meshPieceOutline(points);
+      const endTime = performance.now();
+
+      expect(result.vertices.length).toBeGreaterThan(0);
+      expect(endTime - startTime).toBeLessThan(500);
+    });
+  });
+
   describe('Solver Integration Tests', () => {
     test('solver compatibility - create ClothMeshData from meshPiece, pass to XPBDClothSolver constructor, verify it initializes without error', async () => {
       const { XPBDClothSolver } = await import('../../cloth/xpbdSolver');
