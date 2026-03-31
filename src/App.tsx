@@ -19,10 +19,12 @@ function App() {
       const registry = SkillRegistry.getInstance();
       await registry.initialize();
 
-      // Check if LLM provider is configured — required for core functionality
+      // Check if LLM provider is configured
       const config = loadProviderConfigSync();
       const hasProvider = !!(config?.apiKey) || config?.provider === 'ollama' || config?.provider === 'claude-bridge';
-      setSetupComplete(hasProvider);
+      // Show wizard every launch until provider is configured; skip flag only lasts this session
+      const skippedThisSession = sessionStorage.getItem('openclo-setup-skipped') === 'true';
+      setSetupComplete(hasProvider || skippedThisSession);
 
       setReady(true);
 

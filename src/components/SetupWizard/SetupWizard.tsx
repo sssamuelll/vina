@@ -118,7 +118,11 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     }
   }
 
-  // No skip — AI provider is required for core functionality
+  function handleSkip() {
+    // Skip only lasts this browser tab session — wizard shows again next visit
+    sessionStorage.setItem('openclo-setup-skipped', 'true');
+    onComplete();
+  }
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -247,6 +251,13 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
             onClick={handleSubmit}
           >
             {saving ? 'Saving...' : 'Start Designing'}
+          </button>
+          <button
+            type="button"
+            className="setup-wizard__skip"
+            onClick={handleSkip}
+          >
+            Continue without AI
           </button>
         </div>
       </div>

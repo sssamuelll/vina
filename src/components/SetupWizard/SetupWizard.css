@@ -9,6 +9,8 @@
   align-items: center;
   justify-content: center;
   animation: wizard-fade-in 0.4s ease-out;
+  overflow-y: auto;
+  padding: 40px 20px;
 }
 
 @keyframes wizard-fade-in {
@@ -17,21 +19,14 @@
 }
 
 .setup-wizard__card {
-  max-width: 600px;
+  max-width: 640px;
   width: 100%;
-  padding: 48px 40px;
   animation: wizard-slide-up 0.5s ease-out;
 }
 
 @keyframes wizard-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ─── Logo ─── */
@@ -45,9 +40,9 @@
 }
 
 .setup-wizard__logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 100%);
   display: flex;
   align-items: center;
@@ -56,13 +51,17 @@
 }
 
 .setup-wizard__logo-icon svg {
-  width: 20px;
-  height: 20px;
-  fill: #fff;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .setup-wizard__logo-text {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   color: #ffffff;
   letter-spacing: -0.3px;
@@ -75,8 +74,8 @@
 /* ─── Heading ─── */
 
 .setup-wizard__heading {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
   color: #ffffff;
   text-align: center;
   margin-bottom: 12px;
@@ -84,7 +83,7 @@
 }
 
 .setup-wizard__subheading {
-  font-size: 14px;
+  font-size: 15px;
   color: #888;
   text-align: center;
   line-height: 1.6;
@@ -97,67 +96,84 @@
 /* ─── Provider Cards ─── */
 
 .setup-wizard__providers {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   margin-bottom: 28px;
 }
 
 .setup-wizard__provider-card {
-  flex: 1;
-  padding: 16px 14px;
+  padding: 20px;
   background: #141414;
-  border: 1px solid #2a2a2a;
-  border-radius: 10px;
+  border: 1.5px solid #222;
+  border-radius: 12px;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
-  text-align: center;
+  transition: all 0.2s ease;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .setup-wizard__provider-card:hover {
-  border-color: #3a3a3a;
+  border-color: #444;
   background: #1a1a1a;
+  transform: translateY(-1px);
 }
 
 .setup-wizard__provider-card--selected {
   border-color: #4a9eff;
-  background: rgba(74, 158, 255, 0.06);
+  background: rgba(74, 158, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(74, 158, 255, 0.2);
 }
 
 .setup-wizard__provider-card--selected:hover {
   border-color: #4a9eff;
-  background: rgba(74, 158, 255, 0.08);
+  background: rgba(74, 158, 255, 0.1);
 }
 
 .setup-wizard__provider-name {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
-  color: #ffffff;
-  margin-bottom: 4px;
+  color: #fff;
 }
 
 .setup-wizard__provider-desc {
-  font-size: 11px;
-  color: #666;
+  font-size: 13px;
+  color: #777;
   line-height: 1.4;
 }
 
-/* ─── Config Section (key + model) ─── */
+/* Single card in last row spans full width if odd count */
+.setup-wizard__provider-card:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+/* ─── Config Section ─── */
 
 .setup-wizard__config {
   animation: wizard-fade-in 0.3s ease-out;
   margin-bottom: 28px;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 12px;
+  padding: 24px;
 }
 
 .setup-wizard__field {
   margin-bottom: 16px;
 }
 
+.setup-wizard__field:last-child {
+  margin-bottom: 0;
+}
+
 .setup-wizard__label {
   display: block;
   font-size: 12px;
-  font-weight: 500;
-  color: #888;
-  margin-bottom: 6px;
+  font-weight: 600;
+  color: #999;
+  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -165,13 +181,13 @@
 .setup-wizard__input,
 .setup-wizard__select {
   width: 100%;
-  padding: 10px 14px;
-  background: #141414;
-  border: 1px solid #2a2a2a;
+  padding: 12px 14px;
+  background: #1a1a1a;
+  border: 1px solid #333;
   border-radius: 8px;
   color: #ffffff;
   font-size: 14px;
-  font-family: inherit;
+  font-family: 'SF Mono', 'Fira Code', monospace;
   outline: none;
   transition: border-color 0.2s;
 }
@@ -182,14 +198,16 @@
 }
 
 .setup-wizard__input::placeholder {
-  color: #444;
+  color: #555;
+  font-family: inherit;
 }
 
 .setup-wizard__select {
+  font-family: inherit;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5L6 7.5L9 4.5' stroke='%23666' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
+  background-position: right 14px center;
   padding-right: 36px;
   cursor: pointer;
 }
@@ -207,33 +225,39 @@
 
 .setup-wizard__submit {
   width: 100%;
-  padding: 12px 24px;
-  background: #4a9eff;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #4a9eff 0%, #6366f1 100%);
   color: #ffffff;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   border: none;
-  border-radius: 10px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: background 0.2s, opacity 0.2s;
+  transition: opacity 0.2s, transform 0.2s;
   font-family: inherit;
+  letter-spacing: -0.2px;
 }
 
 .setup-wizard__submit:hover:not(:disabled) {
-  background: #6bb3ff;
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.setup-wizard__submit:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .setup-wizard__submit:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 .setup-wizard__skip {
   display: inline-block;
-  margin-top: 16px;
+  margin-top: 20px;
   background: none;
   border: none;
-  color: #555;
+  color: #444;
   font-size: 13px;
   cursor: pointer;
   font-family: inherit;
@@ -241,7 +265,7 @@
 }
 
 .setup-wizard__skip:hover {
-  color: #888;
+  color: #777;
 }
 
 /* ─── Error ─── */
@@ -249,5 +273,5 @@
 .setup-wizard__error {
   color: #ef4444;
   font-size: 12px;
-  margin-top: 6px;
+  margin-top: 8px;
 }
