@@ -34,17 +34,31 @@ const PROVIDERS: ProviderOption[] = [
   },
   {
     id: 'openai',
-    name: 'OpenAI GPT',
-    description: 'Fast and reliable',
+    name: 'OpenAI',
+    description: 'GPT-4o — fast and reliable',
     needsKey: true,
     defaultModel: 'gpt-4o',
   },
   {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    description: 'Affordable — great for testing',
+    needsKey: true,
+    defaultModel: 'deepseek-chat',
+  },
+  {
     id: 'ollama',
     name: 'Ollama (Local)',
-    description: 'Free, runs on your machine',
+    description: 'Free — runs on your machine',
     needsKey: false,
     defaultModel: 'llama3',
+  },
+  {
+    id: 'claude-bridge',
+    name: 'Claude Code Bridge',
+    description: 'Use your Claude Code session',
+    needsKey: false,
+    defaultModel: 'claude-code',
   },
 ];
 
@@ -185,6 +199,8 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
                   placeholder={
                     selectedProvider.id === 'anthropic'
                       ? 'sk-ant-...'
+                      : selectedProvider.id === 'deepseek'
+                      ? 'sk-...'
                       : 'sk-...'
                   }
                   autoFocus
