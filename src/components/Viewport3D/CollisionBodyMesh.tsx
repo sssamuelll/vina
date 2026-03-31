@@ -99,6 +99,7 @@ export default function CollisionBodyMesh({ body, orbitRef }: CollisionBodyMeshP
       body.transform.rotation[0] * DEG2RAD,
       body.transform.rotation[1] * DEG2RAD,
       body.transform.rotation[2] * DEG2RAD,
+      'XYZ',
     );
     groupRef.current.scale.set(...body.transform.scale);
   }, [body.transform]);

@@ -219,8 +219,8 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
 
       dispatch(addSeam({
         id: `seam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        pieceA: { pieceId: firstEdge.pieceId, edgeName: firstEdge.edgeName },
-        pieceB: { pieceId: clicked.pieceId, edgeName: clicked.edgeName },
+        pieceA: { pieceId: firstEdge.pieceId, edgeName: firstEdge.edgeName, tStart: 0, tEnd: 1 },
+        pieceB: { pieceId: clicked.pieceId, edgeName: clicked.edgeName, tStart: 0, tEnd: 1 },
         type: 'standard',
         tension: 100,
         strength: 1.0,

@@ -347,15 +347,16 @@ function convertToClothMeshData(
   triangles: number[][],
   config: Required<MeshConfig>,
 ): ClothMeshData {
-  // Center the points for better stability
-  let centerX = 0;
-  let centerY = 0;
+  // Center using bounding box center (must match PieceMesh.tsx's ShapeGeometry centering)
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (const p of points) {
-    centerX += p[0];
-    centerY += p[1];
+    if (p[0] < minX) minX = p[0];
+    if (p[0] > maxX) maxX = p[0];
+    if (p[1] < minY) minY = p[1];
+    if (p[1] > maxY) maxY = p[1];
   }
-  centerX /= points.length;
-  centerY /= points.length;
+  const centerX = (minX + maxX) / 2;
+  const centerY = (minY + maxY) / 2;
 
   // Build 3D vertices: [x0, yHeight, z0, x1, yHeight, z1, ...]
   const vertices = new Float32Array(points.length * 3);
