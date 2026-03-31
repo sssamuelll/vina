@@ -19,12 +19,10 @@ function App() {
       const registry = SkillRegistry.getInstance();
       await registry.initialize();
 
-      // Check if LLM provider is already configured
+      // Check if LLM provider is configured — required for core functionality
       const config = loadProviderConfigSync();
-      const hasProvider = !!(config?.provider);
-      const skipped = localStorage.getItem('openclo-setup-skipped') === 'true';
-      const completed = localStorage.getItem('openclo-setup-complete') === 'true';
-      setSetupComplete(hasProvider || skipped || completed);
+      const hasProvider = !!(config?.apiKey) || config?.provider === 'ollama' || config?.provider === 'claude-bridge';
+      setSetupComplete(hasProvider);
 
       setReady(true);
 

@@ -118,10 +118,7 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
     }
   }
 
-  function handleSkip() {
-    localStorage.setItem('openclo-setup-skipped', 'true');
-    onComplete();
-  }
+  // No skip — AI provider is required for core functionality
 
   // ── Render ───────────────────────────────────────────────────────────────
 
@@ -250,13 +247,6 @@ export default function SetupWizard({ onComplete }: SetupWizardProps) {
             onClick={handleSubmit}
           >
             {saving ? 'Saving...' : 'Start Designing'}
-          </button>
-          <button
-            type="button"
-            className="setup-wizard__skip"
-            onClick={handleSkip}
-          >
-            Skip for now
           </button>
         </div>
       </div>
