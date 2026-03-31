@@ -212,11 +212,22 @@ function describePieces(pieces: PatternPiece[]): string {
  */
 export async function analyzeGarment(
   pieces: PatternPiece[],
-  provider: LLMProvider,
-  config: ProviderConfig,
+  provider?: LLMProvider,
+  config?: ProviderConfig,
 ): Promise<GarmentAnalysis> {
   if (pieces.length === 0) {
     return { pieces: [], seams: [] };
+  }
+
+  // Auto-resolve provider if not provided
+  if (!provider || !config) {
+    const resolved = await getProvider();
+    if (!resolved) {
+      console.warn('[garmentAnalyzer] No LLM provider configured');
+      return { pieces: [], seams: [] };
+    }
+    provider = resolved.provider;
+    config = resolved.config;
   }
 
   const userMessage = `Analyze this garment with ${pieces.length} piece${pieces.length === 1 ? '' : 's'}:\n\n${describePieces(pieces)}`;
