@@ -35,6 +35,7 @@ import { downloadPDF } from '../../utils/exportPDF';
 import { toolRegistry } from '../../tools';
 import MarkerEditor from '../MarkerEditor/MarkerEditor';
 import CopilotUIOverlay from '../CopilotPanel/CopilotUIOverlay';
+import CommandBar from '../CommandBar/CommandBar';
 import DisplayBar2D from '../DisplayBar2D/DisplayBar2D';
 import DisplayBar3D from '../DisplayBar3D/DisplayBar3D';
 import { PanelErrorBoundary } from '../ErrorBoundary/PanelErrorBoundary';
@@ -472,6 +473,9 @@ export default function Workspace() {
           </PanelErrorBoundary>
         )}
       </div>
+
+      {/* ─── Command Bar (AI input) ─── */}
+      <CommandBar />
 
       {/* ─── Status Bar ─── */}
       <StatusBar />
