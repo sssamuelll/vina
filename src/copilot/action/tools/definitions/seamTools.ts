@@ -141,8 +141,8 @@ const createSeamTool: ToolDefinition = {
     const seamId = `seam-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`;
     const seam: Seam = {
       id: seamId,
-      pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName },
-      pieceB: { pieceId: params.pieceBId as string, edgeName: edgeBName },
+      pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName, tStart: 0, tEnd: 1 },
+      pieceB: { pieceId: params.pieceBId as string, edgeName: edgeBName, tStart: 0, tEnd: 1 },
       type: (params.seamType as Seam['type']) || 'standard',
       tension: DEFAULT_SEAM_TENSION,
       strength: DEFAULT_SEAM_STRENGTH,

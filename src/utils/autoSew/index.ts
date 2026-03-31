@@ -166,10 +166,14 @@ export function autoSew(
       pieceA: {
         pieceId: candidate.edgeA.pieceId,
         edgeName: candidate.edgeA.name,
+        tStart: 0,
+        tEnd: 1,
       },
       pieceB: {
         pieceId: candidate.edgeB.pieceId,
         edgeName: candidate.edgeB.name,
+        tStart: 0,
+        tEnd: 1,
       },
       type: 'standard' as const,
       tension: 100,

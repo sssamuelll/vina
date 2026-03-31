@@ -144,9 +144,12 @@ export function gradePiece(
 ): PatternPiece {
   const baseVal = baseMeasurements[primaryMeasurement];
   const targetVal = targetMeasurements[primaryMeasurement];
-  if (!baseVal || !targetVal || baseVal === 0) return { ...piece };
+  if (!baseVal || !targetVal || baseVal === 0 || !Number.isFinite(baseVal) || !Number.isFinite(targetVal)) {
+    return { ...piece };
+  }
 
   const scaleFactor = targetVal / baseVal;
+  if (!Number.isFinite(scaleFactor) || scaleFactor <= 0) return { ...piece };
   const center = computeCentroid(piece.outline);
   const scaledOutline = scaleOutline(piece.outline, scaleFactor, center);
 
