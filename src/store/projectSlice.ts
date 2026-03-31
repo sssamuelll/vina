@@ -11,6 +11,127 @@ import { uid } from '../utils/pathHelpers';
 import { detectSemanticEdges } from '../utils/semanticEdges';
 import { autoSew } from '../utils/autoSew';
 
+// ─── Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D) ────
+
+/**
+ * Approximate area of a closed outline using the shoelace formula
+ * on the command endpoints.
+ */
+function approximateArea(outline: PathCommand[]): number {
+  let cx = 0, cy = 0, area = 0;
+  for (const cmd of outline) {
+    let ex = cx, ey = cy;
+    switch (cmd.type) {
+      case 'M': ex = cmd.values[0]; ey = cmd.values[1]; break;
+      case 'L': ex = cmd.values[0]; ey = cmd.values[1]; break;
+      case 'H': ex = cmd.values[0]; break;
+      case 'V': ey = cmd.values[0]; break;
+      case 'C': ex = cmd.values[4]; ey = cmd.values[5]; break;
+      case 'S': ex = cmd.values[2]; ey = cmd.values[3]; break;
+      case 'Q': ex = cmd.values[2]; ey = cmd.values[3]; break;
+      case 'T': ex = cmd.values[0]; ey = cmd.values[1]; break;
+      case 'A': ex = cmd.values[5]; ey = cmd.values[6]; break;
+      case 'Z': continue;
+      default: continue;
+    }
+    area += (cx * ey - ex * cy);
+    cx = ex; cy = ey;
+  }
+  return Math.abs(area) / 2;
+}
+
+/**
+ * When all pieces share the same name (e.g. "Detail" from Seamly2D imports),
+ * assign meaningful names based on geometric analysis so that downstream
+ * semantic-edge detection and auto-sew can work properly.
+ */
+function autoRenameDuplicatePieces(pieces: PatternPiece[]): void {
+  if (pieces.length < 2) return;
+
+  // Check if all pieces share the same name
+  const names = new Set(pieces.map(p => p.name));
+  if (names.size > 1) return; // Already have distinct names
+
+  // Sort by area (largest first) to identify piece types
+  const sorted = [...pieces].sort((a, b) => {
+    return approximateArea(b.outline) - approximateArea(a.outline);
+  });
+
+  const count = sorted.length;
+
+  if (count === 5) {
+    // T-shirt pattern: 2 large bodice pieces, 2 medium sleeves, 1 small neckband
+    const [p0, p1, p2, p3, p4] = sorted;
+
+    p0.name = 'Front Bodice';
+    p0.category = 'bodice';
+    p0.side = 'front';
+
+    p1.name = 'Back Bodice';
+    p1.category = 'bodice';
+    p1.side = 'back';
+
+    p2.name = 'Sleeve Left';
+    p2.category = 'sleeve';
+    p2.side = 'left';
+
+    p3.name = 'Sleeve Right';
+    p3.category = 'sleeve';
+    p3.side = 'right';
+
+    p4.name = 'Neckband';
+    p4.category = 'collar';
+  } else if (count === 4) {
+    // Possible: 2 bodice + 2 sleeves (no neckband)
+    const [p0, p1, p2, p3] = sorted;
+
+    p0.name = 'Front Bodice';
+    p0.category = 'bodice';
+    p0.side = 'front';
+
+    p1.name = 'Back Bodice';
+    p1.category = 'bodice';
+    p1.side = 'back';
+
+    p2.name = 'Sleeve Left';
+    p2.category = 'sleeve';
+    p2.side = 'left';
+
+    p3.name = 'Sleeve Right';
+    p3.category = 'sleeve';
+    p3.side = 'right';
+  } else if (count === 3) {
+    // Possible: 2 bodice + 1 sleeve (fold symmetry)
+    const [p0, p1, p2] = sorted;
+
+    p0.name = 'Front Bodice';
+    p0.category = 'bodice';
+    p0.side = 'front';
+
+    p1.name = 'Back Bodice';
+    p1.category = 'bodice';
+    p1.side = 'back';
+
+    p2.name = 'Sleeve';
+    p2.category = 'sleeve';
+  } else if (count === 2) {
+    const [p0, p1] = sorted;
+
+    p0.name = 'Front';
+    p0.category = 'bodice';
+    p0.side = 'front';
+
+    p1.name = 'Back';
+    p1.category = 'bodice';
+    p1.side = 'back';
+  } else {
+    // Generic fallback: name by size order
+    for (let i = 0; i < sorted.length; i++) {
+      sorted[i].name = `Piece ${i + 1}`;
+    }
+  }
+}
+
 const CATEGORY_DEFAULT_LAYER: Record<string, number> = {
   lining: 0, facing: 0,
   bodice: 1, skirt: 1, trouser: 1, waistband: 1, sleeve: 1,
@@ -159,9 +280,25 @@ const projectSlice = createSlice({
           piece.edges = detectSemanticEdges(piece);
         }
       }
+
+      // Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D)
+      autoRenameDuplicatePieces(state.pieces);
+
+      // Re-detect edges on pieces that were renamed (category/side now set)
+      for (const piece of state.pieces) {
+        if (piece.category && piece.category !== 'other') {
+          piece.edges = detectSemanticEdges(piece);
+        }
+      }
+
       // Auto-detect seams if none exist and pieces have edges
       if (state.seams.length === 0 && state.pieces.some(p => p.edges && p.edges.length > 0)) {
-        const result = autoSew(state.pieces, { minConfidence: 0.6 });
+        // Adaptive confidence: lower threshold when pieces have duplicate names
+        // (naming score will be 0, so only length + proximity + position contribute)
+        const uniqueNames = new Set(state.pieces.map(p => p.name));
+        const namingDiversity = uniqueNames.size / state.pieces.length;
+        const adaptiveConfidence = namingDiversity < 0.5 ? 0.3 : 0.6;
+        const result = autoSew(state.pieces, { minConfidence: adaptiveConfidence });
         if (result.seams.length > 0) {
           for (const proposed of result.seams) {
             state.seams.push(proposed.seam);
