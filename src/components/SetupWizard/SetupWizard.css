@@ -19,7 +19,7 @@
 }
 
 .setup-wizard__card {
-  max-width: 640px;
+  max-width: 800px;
   width: 100%;
   animation: wizard-slide-up 0.5s ease-out;
 }
@@ -40,9 +40,9 @@
 }
 
 .setup-wizard__logo-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #4a9eff 0%, #8b5cf6 100%);
   display: flex;
   align-items: center;
@@ -61,7 +61,7 @@
 }
 
 .setup-wizard__logo-text {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 600;
   color: #ffffff;
   letter-spacing: -0.3px;
@@ -74,21 +74,21 @@
 /* ─── Heading ─── */
 
 .setup-wizard__heading {
-  font-size: 32px;
+  font-size: 40px;
   font-weight: 700;
   color: #ffffff;
   text-align: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   letter-spacing: -0.5px;
 }
 
 .setup-wizard__subheading {
-  font-size: 15px;
-  color: #888;
+  font-size: 18px;
+  color: #999;
   text-align: center;
   line-height: 1.6;
-  margin-bottom: 36px;
-  max-width: 480px;
+  margin-bottom: 40px;
+  max-width: 560px;
   margin-left: auto;
   margin-right: auto;
 }
@@ -103,16 +103,16 @@
 }
 
 .setup-wizard__provider-card {
-  padding: 20px;
+  padding: 24px;
   background: #141414;
   border: 1.5px solid #222;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .setup-wizard__provider-card:hover {
@@ -133,13 +133,13 @@
 }
 
 .setup-wizard__provider-name {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   color: #fff;
 }
 
 .setup-wizard__provider-desc {
-  font-size: 13px;
+  font-size: 15px;
   color: #777;
   line-height: 1.4;
 }
@@ -170,7 +170,7 @@
 
 .setup-wizard__label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #999;
   margin-bottom: 8px;
@@ -181,12 +181,12 @@
 .setup-wizard__input,
 .setup-wizard__select {
   width: 100%;
-  padding: 12px 14px;
+  padding: 14px 16px;
   background: #1a1a1a;
   border: 1px solid #333;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #ffffff;
-  font-size: 14px;
+  font-size: 16px;
   font-family: 'SF Mono', 'Fira Code', monospace;
   outline: none;
   transition: border-color 0.2s;
@@ -225,10 +225,10 @@
 
 .setup-wizard__submit {
   width: 100%;
-  padding: 14px 24px;
+  padding: 16px 24px;
   background: linear-gradient(135deg, #4a9eff 0%, #6366f1 100%);
   color: #ffffff;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   border: none;
   border-radius: 12px;
@@ -258,7 +258,7 @@
   background: none;
   border: none;
   color: #444;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
   font-family: inherit;
   transition: color 0.2s;
