@@ -112,11 +112,12 @@ export default function BottomPanel({ isOpen, onToggle, activeTab: propActiveTab
       onToggle(); // collapse
     } else {
       if (onTabChange) {
+        // setBottomPanelTab already auto-opens the panel — don't also call onToggle
         onTabChange(tabId);
       } else {
         setLocalActiveTab(tabId);
+        if (!isOpen) onToggle(); // expand (only needed for local state path)
       }
-      if (!isOpen) onToggle(); // expand
     }
   }, [activeTab, isOpen, onToggle, onTabChange]);
 
