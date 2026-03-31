@@ -152,8 +152,12 @@ export function autoSew(
     }
   }
 
+  // Filter out self-seams (same piece on both sides — should not happen
+  // with the i<j loop above, but guard against edge cases)
+  const safeCandidates = allCandidates.filter(c => c.edgeA.pieceId !== c.edgeB.pieceId);
+
   // Deduplicate and filter by confidence
-  const ranked = rankAndDeduplicate(allCandidates, minConfidence);
+  const ranked = rankAndDeduplicate(safeCandidates, minConfidence);
 
   // Convert to ProposedSeam objects
   const seams: ProposedSeam[] = ranked.map((candidate, idx) => ({
