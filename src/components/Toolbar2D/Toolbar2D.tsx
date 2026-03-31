@@ -82,19 +82,35 @@ function ToolGroupButton({ tools, activeToolId, visibleToolId, groupIndex, onToo
     };
   }, []);
 
-  // Close strip on pointer up anywhere (for the drag gesture)
+  // Close strip on pointer up, click-outside, or Escape (for the drag gesture + dismiss)
   useEffect(() => {
     if (!stripOpen) return;
-    const handleGlobalUp = () => {
-      if (isDragging.current && hoveredId) {
-        onToolSelect(hoveredId, groupIndex);
-      }
+    const closeStrip = () => {
       setStripOpen(false);
       isDragging.current = false;
       setHoveredId(null);
     };
+    const handleGlobalUp = () => {
+      if (isDragging.current && hoveredId) {
+        onToolSelect(hoveredId, groupIndex);
+      }
+      closeStrip();
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeStrip();
+    };
+    const handleClickOutside = () => {
+      // Delayed so the pointerup handler fires first
+      setTimeout(closeStrip, 50);
+    };
     window.addEventListener('pointerup', handleGlobalUp);
-    return () => window.removeEventListener('pointerup', handleGlobalUp);
+    window.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      window.removeEventListener('pointerup', handleGlobalUp);
+      window.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleClickOutside);
+    };
   }, [stripOpen, hoveredId, groupIndex, onToolSelect]);
 
   const openStrip = useCallback(() => {

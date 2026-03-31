@@ -46,12 +46,16 @@ export function useLineTool(
     } else {
       // Second click — complete the line
       if (state.pieceId) {
+        // Convert pattern-space coordinates to piece-local coordinates
+        const piece = pieces.find(p => p.id === state.pieceId);
+        const offX = piece?.position.x ?? 0;
+        const offY = piece?.position.y ?? 0;
         const line: InternalLine = {
           id: `line-${Date.now()}`,
-          type: 'dart', // construction line
+          type: 'fold', // construction line
           path: [
-            { type: 'M', values: [state.startPoint.x, state.startPoint.y] },
-            { type: 'L', values: [pt.x, pt.y] },
+            { type: 'M', values: [state.startPoint.x - offX, state.startPoint.y - offY] },
+            { type: 'L', values: [pt.x - offX, pt.y - offY] },
           ],
         };
         onComplete(state.pieceId, line);
