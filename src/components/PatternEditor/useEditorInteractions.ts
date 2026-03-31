@@ -315,23 +315,40 @@ export function useEditorInteractions(
     return () => window.removeEventListener('keydown', handler);
   }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown]);
 
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    const newZoom = Math.max(0.1, Math.min(10, zoom2D * delta));
+  // Register wheel handler with { passive: false } to allow preventDefault
+  // React's onWheel uses passive listeners by default in Chrome, causing
+  // "Unable to preventDefault inside passive event listener" warnings.
+  useEffect(() => {
     const svg = svgRef.current;
-    if (svg) {
+    if (!svg) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? 0.9 : 1.1;
+      const currentZoom = zoomRef.current;
+      const currentPan = panRef2.current;
+      const newZoom = Math.max(0.1, Math.min(10, currentZoom * delta));
       const rect = svg.getBoundingClientRect();
       const cx = e.clientX - rect.left;
       const cy = e.clientY - rect.top;
-      const scale = newZoom / zoom2D;
+      const scale = newZoom / currentZoom;
       dispatch(setPan2D({
-        x: cx - scale * (cx - pan2D.x),
-        y: cy - scale * (cy - pan2D.y),
+        x: cx - scale * (cx - currentPan.x),
+        y: cy - scale * (cy - currentPan.y),
       }));
-    }
-    dispatch(setZoom2D(newZoom));
-  }, [zoom2D, pan2D, dispatch]);
+      dispatch(setZoom2D(newZoom));
+    };
+    svg.addEventListener('wheel', handler, { passive: false });
+    return () => svg.removeEventListener('wheel', handler);
+  }, [dispatch]);
+
+  // Refs to avoid stale closures in the wheel handler
+  const zoomRef = useRef(zoom2D);
+  zoomRef.current = zoom2D;
+  const panRef2 = useRef(pan2D);
+  panRef2.current = pan2D;
+
+  // Keep handleWheel as a no-op for the return signature (SVG onWheel removed)
+  const handleWheel = useCallback((_e: React.WheelEvent) => { /* handled by native listener */ }, []);
 
   const handleDoubleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (activeTool === 'editPattern') {
