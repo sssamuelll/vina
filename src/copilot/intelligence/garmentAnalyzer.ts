@@ -102,6 +102,7 @@ Sewing rules:
 - Only match edges with similar lengths (within 30% tolerance).
 - Each edge can participate in at most ONE seam.
 - Never create a seam between an edge and another edge on the same piece.
+- CRITICAL: In the "seams" array, edgeAName and edgeBName MUST be the EXACT edge names from the piece descriptions above (e.g., "sideSeam", "sleeveCap", "armhole", "hemline"). Do NOT invent new names like "rightEdge" or "topEdge" — only use names that appear in the "Edges:" list for each piece.
 
 Respond with ONLY valid JSON, no markdown fences, no explanation:
 {
