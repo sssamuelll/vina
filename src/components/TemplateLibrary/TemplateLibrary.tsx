@@ -101,17 +101,55 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
             dispatch(updatePiece(updated));
           }
 
-          // Create seams from AI analysis
-          for (const seam of analysis.seams) {
+          // Create seams using the NEW edge names (after re-detection with correct categories)
+          // The LLM's seam suggestions use OLD edge names, so we match by category + semantic edge names instead
+          const reclassifiedPieces = store.getState().project.pieces;
+          const findPiece = (cat: string, side?: string) =>
+            reclassifiedPieces.find(p => p.category === cat && (!side || p.side === side));
+          const findEdge = (piece: PatternPiece | undefined, name: string) =>
+            piece?.edges?.find(e => e.name === name);
+
+          const makeSeam = (pA: PatternPiece | undefined, eA: string, pB: PatternPiece | undefined, eB: string) => {
+            if (!pA || !pB || !findEdge(pA, eA) || !findEdge(pB, eB)) return;
             dispatch(addSeam({
               id: `seam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              pieceA: { pieceId: seam.pieceAId, edgeName: seam.edgeAName, tStart: 0, tEnd: 1 },
-              pieceB: { pieceId: seam.pieceBId, edgeName: seam.edgeBName, tStart: 0, tEnd: 1 },
+              pieceA: { pieceId: pA.id, edgeName: eA, tStart: 0, tEnd: 1 },
+              pieceB: { pieceId: pB.id, edgeName: eB, tStart: 0, tEnd: 1 },
               type: 'standard', tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
             }));
+          };
+
+          const front = findPiece('bodice', 'front');
+          const back = findPiece('bodice', 'back');
+          const sleeve = findPiece('sleeve');
+
+          // Side seam: front ↔ back
+          makeSeam(front, 'sideSeam', back, 'sideSeam');
+          // Sleeve to armholes — match by closest length
+          if (sleeve && sleeve.edges) {
+            const frontArmhole = findEdge(front, 'armhole');
+            const backArmhole = findEdge(back, 'armhole');
+            // Find sleeve edges that best match armhole lengths (exclude tiny edges < 50mm)
+            const sleeveEdges = sleeve.edges.filter(e => (e.length ?? 0) > 50);
+            if (frontArmhole && sleeveEdges.length > 0) {
+              const bestForFront = sleeveEdges.reduce((best, e) =>
+                Math.abs((e.length ?? 0) - (frontArmhole.length ?? 0)) < Math.abs((best.length ?? 0) - (frontArmhole.length ?? 0)) ? e : best
+              );
+              makeSeam(front, 'armhole', sleeve, bestForFront.name);
+              // For back armhole, find next best (excluding the one already used)
+              if (backArmhole) {
+                const remaining = sleeveEdges.filter(e => e.name !== bestForFront.name);
+                if (remaining.length > 0) {
+                  const bestForBack = remaining.reduce((best, e) =>
+                    Math.abs((e.length ?? 0) - (backArmhole.length ?? 0)) < Math.abs((best.length ?? 0) - (backArmhole.length ?? 0)) ? e : best
+                  );
+                  makeSeam(back, 'armhole', sleeve, bestForBack.name);
+                }
+              }
+            }
           }
 
-          console.log(`[TemplateLibrary] AI classified ${analysis.pieces.length} pieces, created ${analysis.seams.length} seams`);
+          console.log(`[TemplateLibrary] AI classified ${analysis.pieces.length} pieces, created seams by category matching`);
         } catch (err) {
           console.warn('[TemplateLibrary] AI analysis failed, pieces loaded without seams:', err);
         }
