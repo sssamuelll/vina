@@ -103,7 +103,7 @@ export class SimulationInitClient {
           this.pendingMesh.delete(piece.id);
           reject(new Error(`Meshing timeout for piece ${piece.id}`));
         }
-      }, 10000);
+      }, 30000);
     });
   }
 
