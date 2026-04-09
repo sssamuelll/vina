@@ -73,9 +73,11 @@ interface UseSimulationLifecycleResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Check localStorage feature flag. Default: true (WebGPU enabled). */
+/** Check localStorage feature flag. Default: false (WebGPU disabled — TSL shaders have WGSL
+ *  compatibility issues with atomicAdd on some platforms, causing silent compute failures.
+ *  Set 'webclo-use-webgpu' to 'true' to opt-in once shaders are fixed). */
 function isWebGPUFeatureEnabled(): boolean {
-  return safeGetItem('webclo-use-webgpu') !== 'false';
+  return safeGetItem('webclo-use-webgpu') === 'true';
 }
 
 /** Race a promise against a timeout */
