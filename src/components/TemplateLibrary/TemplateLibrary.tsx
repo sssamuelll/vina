@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { updatePiece, addSeam } from '../../store/projectSlice';
 import { detectSemanticEdges } from '../../utils/semanticEdges';
 import { analyzeGarment } from '../../copilot/intelligence/garmentAnalyzer';
+import { autoSew } from '../../utils/autoSew';
 import type { PatternPiece } from '../../types/types';
 import './TemplateLibrary.css';
 
@@ -80,78 +81,98 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
         }
       }
 
-      // Ask the AI to analyze pieces and determine seams
+      // Analyze pieces and create seams
       const pieces = store.getState().project.pieces;
       if (pieces.length >= 2) {
+        let classified = false;
+
+        // Try LLM-based analysis first
         try {
           console.log('[TemplateLibrary] Asking AI to analyze garment...');
           const analysis = await analyzeGarment(pieces);
 
-          // Apply piece classifications
-          for (const classification of analysis.pieces) {
-            const piece = pieces.find(p => p.id === classification.id);
-            if (!piece) continue;
-            const updated = {
-              ...piece,
-              name: classification.suggestedName,
-              category: classification.category as PatternPiece['category'],
-              side: (classification.side ?? piece.side) as PatternPiece['side'],
+          if (analysis.pieces.length > 0) {
+            // Apply piece classifications
+            for (const classification of analysis.pieces) {
+              const piece = pieces.find(p => p.id === classification.id);
+              if (!piece) continue;
+              const updated = {
+                ...piece,
+                name: classification.suggestedName,
+                category: classification.category as PatternPiece['category'],
+                side: (classification.side ?? piece.side) as PatternPiece['side'],
+              };
+              updated.edges = detectSemanticEdges(updated);
+              dispatch(updatePiece(updated));
+            }
+            classified = true;
+
+            // Create seams using category + semantic edge name matching
+            const reclassifiedPieces = store.getState().project.pieces;
+            const findPiece = (cat: string, side?: string) =>
+              reclassifiedPieces.find(p => p.category === cat && (!side || p.side === side));
+            const findEdge = (piece: PatternPiece | undefined, name: string) =>
+              piece?.edges?.find(e => e.name === name);
+
+            const makeSeam = (pA: PatternPiece | undefined, eA: string, pB: PatternPiece | undefined, eB: string) => {
+              if (!pA || !pB || !findEdge(pA, eA) || !findEdge(pB, eB)) return;
+              dispatch(addSeam({
+                id: `seam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                pieceA: { pieceId: pA.id, edgeName: eA, tStart: 0, tEnd: 1 },
+                pieceB: { pieceId: pB.id, edgeName: eB, tStart: 0, tEnd: 1 },
+                type: 'standard', tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
+              }));
             };
-            updated.edges = detectSemanticEdges(updated);
-            dispatch(updatePiece(updated));
-          }
 
-          // Create seams using the NEW edge names (after re-detection with correct categories)
-          // The LLM's seam suggestions use OLD edge names, so we match by category + semantic edge names instead
-          const reclassifiedPieces = store.getState().project.pieces;
-          const findPiece = (cat: string, side?: string) =>
-            reclassifiedPieces.find(p => p.category === cat && (!side || p.side === side));
-          const findEdge = (piece: PatternPiece | undefined, name: string) =>
-            piece?.edges?.find(e => e.name === name);
-
-          const makeSeam = (pA: PatternPiece | undefined, eA: string, pB: PatternPiece | undefined, eB: string) => {
-            if (!pA || !pB || !findEdge(pA, eA) || !findEdge(pB, eB)) return;
-            dispatch(addSeam({
-              id: `seam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-              pieceA: { pieceId: pA.id, edgeName: eA, tStart: 0, tEnd: 1 },
-              pieceB: { pieceId: pB.id, edgeName: eB, tStart: 0, tEnd: 1 },
-              type: 'standard', tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
-            }));
-          };
-
-          const front = findPiece('bodice', 'front');
-          const back = findPiece('bodice', 'back');
-          const sleeve = findPiece('sleeve');
-
-          // Side seam: front ↔ back
-          makeSeam(front, 'sideSeam', back, 'sideSeam');
-          // Sleeve to armholes — match by closest length
-          if (sleeve && sleeve.edges) {
-            const frontArmhole = findEdge(front, 'armhole');
-            const backArmhole = findEdge(back, 'armhole');
-            // Find sleeve edges that best match armhole lengths (exclude tiny edges < 50mm)
-            const sleeveEdges = sleeve.edges.filter(e => (e.length ?? 0) > 50);
-            if (frontArmhole && sleeveEdges.length > 0) {
-              const bestForFront = sleeveEdges.reduce((best, e) =>
-                Math.abs((e.length ?? 0) - (frontArmhole.length ?? 0)) < Math.abs((best.length ?? 0) - (frontArmhole.length ?? 0)) ? e : best
-              );
-              makeSeam(front, 'armhole', sleeve, bestForFront.name);
-              // For back armhole, find next best (excluding the one already used)
-              if (backArmhole) {
-                const remaining = sleeveEdges.filter(e => e.name !== bestForFront.name);
-                if (remaining.length > 0) {
-                  const bestForBack = remaining.reduce((best, e) =>
-                    Math.abs((e.length ?? 0) - (backArmhole.length ?? 0)) < Math.abs((best.length ?? 0) - (backArmhole.length ?? 0)) ? e : best
-                  );
-                  makeSeam(back, 'armhole', sleeve, bestForBack.name);
+            const front = findPiece('bodice', 'front');
+            const back = findPiece('bodice', 'back');
+            const sleeve = findPiece('sleeve');
+            makeSeam(front, 'sideSeam', back, 'sideSeam');
+            if (sleeve && sleeve.edges) {
+              const frontArmhole = findEdge(front, 'armhole');
+              const backArmhole = findEdge(back, 'armhole');
+              const sleeveEdges = sleeve.edges.filter(e => (e.length ?? 0) > 50);
+              if (frontArmhole && sleeveEdges.length > 0) {
+                const bestForFront = sleeveEdges.reduce((best, e) =>
+                  Math.abs((e.length ?? 0) - (frontArmhole.length ?? 0)) < Math.abs((best.length ?? 0) - (frontArmhole.length ?? 0)) ? e : best
+                );
+                makeSeam(front, 'armhole', sleeve, bestForFront.name);
+                if (backArmhole) {
+                  const remaining = sleeveEdges.filter(e => e.name !== bestForFront.name);
+                  if (remaining.length > 0) {
+                    const bestForBack = remaining.reduce((best, e) =>
+                      Math.abs((e.length ?? 0) - (backArmhole.length ?? 0)) < Math.abs((best.length ?? 0) - (backArmhole.length ?? 0)) ? e : best
+                    );
+                    makeSeam(back, 'armhole', sleeve, bestForBack.name);
+                  }
                 }
               }
             }
+            console.log(`[TemplateLibrary] AI classified ${analysis.pieces.length} pieces, created seams by category matching`);
           }
-
-          console.log(`[TemplateLibrary] AI classified ${analysis.pieces.length} pieces, created seams by category matching`);
         } catch (err) {
-          console.warn('[TemplateLibrary] AI analysis failed, pieces loaded without seams:', err);
+          console.warn('[TemplateLibrary] AI analysis failed:', err);
+        }
+
+        // Fallback: use autoSew (geometric edge-length matching) when LLM is unavailable or returned empty
+        if (!classified) {
+          console.log('[TemplateLibrary] Using autoSew fallback (no LLM available)...');
+          // Ensure edges are detected on all pieces first
+          const currentPieces = store.getState().project.pieces;
+          for (const piece of currentPieces) {
+            if (!piece.edges || piece.edges.length === 0) {
+              const updated = { ...piece, edges: detectSemanticEdges(piece) };
+              dispatch(updatePiece(updated));
+            }
+          }
+          const piecesWithEdges = store.getState().project.pieces;
+          const result = autoSew(piecesWithEdges, { minConfidence: 0.3 });
+          for (const proposed of result.seams) {
+            if (proposed.seam.pieceA.pieceId !== proposed.seam.pieceB.pieceId) {
+              dispatch(addSeam(proposed.seam));
+            }
+          }
+          console.log(`[TemplateLibrary] autoSew created ${result.seams.length} seams (${result.unmatchedEdges.length} unmatched edges)`);
         }
       }
 

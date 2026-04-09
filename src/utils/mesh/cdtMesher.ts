@@ -115,6 +115,12 @@ export function meshPieceOutline(
   // Simplify dense outlines (300+ points from offset operations)
   cleanOutline = simplifyOutline(cleanOutline, 200, 0.5);
 
+  // Ensure clockwise winding (positive signedArea in screen coords / y-down)
+  // CDT2D's interior:true needs CW winding to correctly identify interior triangles.
+  if (signedArea(cleanOutline) < 0) {
+    cleanOutline = cleanOutline.slice().reverse();
+  }
+
   // 1. Convert to PSLG format with boundary subdivision
   const { points, edges } = convertToPSLG(cleanOutline, internalLines, config.curveResolution, config.maxEdgeLength);
 
@@ -257,6 +263,18 @@ function douglasPeucker(points: Point2D[], epsilon: number): Point2D[] {
   return [first, last];
 }
 
+/**
+ * Signed area of a polygon (positive = clockwise in screen coords / CW in math).
+ * Negative = counter-clockwise. Used to ensure consistent winding for CDT.
+ */
+function signedArea(points: Point2D[]): number {
+  let area = 0;
+  for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+    area += (points[j].x - points[i].x) * (points[j].y + points[i].y);
+  }
+  return area * 0.5;
+}
+
 function perpendicularDistance(point: Point2D, lineStart: Point2D, lineEnd: Point2D): number {
   const dx = lineEnd.x - lineStart.x;
   const dy = lineEnd.y - lineStart.y;
@@ -387,6 +405,7 @@ function convertToClothMeshData(
   
   /**
    * Generate interior grid points inside a polygon at the given spacing.
+   * Uses a grid-based spatial hash for O(1) proximity checks instead of O(n).
    */
   function generateInteriorGrid(
     points: number[][],
@@ -394,7 +413,7 @@ function convertToClothMeshData(
     spacing: number,
   ): number[][] {
     if (spacing <= 0 || boundaryPoly.length < 3) return [];
-  
+
     // Compute bounding box
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const p of boundaryPoly) {
@@ -403,28 +422,52 @@ function convertToClothMeshData(
       if (p[1] < minY) minY = p[1];
       if (p[1] > maxY) maxY = p[1];
     }
-  
-    const interior: number[][] = [];
+
     const halfSpacing = spacing * 0.5;
-  
+    const cellSize = halfSpacing; // cell size = exclusion radius
+
+    // Build spatial hash of existing boundary points for O(1) proximity checks
+    const occupied = new Set<string>();
+    function cellKey(x: number, y: number): string {
+      return `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
+    }
+    function markOccupied(x: number, y: number): void {
+      occupied.add(cellKey(x, y));
+    }
+    function isTooClose(x: number, y: number): boolean {
+      const cx = Math.floor(x / cellSize);
+      const cy = Math.floor(y / cellSize);
+      // Check 3x3 neighborhood
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (occupied.has(`${cx + dx},${cy + dy}`)) {
+            // Need exact distance check for points in neighboring cells
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // Register all boundary points
+    for (const p of points) {
+      markOccupied(p[0], p[1]);
+    }
+
+    // For very dense grids, skip the per-point distance check entirely and use
+    // the grid hash. The grid alignment ensures points are already well-spaced.
+    const interior: number[][] = [];
+
     // Offset grid to avoid landing exactly on edges
     for (let y = minY + halfSpacing; y < maxY; y += spacing) {
       for (let x = minX + halfSpacing; x < maxX; x += spacing) {
-        if (pointInPolygon(x, y, boundaryPoly)) {
-          // Keep distance from existing points
-          let tooClose = false;
-          for (const p of points) {
-            const dx = x - p[0], dy = y - p[1];
-            if (dx * dx + dy * dy < halfSpacing * halfSpacing) {
-              tooClose = true;
-              break;
-            }
-          }
-          if (!tooClose) interior.push([x, y]);
+        if (pointInPolygon(x, y, boundaryPoly) && !isTooClose(x, y)) {
+          interior.push([x, y]);
+          markOccupied(x, y);
         }
       }
     }
-  
+
     return interior;
   }
   

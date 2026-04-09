@@ -73,9 +73,13 @@ interface UseSimulationLifecycleResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Check localStorage feature flag. Default: true (WebGPU enabled). */
+/** Check localStorage feature flag. Default: false (WebGPU disabled).
+ *  Three.js 0.183 TSL atomicAdd doesn't propagate isAtomic to StorageBufferNode,
+ *  so WGSL declares array<i32> instead of array<atomic<i32>>. All compute shaders
+ *  silently fail. WASM XPBD solver is used until a Three.js upstream fix lands.
+ *  Set 'webclo-use-webgpu' to 'true' to opt-in. */
 function isWebGPUFeatureEnabled(): boolean {
-  return safeGetItem('webclo-use-webgpu') !== 'false';
+  return safeGetItem('webclo-use-webgpu') === 'true';
 }
 
 /** Race a promise against a timeout */
