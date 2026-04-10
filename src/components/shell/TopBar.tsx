@@ -11,10 +11,9 @@ type ViewMode = '2d' | 'split' | '3d';
 interface TopBarProps {
   onOpenTemplates?: () => void;
   onOpenPanel?: (name: string) => void;
-  onOpenCommandPalette?: () => void;
 }
 
-export default function TopBar({ onOpenTemplates, onOpenPanel, onOpenCommandPalette }: TopBarProps) {
+export default function TopBar({ onOpenTemplates, onOpenPanel }: TopBarProps) {
   const dispatch = useDispatch();
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
@@ -34,7 +33,7 @@ export default function TopBar({ onOpenTemplates, onOpenPanel, onOpenCommandPale
   return (
     <div className="top-bar">
       {/* Logo → opens app menu */}
-      <LogoMenu onOpenTemplates={onOpenTemplates} onOpenPanel={onOpenPanel} onOpenCommandPalette={onOpenCommandPalette} />
+      <LogoMenu onOpenTemplates={onOpenTemplates} onOpenPanel={onOpenPanel} />
 
       {/* Undo/Redo */}
       <button

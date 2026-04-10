@@ -9,7 +9,7 @@ import {
 import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
-import { ChevronRight, Search, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -126,10 +126,9 @@ const TOP_LEVEL: TopLevelItem[] = [
 interface LogoMenuProps {
   onOpenTemplates?: () => void;
   onOpenPanel?: (name: string) => void;
-  onOpenCommandPalette?: () => void;
 }
 
-export default function LogoMenu({ onOpenTemplates, onOpenPanel, onOpenCommandPalette }: LogoMenuProps) {
+export default function LogoMenu({ onOpenTemplates, onOpenPanel }: LogoMenuProps) {
   const [open, setOpen] = useState(false);
   const [hoveredTop, setHoveredTop] = useState<string | null>(null);
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
@@ -220,17 +219,6 @@ export default function LogoMenu({ onOpenTemplates, onOpenPanel, onOpenCommandPa
 
       {open && (
         <div className="logo-menu">
-          {/* Actions... ⌘K at the top */}
-          <div
-            className="logo-menu__item logo-menu__item--actions"
-            onClick={() => { setOpen(false); onOpenCommandPalette?.(); }}
-          >
-            <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <span className="logo-menu__label">Actions...</span>
-            <span className="logo-menu__shortcut">⌘K</span>
-          </div>
-          <div className="logo-menu__separator" />
-
           {/* Top-level menu items with submenus */}
           {TOP_LEVEL.map((item, i) => {
             if ((item as unknown as { separator?: boolean }).separator) {
