@@ -1,38 +1,26 @@
 import { useEffect, useState } from 'react';
 import { Provider } from 'react-redux';
 import { store } from './store';
-import { showToast } from './store/copilotUISlice';
-import Workspace from './components/Workspace/Workspace';
+import AppShell from './components/shell/AppShell';
 import SolverMetrics from './components/Debug/SolverMetrics';
-import SetupWizard from './components/SetupWizard/SetupWizard';
 import { SkillRegistry } from './copilot/action/skills/skillRegistry';
-import { loadProviderConfigSync } from './copilot/providers/types';
 import { isStorageAvailable } from './utils/safeStorage';
+import { showToast } from './store/copilotUISlice';
 import './App.css';
 
 function App() {
   const [ready, setReady] = useState(false);
-  const [setupComplete, setSetupComplete] = useState(false);
 
   useEffect(() => {
     async function init() {
       const registry = SkillRegistry.getInstance();
       await registry.initialize();
-
-      // Check if LLM provider is configured
-      const config = loadProviderConfigSync();
-      const hasProvider = !!(config?.apiKey) || config?.provider === 'ollama' || config?.provider === 'claude-bridge';
-      // Show wizard every launch until provider is configured; skip flag only lasts this session
-      const skippedThisSession = sessionStorage.getItem('openclo-setup-skipped') === 'true';
-      setSetupComplete(hasProvider || skippedThisSession);
-
       setReady(true);
 
-      // One-time warning if localStorage is unavailable
       if (!isStorageAvailable()) {
         store.dispatch(showToast({
           type: 'error',
-          message: 'Local storage is unavailable. Settings will not persist after this session.',
+          message: 'Local storage is unavailable. Settings will not persist.',
           duration: 8000,
         }));
       }
@@ -41,16 +29,19 @@ function App() {
   }, []);
 
   if (!ready) {
-    return <div className="app-loading">Loading skills...</div>;
-  }
-
-  if (!setupComplete) {
-    return <SetupWizard onComplete={() => setSetupComplete(true)} />;
+    return (
+      <div style={{
+        height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: '#0c0c14', color: '#4a4a6a', fontFamily: "'Inter', system-ui, sans-serif",
+      }}>
+        Loading...
+      </div>
+    );
   }
 
   return (
     <Provider store={store}>
-      <Workspace />
+      <AppShell />
       <SolverMetrics />
     </Provider>
   );
