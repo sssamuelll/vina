@@ -4,6 +4,8 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { loadProviderConfigSync } from '../../copilot/providers/types';
 import UnifiedBarChat from './UnifiedBarChat';
+import UnifiedBarCommands from './UnifiedBarCommands';
+import UnifiedBarSettings from './UnifiedBarSettings';
 
 export type BarMode = 'chat' | 'commands' | 'settings';
 
@@ -107,7 +109,13 @@ export default function UnifiedBar() {
       {panelOpen && (
         <div className="unified-bar__panel" onClick={e => e.stopPropagation()}>
           {mode === 'chat' && <UnifiedBarChat input={input} setInput={setInput} />}
-          {/* Commands and Settings panels added in Task 4 */}
+          {mode === 'commands' && (
+            <UnifiedBarCommands
+              query={input}
+              onExecute={() => { setPanelOpen(false); setInput(''); }}
+            />
+          )}
+          {mode === 'settings' && <UnifiedBarSettings />}
         </div>
       )}
     </div>
