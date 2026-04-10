@@ -1,0 +1,68 @@
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg-base);
+  overflow: hidden;
+}
+
+.top-bar {
+  height: var(--top-bar-h);
+  background: var(--bg-deeper);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-3);
+  gap: var(--sp-3);
+  flex-shrink: 0;
+  z-index: 10;
+}
+.top-bar__logo {
+  font-size: var(--text-heading);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.3px;
+}
+.top-bar__spacer { flex: 1; }
+.top-bar__status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.canvas-area {
+  flex: 1;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+.canvas-area__2d {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+.canvas-area__divider {
+  width: 1px;
+  background: var(--border);
+  cursor: col-resize;
+  flex-shrink: 0;
+}
+.canvas-area__3d {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.canvas-area--2d .canvas-area__3d { display: none; }
+.canvas-area--2d .canvas-area__divider { display: none; }
+.canvas-area--3d .canvas-area__2d { display: none; }
+.canvas-area--3d .canvas-area__divider { display: none; }
+
+.unified-bar-slot {
+  height: var(--unified-bar-h);
+  flex-shrink: 0;
+  z-index: 20;
+}
