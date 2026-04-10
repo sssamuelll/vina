@@ -4,17 +4,22 @@ import type { RootState } from '../../store';
 import { setViewMode, undo, redo } from '../../store/editorSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { useState } from 'react';
+import LogoMenu from './LogoMenu';
 
 type ViewMode = '2d' | 'split' | '3d';
 
-export default function TopBar() {
+interface TopBarProps {
+  onOpenTemplates?: () => void;
+  onOpenPanel?: (name: string) => void;
+}
+
+export default function TopBar({ onOpenTemplates, onOpenPanel }: TopBarProps) {
   const dispatch = useDispatch();
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const solverTier = useSelector((s: RootState) => s.simulation.solverTier);
   const particleCount = useSelector((s: RootState) => s.simulation.particleCount);
   const simState = useSelector((s: RootState) => s.simulation.simulationState);
   const pieces = useSelector((s: RootState) => s.project.pieces);
-  // Force re-render after undo/redo to update button states
   const [, forceUpdate] = useState(0);
 
   const modes: ViewMode[] = ['2d', 'split', '3d'];
@@ -27,7 +32,8 @@ export default function TopBar() {
 
   return (
     <div className="top-bar">
-      <span className="top-bar__logo">OpenClo</span>
+      {/* Logo → opens app menu */}
+      <LogoMenu onOpenTemplates={onOpenTemplates} onOpenPanel={onOpenPanel} />
 
       {/* Undo/Redo */}
       <button
@@ -53,7 +59,6 @@ export default function TopBar() {
 
       <div className="top-bar__spacer" />
 
-      {/* View toggle */}
       <div className="pill-group">
         {modes.map(m => (
           <button
@@ -68,7 +73,6 @@ export default function TopBar() {
 
       <div className="top-bar__spacer" />
 
-      {/* Status */}
       <div className="top-bar__status">
         <span className={dotClass} />
         <span>{solverTier ?? 'idle'}</span>

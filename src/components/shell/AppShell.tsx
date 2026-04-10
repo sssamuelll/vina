@@ -61,7 +61,7 @@ export default function AppShell() {
 
   return (
     <div className="app-shell">
-      <TopBar />
+      <TopBar onOpenTemplates={() => setShowTemplates(true)} onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
       <div className={`canvas-area canvas-area--${viewMode}`}>
         <div className="canvas-area__2d">
           <FloatingToolbar />
