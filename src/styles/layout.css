@@ -43,6 +43,7 @@
   flex: 1;
   position: relative;
   overflow: hidden;
+  background: #f5f3f0; /* Warm paper — 2D canvas needs a light bg for pattern visibility */
 }
 .canvas-area__divider {
   width: 1px;
