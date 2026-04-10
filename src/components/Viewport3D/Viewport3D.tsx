@@ -141,9 +141,12 @@ function AnimationDriver() {
 
 interface Viewport3DProps {
   activeTool3D?: Tool3D;
+  /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons, sim-status)
+   *  because the new AppShell provides FloatingControls3D instead. */
+  hideChrome?: boolean;
 }
 
-export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps) {
+export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false }: Viewport3DProps) {
   const dispatch = useDispatch();
   const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
   const { selectedPieceIds } = useSelector((s: RootState) => s.editor);
@@ -619,8 +622,8 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       }}
       onContextMenu={handleContextMenu}
     >
-      <SimModeToggle />
-      <SimulationStatusOverlay />
+      {!hideChrome && <SimModeToggle />}
+      {!hideChrome && <SimulationStatusOverlay />}
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
@@ -763,26 +766,28 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       />
 
       {/* Render Settings toggle + panel */}
-      <button
-        style={{
-          position: 'absolute',
-          top: 8,
-          right: renderPanelOpen ? 290 : (collisionPanelOpen ? 334 : 52),
-          zIndex: 25,
-          background: renderPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: 6,
-          color: renderPanelOpen ? '#4a9eff' : '#ccc',
-          padding: '6px 10px',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontFamily: 'Inter, sans-serif',
-        }}
-        title="Render Settings"
-        onClick={() => setRenderPanelOpen(!renderPanelOpen)}
-      >
-        Render
-      </button>
+      {!hideChrome && (
+        <button
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: renderPanelOpen ? 290 : (collisionPanelOpen ? 334 : 52),
+            zIndex: 25,
+            background: renderPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: 6,
+            color: renderPanelOpen ? '#4a9eff' : '#ccc',
+            padding: '6px 10px',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontFamily: 'Inter, sans-serif',
+          }}
+          title="Render Settings"
+          onClick={() => setRenderPanelOpen(!renderPanelOpen)}
+        >
+          Render
+        </button>
+      )}
       <RenderSettingsPanel
         open={renderPanelOpen}
         onClose={() => setRenderPanelOpen(false)}
@@ -794,35 +799,39 @@ export default function Viewport3D({ activeTool3D = 'camera' }: Viewport3DProps)
       />
 
       {/* Collision Body toggle + panel */}
-      <button
-        style={{
-          position: 'absolute',
-          top: 8,
-          right: collisionPanelOpen ? 290 : 8,
-          zIndex: 25,
-          background: collisionPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-          borderRadius: 6,
-          color: collisionPanelOpen ? '#4a9eff' : '#ccc',
-          padding: '6px 10px',
-          cursor: 'pointer',
-          fontSize: 12,
-          fontFamily: 'Inter, sans-serif',
-        }}
-        title="Collision Bodies"
-        onClick={() => setCollisionPanelOpen(!collisionPanelOpen)}
-      >
-        CB
-      </button>
+      {!hideChrome && (
+        <button
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: collisionPanelOpen ? 290 : 8,
+            zIndex: 25,
+            background: collisionPanelOpen ? 'rgba(74, 158, 255, 0.2)' : 'rgba(30, 30, 30, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+            borderRadius: 6,
+            color: collisionPanelOpen ? '#4a9eff' : '#ccc',
+            padding: '6px 10px',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontFamily: 'Inter, sans-serif',
+          }}
+          title="Collision Bodies"
+          onClick={() => setCollisionPanelOpen(!collisionPanelOpen)}
+        >
+          CB
+        </button>
+      )}
       <CollisionBodyPanel
         open={collisionPanelOpen}
         onClose={() => setCollisionPanelOpen(false)}
       />
 
       {/* Status indicators */}
-      <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>
-        {simulationState === 'running' ? '● SIMULATING' : simulationState === 'paused' ? '⏸ PAUSED' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
-      </div>
+      {!hideChrome && (
+        <div className={`sim-status ${simulationState === 'running' ? 'running' : ''}`}>
+          {simulationState === 'running' ? '● SIMULATING' : simulationState === 'paused' ? '⏸ PAUSED' : `○ ${pieces.length} piece${pieces.length !== 1 ? 's' : ''}`}
+        </div>
+      )}
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
           {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — middle-click to orbit

@@ -29,7 +29,7 @@ export default function AppShell() {
         <div className="canvas-area__3d">
           <FloatingControls3D />
           <Viewport3DErrorBoundary>
-            <Viewport3D activeTool3D={activeTool3D as Tool3D} />
+            <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
           {contextPanel && (
             <ContextPanel title={contextPanel} onClose={() => setContextPanel(null)}>
