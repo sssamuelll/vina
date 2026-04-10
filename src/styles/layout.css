@@ -61,8 +61,4 @@
 .canvas-area--3d .canvas-area__2d { display: none; }
 .canvas-area--3d .canvas-area__divider { display: none; }
 
-.unified-bar-slot {
-  height: var(--unified-bar-h);
-  flex-shrink: 0;
-  z-index: 20;
-}
+/* unified-bar-slot removed — bar is now position:fixed overlay */
