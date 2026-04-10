@@ -73,7 +73,12 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
   }, [dispatch]);
 
   const actionToolDefs = useMemo(() => {
-    return registry.list().map(t => ({
+    const seen = new Set<string>();
+    return registry.list().filter(t => {
+      if (seen.has(t.name)) return false;
+      seen.add(t.name);
+      return true;
+    }).map(t => ({
       name: t.name,
       description: t.description,
       parameters: t.parameters,

@@ -285,6 +285,15 @@ ${actionToolList || 'None'}
       parameters: t.parameters,
     }));
 
-    return [...metaDefs, ...this.actionToolDefs];
+    // Deduplicate: meta-tools first, action tools won't override
+    const seen = new Set<string>();
+    const all: ProviderToolDef[] = [];
+    for (const def of [...metaDefs, ...this.actionToolDefs]) {
+      if (!seen.has(def.name)) {
+        seen.add(def.name);
+        all.push(def);
+      }
+    }
+    return all;
   }
 }
