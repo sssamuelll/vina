@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, MessageSquare, Settings, ArrowUp } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { loadProviderConfigSync } from '../../copilot/providers/types';
 import UnifiedBarChat from './UnifiedBarChat';
 import UnifiedBarCommands from './UnifiedBarCommands';
 import UnifiedBarSettings from './UnifiedBarSettings';
@@ -26,17 +25,97 @@ const MODE_PLACEHOLDERS: Record<BarMode, string> = {
   settings: 'Search settings...',
 };
 
+const STORAGE_KEY = 'openclo-bar-position';
+const BAR_WIDTH = 560;
+const BAR_HEIGHT = 58;
+
+/** Load saved position or default to bottom-center */
+function loadPosition(): { x: number; y: number } {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return {
+    x: Math.round((window.innerWidth - BAR_WIDTH) / 2),
+    y: window.innerHeight - BAR_HEIGHT - 24,
+  };
+}
+
+function clampPosition(x: number, y: number): { x: number; y: number } {
+  const minX = 16;
+  const maxX = window.innerWidth - BAR_WIDTH - 16;
+  const minY = window.innerHeight * 0.8; // top of drag zone (bottom 20%)
+  const maxY = window.innerHeight - BAR_HEIGHT - 16;
+  return {
+    x: Math.max(minX, Math.min(maxX, x)),
+    y: Math.max(minY, Math.min(maxY, y)),
+  };
+}
+
 export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarProps = {}) {
   const [mode, setMode] = useState<BarMode>('chat');
   const [input, setInput] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
+  const [position, setPosition] = useState(loadPosition);
+  const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const dragOffset = useRef({ x: 0, y: 0 });
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
 
-  const config = loadProviderConfigSync();
-  const modelLabel = config?.model ?? 'No AI';
+  // Recalculate position on window resize
+  useEffect(() => {
+    const handler = () => setPosition(prev => clampPosition(prev.x, prev.y));
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
 
+  // ─── Drag handlers ─────────────────────────────────────────────
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Don't drag from input, buttons, or panel
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'BUTTON' || target.tagName === 'SELECT'
+      || target.closest('.unified-bar__input-wrap') || target.closest('.unified-bar__mode-btn')
+      || target.closest('.unified-bar__send') || target.closest('.unified-bar__panel')) {
+      return;
+    }
+    e.preventDefault();
+    setIsDragging(true);
+    dragOffset.current = {
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    };
+  }, [position]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (e: MouseEvent) => {
+      const clamped = clampPosition(
+        e.clientX - dragOffset.current.x,
+        e.clientY - dragOffset.current.y,
+      );
+      setPosition(clamped);
+    };
+
+    const handleUp = () => {
+      setIsDragging(false);
+      setPosition(prev => {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prev)); } catch { /* ignore */ }
+        return prev;
+      });
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragging]);
+
+  // ─── Keyboard shortcuts ────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -66,8 +145,23 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
     }
   }, [input, mode]);
 
+  // Suppress unused vars — pieces/seams kept for future metadata display
+  void pieces; void seams;
+
+  const barClasses = [
+    'unified-bar',
+    panelOpen ? 'unified-bar--panel-open' : '',
+    isDragging ? 'unified-bar--dragging' : 'unified-bar--draggable',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className="unified-bar">
+    <div
+      ref={barRef}
+      className={barClasses}
+      style={{ left: position.x, top: position.y }}
+      onMouseDown={handleMouseDown}
+    >
+      {/* Mode toggle */}
       <div className="unified-bar__modes">
         {(Object.keys(MODE_ICONS) as BarMode[]).map(m => {
           const Icon = MODE_ICONS[m];
@@ -78,12 +172,13 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
               onClick={() => { setMode(m); setPanelOpen(m !== 'chat'); inputRef.current?.focus(); }}
               aria-label={`${m} mode`}
             >
-              <Icon size={12} />
+              <Icon size={16} />
             </button>
           );
         })}
       </div>
 
+      {/* Input */}
       <div className="unified-bar__input-wrap">
         <input
           ref={inputRef}
@@ -97,20 +192,14 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
         {mode === 'commands' && <span className="unified-bar__shortcut">⌘K</span>}
       </div>
 
-      {mode === 'chat' && <span className="unified-bar__model">{modelLabel}</span>}
-
+      {/* Send button (chat mode) */}
       {mode === 'chat' && (
         <button className="unified-bar__send" onClick={handleSubmit} disabled={!input.trim()}>
-          <ArrowUp size={14} />
+          <ArrowUp size={18} />
         </button>
       )}
 
-      <div className="unified-bar__meta">
-        <span>{pieces.length} pieces</span>
-        <span>·</span>
-        <span>{seams.length} seams</span>
-      </div>
-
+      {/* Expanding panel */}
       {panelOpen && (
         <div className="unified-bar__panel" onClick={e => e.stopPropagation()}>
           {mode === 'chat' && <UnifiedBarChat input={input} setInput={setInput} />}
