@@ -9,6 +9,11 @@ import UnifiedBarSettings from './UnifiedBarSettings';
 
 export type BarMode = 'chat' | 'commands' | 'settings';
 
+interface UnifiedBarProps {
+  onOpenTemplates?: () => void;
+  onOpenPanel?: (name: string) => void;
+}
+
 const MODE_ICONS: Record<BarMode, typeof MessageSquare> = {
   chat: MessageSquare,
   commands: Search,
@@ -21,7 +26,7 @@ const MODE_PLACEHOLDERS: Record<BarMode, string> = {
   settings: 'Search settings...',
 };
 
-export default function UnifiedBar() {
+export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarProps = {}) {
   const [mode, setMode] = useState<BarMode>('chat');
   const [input, setInput] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
@@ -113,6 +118,8 @@ export default function UnifiedBar() {
             <UnifiedBarCommands
               query={input}
               onExecute={() => { setPanelOpen(false); setInput(''); }}
+              onOpenTemplates={onOpenTemplates ?? (() => {})}
+              onOpenPanel={onOpenPanel ?? (() => {})}
             />
           )}
           {mode === 'settings' && <UnifiedBarSettings />}

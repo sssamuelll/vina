@@ -40,7 +40,10 @@ export default function AppShell() {
           )}
         </div>
       </div>
-      <UnifiedBar />
+      <UnifiedBar
+        onOpenTemplates={() => setShowTemplates(true)}
+        onOpenPanel={(name) => setContextPanel(name)}
+      />
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
     </div>
   );
