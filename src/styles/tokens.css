@@ -19,27 +19,29 @@
   --destructive: #ef4444;
   --warning: #f59e0b;
 
-  /* Typography */
+  /* Typography — scales with viewport for large screens.
+     clamp(min, preferred, max) ensures readability at any resolution.
+     Base: 13px on small screens, scales to ~16px at 2560px+. */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
-  --text-xs: 9px;
-  --text-sm: 10px;
-  --text-ui: 11px;
-  --text-input: 12px;
-  --text-heading: 13px;
-  --text-title: 16px;
+  --text-xs: clamp(10px, 0.55vw + 3px, 13px);
+  --text-sm: clamp(11px, 0.6vw + 3px, 14px);
+  --text-ui: clamp(12px, 0.65vw + 3px, 15px);
+  --text-input: clamp(13px, 0.7vw + 3px, 16px);
+  --text-heading: clamp(14px, 0.75vw + 3px, 17px);
+  --text-title: clamp(16px, 0.9vw + 4px, 20px);
   --weight-normal: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
   --line-height: 1.5;
 
-  /* Spacing (4px base) */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-6: 24px;
-  --sp-8: 32px;
+  /* Spacing — scales proportionally with font size */
+  --sp-1: clamp(4px, 0.3vw, 6px);
+  --sp-2: clamp(8px, 0.5vw, 10px);
+  --sp-3: clamp(12px, 0.7vw, 16px);
+  --sp-4: clamp(16px, 1vw, 20px);
+  --sp-6: clamp(24px, 1.4vw, 32px);
+  --sp-8: clamp(32px, 1.8vw, 40px);
 
   /* Radii */
   --radius-sm: 6px;
@@ -47,10 +49,10 @@
   --radius-lg: 10px;
   --radius-xl: 12px;
 
-  /* Sizes */
-  --top-bar-h: 36px;
-  --unified-bar-h: 44px;
-  --toolbar-btn: 28px;
+  /* Sizes — scale with viewport for comfort on large displays */
+  --top-bar-h: clamp(36px, 2.5vw, 48px);
+  --unified-bar-h: clamp(44px, 3vw, 56px);
+  --toolbar-btn: clamp(28px, 2vw, 38px);
 
   /* Effects */
   --blur: blur(12px);
