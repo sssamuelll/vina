@@ -1,0 +1,59 @@
+@import './tokens.css';
+@import './reset.css';
+@import './animations.css';
+
+/* Utility classes */
+.mono { font-family: var(--font-mono); }
+.muted { color: var(--text-muted); }
+.ghost { color: var(--text-ghost); }
+.accent { color: var(--accent); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Status dots */
+.dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.dot--success { background: var(--success); }
+.dot--error { background: var(--destructive); }
+.dot--warning { background: var(--warning); }
+.dot--idle { background: var(--text-muted); }
+
+/* Pill toggle group */
+.pill-group {
+  display: flex;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 1px;
+}
+.pill-group__item {
+  padding: 3px 14px;
+  font-size: var(--text-ui);
+  color: var(--text-muted);
+  border-radius: 4px;
+  transition: all var(--transition-fast);
+}
+.pill-group__item--active {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+/* Icon button */
+.icon-btn {
+  width: var(--toolbar-btn);
+  height: var(--toolbar-btn);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+  color: var(--text-muted);
+}
+.icon-btn:hover { background: var(--bg-elevated); color: var(--text-primary); }
+.icon-btn--active { background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-border); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
