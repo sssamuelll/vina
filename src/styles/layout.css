@@ -40,26 +40,41 @@
   overflow: hidden;
 }
 .canvas-area__2d {
-  flex: 1;
   position: relative;
   overflow: hidden;
   background: #f5f3f0; /* Warm paper — 2D canvas needs a light bg for pattern visibility */
 }
 .canvas-area__divider {
-  width: 1px;
-  background: var(--border);
+  width: 4px;
+  background: transparent;
   cursor: col-resize;
   flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  transition: background 0.15s ease;
+}
+/* Visible line in the center of the grab area */
+.canvas-area__divider::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  transition: background 0.15s ease;
+}
+.canvas-area__divider:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+.canvas-area__divider:hover::after {
+  background: var(--accent);
+  width: 2px;
+  margin-left: -1px;
 }
 .canvas-area__3d {
-  flex: 1;
   position: relative;
   overflow: hidden;
 }
-
-.canvas-area--2d .canvas-area__3d { display: none; }
-.canvas-area--2d .canvas-area__divider { display: none; }
-.canvas-area--3d .canvas-area__2d { display: none; }
-.canvas-area--3d .canvas-area__divider { display: none; }
 
 /* unified-bar-slot removed — bar is now position:fixed overlay */

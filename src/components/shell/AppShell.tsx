@@ -1,6 +1,7 @@
-import { useState, lazy, Suspense } from 'react';
-import { useSelector } from 'react-redux';
+import { useState, useRef, useCallback, lazy, Suspense } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
+import { setSplitRatio } from '../../store/layoutSlice';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import FloatingToolbar from './FloatingToolbar';
@@ -11,7 +12,7 @@ import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import ContextPanel from './ContextPanel';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 
-// Lazy-load panel content to avoid importing everything upfront
+// Lazy-load panel content
 const AvatarPanel = lazy(() => import('../Viewport3D/AvatarPanel'));
 const BOMTab = lazy(() => import('../BottomPanel/BOMTab'));
 const GradingTab = lazy(() => import('../BottomPanel/GradingTab'));
@@ -27,10 +28,8 @@ const PanelLoading = () => (
   </div>
 );
 
-/** Map panel names to their lazy-loaded content */
 function renderPanelContent(name: string, onClose: () => void) {
   const fallback = <PanelLoading />;
-
   switch (name) {
     case 'Avatar':
       return <Suspense fallback={fallback}><AvatarPanel open onClose={onClose} /></Suspense>;
@@ -54,27 +53,80 @@ function renderPanelContent(name: string, onClose: () => void) {
 }
 
 export default function AppShell() {
+  const dispatch = useDispatch();
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
+  const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const [showTemplates, setShowTemplates] = useState(false);
   const [contextPanel, setContextPanel] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+
+  // ─── Divider drag (same logic as old Workspace) ─────────────────────
+  const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (ev: MouseEvent) => {
+      if (!isDragging.current || !canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const x = ev.clientX - rect.left;
+      const ratio = Math.max(0.15, Math.min(0.85, x / rect.width));
+      dispatch(setSplitRatio(ratio));
+    };
+
+    const onMouseUp = () => {
+      isDragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }, [dispatch]);
+
+  // ─── Width calculations ─────────────────────────────────────────────
+  const get2dWidth = () => {
+    if (viewMode === '2d') return '100%';
+    if (viewMode === '3d') return '0%';
+    return `${splitRatio * 100}%`;
+  };
+  const get3dWidth = () => {
+    if (viewMode === '3d') return '100%';
+    if (viewMode === '2d') return '0%';
+    return `${(1 - splitRatio) * 100}%`;
+  };
 
   return (
     <div className="app-shell">
-      <TopBar onOpenTemplates={() => setShowTemplates(true)} onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
-      <div className={`canvas-area canvas-area--${viewMode}`}>
-        <div className="canvas-area__2d">
+      <TopBar
+        onOpenTemplates={() => setShowTemplates(true)}
+        onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
+      />
+      <div ref={canvasRef} className="canvas-area">
+        <div
+          className="canvas-area__2d"
+          style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
+        >
           <FloatingToolbar />
           <PatternEditor />
         </div>
-        {viewMode === 'split' && <div className="canvas-area__divider" />}
-        <div className="canvas-area__3d">
+        {viewMode === 'split' && (
+          <div className="canvas-area__divider" onMouseDown={handleDividerMouseDown} />
+        )}
+        <div
+          className="canvas-area__3d"
+          style={{ width: get3dWidth(), display: viewMode === '2d' ? 'none' : undefined }}
+        >
           <FloatingControls3D />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
-        {/* Context panel floats over the canvas area */}
         {contextPanel && (
           <ContextPanel title={contextPanel} onClose={() => setContextPanel(null)}>
             {renderPanelContent(contextPanel, () => setContextPanel(null))}
