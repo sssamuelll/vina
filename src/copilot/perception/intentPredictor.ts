@@ -172,6 +172,45 @@ export interface SelfIntersectionCheckInput {
   outline: PathCommand[];
 }
 
+interface PolygonSegment {
+  segmentIndex: number;
+  start: [number, number];
+  end: [number, number];
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
+}
+
+function areAdjacentSegments(segmentA: number, segmentB: number, totalSegments: number): boolean {
+  if (segmentA === segmentB) return true;
+  if ((segmentA + 1) % totalSegments === segmentB) return true;
+  if ((segmentB + 1) % totalSegments === segmentA) return true;
+  return false;
+}
+
+function buildPolygonSegments(points: [number, number][]): PolygonSegment[] {
+  const segments: PolygonSegment[] = [];
+  const totalSegments = points.length;
+
+  for (let i = 0; i < totalSegments; i++) {
+    const start = points[i];
+    const end = points[(i + 1) % totalSegments];
+
+    segments.push({
+      segmentIndex: i,
+      start,
+      end,
+      minX: Math.min(start[0], end[0]),
+      maxX: Math.max(start[0], end[0]),
+      minY: Math.min(start[1], end[1]),
+      maxY: Math.max(start[1], end[1]),
+    });
+  }
+
+  return segments;
+}
+
 /**
  * Check if two line segments intersect.
  * Returns true if segments (p1,p2) and (p3,p4) cross each other.
@@ -223,25 +262,39 @@ export function checkSelfIntersection(input: SelfIntersectionCheckInput): SelfIn
     };
   }
 
+  const segments = buildPolygonSegments(points);
+  const sortedByMinX = [...segments].sort((a, b) => a.minX - b.minX);
+  const activeSegments: PolygonSegment[] = [];
   let intersectionCount = 0;
 
-  // Check all non-adjacent segment pairs
-  for (let i = 0; i < n; i++) {
-    const p1 = points[i];
-    const p2 = points[(i + 1) % n];
+  // Sweep-line broad phase:
+  // - Sort segments by minX (O(n log n))
+  // - Keep only active segments whose maxX overlaps current segment's minX
+  // - Check exact intersections only among x-overlapping candidates
+  for (const current of sortedByMinX) {
+    // Remove segments that are fully left of the current sweep position.
+    for (let idx = activeSegments.length - 1; idx >= 0; idx--) {
+      if (activeSegments[idx].maxX < current.minX) {
+        activeSegments.splice(idx, 1);
+      }
+    }
 
-    for (let j = i + 2; j < n; j++) {
-      // Skip adjacent segments
-      if (j === (i + n - 1) % n) continue;
-      if (i === 0 && j === n - 1) continue; // First and last are adjacent
+    for (const candidate of activeSegments) {
+      if (areAdjacentSegments(current.segmentIndex, candidate.segmentIndex, n)) {
+        continue;
+      }
 
-      const p3 = points[j];
-      const p4 = points[(j + 1) % n];
+      // Fast reject by y-interval overlap.
+      if (current.maxY < candidate.minY || candidate.maxY < current.minY) {
+        continue;
+      }
 
-      if (segmentsIntersect(p1, p2, p3, p4)) {
+      if (segmentsIntersect(current.start, current.end, candidate.start, candidate.end)) {
         intersectionCount++;
       }
     }
+
+    activeSegments.push(current);
   }
 
   if (intersectionCount > 0) {
