@@ -77,6 +77,29 @@ export const DEFAULT_CONFIG: CuttingLayoutConfig = {
 };
 
 // ─── Helpers ───
+interface PieceIndexEntry {
+  id: string;
+  piece: PatternPiece;
+}
+
+function compareById(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+function findPieceById(index: readonly PieceIndexEntry[], pieceId: string): PatternPiece | undefined {
+  let left = 0;
+  let right = index.length - 1;
+
+  while (left <= right) {
+    const mid = left + Math.floor((right - left) / 2);
+    const cmp = compareById(index[mid].id, pieceId);
+    if (cmp === 0) return index[mid].piece;
+    if (cmp < 0) left = mid + 1;
+    else right = mid - 1;
+  }
+
+  return undefined;
+}
 
 function getPaperDimensions(config: CuttingLayoutConfig): { width: number; height: number } {
   if (config.paperSize === 'CUSTOM') {
@@ -157,12 +180,16 @@ export function computeCuttingLayout(
   };
 
   const nestResult = nestPieces(pieces, nestingOptions);
+  const piecesIndex: PieceIndexEntry[] = pieces
+    .map(piece => ({ id: piece.id, piece }))
+    .sort((a, b) => compareById(a.id, b.id));
+  const unplacedIds = new Set(nestResult.unplaced);
 
   // Build pages from nesting result
   const pageMap = new Map<number, PlacedPiece[]>();
 
   for (const placement of nestResult.placements) {
-    const piece = pieces.find(p => p.id === placement.pieceId);
+    const piece = findPieceById(piecesIndex, placement.pieceId);
     if (!piece) continue;
 
     // Use shared pipeline for outline flattening and SA generation
@@ -253,7 +280,7 @@ export function computeCuttingLayout(
 
   // Compute areas
   const totalPieceArea = pieces
-    .filter(p => !nestResult.unplaced.includes(p.id))
+    .filter(p => !unplacedIds.has(p.id))
     .reduce((sum, p) => sum + computeArea(p.outline) * scale * scale, 0);
   const totalFabricArea = pages.length * paperW * paperH;
   const fabricUtilization = totalFabricArea > 0 ? totalPieceArea / totalFabricArea : 0;
