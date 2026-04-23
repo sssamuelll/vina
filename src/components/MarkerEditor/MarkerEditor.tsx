@@ -15,7 +15,7 @@ import {
 import { computeCuttingLayout } from '../../utils/export/cuttingLayout';
 import type { CuttingLayoutConfig } from '../../utils/export/cuttingLayout';
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
-import { checkPieceOverlap, isWithinBounds, computeUtilization } from '../../utils/export/markerCollision';
+import { computeCollisionFlags, computeUtilization } from '../../utils/export/markerCollision';
 import MarkerPiece from './MarkerPiece';
 import MarkerContextMenu, { type MarkerContextMenuState } from './MarkerContextMenu';
 
@@ -39,19 +39,10 @@ export default function MarkerEditor() {
     const map = new Map<string, boolean>();
     for (let pi = 0; pi < layout.pages.length; pi++) {
       const page = layout.pages[pi];
-      for (let i = 0; i < page.pieces.length; i++) {
-        const key = `${pi}-${i}`;
-        let collision = !isWithinBounds(page.pieces[i], paperWidth, paperHeight, margin);
-        if (!collision) {
-          for (let j = 0; j < page.pieces.length; j++) {
-            if (i !== j && checkPieceOverlap(page.pieces[i], page.pieces[j])) {
-              collision = true;
-              break;
-            }
-          }
-        }
-        map.set(key, collision);
-      }
+      const pageCollisions = computeCollisionFlags(page.pieces, paperWidth, paperHeight, margin);
+      pageCollisions.forEach((collision, pieceIndex) => {
+        map.set(`${pi}-${pieceIndex}`, collision);
+      });
     }
     return map;
   }, [layout, paperWidth, paperHeight, margin]);

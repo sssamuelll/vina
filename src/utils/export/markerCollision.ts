@@ -29,12 +29,68 @@ function aabbOverlap(a: AABB, b: AABB): boolean {
   return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
 }
 
+interface PieceBounds {
+  index: number;
+  bounds: AABB;
+}
+
 /** Check if two placed pieces overlap (AABB-based). */
 export function checkPieceOverlap(a: PlacedPiece, b: PlacedPiece): boolean {
   const aCoords = a.seamAllowance ?? a.outline;
   const bCoords = b.seamAllowance ?? b.outline;
   if (aCoords.length < 4 || bCoords.length < 4) return false;
   return aabbOverlap(getAABB(aCoords), getAABB(bCoords));
+}
+
+/**
+ * Compute per-piece collision flags using a sweep-line broad phase.
+ *
+ * Complexity: O(n log n + c), where c is the number of candidate overlaps
+ * found in the active window. This replaces the previous all-pairs O(n²) pass
+ * in marker rendering.
+ */
+export function computeCollisionFlags(
+  pieces: PlacedPiece[],
+  paperWidth: number,
+  paperHeight: number,
+  margin: number,
+): boolean[] {
+  if (pieces.length === 0) return [];
+
+  const boundsByPiece: PieceBounds[] = pieces.map((piece, index) => {
+    const coords = piece.seamAllowance ?? piece.outline;
+    const bounds = coords.length >= 2
+      ? getAABB(coords)
+      : { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    return {
+      index,
+      bounds,
+    };
+  });
+
+  const collisions = pieces.map(piece => !isWithinBounds(piece, paperWidth, paperHeight, margin));
+  const sorted = [...boundsByPiece].sort((a, b) => a.bounds.minX - b.bounds.minX);
+  const active: PieceBounds[] = [];
+
+  for (const current of sorted) {
+    // Drop pieces that cannot overlap in X anymore.
+    for (let i = active.length - 1; i >= 0; i--) {
+      if (active[i].bounds.maxX <= current.bounds.minX) {
+        active.splice(i, 1);
+      }
+    }
+
+    for (const candidate of active) {
+      if (aabbOverlap(current.bounds, candidate.bounds)) {
+        collisions[current.index] = true;
+        collisions[candidate.index] = true;
+      }
+    }
+
+    active.push(current);
+  }
+
+  return collisions;
 }
 
 /** Check if piece is within paper bounds (considering margin). */
