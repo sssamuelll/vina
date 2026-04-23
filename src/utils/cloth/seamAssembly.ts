@@ -80,6 +80,31 @@ export interface MergedMesh {
   uvs?: Float32Array;
 }
 
+
+interface PieceOffsetIndexEntry {
+  id: string;
+  offset: PieceOffset;
+}
+
+function comparePieceId(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+function findPieceOffsetById(index: readonly PieceOffsetIndexEntry[], pieceId: string): PieceOffset | undefined {
+  let left = 0;
+  let right = index.length - 1;
+
+  while (left <= right) {
+    const mid = left + Math.floor((right - left) / 2);
+    const cmp = comparePieceId(index[mid].id, pieceId);
+    if (cmp === 0) return index[mid].offset;
+    if (cmp < 0) left = mid + 1;
+    else right = mid - 1;
+  }
+
+  return undefined;
+}
+
 // ─── Default Config ─────────────────────────────────────────────────────────
 
 /** Default seam constraint configuration. */
@@ -353,6 +378,9 @@ export function buildSeamConstraints(
 ): SeamConstraintSet {
   const allPairs: Array<{ idA: number; idB: number; compliance: number; tension: number }> = [];
   const positions = mergedMesh.vertices;
+  const pieceOffsetsIndex: PieceOffsetIndexEntry[] = mergedMesh.pieces
+    .map((offset) => ({ id: offset.pieceId, offset }))
+    .sort((a, b) => comparePieceId(a.id, b.id));
 
   for (const seam of seams) {
     // Skip inactive seams
@@ -362,8 +390,8 @@ export function buildSeamConstraints(
     const outlineB = outlines.get(seam.pieceB.pieceId);
     if (!outlineA || !outlineB) continue;
 
-    const offsetA = mergedMesh.pieces.find(p => p.pieceId === seam.pieceA.pieceId);
-    const offsetB = mergedMesh.pieces.find(p => p.pieceId === seam.pieceB.pieceId);
+    const offsetA = findPieceOffsetById(pieceOffsetsIndex, seam.pieceA.pieceId);
+    const offsetB = findPieceOffsetById(pieceOffsetsIndex, seam.pieceB.pieceId);
     if (!offsetA || !offsetB) continue;
 
     // Resolve edge names to segment ranges (semantic lookup + "edge-N" fallback)

@@ -241,6 +241,41 @@ describe('buildSeamConstraints', () => {
     }
   });
 
+
+  it('resolves piece offsets correctly even when merged piece metadata is unsorted', () => {
+    const seam: Seam = {
+      id: 's-unsorted',
+      pieceA: { pieceId: 'a', edgeName: 'rightEdge' },
+      pieceB: { pieceId: 'b', edgeName: 'leftEdge' },
+      type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
+    };
+
+    const merged = {
+      vertices: new Float32Array([
+        20, 1, 0, 30, 1, 0, 30, 1, 10, 20, 1, 10, 20, 1, 0,
+        0, 1, 0, 10, 1, 0, 10, 1, 10, 0, 1, 10, 0, 1, 0,
+      ]),
+      triIds: new Int32Array([0, 1, 2, 5, 6, 7]),
+      pieces: [
+        { pieceId: 'b', vertexOffset: 0, vertexCount: 5, triangleOffset: 0, triangleCount: 1 },
+        { pieceId: 'a', vertexOffset: 5, vertexCount: 5, triangleOffset: 1, triangleCount: 1 },
+      ],
+    };
+
+    const outlines = new Map<string, PathCommand[]>();
+    outlines.set('a', outlineA);
+    outlines.set('b', outlineB);
+
+    const pieces = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }> }>();
+    pieces.set('a', { edges: [{ name: 'rightEdge', segmentRange: [1, 2] }] });
+    pieces.set('b', { edges: [{ name: 'leftEdge', segmentRange: [0, 3] }] });
+
+    const result = buildSeamConstraints([seam], outlines, merged, pieces);
+    expect(result.count).toBe(2);
+    expect(result.restLengths[0]).toBeGreaterThan(0);
+  });
+
   it('skips seams with missing outlines', () => {
     const seam: Seam = {
       id: 's1',
