@@ -37,6 +37,36 @@ interface SeamlyPiece {
   nodes: SeamlyPieceNode[];
 }
 
+interface IndexedPoint {
+  id: string;
+  point: CPoint;
+}
+
+function createSortedPointIndex(points: CPoint[]): IndexedPoint[] {
+  return points
+    .map((point) => ({ id: point.id, point }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function findPointById(index: IndexedPoint[], id: string): CPoint | undefined {
+  let left = 0;
+  let right = index.length - 1;
+
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    const entry = index[mid];
+    const compare = entry.id.localeCompare(id);
+    if (compare === 0) return entry.point;
+    if (compare < 0) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+
+  return undefined;
+}
+
 export interface SeamlyPattern {
   name: string;
   source?: string;
@@ -134,6 +164,8 @@ export function adaptSeamlyPattern(
     });
   }
 
+  const cPointIndex = createSortedPointIndex(cPoints);
+
   // 5. Convert splines/splinePaths → CCurve[]
   const cCurves: CCurve[] = [];
   const curveIdMap = new Map<number, string>(); // seamly step id → our CCurve id
@@ -144,8 +176,8 @@ export function adaptSeamlyPattern(
       const toId = pointIdMap.get(step.point4);
       if (!fromId || !toId) continue;
 
-      const fromPt = cPoints.find(p => p.id === fromId);
-      const toPt = cPoints.find(p => p.id === toId);
+      const fromPt = findPointById(cPointIndex, fromId);
+      const toPt = findPointById(cPointIndex, toId);
       if (!fromPt || !toPt) continue;
 
       const cvId = uid('sc');
@@ -197,8 +229,8 @@ export function adaptSeamlyPattern(
       const toId = pointIdMap.get(lastNode.point);
 
       if (fromId && toId) {
-        const fromPt = cPoints.find(p => p.id === fromId);
-        const toPt = cPoints.find(p => p.id === toId);
+        const fromPt = findPointById(cPointIndex, fromId);
+        const toPt = findPointById(cPointIndex, toId);
 
         if (fromPt && toPt) {
           const kCurve = (step as any).kCurve ?? 1;
@@ -259,7 +291,7 @@ export function adaptSeamlyPattern(
           valid = false;
           continue;
         }
-        const point = cPoints.find(p => p.id === pointCId);
+        const point = findPointById(cPointIndex, pointCId);
         if (!point) { valid = false; continue; }
 
         nodes.push({
