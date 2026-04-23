@@ -38,6 +38,8 @@ export interface ParametricVariable {
 const CATEGORY_ORDER: Record<SliderCategory, number> = {
   fit: 0, length: 1, proportions: 2, ease: 3, construction: 4,
 };
+type ProjectPiece = RootState['project']['pieces'][number];
+type GeneratedPieceLike = Pick<ProjectPiece, 'id' | 'outline'>;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -91,6 +93,46 @@ function deriveRange(
     min: Math.max(0, Math.round(base * 0.4 * 10) / 10),
     max: Math.round(base * 1.6 * 10) / 10,
   };
+}
+
+function buildSortedPieceIndex(pieces: readonly ProjectPiece[]): ProjectPiece[] {
+  return [...pieces].sort((a, b) => a.id.localeCompare(b.id));
+}
+
+function findPieceById(sortedPieces: readonly ProjectPiece[], pieceId: string): ProjectPiece | undefined {
+  let low = 0;
+  let high = sortedPieces.length - 1;
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const midId = sortedPieces[mid].id;
+    const compare = midId.localeCompare(pieceId);
+
+    if (compare === 0) return sortedPieces[mid];
+    if (compare < 0) low = mid + 1;
+    else high = mid - 1;
+  }
+
+  return undefined;
+}
+
+function syncGeneratedPieces(
+  generatedPieces: readonly GeneratedPieceLike[],
+  existingPieces: readonly ProjectPiece[],
+  dispatch: AppDispatch,
+): void {
+  const sortedPieces = buildSortedPieceIndex(existingPieces);
+
+  for (const generatedPiece of generatedPieces) {
+    const existing = findPieceById(sortedPieces, generatedPiece.id);
+    if (!existing) continue;
+
+    dispatch(updatePiece({
+      ...existing,
+      outline: generatedPiece.outline,
+      updatedAt: Date.now(),
+    }));
+  }
 }
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
@@ -211,17 +253,7 @@ export function useParametricEngine() {
 
     try {
       const newPieces = engine.generate(baseMeasurements);
-
-      for (const newPiece of newPieces) {
-        const existing = pieces.find(p => p.id === newPiece.id);
-        if (existing) {
-          dispatch(updatePiece({
-            ...existing,
-            outline: newPiece.outline,
-            updatedAt: Date.now(),
-          }));
-        }
-      }
+      syncGeneratedPieces(newPieces, pieces, dispatch);
     } catch {
       // Formula evaluation error at extreme values — ignore
     }
@@ -252,16 +284,7 @@ export function useParametricEngine() {
       engine.loadPattern(activePattern);
       try {
         const newPieces = engine.generate(baseMeasurements);
-        for (const newPiece of newPieces) {
-          const existing = pieces.find(p => p.id === newPiece.id);
-          if (existing) {
-            dispatch(updatePiece({
-              ...existing,
-              outline: newPiece.outline,
-              updatedAt: Date.now(),
-            }));
-          }
-        }
+        syncGeneratedPieces(newPieces, pieces, dispatch);
       } catch { /* ignore */ }
     }
   }, [dispatch, activePattern, baseMeasurements, pieces]);
@@ -294,16 +317,7 @@ export function useParametricEngine() {
       const resolvedVars = resolveVariables(activePattern.variables, measMap);
 
       // Update pieces in place
-      for (const newPiece of newPieces) {
-        const existing = pieces.find(p => p.id === newPiece.id);
-        if (existing) {
-          dispatch(updatePiece({
-            ...existing,
-            outline: newPiece.outline,
-            updatedAt: Date.now(),
-          }));
-        }
-      }
+      syncGeneratedPieces(newPieces, pieces, dispatch);
 
       // Re-activate template with new defaults
       dispatch(activateTemplate({
