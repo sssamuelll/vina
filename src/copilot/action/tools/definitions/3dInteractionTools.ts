@@ -14,6 +14,7 @@
 import type { ToolDefinition } from '../registry';
 import { detectLandmarks, extractSegments } from '../../../perception/geometryClassifier';
 import type { LandmarkLabel } from '../../../perception/types';
+import type { PatternPiece } from '../../../../types/types';
 import {
   startSimulation,
   pauseSimulation,
@@ -21,6 +22,22 @@ import {
   setViewMode3D,
 } from '../../../../store/simulationSlice';
 import { setCameraPreset, focusOnPiece } from '../../../../store/cameraSlice';
+
+function parseFinitePositiveNumber(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+type PieceWithPosition = Omit<PatternPiece, 'position'> & {
+  position?: { x: number; y: number };
+};
+
+function getPiecePosition(piece: PieceWithPosition): { x: number; y: number } {
+  const { position } = piece;
+  if (position && Number.isFinite(position.x) && Number.isFinite(position.y)) {
+    return { x: position.x, y: position.y };
+  }
+  return { x: 0, y: 0 };
+}
 
 /**
  * Anatomical landmarks that are good pinning candidates.
@@ -171,10 +188,10 @@ export const tools: ToolDefinition[] = [
       },
     },
     execute: async (params, _dispatch, getState) => {
-      const pieces = getState().project.pieces;
+      const pieces = getState().project.pieces as PieceWithPosition[];
       const seams = getState().project.seams;
-      const maxDistance = (params.maxDistance as number) || 50;
-      const maxSuggestions = (params.maxSuggestions as number) || 4;
+      const maxDistance = parseFinitePositiveNumber(params.maxDistance, 50);
+      const maxSuggestions = Math.floor(parseFinitePositiveNumber(params.maxSuggestions, 4));
 
       if (pieces.length < 2) {
         return {
@@ -191,22 +208,29 @@ export const tools: ToolDefinition[] = [
       }
 
       const suggestions: TackSuggestion[] = [];
+      const sortedPieces = [...pieces].sort((a, b) => getPiecePosition(a).x - getPiecePosition(b).x);
 
-      // Simple proximity check based on 2D positions
-      // (In production, would use 3D positions from cloth sim)
-      for (let i = 0; i < pieces.length; i++) {
-        for (let j = i + 1; j < pieces.length; j++) {
-          const pieceA = pieces[i];
-          const pieceB = pieces[j];
+      // Sweep line over X coordinate:
+      // O(n log n) sort + local neighbor checks constrained by maxDistance.
+      for (let i = 0; i < sortedPieces.length; i++) {
+        const pieceA = sortedPieces[i];
+        const posA = getPiecePosition(pieceA);
+
+        for (let j = i + 1; j < sortedPieces.length; j++) {
+          const pieceB = sortedPieces[j];
+          const posB = getPiecePosition(pieceB);
+          const dx = posB.x - posA.x;
+
+          if (dx >= maxDistance) {
+            break;
+          }
+
           const pairKey = [pieceA.id, pieceB.id].sort().join(':');
 
           // Skip if already sewn
           if (sewnPairs.has(pairKey)) continue;
 
           // Calculate 2D distance between piece centers
-          const posA = pieceA.position || { x: 0, y: 0 };
-          const posB = pieceB.position || { x: 0, y: 0 };
-          const dx = posB.x - posA.x;
           const dy = posB.y - posA.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
 
