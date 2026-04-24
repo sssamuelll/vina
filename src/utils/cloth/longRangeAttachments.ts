@@ -15,6 +15,12 @@ export interface LRAConstraint {
 
 /**
  * Build LRA constraints via Dijkstra from pinned particles through the mesh graph.
+ *
+ * Uses a binary min-heap over typed arrays for the priority queue, so the
+ * overall cost is O((V + E) log V) instead of the previous O(V^2) that came
+ * from an insertion-sorted array queue. Ties in distance are broken by node
+ * index so the output is deterministic regardless of pinned-set insertion
+ * order.
  */
 export function buildLRAConstraints(
   restPositions: Float32Array,
@@ -25,21 +31,19 @@ export function buildLRAConstraints(
 ): LRAConstraint[] {
   if (pinnedParticles.size === 0) return [];
 
-  // Build adjacency graph from triangles
-  const adj: Map<number, Set<number>> = new Map();
-  for (let i = 0; i < numParticles; i++) adj.set(i, new Set());
+  const adj: Array<Set<number>> = new Array(numParticles);
+  for (let i = 0; i < numParticles; i++) adj[i] = new Set();
 
   const numTris = triIds.length / 3;
   for (let t = 0; t < numTris; t++) {
     const i0 = triIds[3 * t];
     const i1 = triIds[3 * t + 1];
     const i2 = triIds[3 * t + 2];
-    adj.get(i0)!.add(i1); adj.get(i0)!.add(i2);
-    adj.get(i1)!.add(i0); adj.get(i1)!.add(i2);
-    adj.get(i2)!.add(i0); adj.get(i2)!.add(i1);
+    adj[i0].add(i1); adj[i0].add(i2);
+    adj[i1].add(i0); adj[i1].add(i2);
+    adj[i2].add(i0); adj[i2].add(i1);
   }
 
-  // Edge rest-length helper
   function edgeLength(a: number, b: number): number {
     const ai = a * 3, bi = b * 3;
     const dx = restPositions[ai] - restPositions[bi];
@@ -48,48 +52,101 @@ export function buildLRAConstraints(
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 
-  // Dijkstra from all pinned particles simultaneously
   const dist = new Float32Array(numParticles);
   dist.fill(Infinity);
   const attachedTo = new Int32Array(numParticles);
   attachedTo.fill(-1);
-
-  // Simple priority queue (array-based, sufficient for cloth meshes)
-  const queue: Array<{ node: number; dist: number }> = [];
   const visited = new Uint8Array(numParticles);
+
+  // Upper bound for heap pushes: each directed half-edge can enqueue at most
+  // once per successful relaxation, plus one seed entry per pinned particle.
+  let adjTotal = 0;
+  for (let i = 0; i < numParticles; i++) adjTotal += adj[i].size;
+  const heapCapacity = adjTotal + pinnedParticles.size;
+
+  const heapKeys = new Float64Array(heapCapacity);
+  const heapValues = new Int32Array(heapCapacity);
+  let heapSize = 0;
+
+  // Lexicographic compare: (key, value). Returns true iff a < b.
+  function lt(keyA: number, valueA: number, keyB: number, valueB: number): boolean {
+    if (keyA < keyB) return true;
+    if (keyA > keyB) return false;
+    return valueA < valueB;
+  }
+
+  function swap(i: number, j: number): void {
+    const tk = heapKeys[i]; heapKeys[i] = heapKeys[j]; heapKeys[j] = tk;
+    const tv = heapValues[i]; heapValues[i] = heapValues[j]; heapValues[j] = tv;
+  }
+
+  function siftUp(i: number): void {
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (lt(heapKeys[parent], heapValues[parent], heapKeys[i], heapValues[i])) return;
+      if (heapKeys[parent] === heapKeys[i] && heapValues[parent] === heapValues[i]) return;
+      swap(i, parent);
+      i = parent;
+    }
+  }
+
+  function siftDown(i: number): void {
+    for (;;) {
+      const l = i * 2 + 1;
+      const r = l + 1;
+      let smallest = i;
+      if (l < heapSize && lt(heapKeys[l], heapValues[l], heapKeys[smallest], heapValues[smallest])) {
+        smallest = l;
+      }
+      if (r < heapSize && lt(heapKeys[r], heapValues[r], heapKeys[smallest], heapValues[smallest])) {
+        smallest = r;
+      }
+      if (smallest === i) return;
+      swap(i, smallest);
+      i = smallest;
+    }
+  }
+
+  function heapPush(key: number, value: number): void {
+    heapKeys[heapSize] = key;
+    heapValues[heapSize] = value;
+    heapSize++;
+    siftUp(heapSize - 1);
+  }
+
+  function heapPop(): void {
+    heapSize--;
+    if (heapSize > 0) {
+      heapKeys[0] = heapKeys[heapSize];
+      heapValues[0] = heapValues[heapSize];
+      siftDown(0);
+    }
+  }
 
   for (const p of pinnedParticles) {
     dist[p] = 0;
     attachedTo[p] = p;
-    queue.push({ node: p, dist: 0 });
+    heapPush(0, p);
   }
 
-  // Sort descending so we can pop from end
-  queue.sort((a, b) => b.dist - a.dist);
-
-  while (queue.length > 0) {
-    const { node: u, dist: d } = queue.pop()!;
+  while (heapSize > 0) {
+    const uKey = heapKeys[0];
+    const u = heapValues[0];
+    heapPop();
     if (visited[u]) continue;
-    if (d > dist[u]) continue;
+    if (uKey > dist[u]) continue;
     visited[u] = 1;
 
-    for (const v of adj.get(u)!) {
+    for (const v of adj[u]) {
       const newDist = dist[u] + edgeLength(u, v);
       if (newDist < dist[v]) {
         dist[v] = newDist;
         attachedTo[v] = attachedTo[u];
-        queue.push({ node: v, dist: newDist });
-        // Maintain sorted order (insertion sort from end)
-        let i = queue.length - 1;
-        while (i > 0 && queue[i].dist > queue[i - 1].dist) {
-          [queue[i], queue[i - 1]] = [queue[i - 1], queue[i]];
-          i--;
-        }
+        heapPush(newDist, v);
       }
     }
   }
 
-  // Build constraints for non-pinned particles
   const constraints: LRAConstraint[] = [];
   for (let i = 0; i < numParticles; i++) {
     if (pinnedParticles.has(i)) continue;
