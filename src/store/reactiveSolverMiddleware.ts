@@ -271,6 +271,31 @@ function resolvePointsSync(
 // ─── Piece Building (Phase 2) ────────────────────────────────────────────────
 
 /**
+ * Filter construction pieces down to those safe to hand off to the builder.
+ *
+ * A piece is buildable only when every node in its outline references a point
+ * that resolved without error. On the parametric hot path this runs after
+ * every slider or measurement edit, so the naive `O(P·K·M)` nested `.find()`
+ * is replaced by an `O(M + P·K)` Map index. Duplicate point IDs (which the
+ * type allows even if the slice should not emit them) resolve to the first
+ * occurrence, matching `Array.prototype.find` semantics.
+ *
+ * @internal Exported for unit testing and benchmarking only.
+ */
+export function filterBuildablePieces(pieces: CPiece[], points: CPoint[]): CPiece[] {
+  const pointById = new Map<string, CPoint>();
+  for (const pt of points) {
+    if (!pointById.has(pt.id)) pointById.set(pt.id, pt);
+  }
+  return pieces.filter(cPiece =>
+    !cPiece.nodes.some(node => {
+      const pt = pointById.get(node.pointId);
+      return pt?.resolutionError != null;
+    })
+  );
+}
+
+/**
  * Build pieces using worker pool or main thread fallback.
  */
 async function buildPiecesAsync(
@@ -286,13 +311,7 @@ async function buildPiecesAsync(
     return;
   }
 
-  // Filter out construction pieces where any node references an errored point
-  const buildablePieces = pieces.filter(cPiece =>
-    !cPiece.nodes.some(node => {
-      const pt = points.find(p => p.id === node.pointId);
-      return pt?.resolutionError != null;
-    })
-  );
+  const buildablePieces = filterBuildablePieces(pieces, points);
 
   if (buildablePieces.length === 0) {
     return;

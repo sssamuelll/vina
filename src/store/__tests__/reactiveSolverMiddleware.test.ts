@@ -83,12 +83,14 @@ vi.mock('../../utils/construction/pieceBuilder', () => ({
 
 import {
   createReactiveSolverMiddleware,
+  filterBuildablePieces,
   getSolverMetrics,
   getSolverState,
   subscribeToComputingState,
   shutdownSolver,
   getIsComputing,
 } from '../reactiveSolverMiddleware';
+import type { CPiece, CPoint } from '../../types/construction';
 
 import constructionReducer, { addPoint, addConstructionPiece } from '../constructionSlice';
 import parametricReducer, {
@@ -432,6 +434,229 @@ describe('Reactive Solver Middleware', () => {
     it('non-trigger actions pass through normally', () => {
       store.dispatch(setVariableOverride({ key: '#Test', value: 42 }));
       expect(store.getState().parametric.variableOverrides['#Test']).toBe(42);
+    });
+  });
+});
+
+// ─── filterBuildablePieces (O(P·K·M) → O(M + P·K) refactor) ──────────────────
+
+/**
+ * Reference implementation matching the pre-refactor code at
+ * reactiveSolverMiddleware.ts:290-295 (commit prior to this change).
+ * Kept in the test file only — never exported — so we can assert exact
+ * parity with the Map-indexed replacement.
+ */
+function legacyFilterBuildablePieces(pieces: CPiece[], points: CPoint[]): CPiece[] {
+  return pieces.filter(cPiece =>
+    !cPiece.nodes.some(node => {
+      const pt = points.find(p => p.id === node.pointId);
+      return pt?.resolutionError != null;
+    })
+  );
+}
+
+function makePoint(id: string, overrides: Partial<CPoint> = {}): CPoint {
+  return {
+    id,
+    label: id,
+    x: 0,
+    y: 0,
+    definition: { type: 'absolute', x: 0, y: 0 },
+    visible: true,
+    ...overrides,
+  };
+}
+
+function makePiece(id: string, pointIds: string[]): CPiece {
+  return {
+    id,
+    name: id,
+    nodes: pointIds.map((pointId) => ({ pointId, connection: 'line' as const })),
+    seamAllowance: 10,
+    closed: true,
+  };
+}
+
+/** Mulberry32 — seeded PRNG so property checks are reproducible. */
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function randomScenario(
+  seed: number,
+  numPoints: number,
+  numPieces: number,
+  maxNodesPerPiece: number,
+  errorRate: number,
+): { points: CPoint[]; pieces: CPiece[] } {
+  const rand = mulberry32(seed);
+  const points: CPoint[] = [];
+  for (let i = 0; i < numPoints; i++) {
+    const hasError = rand() < errorRate;
+    points.push(
+      makePoint(`p${i}`, hasError ? { resolutionError: `err-${i}` } : {}),
+    );
+  }
+  const pieces: CPiece[] = [];
+  for (let i = 0; i < numPieces; i++) {
+    const k = 1 + Math.floor(rand() * maxNodesPerPiece);
+    const nodeIds: string[] = [];
+    for (let j = 0; j < k; j++) {
+      nodeIds.push(`p${Math.floor(rand() * numPoints)}`);
+    }
+    pieces.push(makePiece(`piece${i}`, nodeIds));
+  }
+  return { points, pieces };
+}
+
+describe('filterBuildablePieces', () => {
+  describe('parity with legacy O(P·K·M) implementation', () => {
+    it('matches legacy output on 10 seeded random scenarios', () => {
+      const seeds = [1, 2, 3, 5, 8, 13, 21, 34, 55, 89];
+      for (const seed of seeds) {
+        const { points, pieces } = randomScenario(seed, 80, 40, 8, 0.2);
+        const fresh = filterBuildablePieces(pieces, points);
+        const legacy = legacyFilterBuildablePieces(pieces, points);
+        expect(fresh.map((p) => p.id)).toEqual(legacy.map((p) => p.id));
+      }
+    });
+
+    it('matches legacy output when every point errors', () => {
+      const points = [makePoint('a', { resolutionError: 'nope' })];
+      const pieces = [makePiece('piece1', ['a'])];
+      expect(filterBuildablePieces(pieces, points)).toEqual(
+        legacyFilterBuildablePieces(pieces, points),
+      );
+    });
+
+    it('matches legacy output when no point errors', () => {
+      const points = [makePoint('a'), makePoint('b')];
+      const pieces = [makePiece('piece1', ['a', 'b'])];
+      expect(filterBuildablePieces(pieces, points)).toEqual(
+        legacyFilterBuildablePieces(pieces, points),
+      );
+    });
+  });
+
+  describe('semantic invariants', () => {
+    it('keeps a piece whose nodes all resolve cleanly', () => {
+      const points = [makePoint('a'), makePoint('b')];
+      const pieces = [makePiece('piece1', ['a', 'b'])];
+      expect(filterBuildablePieces(pieces, points).map((p) => p.id)).toEqual(['piece1']);
+    });
+
+    it('drops a piece when ANY node references an errored point', () => {
+      const points = [makePoint('a'), makePoint('b', { resolutionError: 'boom' })];
+      const pieces = [makePiece('piece1', ['a', 'b'])];
+      expect(filterBuildablePieces(pieces, points)).toEqual([]);
+    });
+
+    it('keeps a piece whose nodes reference a nonexistent pointId (undefined → not errored)', () => {
+      const points = [makePoint('a')];
+      const pieces = [makePiece('piece1', ['ghost'])];
+      // Legacy .find() returns undefined, pt?.resolutionError is undefined, != null is false
+      // The Map.get() returns undefined, same branch. Both keep the piece.
+      expect(filterBuildablePieces(pieces, points).map((p) => p.id)).toEqual(['piece1']);
+      expect(filterBuildablePieces(pieces, points)).toEqual(
+        legacyFilterBuildablePieces(pieces, points),
+      );
+    });
+
+    it('preserves the input order of pieces', () => {
+      const points = [makePoint('a')];
+      const pieces = [
+        makePiece('z', ['a']),
+        makePiece('a', ['a']),
+        makePiece('m', ['a']),
+      ];
+      expect(filterBuildablePieces(pieces, points).map((p) => p.id)).toEqual(['z', 'a', 'm']);
+    });
+
+    it('first-wins on duplicate point IDs (matches Array.prototype.find)', () => {
+      // Two points share id 'dup'; legacy .find returns the first occurrence
+      // (clean). Our Map must also retain the first and not be shadowed.
+      const points = [
+        makePoint('dup'),
+        makePoint('dup', { resolutionError: 'would break if second wins' }),
+      ];
+      const pieces = [makePiece('piece1', ['dup'])];
+      expect(filterBuildablePieces(pieces, points).map((p) => p.id)).toEqual(['piece1']);
+      expect(filterBuildablePieces(pieces, points)).toEqual(
+        legacyFilterBuildablePieces(pieces, points),
+      );
+    });
+  });
+
+  describe('edge cases', () => {
+    it('returns [] for empty pieces', () => {
+      expect(filterBuildablePieces([], [makePoint('a')])).toEqual([]);
+    });
+
+    it('handles empty points array (pieces with any nodes are kept, nodes resolve to undefined)', () => {
+      const pieces = [makePiece('piece1', ['a'])];
+      expect(filterBuildablePieces(pieces, []).map((p) => p.id)).toEqual(['piece1']);
+    });
+
+    it('handles a piece with zero nodes (vacuously buildable)', () => {
+      const pieces: CPiece[] = [{
+        id: 'empty',
+        name: 'empty',
+        nodes: [],
+        seamAllowance: 10,
+        closed: true,
+      }];
+      expect(filterBuildablePieces(pieces, []).map((p) => p.id)).toEqual(['empty']);
+    });
+
+    it('handles N=1 pieces and N=1 points', () => {
+      expect(
+        filterBuildablePieces([makePiece('p1', ['a'])], [makePoint('a')]).map((p) => p.id),
+      ).toEqual(['p1']);
+    });
+
+    it('is stable under reversed input order', () => {
+      const points = [makePoint('a'), makePoint('b', { resolutionError: 'boom' }), makePoint('c')];
+      const pieces = [
+        makePiece('p1', ['a']),
+        makePiece('p2', ['b']),
+        makePiece('p3', ['c']),
+      ];
+      const forward = filterBuildablePieces(pieces, points).map((p) => p.id);
+      const reversedPoints = filterBuildablePieces(pieces, [...points].reverse()).map((p) => p.id);
+      expect(forward).toEqual(['p1', 'p3']);
+      expect(reversedPoints).toEqual(['p1', 'p3']);
+    });
+
+    it('does not mutate its input arrays', () => {
+      const points = [makePoint('a'), makePoint('b', { resolutionError: 'boom' })];
+      const pieces = [makePiece('p1', ['a']), makePiece('p2', ['b'])];
+      const pointsSnapshot = points.map((p) => ({ ...p }));
+      const piecesSnapshot = pieces.map((p) => ({ ...p, nodes: [...p.nodes] }));
+      filterBuildablePieces(pieces, points);
+      expect(points).toEqual(pointsSnapshot);
+      expect(pieces).toEqual(piecesSnapshot);
+    });
+  });
+
+  describe('performance (detects O(P·K·M) regression)', () => {
+    // With the legacy nested .find(), this scenario is ~P·K·M ≈ 3e8 ops
+    // and runs in tens of seconds on a modern machine. The Map-indexed
+    // version finishes in single-digit milliseconds.
+    it('completes 1000 pieces × 30 nodes × 10000 points in under 250ms', () => {
+      const { points, pieces } = randomScenario(42, 10_000, 1_000, 30, 0.1);
+      const start = performance.now();
+      const out = filterBuildablePieces(pieces, points);
+      const elapsed = performance.now() - start;
+      expect(out.length).toBeGreaterThanOrEqual(0);
+      expect(out.length).toBeLessThanOrEqual(pieces.length);
+      expect(elapsed).toBeLessThan(250);
     });
   });
 });
