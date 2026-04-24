@@ -255,8 +255,13 @@ export function parameterizeEdge(
  * For each vertex on the shorter edge, finds the closest match on the longer
  * edge. Handles unequal vertex counts gracefully.
  *
- * @param edgeA - Parameterized vertices of edge A
- * @param edgeB - Parameterized vertices of edge B
+ * Assumes both inputs are sorted by ascending `t` — an invariant produced by
+ * `parameterizeEdge`, which builds `t` from cumulative arc length. Uses a
+ * two-pointer walk: O(|edgeA| + |edgeB|). On exact ties in |dv.t − target.t|,
+ * the lower target index wins (matches the previous strict-less-than impl).
+ *
+ * @param edgeA - Parameterized vertices of edge A (ascending t)
+ * @param edgeB - Parameterized vertices of edge B (ascending t)
  * @returns Array of [indexA, indexB] pairs
  */
 export function matchVertices(
@@ -265,29 +270,22 @@ export function matchVertices(
 ): Array<[number, number]> {
   if (edgeA.length === 0 || edgeB.length === 0) return [];
 
-  const pairs: Array<[number, number]> = [];
-
-  // Use the shorter edge as the driver to ensure every vertex gets paired
-  const [driver, target] = edgeA.length <= edgeB.length
-    ? [edgeA, edgeB]
-    : [edgeB, edgeA];
   const driverIsA = edgeA.length <= edgeB.length;
+  const driver = driverIsA ? edgeA : edgeB;
+  const target = driverIsA ? edgeB : edgeA;
 
-  for (const dv of driver) {
-    let bestIdx = 0;
-    let bestDist = Math.abs(dv.t - target[0].t);
-    for (let j = 1; j < target.length; j++) {
-      const dist = Math.abs(dv.t - target[j].t);
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestIdx = j;
-      }
+  const pairs = new Array<[number, number]>(driver.length);
+  const lastTargetIdx = target.length - 1;
+  let j = 0;
+
+  for (let i = 0; i < driver.length; i++) {
+    const dv = driver[i];
+    const dt = dv.t;
+    while (j < lastTargetIdx && Math.abs(dt - target[j + 1].t) < Math.abs(dt - target[j].t)) {
+      j++;
     }
-    if (driverIsA) {
-      pairs.push([dv.index, target[bestIdx].index]);
-    } else {
-      pairs.push([target[bestIdx].index, dv.index]);
-    }
+    const tgtIndex = target[j].index;
+    pairs[i] = driverIsA ? [dv.index, tgtIndex] : [tgtIndex, dv.index];
   }
 
   return pairs;

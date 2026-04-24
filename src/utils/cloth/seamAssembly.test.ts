@@ -133,6 +133,132 @@ describe('matchVertices', () => {
     // B is shorter → drives. 10(t=0)→0(t=0), 11(t=1)→2(t=1)
     expect(pairs).toEqual([[0, 10], [2, 11]]);
   });
+
+  it('handles single-vertex target (every driver maps to the only target)', () => {
+    const a: ParameterizedVertex[] = [
+      { index: 0, t: 0 }, { index: 1, t: 0.3 }, { index: 2, t: 1 },
+    ];
+    const b: ParameterizedVertex[] = [{ index: 99, t: 0.5 }];
+    // B is shorter (length 1) → drives. Only one b vertex to emit.
+    const pairs = matchVertices(a, b);
+    // Closest to 0.5 is a[1] (t=0.3, dist=0.2) — tied? 0.3 vs 1 → |0.5-0.3|=0.2, |0.5-1|=0.5, |0.5-0|=0.5.
+    expect(pairs).toEqual([[1, 99]]);
+  });
+
+  it('picks the lower target index on exact distance ties', () => {
+    // dv.t = 0.5 is equidistant to t=0 and t=1. Legacy uses strict `<`, so j=0 wins.
+    const driver: ParameterizedVertex[] = [{ index: 0, t: 0.5 }];
+    const target: ParameterizedVertex[] = [
+      { index: 10, t: 0 },
+      { index: 11, t: 1 },
+    ];
+    const pairs = matchVertices(driver, target);
+    expect(pairs).toEqual([[0, 10]]);
+  });
+
+  it('handles duplicate t values on target (picks lowest index on tie)', () => {
+    const driver: ParameterizedVertex[] = [{ index: 0, t: 0.5 }];
+    const target: ParameterizedVertex[] = [
+      { index: 10, t: 0.5 },
+      { index: 11, t: 0.5 },
+      { index: 12, t: 0.5 },
+    ];
+    const pairs = matchVertices(driver, target);
+    expect(pairs).toEqual([[0, 10]]);
+  });
+
+  it('does not mutate the input arrays', () => {
+    const a: ParameterizedVertex[] = Object.freeze([
+      Object.freeze({ index: 0, t: 0 }),
+      Object.freeze({ index: 1, t: 0.5 }),
+      Object.freeze({ index: 2, t: 1 }),
+    ]) as unknown as ParameterizedVertex[];
+    const b: ParameterizedVertex[] = Object.freeze([
+      Object.freeze({ index: 10, t: 0 }),
+      Object.freeze({ index: 11, t: 1 }),
+    ]) as unknown as ParameterizedVertex[];
+    // Under strict mode + frozen arrays, any mutation throws.
+    expect(() => matchVertices(a, b)).not.toThrow();
+    expect(a.length).toBe(3);
+    expect(b.length).toBe(2);
+  });
+
+  it('matches legacy O(n²) implementation on 10 seeded random sorted inputs', () => {
+    // Legacy implementation — kept here for parity verification only.
+    function legacyMatchVertices(
+      edgeA: ParameterizedVertex[],
+      edgeB: ParameterizedVertex[],
+    ): Array<[number, number]> {
+      if (edgeA.length === 0 || edgeB.length === 0) return [];
+      const pairs: Array<[number, number]> = [];
+      const driverIsA = edgeA.length <= edgeB.length;
+      const driver = driverIsA ? edgeA : edgeB;
+      const target = driverIsA ? edgeB : edgeA;
+      for (const dv of driver) {
+        let bestIdx = 0;
+        let bestDist = Math.abs(dv.t - target[0].t);
+        for (let j = 1; j < target.length; j++) {
+          const dist = Math.abs(dv.t - target[j].t);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestIdx = j;
+          }
+        }
+        if (driverIsA) pairs.push([dv.index, target[bestIdx].index]);
+        else pairs.push([target[bestIdx].index, dv.index]);
+      }
+      return pairs;
+    }
+
+    // Deterministic PRNG (mulberry32) so the test is fully reproducible.
+    function makePrng(seed: number): () => number {
+      let s = seed >>> 0;
+      return () => {
+        s = (s + 0x6d2b79f5) >>> 0;
+        let t = s;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+
+    function makeSortedEdge(rng: () => number, n: number, offset: number): ParameterizedVertex[] {
+      if (n === 0) return [];
+      const ts: number[] = [];
+      for (let i = 0; i < n; i++) ts.push(rng());
+      ts.sort((x, y) => x - y);
+      ts[0] = 0;
+      ts[n - 1] = 1;
+      return ts.map((t, i) => ({ index: offset + i, t }));
+    }
+
+    const rng = makePrng(0xC0FFEE);
+    for (let run = 0; run < 10; run++) {
+      const nA = 2 + Math.floor(rng() * 120);
+      const nB = 2 + Math.floor(rng() * 120);
+      const a = makeSortedEdge(rng, nA, 0);
+      const b = makeSortedEdge(rng, nB, 1000);
+      expect(matchVertices(a, b)).toEqual(legacyMatchVertices(a, b));
+    }
+  });
+
+  it('pairs 20000×20000 vertices in under 100 ms (legacy O(n²) needs ≈ 700 ms)', () => {
+    const N = 20000;
+    const a: ParameterizedVertex[] = new Array(N);
+    const b: ParameterizedVertex[] = new Array(N);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      a[i] = { index: i, t };
+      b[i] = { index: i + N, t };
+    }
+    const t0 = performance.now();
+    const pairs = matchVertices(a, b);
+    const elapsed = performance.now() - t0;
+    expect(pairs.length).toBe(N);
+    expect(pairs[0]).toEqual([0, N]);
+    expect(pairs[N - 1]).toEqual([N - 1, 2 * N - 1]);
+    expect(elapsed).toBeLessThan(100);
+  });
 });
 
 // ─── Mesh Merging ───────────────────────────────────────────────────────────
