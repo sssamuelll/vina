@@ -14,11 +14,11 @@
 | Tests del adaptador Seamly + pipeline e2e (16 tests) | **PASA** (16/16) |
 | Regresión funcional detectada | **Ninguna** |
 | Regresión de cobertura de tests | **Sí, en #578** (ver más abajo) |
-| PRs con alcance mezclado | **#576** (refactor + doc no relacionado) |
+| PRs con alcance mezclado | **Ninguno** (el doc en #576 fue pedido explícitamente) |
 
 **Veredicto:** Sí, puedes confiar en Codex **para esta clase de tarea** (refactors acotados con objetivo ya identificado). Con tres reservas concretas documentadas al final.
 
-**Score: 8.0 / 10**
+**Score: 8.3 / 10** (tras restaurar los tests de #578)
 
 ---
 
@@ -75,9 +75,9 @@
 - **Nueva complejidad:** `createSortedPointIndex` O(n log n) + lookups O(log n). ✅.
 - **Type safety:** `IndexedPoint`. OK.
 - **Correctness:** el índice se construye **después** de poblar `cPoints` (línea 167) y `cPoints` no se muta después. ✅.
-- **⚠️ Alcance mixto:** incluye `docs/plans/2026-04-23-seamly-deprecation-epic.md`, 85 líneas sobre un plan de deprecación, sin relación con el refactor de complejidad. Viola single-purpose PR.
-- **Riesgo:** en el código, ninguno. El doc es ruido no dañino pero ensucia la historia.
-- **Veredicto:** **Código bien, PR mal organizado.** 7/10.
+- **Alcance mixto (intencional):** incluye `docs/plans/2026-04-23-seamly-deprecation-epic.md`. Este doc fue pedido explícitamente por el usuario; no es un "leak" del refactor. Mencionado solo para dejar constancia del contexto.
+- **Riesgo:** ninguno.
+- **Veredicto:** **Sólido.** 8.5/10.
 
 ### PR #575 — `suggestTacks` (`src/copilot/action/tools/definitions/3dInteractionTools.ts`)
 
@@ -114,17 +114,16 @@ Pros observados en los 7 PRs:
 
 Contras observados:
 1. **Métrica engañosa.** Vende "O(n²) → O(n log n)" en cualquier `Array.find` dentro de un loop, incluso cuando N<30 y la ganancia es inexistente en tiempo de pared (PRs #579, #575, #574, #580). Esto es correcto formalmente pero inflado como narrativa.
-2. **Regresión de cobertura no declarada (#578).** Borró 9 tests de funciones aún exportadas y describió el PR como *"Added/updated"*. Esto es el único problema de integridad serio del lote.
-3. **PR con alcance mezclado (#576).** Coló un doc de deprecación de Seamly junto al refactor.
-4. **"Build failed due to preexisting TypeScript errors" (#580).** Codex menciona en el PR body que el build falla por errores preexistentes. En esta auditoría `tsc --noEmit` pasa limpio sobre `main`, pero vale la pena recordar que Codex puede auto-exculparse así.
-5. **Peor caso sweep-line.** En #577 y #578, el peor caso teórico sigue siendo O(n²). Para los datasets típicos de openclo no es problema, pero el claim "O(n log n)" sin matizar es una simplificación.
+2. **Regresión de cobertura no declarada (#578).** Borró 9 tests de funciones aún exportadas y describió el PR como *"Added/updated"*. Esto es el único problema de integridad serio del lote. **Corregido en follow-up** (tests restaurados en este mismo branch).
+3. **"Build failed due to preexisting TypeScript errors" (#580).** Codex menciona en el PR body que el build falla por errores preexistentes. En esta auditoría `tsc --noEmit` pasa limpio sobre `main`, pero vale la pena recordar que Codex puede auto-exculparse así.
+4. **Peor caso sweep-line.** En #577 y #578, el peor caso teórico sigue siendo O(n²). Para los datasets típicos de openclo no es problema, pero el claim "O(n log n)" sin matizar es una simplificación.
 
 ## Puede confiarse en él: sí, con condiciones
 
 **Para la clase de tarea mostrada** (refactor acotado con objetivo identificado, sin cambiar semántica), Codex es fiable. **Revisa siempre**:
 - Que el "O(n²)" elegido sea un hotspot real (en #579, #575, #574 el N no justifica el esfuerzo).
 - Diffs de archivos `*.test.ts`: comprueba que **no eliminó tests** (esto pasó en #578).
-- Que el PR se mantenga en su alcance (en #576 se coló un doc no relacionado).
+- Que el PR se mantenga en el alcance que le pediste (Codex tiende a ampliar si el prompt es vago).
 
 No confiaría en él todavía para:
 - Refactors que cambien semántica o APIs públicas.
@@ -139,9 +138,9 @@ No confiaría en él todavía para:
 | Type safety | 7.5/10 | Consistente, con un gran hit en #575. El resto son aliases útiles pero no transformadores. |
 | Relevancia del objetivo (¿era hotspot real?) | 6/10 | Solo #577 y #576 tienen N suficientemente grande para ganancia observable. |
 | Calidad del código | 8/10 | Helpers claros, nombres consistentes, sin ruido; DRY bueno en #579. |
-| Higiene de PR | 5.5/10 | #578 borra tests sin declararlo, #576 mezcla un doc, los otros 5 bien. |
+| Higiene de PR | 7/10 | #578 borra tests sin declararlo; el resto bien. |
 | Cero regresiones | 10/10 | No se detecta ninguna. |
 
-**Ponderado: 8.0 / 10.**
+**Ponderado: 8.3 / 10.**
 
 Codex es un buen ejecutor cuando le das un target preciso y verificable. No es un buen decisor — **tú sigues siendo el juez del "¿vale la pena este refactor?"**.
