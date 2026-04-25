@@ -1,0 +1,78 @@
+# PR sanity checks.
+#
+# Catches the failure mode that produced the #590 / #591 duplicate merge:
+# two PRs with the same head ref and the same head SHA were both merged
+# nine hours apart, and no reviewer noticed.
+#
+# This workflow fails any PR whose head SHA matches a recently merged PR.
+# It is the cheapest, most precise rule that would have caught that exact
+# incident — and any future re-occurrence of the same pattern.
+#
+# Branch protection ("Require status checks to pass before merging" with
+# this job listed) is the complementary half: this workflow flags the
+# duplicate, branch protection enforces the block. Without that setting,
+# the failing check is still highly visible to reviewers and merge UIs.
+#
+# Lookback window: last 100 closed PRs sorted by updated_at desc. Duplicate
+# merges happen within hours of each other in practice (#590 and #591 were
+# nine hours apart), so 100 PRs is plenty and avoids unbounded pagination.
+
+name: PR sanity checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  duplicate-detection:
+    name: No duplicate of a recently merged PR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compare head SHA + ref against the last 100 merged PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          echo "::group::Current PR"
+          echo "number = #${PR_NUMBER}"
+          echo "head.ref = ${PR_HEAD_REF}"
+          echo "head.sha = ${PR_HEAD_SHA}"
+          echo "::endgroup::"
+
+          # Last 100 closed PRs, ordered by updated_at desc, filtered to merged
+          # ones that are not the current PR. tab-separated: number, sha, ref.
+          response=$(gh api \
+            "repos/${REPO}/pulls?state=closed&per_page=100&sort=updated&direction=desc" \
+            --jq "[.[] | select(.merged_at != null) | select(.number != ${PR_NUMBER}) | {number, sha: .head.sha, ref: .head.ref}]")
+
+          count=$(echo "$response" | jq 'length')
+          echo "Comparing against ${count} recently merged PR(s)"
+
+          dup_sha_pr=$(echo "$response" | jq -r ".[] | select(.sha == \"${PR_HEAD_SHA}\") | .number" | head -n1)
+          dup_ref_pr=$(echo "$response" | jq -r ".[] | select(.ref == \"${PR_HEAD_REF}\") | .number" | head -n1)
+
+          failed=0
+
+          if [ -n "${dup_sha_pr}" ]; then
+            echo "::error title=Duplicate head SHA::PR #${PR_NUMBER} has the same head SHA (${PR_HEAD_SHA}) as already-merged PR #${dup_sha_pr}. This is the same pattern that produced the #590=#591 duplicate merge. If this PR is intentional (e.g. re-applying after a revert), close it and open a new one with a fresh commit."
+            failed=1
+          fi
+
+          if [ -n "${dup_ref_pr}" ] && [ "${dup_ref_pr}" != "${dup_sha_pr}" ]; then
+            echo "::warning title=Reused head ref::PR #${PR_NUMBER} uses head ref '${PR_HEAD_REF}' that was previously merged in PR #${dup_ref_pr}. The SHAs differ so this is allowed, but verify it is a deliberate follow-up rather than an accidental re-push of a stale branch."
+          fi
+
+          if [ "${failed}" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "✓ No duplicate head SHA found against the last ${count} merged PR(s)."

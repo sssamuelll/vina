@@ -20,7 +20,9 @@ copyclip_metrics.jsonl
 snapshot-*.md
 screenshots/
 .claude/
-.github/
+.github/*
+!.github/workflows/
+!.github/workflows/**
 .husky/
 CLAUDE.md
 scripts/deploy.sh

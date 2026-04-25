@@ -90,6 +90,11 @@ npx tsc --noEmit        # Type check
 4. **Run** `npx vitest run` — all tests must pass
 5. **Open PR** with a clear description of what and why
 
+### Automated PR checks
+
+- `.github/workflows/pr-checks.yml` runs on every PR open / synchronize / reopen and **fails** if the PR's head SHA matches a recently merged PR. This is the cheapest check that would have caught the #590 = #591 duplicate merge (same head ref + SHA, merged nine hours apart). If you intentionally re-apply a previously merged commit (e.g. after a revert), close the existing PR and open a new one with a fresh commit on top.
+- The same workflow emits a non-blocking warning if the head **branch name** matches a recently merged PR's branch but the SHA differs — verify it is a deliberate follow-up, not an accidental re-push of a stale branch.
+
 ## Engine Development Guidelines
 
 Each engine in `src/utils/` is an independent module:
