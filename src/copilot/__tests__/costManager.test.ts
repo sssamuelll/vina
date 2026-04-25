@@ -357,6 +357,37 @@ describe('CostManager', () => {
     expect(badManager.getProjectCost().calls).toBe(0);
   });
 
+  it('drops corrupt records on load and keeps valid ones, without producing NaN totals', () => {
+    const goodA = {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      inputTokens: 1000,
+      outputTokens: 200,
+      cost: 0.006,
+      timestamp: 1_700_000_000_000,
+    };
+    const goodB = { ...goodA, inputTokens: 500, outputTokens: 100, cost: 0.003 };
+    const corrupt = [
+      goodA,
+      { ...goodA, inputTokens: 'oops' }, // wrong type
+      { ...goodA, cost: NaN }, // NaN cost
+      { ...goodA, timestamp: '2026-01-15T00:00:00Z' }, // string timestamp
+      goodB,
+    ];
+    localStorageMock.setItem('openclo_usage_mixed', JSON.stringify(corrupt));
+
+    const m = new CostManager('mixed');
+    const summary = m.getProjectCost();
+    expect(summary.calls).toBe(2);
+    expect(summary.tokens).toBe(1800);
+    expect(Number.isFinite(summary.estimatedCost)).toBe(true);
+    expect(summary.estimatedCost).toBeCloseTo(0.009, 6);
+
+    // Sanitized list is re-persisted so corruption does not survive next load.
+    const persisted = JSON.parse(localStorageMock.getItem('openclo_usage_mixed')!);
+    expect(persisted).toHaveLength(2);
+  });
+
   it('should isolate different projects', () => {
     manager.trackUsage('anthropic', 1000, 500, 'claude-sonnet-4-20250514');
 

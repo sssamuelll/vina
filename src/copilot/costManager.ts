@@ -11,6 +11,7 @@
  */
 
 import { safeGetItem, safeSetItem, safeRemoveItem } from '../utils/safeStorage';
+import { parseUsageRecordList } from './usageRecordSchema';
 
 // ─── Pricing Table ──────────────────────────────────────────────────────────
 
@@ -308,16 +309,27 @@ export class CostManager {
    * Load project usage from localStorage.
    */
   private loadProjectUsage(): void {
+    const key = USAGE_STORAGE_PREFIX + this.projectId;
+    let parsed: unknown;
     try {
-      const key = USAGE_STORAGE_PREFIX + this.projectId;
       const saved = safeGetItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          this.projectRecords = parsed;
-        }
-      }
-    } catch { /* ignore */ }
+      if (!saved) return;
+      parsed = JSON.parse(saved);
+    } catch {
+      return;
+    }
+    const { valid, dropped } = parseUsageRecordList(parsed);
+    this.projectRecords = valid;
+    if (dropped > 0) {
+      // Counts only — never log the records themselves; they may contain model names or other internals.
+      console.warn('[CostManager] Dropped corrupt usage records on load', {
+        projectId: this.projectId,
+        dropped,
+        kept: valid.length,
+      });
+      // Re-persist the sanitized list so corruption does not survive future sessions.
+      this.saveProjectUsage();
+    }
   }
 
   /**
