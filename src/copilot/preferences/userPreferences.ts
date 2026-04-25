@@ -13,6 +13,7 @@
 
 import { z } from 'zod';
 import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
+import { recordStorageParseFailure } from '../../utils/telemetry/storageTelemetry';
 
 // ============================================================================
 // Types
@@ -306,14 +307,18 @@ const UserPreferencesSchema = z
  * Pure and deterministic except for the timestamp upper-bound check, which
  * reads `Date.now()` to detect future-dated entries. Does not mutate input.
  */
-export function parseUserPreferences(input: unknown): UserPreferences | null {
+export function parseUserPreferences(
+  input: unknown,
+  onIssue?: (detail: string) => void,
+): UserPreferences | null {
   const result = UserPreferencesSchema.safeParse(input);
   if (result.success) return result.data;
   const issue = result.error.issues[0];
   const path = issue?.path.length ? issue.path.join('.') : '<root>';
-  console.warn(
-    `[userPreferences] dropped corrupt preferences: ${path} — ${issue?.message ?? 'unknown error'}`,
-  );
+  const message = issue?.message ?? 'unknown error';
+  const detail = `${path} — ${message}`;
+  onIssue?.(detail);
+  console.warn(`[userPreferences] dropped corrupt preferences: ${detail}`);
   return null;
 }
 
@@ -550,10 +555,28 @@ export class PreferenceManager {
     let raw: unknown;
     try {
       raw = JSON.parse(stored);
-    } catch {
+    } catch (e) {
+      recordStorageParseFailure({
+        key: STORAGE_KEY,
+        reason: 'json_parse',
+        droppedCount: 1,
+        keptCount: 0,
+        detail: (e as Error).message,
+      });
       return null;
     }
-    return parseUserPreferences(raw);
+    let issueDetail: string | undefined;
+    const parsed = parseUserPreferences(raw, (d) => { issueDetail = d; });
+    if (parsed === null) {
+      recordStorageParseFailure({
+        key: STORAGE_KEY,
+        reason: 'schema_root',
+        droppedCount: 1,
+        keptCount: 0,
+        detail: issueDetail,
+      });
+    }
+    return parsed;
   }
 
   /**
