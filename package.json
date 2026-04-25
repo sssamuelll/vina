@@ -22,7 +22,10 @@
     "prepare": "husky",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "bench": "tsx bench/run.ts",
+    "bench:matchvertices": "tsx bench/matchVertices.bench.ts",
+    "bench:lra": "tsx bench/buildLRAConstraints.bench.ts"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
