@@ -7,6 +7,10 @@ import {
   parseProfilesJson,
   type AvatarProfile,
 } from '../avatarLibrary';
+import {
+  getStorageParseFailureSnapshot,
+  resetStorageParseFailureCounter,
+} from '../../telemetry/storageTelemetry';
 
 // Mock localStorage
 const store: Record<string, string> = {};
@@ -290,5 +294,70 @@ describe('loadProfiles with corrupt storage', () => {
     localStorage.setItem('openclo-avatar-profiles', JSON.stringify([{ id: 'x' }, null]));
     const loaded = loadProfiles();
     expect(loaded.length).toBe(4);
+  });
+});
+
+// ─── loadProfiles — telemetry emission on corrupt storage ────────────────────
+
+describe('loadProfiles telemetry', () => {
+  beforeEach(() => {
+    resetStorageParseFailureCounter();
+  });
+
+  it('emits json_parse failure when storage holds malformed JSON', () => {
+    localStorage.setItem('openclo-avatar-profiles', '{not json');
+    loadProfiles();
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byKey['openclo-avatar-profiles']).toBe(1);
+    expect(snap.byReason.json_parse).toBe(1);
+    expect(snap.recent[0].droppedCount).toBe(1);
+    expect(snap.recent[0].keptCount).toBe(0);
+  });
+
+  it('emits schema_root failure when root is not an array', () => {
+    localStorage.setItem('openclo-avatar-profiles', JSON.stringify({ oops: true }));
+    loadProfiles();
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byReason.schema_root).toBe(1);
+    expect(snap.recent[0].detail).toContain('expected array');
+  });
+
+  it('emits schema_record failure with kept/dropped counts when one profile is corrupt', () => {
+    const good = {
+      id: 'good',
+      name: 'Good',
+      measurements: { height: 170, chest: 90, waist: 70, hips: 95, shoulder: 40, armLength: 60, inseam: 75 },
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    };
+    const bad = { id: 'bad', name: 'Bad', measurements: { height: 'tall' } };
+    localStorage.setItem('openclo-avatar-profiles', JSON.stringify([good, bad]));
+    loadProfiles();
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byReason.schema_record).toBe(1);
+    expect(snap.recent[0].droppedCount).toBe(1);
+    expect(snap.recent[0].keptCount).toBe(1);
+    expect(snap.recent[0].detail).toContain('measurements');
+  });
+
+  it('does not emit when storage is empty (defaults are not corruption)', () => {
+    loadProfiles();
+    expect(getStorageParseFailureSnapshot().total).toBe(0);
+  });
+
+  it('does not emit when storage holds a valid array of profiles', () => {
+    const good = {
+      id: 'good',
+      name: 'Good',
+      measurements: { height: 170, chest: 90, waist: 70, hips: 95, shoulder: 40, armLength: 60, inseam: 75 },
+      createdAt: 1_700_000_000_000,
+      updatedAt: 1_700_000_000_000,
+    };
+    localStorage.setItem('openclo-avatar-profiles', JSON.stringify([good]));
+    loadProfiles();
+    expect(getStorageParseFailureSnapshot().total).toBe(0);
   });
 });

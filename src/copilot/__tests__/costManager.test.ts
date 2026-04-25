@@ -7,6 +7,10 @@ import {
   selectOptimalModel,
   classifyToolComplexity,
 } from '../costManager';
+import {
+  getStorageParseFailureSnapshot,
+  resetStorageParseFailureCounter,
+} from '../../utils/telemetry/storageTelemetry';
 
 // ─── localStorage mock ──────────────────────────────────────────────────────
 
@@ -557,5 +561,62 @@ describe('classifyToolComplexity', () => {
 
   it('should classify empty string as normal', () => {
     expect(classifyToolComplexity('')).toBe('normal');
+  });
+});
+
+// ─── CostManager telemetry on corrupt storage ───────────────────────────────
+
+describe('CostManager telemetry', () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+    resetStorageParseFailureCounter();
+    vi.clearAllMocks();
+  });
+
+  it('emits json_parse failure when project storage holds malformed JSON', () => {
+    localStorageMock.setItem('openclo_usage_telemetry-bad-json', 'not-json{{{');
+    new CostManager('telemetry-bad-json');
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byKey['openclo_usage_telemetry-bad-json']).toBe(1);
+    expect(snap.byReason.json_parse).toBe(1);
+  });
+
+  it('emits schema_record failure with kept/dropped counts when records are partially corrupt', () => {
+    const good = {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      inputTokens: 1000,
+      outputTokens: 200,
+      cost: 0.006,
+      timestamp: 1_700_000_000_000,
+    };
+    const corrupt = [good, { ...good, inputTokens: 'oops' }, { ...good, cost: NaN }];
+    localStorageMock.setItem('openclo_usage_telemetry-mixed', JSON.stringify(corrupt));
+    new CostManager('telemetry-mixed');
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byReason.schema_record).toBe(1);
+    expect(snap.recent[0].droppedCount).toBe(2);
+    expect(snap.recent[0].keptCount).toBe(1);
+  });
+
+  it('does not emit when storage is empty (fresh project)', () => {
+    new CostManager('telemetry-fresh');
+    expect(getStorageParseFailureSnapshot().total).toBe(0);
+  });
+
+  it('does not emit when records are all valid', () => {
+    const good = {
+      provider: 'anthropic',
+      model: 'claude-sonnet-4-20250514',
+      inputTokens: 1000,
+      outputTokens: 200,
+      cost: 0.006,
+      timestamp: 1_700_000_000_000,
+    };
+    localStorageMock.setItem('openclo_usage_telemetry-good', JSON.stringify([good, good]));
+    new CostManager('telemetry-good');
+    expect(getStorageParseFailureSnapshot().total).toBe(0);
   });
 });

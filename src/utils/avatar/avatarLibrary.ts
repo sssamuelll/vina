@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { BodyMeasurements } from '../../types/types';
 import { safeGetItem, safeSetItem } from '../safeStorage';
+import { recordStorageParseFailure } from '../telemetry/storageTelemetry';
 
 export interface AvatarProfile {
   id: string;
@@ -100,8 +101,8 @@ const ProfileSchema = z
 // ─── Parser ──────────────────────────────────────────────────────────────────
 
 export type ParseProfilesResult =
-  | { success: true; data: AvatarProfile[]; rejected: number }
-  | { success: false; error: string };
+  | { success: true; data: AvatarProfile[]; rejected: number; firstRejectDetail?: string }
+  | { success: false; error: string; reason: 'json_parse' | 'schema_root' };
 
 /**
  * Parse a localStorage value (already string-decoded or null) into a validated
@@ -115,16 +116,17 @@ export function parseProfilesJson(raw: string | null): ParseProfilesResult {
   try {
     json = JSON.parse(raw);
   } catch (e) {
-    return { success: false, error: `invalid JSON: ${(e as Error).message}` };
+    return { success: false, error: `invalid JSON: ${(e as Error).message}`, reason: 'json_parse' };
   }
   if (!Array.isArray(json)) {
-    return { success: false, error: `root: expected array, got ${typeofDescription(json)}` };
+    return { success: false, error: `root: expected array, got ${typeofDescription(json)}`, reason: 'schema_root' };
   }
   if (json.length > MAX_PROFILES) {
-    return { success: false, error: `root: too many profiles (${json.length} > ${MAX_PROFILES})` };
+    return { success: false, error: `root: too many profiles (${json.length} > ${MAX_PROFILES})`, reason: 'schema_root' };
   }
   const valid: AvatarProfile[] = [];
   let rejected = 0;
+  let firstRejectDetail: string | undefined;
   for (let i = 0; i < json.length; i++) {
     const result = ProfileSchema.safeParse(json[i]);
     if (result.success) {
@@ -133,12 +135,14 @@ export function parseProfilesJson(raw: string | null): ParseProfilesResult {
       rejected++;
       const issue = result.error.issues[0];
       const path = issue?.path.join('.') || '<root>';
-      console.warn(
-        `[avatarLibrary] dropped profile at index ${i}: ${path} — ${issue?.message ?? 'unknown error'}`,
-      );
+      const message = issue?.message ?? 'unknown error';
+      if (firstRejectDetail === undefined) {
+        firstRejectDetail = `${path} — ${message}`;
+      }
+      console.warn(`[avatarLibrary] dropped profile at index ${i}: ${path} — ${message}`);
     }
   }
-  return { success: true, data: valid, rejected };
+  return { success: true, data: valid, rejected, firstRejectDetail };
 }
 
 function typeofDescription(v: unknown): string {
@@ -189,10 +193,24 @@ export function loadProfiles(): AvatarProfile[] {
   const raw = safeGetItem(STORAGE_KEY);
   const result = parseProfilesJson(raw);
   if (!result.success) {
+    recordStorageParseFailure({
+      key: STORAGE_KEY,
+      reason: result.reason,
+      droppedCount: 1,
+      keptCount: 0,
+      detail: result.error,
+    });
     console.warn(`[avatarLibrary] resetting profiles: ${result.error}`);
     return getDefaultProfiles();
   }
   if (result.rejected > 0) {
+    recordStorageParseFailure({
+      key: STORAGE_KEY,
+      reason: 'schema_record',
+      droppedCount: result.rejected,
+      keptCount: result.data.length,
+      detail: result.firstRejectDetail,
+    });
     console.warn(`[avatarLibrary] dropped ${result.rejected} corrupt profile(s) from storage`);
   }
   return result.data.length > 0 ? result.data : getDefaultProfiles();

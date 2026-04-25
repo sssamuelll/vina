@@ -13,6 +13,10 @@ import {
   DEFAULT_USAGE_STATS,
   parseUserPreferences,
 } from '../userPreferences';
+import {
+  getStorageParseFailureSnapshot,
+  resetStorageParseFailureCounter,
+} from '../../../utils/telemetry/storageTelemetry';
 
 // Mock localStorage and window
 const localStorageMock = (() => {
@@ -559,5 +563,51 @@ describe('PreferenceManager corrupt-storage fallback', () => {
     expect(top).toHaveLength(1);
     expect(top[0].action).toBe('foo');
     expect(top[0].count).toBe(2);
+  });
+});
+
+// ─── PreferenceManager telemetry on corrupt storage ──────────────────────────
+
+describe('PreferenceManager telemetry', () => {
+  beforeEach(() => {
+    localStorageMock.clear();
+    resetPreferenceManager();
+    resetStorageParseFailureCounter();
+    vi.clearAllMocks();
+  });
+
+  it('emits json_parse failure when storage holds malformed JSON', () => {
+    localStorageMock.setItem('openclo_copilot_preferences', '{not json');
+    new PreferenceManager();
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byKey['openclo_copilot_preferences']).toBe(1);
+    expect(snap.byReason.json_parse).toBe(1);
+  });
+
+  it('emits schema_root failure when storage holds JSON with wrong shape', () => {
+    localStorageMock.setItem(
+      'openclo_copilot_preferences',
+      JSON.stringify({ skillLevel: 'wrong-value' }),
+    );
+    new PreferenceManager();
+    const snap = getStorageParseFailureSnapshot();
+    expect(snap.total).toBe(1);
+    expect(snap.byReason.schema_root).toBe(1);
+    expect(snap.recent[0].detail).toBeDefined();
+  });
+
+  it('does not emit when storage is empty', () => {
+    new PreferenceManager();
+    expect(getStorageParseFailureSnapshot().total).toBe(0);
+  });
+
+  it('does not emit when storage holds a valid payload', () => {
+    localStorageMock.setItem(
+      'openclo_copilot_preferences',
+      JSON.stringify(createDefaultPreferences()),
+    );
+    new PreferenceManager();
+    expect(getStorageParseFailureSnapshot().total).toBe(0);
   });
 });

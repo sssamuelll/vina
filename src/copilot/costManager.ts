@@ -12,6 +12,7 @@
 
 import { safeGetItem, safeSetItem, safeRemoveItem } from '../utils/safeStorage';
 import { parseUsageRecordList } from './usageRecordSchema';
+import { recordStorageParseFailure } from '../utils/telemetry/storageTelemetry';
 
 // ─── Pricing Table ──────────────────────────────────────────────────────────
 
@@ -315,12 +316,25 @@ export class CostManager {
       const saved = safeGetItem(key);
       if (!saved) return;
       parsed = JSON.parse(saved);
-    } catch {
+    } catch (e) {
+      recordStorageParseFailure({
+        key,
+        reason: 'json_parse',
+        droppedCount: 1,
+        keptCount: 0,
+        detail: (e as Error).message,
+      });
       return;
     }
     const { valid, dropped } = parseUsageRecordList(parsed);
     this.projectRecords = valid;
     if (dropped > 0) {
+      recordStorageParseFailure({
+        key,
+        reason: 'schema_record',
+        droppedCount: dropped,
+        keptCount: valid.length,
+      });
       // Counts only — never log the records themselves; they may contain model names or other internals.
       console.warn('[CostManager] Dropped corrupt usage records on load', {
         projectId: this.projectId,
