@@ -23,16 +23,13 @@ const body = { chest: 96, waist: 82, hip: 96, shoulder: 44 };
 
 describe('computeEase', () => {
   it('computes bust ease from bodice pieces', () => {
-    // Front bodice 260mm wide = 520mm circumference (×2), body = 960mm
     const front = makeBodicePiece('Front', 260, 600);
     const back = makeBodicePiece('Back', 260, 600);
     back.side = 'back';
     const ease = computeEase([front, back], body);
-    expect(ease.bust).toBeDefined();
-    // 2 pieces at 30% height: each ~260mm wide = 520mm total, body=960mm
-    // ease = 520 - 960 = -440... that's because our measurement is at fraction
-    // The exact value depends on the scanline, but it should be a number
-    expect(typeof ease.bust).toBe('number');
+    // 2 bodices, scanline at 30% on a 260×600 rect → 260 mm width per piece.
+    // total = 520 mm; body chest = 96 cm = 960 mm; ease = round(520 − 960).
+    expect(ease.bust).toBe(-440);
   });
 
   it('doubles measurement for single piece (front only)', () => {
