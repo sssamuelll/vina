@@ -226,12 +226,15 @@ describe('parseUsageRecord — error reporting', () => {
   });
 
   it('error does not echo the entire input record (no PII leak)', () => {
+    // expect.assertions(2) catches the silent-success path: if parseUsageRecord
+    // stops throwing on invalid input, the catch block is skipped, no asserts
+    // run, and Vitest fails the test for missing the required count.
+    expect.assertions(2);
     try {
       parseUsageRecord({ ...validRecord(), provider: 42 });
-      throw new Error('expected throw');
     } catch (err) {
-      const msg = (err as ZodError).message;
-      expect(msg).not.toContain('claude-sonnet-4-20250514');
+      expect(err).toBeInstanceOf(ZodError);
+      expect((err as ZodError).message).not.toContain('claude-sonnet-4-20250514');
     }
   });
 });
