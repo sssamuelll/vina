@@ -69,6 +69,13 @@ describe('UI Bridge Tools (#82)', () => {
     const result: any = await tool.execute({ mode: '3d' }, dispatch as any, mockState as any);
     expect(result.success).toBe(true);
     expect(result.viewMode).toBe('3d');
+    // Contract: dispatches exactly one setViewMode action carrying the mode.
+    // Echo-only mutations (drop the dispatch) survive without these assertions.
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch.mock.calls[0][0]).toEqual({
+      type: 'editor/setViewMode',
+      payload: '3d',
+    });
   });
 
   it('selectPieceById selects a piece', async () => {

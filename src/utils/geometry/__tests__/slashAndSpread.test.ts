@@ -66,18 +66,14 @@ describe('findSlashIntersections', () => {
       { x: 50, y: -10 },
       { x: 50, y: 160 },
     );
-    expect(result).toHaveLength(2);
-    for (const hit of result) {
-      expect(hit).toHaveProperty('commandIndex');
-      expect(hit).toHaveProperty('t');
-      expect(hit).toHaveProperty('point');
-      expect(typeof hit.commandIndex).toBe('number');
-      expect(typeof hit.t).toBe('number');
-      expect(hit.t).toBeGreaterThanOrEqual(0);
-      expect(hit.t).toBeLessThanOrEqual(1);
-      expect(hit.point).toHaveProperty('x');
-      expect(hit.point).toHaveProperty('y');
-    }
+    // Vertical slash at x=50 through this rect produces two intersections:
+    //   bottom edge (cmd 1, midpoint of L (0,0)→(100,0)) at (50, 0)
+    //   top edge    (cmd 3, midpoint of L (100,150)→(0,150)) at (50, 150)
+    // toEqual pins down length, order, indices, t-values, and point coords.
+    expect(result).toEqual([
+      { commandIndex: 1, t: 0.5, point: { x: 50, y: 0 } },
+      { commandIndex: 3, t: 0.5, point: { x: 50, y: 150 } },
+    ]);
   });
 
   it('line that misses piece entirely throws', () => {

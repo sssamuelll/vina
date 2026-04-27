@@ -35,11 +35,17 @@ describe('batchGrade', () => {
     expect(result.totalPieces).toBeGreaterThan(0);
   });
 
-  it('each size has a color', () => {
-    const result = batchGrade(mockPattern, { sizes: ['XS', 'M', 'XL'] });
-    for (const s of result.sizes) {
-      expect(s.color).toBeTruthy();
-      expect(s.color).toMatch(/^#/);
+  it('each size has a distinct hex color', () => {
+    const sizes = ['XS', 'S', 'M', 'L', 'XL'] as const;
+    const result = batchGrade(mockPattern, { sizes: [...sizes] });
+    expect(result.sizes).toHaveLength(5);
+    const colors = result.sizes.map(s => s.color);
+    // A constant-return mutation in getSizeColor collapses the Set to size 1.
+    expect(new Set(colors).size).toBe(5);
+    for (const c of colors) {
+      expect(c).toMatch(/^#[0-9a-f]{6}$/i);
+      // Reject the '#666' fallback path used when the size isn't in the palette.
+      expect(c).not.toBe('#666');
     }
   });
 

@@ -88,7 +88,11 @@ describe('generateNotchPath', () => {
 
   it('default options work correctly', () => {
     const path = generateNotchPath(origin, normalUp, DEFAULT_NOTCH_OPTIONS);
-    expect(path.length).toBeGreaterThan(0);
-    expect(path[0].type).toBe('M');
+    // Defaults are slit/length=8 at origin with inward normal (0,-1):
+    //   M (0,0) → L (0,-8). toEqual pins length, order, types, and coords.
+    expect(path).toEqual([
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [0, -8] },
+    ]);
   });
 });
