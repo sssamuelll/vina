@@ -26,7 +26,7 @@ import type { PaperSize, CuttingLayoutConfig } from '../../utils/export/cuttingL
 import { exportCuttingPDF } from '../../utils/export/pdfCuttingExport';
 import { PAPER_SIZES } from '../../utils/export/cuttingLayout';
 import { openMarker } from '../../store/markerSlice';
-import type { OpenCloProject } from '../../types/types';
+import { loadProjectFromJSON } from '../../utils/projectIO';
 import './views.css';
 
 // ─── Collapsible Section ───
@@ -351,14 +351,26 @@ export default function FileExplorerView() {
       if (!file) return;
       try {
         const text = await file.text();
-        const raw = JSON.parse(text) as OpenCloProject & { referenceImageData?: Record<string, string> };
-        dispatch(loadProject(raw));
+        const result = loadProjectFromJSON(text);
+        if (!result.ok) {
+          console.error('Failed to load project:', result.error);
+          window.alert(
+            `Could not load project: ${result.error.message}` +
+              (result.error.path ? ` (at ${result.error.path})` : ''),
+          );
+          return;
+        }
+        const project = result.project;
+        if (result.warnings.length > 0) {
+          console.warn('Project parse warnings:', result.warnings);
+        }
+        dispatch(loadProject(project));
         // Restore reference image blobs from base64 data embedded in the project file
-        if (raw.referenceImageData && Object.keys(raw.referenceImageData).length > 0) {
-          await deserializeReferenceImages(raw.referenceImageData);
+        if (project.referenceImageData && Object.keys(project.referenceImageData).length > 0) {
+          await deserializeReferenceImages(project.referenceImageData);
         }
         // Garbage-collect orphaned IndexedDB entries
-        const activeIds = (raw.referenceImages ?? []).map((i) => i.id);
+        const activeIds = (project.referenceImages ?? []).map((i) => i.id);
         await garbageCollect(activeIds);
       } catch (err) {
         console.error('Failed to load project:', err);
