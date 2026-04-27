@@ -184,10 +184,10 @@ describe('useSlashAndSpreadTool state machine', () => {
 
     expect(result.phase).toBe('slashComplete');
     expect(result.endPoint).toEqual(pt);
-    expect(result.hit1).toBeTruthy();
-    expect(result.hit2).toBeTruthy();
-    expect(result.halfA).toBeTruthy();
-    expect(result.halfB).toBeTruthy();
+    expect(result.hit1).toEqual(hit1);
+    expect(result.hit2).toEqual(hit2);
+    expect(result.halfA).toEqual(halfA);
+    expect(result.halfB).toEqual(halfB);
     expect(result.error).toBeNull();
   });
 
