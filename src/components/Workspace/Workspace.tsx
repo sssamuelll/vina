@@ -166,29 +166,40 @@ export default function Workspace() {
   }, [dispatch]);
 
   useEffect(() => {
-    loadFromStorage().then(async saved => {
-      if (saved) {
-        dispatch(loadProject(saved));
-        // Garbage-collect orphaned IndexedDB image blobs after load
-        const activeIds = (saved.referenceImages ?? []).map(i => i.id);
-        garbageCollect(activeIds).catch(() => {});
-        // Auto-center 2D viewport on loaded pieces
-        if (saved.pieces?.length > 0) {
-          requestAnimationFrame(() => {
-            const editor = document.querySelector('.pattern-editor');
-            if (editor) {
-              const fit = computeFitView(
-                saved.pieces,
-                editor.clientWidth,
-                editor.clientHeight,
-              );
-              if (fit) {
-                dispatch(setZoom2D(fit.zoom));
-                dispatch(setPan2D(fit.pan));
-              }
+    loadFromStorage().then(async result => {
+      if (!result) return;
+      if (!result.ok) {
+        // Corrupt autosave was quarantined inside loadFromStorage. Start with
+        // a fresh state instead of crashing on garbage data; the user's
+        // pre-corruption blob is preserved under an
+        // `openclo-autosave-quarantine-*` key for manual recovery.
+        console.error('Autosave parse failed; starting fresh:', result.error);
+        return;
+      }
+      const saved = result.project;
+      if (result.warnings.length > 0) {
+        console.warn('Autosave parse warnings:', result.warnings);
+      }
+      dispatch(loadProject(saved));
+      // Garbage-collect orphaned IndexedDB image blobs after load
+      const activeIds = (saved.referenceImages ?? []).map(i => i.id);
+      garbageCollect(activeIds).catch(() => {});
+      // Auto-center 2D viewport on loaded pieces
+      if (saved.pieces.length > 0) {
+        requestAnimationFrame(() => {
+          const editor = document.querySelector('.pattern-editor');
+          if (editor) {
+            const fit = computeFitView(
+              saved.pieces,
+              editor.clientWidth,
+              editor.clientHeight,
+            );
+            if (fit) {
+              dispatch(setZoom2D(fit.zoom));
+              dispatch(setPan2D(fit.pan));
             }
-          });
-        }
+          }
+        });
       }
     });
   }, [dispatch]);

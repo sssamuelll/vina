@@ -11,6 +11,10 @@ import type { PieceGroup, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
 import { OpenCloProject } from '../types/types';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
+import { parseOpenCloProject } from './projectSchema';
+import type { ProjectParseResult, ParseError } from './projectSchema';
+
+export type { ProjectParseResult, ParseError } from './projectSchema';
 
 interface ProjectState {
   id: string;
@@ -80,9 +84,24 @@ export function saveProjectToJSON(state: ProjectState): string {
   return JSON.stringify(serializeDates(stateToProject(state)), null, 2);
 }
 
-export function loadProjectFromJSON(json: string): OpenCloProject {
-  const raw = JSON.parse(json);
-  return deserializeDates(raw) as OpenCloProject;
+/**
+ * Parse a JSON project payload. Returns a Result; never throws.
+ *
+ * This is the file-format boundary: callers receive `{ ok: true, project, warnings }`
+ * or `{ ok: false, error }` and decide how to react. The parser rejects
+ * structurally invalid payloads before they reach Redux.
+ */
+export function loadProjectFromJSON(json: string): ProjectParseResult {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch (e) {
+    return {
+      ok: false,
+      error: { code: 'invalid_json', message: e instanceof Error ? e.message : 'invalid JSON' },
+    };
+  }
+  return parseOpenCloProject(deserializeDates(raw));
 }
 
 // ─── IndexedDB Autosave (async) ─────────────────────────────────────────────
@@ -93,14 +112,51 @@ export async function saveToStorage(state: ProjectState): Promise<void> {
   await saveProject(project);
 }
 
-/** Load project from IndexedDB (with automatic localStorage migration). */
-export async function loadFromStorage(): Promise<OpenCloProject | null> {
+/**
+ * Load project from IndexedDB (with automatic localStorage migration).
+ *
+ * Returns:
+ * - `null` if no autosave exists.
+ * - `ProjectParseResult` for any payload that was found. Callers MUST handle
+ *   `ok: false` (e.g. by quarantining the corrupt blob) — silently treating
+ *   it as "no project" would re-overwrite the autosave on next save and lose
+ *   the user's work.
+ */
+export async function loadFromStorage(): Promise<ProjectParseResult | null> {
   const raw = await loadProjectFromIDB();
   if (!raw) return null;
+  const result = parseOpenCloProject(deserializeDates(raw));
+  if (!result.ok) quarantineCorruptAutosave(raw, result.error);
+  return result;
+}
+
+const QUARANTINE_KEY_PREFIX = 'openclo-autosave-quarantine-';
+// Cap the per-quarantine entry to ~5MB so we never fill localStorage with one blob.
+const MAX_QUARANTINE_BYTES = 5_000_000;
+
+/**
+ * Preserve a corrupt autosave blob under a timestamped localStorage key
+ * before the running app overwrites it with a fresh autosave. Without this,
+ * a once-corrupt IDB row gets silently replaced 30s after launch and the
+ * user loses any data they had.
+ */
+function quarantineCorruptAutosave(raw: unknown, error: ParseError): void {
   try {
-    return deserializeDates(raw) as OpenCloProject;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-');
+    const key = `${QUARANTINE_KEY_PREFIX}${ts}`;
+    let payload: string;
+    try {
+      payload = JSON.stringify({ error, raw });
+    } catch {
+      payload = JSON.stringify({ error, note: 'raw payload not JSON-serializable' });
+    }
+    if (payload.length > MAX_QUARANTINE_BYTES) {
+      payload = JSON.stringify({ error, note: 'raw payload truncated', size: payload.length });
+    }
+    localStorage.setItem(key, payload);
   } catch {
-    return null;
+    // localStorage may be unavailable (Safari private mode, quota exceeded);
+    // we already lost the chance to recover but parse error is logged by caller.
   }
 }
 
@@ -118,15 +174,16 @@ export function saveToLocalStorage(state: ProjectState): void {
 }
 
 /** @deprecated Use loadFromStorage() instead */
-export function loadFromLocalStorage(): OpenCloProject | null {
+export function loadFromLocalStorage(): ProjectParseResult | null {
   // Sync fallback: check localStorage directly (migration happens on async load)
+  let json: string | null;
   try {
-    const json = localStorage.getItem('openclo-autosave');
-    if (!json) return null;
-    return loadProjectFromJSON(json);
+    json = localStorage.getItem('openclo-autosave');
   } catch {
     return null;
   }
+  if (!json) return null;
+  return loadProjectFromJSON(json);
 }
 
 /** @deprecated Use clearStorageProject() instead */
@@ -149,7 +206,7 @@ export function downloadProjectFile(state: ProjectState, filename?: string): voi
   URL.revokeObjectURL(url);
 }
 
-export function uploadProjectFile(): Promise<OpenCloProject> {
+export function uploadProjectFile(): Promise<ProjectParseResult> {
   return new Promise((resolve, reject) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -159,12 +216,7 @@ export function uploadProjectFile(): Promise<OpenCloProject> {
       if (!file) { reject(new Error('No file selected')); return; }
       const reader = new FileReader();
       reader.onload = () => {
-        try {
-          const project = loadProjectFromJSON(reader.result as string);
-          resolve(project);
-        } catch (e) {
-          reject(e);
-        }
+        resolve(loadProjectFromJSON(reader.result as string));
       };
       reader.onerror = () => reject(reader.error);
       reader.readAsText(file);
