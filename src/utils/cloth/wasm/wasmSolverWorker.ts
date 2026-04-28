@@ -159,9 +159,13 @@ function simulationLoop(): void {
       // Save positions before collision for velocity correction
       preCollisionBuf.set(posView);
 
-      // Apply triangle collision — modifies posView in-place
+      // Apply triangle collision — modifies posView in-place.
+      // BUG-2 (#605): pass prevView so the position-based friction kernel in
+      // solveTriangleCollision actually runs. Without prevPos the friction
+      // branch is silently skipped and body.friction is a no-op — matches
+      // the CPU path in xpbdSolver.ts which passes this.prevPos.
       for (const body of collisionBodies) {
-        solveTriangleCollision(posView, invMassCache, n, body.mesh, body.hash, body.margin, body.friction);
+        solveTriangleCollision(posView, invMassCache, n, body.mesh, body.hash, body.margin, body.friction, prevView);
       }
 
       // NaN guard: if any position went NaN, reset to previous valid positions.
