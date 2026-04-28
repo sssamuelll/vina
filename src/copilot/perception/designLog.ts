@@ -54,7 +54,9 @@ export const WARNING_KEYWORDS = [
   'potential',
 ] as const;
 
-/** Counter for generating unique entry IDs */
+// B11-state: format-asserted by tests (`designLog.test.ts:133-141, 202-203,
+// 227-228` assert specific sequential IDs `entry-1` through `entry-14`).
+// Class B per B11-state methodology — preserved as-is. See B10-state RFC.
 let entryIdCounter = 0;
 
 /**

@@ -12,6 +12,7 @@ import {
   type SimSnapshotMeta,
 } from '../../store/simulationSlice';
 import './SnapshotBar.css';
+import { newId } from '../../utils/ids';
 
 interface SnapshotBarProps {
   onSaveSnapshot: (id: string) => void;
@@ -33,7 +34,7 @@ export default function SnapshotBar({ onSaveSnapshot, onRestoreSnapshot, onDelet
   const handleSave = useCallback(() => {
     if (!canSave) return;
     const letter = String.fromCharCode(65 + manualSnapshots.length); // A, B, C
-    const id = `manual-${Date.now()}`;
+    const id = newId();
     onSaveSnapshot(id);
     dispatch(addSnapshot({ id, name: `Version ${letter}`, particleCount: 0, isAutoSave: false }));
     dispatch(setActiveSnapshot(id));

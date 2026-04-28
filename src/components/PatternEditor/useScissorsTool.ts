@@ -7,6 +7,7 @@ import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
 import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
+import { newId } from '../../utils/ids';
 
 export interface ScissorsState {
   targetPieceId: string | null;
@@ -163,7 +164,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
               dispatch(updatePiece({ ...pieceA, edges: cutPair.edgesA }));
               dispatch(updatePiece({ ...pieceB, edges: cutPair.edgesB }));
               dispatch(addSeam({
-                id: `cut-seam-${Date.now()}`,
+                id: newId(),
                 pieceA: { pieceId: pieceA.id, edgeName: cutPair.edgeA.name },
                 pieceB: { pieceId: pieceB.id, edgeName: cutPair.edgeB.name },
                 type: seamType,

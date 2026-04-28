@@ -27,6 +27,7 @@ import type { FitMapMode } from '../../../../utils/cloth/fitMaps';
 import type { InterfacingType } from '../../../../types/types';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
 import { computeStiffnessMultiplier } from '../../../../utils/cloth/interfacing';
+import { newId } from '../../../../utils/ids';
 
 // ─── setFabric ──────────────────────────────────────────────────────────────
 
@@ -224,7 +225,7 @@ const saveSimulationStateTool: ToolDefinition = {
   },
   execute: async (params, dispatch, getState): Promise<ToolResult> => {
     const name = params.name as string;
-    const id = `copilot-${Date.now()}`;
+    const id = newId();
     const state = getState();
     const particleCount = state.simulation.particleCount ?? 0;
 

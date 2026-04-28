@@ -12,6 +12,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { addTape, setPendingTape } from '../../store/avatarTapeSlice';
 import { deriveDimensions } from '../../utils/cloth/garmentPlacement';
+import { newId } from '../../utils/ids';
 
 // Tape colors cycling
 const TAPE_COLORS = ['#ff6b6b', '#4ecdc4', '#ffd93d', '#a29bfe', '#fd79a8', '#00b894'];
@@ -85,7 +86,7 @@ export function useAvatarTape(activeTool3D: string) {
     e.stopPropagation();
 
     const point = e.point as THREE.Vector3;
-    const id = `tape-${Date.now()}`;
+    const id = newId();
 
     if (activeTool3D === 'tape-circumference') {
       const d = deriveDimensions(measurements);

@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { Point2D, PatternPiece, InternalLine } from '../../types/types';
 import { findNearestPiece } from '../../utils/geometry/hitTest';
+import { newId } from '../../utils/ids';
 
 interface LineToolState {
   /** First click point */
@@ -51,7 +52,7 @@ export function useLineTool(
         const offX = piece?.position.x ?? 0;
         const offY = piece?.position.y ?? 0;
         const line: InternalLine = {
-          id: `line-${Date.now()}`,
+          id: newId(),
           type: 'fold', // construction line
           path: [
             { type: 'M', values: [state.startPoint.x - offX, state.startPoint.y - offY] },

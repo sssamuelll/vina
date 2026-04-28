@@ -15,6 +15,7 @@ import {
 } from '../../copilot/providers/types';
 import type { ProviderConfig, ChatMessage as ProviderChatMessage, ProviderToolDef } from '../../copilot/providers/types';
 import { getAllMetaTools } from '../../copilot/reasoning/bridge/meta-tools';
+import { newId } from '../../utils/ids';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
 
     // Add user message
     const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
+      id: newId(),
       role: 'user',
       content: text,
     };
@@ -125,13 +126,13 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
       const response = await agenticHook.run(text);
       setMessages(prev => [
         ...prev,
-        { id: `ai-${Date.now()}`, role: 'assistant', content: response },
+        { id: newId(), role: 'assistant', content: response },
       ]);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'An error occurred';
       setMessages(prev => [
         ...prev,
-        { id: `ai-err-${Date.now()}`, role: 'assistant', content: `Error: ${msg}` },
+        { id: newId(), role: 'assistant', content: `Error: ${msg}` },
       ]);
     }
   }, [agenticHook, setInput]);

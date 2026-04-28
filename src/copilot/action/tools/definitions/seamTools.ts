@@ -9,6 +9,7 @@ import type { ToolDefinition, ToolResult } from '../registry';
 import { updatePiece, addSeam, removeSeam } from '../../../../store/projectSlice';
 import type { Seam, CornerType } from '../../../../types/types';
 import { DEFAULT_SEAM_TENSION, DEFAULT_SEAM_STRENGTH } from '../../../../utils/defaults';
+import { newId } from '../../../../utils/ids';
 
 // ─── setSeamAllowance ───────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ const createSeamTool: ToolDefinition = {
     if (!edgeA) return { success: false, error: `Edge "${edgeAName}" not found on piece "${pieceA.name}". Available: ${pieceA.edges?.map(e => e.name).join(', ') || 'none (run detectEdges first)'}` };
     if (!edgeB) return { success: false, error: `Edge "${edgeBName}" not found on piece "${pieceB.name}". Available: ${pieceB.edges?.map(e => e.name).join(', ') || 'none (run detectEdges first)'}` };
 
-    const seamId = `seam-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`;
+    const seamId = newId();
     const seam: Seam = {
       id: seamId,
       pieceA: { pieceId: params.pieceAId as string, edgeName: edgeAName, tStart: 0, tEnd: 1 },

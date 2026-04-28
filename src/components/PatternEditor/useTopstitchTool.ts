@@ -7,6 +7,7 @@ import type { PatternPiece, Point2D, PathCommand, InternalLine, TopstitchOptions
 import { getEdgeEndpoints, computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
 import { snapToEdge } from './useSegmentSewingTool';
 import { screenToPattern } from './sewingUtils';
+import { newId } from '../../utils/ids';
 
 // Re-export pure functions for backward compatibility
 export { computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
@@ -135,7 +136,7 @@ export function useTopstitchTool(
     if (path.length < 2) return;
     const opts = getOptions();
     const line: InternalLine = {
-      id: `topstitch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: newId(),
       type: 'topstitch',
       path,
       topstitchOptions: opts,

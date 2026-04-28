@@ -7,6 +7,7 @@ import { flattenPath } from '../../utils/seam/index';
 import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath, pointAtPathDistance } from '../../utils/geometry/arcLength';
 import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 import { screenToPattern } from './sewingUtils';
+import { newId } from '../../utils/ids';
 
 // ─── Types ───
 
@@ -295,7 +296,7 @@ export function useMeasureTool(zoom: number, pan: Point2D) {
       const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
       setMeasurements(prev => [...prev, {
-        id: `measure-${Date.now()}`,
+        id: newId(),
         startPoint: start,
         endPoint: pt,
         distance,

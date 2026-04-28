@@ -139,6 +139,39 @@ The repo's root `tsconfig.json` declares `"files": []` and only project referenc
 
 If you run `tsc --noEmit` and it passes but the pre-commit hook fails, the bare command is the bug, not the hook. **Always use `tsc -b --noEmit`** when verifying typecheck status manually.
 
+## ID generation
+
+Use `newId()` from `src/utils/ids.ts` for any new entity that needs a unique opaque identifier (pieces, seams, internal lines, trims, construction points, copilot UI ephemera, suggestions, log entries, etc.). Returns a v4 UUID via `crypto.randomUUID()`.
+
+```typescript
+import { newId } from '../utils/ids';
+const id = newId();  // e.g., "550e8400-e29b-41d4-a716-446655440000"
+```
+
+**Do NOT use `newId()` for:**
+
+- **Composite IDs that intentionally encode state** (e.g., `pin_${vertexIndex}`, `ann_${text}`, `${parentId}-clone-${...}`, `auto-seam-${rankIndex}`). Those exist to encode a relationship in the ID itself; replacing with UUID loses information consumers may rely on. Mark them with `// state-encoded ID — see B10-state` and leave alone until B10-state's RFC reviews them.
+- **IDs with format contracts** asserted by tests or external specs (e.g., `planTypes.genPlanId/genStepId` whose format is asserted by `planTypes.test.ts`; `bomExtractor.nextId` with deterministic re-extraction reset; `exportAAMA.nextHandle` with DXF AAMA hex format requirement; `ollama.ts` inline IDs asserted by `ollama.test.ts:128`).
+
+The historical `uid()` / `lineId()` / `cid()` / etc. helpers in `pathHelpers.ts`, `patternOps.ts`, `seamlyAdapter.ts`, `copilotUISlice.ts`, `constructionSlice.ts`, etc. are all thin wrappers around `newId()`. New code should call `newId()` directly; the wrappers exist for backward compatibility.
+
+## Drift-axis investigation methodology
+
+When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
+
+```bash
+# Date.now() in template literals — catches any timestamp-based ID
+grep -rn "\`[^\`]*\${Date\.now()" src --include="*.ts" --include="*.tsx" | grep -v test
+
+# Counter increments at module level — catches any counter-based ID
+grep -rn "^let [a-zA-Z_][a-zA-Z_0-9]* = 0" src --include="*.ts" --include="*.tsx" | grep -v test
+
+# Tests asserting prefix format — catches load-bearing format contracts
+grep -rn "toMatch.*\^[a-z][a-z_-]*-" src --include="*.test.*"
+```
+
+**Inventory axis counts are lower bounds, not upper bounds.** Expect actual scope to be 1.5–3x the inventory estimate when the axis spans naming conventions. Surface the discrepancy honestly when it appears mid-investigation; "investigation methodology was too narrow" is a valid and important finding.
+
 ## Common Tasks
 
 ### Add New Fabric Preset

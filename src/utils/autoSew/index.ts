@@ -162,6 +162,8 @@ export function autoSew(
   // Convert to ProposedSeam objects
   const seams: ProposedSeam[] = ranked.map((candidate, idx) => ({
     seam: {
+      // state-encoded ID — see B10-state. The rank index is intentionally
+      // baked into the auto-seam ID; do NOT migrate to newId().
       id: `auto-seam-${Date.now()}-${idx}`,
       pieceA: {
         pieceId: candidate.edgeA.pieceId,

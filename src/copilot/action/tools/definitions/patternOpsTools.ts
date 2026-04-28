@@ -5,14 +5,16 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import type { AppDispatch, RootState } from '../../../../store';
 import type { PatternPiece, InternalLineType, PathCommand, SemanticEdge, Point2D } from '../../../../types/types';
+import { newId } from '../../../../utils/ids';
 
 function requireFiniteNumber(value: unknown, name: string): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value)) return `${name} must be a valid number`;
   return null;
 }
 
-function uid(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+// B11-state: thin wrapper. Prefix ignored.
+function uid(_prefix: string): string {
+  return newId();
 }
 
 /**
@@ -140,7 +142,7 @@ export const tools: ToolDefinition[] = [
           // Persist detected edges to Redux store
           dispatch(updatePiece({ ...a, edges: cutPair.edgesA }));
           dispatch(updatePiece({ ...b, edges: cutPair.edgesB }));
-          const seamId = `cut-seam-${Date.now()}`;
+          const seamId = newId();
           const seamTypeVal = (params.seamType as string) || 'standard';
           dispatch(addSeam({
             id: seamId,
@@ -406,7 +408,7 @@ export const tools: ToolDefinition[] = [
       if (cutPair) {
         dispatch(updatePiece({ ...a, edges: cutPair.edgesA }));
         dispatch(updatePiece({ ...b, edges: cutPair.edgesB }));
-        const seamId = `cut-seam-${Date.now()}`;
+        const seamId = newId();
         const seamTypeVal = (params.seamType as string) || 'standard';
         dispatch(addSeam({
           id: seamId,
@@ -474,6 +476,8 @@ export const tools: ToolDefinition[] = [
       } else {
         const offsetPiece: PatternPiece = {
           ...piece,
+          // state-encoded ID — see B10-state. The parent piece's id is
+          // intentionally referenced in the offset id for cross-reference.
           id: `offset-${piece.id}-${Date.now()}`,
           name: `${piece.name} Offset`,
           outline: newOutline,

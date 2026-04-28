@@ -12,6 +12,7 @@
 import type { CPoint, CCurve, CPiece, PieceNode, CurveDefinition } from '../../types/construction';
 import { resolveConstruction, type ConstructionStep } from './constructionResolver';
 import { evaluateFormula, type FormulaContext } from './formulaEvaluator';
+import { newId } from '../ids';
 
 /** Seamly2D GetL: base handle length for old kAsm format (from vspline_p.h) */
 function seamlyGetL(dist: number, kCurve: number): number {
@@ -91,9 +92,10 @@ export interface AdaptedConstruction {
   errors: string[];
 }
 
-let _counter = 0;
-function uid(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
+// B11-state: thin wrapper. Prefix ignored. Previous `let _counter = 0`
+// removed — UUID makes it unnecessary.
+function uid(_prefix: string): string {
+  return newId();
 }
 
 /**

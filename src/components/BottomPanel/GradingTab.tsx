@@ -31,6 +31,7 @@ import {
   getSizeMeasurements,
 } from '../../utils/seamly2d/sizeTables';
 import type { SizeSystem, StandardSize } from '../../utils/seamly2d/sizeTables';
+import { newId } from '../../utils/ids';
 import './GradingTab.css';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -46,8 +47,10 @@ function mmToCm(mm: number): string {
   return (mm / 10).toFixed(1);
 }
 
+// B11-state: thin wrapper around the canonical newId(). Verified
+// non-load-bearing.
 function generateId(): string {
-  return `grd_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  return newId();
 }
 
 // ─── Component ──────────────────────────────────────────────────────────────

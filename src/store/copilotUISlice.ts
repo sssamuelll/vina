@@ -12,6 +12,7 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
+import { newId } from '../utils/ids';
 
 // ============================================================================
 // Types
@@ -145,9 +146,11 @@ const initialState: CopilotUIState = {
 // Helper Functions
 // ============================================================================
 
-let nextId = 1;
-function generateId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${nextId++}`;
+// B11-state: thin wrapper. Prefix ignored. Previous `let nextId = 1`
+// counter removed — verified non-load-bearing (entities have explicit
+// `timestamp: number` fields; no consumer sorts these arrays by ID).
+function generateId(_prefix: string): string {
+  return newId();
 }
 
 // ============================================================================

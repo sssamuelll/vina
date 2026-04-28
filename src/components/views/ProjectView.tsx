@@ -44,6 +44,7 @@ import { openMarker } from '../../store/markerSlice';
 import { loadProjectFromJSON } from '../../utils/projectIO';
 import type { PatternPiece, PieceGroup } from '../../types/types';
 import './views.css';
+import { newId } from '../../utils/ids';
 
 // ─── Collapsible Section ───
 
@@ -195,7 +196,7 @@ export default function ProjectView() {
 
   const handleAddPiece = useCallback(() => {
     const newPiece: PatternPiece = {
-      id: `piece-${Date.now()}`,
+      id: newId(),
       name: `Piece ${pieces.length + 1}`,
       outline: [
         { type: 'M', values: [0, 0] },
@@ -250,7 +251,7 @@ export default function ProjectView() {
       });
       if (options.loadType === 'open') {
         dispatch(loadProject({
-          id: `project-${Date.now()}`,
+          id: newId(),
           name: 'DXF Import',
           pieces: dxfPieces,
           seams: [],

@@ -13,6 +13,7 @@
 import type { RootState } from '../../store';
 import { getPreferenceManager } from '../preferences/userPreferences';
 import { PLAN_TEMPLATES } from '../planner/planGenerator';
+import { newId } from '../../utils/ids';
 import type { PlanTemplate } from '../planner/planTypes';
 
 // ============================================================================
@@ -341,13 +342,14 @@ const SHORTCUT_HINTS: Suggestion[] = [
 // Suggestion Engine
 // ============================================================================
 
-let suggestionIdCounter = 0;
-
 /**
  * Generate a unique suggestion ID.
+ *
+ * B11-state: returns a UUID. Previous `let suggestionIdCounter = 0`
+ * counter removed. Verified non-load-bearing.
  */
 function generateSuggestionId(): string {
-  return `sug-${Date.now()}-${++suggestionIdCounter}`;
+  return newId();
 }
 
 /**

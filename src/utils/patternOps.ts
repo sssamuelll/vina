@@ -18,10 +18,12 @@ import { samplePathAtIntervals } from './geometry/arcLength';
 import { fitCubicBezier, rdpSimplify } from './geometry/bezier';
 import { linePolylineIntersections } from './geometry/lineIntersect';
 import { findSlashIntersections, buildSpreadPiece } from './geometry/slashAndSpread';
+import { newId } from './ids';
 export { buildSpreadPiece } from './geometry/slashAndSpread';
 
-let _counter = 0;
-function uid(prefix: string): string { return `${prefix}-${Date.now()}-${++_counter}`; }
+// B11-state: thin wrapper. Prefix retained in signature for backward
+// compatibility but ignored. The previous `let _counter = 0` is gone.
+function uid(_prefix: string): string { return newId(); }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

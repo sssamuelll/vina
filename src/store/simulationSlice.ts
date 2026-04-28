@@ -319,6 +319,8 @@ const simulationSlice = createSlice({
       position: [number, number, number];
       strength?: PinStrength;
     }>) {
+      // state-encoded ID — see B10-state. The vertex index is intentionally
+      // baked into the pin ID for cross-reference; do NOT migrate to newId().
       const id = `pin_${Date.now()}_${action.payload.vertexIndex}`;
       state.pinnedVertices[id] = {
         id,

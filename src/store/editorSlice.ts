@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece } from '../types/types';
 import { NEW_PROJECT } from './actions';
 import { removeReferenceImage } from './projectSlice';
+import { newId } from '../utils/ids';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -222,7 +223,7 @@ export default editorSlice.reducer;
 export function createPastedPieces(clipboard: { pieces: PatternPiece[] }, mirror = false): PatternPiece[] {
   return clipboard.pieces.map(p => {
     const clone: PatternPiece = JSON.parse(JSON.stringify(p));
-    clone.id = `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    clone.id = newId();
     clone.name = `${p.name} (${mirror ? 'mirror' : 'copy'})`;
     clone.position = {
       x: (p.position?.x ?? 0) + 30,

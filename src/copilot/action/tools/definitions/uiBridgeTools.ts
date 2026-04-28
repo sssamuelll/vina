@@ -8,6 +8,7 @@ import type { ToolDefinition } from '../registry';
 import { duplicatePiece } from '../../../../store/projectSlice';
 import { addInternalLine } from '../../../../store/projectSlice';
 import { setActiveTool, setViewMode, selectPiece, clearSelection } from '../../../../store/editorSlice';
+import { newId } from '../../../../utils/ids';
 import type { InternalLine } from '../../../../types/types';
 import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
 
@@ -50,6 +51,8 @@ export const tools: ToolDefinition[] = [
       const piece = pieces.find((p: any) => p.id === params.pieceId);
       if (!piece) return { success: false, error: `Piece ${params.pieceId} not found` };
       const line: InternalLine = {
+        // state-encoded ID — see B10-state. The annotation text is intentionally
+        // baked into the ID for cross-reference; do NOT migrate to newId() here.
         id: `ann_${Date.now()}_${params.text}`,
         type: 'fold',
         path: [
@@ -81,7 +84,7 @@ export const tools: ToolDefinition[] = [
       const h = Number(params.height);
       const x = Number(params.x) || 0;
       const y = Number(params.y) || 0;
-      const id = `piece_${Date.now()}`;
+      const id = newId();
       dispatch(addPiece({
         id,
         name: params.name as string,

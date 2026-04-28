@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { PatternPiece, Point2D, InternalLine } from '../../types/types';
 import { hitTestPieceBBox } from '../../utils/geometry/hitTest';
+import { newId } from '../../utils/ids';
 
 /**
  * Grainline tool: click+drag inside a piece to draw an arrow
@@ -20,7 +21,7 @@ interface GrainlineState {
 
 function createGrainline(start: Point2D, end: Point2D): InternalLine {
   return {
-    id: `grainline-${Date.now()}`,
+    id: newId(),
     type: 'grainline',
     path: [
       { type: 'M', values: [start.x, start.y] },

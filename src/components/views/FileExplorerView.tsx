@@ -28,6 +28,7 @@ import { PAPER_SIZES } from '../../utils/export/cuttingLayout';
 import { openMarker } from '../../store/markerSlice';
 import { loadProjectFromJSON } from '../../utils/projectIO';
 import './views.css';
+import { newId } from '../../utils/ids';
 
 // ─── Collapsible Section ───
 
@@ -122,7 +123,7 @@ export default function FileExplorerView() {
       });
       if (options.loadType === 'open') {
         dispatch(loadProject({
-          id: `project-${Date.now()}`,
+          id: newId(),
           name: 'DXF Import',
           pieces: dxfPieces,
           seams: [],

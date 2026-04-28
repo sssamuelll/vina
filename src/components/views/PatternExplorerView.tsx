@@ -6,6 +6,7 @@ import { addPiece } from '../../store/projectSlice';
 import { parseDXF, dxfToPatternPieces } from '../../utils/dxf';
 import type { PatternPiece } from '../../types/types';
 import './views.css';
+import { newId } from '../../utils/ids';
 
 // ─── Collapsible Section ───
 
@@ -72,7 +73,7 @@ export default function PatternExplorerView() {
 
   const handleAddPiece = useCallback(() => {
     const newPiece: PatternPiece = {
-      id: `piece-${Date.now()}`,
+      id: newId(),
       name: `Piece ${pieces.length + 1}`,
       outline: [
         { type: 'M', values: [0, 0] },

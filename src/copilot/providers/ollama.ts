@@ -172,6 +172,8 @@ export function parseToolCallsFromText(content: string): {
         for (const tc of parsed.tool_calls) {
           if (tc.name) {
             toolCalls.push({
+              // format-asserted by test (`ollama.test.ts:128` checks `^ollama-/`)
+              // — see B10-state. NOT migrated to newId().
               id: `ollama-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               name: tc.name,
               arguments: JSON.stringify(tc.arguments || {}),
@@ -197,7 +199,9 @@ export function parseToolCallsFromText(content: string): {
           for (const tc of parsed.tool_calls) {
             if (tc.name) {
               toolCalls.push({
-                id: `ollama-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                // format-asserted by test (`ollama.test.ts:128` checks `^ollama-/`)
+              // — see B10-state. NOT migrated to newId().
+              id: `ollama-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                 name: tc.name,
                 arguments: JSON.stringify(tc.arguments || {}),
               });

@@ -4,6 +4,7 @@ import { ChevronRight, ChevronDown, Camera, User, Wind, Lightbulb, Plus } from '
 import type { RootState } from '../../store';
 import type { AnimationTrack } from '../../utils/animation/types';
 import { addTrack, toggleTrackExpanded } from '../../store/animationSlice';
+import { newId } from '../../utils/ids';
 
 const TRACK_ICONS = { camera: Camera, avatar: User, wind: Wind, light: Lightbulb } as const;
 
@@ -51,8 +52,10 @@ export default function TrackList({ scrollRef, onScroll }: TrackListProps) {
   }, [scrollRef]);
 
   const handleAdd = useCallback((objectType: AnimationTrack['objectType']) => {
-    const id = `${objectType}-${Date.now()}`;
+    const id = newId();
     const props = DEFAULT_PROPERTIES[objectType].map((p, i) => ({
+      // state-encoded ID — see B10-state. The parent track id and the property
+      // index are intentionally referenced; do NOT migrate to newId().
       id: `${id}-prop-${i}`,
       path: p.path,
       label: p.label,

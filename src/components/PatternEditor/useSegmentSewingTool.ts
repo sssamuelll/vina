@@ -6,6 +6,7 @@ import { selectSeam } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, resolveEdgeName } from './sewingUtils';
+import { newId } from '../../utils/ids';
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -332,7 +333,7 @@ export function useSegmentSewingTool(
           taped: false,
           tapeWidth: 10,
         };
-        const fullSeam: Seam = { ...seam, id: `seam-${Date.now()}` };
+        const fullSeam: Seam = { ...seam, id: newId() };
         dispatch(addSeam(fullSeam));
         dispatch(selectSeam(fullSeam.id));
         reset();

@@ -13,6 +13,7 @@ import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { useNotchTool } from './useNotchTool';
 import { useTrimTool } from './useTrimTool';
+import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
 import { useEditCurve } from './useEditCurve';
 import { useEditPattern } from './useEditPattern';
@@ -139,7 +140,7 @@ export default function PatternEditor() {
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
       ...piece,
-      id: `piece-${Date.now()}`,
+      id: newId(),
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
@@ -157,7 +158,7 @@ export default function PatternEditor() {
   const lineTool = useLineTool(zoom2D, pan2D, pieces, handleInternalLineAdd);
 
   const handleSeamComplete = useCallback((seam: Omit<Seam, 'id'>) => {
-    const fullSeam: Seam = { ...seam, id: `seam-${Date.now()}` };
+    const fullSeam: Seam = { ...seam, id: newId() };
     dispatch(addSeam(fullSeam));
     dispatch(selectSeam(fullSeam.id));
   }, [dispatch]);
@@ -199,7 +200,7 @@ export default function PatternEditor() {
     const targetPieceId = selectedPieceIds[0] ?? pieces[pieces.length - 1]?.id;
     if (!targetPieceId) return;
     const line: InternalLine = {
-      id: `iline-${Date.now()}`,
+      id: newId(),
       type: lineType,
       path,
     };
@@ -479,7 +480,7 @@ export default function PatternEditor() {
   // ─── Reference image import ───────────────────────────────────────────────
   const handleImageImport = useCallback(async (file: File) => {
     const result = await importReferenceImage(file);
-    const id = `ref-img-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const id = newId();
     // Store blob URL in module-level map for rendering
     objectUrlMap.set(id, result.objectUrl);
     // Persist blob to IndexedDB

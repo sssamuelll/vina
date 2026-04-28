@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
+import { newId } from '../../utils/ids';
 
 /**
  * Notch tool: click on a piece edge to place a notch mark.
@@ -83,7 +84,7 @@ function createNotchLine(point: Point2D, normal: Point2D, piecePos: Point2D, not
   const localPt = { x: point.x - piecePos.x, y: point.y - piecePos.y };
   const opts = notchOptions || DEFAULT_NOTCH_OPTIONS;
   return {
-    id: `notch-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    id: newId(),
     type: 'notch',
     path: generateNotchPath(localPt, normal, opts),
     notchOptions: opts,

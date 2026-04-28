@@ -8,6 +8,7 @@ import { validateAndRepairProject } from '../utils/projectValidator';
 import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 import { uid } from '../utils/pathHelpers';
+import { newId } from '../utils/ids';
 import { detectSemanticEdges } from '../utils/semanticEdges';
 import { autoSew } from '../utils/autoSew';
 
@@ -509,7 +510,7 @@ const projectSlice = createSlice({
       const piece = state.pieces.find(p => p.id === action.payload);
       if (piece) {
         const clone = JSON.parse(JSON.stringify(piece));
-        clone.id = `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        clone.id = newId();
         clone.name = `${piece.name} (copy)`;
         clone.position = { x: (piece.position?.x ?? 0) + 30, y: (piece.position?.y ?? 0) + 30 };
         state.pieces.push(clone);
@@ -975,7 +976,7 @@ const projectSlice = createSlice({
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (piece) {
         const clone: PatternPiece = JSON.parse(JSON.stringify(piece));
-        clone.id = `piece-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        clone.id = newId();
         clone.name = `${piece.name} (linked)`;
         clone.position = { x: (piece.position?.x ?? 0) + 50, y: piece.position?.y ?? 0 };
         clone.linkedPieceId = piece.id;
@@ -1010,6 +1011,8 @@ const projectSlice = createSlice({
       if (!piece) return;
       const clone: PatternPiece = {
         ...JSON.parse(JSON.stringify(piece)),
+        // state-encoded ID — see B10-state. The parent piece's id is
+        // intentionally referenced in the clone id for cross-reference.
         id: `${piece.id}-clone-${Date.now()}`,
         name: `${piece.name} (clone)`,
         layer: action.payload.direction === 'over'
@@ -1143,7 +1146,7 @@ const projectSlice = createSlice({
       const { name, pieceIds, color } = action.payload;
       const GROUP_COLORS = ['#4a9eff', '#ff6b6b', '#51cf66', '#fcc419', '#cc5de8', '#ff922b', '#20c997', '#845ef7'];
       state.groups.push({
-        id: `group-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: newId(),
         name,
         pieceIds: pieceIds.filter(id => state.pieces.some(p => p.id === id)),
         color: color ?? GROUP_COLORS[state.groups.length % GROUP_COLORS.length],
@@ -1358,7 +1361,7 @@ const projectSlice = createSlice({
   extraReducers: (builder) => {
     builder.addCase(NEW_PROJECT, () => ({
       ...initialState,
-      id: 'new-project-' + Date.now(),
+      id: newId(),
     }));
   },
 });

@@ -10,6 +10,7 @@ import {
   selectCollisionBody,
 } from '../../store/collisionBodySlice';
 import type { CollisionBody } from '../../types/collisionBody';
+import { newId } from '../../utils/ids';
 import { detectFormat } from '../../utils/import/meshImporter';
 import './CollisionBodyPanel.css';
 
@@ -34,7 +35,7 @@ export default function CollisionBodyPanel({ open, onClose }: CollisionBodyPanel
     if (format === 'unknown' || format === 'vrm') return;
 
     const body: CollisionBody = {
-      id: `cb-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: newId(),
       name: file.name.replace(/\.[^.]+$/, ''),
       meshUrl: url,
       format: format as 'obj' | 'fbx' | 'glb' | 'gltf',

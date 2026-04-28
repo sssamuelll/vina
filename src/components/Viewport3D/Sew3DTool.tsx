@@ -24,6 +24,7 @@ import { addSeam } from '../../store/projectSlice';
 import { pickEdge } from '../../utils/3d/edgePicker';
 import type { PatternPiece, PathCommand } from '../../types/types';
 import EdgeHighlight from './EdgeHighlight';
+import { newId } from '../../utils/ids';
 
 const SCALE = 0.001;
 
@@ -218,7 +219,7 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
       if (compat === 'blocked') return;
 
       dispatch(addSeam({
-        id: `seam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        id: newId(),
         pieceA: { pieceId: firstEdge.pieceId, edgeName: firstEdge.edgeName, tStart: 0, tEnd: 1 },
         pieceB: { pieceId: clicked.pieceId, edgeName: clicked.edgeName, tStart: 0, tEnd: 1 },
         type: 'standard',

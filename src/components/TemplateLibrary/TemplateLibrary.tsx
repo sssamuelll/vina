@@ -8,6 +8,7 @@ import { analyzeGarment } from '../../copilot/intelligence/garmentAnalyzer';
 import { autoSew } from '../../utils/autoSew';
 import type { PatternPiece } from '../../types/types';
 import './TemplateLibrary.css';
+import { newId } from '../../utils/ids';
 
 interface Props {
   isOpen: boolean;
@@ -117,7 +118,7 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
             const makeSeam = (pA: PatternPiece | undefined, eA: string, pB: PatternPiece | undefined, eB: string) => {
               if (!pA || !pB || !findEdge(pA, eA) || !findEdge(pB, eB)) return;
               dispatch(addSeam({
-                id: `seam-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                id: newId(),
                 pieceA: { pieceId: pA.id, edgeName: eA, tStart: 0, tEnd: 1 },
                 pieceB: { pieceId: pB.id, edgeName: eB, tStart: 0, tEnd: 1 },
                 type: 'standard', tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,

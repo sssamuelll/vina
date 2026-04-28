@@ -98,7 +98,10 @@ export interface OverrideCreationInput {
   reason?: string;
 }
 
-/** Counter for generating unique override IDs */
+// B11-state: format-asserted by tests (`preferenceLearner.test.ts:117`
+// `toContain('override-')`; `designLog.test.ts:91,95` asserts specific
+// sequential IDs `override-2`, `override-3`). Class B per B11-state
+// methodology — preserved as-is. See B10-state RFC for resolution.
 let overrideIdCounter = 0;
 
 /**

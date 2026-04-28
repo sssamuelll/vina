@@ -59,8 +59,11 @@ describe('buildPiece', () => {
   });
 
   it('generates new id when existingPieceId not provided', () => {
+    // B11-state: piece IDs are now v4 UUIDs (via newId() / pathHelpers.uid).
+    // Previously asserted `^piece-/`; that was a shape-lock test, not a
+    // contract — no production consumer parses the prefix.
     const piece = buildPiece(makePiece(), makePoints(), [], makeCtx());
-    expect(piece.id).toMatch(/^piece-/);
+    expect(piece.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 
   it('sets position to { x: 0, y: 0 } for absolute coords', () => {

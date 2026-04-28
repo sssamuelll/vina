@@ -10,6 +10,7 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
+import { newId } from '../utils/ids';
 import type {
   ConstructionState,
   CPoint,
@@ -34,9 +35,11 @@ const initialState: ConstructionState = {
 
 // ─── ID generator ───────────────────────────────────────────────────────────
 
-let _counter = 0;
-function cid(prefix: string): string {
-  return `${prefix}_${Date.now().toString(36)}_${(++_counter).toString(36)}`;
+// B11-state: thin wrapper. Prefix ignored. Previous `let _counter = 0`
+// removed — verified non-load-bearing (no consumer sorts construction
+// points/lines/curves by ID).
+function cid(_prefix: string): string {
+  return newId();
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

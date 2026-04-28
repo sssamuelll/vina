@@ -5,9 +5,12 @@
  */
 
 import type { PatternPiece, GrainLine, GrainDirection, InternalLine, PathCommand } from '../types/types';
+import { newId } from './ids';
 
-let _glCounter = 0;
-function glId(): string { return `gl-${++_glCounter}`; }
+// B11-state: thin wrapper. Previous `let _glCounter = 0` removed.
+// Tests use hardcoded fixture IDs (`gl-1`, etc.); they don't call glId()
+// and assert its output — so format change is invisible to those tests.
+function glId(): string { return newId(); }
 
 /**
  * Extract grainline from piece's InternalLines.

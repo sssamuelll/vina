@@ -8,9 +8,12 @@
  */
 
 import type { PatternPiece, Dart, InternalLine, Point2D, SemanticEdge, PathCommand, DartCapShape } from '../types/types';
+import { newId } from './ids';
 
-let _dartCounter = 0;
-function dartId(): string { return `dart-${++_dartCounter}`; }
+// B11-state: thin wrapper. Previous `let _dartCounter = 0` removed.
+// Tests use hardcoded fixture IDs (`dart-1`, etc.); they don't call dartId()
+// and assert its output — so format change is invisible to those tests.
+function dartId(): string { return newId(); }
 
 /**
  * Extract dart data from an InternalLine with type='dart'.
