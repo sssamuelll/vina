@@ -406,13 +406,30 @@ self.onmessage = async (event: MessageEvent) => {
         // correction between each, preventing particles from tunneling through
         // the avatar mesh.
         jsSubsteps = config.substeps ?? 15;
+
+        // BUG-5 (#608): self-collision is not implemented in the Rust solver
+        // — the `self_collision` flag, `set_adjacency` setter, and adjacency
+        // buffers exist as scaffolding but no `solve_self_collision` method
+        // reads them. Force the flag to false at this boundary so callers
+        // who request self-collision get visible feedback instead of a
+        // silent no-op. Resolution path (Rust impl, JS post-process, or
+        // CPU-only-by-design) is deferred to the A7 RFC (WASM vs CPU
+        // equivalence). When that lands, replace this branch.
+        if (config.selfCollision === true) {
+          console.warn(
+            '[WasmWorker] selfCollision=true requested but the WASM solver has no implementation; ' +
+            'forcing false. Use the CPU solver tier for self-collision. Tracking: #608, A7 RFC.'
+          );
+        }
+        const selfCollisionForRust = false;
+
         solver.configure(
           1,  // substeps=1: JS manages substep loop for per-substep collision
           config.damping ?? 0.99,
           config.gravityY ?? -9.81,
           config.stretchCompliance ?? 0.0,
           config.bendCompliance ?? 0.01,
-          config.selfCollision ?? false,
+          selfCollisionForRust,
           config.thickness ?? 0.002,
           config.collisionMargin ?? 0.005,
           config.groundY ?? 0.0,
