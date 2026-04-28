@@ -278,6 +278,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - 2D: zoom/pan en Redux (`zoom2D`, `pan2D`).
 - `react-zoom-pan-pinch` está en deps pero no se usa en viewports principales.
 
+> **Estado real (verificado 2026-04-28 durante Fase 2):** axis cerrado como **no-drift, misclassified**. El custom pan es feature intencional con semántica deliberadamente distinta de OrbitControls native pan (pan mueve solo `camera.position`, target queda fijo en avatar para preservar orbit-around-avatar). El inventario hizo lectura superficial sin verificar la diferencia semántica. Hallazgo separado durante la investigación: `patchMouseButtons` polling workaround (Viewport3D.tsx:184–201) es drift real pero es su propio axis — capturado como issue **#629**, NO incluido en el cierre de C7. Ratificado en `drift-fase2-c7-camera-controls.md`. Ningún cambio de código para C7.
+
 ### C8 — Mesh import normalization (bypass parcial)
 - **Estado:** drift real.
 - `meshImporter.importMesh` es el path canónico (con safety, warnings, ImportResult).

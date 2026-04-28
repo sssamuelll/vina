@@ -196,6 +196,21 @@ Triggers indicating "this axis is already resolved":
 
 Add this as the first ~5–10 minute step of every Fase 2 investigation. The cost is trivial; the savings on axes already resolved is large.
 
+### Distinguishing re-implementation from intentional feature
+
+When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
+
+Triggers that suggest the suspected re-implementation is actually intentional feature:
+
+- Inline comments documenting the intention (`// keeping orbit target locked on...`, `// custom because we need to...`, `// behaves like X but with Y`).
+- Helpers named specifically for the modification (`patchMouseButtons`, `customResize`, etc.) — the naming hints at intent.
+- Tests verifying the specific divergent behavior.
+- Co-located workarounds for the third-party library (suggesting awareness of the library's default).
+
+When you find any of those near the suspected re-implementation, **pause and read** before proposing a canonical. Replacing intentional behavior with library default rewrites the user-visible behavior — that's a feature change, not a drift fix, and it violates the "comportamiento idéntico antes/después" invariant.
+
+If after reading you confirm the re-implementation is intentional: close the axis as **no-drift, misclassified**. Document the misclassification in the ratification doc and the inventory annotation. Note that this can co-occur with **separate** real drift in the same area (e.g., a workaround pattern alongside intentional behavior) — capture those as their own follow-up issues, NOT folded into the original axis closure. Folding-in by proximity is silent scope creep.
+
 ### Process discipline: stop → notify → wait → execute
 
 When a trigger fires mid-investigation or mid-fix, **physically pause**: write the report, list the options, wait for the user's verde, then execute. Do NOT decide-and-notify-post-hoc, even when the decision seems obvious. Speed never justifies relaxing the loop.
