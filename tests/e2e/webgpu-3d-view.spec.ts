@@ -19,7 +19,7 @@ test.describe('WebGPU 3D View Rendering', () => {
     });
 
     await page.addInitScript(() => {
-      localStorage.setItem('webclo-use-webgpu', 'true');
+      localStorage.setItem('openclo-use-webgpu', 'true');
     });
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
@@ -39,7 +39,7 @@ test.describe('WebGPU 3D View Rendering', () => {
 
   test('skeleton boneMatrices size matches bones array after IK setup', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('webclo-use-webgpu', 'true');
+      localStorage.setItem('openclo-use-webgpu', 'true');
     });
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
@@ -104,7 +104,7 @@ test.describe('WebGPU 3D View Rendering', () => {
     });
 
     await page.addInitScript(() => {
-      localStorage.setItem('webclo-use-webgpu', 'false');
+      localStorage.setItem('openclo-use-webgpu', 'false');
     });
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });

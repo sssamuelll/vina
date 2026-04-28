@@ -7,7 +7,48 @@
  * @module webgpuDetect
  */
 
-import { safeGetItem } from '../../safeStorage';
+import { safeGetItem, safeSetItem, safeRemoveItem } from '../../safeStorage';
+
+// ─── Storage keys ───────────────────────────────────────────────────────────
+
+/**
+ * localStorage key for the WebGPU feature flag.
+ *
+ * Project convention is to prefix all keys with `openclo-` (see
+ * `openclo-workflow`, `openclo-layout`, `openclo-saved-poses`, etc.).
+ * The legacy `webclo-use-webgpu` key was the lone outlier; BUG-11 (#614)
+ * migrates it to this canonical prefix.
+ */
+export const WEBGPU_FEATURE_FLAG_KEY = 'openclo-use-webgpu';
+
+const LEGACY_WEBGPU_FEATURE_FLAG_KEY = 'webclo-use-webgpu';
+
+/**
+ * One-time migration of the WebGPU feature flag from the legacy
+ * `webclo-use-webgpu` key to the canonical `openclo-use-webgpu`.
+ *
+ * Idempotent: safe to call any number of times. After the first call,
+ * the legacy key is gone and subsequent calls are no-ops.
+ *
+ * If the canonical key is already set (e.g. because the user opened a
+ * newer build first and then went back to an older build that wrote the
+ * legacy key), the canonical value wins and the legacy key is just
+ * removed without clobbering the canonical.
+ *
+ * BUG-11 (#614).
+ */
+export function migrateLegacyWebGpuFlag(): void {
+  const legacy = safeGetItem(LEGACY_WEBGPU_FEATURE_FLAG_KEY);
+  if (legacy === null) return;
+  if (safeGetItem(WEBGPU_FEATURE_FLAG_KEY) === null) {
+    safeSetItem(WEBGPU_FEATURE_FLAG_KEY, legacy);
+  }
+  safeRemoveItem(LEGACY_WEBGPU_FEATURE_FLAG_KEY);
+}
+
+// Run migration once at module load. Must happen before the IIFE below
+// reads the canonical key.
+migrateLegacyWebGpuFlag();
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -42,12 +83,12 @@ export function isWebGPUAvailable(): boolean {
  * Whether the WebGPU **rendering** backend is active.
  *
  * Returns `true` when the browser supports WebGPU AND the user has not
- * explicitly opted out via `localStorage.setItem('webclo-use-webgpu', 'false')`.
+ * explicitly opted out via `localStorage.setItem('openclo-use-webgpu', 'false')`.
  * Used to disable features incompatible with WebGPU (e.g. shadow mapping with
  * legacy MeshDepthMaterial).
  */
 export const isWebGPURendererActive: boolean = isWebGPUAvailable() && (() => {
-  return safeGetItem('webclo-use-webgpu') !== 'false';
+  return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) !== 'false';
 })();
 
 /**

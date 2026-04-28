@@ -17,7 +17,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { isWebGPUAvailable } from '../../utils/cloth/gpu/webgpuDetect';
+import { isWebGPUAvailable, WEBGPU_FEATURE_FLAG_KEY } from '../../utils/cloth/gpu/webgpuDetect';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
@@ -77,9 +77,9 @@ interface UseSimulationLifecycleResult {
  *  Three.js 0.183 TSL atomicAdd doesn't propagate isAtomic to StorageBufferNode,
  *  so WGSL declares array<i32> instead of array<atomic<i32>>. All compute shaders
  *  silently fail. WASM XPBD solver is used until a Three.js upstream fix lands.
- *  Set 'webclo-use-webgpu' to 'true' to opt-in. */
+ *  Set 'openclo-use-webgpu' to 'true' to opt-in. */
 function isWebGPUFeatureEnabled(): boolean {
-  return safeGetItem('webclo-use-webgpu') === 'true';
+  return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) === 'true';
 }
 
 /** Race a promise against a timeout */
