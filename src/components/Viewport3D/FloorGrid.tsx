@@ -5,7 +5,7 @@
  * renderer. Fine cells (10cm) in light gray, major sections (1m) darker.
  * Fades at the edges via vertex alpha for depth perception.
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 
 interface FloorGridProps {
@@ -66,6 +66,10 @@ export default function FloorGrid({
       sectionGeo: buildGeo(sectionVerts, sectionAlphas),
     };
   }, [size, cellSize, sectionEvery]);
+  // BUG-9 (#612): inline dispose pending C1 canonical pattern. Both geos
+  // are produced by the same useMemo and recompute together — coupled
+  // lifecycle, single useEffect.
+  useEffect(() => () => { fineGeo.dispose(); sectionGeo.dispose(); }, [fineGeo, sectionGeo]);
 
   return (
     <group position={[0, y, 0]}>

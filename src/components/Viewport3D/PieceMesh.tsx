@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { Html } from '@react-three/drei';
 import { useSelector } from 'react-redux';
@@ -123,6 +123,9 @@ export default function PieceMesh({ piece, isSelected, position, placementRotati
     }
     return geo;
   }, [piece.outline]);
+  // BUG-9 (#612): inline dispose pending C1 canonical pattern. geometry can
+  // be null when the outline has no valid shape, hence the optional chain.
+  useEffect(() => () => { geometry?.dispose(); }, [geometry]);
 
   // Rotation now uses same system as CDT mesher (XZ plane geometry)
   const finalRotation = useMemo((): [number, number, number] => {

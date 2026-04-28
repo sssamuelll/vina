@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -99,6 +99,8 @@ export default function Mannequin() {
     geo.computeVertexNormals();
     return geo;
   }, [measurements]);
+  // BUG-9 (#612): inline dispose pending C1 canonical pattern.
+  useEffect(() => () => bodyGeometry.dispose(), [bodyGeometry]);
 
   const standGeometry = useMemo(() => {
     const points = buildStandProfile();
@@ -106,6 +108,8 @@ export default function Mannequin() {
     geo.computeVertexNormals();
     return geo;
   }, []);
+  // BUG-9 (#612): inline dispose pending C1 canonical pattern.
+  useEffect(() => () => standGeometry.dispose(), [standGeometry]);
 
   return (
     <group userData={{ opencloRole: 'avatar' }}>

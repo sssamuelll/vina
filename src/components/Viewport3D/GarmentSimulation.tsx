@@ -264,6 +264,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     return { staticGeometry: geo };
   }, [pieceMeshes, activePieces, avatarMeasurements]);
+  // BUG-9 (#612): inline dispose pending C1 canonical pattern. staticGeometry
+  // is null when there are no piece meshes, hence the optional chain.
+  useEffect(() => () => { staticGeometry?.dispose(); }, [staticGeometry]);
 
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
 
