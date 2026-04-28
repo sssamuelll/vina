@@ -170,7 +170,51 @@ grep -rn "^let [a-zA-Z_][a-zA-Z_0-9]* = 0" src --include="*.ts" --include="*.tsx
 grep -rn "toMatch.*\^[a-z][a-z_-]*-" src --include="*.test.*"
 ```
 
-**Inventory axis counts are lower bounds, not upper bounds.** Expect actual scope to be 1.5–3x the inventory estimate when the axis spans naming conventions. Surface the discrepancy honestly when it appears mid-investigation; "investigation methodology was too narrow" is a valid and important finding.
+**Inventory axis counts are lower bounds, not upper bounds.** The expected multiplier varies by structure:
+
+- **Structured axes** (slices enumerable by `glob('*Slice.ts')`, type-tagged entities, components in a specific dir): ~1.0–1.3x. Inventory tends to be close; refinements are within categories rather than scope expansions.
+- **Dispersed axes** (helpers ad-hoc, inline patterns, multi-naming): 1.5–3x. Inventory is a starting point; expect significant expansion via the underlying-primitive grep methodology above.
+
+Surface the discrepancy honestly when it appears mid-investigation; "investigation methodology was too narrow" is a valid and important finding.
+
+### Pre-investigation: check for pre-existing canonical infrastructure
+
+Before proposing a canonical for any drift axis, **first check whether the codebase already has formalized infrastructure that resolves the axis**. Patterns to grep for:
+
+- `src/**/*Registry.ts`, `*Manifest.ts`, `*Catalog.ts` — central registries.
+- Tests named `*Coverage.test.ts`, `*Invariant.test.ts`, `*Reset.test.ts` — enforcement of policies.
+- Inline comments `// canonical:`, `// invariant:`, `// MUST:` — design ratifications.
+- Custom lint rules, schemas, type-level constraints.
+
+The drift inventory is a snapshot of the codebase state at inventory-write time. **Between inventory time and Fase 2 time, the team may have shipped canonical infrastructure that resolves the axis without the inventory being updated.** When pre-existing canonical is found, the right output is a **ratification doc** (5–10 lines documenting the existing canonical + sanity check that it works), NOT a canonical proposal followed by Fase 3 migration.
+
+Triggers indicating "this axis is already resolved":
+
+- Central registry file enumerating the domain of the axis.
+- Test asserting completeness (every entity in domain X is in registry Y).
+- Documented reasons inline for design decisions (`// reason: ...`).
+
+Add this as the first ~5–10 minute step of every Fase 2 investigation. The cost is trivial; the savings on axes already resolved is large.
+
+### Process discipline: stop → notify → wait → execute
+
+When a trigger fires mid-investigation or mid-fix, **physically pause**: write the report, list the options, wait for the user's verde, then execute. Do NOT decide-and-notify-post-hoc, even when the decision seems obvious. Speed never justifies relaxing the loop.
+
+Triggers that fire (pause required):
+
+- Scope-invalidating findings (size shift, hidden complexity).
+- Class A/B classification ambiguity at specific sites.
+- Findings suggesting a different axis is the real concern.
+- Architectural decisions emerging where mechanical work was expected.
+- Pre-existing canonical infrastructure discovered (per above).
+
+Steps that don't fire (continue without pause):
+
+- Listing → reading → consumer search → test search.
+- Migration of declared-in-scope sites.
+- Each commit's verification gates.
+
+The line between "obvious decision" and "non-obvious decision" gradually blurs without this discipline. The cost of an extra round-trip is always smaller than the cost of an instilled bad habit.
 
 ## Common Tasks
 

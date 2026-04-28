@@ -225,6 +225,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - **Estado:** drift cosmético.
 - 15 slices reset total, 3 reset selectivo (workflow, avatar, bom — preservan settings de app), 3 sin handler (plugin, renderSettings, marker — ¿intencional?).
 
+> **Estado real (verificado 2026-04-28 durante Fase 2):** canónico ya existía cuando se escribió este inventario. `src/store/newProjectRegistry.ts` formaliza la política y `src/store/__tests__/newProjectReset.test.ts` la enforce con 27 tests (5 invariantes). `markerSlice` SÍ resetea (estaba mal-clasificado en este inventario); `pluginSlice` y `renderSettingsSlice` están documentados con reason explícita (no "asumiblemente intencional"). Eje cerrado por ratificación — ver `drift-fase2-b12state-newproject-reset.md`. Ningún cambio de código.
+
 ---
 
 ## Grupo C — Rendering / coordenadas / unidades
