@@ -122,13 +122,22 @@ cp pkg/xpbd_wasm_bg.wasm public/wasm/
 
 If only `.wasm` is copied, the worker falls back to CPU solver.
 
-## Testing
+## Gate commands
+
+These are the commands the husky pre-commit hook runs and the commands you should use in any "verify before commit/push" step. Manual gate runs **must** match the hook commands; otherwise verifications can pass vacuously while the hook fails.
 
 ```bash
+npx tsc -b --noEmit   # Type check — see note on -b below
 npm run test          # Unit tests (Vitest)
 npm run test:e2e      # E2E tests (Playwright)
-npx tsc --noEmit      # Type check
+npm run lint          # ESLint (eslint --max-warnings=0 enforced in lint-staged)
 ```
+
+### Why `tsc -b --noEmit` and not `tsc --noEmit`
+
+The repo's root `tsconfig.json` declares `"files": []` and only project references (to `tsconfig.app.json`, `tsconfig.node.json`, `bench/tsconfig.json`). Running bare `tsc --noEmit` against the root config typechecks **nothing** — it returns clean vacuously even when `src/` has compile errors. The husky pre-commit hook uses `tsc -b --noEmit` (build mode), which traverses the project references and actually typechecks `src/`.
+
+If you run `tsc --noEmit` and it passes but the pre-commit hook fails, the bare command is the bug, not the hook. **Always use `tsc -b --noEmit`** when verifying typecheck status manually.
 
 ## Common Tasks
 
