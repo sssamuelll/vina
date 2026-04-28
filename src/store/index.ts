@@ -72,7 +72,7 @@ export const store = configureStore({
         ignoredPaths: ['project.pieces', 'project.avatar', 'collisionBody.bodies', 'copilotUI.pendingConfirmation'],
         ignoredActions: ['project/loadProject', 'project/restoreState', 'copilotUI/showConfirmation'],
       },
-    }).concat(createConfirmationMiddleware(), undoMiddleware, linkedEditingMiddleware, createReactiveSolverMiddleware(), gradingStalenessMiddleware),
+    }).concat(createConfirmationMiddleware(), linkedEditingMiddleware, undoMiddleware, createReactiveSolverMiddleware(), gradingStalenessMiddleware),
 });
 
 // Load builtin recipes synchronously — must be available before first copilot turn

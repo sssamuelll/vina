@@ -19,51 +19,116 @@ interface ActionLike {
   payload: unknown;
 }
 
+interface StoreLike {
+  getState(): unknown;
+  dispatch: Dispatch;
+}
+
+interface ProjectStateShape {
+  project?: { pieces: PatternPiece[] };
+}
+
+const BATCH_LABELS: Record<string, string> = {
+  'project/updatePiece': 'Edit Linked Piece',
+  'project/addInternalLine': 'Add Internal Line (Linked)',
+  'project/updateInternalLine': 'Edit Internal Line (Linked)',
+  'project/flipPieceH': 'Flip Linked Piece Horizontal',
+  'project/flipPieceV': 'Flip Linked Piece Vertical',
+};
+
+// Pure: (action, state) → boolean. No side effects, no dispatches, no state mutation.
+// `removeInternalLine` is in SYNCED_ACTIONS but has no cascade handler in the
+// original middleware; we preserve that no-op behavior by excluding it here so
+// it goes through the normal undo path with its existing label, instead of
+// opening an empty batch.
+function willCascade(action: ActionLike, state: ProjectStateShape): boolean {
+  if (!SYNCED_ACTIONS.has(action.type)) return false;
+  if (action.type === 'project/removeInternalLine') return false;
+
+  const piece = locatePieceForAction(action, state);
+  return Boolean(piece?.linkedPieceId && piece.linkMode);
+}
+
+function locatePieceForAction(action: ActionLike, state: ProjectStateShape): PatternPiece | undefined {
+  const pieces = state.project?.pieces;
+  if (!pieces) return undefined;
+  const payload = action.payload;
+
+  if (action.type === 'project/updatePiece') {
+    return payload as PatternPiece;
+  }
+  if (
+    action.type === 'project/addInternalLine' ||
+    action.type === 'project/updateInternalLine'
+  ) {
+    return pieces.find(p => p.id === (payload as { pieceId: string }).pieceId);
+  }
+  if (action.type === 'project/flipPieceH' || action.type === 'project/flipPieceV') {
+    return pieces.find(p => p.id === (payload as string));
+  }
+  return undefined;
+}
+
 export const linkedEditingMiddleware: Middleware = (store) => (next) => (action: unknown) => {
-  const result = next(action);
+  if (isSyncing) return next(action);
 
-  if (isSyncing) return result;
   const act = action as ActionLike;
-  const actionType: string = act?.type ?? '';
-  if (!SYNCED_ACTIONS.has(actionType)) return result;
 
-  const state = store.getState() as { project?: { pieces: PatternPiece[] } };
-  const pieces: PatternPiece[] | undefined = state.project?.pieces;
-  if (!pieces) return result;
+  if (!willCascade(act, store.getState() as ProjectStateShape)) {
+    return next(action);
+  }
 
-  const payload = act.payload;
+  const label = BATCH_LABELS[act.type] ?? 'Linked Edit';
+
+  // Open undo batch BEFORE the original action passes through undoMiddleware,
+  // so undoMid suppresses per-action snapshots and commits one entry on endBatch.
+  store.dispatch({ type: 'undo/startBatch', payload: label });
+  try {
+    const result = next(action);
+
+    isSyncing = true;
+    try {
+      runCascade(act, store);
+    } finally {
+      isSyncing = false;
+    }
+
+    return result;
+  } finally {
+    store.dispatch({ type: 'undo/endBatch' });
+  }
+};
+
+function runCascade(action: ActionLike, store: StoreLike) {
+  const state = store.getState() as ProjectStateShape;
+  const pieces = state.project?.pieces;
+  if (!pieces) return;
+
+  const payload = action.payload;
   let editedPiece: PatternPiece | undefined;
 
-  if (actionType === 'project/updatePiece') {
+  if (action.type === 'project/updatePiece') {
     editedPiece = pieces.find(p => p.id === (payload as PatternPiece).id);
-  } else if (actionType === 'project/addInternalLine' || actionType === 'project/removeInternalLine' || actionType === 'project/updateInternalLine') {
+  } else if (action.type === 'project/addInternalLine' || action.type === 'project/updateInternalLine') {
     editedPiece = pieces.find(p => p.id === (payload as { pieceId: string }).pieceId);
-  } else if (actionType === 'project/flipPieceH' || actionType === 'project/flipPieceV') {
+  } else if (action.type === 'project/flipPieceH' || action.type === 'project/flipPieceV') {
     editedPiece = pieces.find(p => p.id === (payload as string));
   }
 
-  if (!editedPiece?.linkedPieceId || !editedPiece.linkMode) return result;
-
+  if (!editedPiece?.linkedPieceId || !editedPiece.linkMode) return;
   const partner = pieces.find(p => p.id === editedPiece!.linkedPieceId);
-  if (!partner) return result;
+  if (!partner) return;
 
-  isSyncing = true;
-  try {
-    if (actionType === 'project/updatePiece') {
-      syncUpdatePiece(store.dispatch, editedPiece, partner);
-    } else if (actionType === 'project/addInternalLine') {
-      syncAddInternalLine(store.dispatch, editedPiece, partner, (payload as { line: InternalLine }).line);
-    } else if (actionType === 'project/updateInternalLine') {
-      syncUpdateInternalLine(store.dispatch, editedPiece, partner, payload as { pieceId: string; lineId: string; path: PathCommand[] });
-    } else if (actionType === 'project/flipPieceH' || actionType === 'project/flipPieceV') {
-      syncUpdatePiece(store.dispatch, editedPiece, partner);
-    }
-  } finally {
-    isSyncing = false;
+  if (action.type === 'project/updatePiece') {
+    syncUpdatePiece(store.dispatch, editedPiece, partner);
+  } else if (action.type === 'project/addInternalLine') {
+    syncAddInternalLine(store.dispatch, editedPiece, partner, (payload as { line: InternalLine }).line);
+  } else if (action.type === 'project/updateInternalLine') {
+    syncUpdateInternalLine(store.dispatch, editedPiece, partner, payload as { pieceId: string; lineId: string; path: PathCommand[] });
+  } else if (action.type === 'project/flipPieceH' || action.type === 'project/flipPieceV') {
+    syncUpdatePiece(store.dispatch, editedPiece, partner);
   }
-
-  return result;
-};
+}
 
 function syncUpdatePiece(dispatch: Dispatch, source: PatternPiece, partner: PatternPiece) {
   if (source.linkMode === 'instance') {
