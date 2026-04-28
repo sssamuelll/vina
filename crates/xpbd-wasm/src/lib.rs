@@ -28,6 +28,7 @@ pub struct XpbdSolver {
     // Seam constraints
     seam_ids: Vec<u32>,         // [a,b, a,b, ...]
     seam_target: Vec<f32>,      // target distance (usually 0)
+    seam_compliance: Vec<f32>,  // XPBD compliance per seam (0 = rigid; larger = stretchy)
 
     // Self-collision
     self_collision: bool,
@@ -93,6 +94,7 @@ impl XpbdSolver {
             bend_rest: Vec::new(),
             seam_ids: Vec::new(),
             seam_target: Vec::new(),
+            seam_compliance: Vec::new(),
             self_collision: false,
             thickness: 0.002,
             adjacency_offsets: Vec::new(),
@@ -164,10 +166,27 @@ impl XpbdSolver {
         }).collect();
     }
 
-    /// Set seam constraints.
-    pub fn set_seams(&mut self, ids: &[u32], target_dist: &[f32]) {
+    /// Set seam constraints with per-constraint XPBD compliance.
+    ///
+    /// `compliances` is a per-seam alpha value: 0.0 = perfectly rigid seam,
+    /// larger values = more compliant (stretchy). Mirrors the
+    /// `set_stretch_with_types` / `set_bend_with_types` shape used elsewhere
+    /// in this crate.
+    ///
+    /// BUG-3 (#606): the previous 2-arg `set_seams(ids, target)` discarded
+    /// per-seam tension/strength data the JS side computes; the solver
+    /// hardcoded alpha=0 internally and treated every seam as rigid. The
+    /// fix moves the compliance into the API contract so JS-side data
+    /// flows through.
+    pub fn set_seams_with_compliance(
+        &mut self,
+        ids: &[u32],
+        target_dist: &[f32],
+        compliances: &[f32],
+    ) {
         self.seam_ids = ids.to_vec();
         self.seam_target = target_dist.to_vec();
+        self.seam_compliance = compliances.to_vec();
     }
 
     /// Set triangle indices for air drag calculation.
@@ -459,7 +478,7 @@ impl XpbdSolver {
 
     fn solve_seams(&mut self, sdt: f32) {
         let num = self.seam_ids.len() / 2;
-        let alpha = 0.0 / (sdt * sdt); // zero compliance = rigid seams
+        let inv_dt2 = 1.0 / (sdt * sdt);
 
         for c in 0..num {
             let a = self.seam_ids[c * 2] as usize;
@@ -477,6 +496,16 @@ impl XpbdSolver {
             let dist = (dx * dx + dy * dy + dz * dz).sqrt();
             if dist < 1e-12 { continue; }
 
+            // BUG-3 (#606): per-seam alpha derived from the compliance array
+            // populated by `set_seams_with_compliance`. compliance=0 still
+            // means rigid (alpha=0); non-zero values now actually take
+            // effect instead of being silently ignored.
+            let compliance = if c < self.seam_compliance.len() {
+                self.seam_compliance[c]
+            } else {
+                0.0
+            };
+            let alpha = compliance * inv_dt2;
             let target = self.seam_target[c];
             let c_val = dist - target;
             let s = -c_val / (w_sum + alpha);
@@ -723,5 +752,73 @@ impl XpbdSolver {
                 self.velocities[idx + 2] = vz;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// BUG-3 (#606) regression: solve_seams must read per-constraint compliance
+    /// from `seam_compliance` rather than hardcoding alpha=0. With compliance=0
+    /// the seam is rigid (legacy behavior); with compliance>0 the seam should
+    /// resist the constraint correction proportionally.
+    #[test]
+    fn solve_seams_respects_per_constraint_compliance() {
+        // Two particles 2.0 metres apart on the x-axis, both unit inverse mass.
+        // Seam target = 0 (pull together). One sub-step.
+        let positions = vec![0.0, 0.0, 0.0, 2.0, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+
+        let make_solver = |compliance: f32| {
+            let mut s = XpbdSolver::new(&positions, &inv_mass);
+            s.set_seams_with_compliance(&[0u32, 1u32], &[0.0f32], &[compliance]);
+            s
+        };
+
+        let sdt = 1.0 / 60.0;
+
+        // compliance=0 → alpha=0 → s = -dist / w_sum = -2.0 / 2.0 = -1.0.
+        // Each particle moves by 1.0, ending at x=1.0. Rigid.
+        let mut rigid = make_solver(0.0);
+        rigid.solve_seams(sdt);
+        let rigid_a = rigid.positions[0];
+        let rigid_b = rigid.positions[3];
+        let rigid_dist = rigid_b - rigid_a;
+        assert!(rigid_dist.abs() < 1e-5, "compliance=0 should make seam rigid (dist→0); got {}", rigid_dist);
+
+        // Large compliance → alpha large → small correction; particles barely move.
+        let mut compliant = make_solver(1.0);
+        compliant.solve_seams(sdt);
+        let comp_a = compliant.positions[0];
+        let comp_b = compliant.positions[3];
+        let comp_dist = comp_b - comp_a;
+        // alpha = 1.0 / sdt² = 3600. s = -2 / (2 + 3600) ≈ -0.000555.
+        // Particles end at x≈0.000555 and x≈1.999444. Distance ≈ 1.9989.
+        assert!(
+            comp_dist > 1.99,
+            "large compliance should leave seam mostly slack; got dist={}",
+            comp_dist
+        );
+    }
+
+    /// BUG-3 defensive check: if the compliance array is shorter than the
+    /// constraint count (caller mismatch), missing entries default to 0
+    /// (rigid) rather than panicking with index-out-of-bounds.
+    #[test]
+    fn solve_seams_tolerates_short_compliance_array() {
+        let positions = vec![0.0, 0.0, 0.0, 2.0, 0.0, 0.0, 4.0, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+
+        // Two seams declared, only one compliance entry — second seam should
+        // fall back to compliance=0 (rigid) without panicking.
+        s.set_seams_with_compliance(&[0u32, 1u32, 1u32, 2u32], &[0.0f32, 0.0f32], &[1.0f32]);
+
+        s.solve_seams(1.0 / 60.0);
+        // No panic = pass; behavior verification below is just a sanity check.
+        // Second seam (1↔2) had compliance=0 → should pull them together.
+        let dist_12 = (s.positions[6] - s.positions[3]).abs();
+        assert!(dist_12 < 1e-5, "second seam should be rigid (compliance fallback to 0)");
     }
 }

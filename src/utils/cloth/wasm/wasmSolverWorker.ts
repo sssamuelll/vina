@@ -31,7 +31,7 @@ interface WasmXpbdSolver {
   set_stretch_with_types(ids: Uint32Array, rest_lengths: Float32Array, edge_types: Uint8Array): void;
   set_bend(ids: Uint32Array, rest: Float32Array): void;
   set_bend_with_types(ids: Uint32Array, rest_angles: Float32Array, edge_types: Uint8Array): void;
-  set_seams(ids: Uint32Array, target: Float32Array): void;
+  set_seams_with_compliance(ids: Uint32Array, target: Float32Array, compliances: Float32Array): void;
   set_triangles(tri_ids: Uint32Array): void;
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
   set_pins(indices: Uint32Array, positions: Float32Array): void;
@@ -390,8 +390,12 @@ self.onmessage = async (event: MessageEvent) => {
             console.log('[WasmWorker] Adding seam constraints:', seamConstraints.count);
             // Convert pairs to Uint32Array for Wasm
             const ids = new Uint32Array(seamConstraints.ids);
-            // The Rust solver expects (ids, target_lengths)
-            solver.set_seams(ids, seamConstraints.restLengths);
+            // BUG-3 (#606): pass per-seam compliance through to the Rust solver.
+            // Previously the worker called the 2-arg `set_seams(ids, target)`,
+            // which silently dropped `seamConstraints.compliances` — the Rust
+            // solver then hardcoded alpha=0 and treated every seam as rigid
+            // regardless of tension/strength. Now plumbed end-to-end.
+            solver.set_seams_with_compliance(ids, seamConstraints.restLengths, seamConstraints.compliances);
           }
         }
 

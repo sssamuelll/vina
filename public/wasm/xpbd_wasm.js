@@ -144,16 +144,30 @@ export class XpbdSolver {
         wasm.xpbdsolver_set_pins(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
-     * Set seam constraints.
+     * Set seam constraints with per-constraint XPBD compliance.
+     *
+     * `compliances` is a per-seam alpha value: 0.0 = perfectly rigid seam,
+     * larger values = more compliant (stretchy). Mirrors the
+     * `set_stretch_with_types` / `set_bend_with_types` shape used elsewhere
+     * in this crate.
+     *
+     * BUG-3 (#606): the previous 2-arg `set_seams(ids, target)` discarded
+     * per-seam tension/strength data the JS side computes; the solver
+     * hardcoded alpha=0 internally and treated every seam as rigid. The
+     * fix moves the compliance into the API contract so JS-side data
+     * flows through.
      * @param {Uint32Array} ids
      * @param {Float32Array} target_dist
+     * @param {Float32Array} compliances
      */
-    set_seams(ids, target_dist) {
+    set_seams_with_compliance(ids, target_dist, compliances) {
         const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArrayF32ToWasm0(target_dist, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
-        wasm.xpbdsolver_set_seams(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        const ptr2 = passArrayF32ToWasm0(compliances, wasm.__wbindgen_malloc);
+        const len2 = WASM_VECTOR_LEN;
+        wasm.xpbdsolver_set_seams_with_compliance(this.__wbg_ptr, ptr0, len0, ptr1, len1, ptr2, len2);
     }
     /**
      * Set stretch constraints (pairs of ids + rest lengths).
