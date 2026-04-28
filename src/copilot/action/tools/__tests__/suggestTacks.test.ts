@@ -41,9 +41,9 @@ describe('suggestTacks tool', () => {
     const result = await suggestTacksTool!.execute({ maxDistance: 50, maxSuggestions: 10 }, dispatch, getState);
 
     expect(result.success).toBe(true);
-    expect(result.suggestionCount).toBe(1);
-    expect(result.suggestions[0].pieceAId).toBe('a');
-    expect(result.suggestions[0].pieceBId).toBe('b');
+    expect(result.data?.suggestionCount).toBe(1);
+    expect((result.data?.suggestions as Array<{ pieceAId: string; pieceBId: string }>)[0].pieceAId).toBe('a');
+    expect((result.data?.suggestions as Array<{ pieceAId: string; pieceBId: string }>)[0].pieceBId).toBe('b');
   });
 
   it('ignores invalid params and falls back to safe defaults', async () => {
@@ -61,6 +61,6 @@ describe('suggestTacks tool', () => {
     const result = await suggestTacksTool!.execute({ maxDistance: -1, maxSuggestions: 0 }, dispatch, getState);
 
     expect(result.success).toBe(true);
-    expect(result.suggestionCount).toBe(1);
+    expect(result.data?.suggestionCount).toBe(1);
   });
 });

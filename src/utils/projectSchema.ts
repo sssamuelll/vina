@@ -31,7 +31,6 @@ const MAX_POMS = 5_000;
 const MAX_SEAM_GROUPS = 10_000;
 const MAX_REFERENCE_IMAGES = 200;
 const MAX_TRIMS = 5_000;
-const MAX_COLORWAYS = 200;
 
 const MAX_NAME_LEN = 1024;
 const MAX_ID_LEN = 1024;

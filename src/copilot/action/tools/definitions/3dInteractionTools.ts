@@ -158,11 +158,13 @@ export const tools: ToolDefinition[] = [
 
       return {
         success: true,
-        suggestionCount: topSuggestions.length,
-        suggestions: topSuggestions,
-        summary: topSuggestions.length > 0
-          ? `Found ${topSuggestions.length} pin points: ${topSuggestions.map(s => `${s.pieceName}@${s.landmark}`).join(', ')}`
-          : 'No pinning landmarks detected. Consider adding pieces with typical garment features.',
+        data: {
+          suggestionCount: topSuggestions.length,
+          suggestions: topSuggestions,
+          summary: topSuggestions.length > 0
+            ? `Found ${topSuggestions.length} pin points: ${topSuggestions.map(s => `${s.pieceName}@${s.landmark}`).join(', ')}`
+            : 'No pinning landmarks detected. Consider adding pieces with typical garment features.',
+        },
       };
     },
   },
@@ -255,11 +257,13 @@ export const tools: ToolDefinition[] = [
 
       return {
         success: true,
-        suggestionCount: topSuggestions.length,
-        suggestions: topSuggestions,
-        summary: topSuggestions.length > 0
-          ? `Found ${topSuggestions.length} tack candidates between adjacent pieces.`
-          : 'No adjacent unsewn pieces found for tacking.',
+        data: {
+          suggestionCount: topSuggestions.length,
+          suggestions: topSuggestions,
+          summary: topSuggestions.length > 0
+            ? `Found ${topSuggestions.length} tack candidates between adjacent pieces.`
+            : 'No adjacent unsewn pieces found for tacking.',
+        },
       };
     },
   },

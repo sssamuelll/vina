@@ -440,12 +440,12 @@ describe('parseOpenCloProject — referenceImageData filtering', () => {
 
 describe('parseOpenCloProject — trim placement discriminated union', () => {
   it('accepts each valid placement mode', () => {
-    const placements = [
+    const placements: NonNullable<OpenCloProject['trims']>[number]['placement'][] = [
       { mode: 'edge', edgeName: 'hem', tStart: 0, tEnd: 1 },
       { mode: 'edge-points', edgeName: 'hem', positions: [0.25, 0.75] },
       { mode: 'count', quantity: 3 },
       { mode: 'point', positions: [{ x: 0, y: 0 }] },
-    ] as const;
+    ];
     for (const placement of placements) {
       const proj = makeProject({
         trims: [
@@ -478,7 +478,7 @@ describe('parseOpenCloProject — trim placement discriminated union', () => {
           type: 'button',
           name: 'B',
           description: '',
-          placement: { mode: 'unknown', edgeName: 'x' } as unknown as OpenCloProject['trims'][number]['placement'],
+          placement: { mode: 'unknown', edgeName: 'x' } as unknown as NonNullable<OpenCloProject['trims']>[number]['placement'],
           material: 'plastic',
           color: '#000',
           size: 10,
