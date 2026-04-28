@@ -294,4 +294,177 @@ Total ~15-18 archivos tocados. **Confirmado M, pero todo mecánico find-and-repl
 
 ---
 
-**FIN. Esperando aprobación final del canónico para arrancar Fase 3 migración.**
+---
+
+## 10. Re-investigación post-Fase-3-stop (2026-04-28)
+
+Sam aprobó Fase 3 single commit M. Mid-fix encontré que mi investigación original subestimó scope. Stoppé, reseté working tree, y ejecuté re-investigación con metodología expandida que el propio Sam pidió que documente.
+
+### Metodología expandida (anotar en CLAUDE.md o aquí)
+
+Mi grep original buscaba `function uid|export function uid|const uid =` — específico al nombre `uid`. Eso fue el bug metodológico. Para futuros ejes que spanean naming conventions, el grep correcto es sobre el **primitive subyacente**, no el canonical name:
+
+```bash
+# Method 1 — Date.now() en template literals (cualquier ID timestamp-based)
+grep -rn "\`[^\`]*\${Date\.now()" src --include="*.ts" --include="*.tsx" | grep -v test
+
+# Method 2 — Counter increments at module level (cualquier ID counter-based)
+grep -rn "^let [a-zA-Z_][a-zA-Z_0-9]* = 0" src --include="*.ts" --include="*.tsx" | grep -v test
+
+# Method 3 — Tests asserting prefix format (detecta load-bearing por test)
+grep -rn "toMatch.*\^[a-z][a-z_-]*-" src --include="*.test.*"
+
+# Method 4 — Existing canonical callsites (verify completeness)
+grep -rn "crypto\.randomUUID()" src --include="*.ts" --include="*.tsx"
+```
+
+**Anotación clave:** axis counts en el inventario inicial son **lower bounds**, no upper bounds. Esperar 1.5–3x del estimate cuando el axis spanea naming conventions.
+
+### Findings completos — 17 helpers, no 5
+
+| # | File:Line | Helper | Class | Razón |
+|---|---|---|---|---|
+| 1 | `pathHelpers.ts:3` | `uid()` | **B** | `pieceBuilder.test.ts:63` asserts `^piece-/` |
+| 2 | `pathHelpers.ts:4` | `lineId()` | A | No tests find consumers |
+| 3 | `patternOps.ts:24` | `uid(prefix)` | A | No prefix-asserting tests |
+| 4 | `patternOpsTools.ts:14` | `uid(prefix)` | A | No prefix-asserting tests |
+| 5 | `seamlyAdapter.ts:96` | `uid(prefix)` | A | No prefix-asserting tests |
+| 6 | `copilotUISlice.ts:150` | `generateId(prefix)` | A | Verified non-load-bearing earlier |
+| 7 | `constructionSlice.ts:37-39` | `cid(prefix)` | A | Verified non-load-bearing earlier |
+| 8 | `planTypes.ts:170` | `genPlanId()` | **B** | `planTypes.test.ts:24-25` asserts `^plan-\d+-\d+$` |
+| 9 | `planTypes.ts:178` | `genStepId()` | **B** | `planTypes.test.ts:35-36` asserts `^step-\d+-\d+$` |
+| 10 | `preferenceLearner.ts:109` | `genOverrideId()` | A | No tests |
+| 11 | `suggestionEngine.ts:350` | `genSuggestionId()` | A | No tests |
+| 12 | `designLog.ts:67` | `genEntryId()` | A | No tests |
+| 13 | `GradingTab.tsx:50` | `generateId()` (local) | A | No tests |
+| 14 | `dartEntity.ts:13` | `dartId()` | A | No prefix-parse consumers; tests use hardcoded fixtures (not asserting helper output) |
+| 15 | `grainLine.ts:10` | `glId()` | A | Same as dartId |
+| 16 | `bomExtractor.ts:130-132` | `nextId(prefix)` + reset | **B** | `_idCounter = 0` reset implies deterministic re-extraction is the contract |
+| 17 | `exportAAMA.ts:22` | `nextHandle()` | **B** | DXF AAMA/ASTM format: entity handles must be valid hex strings. UUID violates spec. |
+
+**Class A helpers: 12. Class B helpers: 5** (preservados, comentario referenciando B10-state).
+
+### Findings completos — 60 inline sites, ~33 entity-IDs
+
+Los 60 sites de `Date.now()` en template literals se dividen:
+
+**Filenames (NOT IDs, OUT OF SCOPE):** 4 sites
+- `Viewport3D.tsx:349, 409` (download filenames).
+- `ExportDialog.tsx:73, 116` (export filenames).
+
+**Display names (NOT IDs, OUT OF SCOPE):** 3 sites
+- `useRectangleTool.ts:84` `Rect ${...}` (piece name).
+- `usePenTool.ts:131, 193` `Piece ${...}` (piece names).
+
+**Class B inline (state-encoding):** 5 sites
+- `uiBridgeTools.ts:53` — `ann_${Date.now()}_${params.text}` (text encoded).
+- `simulationSlice.ts:322` — `pin_${Date.now()}_${vertexIndex}` (vertex idx encoded).
+- `patternOpsTools.ts:477` — `offset-${piece.id}-${Date.now()}` (parent piece id).
+- `projectSlice.ts:1013` — `${piece.id}-clone-${Date.now()}` (parent piece id).
+- `autoSew/index.ts:165` — `auto-seam-${Date.now()}-${idx}` (rank index — Class B by precaution).
+
+**Class B by test (NEW finding — load-bearing per test format assertion):** 2 sites
+- `ollama.ts:175` — `ollama-${Date.now()}-${random}` — `ollama.test.ts:128` asserts `^ollama-/`.
+- `ollama.ts:200` — same.
+
+**Class A inline (migrate to `newId()`):** ~30 sites
+- `uiBridgeTools.ts:84`, `simulationTools.ts:227`, `seamTools.ts:141`.
+- `patternOpsTools.ts:143, 409`.
+- `editorSlice.ts:225`.
+- `projectSlice.ts:512, 978, 1146`.
+- `useGrainlineTool.ts:23`, `useMeasureTool.ts:298`, `useSegmentSewingTool.ts:335`, `useTopstitchTool.ts:138`, `useNotchTool.ts:86`, `useScissorsTool.ts:166`, `useLineTool.ts:54`.
+- `PatternEditor.tsx:142, 160, 202, 482`.
+- `UnifiedBarChat.tsx:118, 128, 134`.
+- `SnapshotBar.tsx:36`.
+- `TemplateLibrary.tsx:120`.
+- `useAvatarTape.ts:88`.
+- `Sew3DTool.tsx:221`.
+- `CollisionBodyPanel.tsx:37`.
+- `PatternExplorerView.tsx:75`.
+- `FileExplorerView.tsx:125`.
+- `TrackList.tsx:54`.
+- `ProjectView.tsx:198, 253`.
+
+### Tests asserting ID format — 4 critical
+
+| Test | Assertion | Implications |
+|---|---|---|
+| `planTypes.test.ts:24-36` | `^plan-\d+-\d+$`, `^step-\d+-\d+$` | genPlanId/genStepId are Class B by test |
+| `copilotIntegration.test.ts:212` | `^plan-/` | Confirms plan format is contract |
+| `ollama.test.ts:128` | `^ollama-/` | ollama inline IDs are Class B by test |
+| `pieceBuilder.test.ts:63` | `^piece-/` | pathHelpers.uid is Class B by test |
+
+**4 tests would need updating** if these were migrated. Per Sam's directive, format-asserting tests = "tests del comportamiento, no del bug". Cannot migrate silently.
+
+### Final consolidated scope
+
+**Class A — migrate to `newId()`:**
+- 12 Class A helpers (refactor to wrappers).
+- ~30 Class A inline sites.
+- 1 new file `src/utils/ids.ts`.
+- 1 CLAUDE.md update.
+- ~25-30 files touched.
+
+**Class B — preserve with comment + B10-state flag:**
+- 5 Class B helpers (planTypes×2 + bomExtractor + exportAAMA + pathHelpers.uid).
+- 5 inline composite-encoding (uiBridgeTools, simulationSlice, patternOpsTools, projectSlice, autoSew).
+- 2 inline Class-B-by-test (ollama×2).
+
+**Out of scope of B11-state entirely:**
+- 4 filenames (not entity IDs).
+- 3 display names (not entity IDs).
+
+### Open question for Sam — pathHelpers.uid
+
+`pathHelpers.uid()` is the single most-called ID generator in the project (39+ callsites in copilot/ + utils). Test `pieceBuilder.test.ts:63` asserts `^piece-/`. Two interpretations:
+
+1. **The test is verifying behavior**: someone wanted IDs to start with `piece-` for filtering/debugging. → Class B, do not migrate. → 39+ Class A inline sites that consume uid() also stay timestamp-based, since uid() doesn't migrate.
+
+2. **The test is a remnant of bug-coverage**: `^piece-/` is what the helper happens to produce, the test was written to lock the current shape, but no production code depends on the prefix. → Class A, migrate. → Test gets updated to assert UUID shape.
+
+**Cannot decide alone.** Per your directive, test asserting format = stop and ask. Either:
+- Sam decides interpretation (1) or (2).
+- Sam clarifies whether prefix-by-debug-readability is load-bearing in this codebase (matches the rationale he applied to the planner/suggestions counter helpers).
+
+**My inclination:** interpretation (2) — test was written to lock the shape but no production code parses the prefix. The 39+ callsites of `uid()` use it as opaque identifier. The benefit of canonicalizing is real; the cost (update one test) is small.
+
+### Open question for Sam — planner/suggestions/perception helpers
+
+`genPlanId`, `genStepId` have explicit format-asserting tests. `genOverrideId`, `genSuggestionId`, `genEntryId` have NO tests but are debug-readable in similar subsystems (planner, suggestions, perception). Sam earlier flagged: "debug-readability puede ser load-bearing en sí misma. Si alguien filtra logs por prefix `plan-` para ver solo IDs de plan, eso es consumer del formato."
+
+Consistent treatment options:
+- **All 5 stay Class B** (preserve shape, debug-readability is contract). Conservative.
+- **Only the 2 with explicit tests stay Class B** (genPlanId/genStepId), the other 3 migrate. Less conservative.
+- **All 5 migrate** with explicit log-format check (test that no log line patterns parse `plan-` prefix). Most aggressive.
+
+**Cannot decide alone.** Sam's earlier directive: "verificá específicamente: (a) hay logs/observability que parsea esos prefijos, (b) hay tests que assertan formato, (c) Redux DevTools workflow asume legibilidad humana."
+- (a) Did not find any log-parsing of prefixes — but did NOT do exhaustive grep on log/console patterns.
+- (b) For genPlanId/genStepId yes (planTypes.test.ts). For others no.
+- (c) Cannot programmatically verify — depends on dev habits.
+
+### Updated size estimate
+
+- ~25-30 files touched.
+- ~12 Class A helpers refactored.
+- ~30 Class A inline sites migrated.
+- ~10 Class B sites preserved with comments.
+- 4 Class B-by-test sites preserved (or migrated with test updates if Sam clears).
+- 1 new file + 1 CLAUDE.md update.
+- **L→XL.** Single commit XL is feasible per Sam's earlier rejection of fragmentation.
+
+### Decisions needed from Sam before re-arrancar Fase 3
+
+1. **`pathHelpers.uid` interpretation** (1) or (2)?
+2. **planner/suggestions/perception helpers** — all 5 Class B? Only 2? All 5 migrate with test updates?
+3. **Confirm `auto-seam-${idx}`** as Class B (idx encodes rank position)?
+4. **Confirm size XL** (~25-30 files) for single commit?
+
+### What I will NOT do without Sam's verde
+
+- Touch any code.
+- Open follow-up issues for the discovered scope expansion (those would compete with the unified migration if some Class B helpers turn out to need their own treatment).
+- Pre-empt the 4 decisions above.
+
+---
+
+**FIN re-investigación. Esperando respuestas para arrancar Fase 3 con scope confirmado.**
