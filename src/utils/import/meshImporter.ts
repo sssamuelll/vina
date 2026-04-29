@@ -9,6 +9,7 @@
 
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import type { VRM } from '@pixiv/three-vrm';
 import { loadVRM } from '../avatar/vrmLoader';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -30,6 +31,12 @@ export interface ImportResult {
   meshCount: number;
   vertexCount: number;
   warnings: string[];
+  /**
+   * VRM instance, populated only when format is 'vrm'. Consumers that need
+   * humanoid bone metadata, expressions, or IK should use this; for generic
+   * scene rendering the `scene` field is sufficient.
+   */
+  vrm?: VRM;
 }
 
 export interface ImportLimits {
@@ -352,12 +359,14 @@ export async function importMesh(
 
   // Load based on format
   let scene: THREE.Group;
+  let vrmInstance: VRM | undefined;
 
   switch (format) {
     case 'vrm': {
       // VRM uses its own loader
       const vrm = await loadVRM(url);
       scene = vrm.scene as THREE.Group;
+      vrmInstance = vrm.vrm;
       break;
     }
     case 'obj':
@@ -449,6 +458,7 @@ export async function importMesh(
     heightMm,
     ...stats,
     warnings,
+    vrm: vrmInstance,
   };
 }
 
