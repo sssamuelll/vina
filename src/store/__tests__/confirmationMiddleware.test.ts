@@ -17,7 +17,7 @@ import workflowReducer, { setConfirmOverride } from '../workflowSlice';
 import copilotUIReducer from '../copilotUISlice';
 import projectReducer from '../projectSlice';
 import constructionReducer from '../constructionSlice';
-import { createConfirmationMiddleware } from '../confirmationMiddleware';
+import { confirmationMiddleware } from '../confirmationMiddleware';
 
 // ─── Store factory ────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ function makeStore() {
     },
     middleware: (getDefault) =>
       getDefault({ serializableCheck: false }).concat(
-        createConfirmationMiddleware()
+        confirmationMiddleware
       ),
   });
 }

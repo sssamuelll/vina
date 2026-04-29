@@ -562,111 +562,109 @@ function handleWorkerResult(result: BuildPieceResult): void {
   }
 }
 
-// ─── Middleware Factory ──────────────────────────────────────────────────────
+// ─── Middleware ──────────────────────────────────────────────────────────────
 
 /**
- * Create the reactive solver middleware.
+ * The reactive solver middleware.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
-export function createReactiveSolverMiddleware(): Middleware<{}, any> {
-  return (store) => {
-    // Store dispatch reference for async callbacks
-    storeDispatch = store.dispatch as AppDispatch;
+export const reactiveSolverMiddleware: Middleware<{}, any> = (store) => {
+  // Store dispatch reference for async callbacks
+  storeDispatch = store.dispatch as AppDispatch;
 
-    return (next) => (action: unknown) => {
-      // Let the action go through first
-      const result = next(action);
+  return (next) => (action: unknown) => {
+    // Let the action go through first
+    const result = next(action);
 
-      // Update unresolvedCount when points are removed (removePoint flags dependents)
-      if ((action as AnyAction).type === 'construction/removePoint') {
-        const updatedState = store.getState() as SolverRootState;
-        const count = updatedState.construction.points.filter(
-          (p: CPoint) => p.resolutionError != null
-        ).length;
-        store.dispatch(setUnresolvedCount(count) as AnyAction);
-      }
+    // Update unresolvedCount when points are removed (removePoint flags dependents)
+    if ((action as AnyAction).type === 'construction/removePoint') {
+      const updatedState = store.getState() as SolverRootState;
+      const count = updatedState.construction.points.filter(
+        (p: CPoint) => p.resolutionError != null
+      ).length;
+      store.dispatch(setUnresolvedCount(count) as AnyAction);
+    }
 
-      // Check if this is a trigger action
-      const typedAction = action as AnyAction;
-      const actionType = typedAction.type as string;
-      if (!TRIGGER_ACTIONS.some(trigger => actionType === trigger)) {
-        return result;
-      }
-
-      // Increment generation and cancel stale work
-      const previousGenerationId = state.generationId;
-      state.generationId++;
-
-      if (state.pool && state.poolReady) {
-        state.pool.cancelGeneration(previousGenerationId);
-      }
-
-      // Clear pending debounce
-      if (state.debounceTimer) {
-        clearTimeout(state.debounceTimer);
-        state.debounceTimer = null;
-      }
-
-      // Get current state
-      const reduxState = store.getState();
-
-      // Phase 1: Resolve points synchronously (instant feedback)
-      const { points, errors } = resolvePointsSync(reduxState);
-
-      // Report resolution errors to metrics
-      if (errors.length > 0) {
-        for (const err of errors) {
-          if (state.metrics.errors.length < 10) {
-            state.metrics.errors.push(err.error);
-          }
-        }
-      }
-
-      // Dispatch resolved points (including resolutionError for propagation)
-      if (points.length > 0) {
-        store.dispatch(resolveAll({
-          resolved: points.map(p => ({ id: p.id, x: p.x, y: p.y, resolutionError: p.resolutionError })),
-        }) as AnyAction);
-      }
-
-      // Update unresolved count for UI badge
-      const unresolvedCount = points.filter(p => p.resolutionError != null).length;
-      store.dispatch(setUnresolvedCount(unresolvedCount) as AnyAction);
-
-      // Phase 2: Debounced piece building
-      const debounceMs = calculateDebounceMs();
-      const currentGenerationId = state.generationId;
-
-      // Signal computing started (debounce pending)
-      setComputingState(true);
-
-      state.debounceTimer = setTimeout(() => {
-        // Double-check generation hasn't changed
-        if (currentGenerationId !== state.generationId) {
-          setComputingState(false);
-          return;
-        }
-
-        // Build pieces async
-        buildPiecesAsync(
-          store.dispatch as AppDispatch,
-          store.getState(),
-          currentGenerationId
-        ).catch((error) => {
-          console.error('[ReactiveSolver] Build error:', error);
-        }).finally(() => {
-          // For main thread builds, mark complete immediately
-          // Worker pool builds complete when all pending jobs finish
-          if (state.pendingJobs.size === 0) {
-            setComputingState(false);
-          }
-        });
-      }, debounceMs);
-
+    // Check if this is a trigger action
+    const typedAction = action as AnyAction;
+    const actionType = typedAction.type as string;
+    if (!TRIGGER_ACTIONS.some(trigger => actionType === trigger)) {
       return result;
-    };
+    }
+
+    // Increment generation and cancel stale work
+    const previousGenerationId = state.generationId;
+    state.generationId++;
+
+    if (state.pool && state.poolReady) {
+      state.pool.cancelGeneration(previousGenerationId);
+    }
+
+    // Clear pending debounce
+    if (state.debounceTimer) {
+      clearTimeout(state.debounceTimer);
+      state.debounceTimer = null;
+    }
+
+    // Get current state
+    const reduxState = store.getState();
+
+    // Phase 1: Resolve points synchronously (instant feedback)
+    const { points, errors } = resolvePointsSync(reduxState);
+
+    // Report resolution errors to metrics
+    if (errors.length > 0) {
+      for (const err of errors) {
+        if (state.metrics.errors.length < 10) {
+          state.metrics.errors.push(err.error);
+        }
+      }
+    }
+
+    // Dispatch resolved points (including resolutionError for propagation)
+    if (points.length > 0) {
+      store.dispatch(resolveAll({
+        resolved: points.map(p => ({ id: p.id, x: p.x, y: p.y, resolutionError: p.resolutionError })),
+      }) as AnyAction);
+    }
+
+    // Update unresolved count for UI badge
+    const unresolvedCount = points.filter(p => p.resolutionError != null).length;
+    store.dispatch(setUnresolvedCount(unresolvedCount) as AnyAction);
+
+    // Phase 2: Debounced piece building
+    const debounceMs = calculateDebounceMs();
+    const currentGenerationId = state.generationId;
+
+    // Signal computing started (debounce pending)
+    setComputingState(true);
+
+    state.debounceTimer = setTimeout(() => {
+      // Double-check generation hasn't changed
+      if (currentGenerationId !== state.generationId) {
+        setComputingState(false);
+        return;
+      }
+
+      // Build pieces async
+      buildPiecesAsync(
+        store.dispatch as AppDispatch,
+        store.getState(),
+        currentGenerationId
+      ).catch((error) => {
+        console.error('[ReactiveSolver] Build error:', error);
+      }).finally(() => {
+        // For main thread builds, mark complete immediately
+        // Worker pool builds complete when all pending jobs finish
+        if (state.pendingJobs.size === 0) {
+          setComputingState(false);
+        }
+      });
+    }, debounceMs);
+
+    return result;
   };
-}
+};
 
 // ─── Exports ─────────────────────────────────────────────────────────────────
 
