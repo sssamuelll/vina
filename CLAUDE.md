@@ -196,6 +196,19 @@ Triggers indicating "this axis is already resolved":
 
 Add this as the first ~5–10 minute step of every Fase 2 investigation. The cost is trivial; the savings on axes already resolved is large.
 
+#### Read contents, don't list directories
+
+When a directory appears in the initial investigation, **listing it and categorizing by name or intuition is not enough**. Read the relevant contents explicitly.
+
+- **Anti-pattern:** "geometry/ — utilidades puramente geométricas, no es candidate para C5" — when `geometry/coords.ts` inside has exactly the helper that C5 proposes to create.
+- **Correct pattern:** "geometry/ — leí coords.ts (`screenToPattern` ya existe), transform.ts (handles, no relevante), distance.ts (geom pura, no relevante); de los 15 archivos, coords.ts y transform.ts:68 son relevantes a C5".
+
+The directory's name and the author's prior beliefs about what's inside are not evidence. Reading the file is.
+
+**Precedente C5 (2026-04-29):** the C5 Fase 2 doc initially categorized `src/utils/geometry/` as "no candidate" without reading its contents. `geometry/coords.ts` exported `screenToPattern` (the exact helper C5 proposed creating) and was unused by 20 callsites in 16 files. Failure structurally identical to issue #640 (`formatDimension` exists but unused, 8 sites). Adversarial self-review of PR #641 detected the failure post-doc-commit; rule anchored here to prevent repetition in upcoming (b) ejes (B3-state, B6-state, A3, D3, etc.). Issue #642 captures the unused-helper drift independently.
+
+The cost of reading the relevant files in the directory at inventory time is minutes. The cost of building a Fase 2 doc on the wrong premise is rebuilding it after a reviewer (or yourself, adversarially) catches the omission. Always read.
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
