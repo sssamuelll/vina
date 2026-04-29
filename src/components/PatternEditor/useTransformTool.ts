@@ -11,6 +11,7 @@ import {
   type HandleId,
   type BBox,
 } from '../../utils/geometry/transform';
+import { screenToPattern } from '../../utils/geometry';
 
 interface TransformDragState {
   handleId: HandleId;
@@ -52,12 +53,8 @@ export function useTransformTool(
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );

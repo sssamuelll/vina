@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Point2D, PathCommand, InternalLine } from '../../types/types';
+import { screenToPattern } from '../../utils/geometry';
 
 interface RectState {
   start: Point2D | null;
@@ -39,12 +40,8 @@ export function useRectangleTool(
   stateRef.current = state;
 
   const toPattern = useCallback((e: React.MouseEvent<SVGSVGElement>): Point2D => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    return {
-      x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-      y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-    };
+    const rect = e.currentTarget.getBoundingClientRect();
+    return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
   }, [zoom2D, pan2D]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {

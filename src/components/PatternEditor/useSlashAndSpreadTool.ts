@@ -14,6 +14,7 @@ import { updatePiece } from '../../store/projectSlice';
 import { setToolOption } from '../../store/toolSlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
+import { screenToPattern } from '../../utils/geometry';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
@@ -475,12 +476,8 @@ export function useSlashAndSpreadTool(
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );

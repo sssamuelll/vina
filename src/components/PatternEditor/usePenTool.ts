@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { Point2D, PathCommand, PatternPiece } from '../../types/types';
+import { screenToPattern } from '../../utils/geometry';
 
 /** 
  * A node in the pen path. Each node has an anchor point and optional
@@ -44,12 +45,11 @@ export function usePenTool(
   nodesRef.current = state.nodes;
 
   /** Convert screen coords to pattern space */
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => {
-    return {
-      x: (screenX - svgRect.left - pan.x) / zoom,
-      y: (screenY - svgRect.top - pan.y) / zoom,
-    };
-  }, [zoom, pan]);
+  const toPattern = useCallback(
+    (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+      screenToPattern(screenX, screenY, svgRect, zoom, pan),
+    [zoom, pan],
+  );
 
   /** Distance between two points */
   const dist = (a: Point2D, b: Point2D) => Math.hypot(a.x - b.x, a.y - b.y);

@@ -45,6 +45,9 @@ export function usePolyPenTool(
   const dragStartRef = useRef<Point2D | null>(null);
   const CLOSE_THRESHOLD = 8;
 
+  // C5: divergent formula fix in commit 9 (latent pan/zoom bug — see Fase 2 doc §4.7).
+  // Intentionally NOT migrated to screenToPattern in this commit (8a) to keep
+  // refactor and bug fix as separate atomic commits per audit philosophy.
   const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => ({
     x: (screenX - svgRect.left) / zoom - pan.x,
     y: (screenY - svgRect.top) / zoom - pan.y,

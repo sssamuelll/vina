@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
+import { screenToPattern } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 
 /**
@@ -100,10 +101,11 @@ export function useNotchTool(
 ) {
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => ({
-    x: (screenX - svgRect.left - pan.x) / zoom,
-    y: (screenY - svgRect.top - pan.y) / zoom,
-  }), [zoom, pan]);
+  const toPattern = useCallback(
+    (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+      screenToPattern(screenX, screenY, svgRect, zoom, pan),
+    [zoom, pan],
+  );
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;

@@ -24,6 +24,7 @@ import {
   convertToLine,
   type EditableNode,
 } from './nodeEditorUtils';
+import { screenToPattern } from '../../utils/geometry';
 
 // ─── Constants ───
 
@@ -93,12 +94,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   /** Convert screen coords to pattern-space coords (accounting for pan/zoom) */
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan.x) / zoom,
-        y: (e.clientY - rect.top - pan.y) / zoom,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
     },
     [zoom, pan],
   );

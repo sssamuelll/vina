@@ -9,6 +9,7 @@ import {
   type EditableNode,
   type NodeRef,
 } from './nodeEditorUtils';
+import { screenToPattern } from '../../utils/geometry';
 
 export interface EditCurveState {
   isEditing: boolean;
@@ -36,12 +37,11 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     startPos: Point2D;
   } | null>(null);
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => {
-    return {
-      x: (screenX - svgRect.left - pan.x) / zoom,
-      y: (screenY - svgRect.top - pan.y) / zoom,
-    };
-  }, [zoom, pan]);
+  const toPattern = useCallback(
+    (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+      screenToPattern(screenX, screenY, svgRect, zoom, pan),
+    [zoom, pan],
+  );
 
   const enterEdit = useCallback((pieceId: string, selectedNode?: NodeRef) => {
     const piece = pieces.find(p => p.id === pieceId);

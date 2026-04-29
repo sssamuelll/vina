@@ -28,6 +28,7 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
 }
 import { extractNodes, NodeRef } from './nodeEditorUtils';
+import { screenToPattern } from '../../utils/geometry';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
@@ -236,15 +237,13 @@ export function useEditorInteractions(
     e: React.MouseEvent<SVGSVGElement>,
     piece: PatternPiece
   ): NodeRef | null => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const clickX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-    const clickY = (e.clientY - rect.top - pan2D.y) / zoom2D;
-    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
+
     // Convert to piece-local coordinates
     const localX = clickX - piece.position.x;
     const localY = clickY - piece.position.y;
-    
+
     const nodes = extractNodes(piece);
     const CLICK_THRESHOLD = 8 / zoom2D; // 8 screen pixels
     
@@ -434,10 +433,8 @@ export function useEditorInteractions(
       return;
     }
     if (activeTool === 'select') {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      const clickX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-      const clickY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
       // Check if dragging an endpoint of the currently selected internal line
       if (selectedInternalLine) {
@@ -609,10 +606,9 @@ export function useEditorInteractions(
       const svg = svgRef.current;
       if (svg) {
         const svgRect = svg.getBoundingClientRect();
-        const patternX = (e.clientX - svgRect.left - pan2D.x) / zoom2D;
-        const patternY = (e.clientY - svgRect.top - pan2D.y) / zoom2D;
-        marqueeRef.current.currentPattern = { x: patternX, y: patternY };
-        setSelectMarquee({ start: marqueeRef.current.startPattern, current: { x: patternX, y: patternY } });
+        const patternPoint = screenToPattern(e.clientX, e.clientY, svgRect, zoom2D, pan2D);
+        marqueeRef.current.currentPattern = patternPoint;
+        setSelectMarquee({ start: marqueeRef.current.startPattern, current: patternPoint });
       }
       return;
     }

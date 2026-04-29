@@ -11,6 +11,7 @@ import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
+import { screenToPattern } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
@@ -275,8 +276,7 @@ export default function PatternEditor() {
     // Determine which piece (if any) is under the cursor
     const svg = e.currentTarget as SVGSVGElement;
     const rect = svg.getBoundingClientRect();
-    const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-    const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+    const { x: canvasX, y: canvasY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
     // ── SeamAllowance tool: open CornerTypeMenu when near a vertex ──
     if (activeTool === 'seamAllowance') {
@@ -548,9 +548,7 @@ export default function PatternEditor() {
       const svgEl = svgRef.current;
       if (!svgEl) return;
       const rect = svgEl.getBoundingClientRect();
-      const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-      const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
-      const pt = { x: canvasX, y: canvasY };
+      const pt = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
       if (!calibrationMode.point1) {
         // First click: set point1
@@ -574,9 +572,7 @@ export default function PatternEditor() {
     const svgEl = svgRef.current;
     if (svgEl) {
       const rect = svgEl.getBoundingClientRect();
-      const canvasX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-      const canvasY = (e.clientY - rect.top - pan2D.y) / zoom2D;
-      const pos = { x: canvasX, y: canvasY };
+      const pos = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
       cursorPositionRef.current = pos;
       if (calibrationMode) {
         setCursorPosition(pos);
