@@ -1,0 +1,27 @@
+name: Deploy OpenClo
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Deploy to server
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@13.48.46.19 "mkdir -p /tmp/openclo-deploy/assets /tmp/openclo-deploy/wasm"
+          rsync -az --delete --no-inc-recursive -e "ssh -i ~/.ssh/key -o StrictHostKeyChecking=no" dist/ ubuntu@13.48.46.19:/tmp/openclo-deploy/
+          ssh -i ~/.ssh/key -o StrictHostKeyChecking=no ubuntu@13.48.46.19 "sudo rsync -a --delete /tmp/openclo-deploy/ /var/www/openclo/ && sudo chown -R www-data:www-data /var/www/openclo/"
+          rm -f ~/.ssh/key
