@@ -14,3 +14,14 @@ export function screenToPattern(
     y: (screenY - svgRect.top - pan.y) / zoom,
   };
 }
+
+/**
+ * Convert a screen-pixel length to the equivalent pattern-space length.
+ *
+ * Used for snapping thresholds, hit-test radii, and runtime drag deltas
+ * where the input is a length (delta) rather than a position. Pan offset
+ * does not apply to lengths.
+ */
+export function screenToPatternLength(px: number, zoom: number): number {
+  return px / zoom;
+}
