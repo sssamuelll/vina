@@ -277,7 +277,7 @@ const click = { x: e.clientX, y: e.clientY };  // ScreenXY
 findNearestVertex(piece.outline, click, snapDist); // espera PatternXY
 ```
 
-Sites: el inventario reporta TS error #627 que es exactamente esta clase. La aritmética que coincide en shape (`{x: number, y: number}`) no se distingue por nombre. Hoy: drift documentada en comments. Con branded types: compiler error inmediato.
+Sites: la aritmética que coincide en shape (`{x: number, y: number}`) no se distingue por nombre. Hoy: drift documentada en comments. Con branded types: compiler error inmediato. La clase de bug emparentada — el cast `as unknown as BodyMeasurements` en `src/utils/avatar/avatarLibrary.ts:70` — fue parte de los errores capturados en [#627](https://github.com/sssamuelll/openclo/issues/627) (closed) y **sigue presente como workaround**: el TS no reconoce el shape Record-de-cm como `BodyMeasurements`, así que se castea por la fuerza. Branded types lo eliminarían por construcción.
 
 **Categoría 3: meters vs millimeters at avatar boundary.**
 
@@ -292,14 +292,13 @@ importMesh(url, file, { targetHeightMm: height });  // FAIL si height es Metres
 
 #### 4.5 Bugs documentables ahora pero no contados
 
-Sin telemetry de bugs históricos por causa unit-mismatch, no puedo cuantificar el ROI. Lo que sí sé:
+Sin telemetry de bugs históricos por causa unit-mismatch, no puedo cuantificar el ROI. Lo que sí sé, verificado:
 
-- `avatarLibrary.ts:70` es un cast vergonzoso (`Record<string, number> as BodyMeasurements`) que existe porque el TS no reconoce que el mapping es cm. Branded types lo eliminan.
-- TS error #627 lo causa.
-- Los 4 markers `// C6-impl:` son comments documentando lo que branded types harían automáticamente.
+- `src/utils/avatar/avatarLibrary.ts:70` — `return out as unknown as BodyMeasurements` (verificado vigente en main al 2026-04-29). Existe porque TS no reconoce que el mapping construido es cm. Branded types lo eliminan por construcción. Este cast fue parte de [#627](https://github.com/sssamuelll/openclo/issues/627) (closed) — el issue era más amplio (10+ errores upstream lint+tsc), pero este cast específico se aceptó como workaround y no se removió.
+- Los 4 markers `// C6-impl:` (`AvatarModel.tsx:193,199`, `avatarCollisionMesh.ts:24,30`) son comments documentando lo que branded types harían automáticamente.
 - D drift (issue #639) tiene 5 sitios `* 10` en `easeTracking.ts` que documentan inline lo que branded types harían explícito.
 
-Indicios cualitativos: 3+ ocasiones documentadas en comments / issues / casts que branded types resolverían por construcción.
+Indicios cualitativos: ~6 ocasiones documentadas en comments / issues / casts que branded types resolverían por construcción.
 
 ### Qué se gana en doc / mental load
 
@@ -340,16 +339,14 @@ Tres lecturas posibles, en orden de costo/beneficio:
 
 Razonamiento:
 
-1. **El audit no es momento de imponer un refactor de tipos del tamaño que requiere Q2-A.** Branded types se introducen mejor cuando hay decisión consciente del equipo de pagar el boilerplate, no como side effect de un drift unify. Imponerlos en C5 es mezclar dos decisiones (centralizar conversiones + introducir branded types) en una; cada una merece su evaluación.
-2. **Los bugs documentables son pocos.** TS error #627 + 4 markers C6-impl + cast en avatarLibrary.ts. ~6 sitios totales. Branded types valen su costo cuando los bugs son recurrentes y caros, no cuando son evitables con grep.
-3. **Q2-B es middle ground sin gran ganancia.** Si pagás boilerplate, paga el completo (Q2-A); si no querés pagarlo, helpers nombrados ya son 80% de la disciplina. Q2-B atrapa solo mitad de las clases sin ahorrar mitad del cost.
-4. **Branded types son additive.** Si en 6 meses la drift de unidad reaparece o aparece nueva, el equipo puede introducir branded types entonces, sobre la base limpia que C5 deja con Q2-C. No quemamos opcionalidad.
+1. **Los bugs documentables son pocos relativos al costo.** ~6 sitios contables (cast `avatarLibrary.ts:70`, 4 markers C6-impl, ease/grading inline `* 10`) vs ~80-150 callsites de boilerplate para Q2-A. Branded types valen su costo cuando los bugs son recurrentes y caros; con la evidencia actual, helpers nombrados + grep capturan el 80% del valor a una fracción del costo. Si la base de evidencia crece (ver "Decisión revisable" abajo), la respuesta cambia.
+2. **Q2-B es middle ground sin gran ganancia.** Si pagás boilerplate, paga el completo (Q2-A); si no querés pagarlo, helpers nombrados ya son 80% de la disciplina. Q2-B atrapa solo mitad de las clases sin ahorrar mitad del cost.
+3. **Posponer no preserva opcionalidad gratis.** Introducir branded types en 6 meses cuesta lo mismo o más que introducirlos hoy — el codebase crece, los callsites multiplican. Lo que **sí** ganamos posponiendo: no compramos certeza falsa hoy. Sin telemetry de bug-history y sin roadmap explícito de copilot expansion, Q2-A sería paid based on hunch. Q2-C deja la opción abierta a un costo realista posterior, no menor.
 
-**Pero** mi confianza es **media-baja** específicamente porque:
+**Pero** mi confianza es **media** específicamente porque:
 
 - No conozco bug-history del proyecto. Si en el último año hubo 5+ bugs por unit-mismatch, mi recomendación se invierte hacia Q2-A.
 - Si el roadmap del equipo incluye más copilot tool generation (LLM-written code), branded types compran mucho más (LLMs son particularmente susceptibles a unit-mixing).
-- La "introducción gradual" que propongo es genuinamente más fácil de prometer que ejecutar — los costos crecen con el código.
 
 Vos sabés lo que yo no sé acá. Si decidís Q2-A o Q2-B, el doc se ajusta y la migración cambia. Mi número de S/M/L (sección 6) asume Q2-C; si la decisión es Q2-A, el size sube de L a XL.
 
@@ -431,10 +428,15 @@ Asumiendo Q2-C (helpers nombrados, sin branded types) y Q3-B (módulo `coords/`)
 
 Tu lectura: "L (~25 archivos tocados, 4 helpers nuevos, posibles branded types)". Mi número coincide sin branded types; con branded types completos sale XL. La discrepancia depende solo de Q2.
 
-### Tiempo estimado (rough)
+### Tiempo estimado (rough, con buffer explícito)
 
-- Q2-C + Q3-B: 3-5 commits unify, ~4-6 horas de trabajo continuo (incluyendo tests). Cada commit pasa gates.
-- Q2-A + Q3-B: 8-12 commits unify, ~10-15 horas. Branded types se introducen primero (enable type-checking errors), después se migran callsites por categoría.
+- **Q2-C + Q3-B: 6-9 horas** de trabajo continuo, incluyendo:
+  - 3 helpers nuevos con sus tests (1.5-2h).
+  - 5 commits de migración por categoría con gates (vitest + tsc + eslint) entre cada uno (3-4h).
+  - Buffer explícito para test fixing: si algún test existente falla por sutilezas (precisión float, mock paths, signatures), se respeta el principio "stop, reportá, no improvises". Suma 1-2h en el peor caso (1-3h).
+  - Anchor docs en CLAUDE.md (0.5h).
+  - 4-6h era estimación con cero debugging y gates rápidos; 6-9h es honesta para no presionar el ritmo y terminar con un gate skipped.
+- **Q2-A + Q3-B: 12-18 horas, 8-12 commits.** Branded types se introducen primero (enable type-checking errors), después se migran callsites por categoría. Buffer del 30-40% sobre la estimación nominal por la volatilidad de TS errors en cascada.
 
 ---
 
@@ -463,15 +465,52 @@ Cada commit pasa `npx tsc -b --noEmit && npx eslint --max-warnings=0 <archivos> 
 
 ## 8. Comportamiento idéntico antes/después
 
-Verificación obligatoria por commit:
+Verificación obligatoria por commit. La equivalencia matemática es trivial en todas las categorías; lo no-trivial es **qué tests existentes la cubren end-to-end**. Auditado al 2026-04-29:
 
-- Sites de Categoría A: floats producidos por `m.height/100` deben ser idénticos a `cmToM(m.height)`. Ambos son `value/100`. Trivialmente equivalente.
-- Sites de Categoría B: `mm/1000 === mmToM(mm)`. Trivial.
-- Sites de Categoría C: los `* 1000` y `* 0.001` se sustituyen por `mToMm` y `mmToM`. Trivial.
-- Sites de Categoría F: `(client - rect - pan) / zoom === screenToPatternPoint(e, rect, pan, zoom)`. Trivial pero requiere verificar que la firma del helper recibe `pan2D` y `zoom2D` como están en el caller (no `pan2D.x` desestructurado).
-- Snapping: `N / zoom === screenToPatternLength(N, zoom)`. Trivial.
+### Categoría A — Body cm → world m
 
-Tests existentes en `src/utils/cloth/__tests__/`, `src/components/PatternEditor/__tests__/` y simulation integration tests deben pasar sin modificación. Tests de los helpers nuevos en sus siblings.
+**Cubierta indirectamente.** `src/utils/cloth/__tests__/garmentPlacement.test.ts:86` contiene:
+
+```ts
+const waistH = 168 * 0.55 / 100; // ~0.924
+```
+
+Ese test inline aplica la fórmula `cmToM` que migraremos. Si reemplazo `m.height/100` por `cmToM(m.height)`, este test regresiona si la función no devuelve `value/100`. Suficiente para Cat A sin tests nuevos adicionales — el unit test del helper `cmToM` en `src/utils/coords/__tests__/units.test.ts` ya verificará la fórmula directamente.
+
+### Categoría B — Pattern mm → world m
+
+**No tiene test end-to-end existente** que valide `mm/1000 === mToM(mm)` integrado. Pero la fórmula es la más simple del set y `garmentPlacement.test.ts` tiene tests indirectos sobre `placeGarmentPieces` que consumen el resultado. El unit test del helper `mmToM` en commit 2 (helper creation) cubre el contrato directamente. Suficiente.
+
+### Categoría C — Avatar boundary m ↔ mm (4 markers C6-impl)
+
+**Parcialmente cubierta.** `src/utils/import/__tests__/meshImporter.test.ts` cubre `detectFormat` (8 tests), `detectUnit` (6 tests), `isSupportedFormat`, `DEFAULT_IMPORT_LIMITS`, file size limits con `importMesh`. **NO** hay test directo del flujo integrado `targetHeightMm = height * 1000` + `scene.scale.multiplyScalar(0.001)` en `AvatarModel.tsx` ni `avatarCollisionMesh.ts`.
+
+**Acción requerida:** en el commit del helper `metresToImporter` / `importerToMetres` (commit 4 del plan), agregar test mínimo que verifique:
+- `metresToImporter(1.7).valueMm === 1700` (o equivalente según signature final).
+- `importerToMetres(scene)` aplica `scale.multiplyScalar(0.001)` y verifica con un mock de `THREE.Scene`.
+
+Eso cubre el contrato del helper antes de que la migración de callsites toque `AvatarModel.tsx`.
+
+### Categoría F — Screen → pattern
+
+**No cubierta end-to-end.** Auditado: `src/components/PatternEditor/__tests__/useSlashAndSpreadTool.test.ts` testa la state machine con `OutlineHit` mocks que ya están en pattern coords (líneas 38-48); NO simula `MouseEvent` con `clientX/clientY`, `getBoundingClientRect` ni `pan2D/zoom2D`. Los otros tests del PatternEditor siguen el mismo patrón (mockean coords post-conversión). El uniformly-applied pattern de la conversión hace muy poco probable un bug — pero el "muy poco probable" no es lo que un commit de unify exige.
+
+**Acción requerida:** en el commit del helper `screenToPatternPoint` (commit 3 del plan), agregar test mínimo que verifique:
+- Mock `MouseEvent` con `clientX: 100, clientY: 50`.
+- Mock `rect = { left: 10, top: 5 }`.
+- `pan2D: { x: 20, y: 10 }`, `zoom2D: 2`.
+- Resultado esperado: `{ x: (100-10-20)/2, y: (50-5-10)/2 } === { x: 35, y: 17.5 }`.
+
+Mismo test sirve para `screenToPatternLength(N, zoom) === N/zoom` con un caso simple. Eso cubre el contrato antes de tocar los 11 archivos de PatternEditor.
+
+### Snapping
+
+Cubierta por el test de `screenToPatternLength` arriba. Sin tests adicionales.
+
+### Resumen de gates por commit
+
+- **Commits 2-4** (helpers): cada uno trae sus tests sibling. Los tests cubren el contrato del helper; el contrato es lo que la migración invocará.
+- **Commits 5-9** (migración por categoría): existing tests de `garmentPlacement.test.ts`, `Mannequin.test.tsx`, `meshImporter.test.ts`, `useSlashAndSpreadTool.test.ts` deben pasar sin modificación. Si rompen: stop, reportá, no improvisás fix (per Sam).
 
 ---
 
@@ -484,37 +523,40 @@ Ambas referenciadas explícitamente en sus respectivos README; cualquier futura 
 
 ---
 
-## 10. Preguntas concretas para vos
+## 10. Decisiones tomadas (2026-04-29, post-Sam)
 
-Antes de pasar a Fase 3 (migración), necesito tres respuestas:
+### Q3 — Module colocation: **Q3-B**
 
-### Q3 — Module colocation: A o B?
+`src/utils/coords/` con submódulos (`units.ts` para conversiones de unidad, `pattern.ts` para conversiones espaciales screen↔pattern, `boundaries.ts` para el mapping m↔mm con `importMesh`). El display formatter `formatDimension` queda en `src/utils/units.ts` (legacy) — eventualmente se moverá a `src/utils/display/units.ts` cuando D3 entre en scope, pero ese movimiento es trabajo de D3, no de C5. La separación display layer / conversión interna es la lectura correcta y deja D3 territory limpio.
 
-- **Q3-A**: expandir `src/utils/units.ts`.
-- **Q3-B**: crear `src/utils/coords/` con submódulos.
+### Q2 — Branded types: **Q2-C**
 
-Mi recomendación: **Q3-B con confianza media-alta**, especialmente si Q2 elige branded types.
+Helpers nombrados, sin branded types. Los ~6 sitios documentables no justifican el costo de ~80-150 callsites de boilerplate. Helpers nombrados + grep capturan el ~80% de la disciplina por convención.
 
-### Q2 — Branded types: A, B o C?
+### Q-snapping: incluir como `screenToPatternLength`
 
-- **Q2-A**: completos (`Cm`/`Mm`/`Metres`/`PatternXY`/`ScreenXY`/`WorldXYZ`).
-- **Q2-B**: solo unit-level (`Cm`/`Mm`/`Metres`).
-- **Q2-C**: sin branded types, solo helpers nombrados.
-
-Mi recomendación: **Q2-C con confianza media**. Con caveats: si tenés bug-history que sugiere unit-mismatch recurrente, o roadmap de copilot tool generation pesado, mi recomendación se inverta hacia Q2-A.
-
-### Q-snapping — confirmás o redirigís?
-
-Mi proposal: snapping thresholds **entran al módulo** como helper sibling `screenToPatternLength`. Justificación en sección 5.
-
-Si preferís dejarlos fuera con justificación inline, decímelo.
+Snapping thresholds (`PatternEditor.tsx:283, 324, 364`) entran al módulo como helper sibling. La separación point/length es semántica genuina, no overhead.
 
 ---
 
-## 11. Lo que NO sigue de este doc
+## 11. Decisión revisable: criterios para reabrir Q2 como RFC
 
-- No hay código tocado todavía (working tree limpio post-doc commit).
-- No hay PR pusheado todavía (esperando tu verde sobre Q2 + Q3 antes de Fase 3).
-- No hay commits unify (Fase 3 viene después, atómicos por categoría).
+Q2-C cierra **hoy** sin quemar la opción de Q2-A en el futuro. La adopción posterior de branded types cuesta lo mismo o más, pero hoy no compramos certeza falsa. Para evitar deferir indefinidamente, fijamos triggers objetivos que reabren Q2 como RFC dedicado:
+
+1. **≥3 bugs nuevos por unit-mismatch reportados en los próximos 6 meses** (a partir del 2026-04-29). Cuenta cualquier bug donde la causa raíz documentada sea mezcla cm/mm, screen↔pattern coord swap, o m↔mm cross al borde de `importMesh`.
+2. **Expansión material del roadmap de copilot tool generation.** Si entra en scope generar código LLM-written que toque measurements, `BodyMeasurements`, o coord systems, el ROI de branded types sube significativamente (LLMs son particularmente susceptibles a unit-mixing silencioso).
+3. **C6-impl o D drift (#639) revela patrones de bug que branded types habrían atrapado.** Si durante la implementación o el follow-up de #639 surge un bug que branded types prevendrían por construcción, ese hallazgo cuenta como evidencia.
+
+Cualquiera de los tres triggers reabre Q2 con un RFC dedicado, no automáticamente como sub-task de C5. El RFC reevalúa con la nueva evidencia y decide entre Q2-A, Q2-B, o "mantener Q2-C con triggers actualizados".
+
+Esta sección es **load-bearing**: sin estos triggers, Q2-C sería deferral cobarde. Con ellos, es decisión informada con camino de regreso.
+
+---
+
+## 12. Lo que NO sigue de este doc
+
+- Fase 3 (migración) arranca cuando este commit del doc está en main vía PR ready/merged.
+- No hay branded types introducidos.
+- No hay tocado D drift (#639) ni display formatters (#640) — ambos son follow-ups separados.
 
 **FIN.**
