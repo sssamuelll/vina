@@ -5,6 +5,7 @@
 
 import type { CollisionMeshData } from './collisionMesh';
 import { extractCollisionMesh } from './collisionMesh';
+import { metresToImporter, importerToMetres } from '../geometry';
 
 /**
  * Load avatar model, extract mesh data, and convert to flat CollisionMeshData.
@@ -20,15 +21,11 @@ export async function extractAvatarCollisionMesh(
   const { importMesh } = await import('../import/meshImporter');
 
   const filename = avatarUrl.split('/').pop() || avatarUrl;
-  // avatarHeight is meters; importMesh expects mm.
-  // C6-impl: centralize m→mm conversion at boundary (currently inline pending C6 implementation)
   const result = await importMesh(avatarUrl, filename, {
-    targetHeightMm: avatarHeight * 1000,
+    targetHeightMm: metresToImporter(avatarHeight),
   });
 
-  // importMesh outputs in mm; downstream collision pipeline expects meters.
-  // C6-impl: centralize mm→m conversion at boundary (currently inline pending C6 implementation)
-  result.scene.scale.multiplyScalar(0.001);
+  importerToMetres(result.scene);
   result.scene.updateMatrixWorld(true);
 
   const { vertices, indices, normals } = extractMeshData(result.scene);
