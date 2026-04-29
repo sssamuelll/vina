@@ -281,6 +281,19 @@ When choosing alignment over real fix, the Fase 2 doc must capture the technical
 
 Origin: anchored in B5-state Fase 2 (2026-04-29) when middleware factory pattern was found vestigial. Philosophy applies to all subsequent (b) and (c) ejes where this tension appears.
 
+### Verifying external infrastructure without implicit truncation
+
+When checking the existence of external infrastructure (GitHub labels, files, canonical implementations, registry entries) before assuming a gap, **use commands that don't truncate by default**. The pattern that fails silently is "looked correct, gave false confidence":
+
+- `gh label list | head -30` — caps at 30 labels, silently drops the rest. The correct form is `gh label list --limit 200` (or higher).
+- `tsc --noEmit` — typechecks the root tsconfig which has `"files": []`, so it returns clean even when `src/` has compile errors. The correct form is `tsc -b --noEmit` (already documented under "Gate commands").
+- `grep -l pattern dir/` — exits on first match per file, can miss multiple-match cases the next pipeline stage needs.
+- `find . -name 'X' | head -10` — discards results past 10, hides true scope when the axis is dispersed.
+
+The principle: **before concluding "X doesn't exist" or "the count is N", verify the command exposed the full set rather than a default-truncated slice.** This is the same trap as `tsc --noEmit` vs `tsc -b --noEmit` — the command that looks correct can give false confidence.
+
+Origin: anchored during C8 Fase 2 (2026-04-29) after a `gh label list | head -30` call concluded that `severity:medium` and `follow-up` labels did not exist in the repo, when in fact both were present beyond the 30-line truncation. Issue #635 was opened with incomplete labels as a result, requiring retroactive correction. Apply this rule to any infrastructure check, not only label discovery.
+
 ## Common Tasks
 
 ### Add New Fabric Preset
