@@ -8,44 +8,30 @@ import { extractCollisionMesh } from './collisionMesh';
 
 /**
  * Load avatar model, extract mesh data, and convert to flat CollisionMeshData.
- * Reuses the same avatar loading pipeline as GarmentSimulation.
+ * Routes through the importMesh canonical (covers GLTF/GLB/OBJ/FBX/VRM with
+ * unified unit detection, target-height scaling, center-on-ground, and
+ * MeshImportLimitError safety) — see C8 Fase 2 doc.
  */
 export async function extractAvatarCollisionMesh(
   avatarUrl: string,
   avatarHeight: number,
 ): Promise<CollisionMeshData | null> {
   const { extractMeshData } = await import('./avatarMeshExtractor');
-  const THREE = await import('three');
-  const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-  const { isVRMFile, loadVRM } = await import('../avatar/vrmLoader');
+  const { importMesh } = await import('../import/meshImporter');
 
-  let scene: import('three').Group;
-  if (isVRMFile(avatarUrl)) {
-    const result = await loadVRM(avatarUrl);
-    scene = result.scene;
-  } else {
-    const loader = new GLTFLoader();
-    const gltf = await loader.loadAsync(avatarUrl);
-    scene = gltf.scene as import('three').Group;
-  }
+  const filename = avatarUrl.split('/').pop() || avatarUrl;
+  // avatarHeight is meters; importMesh expects mm.
+  // C6-impl: centralize m→mm conversion at boundary (currently inline pending C6 implementation)
+  const result = await importMesh(avatarUrl, filename, {
+    targetHeightMm: avatarHeight * 1000,
+  });
 
-  // Scale + center (same transforms as AvatarModel.tsx)
-  const box = new THREE.Box3().setFromObject(scene);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  if (size.y > 0) {
-    const scale = avatarHeight / size.y;
-    scene.scale.setScalar(scale);
-    const scaledBox = new THREE.Box3().setFromObject(scene);
-    const scaledCenter = new THREE.Vector3();
-    scaledBox.getCenter(scaledCenter);
-    scene.position.y = -scaledBox.min.y;
-    scene.position.x = -scaledCenter.x;
-    scene.position.z = -scaledCenter.z;
-  }
-  scene.updateMatrixWorld(true);
+  // importMesh outputs in mm; downstream collision pipeline expects meters.
+  // C6-impl: centralize mm→m conversion at boundary (currently inline pending C6 implementation)
+  result.scene.scale.multiplyScalar(0.001);
+  result.scene.updateMatrixWorld(true);
 
-  const { vertices, indices, normals } = extractMeshData(scene);
+  const { vertices, indices, normals } = extractMeshData(result.scene);
   console.log(`[AvatarCollision] extractMeshData: ${vertices.length / 3} verts, ${indices.length / 3} tris, normals=${normals ? normals.length / 3 : 'NONE'}`);
 
   if (vertices.length === 0 || indices.length === 0) return null;
@@ -58,7 +44,5 @@ export async function extractAvatarCollisionMesh(
     index: { array: indices, count: indices.length },
   };
 
-  const result = extractCollisionMesh(geo as Parameters<typeof extractCollisionMesh>[0]);
-
-  return result;
+  return extractCollisionMesh(geo as Parameters<typeof extractCollisionMesh>[0]);
 }
