@@ -8,6 +8,7 @@ import { batchUndo } from '../../store/undoMiddleware';
 import { getTrimPreset } from '../../utils/trim/trimLibrary';
 import { TRIM_DEFAULTS } from '../../types/trim';
 import { interpolateEdgePoint, computeEdgeLengthMM } from '../../utils/geometry/edgeInterpolation';
+import { screenToPattern } from '../../utils/geometry';
 import { uid } from '../../utils/pathHelpers';
 
 const EDGE_HIT_THRESHOLD = 20; // px screen space
@@ -73,10 +74,11 @@ export function useTrimTool(
   const [hoveredEdge, setHoveredEdge] = useState<TrimHover | null>(null);
   const toolOptions = useSelector((s: RootState) => s.tools.toolOptions['trimPlace'] ?? {});
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => ({
-    x: (screenX - svgRect.left - pan.x) / zoom,
-    y: (screenY - svgRect.top - pan.y) / zoom,
-  }), [zoom, pan]);
+  const toPattern = useCallback(
+    (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+      screenToPattern(screenX, screenY, svgRect, zoom, pan),
+    [zoom, pan],
+  );
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;

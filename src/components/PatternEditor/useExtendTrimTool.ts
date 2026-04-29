@@ -5,6 +5,7 @@ import { updatePiece } from '../../store/projectSlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { extendEdge, trimEdgeAtPoint } from '../../utils/patternOps';
 import { flattenPath } from '../../utils/seam/index';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 export interface ExtendTrimState {
   /** Currently hovered snap point (endpoint for extend, point-on-edge for trim) */
@@ -46,12 +47,8 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );
@@ -60,7 +57,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   const findNearestEndpoint = useCallback(
     (pt: Point2D, piece: PatternPiece): ExtendTrimState['hoveredSnap'] => {
       const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
-      const threshold = SNAP_THRESHOLD / zoom2D;
+      const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
       let best: ExtendTrimState['hoveredSnap'] = null;
       let bestDist = Infinity;
 
@@ -122,7 +119,7 @@ export function useExtendTrimTool(zoom2D: number, pan2D: Point2D) {
   const findNearestEdgePoint = useCallback(
     (pt: Point2D, piece: PatternPiece): ExtendTrimState['hoveredSnap'] => {
       const localPt = { x: pt.x - piece.position.x, y: pt.y - piece.position.y };
-      const threshold = SNAP_THRESHOLD / zoom2D;
+      const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
       let best: ExtendTrimState['hoveredSnap'] = null;
       let bestDist = Infinity;
 

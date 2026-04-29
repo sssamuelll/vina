@@ -196,6 +196,39 @@ Triggers indicating "this axis is already resolved":
 
 Add this as the first ~5–10 minute step of every Fase 2 investigation. The cost is trivial; the savings on axes already resolved is large.
 
+#### Read contents, don't list directories
+
+When a directory appears in the initial investigation, **listing it and categorizing by name or intuition is not enough**. Read the relevant contents explicitly.
+
+- **Anti-pattern:** "geometry/ — utilidades puramente geométricas, no es candidate para C5" — when `geometry/coords.ts` inside has exactly the helper that C5 proposes to create.
+- **Correct pattern:** "geometry/ — leí coords.ts (`screenToPattern` ya existe), transform.ts (handles, no relevante), distance.ts (geom pura, no relevante); de los 15 archivos, coords.ts y transform.ts:68 son relevantes a C5".
+
+The directory's name and the author's prior beliefs about what's inside are not evidence. Reading the file is.
+
+**Precedente C5 (2026-04-29):** the C5 Fase 2 doc initially categorized `src/utils/geometry/` as "no candidate" without reading its contents. `geometry/coords.ts` exported `screenToPattern` (the exact helper C5 proposed creating) and was unused by 20 callsites in 16 files. Failure structurally identical to issue #640 (`formatDimension` exists but unused, 8 sites). Adversarial self-review of PR #641 detected the failure post-doc-commit; rule anchored here to prevent repetition in upcoming (b) ejes (B3-state, B6-state, A3, D3, etc.). Issue #642 captures the unused-helper drift independently.
+
+The cost of reading the relevant files in the directory at inventory time is minutes. The cost of building a Fase 2 doc on the wrong premise is rebuilding it after a reviewer (or yourself, adversarially) catches the omission. Always read.
+
+#### Verify divergence, don't assume uniformity by grep
+
+When a grep returns N callsites with shape that "looks similar", do NOT assume N uniform implementations. Read the formula in each callsite before classifying as "uniformly migratable". Shape-similar can hide math-different.
+
+- **Anti-pattern:** grep `rect\.left - pan` returns 20 hits across 16 files; conclude "20 uniform sites, mechanical migration". Doc claims "Cero divergencia semántica verificada" without reading each file.
+- **Correct pattern:** for each hit, read the surrounding line. Verify operator order (e.g., `(screen - rect - pan) / zoom` vs `(screen - rect) / zoom - pan` are mathematically distinct under zoom != 1 + pan != 0). Classify each as "uniform" or "divergent" with explicit math.
+
+**Precedente C5 (2026-04-29):** the C5 Fase 2 doc claimed "20 callsites uniform" for screen→pattern conversion. Adversarial self-review revealed `usePolyPenTool.ts:48-51` has a shape-similar formula `(screenX - svgRect.left) / zoom - pan.x` that is **mathematically incorrect** for the SVG transform `translate(pan) scale(zoom)` actually used. Pan applied after zoom division produces visible offset = `pan * (zoom - 1) / zoom` under combined pan + zoom. Bug latent for any user with non-zero pan and non-unit zoom — observable but undetected because preview/persistence used the same buggy `toPattern`, masking the divergence in the `CLOSE_THRESHOLD` self-test. Issue #642 split into "20 uniform sites" (commit 8a) + "1 divergent site" (commit 9 fix). The lesson: greps that look uniform may not be — read each match.
+
+#### Look outside the obvious directory
+
+When the drift pattern is **semantic**, not **structural**, consumers may live in directories you wouldn't search. Drift is defined by what code *does*, not where it lives. A grep filtered to the directory where a pattern "naturally appears" misses sibling consumers in adjacent directories.
+
+- **Anti-pattern:** grep `THRESHOLD / zoom` constrained to `src/components/PatternEditor/` because that's where most threshold logic lives; conclude "13 sites" and stop.
+- **Correct pattern:** grep `THRESHOLD / zoom` from `src/` root, filter by content (the pattern), not by path. If the eje is "screen-pixel snapping", any consumer of that concept is in scope, regardless of directory.
+
+**Precedente C5 (2026-04-29):** the snapping count progression illustrates location bias. Inventory: 6 sites. Self-review iteration 1: 13 sites (still PatternEditor-centric grep). External reviewer: 18 sites (added some PatternEditor sites missed). Self-review iteration 2 with iterative refinement (after Sam's regla 1 v2): 23 sites. The +5 from the final iteration include `src/hooks/useElasticTool.ts:34` — same threshold semantic, different directory, missed by every prior grep that filtered to PatternEditor. Each iteration was better than the previous; the empirical lower-bound progression `6 → 13 → 18 → 23` is the cost of location bias compounded by primitive specialization.
+
+This corolary co-applies with "Read contents, don't list directories": both are forms of the same parent rule — **inventory counts are lower bounds, and the path to the upper bound is iterative refinement of where you look and what you read.**
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.

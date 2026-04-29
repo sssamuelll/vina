@@ -5,6 +5,7 @@ import { addPiece, removePiece, removeSeam } from '../../store/projectSlice';
 import type { Point2D, PatternPiece } from '../../types/types';
 import { mergePieces } from '../../utils/patternOps';
 import { findSharedEdge } from '../../utils/geometry/mergeOutline';
+import { screenToPattern } from '../../utils/geometry';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 
 export interface MergeState {
@@ -33,12 +34,8 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );
@@ -153,7 +150,6 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
   );
 
   const handleMouseMove = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_e: React.MouseEvent<SVGSVGElement>) => {
       // Could add hover highlighting in the future
     },

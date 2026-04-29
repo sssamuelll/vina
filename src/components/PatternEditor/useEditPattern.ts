@@ -24,6 +24,7 @@ import {
   convertToLine,
   type EditableNode,
 } from './nodeEditorUtils';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 // ─── Constants ───
 
@@ -93,12 +94,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   /** Convert screen coords to pattern-space coords (accounting for pan/zoom) */
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan.x) / zoom,
-        y: (e.clientY - rect.top - pan.y) / zoom,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
     },
     [zoom, pan],
   );
@@ -116,7 +113,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   );
 
   /** Hit radius in pattern-space units */
-  const hitRadius = HIT_RADIUS_PX / zoom;
+  const hitRadius = screenToPatternLength(HIT_RADIUS_PX, zoom);
 
   // ─── Helper: get current piece ───
 
@@ -317,8 +314,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // Active drag
       if (drag) {
         if (drag.type === 'node' || drag.type === 'segment') {
-          const dx = (e.clientX - drag.startMouse.x) / zoom;
-          const dy = (e.clientY - drag.startMouse.y) / zoom;
+          const dx = screenToPatternLength(e.clientX - drag.startMouse.x, zoom);
+          const dy = screenToPatternLength(e.clientY - drag.startMouse.y, zoom);
 
           let outline = piece.outline;
           for (const [cmdIdx, startPos] of drag.startPositions) {

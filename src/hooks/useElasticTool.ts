@@ -7,6 +7,7 @@ import { ELASTIC_DEFAULTS } from '../types/types';
 import { uid } from '../utils/pathHelpers';
 import { screenToPattern, resolveEdgeName, EDGE_HIT_THRESHOLD } from '../components/PatternEditor/sewingUtils';
 import { getEdgeEndpoints } from '../utils/geometry/path';
+import { screenToPatternLength } from '../utils/geometry';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ export function findNearestEdgeOnPiece(
   const cmds = piece.outline;
   const ox = piece.position?.x ?? 0;
   const oy = piece.position?.y ?? 0;
-  const threshold = EDGE_HIT_THRESHOLD / zoom;
+  const threshold = screenToPatternLength(EDGE_HIT_THRESHOLD, zoom);
 
   let best: { edgeIndex: number; midpoint: Point2D; dist: number } | null = null;
 

@@ -28,20 +28,10 @@ export const VERTEX_SNAP_THRESHOLD = 10; // px in screen space
 
 /**
  * Convert screen coordinates to pattern space.
+ * Re-exported from canonical geometry/coords.ts (C5 unification).
  * Pure function — wrap in useCallback within each hook.
  */
-export function screenToPattern(
-  screenX: number,
-  screenY: number,
-  svgRect: DOMRect,
-  zoom: number,
-  pan: Point2D,
-): Point2D {
-  return {
-    x: (screenX - svgRect.left - pan.x) / zoom,
-    y: (screenY - svgRect.top - pan.y) / zoom,
-  };
-}
+export { screenToPattern } from '../../utils/geometry';
 
 /**
  * Resolve a semantic edge name from a segment index.

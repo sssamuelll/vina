@@ -5,6 +5,7 @@ import { addPiece, removePiece, addSeam, updatePiece } from '../../store/project
 import type { Point2D, PatternPiece, Seam } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { newId } from '../../utils/ids';
@@ -43,12 +44,8 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );
@@ -79,7 +76,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
         }
       }
 
-      const threshold = SNAP_THRESHOLD / zoom2D;
+      const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
       return bestDist <= threshold ? bestPt : null;
     },
     [zoom2D],

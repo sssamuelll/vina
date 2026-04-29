@@ -9,6 +9,7 @@ import {
   type EditableNode,
   type NodeRef,
 } from './nodeEditorUtils';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 export interface EditCurveState {
   isEditing: boolean;
@@ -36,12 +37,11 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     startPos: Point2D;
   } | null>(null);
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => {
-    return {
-      x: (screenX - svgRect.left - pan.x) / zoom,
-      y: (screenY - svgRect.top - pan.y) / zoom,
-    };
-  }, [zoom, pan]);
+  const toPattern = useCallback(
+    (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+      screenToPattern(screenX, screenY, svgRect, zoom, pan),
+    [zoom, pan],
+  );
 
   const enterEdit = useCallback((pieceId: string, selectedNode?: NodeRef) => {
     const piece = pieces.find(p => p.id === pieceId);
@@ -76,7 +76,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     const piece = pieces.find(p => p.id === state.editingPieceId);
     if (!piece) return false;
 
-    const HIT = 8 / zoom;
+    const HIT = screenToPatternLength(8, zoom);
 
     // Check control points first (they should be clickable above anchors)
     for (const node of state.nodes) {
@@ -110,8 +110,8 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     if (!state.isEditing || !state.editingPieceId) return false;
 
     if (dragRef.current) {
-      const dx = (e.clientX - dragRef.current.startMouse.x) / zoom;
-      const dy = (e.clientY - dragRef.current.startMouse.y) / zoom;
+      const dx = screenToPatternLength(e.clientX - dragRef.current.startMouse.x, zoom);
+      const dy = screenToPatternLength(e.clientY - dragRef.current.startMouse.y, zoom);
       const newPos: Point2D = {
         x: dragRef.current.startPos.x + dx,
         y: dragRef.current.startPos.y + dy,
@@ -136,7 +136,7 @@ export function useEditCurve(zoom: number, pan: Point2D) {
     const svg = e.currentTarget;
     const rect = svg.getBoundingClientRect();
     const pt = toPattern(e.clientX, e.clientY, rect);
-    const HIT = 8 / zoom;
+    const HIT = screenToPatternLength(8, zoom);
 
     let hovered: NodeRef | null = null;
     for (const node of state.nodes) {

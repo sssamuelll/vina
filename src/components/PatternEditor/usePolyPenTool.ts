@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Point2D, PathCommand, PatternPiece, InternalLineType } from '../../types/types';
+import { screenToPattern } from '../../utils/geometry';
 
 export interface PolyPenNode {
   point: Point2D;
@@ -45,10 +46,11 @@ export function usePolyPenTool(
   const dragStartRef = useRef<Point2D | null>(null);
   const CLOSE_THRESHOLD = 8;
 
-  const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D => ({
-    x: (screenX - svgRect.left) / zoom - pan.x,
-    y: (screenY - svgRect.top) / zoom - pan.y,
-  }), [zoom, pan]);
+  const toPattern = useCallback(
+    (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
+      screenToPattern(screenX, screenY, svgRect, zoom, pan),
+    [zoom, pan],
+  );
 
   const reset = useCallback(() => {
     nodesRef.current = [];

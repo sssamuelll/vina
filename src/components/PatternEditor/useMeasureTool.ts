@@ -7,6 +7,7 @@ import { flattenPath } from '../../utils/seam/index';
 import { computePathArcLength, samplePathAtIntervals, samplePathDense, distanceAlongPath, pointAtPathDistance } from '../../utils/geometry/arcLength';
 import type { ArcLengthSample } from '../../utils/geometry/arcLength';
 import { screenToPattern } from './sewingUtils';
+import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 
 // ─── Types ───
@@ -92,7 +93,7 @@ export function snapToOutline(
     }
   }
 
-  const threshold = SNAP_THRESHOLD / zoom;
+  const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom);
   if (bestDist <= threshold && bestPt) {
     return { point: bestPt, pieceId: piece.id, segmentIndex: bestSegment };
   }

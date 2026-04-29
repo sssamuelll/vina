@@ -28,6 +28,7 @@ function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: numb
   return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
 }
 import { extractNodes, NodeRef } from './nodeEditorUtils';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 const MEASURE_TOOL_IDS = new Set(['measure', 'measureCurve', 'compareCurves']);
 
@@ -236,17 +237,15 @@ export function useEditorInteractions(
     e: React.MouseEvent<SVGSVGElement>,
     piece: PatternPiece
   ): NodeRef | null => {
-    const svg = e.currentTarget;
-    const rect = svg.getBoundingClientRect();
-    const clickX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-    const clickY = (e.clientY - rect.top - pan2D.y) / zoom2D;
-    
+    const rect = e.currentTarget.getBoundingClientRect();
+    const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
+
     // Convert to piece-local coordinates
     const localX = clickX - piece.position.x;
     const localY = clickY - piece.position.y;
-    
+
     const nodes = extractNodes(piece);
-    const CLICK_THRESHOLD = 8 / zoom2D; // 8 screen pixels
+    const CLICK_THRESHOLD = screenToPatternLength(8, zoom2D); // 8 screen pixels
     
     for (const node of nodes) {
       const dx = localX - node.position.x;
@@ -434,10 +433,8 @@ export function useEditorInteractions(
       return;
     }
     if (activeTool === 'select') {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      const clickX = (e.clientX - rect.left - pan2D.x) / zoom2D;
-      const clickY = (e.clientY - rect.top - pan2D.y) / zoom2D;
+      const rect = e.currentTarget.getBoundingClientRect();
+      const { x: clickX, y: clickY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
       // Check if dragging an endpoint of the currently selected internal line
       if (selectedInternalLine) {
@@ -449,7 +446,7 @@ export function useEditorInteractions(
             if (endpoints) {
               const localX = clickX - ilPiece.position.x;
               const localY = clickY - ilPiece.position.y;
-              const EP_THRESHOLD = 8 / zoom2D;
+              const EP_THRESHOLD = screenToPatternLength(8, zoom2D);
               for (let i = 0; i < 2; i++) {
                 if (Math.hypot(localX - endpoints[i].x, localY - endpoints[i].y) <= EP_THRESHOLD) {
                   internalLineDragRef.current = {
@@ -493,7 +490,7 @@ export function useEditorInteractions(
           // Check if clicking on an internal line
           const localX = clickX - piece.position.x;
           const localY = clickY - piece.position.y;
-          const LINE_THRESHOLD = 5 / zoom2D;
+          const LINE_THRESHOLD = screenToPatternLength(5, zoom2D);
           let nearestLine: InternalLine | null = null;
           let nearestDist = Infinity;
           for (const line of piece.internals) {
@@ -551,8 +548,8 @@ export function useEditorInteractions(
       return;
     }
     if (internalLineDragRef.current && activeTool === 'select') {
-      const dx = (e.clientX - internalLineDragRef.current.startMouse.x) / zoom2D;
-      const dy = (e.clientY - internalLineDragRef.current.startMouse.y) / zoom2D;
+      const dx = screenToPatternLength(e.clientX - internalLineDragRef.current.startMouse.x, zoom2D);
+      const dy = screenToPatternLength(e.clientY - internalLineDragRef.current.startMouse.y, zoom2D);
       const newPos: Point2D = {
         x: internalLineDragRef.current.startPos.x + dx,
         y: internalLineDragRef.current.startPos.y + dy,
@@ -589,8 +586,8 @@ export function useEditorInteractions(
       return;
     }
     if (dragRef.current && activeTool === 'select') {
-      const dx = (e.clientX - dragRef.current.startMouse.x) / zoom2D;
-      const dy = (e.clientY - dragRef.current.startMouse.y) / zoom2D;
+      const dx = screenToPatternLength(e.clientX - dragRef.current.startMouse.x, zoom2D);
+      const dy = screenToPatternLength(e.clientY - dragRef.current.startMouse.y, zoom2D);
       const newX = dragRef.current.startPos.x + dx;
       const newY = dragRef.current.startPos.y + dy;
       // Update SVG transform directly during drag (no Redux dispatch)
@@ -609,10 +606,9 @@ export function useEditorInteractions(
       const svg = svgRef.current;
       if (svg) {
         const svgRect = svg.getBoundingClientRect();
-        const patternX = (e.clientX - svgRect.left - pan2D.x) / zoom2D;
-        const patternY = (e.clientY - svgRect.top - pan2D.y) / zoom2D;
-        marqueeRef.current.currentPattern = { x: patternX, y: patternY };
-        setSelectMarquee({ start: marqueeRef.current.startPattern, current: { x: patternX, y: patternY } });
+        const patternPoint = screenToPattern(e.clientX, e.clientY, svgRect, zoom2D, pan2D);
+        marqueeRef.current.currentPattern = patternPoint;
+        setSelectMarquee({ start: marqueeRef.current.startPattern, current: patternPoint });
       }
       return;
     }
@@ -654,7 +650,7 @@ export function useEditorInteractions(
       const my1 = Math.min(mq.startPattern.y, mq.currentPattern.y);
       const mx2 = Math.max(mq.startPattern.x, mq.currentPattern.x);
       const my2 = Math.max(mq.startPattern.y, mq.currentPattern.y);
-      const MIN_DRAG = 3 / zoom2D;
+      const MIN_DRAG = screenToPatternLength(3, zoom2D);
       if (mx2 - mx1 > MIN_DRAG || my2 - my1 > MIN_DRAG) {
         const hitIds: string[] = [];
         for (const piece of pieces) {

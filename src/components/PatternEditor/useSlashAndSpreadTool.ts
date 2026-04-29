@@ -14,6 +14,7 @@ import { updatePiece } from '../../store/projectSlice';
 import { setToolOption } from '../../store/toolSlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
@@ -120,7 +121,7 @@ function snapToOutline(
     }
   }
 
-  const threshold = SNAP_THRESHOLD / zoom2D;
+  const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
   return bestDist <= threshold ? bestPt : null;
 }
 
@@ -275,7 +276,7 @@ export function transitionMouseDown(
       y: pt.y - piece.position.y,
     };
 
-    const threshold = PIVOT_THRESHOLD / zoom2D;
+    const threshold = screenToPatternLength(PIVOT_THRESHOLD, zoom2D);
     const d1 = dist2D(localPt, state.hit1.point);
     const d2 = dist2D(localPt, state.hit2.point);
 
@@ -475,12 +476,8 @@ export function useSlashAndSpreadTool(
 
   const toPattern = useCallback(
     (e: React.MouseEvent<SVGSVGElement>): Point2D => {
-      const svg = e.currentTarget;
-      const rect = svg.getBoundingClientRect();
-      return {
-        x: (e.clientX - rect.left - pan2D.x) / zoom2D,
-        y: (e.clientY - rect.top - pan2D.y) / zoom2D,
-      };
+      const rect = e.currentTarget.getBoundingClientRect();
+      return screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
     },
     [zoom2D, pan2D],
   );
@@ -505,7 +502,6 @@ export function useSlashAndSpreadTool(
     }
 
     // Strip signals before storing state
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { _applyPiece, _toggleMode, ...cleanState } = result;
     setState(cleanState);
   }, [dispatch, toolOptions.mode]);

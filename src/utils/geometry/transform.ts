@@ -1,4 +1,5 @@
 import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
+import { screenToPatternLength } from './coords';
 
 export type HandleId = 'nw' | 'n' | 'ne' | 'w' | 'e' | 'sw' | 's' | 'se' | 'rotate';
 
@@ -65,7 +66,7 @@ export function computeHandlePositions(bbox: BBox, zoom = 1): HandlePosition[] {
   const { x, y, width, height } = bbox;
   const cx = x + width / 2;
   const cy = y + height / 2;
-  const armLen = ROTATION_ARM_LENGTH / zoom;
+  const armLen = screenToPatternLength(ROTATION_ARM_LENGTH, zoom);
 
   return [
     { id: 'nw', pos: { x, y }, cursor: 'nwse-resize' },

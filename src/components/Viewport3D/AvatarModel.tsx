@@ -9,6 +9,7 @@ import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, cle
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
 import { isVRMFile, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
 import { detectFormat, importMesh, type MeshFormat } from '../../utils/import/meshImporter';
+import { metresToImporter, importerToMetres } from '../../utils/geometry';
 // WebGPURenderer always uses NodeMaterial — legacy MeshDepthMaterial (shadows) unsupported
 const nodeMaterialActive = true;
 import type { VRM } from '@pixiv/three-vrm';
@@ -189,15 +190,11 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     const filename = url.split('/').pop() || url;
 
     importMesh(url, filename, {
-      // height is meters; importMesh expects mm.
-      // C6-impl: centralize m→mm conversion at boundary (currently inline pending C6 implementation)
-      targetHeightMm: height * 1000,
+      targetHeightMm: metresToImporter(height),
     }).then((result) => {
       if (cancelled) return;
 
-      // importMesh outputs in mm; Three.js viewport convention is meters.
-      // C6-impl: centralize mm→m conversion at boundary (currently inline pending C6 implementation)
-      result.scene.scale.multiplyScalar(0.001);
+      importerToMetres(result.scene);
       result.scene.updateMatrixWorld(true);
 
       setImportedScene(result.scene);
