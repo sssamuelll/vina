@@ -205,3 +205,75 @@ No respondo esto en este doc. Lo dejo abierto para vos.
 ---
 
 **FIN FASE 2 B5-state.** Awaiting Sam's decision on Pregunta 1 (philosophy) y Pregunta 2 (option 1/2/3) antes de Fase 3.
+
+---
+
+## 7. Decisión post-Sam (2026-04-29)
+
+### Pregunta 1 — Filosofía del audit
+
+Sam: **"Depende del eje, con criterio explícito."** No es respuesta evasiva — es la única respuesta honesta. Una regla universal del tipo "siempre arreglar el problema real" o "siempre consistencia" lleva a malas decisiones donde la otra opción es correcta.
+
+Criterios anclados (capturados en `CLAUDE.md` como guidance audit-wide):
+
+- **Arreglar el problema real** cuando: code smell tiene impacto observable (bugs, perf, riesgo de regresión silenciosa), O blast radius del fix es contenible (no abre sub-ejes en cascada), O el problema empeora con el tiempo si no se toca.
+- **Priorizar consistencia** cuando: smell es estable (no se manifiesta como bug, no degrada), O blast radius del fix real es desproporcionado al beneficio, O el "fix real" requiere decisiones arquitectónicas que merecen su propio eje formal.
+
+Los criterios no son ortogonales — frecuentemente apuntan en direcciones distintas y la decisión es juicio. El anti-patrón cobarde a evitar es **alineación con docs decorativas** ("by historical reasons") que ratifica el smell como design sin análisis.
+
+### Pregunta 2 — Opción para B5-state
+
+**Opción 1 confirmada.** Aplicación de los criterios al eje:
+
+- ¿Impacto observable? `shutdownSolver()` es workaround conocido, documentado, funcional. **No causa bugs, no degrada perf, no introduce riesgo silencioso.** Feo, no roto.
+- ¿Blast radius contenible? **No.** Mi propio reporte muestra que Opción 2 abre sub-RFC oculto sobre cómo exponer APIs públicas que hoy son module-level. Eso es exactamente "abre sub-ejes en cascada".
+- ¿Empeora con el tiempo? **No.** Factory pattern vestigial es estable.
+- ¿Opción 3 es viable? **No.** Mi reporte muestra que aplicar la regla limpiamente (3.a) es Opción 2 con un middleware menos. 3.b es Opción 1 maquillada con discurso.
+
+Opción 1 es **proporcional al problema, no cobarde**. Cobarde sería 3.b (alinear sin tocar y pretender que se hizo algo). Opción 1 es honesta: alinea el patrón, deja `shutdownSolver()` como deuda explícitamente capturada (sección 8 abajo), y si el smell empieza a causar bugs reales se reabre como su propio eje con sub-RFC formal.
+
+### Pregunta 3 — Alcance del unify
+
+Sam: si factory function tiene 0 consumers en producción → removelo y exportá const directo. Si 1+ consumers → mantenelo como wrapper deprecated.
+
+**Verificación final:** `createConfirmationMiddleware` y `createReactiveSolverMiddleware` solo importados por:
+
+- `src/store/index.ts:24, 27` — wiring del store.
+- `src/store/__tests__/confirmationMiddleware.test.ts` — test setup.
+- `src/store/__tests__/reactiveSolverMiddleware.test.ts` — test setup.
+
+**0 consumers en producción.** El factory function se remueve. El unify exporta `const xxxMiddleware: Middleware = ...` directo.
+
+---
+
+## 8. Deuda técnica explícita post-unify
+
+**Smell:** Module-level state in middleware requires explicit reset workaround in tests.
+
+**Manifestación concreta:** `src/store/__tests__/reactiveSolverMiddleware.test.ts:128`:
+
+```ts
+beforeEach(() => {
+  vi.useFakeTimers();
+  shutdownSolver(); // Reset module-level state between tests
+  store = createTestStore();
+});
+```
+
+El comentario inline es el codebase mismo confesando que la arquitectura actual no proporciona test isolation por construcción. **Post-unify de Opción 1, ese comentario y el `shutdownSolver()` call siguen ahí** — el unify no los toca.
+
+**Otros middleware con la misma forma de smell** (no tienen el workaround porque no tienen tests con el problema, o lo tienen masked):
+
+- `src/store/confirmationMiddleware.ts:85` — `let persistTimer` module-level. Su debounced timer probablemente se auto-limpia vía `clearTimeout` en cada dispatch, masking el problema sin un workaround explícito.
+- `src/store/linkedEditingMiddleware.ts:6` — `let isSyncing = false` module-level. Re-entry guard auto-clearing.
+- `src/store/undoMiddleware.ts:8-9, 55, 117-118` — múltiples piezas de state module-level (callbacks, history, listeners).
+
+**Candidato a futuro eje cuando Opción 2 sea justificada:** "Module-level middleware state — proper closure encapsulation". Las condiciones que justificarían tomarlo:
+
+1. Bug observado en producción atribuible a state shared entre stores (ej. HMR durante dev causando state stale, multi-store escenarios).
+2. Aparición de patrón "create middleware with config" que naturalmente quiere closure (ej. parametrizar `MAX_HISTORY` en undoMiddleware por test/prod).
+3. Crecimiento de superficie de testing donde más middleware necesitan reset explícito (en cuyo caso la deuda crece y la balance criterios cambia).
+
+**Forma esperada del futuro eje:** sub-RFC de exposición de APIs públicas (2.a/2.b/2.c en sección 2), posiblemente categoría (c) RFC propio. **NO** se abre como issue separada hoy — vive como input para futura decisión.
+
+**Captura de cross-eje observation:** la convención emergente "control actions > meta flags" del addendum 2026-04-29 es input para B3-state, no para este eje (per directiva de Sam: "no metas en B5-state — es B3-state").
