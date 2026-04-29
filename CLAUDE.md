@@ -294,6 +294,21 @@ The principle: **before concluding "X doesn't exist" or "the count is N", verify
 
 Origin: anchored during C8 Fase 2 (2026-04-29) after a `gh label list | head -30` call concluded that `severity:medium` and `follow-up` labels did not exist in the repo, when in fact both were present beyond the 30-line truncation. Issue #635 was opened with incomplete labels as a result, requiring retroactive correction. Apply this rule to any infrastructure check, not only label discovery.
 
+### Inventory misclassification is itself drift to capture
+
+When a Fase 2 investigation reveals that the inventory's classification of an eje is incorrect (drift cosmético that is actually architectural; drift that is actually intentional feature; drift that is actually three roles correctly distinguished; drift that no longer exists because canonical infrastructure pre-existed), close the eje by **ratification with the corrected classification**. Do NOT force the eje to fit the original inventory premise. The Fase 2 doc captures the reclassification as legitimate audit output — the inventory is corrected, not the code.
+
+Repeated cases observed during the 2026-04-28/29 audit:
+
+- **B12-state** — inventory said "drift cosmético, NEW_PROJECT reset coverage". Investigation revealed `newProjectRegistry.ts` + 27 invariant tests pre-existed. Closed by ratification, zero code change.
+- **C7** — inventory said "drift, custom pan re-implements OrbitControls". Investigation revealed the custom pan is intentional feature with deliberately different semantics (preserves orbit-around-avatar). Closed as no-drift, misclassified.
+- **B5-state** — inventory said "drift cosmético, factory vs const middleware". Investigation revealed factory pattern is vestigial (state at module-level in 5/5 middlewares regardless of pattern), making the question architectural (consistency vs real fix), not cosmetic. Reclassified (a) → (b). Closed via Option 1 (consistency alignment with explicit technical debt captured).
+- **D1-cosmetic** — inventory said "drift cosmético, 3 casings of grainLine". Investigation revealed the 3 variants are 3 distinct linguistic roles (PascalCase types, camelCase properties, lowercase compound discriminated-union literals) all following TS standard and codebase precedent (InternalLineType + TopstitchMode siblings). Closed by ratification, zero code change.
+
+Pattern recognized: the inventory was a rapid snapshot; deep investigation reveals real shape. Generalizes prior rule "Inventory axis counts are lower bounds, not upper bounds" → **inventory classifications are also starting points, not conclusions**. Ratification by reclassification preserves audit honesty and avoids forcing artifact-of-classification work.
+
+When the reclassification is itself a useful artifact (e.g., D5 was downgraded from (a) to (b) during D1-cosmetic Fase 2 investigation), capture it as an appendix in the current eje's Fase 2 doc with cross-reference to the affected inventory entry, so the next session reading the inventory sees the correction without losing the original premise.
+
 ## Common Tasks
 
 ### Add New Fabric Preset
