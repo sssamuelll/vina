@@ -10,6 +10,7 @@
  */
 
 import { getPhysicalFabric } from './physicalFabric';
+import { mmToM } from '../geometry';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export function computeLayerOffset(
     totalThicknessMm += lookupFabricThickness(p.fabricId);
   }
 
-  return totalThicknessMm / 1000;
+  return mmToM(totalThicknessMm);
 }
 
 // ─── buildMarginArray ─────────────────────────────────────────────────────────

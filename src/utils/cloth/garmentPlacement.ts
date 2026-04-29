@@ -11,6 +11,7 @@
 
 import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
+import { mmToM } from '../geometry';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -182,7 +183,7 @@ export function computePlacement(
   const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
 
   // Piece height in meters (for vertical centering)
-  const pH = pieceGeometry.heightMm / 1000;
+  const pH = mmToM(pieceGeometry.heightMm);
 
   // Both PieceMesh and CDT mesher now output pieces in XZ plane (Y=0).
   // Pattern X → 3D X (width), Pattern Y → 3D Z (height/length).

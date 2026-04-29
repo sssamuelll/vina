@@ -14,6 +14,8 @@
  * @module fitMaps
  */
 
+import { mmToM } from '../geometry';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /** Which fit map visualization is active. */
@@ -206,7 +208,7 @@ export function computeStressMap(
   // tensile strength (N/5cm) = force at break over 5cm strip width
   // E ≈ tensileStrength / (maxStretch × crossSectionArea)
   // crossSection ≈ thickness(m) × 0.05(m)
-  const thicknessM = fabric.thickness / 1000;
+  const thicknessM = mmToM(fabric.thickness);
   const crossSection = thicknessM * 0.05; // 5cm strip
   const maxStretch = Math.max(fabric.maxStretchRatio, 0.01);
   // Average tensile strength — we use fabric.weight as a proxy if needed
