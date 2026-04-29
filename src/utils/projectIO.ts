@@ -9,7 +9,6 @@
 
 import type { PieceGroup, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
-import { OpenCloProject } from '../types/types';
 import { saveProject, loadProject as loadProjectFromIDB, clearProject } from './storage';
 import { parseOpenCloProject } from './projectSchema';
 import type { ProjectParseResult, ParseError } from './projectSchema';

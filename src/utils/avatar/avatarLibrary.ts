@@ -67,7 +67,7 @@ const MeasurementsSchema = z
     for (const [k, v] of Object.entries(m)) {
       if (typeof v === 'number' && Number.isFinite(v)) out[k] = v;
     }
-    return out as BodyMeasurements;
+    return out as unknown as BodyMeasurements;
   });
 
 const timestampSchema = z

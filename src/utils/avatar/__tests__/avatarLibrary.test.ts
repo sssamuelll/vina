@@ -179,7 +179,7 @@ describe('parseProfilesJson', () => {
     expect(r.success).toBe(true);
     if (r.success) {
       expect(r.data).toHaveLength(1);
-      expect((r.data[0].measurements as Record<string, number>).bicepsCirc).toBe(32);
+      expect((r.data[0].measurements as unknown as Record<string, number>).bicepsCirc).toBe(32);
     }
   });
 
