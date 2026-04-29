@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { WebGPURenderer } from 'three/webgpu';
 import type { AnyRenderer } from '../../types/renderer';
 import { isWebGPURendererActive } from '../../utils/cloth/gpu/webgpuDetect';
+import { cmToM } from '../../utils/geometry';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import DraggablePiece from './DraggablePiece';
@@ -652,7 +653,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           <Suspense fallback={null}>
             <AvatarModel
             url={avatarModelUrl}
-            height={avatar.measurements.height / 100}
+            height={cmToM(avatar.measurements.height)}
             onPointerDown={isTapeTool ? handleAvatarClick : undefined}
           />
           </Suspense>

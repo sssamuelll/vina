@@ -18,6 +18,7 @@ import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { isWebGPUAvailable, WEBGPU_FEATURE_FLAG_KEY } from '../../utils/cloth/gpu/webgpuDetect';
+import { cmToM } from '../../utils/geometry';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
@@ -175,7 +176,7 @@ export function useSimulationLifecycle({
   const dispatch = useDispatch();
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
   const avatarModelUrl = useSelector((s: RootState) => s.project.avatarModelUrl);
-  const avatarHeight = useSelector((s: RootState) => s.project.avatar.measurements.height) / 100;
+  const avatarHeight = cmToM(useSelector((s: RootState) => s.project.avatar.measurements.height));
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
   const measurements = useSelector((s: RootState) => s.project.avatar.measurements);
   const morphTargets = useSelector((s: RootState) => s.avatar.morphTargets);

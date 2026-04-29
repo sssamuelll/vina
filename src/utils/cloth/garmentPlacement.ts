@@ -11,7 +11,7 @@
 
 import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
-import { mmToM } from '../geometry';
+import { mmToM, cmToM } from '../geometry';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -148,18 +148,18 @@ interface BodyDimensions {
 }
 
 export function deriveDimensions(m: BodyMeasurements): BodyDimensions {
-  const h = m.height / 100;
-  const chestCirc = m.chest / 100;
-  const hipCirc = m.hips / 100;
+  const h = cmToM(m.height);
+  const chestCirc = cmToM(m.chest);
+  const hipCirc = cmToM(m.hips);
   return {
     heightM: h,
-    waistHeight: m.waistHeight ? m.waistHeight / 100 : h * 0.55,
+    waistHeight: m.waistHeight ? cmToM(m.waistHeight) : h * 0.55,
     shoulderHeight: h * 0.82,
     neckHeight: h * 0.87,
     chestRadius: chestCirc / (2 * Math.PI),
     hipRadius: hipCirc / (2 * Math.PI),
-    shoulderWidth: m.shoulderWidth ? m.shoulderWidth / 100 : (m.shoulder / 100),
-    armLength: m.armLength ? m.armLength / 100 : h * 0.33,
+    shoulderWidth: m.shoulderWidth ? cmToM(m.shoulderWidth) : cmToM(m.shoulder),
+    armLength: m.armLength ? cmToM(m.armLength) : h * 0.33,
   };
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import { cmToM } from '../../utils/geometry';
 
 /**
  * Parametric dress form mannequin built with LatheGeometry.
@@ -133,7 +134,7 @@ export default function Mannequin() {
       </mesh>
 
       {/* Neck cap finial (classic dress form metal knob) */}
-      <mesh position={[0, measurements.height * 0.01 * 0.93, 0]}>
+      <mesh position={[0, cmToM(measurements.height) * 0.93, 0]}>
         <sphereGeometry args={[0.012, 16, 16]} />
         <meshStandardMaterial color="#666" metalness={0.9} roughness={0.15} />
       </mesh>
