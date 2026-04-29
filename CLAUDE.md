@@ -231,6 +231,20 @@ Steps that don't fire (continue without pause):
 
 The line between "obvious decision" and "non-obvious decision" gradually blurs without this discipline. The cost of an extra round-trip is always smaller than the cost of an instilled bad habit.
 
+### Resuming drift work across sessions
+
+Sesiones nuevas que arrancan contra trabajo de drift previo deben empezar con un diff de commits desde el último cierre conocido. La forma de capturar ese delta depende del tamaño:
+
+- **Delta chico** (1–3 commits sin cierres de eje y sin patrones canónicos nuevos en código): **actualización inline** en el doc relevante (`drift-inventory-fase1.md`, `drift-fase2-classification.md`, o el archivo de Fase 2 del eje activo). Sin archivo nuevo.
+- **Delta grande** (5+ commits, cierres múltiples de ejes/bugs, patrones canónicos nuevos en código que cambian contexto downstream): emitir un **addendum dedicado** en `docs/reports/drift-inventory-addendum-{fecha}.md`. El addendum no reemplaza el inventario original — lo extiende, anotando solo el delta y reclasificaciones.
+
+Regla anti-fragmentación: el addendum es excepción, no patrón por sesión. Si el delta no justifica un archivo dedicado, va inline.
+
+Cuando el addendum identifica patrones canónicos que aparecieron en código durante el delta, distinguir explícitamente:
+
+- **Precedente válido** — patrón intencional con scope claro, producto de una decisión de diseño explícita (no colateral de otro fix). Entra como input directo al eje correspondiente cuando llegue su Fase 2.
+- **Precedente bajo evaluación** — patrón que emergió dentro de un fix puntual sin pasar por decisión de diseño para el eje futuro. Es candidato plausible, no canónico automático. La Fase 2 del eje correspondiente debe evaluarlo como una opción más, no asumirlo. Confundir las dos clases es ratificación por inercia — el anti-patrón que motivó reclasificar BUG-5 al scope de A7 RFC.
+
 ## Common Tasks
 
 ### Add New Fabric Preset
