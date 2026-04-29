@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createSelector, PayloadAction } from '@reduxjs/toolkit';
 import { NEW_PROJECT } from './actions';
 import type { BOMEntry, BOMEntryResolved, BOMCategory, BOMState } from '../types/bom';
 import type { RootState } from './index';
@@ -112,55 +112,72 @@ export const {
 } = bomSlice.actions;
 
 // ─── Selectors ───────────────────────────────────────────────────────────────
+// Pattern follows src/store/selectors.ts (introduced 2026-03-05): plain root
+// selectors, memoized derivations via createSelector. Memoization preserves
+// reference identity across calls when inputs are unchanged, preventing
+// useSelector re-renders for consumers that subscribe to derived arrays.
+//
+// Parameterized selectors (selectBOMByCategory, selectTotalCostByColorway,
+// selectBOMForColorway) use the "arg as input selector" pattern: the second
+// argument flows through an input selector, default lruMemoize keeps cache
+// size 1. Sufficient for current usage (one consumer, one arg value at a
+// time). Factory-per-component and weakMapMemoize were considered and
+// rejected as overkill — see docs/reports/2026-04-29-drift-fase2-b4state-selectors.md.
 
-/** All BOM entries. */
-export function selectBOMEntries(state: RootState): BOMEntry[] {
-  return state.bom.entries;
-}
+/** All BOM entries. Plain root selector — Immer keeps reference stable across non-mutating updates. */
+export const selectBOMEntries = (state: RootState): BOMEntry[] => state.bom.entries;
 
 /** BOM entries filtered by category. */
-export function selectBOMByCategory(state: RootState, category: BOMCategory): BOMEntry[] {
-  return state.bom.entries.filter(e => e.category === category);
-}
+export const selectBOMByCategory = createSelector(
+  [selectBOMEntries, (_state: RootState, category: BOMCategory) => category],
+  (entries, category): BOMEntry[] => entries.filter(e => e.category === category),
+);
 
 /** Sum of quantity * unitCost across all entries. */
-export function selectTotalCost(state: RootState): number {
-  return state.bom.entries.reduce((sum, e) => sum + e.quantity * e.unitCost, 0);
-}
+export const selectTotalCost = createSelector(
+  [selectBOMEntries],
+  (entries): number => entries.reduce((sum, e) => sum + e.quantity * e.unitCost, 0),
+);
 
 /** Sum of quantity * (override unitCost ?? base unitCost) for a given colorway. */
-export function selectTotalCostByColorway(state: RootState, colorwayId: string): number {
-  return state.bom.entries.reduce((sum, e) => {
-    const override = e.colorwayOverrides[colorwayId];
-    const cost = override?.unitCost ?? e.unitCost;
-    return sum + e.quantity * cost;
-  }, 0);
-}
+export const selectTotalCostByColorway = createSelector(
+  [selectBOMEntries, (_state: RootState, colorwayId: string) => colorwayId],
+  (entries, colorwayId): number =>
+    entries.reduce((sum, e) => {
+      const override = e.colorwayOverrides[colorwayId];
+      const cost = override?.unitCost ?? e.unitCost;
+      return sum + e.quantity * cost;
+    }, 0),
+);
 
 /**
  * Whether the BOM is stale relative to the current project.
  * True if extractedProjectVersion is null or differs from project.updatedAt.
  */
-export function selectBOMIsStale(state: RootState): boolean {
-  const { extractedProjectVersion } = state.bom;
-  if (extractedProjectVersion == null) return true;
-  const projectUpdatedAt = (state.project as unknown as Record<string, unknown>).updatedAt as number | undefined;
-  return extractedProjectVersion !== projectUpdatedAt;
-}
+export const selectBOMIsStale = createSelector(
+  [(state: RootState) => state.bom.extractedProjectVersion,
+   (state: RootState) => (state.project as unknown as Record<string, unknown>).updatedAt as number | undefined],
+  (extractedProjectVersion, projectUpdatedAt): boolean => {
+    if (extractedProjectVersion == null) return true;
+    return extractedProjectVersion !== projectUpdatedAt;
+  },
+);
 
 /** BOM entries with colorway overrides resolved into flat fields. */
-export function selectBOMForColorway(state: RootState, colorwayId: string): BOMEntryResolved[] {
-  return state.bom.entries.map(entry => {
-    const override = entry.colorwayOverrides[colorwayId];
-    const resolvedName = override?.name ?? entry.name;
-    const resolvedUnitCost = override?.unitCost ?? entry.unitCost;
-    return {
-      ...entry,
-      resolvedName,
-      resolvedUnitCost,
-      totalCost: entry.quantity * resolvedUnitCost,
-    };
-  });
-}
+export const selectBOMForColorway = createSelector(
+  [selectBOMEntries, (_state: RootState, colorwayId: string) => colorwayId],
+  (entries, colorwayId): BOMEntryResolved[] =>
+    entries.map(entry => {
+      const override = entry.colorwayOverrides[colorwayId];
+      const resolvedName = override?.name ?? entry.name;
+      const resolvedUnitCost = override?.unitCost ?? entry.unitCost;
+      return {
+        ...entry,
+        resolvedName,
+        resolvedUnitCost,
+        totalCost: entry.quantity * resolvedUnitCost,
+      };
+    }),
+);
 
 export default bomSlice.reducer;
