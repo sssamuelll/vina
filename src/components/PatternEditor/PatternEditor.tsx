@@ -11,7 +11,7 @@ import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
 import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
-import { screenToPattern } from '../../utils/geometry';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
@@ -280,7 +280,7 @@ export default function PatternEditor() {
 
     // ── SeamAllowance tool: open CornerTypeMenu when near a vertex ──
     if (activeTool === 'seamAllowance') {
-      const snapDist = 10 / zoom2D;
+      const snapDist = screenToPatternLength(10, zoom2D);
       for (const piece of pieces) {
         if (!piece.outline?.length) continue;
         const localX = canvasX - (piece.position?.x ?? 0);
@@ -321,7 +321,7 @@ export default function PatternEditor() {
 
     // Hit-test seams: check proximity to seam connection lines and edge highlights
     let hitSeamId: string | null = null;
-    const SEAM_THRESHOLD = 8 / zoom2D;
+    const SEAM_THRESHOLD = screenToPatternLength(8, zoom2D);
     for (const seam of seams) {
       const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
       const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
@@ -361,7 +361,7 @@ export default function PatternEditor() {
     let hitInternalLineId: string | null = null;
     let hitInternalLineType: string | null = null;
     if (hitPiece && !hitSeamId) {
-      const IL_THRESHOLD = 6 / zoom2D;
+      const IL_THRESHOLD = screenToPatternLength(6, zoom2D);
       let nearestDist = Infinity;
       for (const line of hitPiece.internals) {
         const localX = canvasX - (hitPiece.position?.x ?? 0);
@@ -406,7 +406,7 @@ export default function PatternEditor() {
     if (editPatternTool.isEditing && editPatternTool.editingPieceId && hitPiece?.id === editPatternTool.editingPieceId) {
       const localPt = { x: canvasX - (hitPiece.position?.x ?? 0), y: canvasY - (hitPiece.position?.y ?? 0) };
       const segHit = nearestSegment(localPt, hitPiece.outline);
-      if (segHit && segHit.distance <= 8 / zoom2D) {
+      if (segHit && segHit.distance <= screenToPatternLength(8, zoom2D)) {
         segmentIndex = segHit.commandIndex;
         const cmd = hitPiece.outline[segHit.commandIndex];
         segmentIsCurve = cmd?.type === 'C' || cmd?.type === 'Q';

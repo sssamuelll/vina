@@ -6,6 +6,7 @@ import { selectSeam } from '../../store/editorSlice';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, resolveEdgeName } from './sewingUtils';
+import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 
 // ─── Types ────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ export function snapToEdge(
   zoom: number,
   edgeConstraint?: number,
 ): SnapResult | null {
-  const threshold = SNAP_THRESHOLD / zoom;
+  const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom);
   const cmds = piece.outline;
   const ox = piece.position?.x ?? 0;
   const oy = piece.position?.y ?? 0;

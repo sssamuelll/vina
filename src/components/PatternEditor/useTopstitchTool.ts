@@ -7,6 +7,7 @@ import type { PatternPiece, Point2D, PathCommand, InternalLine, TopstitchOptions
 import { getEdgeEndpoints, computeOffsetPath, computeSegmentOffsetPath } from '../../utils/geometry/path';
 import { snapToEdge } from './useSegmentSewingTool';
 import { screenToPattern } from './sewingUtils';
+import { screenToPatternLength } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 
 // Re-export pure functions for backward compatibility
@@ -106,7 +107,7 @@ export function useTopstitchTool(
   }, [getMode]);
 
   const findEdge = useCallback((pt: Point2D): { pieceId: string; edgeIndex: number; start: Point2D; end: Point2D } | null => {
-    const threshold = SNAP_THRESHOLD / zoom2D;
+    const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
     let best: { pieceId: string; edgeIndex: number; start: Point2D; end: Point2D; dist: number } | null = null;
 
     for (const piece of pieces) {

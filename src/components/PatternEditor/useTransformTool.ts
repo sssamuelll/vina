@@ -11,7 +11,7 @@ import {
   type HandleId,
   type BBox,
 } from '../../utils/geometry/transform';
-import { screenToPattern } from '../../utils/geometry';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 interface TransformDragState {
   handleId: HandleId;
@@ -63,7 +63,7 @@ export function useTransformTool(
     (e: React.MouseEvent<SVGSVGElement>): boolean => {
       if (!bbox || handles.length === 0) return false;
       const pt = toPattern(e);
-      const threshold = HANDLE_HIT_THRESHOLD / zoom2D;
+      const threshold = screenToPatternLength(HANDLE_HIT_THRESHOLD, zoom2D);
       const hitId = hitTestHandle(pt, handles, threshold);
       if (!hitId) return false;
 
@@ -179,7 +179,7 @@ export function useTransformTool(
   const getCursor = useCallback(
     (pt: Point2D): string | null => {
       if (!handles.length) return null;
-      const threshold = HANDLE_HIT_THRESHOLD / zoom2D;
+      const threshold = screenToPatternLength(HANDLE_HIT_THRESHOLD, zoom2D);
       const hitId = hitTestHandle(pt, handles, threshold);
       if (!hitId) return null;
       return handles.find(h => h.id === hitId)?.cursor ?? null;

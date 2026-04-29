@@ -24,7 +24,7 @@ import {
   convertToLine,
   type EditableNode,
 } from './nodeEditorUtils';
-import { screenToPattern } from '../../utils/geometry';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 
 // ─── Constants ───
 
@@ -113,7 +113,7 @@ export function useEditPattern(zoom: number, pan: Point2D) {
   );
 
   /** Hit radius in pattern-space units */
-  const hitRadius = HIT_RADIUS_PX / zoom;
+  const hitRadius = screenToPatternLength(HIT_RADIUS_PX, zoom);
 
   // ─── Helper: get current piece ───
 
@@ -314,8 +314,8 @@ export function useEditPattern(zoom: number, pan: Point2D) {
       // Active drag
       if (drag) {
         if (drag.type === 'node' || drag.type === 'segment') {
-          const dx = (e.clientX - drag.startMouse.x) / zoom;
-          const dy = (e.clientY - drag.startMouse.y) / zoom;
+          const dx = screenToPatternLength(e.clientX - drag.startMouse.x, zoom);
+          const dy = screenToPatternLength(e.clientY - drag.startMouse.y, zoom);
 
           let outline = piece.outline;
           for (const [cmdIdx, startPos] of drag.startPositions) {

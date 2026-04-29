@@ -14,7 +14,7 @@ import { updatePiece } from '../../store/projectSlice';
 import { setToolOption } from '../../store/toolSlice';
 import type { Point2D, PatternPiece, PathCommand } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
-import { screenToPattern } from '../../utils/geometry';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import {
   findSlashIntersections,
   splitOutlineAtSlash,
@@ -121,7 +121,7 @@ function snapToOutline(
     }
   }
 
-  const threshold = SNAP_THRESHOLD / zoom2D;
+  const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
   return bestDist <= threshold ? bestPt : null;
 }
 
@@ -276,7 +276,7 @@ export function transitionMouseDown(
       y: pt.y - piece.position.y,
     };
 
-    const threshold = PIVOT_THRESHOLD / zoom2D;
+    const threshold = screenToPatternLength(PIVOT_THRESHOLD, zoom2D);
     const d1 = dist2D(localPt, state.hit1.point);
     const d2 = dist2D(localPt, state.hit2.point);
 

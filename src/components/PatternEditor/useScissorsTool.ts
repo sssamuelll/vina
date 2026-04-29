@@ -5,7 +5,7 @@ import { addPiece, removePiece, addSeam, updatePiece } from '../../store/project
 import type { Point2D, PatternPiece, Seam } from '../../types/types';
 import { flattenPath } from '../../utils/seam/index';
 import { linePolylineIntersections } from '../../utils/geometry/lineIntersect';
-import { screenToPattern } from '../../utils/geometry';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { splitPieceAtLine, findCutEdgePair } from '../../utils/patternOps';
 import { useGuardedAction } from '../../hooks/useGuardedAction';
 import { newId } from '../../utils/ids';
@@ -76,7 +76,7 @@ export function useScissorsTool(zoom2D: number, pan2D: Point2D) {
         }
       }
 
-      const threshold = SNAP_THRESHOLD / zoom2D;
+      const threshold = screenToPatternLength(SNAP_THRESHOLD, zoom2D);
       return bestDist <= threshold ? bestPt : null;
     },
     [zoom2D],
