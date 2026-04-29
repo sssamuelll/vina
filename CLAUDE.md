@@ -259,6 +259,28 @@ Within an audit branch, the typical commit order is:
 
 Audit branches use the `drift/{ID}-{shortname}` naming convention (e.g., `drift/b5-state-middleware-patterns`). One branch per eje, one PR per eje. PR opens in draft after the Fase 2 doc commit; user approves the canonical via PR comment or chat; PR moves to ready-for-review after the Fase 3 unify commit lands; merged via standard merge commit (preserves all 3+ commits in main history).
 
+### Audit philosophy: when to fix the real problem vs align for consistency
+
+When an eje's investigation reveals that "drift" is the surface manifestation of a deeper architectural problem (e.g., a vestigial pattern, a workaround documenting a smell), there are two viable closures: **fix the real problem** (replace the smell with proper architecture) or **align for consistency** (formalize the existing pattern, accept the smell as documented technical debt). The right choice depends on the eje, with explicit criteria.
+
+**Fix the real problem when** any of:
+
+- The code smell has **observable impact** — bugs, performance degradation, silent regression risk in production.
+- The blast radius of the fix is **containable** — does not open sub-ejes in cascade or require an architectural sub-RFC the eje did not anticipate.
+- The problem **degrades over time** if not touched (e.g., compounds with new code being added against the smell).
+
+**Prioritize consistency alignment when** any of:
+
+- The smell is **stable** — does not manifest as bugs, does not degrade with time, contained to a known surface (often tests, internal utilities).
+- The blast radius of the real fix is **disproportionate to the benefit** (e.g., requires touching many consumers or breaking public APIs for a smell that only affects internal layout).
+- The "real fix" requires architectural decisions that **merit their own formal eje** (sub-RFC, dedicated investigation) rather than being bundled into a pattern-alignment commit.
+
+These criteria are **not orthogonal** — they often point in opposite directions, and the closure is judgment. But they are anchorable and reproducible. The cobarde anti-pattern to avoid is **alignment with decorative documentation** (e.g., "by historical reasons" comments that ratify a smell as design without analysis) — that's worse than either real fix or honest pattern alignment.
+
+When choosing alignment over real fix, the Fase 2 doc must capture the technical debt explicitly in a "Deuda técnica explícita post-unify" section, naming the smell and the conditions under which a future eje would be justified to take it on. This preserves the option to revisit when those conditions are met (e.g., the smell starts causing real bugs).
+
+Origin: anchored in B5-state Fase 2 (2026-04-29) when middleware factory pattern was found vestigial. Philosophy applies to all subsequent (b) and (c) ejes where this tension appears.
+
 ## Common Tasks
 
 ### Add New Fabric Preset
