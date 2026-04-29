@@ -300,6 +300,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 | Trim / Notion / Hardware | `Trim` (~80), `Notion` (0), `Hardware` (0) | Sin drift. `trim` canónico. |
 | Notch / Mark / Marker | `notch` (~30, muesca), `Marker` (~15, layout corte papel) | Sin drift. Conceptos industria distintos. |
 | Grain / Grainline | `GrainLine` tipo, `grainLine` prop (~40), `grainline` InternalLineType (~15) | Cosmético — 3 casings. Y dualidad rico vs InternalLine como en Dart. |
+
+> **Estado real (verificado 2026-04-29 durante D1-cosmetic Fase 2):** axis cerrado como **no-drift por ratificación**. Las 3 variantes son 3 roles lingüísticos legítimos siguiendo TS standard + sibling precedent (PascalCase types, camelCase properties, lowercase compound discriminated-union literals — `'grainline'` consistente con 7 siblings en `InternalLineType` + `'seamline'` en `TopstitchMode`). Inconsistencia real menor (`hasGrainLine` vs `hasGrainline`, 6 sitios) capturada como issue **#637**. Ratificado en `drift-fase2-d1-cosmetic-grainline-casing.md`. Ningún cambio de código. La dualidad rico vs InternalLine para Grain/Dart sigue siendo D1-real (drift abierto separado).
 | Pattern / Blueprint / Template | `Blueprint` (construcción), `template` (Seamly2D import), `pattern` (genérico) | Sin drift; conceptos distintos. |
 
 ### D2 ★ — Manejo de errores JS (4+ estrategias conviven)
@@ -334,6 +336,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - `store/confirmationMiddleware.ts` importa de `store/copilotUISlice.ts` (acoplamiento bidireccional store↔copilot).
 - `store/reactiveSolverMiddleware.ts` importa de `utils/construction/`, `utils/seamly2d/` (aceptable, orquestación).
 - **Capa `core/` documentada en CLAUDE.md no existe** — el motor de patrones vive mezclado en `utils/`.
+
+> **Estado real (verificado 2026-04-29 durante D1-cosmetic Fase 2):** axis **reclasificado de (a) mecánico S a (b) decisión arquitectónica**. El read-only previo a la inversión D5↔D1-cosmetic reveló: (1) los 3 ítems flageados arriba son problemáticos — ProgressMessage:2 import es type-only (zero runtime cost) y vive dentro de `CopilotPanel/`; confirmationMiddleware → copilotUISlice es store→store, no cross-layer; `core/` no-existence es documentation drift, no code drift. (2) Sweep completo de `components/ → copilot/` reveló 9 archivos cross-layer (no 1-2 como decía el inventario), 4-7x más allá del rango lower-bound estructurado. (3) El codebase no tiene formal layer infrastructure (eslint, comentarios, docs). La pregunta real es decisión arquitectónica "¿hay capas formales?" con 3 opciones (no-layer ratify, full restriction L+, partial restriction). Apéndices A+B en `drift-fase2-d1-cosmetic-grainline-casing.md` preservan los hallazgos como input para Fase 2 de D5 cuando se retome. Pendiente Fase 2 (b).
 
 ### D6 ★ — Tipos de Fabric duplicados
 - **Estado:** drift real.
