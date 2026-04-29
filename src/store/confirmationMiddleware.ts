@@ -98,88 +98,86 @@ function debouncedPersist(getState: () => unknown) {
 // ─── Middleware factory ───────────────────────────────────────────────────────
 
 /**
- * Creates the confirmation middleware.
+ * Confirmation middleware.
  *
  * Place this **before** undoMiddleware in the custom middleware chain so that
  * blocked actions never reach the undo history.
  */
-export function createConfirmationMiddleware(): Middleware {
-  return (storeApi) => (next) => (rawAction: unknown) => {
-    const action = rawAction as ActionLike;
+export const confirmationMiddleware: Middleware = (storeApi) => (next) => (rawAction: unknown) => {
+  const action = rawAction as ActionLike;
 
-    // ── 0. Auto-apply tool memory on tool activation in expert mode ───────────
+  // ── 0. Auto-apply tool memory on tool activation in expert mode ───────────
 
-    if (action.type === 'tools/setActiveTool2D' || action.type === 'tools/setActiveTool3D') {
-      const result = next(action);
-      const state = storeApi.getState() as StoreState & {
-        workflow?: { expertMode: boolean; toolMemory: Record<string, Record<string, unknown>> };
-      };
-      if (state.workflow?.expertMode) {
-        const toolId = action.payload as string;
-        const memory = state.workflow.toolMemory[toolId];
-        if (memory) {
-          for (const [optionId, value] of Object.entries(memory)) {
-            storeApi.dispatch({
-              type: 'tools/setToolOption',
-              payload: { toolId, optionId, value },
-              meta: { fromToolMemory: true },
-            });
-          }
-        }
-      }
-      return result;
-    }
-
-    // ── 1. Destructive action gating ─────────────────────────────────────────
-
-    const opName = DESTRUCTIVE_ACTIONS[action.type];
-    if (opName) {
-      // Allow caller to bypass the guard (e.g. when the user already confirmed)
-      if (!action.meta?.skipConfirmation) {
-        const state = storeApi.getState() as StoreState;
-        const override = state.workflow?.confirmOverrides?.[opName] ?? 'default';
-
-        // All "destructive" actions are undoable (Ctrl+Z), so don't confirm
-        // by default. Only confirm if the user explicitly set override to 'always'.
-        const shouldConfirm = override === 'always';
-
-        if (shouldConfirm) {
-          // Block the action and show the confirmation dialog instead
-          storeApi.dispatch(
-            showConfirmation({
-              source: 'middleware',
-              title: getTitle(opName, action.payload),
-              description: 'Please confirm you want to proceed.',
-              consequences: getConsequences(opName, action.payload),
-              destructive: true,
-              reduxAction: { type: action.type, payload: action.payload },
-            })
-          );
-          // Do NOT call next(action) — action is deferred until the user confirms
-          return;
-        }
-      }
-    }
-
-    // ── 2. Let the action through ─────────────────────────────────────────────
-
+  if (action.type === 'tools/setActiveTool2D' || action.type === 'tools/setActiveTool3D') {
     const result = next(action);
-
-    // ── 3. Mirror setToolOption into workflow.toolMemory ──────────────────────
-
-    if (action.type === 'tools/setToolOption' && !action.meta?.fromToolMemory) {
-      const { toolId, optionId, value } = action.payload as SetToolOptionPayload;
-      storeApi.dispatch(
-        updateToolMemory({ tool: toolId, values: { [optionId]: value } })
-      );
+    const state = storeApi.getState() as StoreState & {
+      workflow?: { expertMode: boolean; toolMemory: Record<string, Record<string, unknown>> };
+    };
+    if (state.workflow?.expertMode) {
+      const toolId = action.payload as string;
+      const memory = state.workflow.toolMemory[toolId];
+      if (memory) {
+        for (const [optionId, value] of Object.entries(memory)) {
+          storeApi.dispatch({
+            type: 'tools/setToolOption',
+            payload: { toolId, optionId, value },
+            meta: { fromToolMemory: true },
+          });
+        }
+      }
     }
-
-    // ── 4. Persist workflow state changes ─────────────────────────────────────
-
-    if (action.type.startsWith('workflow/')) {
-      debouncedPersist(storeApi.getState);
-    }
-
     return result;
-  };
-}
+  }
+
+  // ── 1. Destructive action gating ─────────────────────────────────────────
+
+  const opName = DESTRUCTIVE_ACTIONS[action.type];
+  if (opName) {
+    // Allow caller to bypass the guard (e.g. when the user already confirmed)
+    if (!action.meta?.skipConfirmation) {
+      const state = storeApi.getState() as StoreState;
+      const override = state.workflow?.confirmOverrides?.[opName] ?? 'default';
+
+      // All "destructive" actions are undoable (Ctrl+Z), so don't confirm
+      // by default. Only confirm if the user explicitly set override to 'always'.
+      const shouldConfirm = override === 'always';
+
+      if (shouldConfirm) {
+        // Block the action and show the confirmation dialog instead
+        storeApi.dispatch(
+          showConfirmation({
+            source: 'middleware',
+            title: getTitle(opName, action.payload),
+            description: 'Please confirm you want to proceed.',
+            consequences: getConsequences(opName, action.payload),
+            destructive: true,
+            reduxAction: { type: action.type, payload: action.payload },
+          })
+        );
+        // Do NOT call next(action) — action is deferred until the user confirms
+        return;
+      }
+    }
+  }
+
+  // ── 2. Let the action through ─────────────────────────────────────────────
+
+  const result = next(action);
+
+  // ── 3. Mirror setToolOption into workflow.toolMemory ──────────────────────
+
+  if (action.type === 'tools/setToolOption' && !action.meta?.fromToolMemory) {
+    const { toolId, optionId, value } = action.payload as SetToolOptionPayload;
+    storeApi.dispatch(
+      updateToolMemory({ tool: toolId, values: { [optionId]: value } })
+    );
+  }
+
+  // ── 4. Persist workflow state changes ─────────────────────────────────────
+
+  if (action.type.startsWith('workflow/')) {
+    debouncedPersist(storeApi.getState);
+  }
+
+  return result;
+};

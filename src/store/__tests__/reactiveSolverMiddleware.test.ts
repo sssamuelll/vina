@@ -82,7 +82,7 @@ vi.mock('../../utils/construction/pieceBuilder', () => ({
 // ─── Import middleware and slices AFTER mocks ────────────────────────────────
 
 import {
-  createReactiveSolverMiddleware,
+  reactiveSolverMiddleware,
   filterBuildablePieces,
   getSolverMetrics,
   getSolverState,
@@ -112,7 +112,7 @@ function createTestStore() {
       editor: editorReducer,
     },
     middleware: (getDefault) =>
-      getDefault({ serializableCheck: false }).concat(createReactiveSolverMiddleware()),
+      getDefault({ serializableCheck: false }).concat(reactiveSolverMiddleware),
   });
 }
 
