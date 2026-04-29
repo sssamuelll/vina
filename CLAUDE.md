@@ -245,6 +245,20 @@ Cuando el addendum identifica patrones canónicos que aparecieron en código dur
 - **Precedente válido** — patrón intencional con scope claro, producto de una decisión de diseño explícita (no colateral de otro fix). Entra como input directo al eje correspondiente cuando llegue su Fase 2.
 - **Precedente bajo evaluación** — patrón que emergió dentro de un fix puntual sin pasar por decisión de diseño para el eje futuro. Es candidato plausible, no canónico automático. La Fase 2 del eje correspondiente debe evaluarlo como una opción más, no asumirlo. Confundir las dos clases es ratificación por inercia — el anti-patrón que motivó reclasificar BUG-5 al scope de A7 RFC.
 
+### Atomicity by default for unify commits
+
+The unify commit (Fase 3) must be **atomic** — only the code that implements the canonical, nothing else. Documentation (Fase 2 docs, inventory annotations, lessons in CLAUDE.md), follow-up issue cross-links, and methodology updates go in **separate commits within the same branch**. The exception is documentation intrinsic to the code change itself (changelog entries, comment headers that the unify commit touches). Fase 2 docs are external context and always go in their own commit.
+
+Within an audit branch, the typical commit order is:
+
+1. Any methodology updates to CLAUDE.md.
+2. Fase 2 doc with canonical proposal (or, for ejes in (b), options + tradeoffs + recommendation).
+3. Approval gate from user.
+4. Unify commit with code only.
+5. Any follow-up issue references or inventory annotations.
+
+Audit branches use the `drift/{ID}-{shortname}` naming convention (e.g., `drift/b5-state-middleware-patterns`). One branch per eje, one PR per eje. PR opens in draft after the Fase 2 doc commit; user approves the canonical via PR comment or chat; PR moves to ready-for-review after the Fase 3 unify commit lands; merged via standard merge commit (preserves all 3+ commits in main history).
+
 ## Common Tasks
 
 ### Add New Fabric Preset
