@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLoader, useFrame, ThreeEvent } from "@react-three/fiber";
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { useFrame, ThreeEvent } from "@react-three/fiber";
 
 import * as THREE from 'three';
 import { useSelector, useDispatch } from 'react-redux';
@@ -8,14 +7,11 @@ import type { RootState } from '../../store';
 import { computeMorphWeights, MORPH_BONE_MAP, type MorphConfig } from '../../utils/avatar/morphTargets';
 import { IK_END_EFFECTOR_BONES, JOINT_CONSTRAINTS, setAvailableMorphTargets, clearMorphTargets } from '../../store/avatarSlice';
 import { clampSwingTwist, ANATOMICAL_CONSTRAINTS } from '../../utils/avatar/swingTwistConstraint';
-import { isVRMFile, loadVRM, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
-import { detectFormat, detectUnit, type MeshFormat } from '../../utils/import/meshImporter';
+import { isVRMFile, VRM_TO_MIXAMO_BONE_MAP } from '../../utils/avatar/vrmLoader';
+import { detectFormat, importMesh, type MeshFormat } from '../../utils/import/meshImporter';
 // WebGPURenderer always uses NodeMaterial — legacy MeshDepthMaterial (shadows) unsupported
 const nodeMaterialActive = true;
 import type { VRM } from '@pixiv/three-vrm';
-
-// ─── Unit scale map (to meters for three.js scene) ─────────────────────────
-const UNIT_TO_METERS: Record<string, number> = { mm: 0.001, cm: 0.01, m: 1, inches: 0.0254 };
 
 interface AvatarModelProps {
   url: string;
@@ -164,12 +160,8 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const format = detectFormat(url.split('/').pop() || url) as MeshFormat;
   const isVrm = format === 'vrm' || isVRMFile(url);
   const isObjFbx = format === 'obj' || format === 'fbx';
-  const isGltf = !isVrm && !isObjFbx;
-  // useLoader is always called (hooks can't be conditional), but non-GLTF files are loaded separately
-  const gltf = useLoader(GLTFLoader, isGltf ? url : '/default-avatar.glb');
+  const [importedScene, setImportedScene] = useState<THREE.Group | null>(null);
   const [vrmInstance, setVrmInstance] = useState<VRM | null>(null);
-  const [vrmScene, setVrmScene] = useState<THREE.Group | null>(null);
-  const [objFbxScene, setObjFbxScene] = useState<THREE.Group | null>(null);
   const boneMap = useRef<Map<string, THREE.Bone>>(new Map());
   const bindPoses = useRef<Map<string, THREE.Quaternion>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -188,88 +180,37 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
   const ikEnabled = useSelector((s: RootState) => s.avatar.pose.ikEnabled);
   const avatarRenderStyle = useSelector((s: RootState) => s.renderSettings.avatarRenderStyle);
 
-  // Load VRM files separately
+  // Load mesh via importMesh canonical (handles GLTF/GLB/OBJ/FBX/VRM uniformly:
+  // unit detection, target-height auto-scale, center-on-ground, safety limits).
+  // Replaces 3 prior loading paths (useLoader+phantom-load, separate VRM useEffect,
+  // separate OBJ/FBX useEffect with inline scaling) — see C8 Fase 2 doc.
   useEffect(() => {
-    if (!isVrm) {
-      setVrmInstance(null);
-      setVrmScene(null);
-      return;
-    }
     let cancelled = false;
-    loadVRM(url).then((result) => {
+    const filename = url.split('/').pop() || url;
+
+    importMesh(url, filename, {
+      // height is meters; importMesh expects mm.
+      // C6-impl: centralize m→mm conversion at boundary (currently inline pending C6 implementation)
+      targetHeightMm: height * 1000,
+    }).then((result) => {
       if (cancelled) return;
-      setVrmInstance(result.vrm);
-      setVrmScene(result.scene);
+
+      // importMesh outputs in mm; Three.js viewport convention is meters.
+      // C6-impl: centralize mm→m conversion at boundary (currently inline pending C6 implementation)
+      result.scene.scale.multiplyScalar(0.001);
+      result.scene.updateMatrixWorld(true);
+
+      setImportedScene(result.scene);
+      setVrmInstance(result.vrm ?? null);
     }).catch((err) => {
-      console.error('[AvatarModel] Failed to load VRM:', err);
+      console.error('[AvatarModel] Failed to load mesh:', err);
     });
+
     return () => { cancelled = true; };
-  }, [url, isVrm]);
-
-  // Load OBJ/FBX files separately
-  useEffect(() => {
-    if (!isObjFbx) {
-      setObjFbxScene(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        let result: THREE.Group;
-        if (format === 'fbx') {
-          const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js');
-          result = await new FBXLoader().loadAsync(url);
-        } else {
-          const { OBJLoader } = await import('three/examples/jsm/loaders/OBJLoader.js');
-          result = await new OBJLoader().loadAsync(url);
-        }
-        if (cancelled) return;
-        const group = result instanceof THREE.Group ? result : new THREE.Group().add(result);
-
-        // Auto-scale: detect unit from bounding box and normalize
-        const bbox = new THREE.Box3().setFromObject(group);
-        const unit = detectUnit(bbox);
-        const scale = UNIT_TO_METERS[unit] || 1;
-        if (scale !== 1) {
-          group.scale.multiplyScalar(scale);
-          group.updateMatrixWorld(true);
-        }
-
-        // Auto-scale to target height
-        const scaledBbox = new THREE.Box3().setFromObject(group);
-        const currentHeight = scaledBbox.max.y - scaledBbox.min.y;
-        if (currentHeight > 0) {
-          const targetHeight = height; // meters
-          const ratio = targetHeight / currentHeight;
-          if (ratio > 2 || ratio < 0.5) {
-            group.scale.multiplyScalar(ratio);
-            group.updateMatrixWorld(true);
-          }
-        }
-
-        // Center feet on ground
-        const finalBbox = new THREE.Box3().setFromObject(group);
-        const center = new THREE.Vector3();
-        finalBbox.getCenter(center);
-        group.position.set(-center.x, -finalBbox.min.y, -center.z);
-
-        // Ensure normals
-        group.traverse(obj => {
-          if (obj instanceof THREE.Mesh && obj.geometry && !obj.geometry.attributes.normal) {
-            obj.geometry.computeVertexNormals();
-          }
-        });
-
-        setObjFbxScene(group);
-      } catch (err) {
-        if (!cancelled) console.error(`[AvatarModel] Failed to load ${format}:`, err);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [url, isObjFbx, format, height]);
+  }, [url, height]);
 
   useEffect(() => {
-    const scene = isVrm ? vrmScene : isObjFbx ? objFbxScene : gltf?.scene;
+    const scene = importedScene;
     if (!scene || !groupRef.current) return;
     boneMap.current.clear();
     bindPoses.current.clear();
@@ -415,7 +356,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
     // Apply initial pose immediately after loading
     requestAnimationFrame(() => applyPose.current());
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vrmScene, objFbxScene, gltf, autoScale, height, vrmInstance, isVrm, isObjFbx]);
+  }, [importedScene, autoScale, height, vrmInstance, isVrm, isObjFbx]);
 
   // Initialize IK solver and chains
   const initializeIK = async (activeScene: THREE.Object3D) => {
@@ -703,8 +644,7 @@ export default function AvatarModel({ url, autoScale = true, height = 1.80, onPo
       }
       mat.needsUpdate = true;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vrmScene, objFbxScene, gltf, avatarRenderStyle]);
+  }, [importedScene, avatarRenderStyle]);
 
   return <group ref={groupRef} onPointerDown={onPointerDown} userData={{ opencloRole: 'avatar' }} />;
 }
