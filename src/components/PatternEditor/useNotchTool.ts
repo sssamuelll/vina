@@ -119,7 +119,7 @@ export function useNotchTool(
         return;
       }
     }
-  }, [toPattern, pieces, zoom, onAddNotch]);
+  }, [toPattern, pieces, zoom, onAddNotch, notchOptions]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;

@@ -505,7 +505,6 @@ export function useSlashAndSpreadTool(
     }
 
     // Strip signals before storing state
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { _applyPiece, _toggleMode, ...cleanState } = result;
     setState(cleanState);
   }, [dispatch, toolOptions.mode]);

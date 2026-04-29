@@ -153,7 +153,6 @@ export function useMergeTool(zoom2D: number, pan2D: Point2D) {
   );
 
   const handleMouseMove = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     (_e: React.MouseEvent<SVGSVGElement>) => {
       // Could add hover highlighting in the future
     },
