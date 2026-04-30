@@ -433,6 +433,98 @@ Reopen B10-state Par 1 (per § 7 of the Fase 2 doc) if:
 4. `setFabric` callsites grow past ~5 sites — evaluate if all are legitimate transient or if the convention is being violated.
 5. Lint rule for target slice enforcement is implemented (follow-up issue) — reabrir si emerge false positives or new convention edges.
 
+## Entity collections shape policy (B2-state ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-b2state-entity-collections.md` (full Fase 2 doc with 4 sub-decisiones, 38 collections inventariadas, 0 EntityAdapter usage).
+
+### Shape decision table
+
+For each new entity collection in a Redux slice, choose shape according to triggers:
+
+| Shape | Triggers (all should apply) | Examples (current codebase) |
+|---|---|---|
+| **Array `Entity[]`** | Entity has lifecycle (CRUD); ordering matters; iteration is dominant access | `pieces`, `seams`, `points`, `bodies` (23 collections) |
+| **Record `<entityId, attribute>`** | Per-entity transient attribute; entity lifecycle lives elsewhere; sparse (not all entities have it) | `pieceFabrics`, `pieceTints`, `arrangementOverrides` (~10) |
+| **Record `<key, value>` (non-entity key)** | Key is a non-entity (layer number, tool id, size name, plugin id) | `layerNames`, `toolMemory`, `pluginErrors` (~5) |
+| **EntityAdapter** | See § "EntityAdapter adoption" below — opt-in with explicit triggers | (0 current; first adoption pioneers the pattern) |
+
+**Operational test for new collections:** does the collection contain entities with their own lifecycle (creation, mutation, deletion, ordering)?
+
+- **Yes + ordering matters** → array.
+- **Yes + ordering not load-bearing + lookup ratio is low** → array (default; do not introduce Record solely for lookup speed).
+- **No (it's a sparse attribute derived from an entity in another slice)** → `Record<entityId, attribute>`.
+- **No (it's config / metadata indexed by a non-entity key)** → `Record<key, value>`.
+- **Any of the above + EntityAdapter triggers** → consider EntityAdapter (§ next).
+
+> "Ordering matters" is orientative, not greppable. Edge cases (e.g., a collection where ordering is not load-bearing but conveniente) require judgment. The 38 current collections fit this table without ambiguity.
+
+### EntityAdapter adoption
+
+Redux Toolkit `createEntityAdapter` is **not used** anywhere in the codebase (0 sites). Adopt only when **at least 2** of the following triggers apply for the new collection:
+
+1. **Large size:** typical production count >500 entities.
+2. **High lookup ratio:** lookups by id are >10× more frequent than full-array iteration.
+3. **Complex CRUD:** add/update/remove/upsert with identical logic across reducers benefits from the prefab.
+4. **Ordering + lookup simultaneously:** the collection needs stable order + efficient lookup at once (the `{ ids[], entities{} }` shape provides both).
+
+Without ≥2 triggers, prefer array entity or Record attribute per the shape decision table.
+
+The first slice to adopt EntityAdapter pioneers the pattern — document the migration explicitly so subsequent adopters have a precedent. "Lookup ratio high" is a heuristic; verify post-hoc with profiling if doubtful.
+
+### Cross-slice references
+
+When a slice references entities owned by another slice, three categories are legitimate. Document inline at the introduction site which category applies.
+
+| Category | When to use | Example |
+|---|---|---|
+| **Cross-slice cache** | Sparse attribute derived from entity, lives in transient slice (sim, render); source-of-truth in another slice; explicit sync mechanism (hook/middleware) | `simulation.pieceFabrics` ← sync from `project.pieces[].fabricId` via `useColorwaySync` (B10-state Par 1) |
+| **Cross-namespace bridge** | Two slices manage semantically related entities with their own identity; this slice maps IDs between namespaces; does NOT duplicate entities | `construction.pieceIdentityMap` (construction piece id → project piece id) |
+| **Cross-slice ID reference** | This slice maintains array/Record of IDs referencing entities in another slice; lookup via cross-slice selector | `parametric.generatedPieceIds` (refers to `project.pieces`) |
+
+**Anti-pattern (denormalization without coordination):** a slice duplicates fields of entities owned by another slice without sync mechanism or bridge purpose. If observed, treat as smell — coordinate via cache (with explicit sync) or refactor to bridge/ID reference.
+
+### Lookup convention (forward-only)
+
+The codebase has ~400 `.find(p => p.id === X)` callsites against slice entity collections (verified across components, store, copilot). All are off the frame-loop hot path. They are **preserved as-is** — no retroactive migration.
+
+For **new callsites and slices** going forward:
+
+1. Slices with collections of significant size (≥10 readers, or growing usage) **export memoized selectors** using `createSelector` (precedent: `bomSlice.ts` selectors, ratified by B4-state).
+2. The convention is `selectXById` returning either the entity or `undefined`:
+
+   ```ts
+   // projectSlice.ts (forward-only example)
+   export const selectPieceById = createSelector(
+     [(state: RootState) => state.project.pieces, (_state, id: string) => id],
+     (pieces, id) => pieces.find(p => p.id === id)
+   );
+   ```
+
+3. New callsites use the exported selector instead of inline `.find()`:
+
+   ```ts
+   const piece = useSelector(s => selectPieceById(s, pieceId));
+   ```
+
+4. **Existing 400 callsites are NOT migrated retroactively.** Migration is opportunistic — when a callsite is touched for another reason, prefer the selector. A custom eslint rule (follow-up issue) provides gradual enforcement via warning.
+
+5. **First selector export is per-slice deferred.** B2-state Fase 3 does not introduce selectors per-slice. The first slice to export `selectXById` (likely `projectSlice`) does so when the slice is touched for another reason.
+
+### Inventory snapshot (2026-04-30)
+
+23 array entity collections in 9 slices, 15 Record collections (per-entity attribute or non-entity metadata), 0 EntityAdapter. ~400 inline `.find` callsites preserved. 1 cross-slice cache (fabric, B10-state Par 1), 1 cross-namespace bridge (`pieceIdentityMap`), 1 cross-slice ID reference (`generatedPieceIds`). 1 slice with `createSelector` exports (`bomSlice`, B4-state).
+
+### Reopen triggers
+
+Reopen B2-state if:
+
+1. Performance bottleneck verified in an entity collection caused by O(n) lookup. Evaluate per-slice migration to Record or EntityAdapter.
+2. A new collection does not fit any of the 4 shapes (e.g., legitimate hybrid, queue/stack semantics).
+3. A new cross-slice reference does not fit any of the 3 legitimate categories.
+4. Lint rule (follow-up) generates persistent false positives after 1 month warning-only.
+5. EntityAdapter first adoption occurs — document explicitly as precedent.
+6. Selector exports generalize to >5 slices — evaluate whether mass migration of the 400 sites is now warranted.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
