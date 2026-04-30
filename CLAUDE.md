@@ -827,6 +827,23 @@ Patrón observable: el inventario clasifica como drift cualquier case donde el c
 
 Esto NO significa que todos los ejes son ratify-by-convention. 6/16 (38%) cerraron como real-fix (B11-state IDs canonical, C5 helper unify, B6-state Fase 3 pendiente, BUG migrations, B3-state cascade convention, B10-state Par 1 hybrid copilot migration). El patrón ratify-by-convention es dominante pero NO universal — el sweep decide caso por caso.
 
+#### Pattern 2.5 hybrid — declared deprecation + unused bridge (anchored 2026-04-30 after D6)
+
+Cuando git blame muestra **"declared deprecation intent + unused bridge function"** simultáneamente, el framing puede ser **Pattern 2.5 hybrid** — los types coexisten legítimamente como roles distintos (no migration), PERO hay artefactos de la migration nunca ejecutada (header doc-drift + bridge unused) que requieren cleanup.
+
+**Diagnóstico:**
+
+1. Grep callsites del bridge function. Si **0 usage externo**: Pattern 2.5 hybrid (ratify roles + cleanup artifacts). Si **N>0 usage**: Pattern 1 real (legacy active, migration meaningful) o Pattern 2 con bridge en uso intencional (D1-real shape).
+
+2. Verify legacy type consumer count + lifecycle. Si los consumers tienen **niche role legítimo** (e.g., public API surface for plugins/external consumers) y **no son migration holdouts**: ratify role + reframe deprecation framing.
+
+**Acción cleanup:**
+- Remove dead bridge function + sus tests self-referenciales.
+- Reframe header doc-drift que dice "backward compatibility" cuando NO es deprecation real.
+- Document distinct consumer audiences explicitly (JSDoc + CLAUDE.md section).
+
+**Origen:** D6 (`Fabric` / `FabricMaterial` / `PhysicalFabric`) — `physicalFabric.ts:8` decía "FabricMaterial remains for backward compatibility" + bridge `toBasicMaterial` con 0 callsites productivos. Sweep refresh reveló FabricMaterial role evolucionó a "basic public API surface for plugins" sin re-documentation. Ratificado como 3-tier API surface, dead bridge removed (-60 líneas net).
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
