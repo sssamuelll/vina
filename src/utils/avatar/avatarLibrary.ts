@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { BodyMeasurements } from '../../types/types';
-import { safeGetItem, safeSetItem } from '../safeStorage';
+import { safeGetItem } from '../safeStorage';
 import { recordStorageParseFailure } from '../telemetry/storageTelemetry';
 
 export interface AvatarProfile {
@@ -216,21 +216,39 @@ export function loadProfiles(): AvatarProfile[] {
   return result.data.length > 0 ? result.data : getDefaultProfiles();
 }
 
-export function saveProfile(profile: AvatarProfile): void {
-  const profiles = loadProfiles();
-  const idx = profiles.findIndex(p => p.id === profile.id);
-  if (idx >= 0) {
-    profiles[idx] = { ...profile, updatedAt: Date.now() };
-  } else {
-    profiles.push(profile);
-  }
-  // Write to both IndexedDB and localStorage
-  import('../storage').then(({ storageSet }) => { storageSet('avatars', 'profiles', profiles); });
-  safeSetItem(STORAGE_KEY, JSON.stringify(profiles));
+/** Async authoritative loader: IDB primary + read-side migration from legacy
+ *  LS (BUG-10 canonical). Returns defaults when neither has any profiles. */
+export async function loadProfilesAsync(): Promise<AvatarProfile[]> {
+  const { storageGet, migrateFromLocalStorage } = await import('../storage');
+  const existing = await storageGet<AvatarProfile[]>('avatars', 'profiles');
+  if (existing && existing.length > 0) return existing;
+  const migrated = await migrateFromLocalStorage<AvatarProfile[]>(STORAGE_KEY, 'avatars', 'profiles');
+  if (migrated && migrated.length > 0) return migrated;
+  return getDefaultProfiles();
 }
 
-export function deleteProfile(id: string): void {
-  const profiles = loadProfiles().filter(p => p.id !== id);
-  import('../storage').then(({ storageSet }) => { storageSet('avatars', 'profiles', profiles); });
-  safeSetItem(STORAGE_KEY, JSON.stringify(profiles));
+/** Persist a list of profiles to IDB. Fire-and-forget callers (reducers) wrap
+ *  this in `void`. The canonical `storageSet` falls back to LS internally only
+ *  when IDB is unavailable. */
+function persistProfiles(profiles: AvatarProfile[]): Promise<void> {
+  return import('../storage').then(({ storageSet }) => storageSet('avatars', 'profiles', profiles));
+}
+
+/** Insert or update a profile within `current` and persist the new list to IDB.
+ *  Returns the new list (caller assigns to state). */
+export function saveProfile(profile: AvatarProfile, current: AvatarProfile[]): AvatarProfile[] {
+  const idx = current.findIndex(p => p.id === profile.id);
+  const next = idx >= 0
+    ? current.map((p, i) => (i === idx ? { ...profile, updatedAt: Date.now() } : p))
+    : [...current, profile];
+  void persistProfiles(next);
+  return next;
+}
+
+/** Remove a profile by id from `current` and persist the new list to IDB.
+ *  Returns the new list (caller assigns to state). */
+export function deleteProfile(id: string, current: AvatarProfile[]): AvatarProfile[] {
+  const next = current.filter(p => p.id !== id);
+  void persistProfiles(next);
+  return next;
 }

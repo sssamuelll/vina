@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
+import { AvatarProfile, loadProfiles, loadProfilesAsync, saveProfile as upsertProfile, deleteProfile as removeProfileFromList } from '../utils/avatar/avatarLibrary';
 import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
 import { safeGetItem } from '../utils/safeStorage';
 import { NEW_PROJECT } from './actions';
@@ -274,23 +274,24 @@ const avatarSlice = createSlice({
       state.poseEditorOpen = !state.poseEditorOpen;
     },
     // ─── Profile management ───
-    loadProfilesFromStorage(state) {
-      state.avatarProfiles = loadProfiles();
+    /** Hydrate avatarProfiles from storage. Optional payload from the
+     *  component's mount effect (which awaits loadProfilesAsync); falls back
+     *  to the sync LS read for the brief initial render before async hydrate
+     *  resolves. Mirrors the saved-poses pattern (BUG-10). */
+    loadProfilesFromStorage(state, action: PayloadAction<AvatarProfile[] | undefined>) {
+      state.avatarProfiles = action.payload ?? loadProfiles();
     },
     setActiveProfile(state, action: PayloadAction<string | null>) {
       state.activeProfileId = action.payload;
     },
     addProfile(state, action: PayloadAction<AvatarProfile>) {
-      persistProfile(action.payload);
-      state.avatarProfiles = loadProfiles();
+      state.avatarProfiles = upsertProfile(action.payload, state.avatarProfiles);
     },
     updateProfile(state, action: PayloadAction<AvatarProfile>) {
-      persistProfile(action.payload);
-      state.avatarProfiles = loadProfiles();
+      state.avatarProfiles = upsertProfile(action.payload, state.avatarProfiles);
     },
     deleteProfile(state, action: PayloadAction<string>) {
-      removeProfile(action.payload);
-      state.avatarProfiles = loadProfiles();
+      state.avatarProfiles = removeProfileFromList(action.payload, state.avatarProfiles);
       if (state.activeProfileId === action.payload) {
         state.activeProfileId = null;
       }
@@ -421,4 +422,8 @@ export const {
   toggleIK, setIKTarget, removeIKTarget, updateIKChainTarget,
   setAvailableMorphTargets, setMorphTarget, clearMorphTargets,
 } = avatarSlice.actions;
+
+// Re-export the async profile loader so components can hydrate via the
+// canonical IDB path (BUG-10) without reaching into avatarLibrary directly.
+export { loadProfilesAsync };
 export default avatarSlice.reducer;
