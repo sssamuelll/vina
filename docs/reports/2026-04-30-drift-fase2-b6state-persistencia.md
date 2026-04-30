@@ -274,3 +274,179 @@ ELSE: IDB-canonical (with cache pattern only if sync API contract breaking)
 - El cost de aplicar el criterio caso por caso es bounded (15 sitios totales, todos enumerados).
 
 ---
+
+### 3.2 Schema versioning
+
+**Decisión**: política mandatory/opcional/per-shape para shapes que evolucionan en formato persistido.
+
+#### Estado actual
+
+- 1 site con versioning explícito: `workflowSlice.ts:14-79` con `STORAGE_VERSION = 1` + `PersistedEnvelopeSchema.strict()` que rechaza envelopes con version distinta.
+- 1 site con forward-compat parcial: `avatarLibrary.ts ProfileSchema.catchall(measurementValueSchema)` — acepta fields nuevos pero no migra existing fields.
+- 22 sites sin versioning ni forward-compat: incluye los 8 canonical post-BUG-10, los 12 ad-hoc, los 3 LS-only legitimate menos design log/quarantine.
+
+#### Opción A — Versioning mandatory para todo IDB-canonical
+
+**Propuesta:**
+- Cada shape persistido en IDB envuelve el payload con `{ version: number, data: T }`.
+- Read-side rechaza versiones desconocidas (returns null/default) o invoca migration helper si está registrado.
+- Migration helpers se enrolan en un registry centralizado (`src/utils/storage.ts: registerMigration(store, key, fromVersion, toVersion, fn)`).
+- Schema actual = version 1 por convención.
+
+**Pros:**
+- Forward-compat por construcción para todos los shapes IDB.
+- Future shape changes son explícitos (incrementar version + escribir migration) en vez de implícitos (mudar shape, rezar).
+- Precedente de workflowSlice formaliza el pattern; es replicable.
+
+**Contras:**
+- Boilerplate per-shape (cada `storageSet` envuelve payload, cada `storageGet` desenvuelve).
+- Cost desproporcionado para shapes que nunca cambian (e.g., capsule position si decidiera vivir en IDB).
+- Migration helpers son código permanente — incluso para shapes que evolucionaron una sola vez, el helper queda forever.
+
+#### Opción B — Versioning opcional, mandatory cuando shape cambia
+
+**Propuesta:**
+- Default: shapes persisten sin envelope (igual que hoy).
+- Cuando un shape cambia formato y debe convivir con datos legacy, **se opta-in al envelope** y se introduce migration.
+- Convención: helper `storageSetVersioned(store, key, value, version)` + `storageGetVersioned(store, key, currentVersion, migrations)` para sites que opt-in.
+- workflowSlice queda como ejemplo.
+
+**Pros:**
+- Zero overhead en shapes estables.
+- Versioning cuando es needed, sin imponer overhead a casos triviales.
+- Realidad: la mayoría de los shapes no cambian (auth config, plugin metadata, sortable preferences). Imponer envelope para shapes estables es waste.
+
+**Contras:**
+- Requiere disciplina del equipo: cuando alguien cambia shape, debe recordar migrar a envelope versionado en vez de simplemente shipping. Olvido = silent breakage.
+- No hay enforcement automático; solo policy + code review.
+- Cuando sí se necesita versioning, el opt-in es retroactivo (datos viejos no tienen version field, hay que treat unversioned = version 1).
+
+#### Opción C — Forward-compat por convención (`.catchall()` zod) sin versioning
+
+**Propuesta:**
+- Adoptar `ProfileSchema.catchall()` pattern: zod schemas con `.catchall(z.unknown())` o `.passthrough()` para que reads acepten fields nuevos sin breakage.
+- Shape changes son additive-only (nuevos fields opcionales). Cambios destructivos son explícitos breaking changes que requieren manual data migration.
+- Sin envelope, sin migration registry. Schema-driven forward-compat.
+
+**Pros:**
+- Mucho menor boilerplate que Opción A.
+- Aprovecha el zod boundary (sub-decisión #4 — si zod boundary es policy, esto se obtiene gratis).
+- Forward-compat suficiente para los cambios típicos (agregar fields, defaultear missing fields).
+
+**Contras:**
+- No cubre breaking changes (cambios destructivos como rename de field, change de type). Para esos, igual hay que escribir migration manual.
+- Asume que zod boundary parsing es policy (sub-decisión #4). Si zod boundary se decide opcional, esta opción cae.
+- workflowSlice precedente queda como excepción — no se aplicaría uniforme.
+
+#### Recomendación 3.2
+
+**Opción B (versioning opt-in con helpers) con confianza media.**
+
+**Razones:**
+
+1. **Reality check**: en 8 sites canonical post-BUG-10, ninguno cambió shape en los últimos 3 meses. Imponer Opción A introduce boilerplate forever para casos que no lo necesitan.
+2. **workflowSlice precedente** valida la viabilidad de Opción B: cuando se necesitó versioning (porque workflow state evolucionó), se opt-in con envelope strict + zod. El pattern funciona y es discoverable (un dev nuevo puede leer workflowSlice y replicar).
+3. **Opción C es seductora pero incompleta** — `.catchall()` cubre additive changes, no breaking changes. Apoyarse exclusivamente en zod forward-compat deja la mitad del problema sin resolver.
+4. **Confianza media (no alta)** porque B requiere disciplina del equipo + convention sin enforcement automático. Si en 6 meses se observa que la opt-in fue olvidada en algún breaking change, reabrimos como sub-decisión `B-revised` con enforcement (e.g., custom ESLint rule que requiere envelope para shapes de `storage.ts:`).
+
+**Trigger de reapertura:** observación de un shape change shipped sin versioning donde después se necesitó migration urgent. Documenta el caso, evalúa Opción A vs `B-revised` con enforcement.
+
+**Implementation plan (post-policy ratification, fuera de scope Fase 2):**
+- Agregar `storageSetVersioned`/`storageGetVersioned` a `storage.ts` como helpers opcionales.
+- Documentar inline en `storage.ts` cuándo opt-in (cambio de shape destructivo o additive con default-needed).
+- Sin migración retroactiva: shapes existentes quedan como están hasta que cambien.
+
+---
+
+### 3.3 Multi-store transactions
+
+**Decisión**: diseñar capability nueva o aceptar eventually-consistent en los acoplamientos lógicos existentes.
+
+#### Estado actual
+
+3 acoplamientos lógicos sin atomic transactions:
+
+| Acoplamiento | Stores | Riesgo si falla parcialmente |
+|---|---|---|
+| Saved poses ↔ Avatar profiles | `avatars: profiles`, `avatars: saved-poses` | Pose huérfana referenciando profile borrado. Bajo (no hay enforcement de FK). |
+| Provider config ↔ Fallback provider | `settings: provider-config`, `settings: fallback-provider` | Fallback configurado para provider que ya no es primary. Bajo (logical consistency, app valida en runtime). |
+| Installed plugins ↔ Per-plugin storage | `plugins: installed`, `plugins: plugin:{id}` | Per-plugin storage huérfana (plugin desinstalado pero data residual). Bajo-medio (consume quota, no breaks runtime). |
+
+Cero `Promise.all([storageSet(...), storageSet(...)])` en codebase. Cero IDB transactions multi-store.
+
+#### Opción A — Diseñar capability multi-store transaction wrapper
+
+**Propuesta:**
+- `storage.ts` exporta `storageTransaction(operations: Array<{ store, key, value }>) → Promise<void>`.
+- Internamente abre un IDB transaction sobre todos los stores afectados, ejecuta writes en orden, commit o rollback.
+- Los 3 acoplamientos identificados se refactorian para usar la API nueva.
+- Future couplings se discoveran por code review.
+
+**Pros:**
+- Capability formalizada y reusable.
+- Elimina por construcción los 3 risks identificados (small pero non-zero).
+- Future-proof: si aparece un acoplamiento de mayor blast radius (ej. plugin install que toca multiple stores), está cubierto.
+
+**Contras:**
+- Costo de diseño + implementación + tests significativo (~15-25h de dev work).
+- IDB transaction semantics across stores es API-level boilerplate (open transaction, get object stores, batch writes, await done).
+- Hoy no hay evidencia de bugs de race observados en producción para los 3 acoplamientos. El payoff es preventivo, no correctivo.
+- Performance: transactions multi-store son más lentos que individual writes (sequencial bottleneck, abort retry overhead). Para los 3 casos identificados (pequeños y no-frecuentes), el cost es overkill.
+
+#### Opción B — Aceptar eventually-consistent + add cleanup helpers
+
+**Propuesta:**
+- No diseñar transaction API.
+- Cada acoplamiento mantiene independent writes.
+- Add cleanup helpers que detectan + reparan inconsistencias on read:
+  - `loadSavedPosesAsync()` filtra poses cuyo profileId no existe en profiles list.
+  - `loadFallbackProvider()` valida que el provider referenciado tiene config válido.
+  - `loadPluginStorage()` retorna null para plugins no instalados (force unlock cleanup).
+- Documenta inline cada acoplamiento como "eventually consistent + read-side cleanup".
+
+**Pros:**
+- Zero refactor estructural; preserva la simplicidad write-side actual.
+- Read-side cleanup es defensive programming bien-recibido.
+- Costo bounded: 3 cleanup checks adicionales (~3h dev).
+
+**Contras:**
+- Read-side cleanup no fixes root cause; solo masca el síntoma. Si IDB queda inconsistent, el cleanup happens silently — usuario ve "data lost" sin entender por qué.
+- Future couplings de mayor blast radius requerirían rediseño (Opción A reactiva).
+- "Eventually consistent" semantics sin atomic boundary es difícil de razonar — qué garantías tiene el caller? Cuándo es safe leer?
+
+#### Opción C — Defer (no decidir ahora)
+
+**Propuesta:**
+- B6-state ratifica que los 3 acoplamientos identificados tienen blast radius bajo.
+- Documenta los 3 inline en código + en Sec 9 de este doc.
+- Si en 6 meses aparece un caso de mayor blast radius o se observa bug en producción, reabrimos como sub-decisión propia.
+
+**Pros:**
+- Zero costo ahora. Prioriza decisiones de mayor payoff (políticas globales sobre infra puntual).
+- No-decisiones son defensible cuando el problema es pre-mature optimization (cero bugs observados, blast radius bajo en los 3 casos).
+
+**Contras:**
+- Si Fase 3 introduce un caso de coupling complejo (ej. cross-store changes durante save batch), no hay infra preparada — requiere reactive design.
+- Documentar "deferred" sin criterio explícito de cuándo reabrir es deuda mal definida.
+
+#### Recomendación 3.3
+
+**Opción C (defer con criterio explícito de reapertura) con confianza alta.**
+
+**Razones:**
+
+1. **Cost-benefit asimétrico hoy**: los 3 acoplamientos identificados tienen blast radius bajo. Diseñar capability multi-store transaction (Opción A, ~15-25h) es preventive over-engineering para cases que no han producido bugs en producción.
+2. **Read-side cleanup (Opción B) es band-aid**: no fixes root cause y obscurece el logical model — preferible no-cleanup que cleanup-silent.
+3. **Trigger explícito hace el defer responsible**: reabrir si (a) aparece un acoplamiento con blast radius alto (e.g., user-visible data loss), (b) Fase 3 introduce nueva capability que requiere atomicity (e.g., bulk import que escribe a múltiples stores).
+4. **Confianza alta** porque los 3 acoplamientos están enumerados y documentados — la opción es "no ahora, revisable bajo trigger explícito" no "ignorar".
+
+**Trigger de reapertura:**
+- Bug report de inconsistencia inter-store que no se resuelve con read-side cleanup.
+- Diseño de capability nueva (ej. project save bulk, plugin marketplace install batch) que cruza stores y requiere atomicity para correctness.
+- Observabilidad de quota consumption por orphan data (per-plugin storage de plugins desinstalados acumulándose).
+
+**Implementation plan (post-policy ratification):**
+- Add comentario inline en cada uno de los 3 sitios documentando el coupling y los read-side cleanup expectations.
+- Sin cambio estructural ahora.
+
+---
