@@ -20,7 +20,7 @@ import { getDefaultPluginRegistry } from './pluginRegistry';
 import { PluginHost } from './sandbox/PluginHost';
 import type { AppDispatch, RootState } from '../../store';
 import type { ToolRegistry } from '../action/tools/registry';
-import { safeGetItem, safeSetItem, safeRemoveItem } from '../../utils/safeStorage';
+import { safeGetItem, safeRemoveItem } from '../../utils/safeStorage';
 
 // ─── PluginHost Singleton ────────────────────────────────────────────────────
 
@@ -66,31 +66,72 @@ const INSTALLED_PLUGINS_KEY = 'openclo_installed_plugins';
 
 // ─── Persistence ────────────────────────────────────────────────────────────
 
-/**
- * Load the installed plugins list from localStorage.
- *
- * @returns Array of InstalledPlugin entries
- */
-export function loadInstalledPluginsList(): InstalledPlugin[] {
+/** Module-level cache of the installed-plugins list. Sync API reads/writes
+ *  this cache; IDB persistence is handled fire-and-forget so the sync
+ *  contract callers depend on (install/enable/disable then read) keeps
+ *  working post-BUG-10 without forcing every caller to async. */
+let installedCache: InstalledPlugin[] | null = null;
+
+function readLegacyLS(): InstalledPlugin[] {
   try {
     const raw = safeGetItem(INSTALLED_PLUGINS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed as InstalledPlugin[];
+    return Array.isArray(parsed) ? (parsed as InstalledPlugin[]) : [];
   } catch {
     return [];
   }
 }
 
 /**
- * Save the installed plugins list to localStorage.
+ * Load the installed plugins list synchronously.
  *
- * @param plugins - Array of InstalledPlugin entries to persist
+ * Returns the in-memory cache when populated; otherwise lazy-initializes from
+ * the legacy localStorage key. New code should prefer
+ * `loadInstalledPluginsListAsync` to ensure IDB is consulted (BUG-10
+ * canonical); the sync variant is the right choice only when the caller
+ * cannot await.
+ */
+export function loadInstalledPluginsList(): InstalledPlugin[] {
+  if (installedCache === null) installedCache = readLegacyLS();
+  return [...installedCache];
+}
+
+/**
+ * Async authoritative load: IDB primary + read-side migration from legacy LS.
+ * Populates the in-memory cache so subsequent sync reads see the IDB state.
+ * BUG-10 canonical.
+ */
+export async function loadInstalledPluginsListAsync(): Promise<InstalledPlugin[]> {
+  const { storageGet, migrateFromLocalStorage } = await import('../../utils/storage');
+  const existing = await storageGet<InstalledPlugin[]>('plugins', 'installed');
+  if (existing && existing.length > 0) {
+    installedCache = existing;
+    return [...existing];
+  }
+  const migrated = await migrateFromLocalStorage<InstalledPlugin[]>(
+    INSTALLED_PLUGINS_KEY,
+    'plugins',
+    'installed',
+  );
+  installedCache = migrated ?? [];
+  return [...installedCache];
+}
+
+/**
+ * Save the installed plugins list. Updates the in-memory cache synchronously
+ * (so a follow-up sync read sees the new value) and persists via the IDB
+ * canonical asynchronously (BUG-10). The previous parallel safeSetItem to
+ * the legacy LS key is removed.
  */
 export function saveInstalledPluginsList(plugins: InstalledPlugin[]): void {
-  import("../../utils/storage").then(({ storageSet }) => { storageSet("plugins", "installed", plugins); }).catch(() => {});
-  safeSetItem(INSTALLED_PLUGINS_KEY, JSON.stringify(plugins));
+  installedCache = [...plugins];
+  import('../../utils/storage').then(({ storageSet }) => storageSet('plugins', 'installed', plugins)).catch(() => {});
+}
+
+/** Test helper: reset the in-memory cache so beforeEach setups start clean. */
+export function _resetInstalledPluginsCacheForTests(): void {
+  installedCache = null;
 }
 
 // ─── Install / Remove ───────────────────────────────────────────────────────

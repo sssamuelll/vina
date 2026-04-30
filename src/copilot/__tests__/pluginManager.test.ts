@@ -9,6 +9,7 @@ import {
   listEnabledPluginIds,
   loadInstalledPluginsList,
   resetPluginManager,
+  _resetInstalledPluginsCacheForTests,
 } from '../plugins/pluginManager';
 import { resetLoadedPlugins } from '../plugins/pluginLoader';
 import { resetDefaultPluginRegistry } from '../plugins/pluginRegistry';
@@ -51,6 +52,7 @@ describe('Plugin Manager', () => {
     resetLoadedPlugins();
     resetDefaultPluginRegistry();
     localStorage.clear();
+    _resetInstalledPluginsCacheForTests();
   });
 
   describe('installPluginFromManifest', () => {
