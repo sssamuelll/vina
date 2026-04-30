@@ -46,7 +46,17 @@ export interface OllamaConfig {
 const DEFAULT_OLLAMA_CONFIG: OllamaConfig = { url: OLLAMA_DEFAULT_URL, model: 'llama3', autoDetect: true };
 
 /** Module-level cache; sync API returns from cache, IDB persistence is the
- *  source of truth. Same shape as pluginManager.installedCache (BUG-10). */
+ *  source of truth. Same shape as pluginManager.installedCache (BUG-10).
+ *
+ *  CACHE NOTE (BUG-10 / B6-state input):
+ *  - Order-dependent staleness: if `loadOllamaConfig()` (sync, used in
+ *    AgentSettings render) runs before `loadOllamaConfigAsync()`, the cache
+ *    lazy-inits from legacy LS. Async hydrate reconciles only if it runs.
+ *  - Silent IDB write failure: `saveOllamaConfig` fires the IDB write with
+ *    `.catch(() => {})`; failed writes leave cache and IDB diverged silently.
+ *    Same failure class the canonical eliminated for the 6 non-cached sites;
+ *    preserved here intentionally to keep the sync API contract.
+ *  Resolution deferred to B6-state Fase 2 — sync API policy decision. */
 let ollamaConfigCache: OllamaConfig | null = null;
 
 function readLegacyLS(): OllamaConfig | null {

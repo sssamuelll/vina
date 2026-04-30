@@ -263,6 +263,33 @@ Sites LS-only adyacentes que **no son double-writes** y por tanto fuera del scop
 
 **Sin issues separadas para los 3 LS-only adyacentes.** Su actionability depende de B6-state Fase 2 decidir policy (canonical IDB-only para todo, o shape-based separation con LS-only legitimate). Abrir issues ahora forzaría decisiones prematuras. Esta nota es el artifact que B6-state Fase 2 lee para tomar las 3 decisiones cuando arranque.
 
+### 9.1 Cache pattern emergente durante implementación (input para B6-state)
+
+Durante la migración (commits 5 y 7 del PR de implementación), 2 sitios requirieron un **module-level cache** para preservar la sync API mientras se adopta la canonical IDB:
+
+| Site | Cache símbolo | Por qué cache | Sync caller(s) que lo justifican |
+|---|---|---|---|
+| `pluginManager.ts` | `installedCache` | Sync API contract (install → enable → list en mismo flow sync de tests + handlers) | `installPluginFromManifest`, `listInstalledPlugins`, `enablePlugin`/`disablePlugin` |
+| `providers/ollama.ts` | `ollamaConfigCache` | Sync API contract — `loadOllamaConfig()` se llama en render de `AgentSettings` | `AgentSettings.tsx:108` (render-time read) |
+
+**Failure modes que el cache pattern preserva** (commented inline en cada símbolo):
+
+- **Order-dependent staleness**: si la sync `loadX()` corre antes que la async `loadXAsync()` en una sesión, el cache lazy-init lee LS legacy. La hidratación async reconcilia solo si corre y si IDB tiene data.
+- **Silent IDB write failure**: `saveX` dispara la escritura IDB con `.catch(() => {})`; escrituras fallidas dejan cache e IDB diverged silently. Mismo failure class que el canonical eliminó para los 6 sitios sin cache; preservado intencionalmente para mantener el sync API contract.
+
+**Pregunta para B6-state Fase 2**: ¿la sync API para estos stores stays como cache-shadowing (preserva contrato actual, mantiene los 2 failure modes documentados), o migra a async-only con loading state en los componentes consumidores (`AgentSettings`, plugin handlers)? La decisión interactúa con la política global de async-states — si B6-state ratifica cache-shadowing como excepción legítima, los 2 sitios stay; si ratifica async-only, ambos requieren refactor de sus consumers sync.
+
+### 9.2 Pattern emergente — pure function thread-by-reducer (input para B6-state)
+
+`avatarLibrary.saveProfile(profile, current) → next` y `deleteProfile(id, current) → next` cambiaron durante esta migración de mutation con LS round-trip a **pure function list-in/list-out**. El reducer Redux (`addProfile`, `updateProfile`, `deleteProfile` en `avatarSlice`) thread `state.avatarProfiles` como `current`, asigna el resultado a `state.avatarProfiles`, y la función pura dispara la persistencia IDB fire-and-forget como side effect.
+
+Beneficios observables:
+- Sin LS round-trip dentro del reducer.
+- Lógica testeable sin mockear storage (los tests post-migration en `avatarLibrary.test.ts` ya no necesitan `localStorage` mock para verificar la lógica de upsert/delete; solo verifican el list-in/list-out shape).
+- Composable (cualquier reducer puede usar el helper sin acoplamiento a un storage backend específico).
+
+Cuando B6-state Fase 2 evalúe migraciones similares (workflowSlice, userPreferences, otros library helpers consumidos por reducers Redux), este shape change es **candidate canonical para "library helpers consumidos por reducers Redux"**. La ratificación o el descarte queda para B6-state.
+
 ---
 
 ## 10. Cross-references

@@ -69,7 +69,19 @@ const INSTALLED_PLUGINS_KEY = 'openclo_installed_plugins';
 /** Module-level cache of the installed-plugins list. Sync API reads/writes
  *  this cache; IDB persistence is handled fire-and-forget so the sync
  *  contract callers depend on (install/enable/disable then read) keeps
- *  working post-BUG-10 without forcing every caller to async. */
+ *  working post-BUG-10 without forcing every caller to async.
+ *
+ *  CACHE NOTE (BUG-10 / B6-state input):
+ *  - Order-dependent staleness: if `loadInstalledPluginsList()` (sync) runs
+ *    before `loadInstalledPluginsListAsync()` in a session, the cache lazy-
+ *    inits from legacy LS. Async hydrate reconciles only if it runs and IDB
+ *    has data.
+ *  - Silent IDB write failure: `saveInstalledPluginsList` fires the IDB
+ *    write with `.catch(() => {})`; failed writes leave cache and IDB
+ *    diverged silently. This is the same failure class the canonical
+ *    eliminated for the 6 non-cached sites; it is preserved here intentionally
+ *    to keep the sync API contract.
+ *  Resolution deferred to B6-state Fase 2 — sync API policy decision. */
 let installedCache: InstalledPlugin[] | null = null;
 
 function readLegacyLS(): InstalledPlugin[] {
