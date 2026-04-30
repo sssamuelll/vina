@@ -20,7 +20,7 @@ import type {
   ProviderToolCall,
   StreamChunk,
 } from './types';
-import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
+import { safeGetItem } from '../../utils/safeStorage';
 
 /** Default Ollama API URL */
 export const OLLAMA_DEFAULT_URL = 'http://localhost:11434';
@@ -43,27 +43,66 @@ export interface OllamaConfig {
   autoDetect: boolean;
 }
 
-/**
- * Load Ollama configuration from localStorage.
- *
- * @returns Stored config or defaults
- */
-export function loadOllamaConfig(): OllamaConfig {
+const DEFAULT_OLLAMA_CONFIG: OllamaConfig = { url: OLLAMA_DEFAULT_URL, model: 'llama3', autoDetect: true };
+
+/** Module-level cache; sync API returns from cache, IDB persistence is the
+ *  source of truth. Same shape as pluginManager.installedCache (BUG-10). */
+let ollamaConfigCache: OllamaConfig | null = null;
+
+function readLegacyLS(): OllamaConfig | null {
   try {
     const saved = safeGetItem(OLLAMA_CONFIG_KEY);
-    if (saved) return JSON.parse(saved);
+    if (saved) return JSON.parse(saved) as OllamaConfig;
   } catch { /* ignore */ }
-  return { url: OLLAMA_DEFAULT_URL, model: 'llama3', autoDetect: true };
+  return null;
 }
 
 /**
- * Save Ollama configuration to localStorage.
+ * Load Ollama configuration synchronously. Returns the in-memory cache
+ * (lazy-initialized from legacy LS). New callers should prefer
+ * `loadOllamaConfigAsync` to ensure IDB is consulted (BUG-10 canonical);
+ * sync is the right choice only when the caller cannot await.
+ */
+export function loadOllamaConfig(): OllamaConfig {
+  if (ollamaConfigCache === null) ollamaConfigCache = readLegacyLS() ?? { ...DEFAULT_OLLAMA_CONFIG };
+  return { ...ollamaConfigCache };
+}
+
+/**
+ * Async authoritative load: IDB primary + read-side migration from legacy LS.
+ * Populates the in-memory cache so subsequent sync reads see the IDB state.
+ * BUG-10 canonical.
+ */
+export async function loadOllamaConfigAsync(): Promise<OllamaConfig> {
+  const { storageGet, migrateFromLocalStorage } = await import('../../utils/storage');
+  const existing = await storageGet<OllamaConfig>('settings', 'ollama-config');
+  if (existing) {
+    ollamaConfigCache = existing;
+    return { ...existing };
+  }
+  const migrated = await migrateFromLocalStorage<OllamaConfig>(
+    OLLAMA_CONFIG_KEY,
+    'settings',
+    'ollama-config',
+  );
+  ollamaConfigCache = migrated ?? { ...DEFAULT_OLLAMA_CONFIG };
+  return { ...ollamaConfigCache };
+}
+
+/**
+ * Save Ollama configuration. Updates the in-memory cache synchronously and
+ * persists via the IDB canonical asynchronously (BUG-10).
  *
  * @param config - Configuration to save
  */
 export function saveOllamaConfig(config: OllamaConfig): void {
-  import("../../utils/storage").then(({ storageSet }) => { storageSet("settings", "ollama-config", config); }).catch(() => {});
-  safeSetItem(OLLAMA_CONFIG_KEY, JSON.stringify(config));
+  ollamaConfigCache = { ...config };
+  import('../../utils/storage').then(({ storageSet }) => storageSet('settings', 'ollama-config', config)).catch(() => {});
+}
+
+/** Test helper: reset the in-memory cache so beforeEach setups start clean. */
+export function _resetOllamaConfigCacheForTests(): void {
+  ollamaConfigCache = null;
 }
 
 /**
