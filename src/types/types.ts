@@ -412,6 +412,16 @@ export type CornerType =
 
 // ─── Fabrics ───
 
+/**
+ * Project fabric catalog entry — persistent project state.
+ *
+ * Stored in `projectState.fabrics[]`. Used by save/load, BOM, DXF export.
+ * For sim engineering parameters, see `PhysicalFabric`
+ * (`src/utils/cloth/physicalFabric.ts`). For plugin/copilot basic shape,
+ * see `FabricMaterial` (`src/utils/cloth/fabricLibrary.ts`).
+ *
+ * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ */
 export interface Fabric {
   id: string;
   name: string;

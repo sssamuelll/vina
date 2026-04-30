@@ -12,7 +12,6 @@ import {
   getFabricsByWeave,
   getFabricsByWeight,
   isValidPhysicalFabric,
-  toBasicMaterial,
   toXPBDParams,
 } from '../physicalFabric';
 
@@ -145,41 +144,6 @@ describe('Physical Fabric Library — physical reasonableness', () => {
     const nonwovens = PHYSICAL_FABRIC_LIBRARY.filter(f => f.weaveType === 'nonwoven');
     for (const nw of nonwovens) {
       expect(Math.abs(nw.bendingWarp - nw.bendingWeft)).toBeLessThan(1.0);
-    }
-  });
-});
-
-// ─── Conversion to basic FabricMaterial ─────────────────────────────────────
-
-describe('toBasicMaterial', () => {
-  it('converts silk to low stiffness', () => {
-    const silk = getPhysicalFabric('silk-charmeuse')!;
-    const basic = toBasicMaterial(silk);
-    expect(basic.stretchStiffness).toBeLessThan(0.97);
-    expect(basic.bendStiffness).toBeLessThan(0.1);
-  });
-
-  it('converts canvas to high stiffness', () => {
-    const canvas = getPhysicalFabric('canvas-12oz')!;
-    const basic = toBasicMaterial(canvas);
-    expect(basic.stretchStiffness).toBeGreaterThan(0.95);
-    expect(basic.bendStiffness).toBeGreaterThan(0.4);
-  });
-
-  it('preserves weight and friction', () => {
-    const poplin = getPhysicalFabric('cotton-poplin')!;
-    const basic = toBasicMaterial(poplin);
-    expect(basic.weight).toBe(poplin.weight);
-    expect(basic.friction).toBe(poplin.friction);
-  });
-
-  it('stiffness values stay in 0-1 range', () => {
-    for (const f of PHYSICAL_FABRIC_LIBRARY) {
-      const basic = toBasicMaterial(f);
-      expect(basic.stretchStiffness).toBeGreaterThanOrEqual(0);
-      expect(basic.stretchStiffness).toBeLessThanOrEqual(1);
-      expect(basic.bendStiffness).toBeGreaterThanOrEqual(0);
-      expect(basic.bendStiffness).toBeLessThanOrEqual(1);
     }
   });
 });

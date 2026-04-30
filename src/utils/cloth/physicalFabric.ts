@@ -1,17 +1,21 @@
 /**
- * Physical Fabric Library — real-world textile properties with engineering units.
+ * Physical Fabric Library — engineering-grade textile properties.
  *
- * This extends the basic FabricMaterial with anisotropic properties (warp/weft),
- * shear data, tensile strength, and composition metadata. Values are sourced from
- * textile engineering literature (Kawabata KES, FAST system, ISO standards).
+ * Anisotropic warp/weft data, shear, tensile strength, composition metadata.
+ * Used as the primary fabric type for sim solver, diagnostic, render, and
+ * modern copilot tools (~60 callsites). Values sourced from textile
+ * engineering literature (Kawabata KES, FAST system, ISO standards).
  *
- * The basic FabricMaterial in fabricLibrary.ts remains for backward compatibility.
- * PhysicalFabric is the professional-grade version used by the diagnostic system.
+ * The basic `FabricMaterial` in fabricLibrary.ts remains as a separate, more
+ * public API surface for plugin authors and simple copilot tools — NOT a
+ * deprecating legacy. The two types serve distinct consumer audiences.
+ *
+ * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
  *
  * @module physicalFabric
  */
 
-import type { FabricMaterial, XPBDCompliance } from './fabricLibrary';
+import type { XPBDCompliance } from './fabricLibrary';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +34,18 @@ export type WeaveType =
 
 export type FabricSource = 'library' | 'custom' | 'lab-tested' | 'community';
 
+/**
+ * Engineering-grade fabric properties for cloth simulation, diagnostic,
+ * and render. Primary modern fabric type (~60 callsites).
+ *
+ * Anisotropic warp/weft data, shear, tensile strength, composition metadata.
+ *
+ * For plugin/copilot basic shape, see `FabricMaterial`
+ * (`src/utils/cloth/fabricLibrary.ts`). For project catalog entries, see
+ * `Fabric` (`src/types/types.ts`).
+ *
+ * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ */
 export interface PhysicalFabric {
   /** Unique ID (slug format) */
   id: string;
@@ -609,24 +625,6 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     source: 'library', tags: ['interfacing', 'fusible', 'nonwoven', 'structure', 'collar', 'cuff'],
   },
 ];
-
-// ─── Conversion: PhysicalFabric → basic FabricMaterial ──────────────────
-
-/** Convert a PhysicalFabric to the basic FabricMaterial for backward compatibility. */
-export function toBasicMaterial(pf: PhysicalFabric): FabricMaterial {
-  const avgStretch = (pf.stretchWarp + pf.stretchWeft) / 2;
-  const avgBend = (pf.bendingWarp + pf.bendingWeft) / 2;
-  return {
-    name: pf.name,
-    weight: pf.weight,
-    // Map % stretch to 0-1 stiffness (inverse): 0% → 1.0, 80% → ~0.05
-    stretchStiffness: Math.max(0, 1 - avgStretch / 100),
-    // Map mN·cm bending to 0-1: 0 → 0.0, 8 → 1.0
-    bendStiffness: Math.min(1, avgBend / 8),
-    friction: pf.friction,
-    thickness: pf.thickness,
-  };
-}
 
 // ─── Conversion: PhysicalFabric → XPBD solver params ────────────────────
 
