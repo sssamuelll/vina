@@ -155,6 +155,101 @@ const id = newId();  // e.g., "550e8400-e29b-41d4-a716-446655440000"
 
 The historical `uid()` / `lineId()` / `cid()` / etc. helpers in `pathHelpers.ts`, `patternOps.ts`, `seamlyAdapter.ts`, `copilotUISlice.ts`, `constructionSlice.ts`, etc. are all thin wrappers around `newId()`. New code should call `newId()` directly; the wrappers exist for backward compatibility.
 
+## Persistence policy (B6-state ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-b6state-persistencia.md` (full Fase 2 doc with 8 sub-decisions, opciones por tradeoffs, exception list).
+
+Cross-ref: `docs/reports/2026-04-30-bug-10-fix-options.md` (the BUG-10 nota that established the canonical IDB pattern adopted by 8 sites).
+
+### Canonical write/read
+
+Use `storageSet` / `storageGet` from `src/utils/storage.ts` for IDB-primary persistence. Use `migrateFromLocalStorage(legacyKey, store, key)` for one-time LS→IDB handover on first read. Never write to both LS and IDB in parallel (the BUG-10 anti-pattern).
+
+```typescript
+import { storageSet, storageGet, migrateFromLocalStorage } from '../utils/storage';
+
+// Write
+await storageSet('settings', 'my-key', value);
+
+// Read with read-side migration from legacy LS
+const existing = await storageGet<MyShape>('settings', 'my-key');
+if (existing) return existing;
+return (await migrateFromLocalStorage<MyShape>('legacy-ls-key', 'settings', 'my-key')) ?? defaultValue;
+```
+
+The 4 IDB stores defined are `projects`, `avatars`, `plugins`, `settings`. New storeNames require version bump in `storage.ts:25`.
+
+### When LS-only is legitimate (orientative criterion, ratify per-site)
+
+LS-only is legitimate IFF **all three** apply:
+- shape size ≤ ~1KB
+- AND sync access is required for the render path or sub-millisecond user input
+- AND per-browser UX (no cross-machine value gain from sync)
+
+This criterion is **orientative, not greppable**. Each LS-only site requires explicit ratification via inline comment so future grep can audit coverage:
+
+```typescript
+// shape: SubtoolState ~100B, LS-only: sub-millisecond access during 3D render path
+safeSetItem(SUBTOOL_STORAGE_KEY, JSON.stringify(state));
+```
+
+```typescript
+// shape: AgentConfig ~80B, IDB canonical (B6-state § 5)
+await storageSet('settings', 'agent-config', config);
+```
+
+If a new write doesn't fit any existing pattern, default to IDB canonical and prove the LS-only case in PR review.
+
+### Schema versioning (opt-in)
+
+Default: shapes persist without an envelope. When a shape changes format and legacy data must coexist, **opt in** to an envelope helper (precedent: `workflowSlice.ts:14-79` with `STORAGE_VERSION = 1` + zod strict envelope).
+
+To mitigate **silent migration debt risk** (a dev changing a persisted shape without knowing the opt-in path exists): every `storageSet` call site should carry an inline comment declaring the shape + version + opt-in status:
+
+```typescript
+// shape: AgentConfig v1 — opt-in envelope: no (stable shape, no migrations expected)
+await storageSet('settings', 'agent-config', config);
+```
+
+```typescript
+// shape: WorkflowState v1 — opt-in envelope: yes (zod strict, see workflowSlice.ts:14)
+await storageSet('settings', 'workflow', envelopedValue);
+```
+
+Any shape change to a persisted type requires either:
+- (a) opt-in to the envelope versioning helper if datos legacy must coexist, or
+- (b) explicit declaration "breaking change, drop legacy data" with migration removal in the commit message.
+
+The grep pattern `// shape: <Type> v<N> — opt-in envelope: <yes|no>` is the audit hook for this convention.
+
+### zod boundary parsing
+
+Mandatory at IDB read boundary for **user-generated data** (poses, profiles, plugin manifests). Optional for internal config with stable TypeScript-narrow shape (agent-config, provider-config, fallback-provider, ollama-config).
+
+When in doubt: zod-parse on read. The cost is bounded; the bug surface from corrupt data is real.
+
+### Sync API exceptions
+
+The cache-shadowing pattern (module-level cache + sync API + async hydrate + IDB persistence) is ratified as exception in 2 sites: `pluginManager.installedCache`, `providers/ollama.ollamaConfigCache`. Failure modes (order-dependent staleness + silent IDB write failure) are documented inline and accepted as the trade-off for sync API contract preservation.
+
+If a third cache site emerges with the same shape, evaluate canonical helper extraction (B6-state § 3.5 reopen trigger).
+
+### Migration window
+
+`migrateFromLocalStorage` paths are **indefinite — do not remove** post-canonical-adoption. Comment inline: `// Legacy LS migration; permanent per B6-state § 3.7`. Reopen the policy if the codebase accumulates >5 distinct migration paths or telemetry confirms zero legacy reads for >12 months.
+
+### What is out-of-scope of this policy
+
+- **SecureStorage** (encrypted secrets in sessionStorage) — separate concern. Boundary: non-secrets in IDB, secrets in SecureStorage.
+- **Plugin sandbox storage** (`PluginBridge.ts:622`) — plugin isolation boundary, intentional.
+- **Skill persistence DB** (`openclo_skills_v1`) — separate IDB instance with custom schema/indices. Ratified as deliberate separation.
+- **Reference image blob storage** (`openclo-reference-images`) — separate IDB instance for large blobs. Ratified.
+- **`projectIO.ts:155` quarantine** — deliberately LS-only for resilience (Safari private mode survival).
+
+### When to update this section
+
+Reopen B6-state Fase 2 (per § 7 reopen triggers) if any persistence drift surfaces a case that the policy doesn't cover, or if observed bugs invalidate one of the ratified opciones.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
