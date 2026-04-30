@@ -1,12 +1,14 @@
 # Drift audit shipping rate (2026-04-27 → 2026-04-30)
 
-**Snapshot, no análisis.** Captura el throughput observado del audit hasta el cierre de B3-state para calibrar estimates de ejes restantes.
+**Snapshot, no análisis.** Captura el throughput observado del audit hasta el cierre del bloque (b) state completo.
+
+**Última actualización:** post-merge B2-state (PR #663). Ejes cerrados acumulados: 13. Próxima actualización: cuando se cierre otro hito grande (e.g., bloque D ejes, primer RFC).
 
 ---
 
 ## Ejes
 
-**Cerrados:** 11 ejes (10 cierres + 1 ratification-only contado aparte).
+**Cerrados:** 13 ejes (algunos con sub-cierres separados).
 
 | ID | Cierre | Tipo |
 |---|---|---|
@@ -21,14 +23,18 @@
 | D1-cosmetic | ratification (3 casings = 3 roles distintos) | mecánico |
 | B6-state | ratification (persistencia policy, 8 sub-decisiones) | (b) decisión |
 | B3-state | ratification (cascade middleware patterns) | (b) decisión |
+| B10-state | hybrid (Par 2 ratify misclass + Par 1 ratify+migrate hybrid scope) | (b) decisión |
+| B2-state | ratification (entity collections shape policy, convention forward-only) | (b) decisión |
 
-**Categorías:** 7 mecánicos + 4 (b) decisión.
+**Categorías:** 7 mecánicos + 6 (b) decisión.
+
+**Bloque (b) state cerrado completamente:** B2, B3, B4, B5, B6, B10, B11, B12 — todos los ejes del state ya tienen ratification doc o canonical. Próximos (b) son en otros dominios (A, D).
 
 ---
 
 ## BUGs
 
-**Cerrados:** 14 (BUG-1, 2, 3, 5, 7, 9, 11 prioritarios + BUG-4, 6, 8, 10, 12, 13, 15 secundarios + BUG-14 ratificado misclassified). Total 15 si BUG-14 entra; 14 si se cuenta como ratification.
+**Cerrados:** 14-15 (BUG-1, 2, 3, 5, 7, 9, 11 prioritarios + BUG-4, 6, 8, 10, 12, 13, 15 secundarios + BUG-14 ratificado misclassified).
 
 **PRs:** ~7-8 fix implementation + 2 notas fix-options (BUG-7, BUG-10).
 
@@ -36,11 +42,11 @@
 
 ## Documentación
 
-- 11 Fase 2 docs (ratifications + decision docs).
+- 13 Fase 2 docs (ratifications + decision docs).
 - 2 notas fix-options (BUG-7, BUG-10).
 - 1 inventory addendum (2026-04-29).
-- 1 audit shipping rate (este doc).
-- ~5500-6500 líneas de doc en 4 días.
+- 1 audit shipping rate (este doc, ya updated).
+- **~7000-8000 líneas de doc en 4 días** (delta: +175 B10 Par 2 + 429 B10 Par 1 + 589 B2 ≈ +1200 líneas vs snapshot previo).
 
 ---
 
@@ -54,21 +60,29 @@
 - Persistence policy (B6-state ratified, full section).
 - Cascade middleware patterns (B3-state ratified, full section + sub-sections).
 - Action meta flags (B3-state ratified, sub-section).
+- **Fabric assignment patterns (B10-state Par 1 ratified).**
+- **Entity collections shape policy (B2-state ratified).**
+
+**10 secciones / regla anchored** (delta: +2 desde snapshot previo).
 
 ---
 
 ## Issues open as follow-up
 
-**~22 follow-up issues abiertos** post-cierre de los ejes y bugs:
+**~23 follow-up issues abiertos** post-cierre acumulado. 2 closed (#627, #642).
 
 | Rango | Cantidad | Categoría |
 |---|---|---|
 | #619-#637 | ~12 | follow-ups varios (cdtMesher flake, openclo-use-webgpu defaults, material disposal, set_stretch legacy, etc.) |
-| #639-#645 | 5 | C5/C6 follow-ups + AgentConfig + ESLint CI + AgenticLoop errors |
-| #654-#657 | 3 | B6-state Fase 3 migrations + skill rename + telemetry hook + CLAUDE.md path stale |
+| #639-#645 | 5 (1 closed: #642) | C5/C6 follow-ups + AgentConfig + ESLint CI + AgenticLoop errors |
+| #654-#657 | 4 | B6-state Fase 3 migrations + skill rename + telemetry hook + CLAUDE.md path stale |
 | #659 | 1 | Custom eslint rule @cascade header (B3-state) |
+| **#662** | 1 | **Custom eslint rule fabric write target slice (B10-state Par 1)** |
+| **#664** | 1 | **Custom eslint rule selectXById usage (B2-state)** |
 
-**Total commits en main since 2026-04-27:** 97.
+**Lint-rule cluster emergente:** 3 issues (#659 + #662 + #664) son custom eslint rules para enforce convention de B-state ratifications. Posible agrupación en un único custom plugin si el implementador prefiere — decisión queda a quien los implemente.
+
+**Total commits en main since 2026-04-27:** ~120 (delta: +23 desde snapshot previo).
 
 ---
 
@@ -87,14 +101,30 @@
 | D1-cosmetic | 2-4h | ~1.5h | ~0.5x | Ratification por reclassification (3 roles) |
 | B6-state | 12-16h | ~8h | ~0.6x | 8 sub-decisiones, sin código |
 | B3-state | 6-10h | ~5h | ~0.6x | Sweep cerró limpio + precedente fresco BUG-7 |
+| **B10-state Par 2** | **2h** | **~1.5h** | **~0.75x** | **Misclassification ratification** |
+| **B10-state Par 1** | **5-7h** | **~3h** | **~0.5x** | **Investigación adicional Q1-Q3 cerró β pre-redacción** |
+| **B2-state** | **5-9h** | **~3.5h** | **~0.5x** | **Sweep clean + framing ratify simplificó** |
 
-**Promedio:** factor ~0.5-0.7x del estimate inicial. **Causa dominante:** ratification path (consistency-alignment o canonical pre-existente) en lugar de unify XL — los ejes (a) cerraron por debajo del estimate cuando el sweep reveló que el drift era cosmético o ya resuelto.
+**Promedio actualizado:** factor ~0.5x del estimate inicial. **Causa dominante reaffirmada:** ratification path (consistency-alignment o canonical pre-existente o misclassification reclassified) en lugar de unify XL.
+
+### Patrón shape común para los (b) políticos transversales
+
+Los siguientes ejes cerraron como **ratify status quo + criterion forward-only** (o variante misclassification):
+
+- **D1-cosmetic** — 3 casings = 3 roles distintos.
+- **B5-state** — factory pattern vestigial.
+- **C7** — custom pan intentional feature.
+- **B6-state partial** — persistence policy con LS exceptions ratified.
+- **B10-state Par 2** — snapshot intencional, no duplicate.
+- **B2-state** — convention transversal forward-only.
+
+**Cuántos casos:** 6/13 ejes cerrados son ratification por convention/misclassification. Esto sugiere que el **inventario inicial sobrestima drift real** — muchos casos clasificados como "drift" son patterns coherentes pendientes de doc.
 
 ---
 
 ## Pendientes
 
-- **9 ejes (b) restantes:** A3, B2-state, B10-state, D1-real, D3, D4, D5, D6, D7.
+- **7 ejes (b) restantes:** A3 (cross-boundary errors), D1-real, D3, D4, D5, D6, D7. **Bloque (b) state cerrado completamente.**
 - **6 ejes (c) RFC:** A2, A4, A6, A7, C1, C4.
 - **1 sub-track compuesto:** E-async-states (B8-state + D2 + D8).
 
@@ -102,11 +132,15 @@
 
 ## Implicaciones para forward planning
 
-- **Pace ~2-3 ejes/día sostenible** si el scope queda en (b) ratification con consistency-alignment.
+- **Pace ~2-3 ejes/día sostenible** si el scope queda en (b) ratification con consistency-alignment. **Verified empíricamente** post-cierre de B10+B2 en una tarde.
 - **(c) RFCs probablemente bajan el rate a 0.5-1 RFC/día** por la naturaleza arquitectural del trabajo.
-- **Total runway estimado** para cerrar todos los (b) restantes + (c) RFCs + E-async-states sub-track con pace actual: **5-8 días adicionales**.
-- **Riesgos:** E-async-states es el más impredecible (sub-track multi-sesión); A7 RFC absorbió scope de BUG-5 y puede expandirse más cuando arranque.
+- **Total runway estimado** para cerrar todos los (b) restantes + (c) RFCs + E-async-states sub-track con pace actual: **4-7 días adicionales** (delta: -1-2 días desde snapshot previo).
+- **Riesgos:** E-async-states sigue siendo el más impredecible (sub-track multi-sesión); A7 RFC absorbió scope de BUG-5 y puede expandirse más cuando arranque.
+
+### Lint-rule cluster (deuda técnica explícita)
+
+3 follow-up issues (#659, #662, #664) son custom eslint rules. Si pasan demasiado tiempo sin implementarse, las convenciones ratificadas dependen solo de review humano. Mitigación: severity:medium en los 3 (no severity:low) para priority en cola post-audit. Posible: bundle en single plugin con 3 rules — decisión queda al implementador.
 
 ---
 
-**FIN DEL SNAPSHOT.** Próxima actualización: cuando se cierre el bloque (b) o se arranque el primer (c) RFC, lo que ocurra primero.
+**FIN DEL SNAPSHOT.** Próxima actualización: cuando se cierre otro hito grande (cierre de bloque D ejes, o primer RFC iniciado).
