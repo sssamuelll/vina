@@ -144,7 +144,17 @@ export interface DartOptions {
   capShape?: DartCapShape;
 }
 
-/** A dart with full geometric and semantic data */
+/**
+ * Rich domain view of a dart, derived from `InternalLine{type:'dart'}`.
+ *
+ * Storage layer uses `InternalLine{type:'dart'}` (path data only) in
+ * `pieces[].internals`. This Dart entity captures dart-specific semantics
+ * (intake, apex, legs, foldDirection, capShape) for domain operations.
+ *
+ * Convert via `extractDartFromInternal` / `extractDarts` from
+ * `src/utils/dartEntity.ts`. See CLAUDE.md "Dart representation (D1-real
+ * ratified)" for the full contract.
+ */
 export interface Dart {
   id: string;
   /** Intake (width absorbed) in mm */
@@ -180,6 +190,18 @@ export interface GrainLine {
   path: PathCommand[];
 }
 
+/**
+ * Discriminated union for internal line types stored in `pieces[].internals`.
+ *
+ * The `'dart'` variant is the **storage shape** (path data only); the rich
+ * domain view is the `Dart` entity (`src/types/types.ts:148`). See bridge
+ * module `src/utils/dartEntity.ts` for conversion. Other variants like
+ * `'grainline'` have their own rich types (e.g., `GrainLine` interface);
+ * the rest (`'notch'`, `'fold'`, `'pleat'`, `'topstitch'`, `'reference'`)
+ * are storage-only by design.
+ *
+ * Cross-ref: CLAUDE.md "Dart representation (D1-real ratified)".
+ */
 export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch' | 'reference';
 
 export type NotchShape = 'slit' | 't-notch' | 'v-internal' | 'v-external' | 'u-notch' | 'castle' | 'diamond';

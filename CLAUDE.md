@@ -588,6 +588,68 @@ Reopen D5 if:
 4. Cross-layer file count grows past ~40 (currently 24) without convention updates.
 5. An eslint plugin like `boundaries` is introduced for another reason (e.g., WASM↔JS layering); evaluate whether TS-side enforcement now applies.
 
+## Dart representation (D1-real ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-d1real-dart-internalline.md` (full Fase 2 doc with 3 sub-decisiones, git blame analysis confirming enrichment intent).
+
+Two representations of a dart coexist with distinct roles. They are **intentionally dual** — not migration drift.
+
+```
+storage layer (persisted with project):
+  pieces[].internals  ←  InternalLine[] (7 types via discriminated union)
+                          │
+                          │  (variant 'dart' specifically, path: PathCommand[])
+                          ▼
+                          dartEntity.extractDartFromInternal() / extractDarts(piece)
+                          ▼
+domain layer (computed, optionally cached):
+  pieces[].darts?     ←  Dart[] (rich semantic structure:
+                          intake, apex, legs[2], foldDirection, capShape)
+                          │
+                          │  domain operations (adjustDartIntake,
+                          │  segmentDart, shapeDartCap)
+                          ▼
+                          new InternalLine{type:'dart'} (back to storage)
+```
+
+### When to use which
+
+| Use case | Representation |
+|---|---|
+| Persistence, project save/load | `InternalLine{type:'dart'}` (storage primitive) |
+| 2D render (`PieceRenderer.tsx`) | `InternalLine{type:'dart'}` (path data) |
+| DXF import/export | `InternalLine{type:'dart'}` |
+| Domain operations (adjust intake, segment, shape cap) | `Dart` entity (rich semantic) |
+| Geometric transformations (slashAndSpread rotations/translations/splits) | `Dart` entity |
+| Copilot tools that reason about dart structure | `Dart` entity (via `extractDarts`) |
+
+**Decision rule:** if the operation needs `intake`, `apex`, `legs`, `foldDirection`, or `capShape` — use `Dart` entity. If it just needs the path (storage, render, mirror, DXF) — use `InternalLine{type:'dart'}`.
+
+### Bridge module — `src/utils/dartEntity.ts`
+
+All bidirectional conversion + domain operations are concentrated in this module. Consumers should NOT replicate conversion logic locally.
+
+Functions:
+- `extractDartFromInternal(line, edges?)` — single InternalLine → Dart.
+- `extractDarts(piece)` — bulk extraction; `pieces[].darts ?? extractDarts(piece)` is the lazy-cache idiom.
+- `adjustDartIntake(dart, deltaMm)` — domain op.
+- `segmentDart(dartLine, segments, ...)` — emits N new InternalLines.
+- `shapeDartCap(dart, capShape)` — generates new path.
+
+### Why not unified
+
+The shapes are structurally orthogonal: `path: PathCommand[]` cannot capture intake/apex/legs/foldDirection/capShape semantics. Killing `Dart` entity would lose expressiveness; killing `InternalLine{type:'dart'}` would break consistency with the 6 other internal line variants. The dual representation is the right shape — git blame confirms it was introduced as enrichment (commit `433f8399` "Rich Dart Entity — structured dart data on PatternPiece"), not migration.
+
+### Reopen triggers
+
+Reopen D1-real if:
+
+1. Dual maintenance accidental detected — a consumer mutates `piece.darts` without re-syncing `piece.internals` (or vice versa) bypassing the bridge module.
+2. A third dart-like representation emerges (e.g., a copilot tool defining its own `DartView`).
+3. The bridge module gets bypassed systematically in new code.
+4. `pieces[].darts` becomes required (not optional cache) — evaluate whether `InternalLine{type:'dart'}` can be deprecated.
+5. Domain operations emerge for other `InternalLineType` variants (`pleatEntity.ts`, `notchEntity.ts`); evaluate whether the pattern should generalize.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
