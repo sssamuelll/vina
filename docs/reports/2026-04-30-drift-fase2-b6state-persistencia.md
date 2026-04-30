@@ -973,6 +973,8 @@ Items que cruzan B6-state pero no entran a su scope, capturados explícitamente:
   - **DesignLogManager**: Per-project session log. **Sub-decisión menor**: migrar a canonical IDB? Recomendación: **migrate** (consistency con per-project memory pattern, low cost). Costo ~2h.
   - **projectIO quarantine**: Deliberately LS-only por resilience (Safari private mode survival). Ratificada como exception explícita. Documentar inline.
 
+- **`errorRecovery.ts:345`** (defensive cleanup, no regular write): `safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(rest))` dentro de `clearLegacyFallbackKeys()` — escribe el config sin apiKey al LS legacy como parte del scrub de API keys legacy. Solo se ejecuta una vez por usuario con datos pre-2026-03-23. **Out of B6-state policy scope**: no es persistence de regular runtime data; es one-shot security cleanup. Ratificada como tal post-BUG-10. Eventually obsoleta cuando todos los usuarios hayan corrido el scrub al menos una vez (per § 3.7 indefinite-no-remove policy, queda forever sin costo).
+
 ### Issues nuevas que B6-state genera (todavía no abiertas)
 
 Después de tu ratificación, abrir:
