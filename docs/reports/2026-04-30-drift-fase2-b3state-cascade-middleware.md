@@ -456,5 +456,194 @@ CLAUDE.md tiene la lista; los archivos individuales tienen comentarios informale
 
 **Total migration:** 5 headers + 1 lint rule + ~180 líneas a CLAUDE.md + 0 cambio runtime + 0 cambio en cascadas existentes (5/5 ya cumplen los criterios). Las 5 cascadas se preservan textualmente; B3-state cementa la convención sin tocar código de comportamiento.
 
-[Sec 4-9 pendientes — incremental push.]
+## Sección 4 — Recomendación consolidada
+
+Si Sam aprueba las 5 sub-decisiones tal como recomendado en Sec 3, el canónico de B3-state queda:
+
+### 4.1 Convención canónica de cascade middleware
+
+**Una cascade middleware** es un middleware en `src/store/*Middleware.ts` que intercepta una action y emite uno o más dispatches secundarios sin que el call-site sepa o controle. Las cascadas son legítimas si:
+
+1. La cascade tiene **header `@cascade` documentando** shape, triggers, dispatches, guard, undo policy. (Sub-decisión 3.1.B.)
+2. La cascade respeta el **criterio undo grouping** (agrupa solo si modifica `project.*` Y los dispatches representan un paso de usuario semántico único). (Sub-decisión 3.3.A.)
+3. La cascade tiene **depth ≤ 1** (los dispatches secundarios no pueden ser triggers de otra cascade). (Sub-decisión 3.4.A.)
+4. La cascade aparece en la **sección "Cascade middleware patterns" de CLAUDE.md** como índice. (Sub-decisión 3.5.A.)
+
+### 4.2 Convención de cascade vs orchestration
+
+Definida operacionalmente en CLAUDE.md (Sub-decisión 3.2.A). Test: ¿el call-site sabe que B se va a dispatchar como consecuencia de A y la dispatcha explícitamente? Sí → orchestration. No → cascade.
+
+Caso `batchUndo()` resuelto como **orchestration con cascade-adjacent batching**: el caller controla qué se dispatcha; el middleware controla cómo se agrupa en undo.
+
+### 4.3 Convención de meta flags
+
+Los 2 meta flags activos (`meta.skipConfirmation`, `meta.fromToolMemory`) se documentan centralmente en CLAUDE.md sección "Action meta flags" con propósito + callsites pattern.
+
+Cualquier nuevo `meta.*` flag introducido en el futuro requiere:
+1. Documentación en CLAUDE.md "Action meta flags".
+2. Justificación de por qué no es alternativa a control actions o `@cascade` header.
+
+### 4.4 Mapping de cascadas existentes a la convención
+
+| Cascade | Header `@cascade` | Undo policy | Depth | CLAUDE.md índice |
+|---|---|---|---|---|
+| linkedEditing (sym 1↔1) | requiere agregar | agrupa (criterio: modifica project + paso único) ✓ | 1 ✓ | requiere agregar |
+| gradingStaleness (obs idempotent) | requiere agregar | no agrupa (metadata) ✓ | 0 ✓ | requiere agregar |
+| confirmation (a) replay | requiere agregar (1 de 3 sub-cascadas) | n/a (single action) ✓ | 1 ✓ | requiere agregar |
+| confirmation (b)(c) tool-memory | requiere agregar (2 de 3 sub-cascadas) | no agrupa (state mirror) ✓ | 1 ✓ | requiere agregar |
+| reactiveSolver (a) removePoint obs | requiere agregar | no agrupa ✓ | 0 ✓ | ya existe (reactivo) |
+| reactiveSolver (b) chain async | requiere agregar | no agrupa (solver state) ✓ | 1 ✓ | ya existe (reactivo) |
+| undoMiddleware (mecanismo) | n/a (es el mecanismo) | n/a | n/a | requiere agregar |
+
+Las 5 cascadas existentes pasan el criterio canónico **sin cambio de código** — B3-state cementa convención + documentation, no behavior.
+
+### 4.5 Lint rule (futura, no en este PR)
+
+Lint rule custom para enforce header `@cascade` queda como **out-of-scope inmediato**:
+- Implementación: requiere eslint plugin custom o regla AST.
+- Severity inicial: warning-only por 1 mes.
+- Justificación de out-of-scope: el código de la lint rule es trabajo separado y testeable per se. B3-state ratifica la convención; otra issue/PR implementa el lint.
+
+**Acción:** issue de follow-up "audit: implementar lint rule custom para `@cascade` header en middlewares". Severity:low. Labels: audit, follow-up.
+
+---
+
+## Sección 5 — Plan de migración Fase 3
+
+**Nota:** Fase 3 es trabajo separado, no parte de este PR. Lista qué tendría que pasar para implementar el canónico una vez ratificado.
+
+### 5.1 Commit 1 — CLAUDE.md anchoring
+
+Agregar 3 secciones a CLAUDE.md:
+
+1. **"Cascade middleware patterns"** — convención operacional (4.1) + criterio undo (3.3.A) + depth cap (3.4.A) + caso `batchUndo()` (3.2.A). Lista las 5 cascadas con resumen 1-2 líneas + cross-ref al archivo. ~120 líneas.
+2. **"Cascade vs orchestration distinction"** — definición operacional (3.2.A) + ejemplo `batchUndo()`. ~30 líneas.
+3. **"Action meta flags"** — `meta.skipConfirmation` (propósito, 7 callsites pattern), `meta.fromToolMemory` (propósito, internal). Política para introducir nuevo flag. ~30 líneas.
+
+Total ~180 líneas.
+
+### 5.2 Commit 2 — `@cascade` headers
+
+Agregar header doc-comment estructurado a 5 archivos:
+
+1. `src/store/linkedEditingMiddleware.ts` — 1 header.
+2. `src/store/gradingStalenessMiddleware.ts` — 1 header.
+3. `src/store/confirmationMiddleware.ts` — 3 headers (uno por sub-cascade).
+4. `src/store/reactiveSolverMiddleware.ts` — 2 headers (removePoint obs + trigger chain).
+5. `src/store/undoMiddleware.ts` — 1 header (mecanismo).
+
+Total 8 headers. Cada uno ~10-15 líneas.
+
+### 5.3 Commit 3 (futuro, follow-up issue) — Lint rule
+
+Custom eslint plugin que verifica todo middleware en `src/store/*Middleware.ts` con `dispatch(` en body lleva `@cascade` header válido.
+
+Severity inicial: `warn` por 1 mes; después `error` si no surgieron false positives.
+
+---
+
+## Sección 6 — Cross-refs y dependencias
+
+### 6.1 Inputs (lo que B3-state usa como base)
+
+- `docs/reports/2026-04-28-drift-fase2-classification.md` — clasificación inicial del eje (b).
+- `docs/reports/2026-04-29-drift-inventory-addendum.md` § 3 — precedente bajo evaluación (BUG-7 batch grouping).
+- `docs/reports/2026-04-28-bug-7-fix-options.md` — nota fix-options BUG-7 (precedente fresco de batch grouping).
+- B12-state ratificación — `NEW_PROJECT` extraReducer pattern como pre-existing canonical, fuera de scope de B3-state.
+- CLAUDE.md secciones existentes "Reactive Solver Middleware", "Expert Mode (Click'n'Go)" — descripciones de subsystems que B3-state extiende.
+
+### 6.2 Outputs (lo que B3-state habilita)
+
+- **B5-state ratificación cosmética** ya cerrada — la convención `@cascade` es complementaria al middleware factory pattern que B5-state ratificó. Ambas conviven sin conflict.
+- **E-async-states sub-track futuro** — B3-state cementa la línea cascade-vs-orchestration; E-async-states asume esa línea como input (decide error handling para orchestration y para Phase 2 async chains de reactiveSolver, que B3-state explícitamente NO decide).
+- **Lint rule custom** — issue de follow-up para implementación.
+- **Documentación central de meta flags** — habilita futuras revisiones de `meta.*` introducciones (cualquier nueva flag debe pasar por la sección de CLAUDE.md y justificarse).
+
+### 6.3 Conflicts y co-existence
+
+- `confirmationMiddleware` mezcla cascade (intercept-defer + tool-memory mirror + auto-apply) con state-mirror. La estructura es heredada de Click'n'Go #268 y NO es scope de B3-state refactorearla. Si emerge un eje futuro (e.g., refactor del confirmation flow), B3-state ratifica el actual con 3 `@cascade` headers; cualquier refactor mantiene o reduce los headers.
+- `reactiveSolverMiddleware` cascade chain async tiene error handling ad-hoc (`console.error` en `:655`). Eso es scope de E-async-states, NO de B3-state. La ratificación de B3-state preserva el código actual; E-async-states puede reabrir.
+
+### 6.4 No-conflicts (out-of-scope verificado)
+
+- AgenticLoop / Copilot bridge orchestration — no afectada por B3-state (orchestration sequential, no cascade).
+- `NEW_PROJECT` extraReducer — no afectada por B3-state (already canonical via B12-state).
+- Undo internals (`batchDepth`, `batchSnapshot`) — no afectados (BUG-7 ya ratificó el shape).
+- Persistencia (B6-state ratificada) — no afectada (B6-state opera en boundary IDB/LS, B3-state opera en cascade dispatches).
+
+---
+
+## Sección 7 — Reopen triggers
+
+B3-state ratificación queda **revisable** si emerge cualquiera de:
+
+1. **Una cascade nueva** que no fitte en ninguno de los 6 primitives inventariados (boolean re-entrance, generation counter, idempotent-no-guard, meta flag, control actions, cross-slice extraReducer). Reabrir Sec 3.1 con el nuevo shape.
+2. **Caso de cascade-of-cascade legítimo** (depth > 1) que no se pueda reescribir como orchestration. Reabrir Sec 3.4 con el caso concreto.
+3. **`meta.cascadeOf` runtime debugging** se vuelve necesidad real (e.g., debugging session donde stack trace no alcanza). Reabrir Sec 3.1 evaluando 3.1.A.
+4. **Lint rule custom genera false positives** persistentes después de 1 mes warning-only. Reabrir Sec 3.5 evaluando si la lint debe relajarse o cambiar approach.
+5. **Caso ambiguo cascade vs orchestration** que el test operacional (3.2.A) no resuelva. Reabrir Sec 3.2 con el caso para extender la definición.
+6. **E-async-states sub-track** decide error handling para async chains, y esa decisión obliga a re-evaluar B3-state convención de cascade middleware. Reabrir cualquier sub-decisión afectada.
+
+Cada reopen produce un addendum a este doc, no un nuevo doc desde cero.
+
+---
+
+## Sección 8 — Deuda técnica explícita post-ratificación
+
+Aún si B3-state se ratifica con todas las recomendaciones aceptadas, las siguientes deudas técnicas **persisten** y se documentan explícitamente:
+
+1. **`confirmationMiddleware` mezcla 3 sub-cascadas en un mismo archivo.** Es heredado de Click'n'Go #268. B3-state ratifica el shape actual con 3 headers `@cascade`, no refactorea. Deuda futura: si emerge necesidad de modificar tool-memory o confirmation independientemente, considerar split en 2 middlewares separados.
+
+2. **`reactiveSolverMiddleware` Phase 2 async chain tiene error handling con `console.error` (`:655`).** Suficiente para desarrollo pero insuficiente para producción (errores silenciosos al usuario). Deuda asignada a **E-async-states** sub-track.
+
+3. **Lint rule `@cascade` no se implementa en este PR.** Out-of-scope; issue de follow-up. Mientras tanto, la convención depende de review humano.
+
+4. **`useScissorsTool.ts:152` comment-only mention de `meta.skipConfirmation`** se preserva por ahora; se promueve a CLAUDE.md "Action meta flags" pero el comment local queda. Si en el futuro se hace cleanup de comments redundantes, ese es candidato.
+
+5. **Discoverability de `batchUndo()`:** los 5 callsites lo importan desde `undoMiddleware.ts`. Es helper público pero no está documentado en CLAUDE.md. Acción: agregar mención en CLAUDE.md "Cascade middleware patterns" (parte del Commit 1 de Fase 3).
+
+---
+
+## Sección 9 — Decisión pendiente y siguiente paso
+
+### 9.1 Pregunta a Sam
+
+¿Aprobás las 5 sub-decisiones tal como recomendado en Sec 3 (3.1.B + 3.2.A + 3.3.A + 3.4.A + 3.5.A)?
+
+Si **sí, todo aprobado:**
+- Marco PR ready-for-review.
+- Sec 4-9 quedan como ratificación final.
+- Fase 3 (CLAUDE.md anchoring + headers) en commits separados, sobre este mismo PR o branch nueva.
+- Issue de follow-up para lint rule.
+- Anotar inventario annotation B3-state cerrado.
+
+Si **alguna sub-decisión querés cambiar:**
+- Indicame cuál (3.1, 3.2, 3.3, 3.4, 3.5) y qué opción preferís (3.x.A, B, C, D).
+- Re-edito Sec 4 (recomendación consolidada) con el cambio.
+- Re-pusheo.
+
+Si **el scope del eje cambia** (e.g., Sam decide que `reactiveSolverMiddleware` cascade async debe absorberse a B3-state en vez de E-async-states):
+- STOP. Reabro Sec 1 con el scope ampliado.
+- Re-evalúo el inventory y opciones.
+
+### 9.2 Estado del PR
+
+- Sec 1-9 ✅ ready.
+- PR #658 en draft.
+- Pendiente verde de Sam para promover a ready-for-review.
+- Pendiente Fase 3 commits (CLAUDE.md + headers).
+
+### 9.3 Calibración estimate vs actual
+
+- Estimate Sec 1-2: ~3-4h. Actual: ~2.5h.
+- Estimate Sec 3-5 (recomendaciones + plan migración): ~3-4h. Actual: ~1.5h.
+- Estimate Sec 6-9 (cross-refs + reopen + deuda + decisión): ~1-2h. Actual: ~1h.
+- **Total Fase 2 doc: ~5h actual vs 6-10h estimate.** Factor 0.5-0.8x. Causa: el sweep cerró limpio sin sorpresas (5 cascadas + 6 primitives encajaron sin requerir re-iteración del scope), y el precedente fresco BUG-7 ahorró tiempo de redactar opciones desde cero para batch grouping.
+
+**Total esperado Fase 3 (no en este PR):** ~2-3h para CLAUDE.md anchoring + headers + verify.
+
+---
+
+**FIN DEL DOC.** Esperando verde de Sam para promover PR a ready-for-review.
+
 
