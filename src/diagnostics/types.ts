@@ -100,6 +100,19 @@ export interface InspectionData {
 
 export type DiagnosticSeverity = 'info' | 'warning' | 'critical' | 'error';
 
+/**
+ * Runtime user inspection diagnostic emitted by `ruleEngine.evaluateRules`
+ * during user-triggered inspection (right-click piece → Inspect).
+ *
+ * Transient in `inspectorState.diagnostics` (cleared on target change).
+ * Severity set is 4 values; 'critical' indicates blocker-level UX issues
+ * that warrant immediate user attention.
+ *
+ * For load-time validation, use `ValidationDiagnostic` from
+ * `src/utils/projectValidator.ts`.
+ *
+ * Cross-ref: D7 ratification doc, CLAUDE.md "Diagnostic types".
+ */
 export interface Diagnostic {
   severity: DiagnosticSeverity;
   category: string;
