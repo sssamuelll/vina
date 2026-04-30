@@ -251,7 +251,20 @@ const simulationSlice = createSlice({
     resetSimulation(state) {
       state.simulationState = 'idle';
     },
-    /** Set the fabric for a specific pattern piece. */
+    /**
+     * Set the fabric for a specific pattern piece in the SIMULATION runtime cache.
+     *
+     * **Transient by design.** Writes ONLY to `sim.pieceFabrics`. Used for:
+     * - `MaterialTab.tsx` — preview material panel, sibling de tint/opacity/UV/textures.
+     * - `SimulationView.tsx` — sim sidebar tweaks, sibling de Per-Piece Freeze.
+     * - `useColorwaySync.ts` — sync `project.fabricId` + colorway override → sim cache.
+     *
+     * **Do NOT use for persistent piece fabric assignment.** Use
+     * `project/setPieceFabric` for persistent writes (e.g., copilot tools,
+     * programmatic apply). Persistent writes propagate to sim via `useColorwaySync`.
+     *
+     * Cross-ref: B10-state Par 1 ratification (CLAUDE.md "Fabric assignment patterns").
+     */
     setFabric(state, action: PayloadAction<{ pieceId: string; fabricId: string }>) {
       state.pieceFabrics[action.payload.pieceId] = action.payload.fabricId;
     },
