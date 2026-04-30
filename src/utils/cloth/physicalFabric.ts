@@ -1,12 +1,16 @@
 /**
- * Physical Fabric Library — real-world textile properties with engineering units.
+ * Physical Fabric Library — engineering-grade textile properties.
  *
- * This extends the basic FabricMaterial with anisotropic properties (warp/weft),
- * shear data, tensile strength, and composition metadata. Values are sourced from
- * textile engineering literature (Kawabata KES, FAST system, ISO standards).
+ * Anisotropic warp/weft data, shear, tensile strength, composition metadata.
+ * Used as the primary fabric type for sim solver, diagnostic, render, and
+ * modern copilot tools (~60 callsites). Values sourced from textile
+ * engineering literature (Kawabata KES, FAST system, ISO standards).
  *
- * The basic FabricMaterial in fabricLibrary.ts remains for backward compatibility.
- * PhysicalFabric is the professional-grade version used by the diagnostic system.
+ * The basic `FabricMaterial` in fabricLibrary.ts remains as a separate, more
+ * public API surface for plugin authors and simple copilot tools — NOT a
+ * deprecating legacy. The two types serve distinct consumer audiences.
+ *
+ * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
  *
  * @module physicalFabric
  */
