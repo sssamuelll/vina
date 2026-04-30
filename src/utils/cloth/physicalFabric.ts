@@ -34,6 +34,18 @@ export type WeaveType =
 
 export type FabricSource = 'library' | 'custom' | 'lab-tested' | 'community';
 
+/**
+ * Engineering-grade fabric properties for cloth simulation, diagnostic,
+ * and render. Primary modern fabric type (~60 callsites).
+ *
+ * Anisotropic warp/weft data, shear, tensile strength, composition metadata.
+ *
+ * For plugin/copilot basic shape, see `FabricMaterial`
+ * (`src/utils/cloth/fabricLibrary.ts`). For project catalog entries, see
+ * `Fabric` (`src/types/types.ts`).
+ *
+ * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ */
 export interface PhysicalFabric {
   /** Unique ID (slug format) */
   id: string;

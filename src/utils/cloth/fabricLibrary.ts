@@ -10,7 +10,18 @@
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /**
- * Physical properties of a fabric material.
+ * Basic fabric shape — public API surface for plugins + simple consumers.
+ *
+ * Used by:
+ * - Plugin system (`PluginFabric.material`) — contract for plugin authors.
+ * - Copilot `simulationTools` for simple fabric lookup via `FABRIC_LIBRARY`.
+ *
+ * For modern sim/render/diagnostic paths, see `PhysicalFabric`
+ * (`src/utils/cloth/physicalFabric.ts`). NOT a deprecating legacy —
+ * intentionally kept as the basic shape that plugin authors can supply
+ * without needing the 25+ engineering fields of `PhysicalFabric`.
+ *
+ * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
  */
 export interface FabricMaterial {
   /** Human-readable name */
