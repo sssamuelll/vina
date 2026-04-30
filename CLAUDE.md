@@ -662,6 +662,16 @@ When the drift pattern is **semantic**, not **structural**, consumers may live i
 
 This corolary co-applies with "Read contents, don't list directories": both are forms of the same parent rule — **inventory counts are lower bounds, and the path to the upper bound is iterative refinement of where you look and what you read.**
 
+#### Sub-sweeps son contextuales, no autoritativos
+
+Sub-sweeps hechos durante investigación de un eje (capturados como Apéndice o sección secundaria del Fase 2 doc de ese eje) son **contextuales al eje en curso**, no autoritativos para el eje futuro al que el sub-sweep apunta. Cuando ese eje futuro abre su propia investigación, debe correr su sweep autoritativo desde cero — el sub-sweep previo es input directo, no inventario cerrado.
+
+**Origen:** D5 Fase 2 (2026-04-30) descubrió +167% más cross-layer archivos (24 vs 9) que el sub-sweep del Apéndice B de D1-cosmetic (2026-04-29). El undercount no invalida D1-cosmetic — el Apéndice B sirvió su propósito en context (sub-investigación de grainLine casing). Pero el sub-sweep narrow-foco no capturó el breadth scan que D5 requería.
+
+**La regla:** el sweep del eje propio es autoritativo. Sub-sweeps son inputs.
+
+Aplicación: cuando un Fase 2 doc futuro afirma "sweep ya pre-done en Apéndice X de eje Y", el refresh contra estado actual del codebase NO es opcional — es validation requerida. Si diverge >50%, declarar el sweep propio como autoritativo y notar la divergencia explícitamente en el doc; no rebuild la metodología del Apéndice X, capturar el delta y proceder.
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
