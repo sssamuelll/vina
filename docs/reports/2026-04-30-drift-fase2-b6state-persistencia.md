@@ -631,3 +631,190 @@ Cero `Promise.all([storageSet(...), storageSet(...)])` en codebase. Cero IDB tra
 - Opcional cleanup: mejorar el wording de los inline comments en `installedCache` y `ollamaConfigCache` para incluir explícitamente "ratificado por B6-state Fase 2 § 3.5 como sync API exception" (1-líneas adicionales). Lo hago como sub-bullet del cleanup commit post-PR ratificación.
 
 ---
+
+### 3.6 Skill persistence (decisión menor)
+
+**Decisión**: ratificar separación del DB `openclo_skills_v1` y resolver naming collision con el helper canonical `migrateFromLocalStorage`.
+
+#### Estado actual
+
+- DB separado `openclo_skills_v1` (`skillPersistence.ts:14`) con 2 stores (`skills`, `preferences`) e índices custom (source, enabled, installedAt).
+- Método custom `migrateFromLocalStorage()` dentro de la clase (`skillPersistence.ts:203`) — homónimo del helper canonical en `storage.ts:141`. **Naming collision**.
+
+#### Recomendación 3.6
+
+**Ratificar separación + alinear naming. Confianza alta.**
+
+**Decisión:**
+1. **Separación del DB queda intencional**: schema con índices que el canonical no soporta + lifecycle plugin-managed (skills se instalan/desinstalan dynamically, separación facilita cleanup masivo). Documentar inline en `skillPersistence.ts` el rationale: "Separate DB by design — index requirements + plugin lifecycle isolation. Not subject to BUG-10 canonical."
+2. **Renombrar el método custom**: `SkillPersistence.migrateFromLocalStorage()` → `SkillPersistence.migrateLegacySkills()`. Naming consistente con domain (skills) en lugar de mecanismo (LS migration), elimina collision con helper canonical, mejora discoverability.
+
+**Costo:** ~30min — rename + grep callers + inline doc update. Aplicable en chore-commit post-Fase 2 ratificación.
+
+**Trigger de reapertura:**
+- Si en future eje aparece otro DB separado con naming collision similar, considerar policy "custom DB methods con prefix `Migrate{Domain}` consistent" como rule.
+
+---
+
+### 3.7 Migration window policy
+
+**Decisión**: cuánto tiempo permanece el `migrateFromLocalStorage` fallback en cada site post-canonical-adoption antes de cleanup.
+
+#### Estado actual
+
+8 sites canonical post-BUG-10 + project autosave usan `migrateFromLocalStorage` para LS legacy → IDB handover. La nota BUG-10 § 6 dejó "eliminación del migration code" out-of-scope (decisión de mantenimiento, no arquitectura). B6-state ratifica policy.
+
+#### Opción A — N-release window (e.g., 3 releases)
+
+**Propuesta:**
+- Migration code permanece N releases después de canonical adoption.
+- Después de N releases, asume todos los usuarios han hecho upgrade y leído al menos una vez (migrating LS → IDB on first read).
+- Cleanup commit elimina el `migrateFromLocalStorage` call + el legacy LS key constant. Sites que nunca leen post-deploy quedan con stale LS data hasta que el usuario clear browser data — aceptable.
+
+**Pros:**
+- Bounded code lifetime — el migration code no es forever.
+- Calendar simple: tracking en GitHub project board "scheduled cleanup commits" por site.
+- Reduce future grep noise (legacy LS keys desaparecen del codebase).
+
+**Contras:**
+- N=3 es arbitrario — para users que skipean releases o instalan after-the-fact, datos legacy quedan stranded. Mitigation: N grande (e.g., 6+).
+- Tracking is ongoing maintenance burden.
+
+#### Opción B — Indefinite (no remove)
+
+**Propuesta:**
+- Migration code permanece forever.
+- Costo: ~10 líneas por site, total ~80-100 líneas de migration code persistent.
+
+**Pros:**
+- Zero risk de stranded data.
+- Zero ongoing maintenance.
+
+**Contras:**
+- Codebase noise: legacy LS key constants persisten en archivos canonical para siempre.
+- Confusion para devs nuevos: "¿Por qué hay un `LEGACY_AGENT_STORAGE_KEY` aún?"
+
+#### Opción C — Remove on next major version (semver bump)
+
+**Propuesta:**
+- Migration code permanece hasta el próximo major version bump (e.g., openclo 1.0).
+- En major version, todos los migration paths se borran a la vez.
+
+**Pros:**
+- Aligned con semver — usuarios que upgrade a major saben que data migration puede haberse hecho.
+- Removes incentive para release-by-release tracking.
+
+**Contras:**
+- "Major version" timing es business decision, no architectural — puede ser meses o años away.
+- Si openclo nunca sale de 0.x.y, este path nunca cierra.
+
+#### Recomendación 3.7
+
+**Opción B (indefinite, no remove) con confianza media.**
+
+**Razones:**
+
+1. **Cost de cleanup desproporcionado al benefit**: ~80-100 líneas de migration code es bounded; el codebase noise es minor. Cost de mantenimiento de tracking + scheduling cleanup commits es non-trivial.
+2. **Risk de stranded data ≠ 0**: usuarios que instalan after-the-fact o skipean releases existen — para apps con users larguísimos como SaaS opcional, "N=3 releases" no garantiza migration completa.
+3. **Confianza media** porque la opción es defensible pero no obvia. Si en future eje aparece un patrón de "muchos legacy paths de migration acumulados a través de varios refactors" se reabre como sub-decisión revisable con criterio de tracking.
+
+**Implementation plan:**
+- Cero acción ahora.
+- Comentario inline en cada site con `migrateFromLocalStorage` call: `// Legacy LS migration; permanent per B6-state § 3.7. Remove only if usage telemetry shows zero reads from legacy key for >12 months.`
+- Documentar policy en `storage.ts` cerca del helper.
+
+**Trigger de reapertura:**
+- Acumulación de >5 distintos `migrateFromLocalStorage` paths en archivos individuales (signal de patrón de drift en migration paths).
+- Telemetría que confirma cero reads de legacy key for >12 months → cleanup justificado para sites específicos.
+
+---
+
+### 3.8 Storage quota / IDB unavailable behavior
+
+**Decisión**: comportamiento esperado del canonical bajo IDB unavailable (Safari private mode, settings disabled, quota exhaustion).
+
+#### Estado actual
+
+`storageSet` (`storage.ts:73-82`):
+```typescript
+export async function storageSet(store, key, value) {
+  try {
+    const db = await getDB();
+    await db.put(store, value, key);
+  } catch {
+    safeSetItem(`${DB_NAME}:${store}:${key}`, JSON.stringify(value));  // silent LS fallback
+  }
+}
+```
+
+`storageGet` (`storage.ts:53-66`): mismo pattern — IDB primario, LS fallback silencioso.
+
+`safeSetItem` (`safeStorage.ts`): swallow LS write errors silently (`try {} catch {}`).
+
+Result: IDB unavailable → silent LS fallback. LS quota exceeded → silent failure (no UI signal). Usuario no aware de degraded persistence.
+
+#### Opción A — Surface degraded persistence al usuario
+
+**Propuesta:**
+- `storageSet` retorna `Promise<{ ok: true } | { ok: false, reason: 'idb-unavailable' | 'lsquota' }>`.
+- Callers chequean el result y dispatch toast a usuario en degraded paths.
+- Dashboard / app status indicator cuando IDB no disponible.
+
+**Pros:**
+- Transparencia: usuario sabe que sus datos pueden no persistir.
+- Diagnostic-friendly cuando data loss reportado.
+
+**Contras:**
+- Breaking change al contract de `storageSet` (currently `Promise<void>`). Callers deben actualizar.
+- Most callers no necesitan el detail — solo agregan boilerplate.
+- Toast spam en Safari private mode (donde IDB siempre falla).
+
+#### Opción B — Status quo + telemetry hook
+
+**Propuesta:**
+- Mantener silent LS fallback (compat con código actual).
+- Add telemetry hook que cuenta IDB-unavailable events para diagnostic post-hoc.
+- Future degraded UX (warning banner) se construye sobre telemetry, no sobre breaking changes al contract.
+
+**Pros:**
+- Zero breaking changes.
+- Telemetry data informa future decisions (¿está pasando? ¿qué shapes?).
+- Degraded UX puede agregarse incremental sobre la telemetry.
+
+**Contras:**
+- No ofrece transparencia inmediata al usuario.
+- Telemetry hook requiere registry + opt-in mechanism.
+
+#### Opción C — Status quo + document + defer
+
+**Propuesta:**
+- B6-state ratifica el status quo silent fallback.
+- Documenta en `storage.ts` que silent fallback es policy intencional (resilience over diagnostic visibility).
+- Si en future eje (ej. observability sub-track o user-reported data loss) emerge necesidad, reabrir.
+
+**Pros:**
+- Zero cost ahora.
+- Reactive: implementa solo si necesario.
+
+**Contras:**
+- "Silent" es exactamente lo que el audit busca evitar. Documenting a smell as policy es borderline cobarde.
+
+#### Recomendación 3.8
+
+**Opción B (status quo + telemetry hook) con confianza media.**
+
+**Razones:**
+
+1. **El silent fallback es feature, not bug**: en Safari private mode, app debe seguir funcionando. Surface error al usuario en cada write sería UX-rompiente.
+2. **Telemetry es middle ground**: preserva el resilience contract (silent fallback) y agrega visibility para diagnostic post-hoc.
+3. **Confianza media** porque telemetry hook design depende de B8-state / D2 / D8 (E-async-states). Si E-async-states diseña telemetry framework, este sub-decision se hace cheap. Sin él, requiere infrastructure dedicada.
+
+**Implementation plan:**
+- Add telemetry hook stub en `storage.ts` (counter + opcional callback). No-op por default.
+- Documentar política inline: "Silent fallback by design for resilience; telemetry hook available for diagnostic. Surface UX warnings depends on E-async-states sub-track decision."
+
+**Trigger de reapertura:**
+- E-async-states ratifica policy de surfacing degraded states → integrar storage telemetry en that policy.
+- User-reported data loss attributable a silent fallback → reconsidering Option A.
+
+---
