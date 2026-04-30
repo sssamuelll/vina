@@ -1,8 +1,20 @@
 /**
- * Rich Dart Entity — extract, manipulate, and reason about darts.
+ * Rich Dart Entity — bridge module between storage and domain layers.
  *
- * Converts flat InternalLine dart paths into structured Dart entities
- * with intake, apex, legs, and edge association.
+ * Storage layer (`pieces[].internals` → `InternalLine{type:'dart'}`) holds
+ * flat path data. This module derives and operates on the rich `Dart`
+ * entity (intake, apex, legs, foldDirection, capShape) for domain ops.
+ *
+ * Conversion is bidirectional:
+ * - InternalLine → Dart: `extractDartFromInternal`, `extractDarts`.
+ * - Dart → InternalLine: `segmentDart` (writes new InternalLines),
+ *   `shapeDartCap` (returns new path).
+ *
+ * Domain operations (`adjustDartIntake`, `segmentDart`, `shapeDartCap`)
+ * live here intentionally — concentrating bridge + ops in a single
+ * cohesive module.
+ *
+ * Cross-ref: D1-real ratification doc, CLAUDE.md "Dart representation".
  *
  * @module dartEntity
  */
