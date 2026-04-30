@@ -3,6 +3,7 @@ import { EditorState, ViewMode, Tool2D, Point2D, UnitSystem, PatternPiece } from
 import { NEW_PROJECT } from './actions';
 import { removeReferenceImage } from './projectSlice';
 import { newId } from '../utils/ids';
+import { DEFAULT_SEAM_ALLOWANCE } from '../utils/defaults';
 
 const initialState: EditorState = {
   viewMode: 'split',
@@ -15,7 +16,7 @@ const initialState: EditorState = {
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
   showSeamAllowance: true,
-  defaultSeamAllowanceWidth: 10,
+  defaultSeamAllowanceWidth: DEFAULT_SEAM_ALLOWANCE,
   showGrainlines: true,
   showAnchorPoints: false,
   showPieceNames: false,
