@@ -37,6 +37,12 @@ export interface WasmSolverConfig {
   stretchComplianceWeft?: number;
   /** Stretch compliance for SHEAR (diagonal) edges */
   stretchComplianceShear?: number;
+  /** Bending compliance for WARP edges */
+  bendComplianceWarp?: number;
+  /** Bending compliance for WEFT edges */
+  bendComplianceWeft?: number;
+  /** Internal damping (0.0 = fluid, 1.0 = heavy/settles quickly) */
+  internalDamping?: number;
 }
 
 export class WasmSolverClient {
@@ -198,9 +204,10 @@ export class WasmSolverClient {
   }
 
   /**
-   * Update solver configuration at runtime (e.g. substeps on mode change).
+   * Update solver configuration at runtime. Any field of `WasmSolverConfig`
+   * can be updated; missing fields keep their last-applied value.
    */
-  setConfig(config: { substeps?: number }): void {
+  setConfig(config: Partial<WasmSolverConfig>): void {
     this.worker?.postMessage({ type: 'setConfig', config });
   }
 
