@@ -11,7 +11,7 @@
  * @module physicalFabric
  */
 
-import type { FabricMaterial, XPBDCompliance } from './fabricLibrary';
+import type { XPBDCompliance } from './fabricLibrary';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -609,24 +609,6 @@ export const PHYSICAL_FABRIC_LIBRARY: PhysicalFabric[] = [
     source: 'library', tags: ['interfacing', 'fusible', 'nonwoven', 'structure', 'collar', 'cuff'],
   },
 ];
-
-// ─── Conversion: PhysicalFabric → basic FabricMaterial ──────────────────
-
-/** Convert a PhysicalFabric to the basic FabricMaterial for backward compatibility. */
-export function toBasicMaterial(pf: PhysicalFabric): FabricMaterial {
-  const avgStretch = (pf.stretchWarp + pf.stretchWeft) / 2;
-  const avgBend = (pf.bendingWarp + pf.bendingWeft) / 2;
-  return {
-    name: pf.name,
-    weight: pf.weight,
-    // Map % stretch to 0-1 stiffness (inverse): 0% → 1.0, 80% → ~0.05
-    stretchStiffness: Math.max(0, 1 - avgStretch / 100),
-    // Map mN·cm bending to 0-1: 0 → 0.0, 8 → 1.0
-    bendStiffness: Math.min(1, avgBend / 8),
-    friction: pf.friction,
-    thickness: pf.thickness,
-  };
-}
 
 // ─── Conversion: PhysicalFabric → XPBD solver params ────────────────────
 

@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Physical Fabric — edge cases, boundary conditions, and XPBD conversion accuracy.
  */
@@ -11,7 +11,6 @@ import {
   getFabricsByWeave,
   getFabricsByWeight,
   isValidPhysicalFabric,
-  toBasicMaterial,
   toXPBDParams,
   type PhysicalFabric,
 } from '../physicalFabric';
@@ -81,38 +80,6 @@ describe('toXPBDParams — edge cases', () => {
     const canvas = getPhysicalFabric('canvas-12oz')!;
     const p = toXPBDParams(canvas);
     expect(p.shearCompliance).toBeLessThan(p.stretchComplianceWarp);
-  });
-});
-
-// ─── toBasicMaterial edge cases ─────────────────────────────────────────────
-
-describe('toBasicMaterial — edge cases', () => {
-  it('lycra maps to very low stretch stiffness', () => {
-    const lycra = getPhysicalFabric('lycra-spandex')!;
-    const basic = toBasicMaterial(lycra);
-    // avg stretch (60+80)/2 = 70% → 1 - 0.7 = 0.3
-    expect(basic.stretchStiffness).toBeCloseTo(0.3, 1);
-  });
-
-  it('interfacing maps to high bend stiffness', () => {
-    const inter = getPhysicalFabric('fusible-interfacing-medium')!;
-    const basic = toBasicMaterial(inter);
-    // avg bending (2.5+2.5)/2 = 2.5 → 2.5/8 = 0.3125
-    expect(basic.bendStiffness).toBeGreaterThan(0.3);
-  });
-
-  it('rib knit with 80% weft maps to very low stretch stiffness', () => {
-    const rib = getPhysicalFabric('rib-knit')!;
-    const basic = toBasicMaterial(rib);
-    // avg (10+80)/2 = 45% → 1 - 0.45 = 0.55
-    expect(basic.stretchStiffness).toBeLessThan(0.6);
-  });
-
-  it('all basic materials have consistent stiffness ordering', () => {
-    const denimBasic = toBasicMaterial(getPhysicalFabric('denim-12oz')!);
-    const jerseyBasic = toBasicMaterial(getPhysicalFabric('cotton-jersey')!);
-    expect(denimBasic.stretchStiffness).toBeGreaterThan(jerseyBasic.stretchStiffness);
-    expect(denimBasic.bendStiffness).toBeGreaterThan(jerseyBasic.bendStiffness);
   });
 });
 
