@@ -20,6 +20,20 @@ const PIECE_MODIFYING_ACTIONS = new Set([
   'project/removeInternalLine',
 ]);
 
+/**
+ * @cascade
+ * shape: obs 1→1 asymmetric (idempotent — setStale only goes true→true)
+ * triggers: project/updatePiece, project/movePiece, project/rotatePiece,
+ *           project/removePiece, project/removePieces,
+ *           project/addInternalLine, project/updateInternalLine,
+ *           project/removeInternalLine
+ * dispatches: grading/setStale (true) when modified piece is base, not generated
+ * guard: none (setStale is idempotent + early-return if already stale or empty)
+ * undo: does not group (metadata observation, not part of user undo step)
+ * cap-depth: 0 (grading/setStale is not in any trigger set)
+ * cross-ref: CLAUDE.md "Cascade middleware patterns",
+ *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
+ */
 export const gradingStalenessMiddleware: Middleware = (store) => (next) => (action: unknown) => {
   const result = next(action);
 

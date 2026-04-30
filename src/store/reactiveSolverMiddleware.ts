@@ -566,6 +566,11 @@ function handleWorkerResult(result: BuildPieceResult): void {
 
 /**
  * The reactive solver middleware.
+ *
+ * Holds 2 sub-cascadas — see @cascade headers per branch below.
+ *
+ * cross-ref: CLAUDE.md "Cascade middleware patterns",
+ *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
 export const reactiveSolverMiddleware: Middleware<{}, any> = (store) => {
@@ -577,6 +582,15 @@ export const reactiveSolverMiddleware: Middleware<{}, any> = (store) => {
     const result = next(action);
 
     // Update unresolvedCount when points are removed (removePoint flags dependents)
+    /**
+     * @cascade (sub-cascada a — removePoint observation)
+     * shape: obs 1→1 — point removal recomputes derived unresolved count
+     * triggers: construction/removePoint
+     * dispatches: construction/setUnresolvedCount
+     * guard: none (idempotent recompute)
+     * undo: does not group (derived count, not user action)
+     * cap-depth: 0 (setUnresolvedCount is not in any trigger set)
+     */
     if ((action as AnyAction).type === 'construction/removePoint') {
       const updatedState = store.getState() as SolverRootState;
       const count = updatedState.construction.points.filter(
@@ -586,6 +600,23 @@ export const reactiveSolverMiddleware: Middleware<{}, any> = (store) => {
     }
 
     // Check if this is a trigger action
+    /**
+     * @cascade (sub-cascada b — parametric trigger chain)
+     * shape: chain multi-stage (Phase 1 sync + Phase 2 async debounced)
+     * triggers: project/updateMeasurements, construction/setVariable,
+     *           parametric/setVariableOverride, parametric/setVariableOverrides,
+     *           parametric/activateTemplate
+     * dispatches:
+     *   Phase 1 (sync): construction/resolveAll, construction/setUnresolvedCount
+     *   Phase 2 (async, debounced): project/upsertPieceOutline,
+     *                                construction/mapPieceIdentity per piece
+     * guard: state.generationId counter (cancels stale work in pool)
+     * undo: does not group (solver-derived state, not user action; trigger
+     *       itself is user-undoable via its own snapshot path)
+     * cap-depth: 1 (Phase 2 outputs are not in TRIGGER_ACTIONS)
+     * deuda: Phase 2 async chain error handling (console.error :655) is scope
+     *        of E-async-states sub-track, not B3-state.
+     */
     const typedAction = action as AnyAction;
     const actionType = typedAction.type as string;
     if (!TRIGGER_ACTIONS.some(trigger => actionType === trigger)) {

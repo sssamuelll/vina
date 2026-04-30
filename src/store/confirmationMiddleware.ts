@@ -102,11 +102,25 @@ function debouncedPersist(getState: () => unknown) {
  *
  * Place this **before** undoMiddleware in the custom middleware chain so that
  * blocked actions never reach the undo history.
+ *
+ * Holds 3 sub-cascadas — see @cascade headers per branch below.
+ *
+ * cross-ref: CLAUDE.md "Cascade middleware patterns",
+ *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
  */
 export const confirmationMiddleware: Middleware = (storeApi) => (next) => (rawAction: unknown) => {
   const action = rawAction as ActionLike;
 
   // ── 0. Auto-apply tool memory on tool activation in expert mode ───────────
+  /**
+   * @cascade (sub-cascada c — tool-memory auto-apply)
+   * shape: 1→N fan-out — one tool-activation triggers N setToolOption dispatches
+   * triggers: tools/setActiveTool2D, tools/setActiveTool3D
+   * dispatches: tools/setToolOption (with meta.fromToolMemory: true) per saved option
+   * guard: meta.fromToolMemory marks each re-dispatch so sub-cascada b skips it
+   * undo: does not group (state mirror, not user action)
+   * cap-depth: 1 (meta.fromToolMemory prevents mirror loop)
+   */
 
   if (action.type === 'tools/setActiveTool2D' || action.type === 'tools/setActiveTool3D') {
     const result = next(action);
@@ -130,7 +144,17 @@ export const confirmationMiddleware: Middleware = (storeApi) => (next) => (rawAc
   }
 
   // ── 1. Destructive action gating ─────────────────────────────────────────
-
+  /**
+   * @cascade (sub-cascada a — intercept-defer-replay)
+   * shape: replay — destructive action blocked, UI dialog dispatched, then
+   *        user-confirm causes call-site to re-dispatch with meta.skipConfirmation
+   * triggers: project/removePiece, project/removePieces, project/removeSeam,
+   *           construction/removePoint
+   * dispatches: copilotUI/showConfirmation (UI) when override === 'always'
+   * guard: meta.skipConfirmation flag (caller responsibility on replay)
+   * undo: n/a (replay is single action; original blocked, replay flows through)
+   * cap-depth: 1 (replays with meta.skipConfirmation do not re-block)
+   */
   const opName = DESTRUCTIVE_ACTIONS[action.type];
   if (opName) {
     // Allow caller to bypass the guard (e.g. when the user already confirmed)
@@ -165,7 +189,15 @@ export const confirmationMiddleware: Middleware = (storeApi) => (next) => (rawAc
   const result = next(action);
 
   // ── 3. Mirror setToolOption into workflow.toolMemory ──────────────────────
-
+  /**
+   * @cascade (sub-cascada b — tool-memory mirror)
+   * shape: obs 1→1 — every setToolOption from a user mirrors into workflow.toolMemory
+   * triggers: tools/setToolOption (only if meta.fromToolMemory is absent)
+   * dispatches: workflow/updateToolMemory
+   * guard: skip if action.meta.fromToolMemory (set by sub-cascada c re-dispatches)
+   * undo: does not group (state mirror, not user action)
+   * cap-depth: 1 (updateToolMemory is workflow/*, not in trigger set)
+   */
   if (action.type === 'tools/setToolOption' && !action.meta?.fromToolMemory) {
     const { toolId, optionId, value } = action.payload as SetToolOptionPayload;
     storeApi.dispatch(

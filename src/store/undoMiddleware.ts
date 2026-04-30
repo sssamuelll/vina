@@ -194,6 +194,19 @@ function safeClone<T>(value: T): T | null {
 
 // ─── Middleware ──────────────────────────────────────────────────────────────
 
+/**
+ * @cascade (mechanism, not user-facing cascade)
+ * shape: self-dispatch + control-actions consumer
+ * triggers (self): editor/undo, editor/redo (also dispatched by jumpToIndex)
+ * triggers (control): undo/startBatch, undo/endBatch
+ * dispatches: project/restoreState (on undo/redo)
+ * guard: batchDepth counter suppresses snapshots inside explicit batches
+ * undo: this middleware IS the grouping mechanism for other cascades
+ * cap-depth: n/a (self-dispatch is idempotent — each editor/undo consumes stack)
+ * cross-ref: CLAUDE.md "Cascade middleware patterns",
+ *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
+ *            BUG-7 fix-options doc (batch grouping precedent)
+ */
 export const undoMiddleware: Middleware = (store) => (next) => (action: any) => {
   const actionType: string = action?.type ?? '';
 
