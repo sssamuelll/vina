@@ -366,7 +366,8 @@ export async function clearLegacyFallbackKeys(): Promise<void> {
 
 /**
  * Load a fallback provider configuration.
- * Non-secret config from localStorage, API key from SecureStorage (sessionStorage).
+ * Non-secret config from IDB canonical (BUG-10) with read-side migration from
+ * legacy LS; API key from SecureStorage (sessionStorage).
  *
  * Note: after the browser tab is closed, the API key is lost (sessionStorage is
  * ephemeral). The user must re-enter it each session for fallback to be available.
@@ -375,15 +376,24 @@ export async function clearLegacyFallbackKeys(): Promise<void> {
  */
 export async function loadFallbackProvider(): Promise<ProviderConfig | null> {
   try {
-    const saved = safeGetItem(FALLBACK_PROVIDER_KEY);
-    if (!saved) return null;
-    const config = JSON.parse(saved);
-    // Retrieve API key from SecureStorage (encrypted, async)
+    const { storageGet, migrateFromLocalStorage } = await import('../utils/storage');
+    let stored = await storageGet<{ provider: string; model?: string; baseUrl?: string }>(
+      'settings',
+      'fallback-provider',
+    );
+    if (!stored) {
+      stored = (await migrateFromLocalStorage<{ provider: string; model?: string; baseUrl?: string }>(
+        FALLBACK_PROVIDER_KEY,
+        'settings',
+        'fallback-provider',
+      )) ?? undefined;
+    }
+    if (!stored) return null;
     const apiKey = (await SecureStorage.get(FALLBACK_APIKEY_SECURE_KEY)) ?? '';
     return {
-      provider: config.provider,
-      model: config.model ?? '',
-      baseUrl: config.baseUrl,
+      provider: stored.provider as ProviderConfig['provider'],
+      model: stored.model ?? '',
+      baseUrl: stored.baseUrl,
       apiKey,
     };
   } catch (err) {
@@ -394,8 +404,8 @@ export async function loadFallbackProvider(): Promise<ProviderConfig | null> {
 
 /**
  * Save a fallback provider configuration.
- * API key goes to SecureStorage (sessionStorage, cleared on tab close),
- * non-secret config to localStorage and IndexedDB.
+ * API key goes to SecureStorage (sessionStorage, cleared on tab close);
+ * non-secret config to IDB canonical (BUG-10).
  *
  * @param config - Fallback provider configuration
  */
@@ -405,16 +415,14 @@ export async function saveFallbackProvider(config: ProviderConfig): Promise<void
   if (!stored) {
     console.warn('[errorRecovery] API key could not be stored securely; fallback provider may not work after page refresh');
   }
-  // Store non-secret config in localStorage and IndexedDB
+  // Store non-secret config in IDB canonical (BUG-10).
   const storedConfig = {
     provider: config.provider,
     model: config.model,
     baseUrl: config.baseUrl,
   };
-  import("../utils/storage")
-    .then(({ storageSet }) => { storageSet("settings", "fallback-provider", storedConfig); })
-    .catch((err) => { console.warn('[errorRecovery] storageSet for fallback provider failed:', err); });
-  safeSetItem(FALLBACK_PROVIDER_KEY, JSON.stringify(storedConfig));
+  const { storageSet } = await import('../utils/storage');
+  await storageSet('settings', 'fallback-provider', storedConfig);
 }
 
 /**
