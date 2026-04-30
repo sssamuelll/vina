@@ -108,6 +108,16 @@ export class AgenticLoop {
   async run(userRequest: string, onEvent: AgenticEventHandler): Promise<string> {
     this.lastToolCalls = [];
 
+    try {
+      return await this.runInner(userRequest, onEvent);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      onEvent({ type: 'error', error: errorMsg });
+      throw err;
+    }
+  }
+
+  private async runInner(userRequest: string, onEvent: AgenticEventHandler): Promise<string> {
     // Retrieve relevant knowledge for this request
     const knowledge = await this.retrieveKnowledge(userRequest);
     const systemPrompt = this.buildSystemPrompt(knowledge);
