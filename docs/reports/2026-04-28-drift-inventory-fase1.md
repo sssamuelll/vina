@@ -42,6 +42,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - `src/utils/cloth/wasm/wasmSolverWorker.ts:503–508` extrae solo `substeps`.
 - Cambios runtime a `damping`, `gravity`, `dragCoefficient`, `selfCollision`, etc. son no-ops silenciosos.
 
+> **Estado real (cerrado 2026-04-30):** BUG-4 cerrado vía PR #651 (commit `a164ea9`, mismo PR que BUG-6). Module-level `currentConfig: AppliedSolverConfig` introducido + helper `applySolverConfig()` que centraliza `solver.configure(...)` con todos los 16 campos. Cliente `WasmSolverConfig` extendido con `bendComplianceWarp`/`bendComplianceWeft`/`internalDamping`. Sin cambios Rust — `solver.configure()` ya aceptaba todo; el bug era el handler JS ignorando campos. 513 cloth tests pass.
+
 ### B5 — Self-collision muerta en WASM tier
 - Rust solver tiene campo `self_collision` y método `set_adjacency`, pero el worker nunca llama `set_adjacency`.
 - `config.selfCollision` se pasa a `configure()` pero queda siempre en `false` por default en `wasmSolverWorker.ts:401`.
@@ -51,6 +53,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - CPU: adaptativo `Math.max(0.02, clothThickness * 10)` (`xpbdSolver.ts:699`).
 - Para tela de 2mm: CPU=0.02, WASM=0.05 → resolución de colisión distinta entre tiers.
 
+> **Estado real (cerrado 2026-04-30):** BUG-6 cerrado vía PR #651 (commit `a86a393`, mismo PR que BUG-4). Los 3 sites de `0.05` reemplazados por `Math.max(0.02, currentConfig.thickness * 10)` inline — **sin helper extraction** por carve-out explícito (mismo principio BUG-9 → C1: extraer `computeAdaptiveCellSize` cruzaría a Class A/B y pre-emptaría C1 RFC). Total post-fix: 3 (WASM) + 3 (CPU) = 6 inline copies. Deuda técnica explícita capturada para C1 RFC.
+
 ### B7 ★ — `linkedEditing` rompe undo de un solo paso
 - `src/store/linkedEditingMiddleware.ts:81` despacha `updatePiece` secundario para sincronizar el partner.
 - `undoMiddleware` ve este segundo dispatch y crea un snapshot extra.
@@ -59,6 +63,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 ### B8 — `ACTION_LABELS` en undoMiddleware referencia action types inexistentes
 - `src/store/undoMiddleware.ts:148–150`: `'project/setFabric'`, `'project/setAvatarMeasurements'`, `'project/setSeamAllowance'`, `'project/importPieces'`, `'project/applyGrading'`, `'project/updateGrainLine'` — ninguno existe en `projectSlice.ts`.
 - **Síntoma:** History panel muestra labels falback con nombres incorrectos.
+
+> **Estado real (cerrado 2026-04-30):** BUG-8 cerrado vía PR #648 (commit `b4dd136`). Mapping verificado contra `projectSlice` exports: 4 renamed (`setFabric`→`setFabricCode`, `setAvatarMeasurements`→`updateMeasurements`, `setSeamAllowance`→`setGroupSeamAllowance`, `updateGrainLine`→`setInternalLine`), 1 added (`setInternalLine` cubre todos los internals), 2 removed (`importPieces` + `applyGrading` dead, sin equivalente actual). Generic camelCase fallback preservado para drift futuro.
 
 ### B9 — Geometrías Three.js no dispuestas (memory leak GPU)
 - `src/components/Viewport3D/GarmentSimulation.tsx:255` — `useMemo` recrea `staticGeometry` sin cleanup.
@@ -70,6 +76,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - Mismo patrón en `agent-config` y otros 3 lugares.
 - **Síntoma:** si una escritura falla y la otra no, los dos backings divergen sin detección.
 
+> **Estado real (cerrado 2026-04-30):** BUG-10 cerrado vía nota fix-options (PR #646, `e884ebe`) + implementación (PR #652, `7274c25`). **Inventario subestimó el conteo: progresión 3 (issue) → 6 (sweep agent) → 8 (regla 1 v3 con greppable evidence)**. Sites finales adoptan canonical IDB: agent-config, saved-poses, avatar profiles, per-plugin storage, installed plugins, provider-config, ollama-config, fallback-provider. Pre-existing canonical encontrado en `storage.ts:163-178` (`saveProject`/`loadProject`/`migrateFromLocalStorage`) — la nota repositioned como ratificación + extensión, no propuesta nueva. 3 oleadas históricas de drift documentadas (commits `4f6f5fa`/`4a115f73`/`84c9d18a`/`e2e66212`). Cache pattern emergente en 2 sitios (pluginManager, ollama) para preservar sync API + pure-function pattern emergente en avatarLibrary (saveProfile/deleteProfile signature change) — ambos capturados en § 9.1/9.2 de la nota como input para B6-state. Docs commit final codifica el canonical inline en `storage.ts:165` con cross-ref a la nota. 3 LS-only adyacentes (ProjectMemory class API, DesignLogManager, projectIO quarantine) capturados como out-of-scope para B6-state Fase 2. 2940/2941 tests pass.
+
 ### B11 — Prefijos de localStorage inconsistentes (`webclo-` vs `openclo-`)
 - `src/utils/cloth/gpu/webgpuDetect.ts:49`: `'webclo-use-webgpu'`.
 - Resto del codebase: `'openclo-*'` (workflow, layout, agent-config).
@@ -80,19 +88,27 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - `src/utils/defaults.ts:13` declara `DEFAULT_SEAM_ALLOWANCE = 10`.
 - Mismo valor, fuentes distintas. CLAUDE.md prescribe single source of truth — incumplido.
 
+> **Estado real (cerrado 2026-04-30):** BUG-12 cerrado vía PR #647 (commit `dd05e48`). Strict scope ejecutado — solo `editorSlice.ts:18` migrado a `DEFAULT_SEAM_ALLOWANCE`. Test mocks (3 sites en `actionExecutor`/`copilotContext`/`contextBuilder` __tests__) preservados como state fixtures (no son source-of-truth duplications). Sweep agent confirmó zero scope expansion: ningún otro slice bypassea defaults.ts.
+
 ### B13 — `pluginSlice.enabledPlugins[]` redundante con `installedPlugins[].enabled`
 - Dos representaciones del mismo estado de activación; ambos reducers escriben a los dos.
 - **Síntoma:** si la carga desde localStorage rehidrata uno solo, la app queda inconsistente.
+
+> **Estado real (cerrado 2026-04-30):** BUG-13 cerrado vía PR #649 (commit `7ac7a23`). Sweep agent reveló **zero runtime consumers de ambos campos** — el truth source real está en `localStorage` via `pluginManager.ts`, no Redux. Redux pluginSlice no está persistido (sin redux-persist, `setPluginState` nunca dispatchada en runtime). Strict scope: eliminó `enabledPlugins[]` redundante, mantuvo `installedPlugins[].enabled`. 55 plugin+contextBuilder tests pass. Slice entero podría ser dead-ish — capturado como out-of-scope.
 
 ### B14 — `protocol.ts` posiblemente código muerto
 - `src/copilot/protocol.ts` define `CopilotCommand`/`CopilotResponse`/`CopilotContext` para un agente externo HTTP/WebSocket.
 - El sistema actual usa `AgenticLoop` con providers; ese flujo ya no existe.
 - **Acción:** confirmar y eliminar.
 
+> **Estado real (ratificado 2026-04-30, NO drift):** BUG-14 ratificado como **misclassified** vía cierre de #617 con cross-ref a #644. Sweep verificó 3 consumers activos: `CopilotPanel.tsx` importa `AgentConfig` en runtime (no type-only), `__tests__/protocol.test.ts` importa `buildCopilotContext` + `DEFAULT_SYSTEM_PROMPT`, `agentConnector.ts` importa types (file marcado `@deprecated` pero transitively keeps `protocol.ts` reachable). El flujo HTTP/WS legacy SÍ está retirado, pero `AgentConfig` fue adoptado por `CopilotPanel` y no es removible sin migración de consumer. Cero código tocado por este BUG. Migración separada a `providers/types.ts:ProviderConfig` tracked en #644 (severity:low) — requires producto/architecture review, no es bug. Mismo precedente que B12-state ratification.
+
 ### B15 — Evento `error` del `AgenticLoop` no manejado en hook
 - `src/copilot/reasoning/bridge/AgenticLoop.ts` emite eventos `{ type: 'error' }`.
 - `src/copilot/hooks/useAgenticLoop.ts` solo maneja `tool:start`/`tool:complete`/`tool:error`/`complete`.
 - **Síntoma:** errores de loop (red caída, etc.) no actualizan estado UI.
+
+> **Estado real (cerrado 2026-04-30):** BUG-15 cerrado vía PR #650 (commit `c191d94`). Sweep reveló que `{ type: 'error' }` estaba **definido en el union pero nunca emitido**. Fix mínimo: `AgenticLoop.run` wrap en try/catch, emite + rethrow (preserva CopilotPanel surface 2). `useAgenticLoop.handleEvent` gana `'error'` case → dispatch `showErrorToast` + `setIsRunning(false)`. Regression test añadido. Inconsistencia más profunda detectada (3 surfaces: toolCalls update vs assistant message vs toast) tracked separadamente en **#645** como input directo a E-async-states sub-track — fuera de BUG-15 scope.
 
 ---
 
