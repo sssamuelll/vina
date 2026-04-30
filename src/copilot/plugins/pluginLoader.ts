@@ -15,7 +15,7 @@ import type {
   ValidationResult,
 } from './types';
 import { ALL_PLUGIN_PERMISSIONS } from './types';
-import { safeGetItem, safeSetItem, safeRemoveItem } from '../../utils/safeStorage';
+import { safeGetItem, safeRemoveItem } from '../../utils/safeStorage';
 
 /** Current OpenClo version — used for plugin compatibility checks */
 const OPENCLO_VERSION = '0.4.0';
@@ -437,7 +437,12 @@ export function getPluginStorageKey(pluginId: string): string {
 }
 
 /**
- * Read plugin-scoped data from localStorage.
+ * Read plugin-scoped data from the legacy localStorage key, synchronously.
+ *
+ * Kept for transitional callers that need a sync return; new code should
+ * prefer `readPluginStorageAsync` (IDB-primary canonical, BUG-10). Once the
+ * legacy LS key is migrated to IDB, this returns null and callers must use
+ * the async variant.
  *
  * @param pluginId - The plugin id
  * @returns Parsed data or null if not found
@@ -453,22 +458,44 @@ export function readPluginStorage(pluginId: string): Record<string, unknown> | n
 }
 
 /**
- * Write plugin-scoped data to localStorage.
+ * Async authoritative read: IDB primary + read-side migration from legacy LS.
+ * BUG-10 canonical.
+ *
+ * @param pluginId - The plugin id
+ * @returns Parsed data or null if not found
+ */
+export async function readPluginStorageAsync(pluginId: string): Promise<Record<string, unknown> | null> {
+  const { storageGet, migrateFromLocalStorage } = await import('../../utils/storage');
+  const idbKey = `plugin:${pluginId}`;
+  const existing = await storageGet<Record<string, unknown>>('plugins', idbKey);
+  if (existing) return existing;
+  const migrated = await migrateFromLocalStorage<Record<string, unknown>>(
+    getPluginStorageKey(pluginId),
+    'plugins',
+    idbKey,
+  );
+  return migrated ?? null;
+}
+
+/**
+ * Write plugin-scoped data via the IDB canonical (BUG-10). Replaces the
+ * previous double-write LS+IDB pattern; storageSet falls back to LS internally
+ * only when IDB is unavailable.
  *
  * @param pluginId - The plugin id
  * @param data - Data to persist
  */
 export function writePluginStorage(pluginId: string, data: Record<string, unknown>): void {
-  import('../../utils/storage').then(({ storageSet }) => { storageSet('plugins', `plugin:${pluginId}`, data); }).catch(() => {});
-  safeSetItem(getPluginStorageKey(pluginId), JSON.stringify(data));
+  import('../../utils/storage').then(({ storageSet }) => storageSet('plugins', `plugin:${pluginId}`, data)).catch(() => {});
 }
 
 /**
- * Clear plugin-scoped data from localStorage and IndexedDB.
+ * Clear plugin-scoped data from IndexedDB and any legacy localStorage entry.
  *
  * @param pluginId - The plugin id
  */
 export function clearPluginStorage(pluginId: string): void {
   import('../../utils/storage').then(({ storageDel }) => { storageDel('plugins', `plugin:${pluginId}`); }).catch(() => {});
+  // Also clear any legacy LS key so a future sync read doesn't surface stale data.
   safeRemoveItem(getPluginStorageKey(pluginId));
 }
