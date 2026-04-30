@@ -734,6 +734,36 @@ Sub-sweeps hechos durante investigación de un eje (capturados como Apéndice o 
 
 Aplicación: cuando un Fase 2 doc futuro afirma "sweep ya pre-done en Apéndice X de eje Y", el refresh contra estado actual del codebase NO es opcional — es validation requerida. Si diverge >50%, declarar el sweep propio como autoritativo y notar la divergencia explícitamente en el doc; no rebuild la metodología del Apéndice X, capturar el delta y proceder.
 
+### Inventory drift overestimation pattern (anchored 2026-04-30 after 10 ratify-by-convention closures)
+
+**Inventarios iniciales de drift sobrestiman drift real sistematicamente.** De los primeros 16 ejes cerrados del audit, **10 (62%) cerraron como ratify-by-convention** — el "drift" inventoriado resultó ser pattern intencional sin documentation.
+
+Patrón observable: el inventario clasifica como drift cualquier case donde el codebase tiene N representations de un concept o N implementations de un pattern. Sin investigation profunda, eso parece drift. Con investigation (regla 1 v2/v3 + git blame + consumer analysis), la mayoría resultan ser:
+
+- **Roles distintos con ortogonal lifecycles** (D7 — `ValidationDiagnostic` vs `Diagnostic`).
+- **Bridge patterns intencionales** (D1-real — `Dart` entity vs `InternalLine{type:'dart'}` con `dartEntity.ts` como bridge module).
+- **Feature ownership organization** (D5 — components/ → copilot/ imports legítimos por feature ownership).
+- **Snapshots intencionales** (B10-Par2 — `parametric.baseMeasurements` snapshot del template activo, no duplicate de `avatar.measurements`).
+- **Convention transversal coherente** (B2-state — array entity + Record attribute pattern uniforme).
+- **Vestigial pero no drift** (B5-state — middleware factory pattern al que ya no se le agregaba estado).
+- **Misclasificaciones puras del inventario** (B12-state — canonical pre-existente; C7 — custom pan intentional feature; D1-cosmetic — 3 casings = 3 roles lingüísticos).
+- **Persistence policy con LS exceptions ratificadas** (B6-state partial).
+
+**Implicación operacional para futuros ejes:**
+
+1. **El sweep refresh debe priorizar git blame + consumer analysis ANTES de asumir migration intent.** Commit messages keywords son load-bearing evidence:
+   - `"migrate"`, `"replace"`, `"deprecate"` → migration intent confirmed.
+   - `"rich"`, `"enrichment"`, `"structured"`, `"enhanced"` → enrichment intent (dual representation legítimo).
+   - Commits ambiguos → check subsequent commits + bridge module presence.
+
+2. **"Inventario dice migration incompleta" no es evidence — es hipótesis a validar.** El inventario es Fase 1 quick-scan; la verdad estructural se establece en el sweep refresh de Fase 2.
+
+3. **N=2 representations no es señal automática de drift.** Si las N representations tienen shapes ortogonales (e.g., flat path vs rich semantic) y bridge module documentado, son enrichment legítimo. Solo es drift cuando hay duplicación accidental sin bridge ni intent design.
+
+4. **Calibrar estimates con factor ~0.5x del nominal** para futuros ejes (b) que aparezcan como "drift" en el inventario. La mayoría serán ratify-by-convention; el work es redactar el doc, no migrar código.
+
+Esto NO significa que todos los ejes son ratify-by-convention. 6/16 (38%) cerraron como real-fix (B11-state IDs canonical, C5 helper unify, B6-state Fase 3 pendiente, BUG migrations, B3-state cascade convention, B10-state Par 1 hybrid copilot migration). El patrón ratify-by-convention es dominante pero NO universal — el sweep decide caso por caso.
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
