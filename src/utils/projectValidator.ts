@@ -29,6 +29,18 @@ export type ValidationCode =
   | 'PLEAT_DANGLING_EDGE'
   | 'AUTO_SEAMS_DETECTED';
 
+/**
+ * Boundary parsing diagnostic emitted during `loadProject` validation.
+ *
+ * Persisted in `projectState.loadDiagnostics`. Severity set is 3 values
+ * (error/warning/info) — load-time issues are recoverable via quarantine,
+ * so 'critical' does not apply here.
+ *
+ * For runtime user inspection (right-click → Inspect), use `Diagnostic`
+ * from `src/diagnostics/types.ts`.
+ *
+ * Cross-ref: D7 ratification doc, CLAUDE.md "Diagnostic types".
+ */
 export interface ValidationDiagnostic {
   severity: 'error' | 'warning' | 'info';
   code: ValidationCode;
