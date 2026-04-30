@@ -450,3 +450,184 @@ Cero `Promise.all([storageSet(...), storageSet(...)])` en codebase. Cero IDB tra
 - Sin cambio estructural ahora.
 
 ---
+
+### 3.4 zod boundary parsing
+
+**Decisión**: política uniform-on-IDB-read, scope limitado a riesgo, o per-shape.
+
+#### Estado actual
+
+3 boundaries con zod parsing:
+- `projectSchema.ts` — JSON file import/export (file boundary, no IDB).
+- `avatarLibrary.ProfileSchema` + `MeasurementsSchema` — read boundary IDB+LS.
+- `workflowSlice.PersistedEnvelopeSchema` — read boundary LS.
+
+5 de 8 sites canonical post-BUG-10 leen IDB sin parse: agent-config, saved-poses, per-plugin storage, installed plugins, provider-config, ollama-config, fallback-provider.
+
+#### Opción A — Mandatory zod parse en todo IDB read boundary
+
+**Propuesta:**
+- Cada `storageGet` consumer envuelve el resultado en zod parse.
+- Schemas se definen co-located con el shape (e.g., `avatarConfigSchema` en `CopilotPanel.tsx` o file dedicado).
+- Failure = return null + log warning + (opcionalmente) quarantine raw blob.
+
+**Pros:**
+- Garantías fuertes en boundary: cualquier corruption (manual edit, tab desync, partial write) se detecta y rechaza en lugar de propagarse.
+- Forward-compat via `.catchall()` se obtiene en sub-decisión #2 sin extra effort.
+- Consistente con projectSchema philosophy.
+
+**Contras:**
+- Boilerplate per-site (~10-30 líneas de zod schema por shape).
+- Para shapes triviales (boolean flag, single string), el overhead es desproporcionado.
+- Performance: zod parse en hot path (mount-time read) tiene cost (~1ms para shapes grandes como profiles).
+
+#### Opción B — Zod parse mandatory para "user-generated data" + opcional para "internal config"
+
+**Propuesta:**
+- User-generated (poses, profiles, projects, marketplace skills) requiere zod en read boundary.
+- Internal config (provider-config, ollama-config, agent-config, layoutSlice) puede saltar zod si shape es primitive-typed-by-typescript.
+- Criterio greppable: shape contains user-input strings o user-defined arrays → mandatory zod. Shape es discriminated union de tipos enum + primitives → optional.
+
+**Pros:**
+- Boilerplate solo donde el riesgo es real (user input es untrusted).
+- Performance: zod parse en hot path solo cuando necesario.
+- Reconoce la realidad: agent-config schema (3 fields, 2 strings 1 enum) no se beneficia de zod del mismo modo que pose array (50+ items con joints + matrices).
+
+**Contras:**
+- Criterio "user-generated vs internal config" tiene zonas grises (¿es ollama-config "internal"? El URL es user input).
+- Cognitive overhead: cada nuevo shape requiere decisión de criterio.
+- Inconsistente con Opción A precedent (workflowSlice ya tiene zod).
+
+#### Opción C — Status quo + close gaps documented
+
+**Propuesta:**
+- B6-state documenta los 5 IDB sites sin parse como "deferred risk".
+- No mandatorea zod nuevo.
+- Si en 6 meses se observa corruption bug en alguno, agrega zod ad-hoc.
+
+**Pros:**
+- Zero cost ahora.
+- Reactive cuando el cost-benefit es claro (bug observado, schema demonstrably needed).
+
+**Contras:**
+- Anti-patrón cobarde: documenta drift sin resolver.
+- Los 5 sites IDB sin parse son un blind spot — corruption silenciosa de cualquiera de ellos podría producir bug confuso difícil de attribuir a falta de schema.
+
+#### Recomendación 3.4
+
+**Opción B (zod mandatory para user-generated, opcional para internal config) con confianza media-alta.**
+
+**Razones:**
+
+1. **Cost-benefit calibrado**: zod overhead solo donde el risk de corruption importa (user-generated data has unbounded shape surface). Internal config con types TS-narrow tiene risk surface chica.
+2. **Precedente consistent**: avatarLibrary ya aplica zod a profiles (user-generated). projectSchema aplica a project import (user-generated). workflowSlice aplica a versioned envelope (user-driven workflow state). Los 3 precedentes son user-generated.
+3. **Confianza media-alta** (no alta) por la zona gris del criterio. Mitigación: la sub-decisión incluye una tabla explícita por site (ver Implementation plan abajo) clasificando cada uno como "user-gen" o "internal", con razón inline. Future shapes nuevos siguen la misma tabla.
+
+**Tabla de clasificación de los 8 sites canonical post-BUG-10:**
+
+| Site | Clasificación | Zod policy |
+|---|---|---|
+| `agent-config` | Internal (3 fields fixed shape) | Optional (skip OK) |
+| `saved-poses` | User-generated (variable count, user-named, user-jointed) | **Mandatory zod parse** |
+| `avatar profiles` | User-generated (already has ProfileSchema) | Mandatory ✓ done |
+| `per-plugin storage` | Plugin-generated (untrusted by definition) | **Mandatory zod parse** at canonical boundary; plugin's own schema |
+| `installed plugins` | Internal-ish (registry data, version + name, pero plugin manifests son user-generated por el plugin author) | **Mandatory zod parse** (precedente plugin manifest validation) |
+| `provider-config` | Internal (provider enum + URL string) | Optional (skip OK) |
+| `ollama-config` | Mixed (URL is user input, other fields are TS-typed) | Optional w/ basic url validation |
+| `fallback-provider` | Internal (similar a provider-config) | Optional (skip OK) |
+
+**Implementation plan (post-policy ratification):**
+- Add zod schema for `saved-poses` (mandatory user-gen).
+- Add zod schema for `installed plugins list` (mandatory plugin metadata).
+- Document the table above en `storage.ts` comment.
+
+**Trigger de reapertura:**
+- Corruption bug observado en uno de los 4 sites clasificados como "internal" → reclasificar y agregar zod.
+- Plugin schema escape (per-plugin storage corruption from sandboxed plugin) → tighten zod boundary on plugin-generated data.
+
+---
+
+### 3.5 Sync API policy
+
+**Decisión**: ratificar cache-shadowing como exception documentada o migrar a async-only con loading states.
+
+#### Estado actual
+
+2 sites con cache pattern post-BUG-10 + failure modes documentados inline:
+
+| Site | Sync consumer | Failure modes documentados |
+|---|---|---|
+| `pluginManager.installedCache` | `installPluginFromManifest`, test fixtures | Order-dependent staleness, silent IDB write failure |
+| `providers/ollama.ollamaConfigCache` | `AgentSettings.tsx:108` (render-time read in form) | Same |
+
+#### Opción A — Ratificar cache-shadowing (status quo) con policy explícita
+
+**Propuesta:**
+- B6-state ratifica que sync API + cache shadow es exception legítima cuando: (a) sync API es contract público (plugin handlers, render path), (b) failure modes están documentados inline.
+- No migration needed; los 2 sites quedan como están.
+- Future cache sites se ratifican individualmente con el mismo criterio.
+
+**Pros:**
+- Zero refactor cost.
+- Preserva sync contracts que tienen consumers (tests, render).
+- Failure modes ya documentados inline (post-chore-docs commit `d291494`); no requiere extra work.
+
+**Contras:**
+- Los 2 failure modes (order staleness + silent IDB write failure) **persisten en producción**. Si algún día se observa data loss debido a uno de ellos, la mitigation es reactive.
+- Cache pattern es duplication: 2 sites con el mismo shape (`xxxCache: T | null` + lazy LS init + sync API + async hydrate). Podría unificarse en un helper canonical, pero hacerlo refactor.
+
+#### Opción B — Migrar ambos a async-only con loading state
+
+**Propuesta:**
+- `pluginManager.installPluginFromManifest` se vuelve async; tests + plugin handlers refactoran.
+- `AgentSettings.tsx` usa loading state mientras `loadOllamaConfigAsync` resuelve; UI muestra spinner ~5ms en mount.
+- Cache fields se eliminan; storage.ts es source of truth.
+
+**Pros:**
+- Elimina los 2 failure modes por construcción.
+- Consistencia con los otros 6 canonical sites (todos async).
+- Reduce surface area de la canonical pattern (cero excepciones).
+
+**Contras:**
+- Refactor cost: ~6-10h (test fixtures + AgentSettings UI loading state + plugin handler audit).
+- Plugin API contract en `pluginManager` es plugin-facing; cambiar a async puede requerir version bump del plugin API.
+- Loading state UI <5ms en `AgentSettings` mount es perceptible si la app es slow generally; visual flicker non-zero.
+
+#### Opción C — Cache-shadowing OK + extract canonical helper
+
+**Propuesta:**
+- Mantener cache-shadowing pattern.
+- Extraer un helper canonical en `storage.ts` que encapsula el cache + sync read + async hydrate + sync write + IDB persist.
+- Los 2 sitios se refactoran para usar el helper.
+- Future cache sites usan el mismo helper sin re-implementar.
+
+**Pros:**
+- Combina las ventajas de A (no UI breakage) y B (reducir surface duplicada).
+- Failure modes quedan documentados en un solo lugar (el helper) en vez de 2 sites.
+
+**Contras:**
+- Cost intermedio (~3-5h para diseñar helper + refactor 2 sitios).
+- Helper API has 4-5 callbacks (legacy LS read, schema validate, async hydrate, sync write, async persist) — surface más complicada que la del cache pattern simple.
+- "Generalizar para 2 casos" puede ser premature abstraction si los 2 casos no comparten más que shape.
+
+#### Recomendación 3.5
+
+**Opción A (ratificar status quo con policy explícita) con confianza alta.**
+
+**Razones:**
+
+1. **Cost-benefit favorable**: Opción A es zero-cost; los failure modes ya están documentados inline (`d291494`). Opción B introduce refactor de plugin API que cruza la línea de "BUG-10 implementation no debe pre-empt plugin contract".
+2. **Opción C es premature abstraction**: 2 sites con cache pattern no justifican un helper canonical con 4-5 callbacks. Si en 6 meses aparece un tercer cache site con shape similar, evaluamos extracción ahí.
+3. **Failure modes son documented + bounded**: order staleness se mitiga si components dispatch async hydrate en mount (igual que los otros sites canonical hacen). Silent IDB write failure es shared con los 6 sites async fire-and-forget — no es exclusivo de cache sites.
+4. **Confianza alta** porque los 2 failure modes están enumerados, los 2 sites están enumerados, y el path de mitigation está claro (mount effect dispatch async hydrate, tests use cache reset helper).
+
+**Trigger de reapertura:**
+- Bug observado de "stale cached value" en producción.
+- Tercer cache site emerge con shape similar (justifies helper extraction, Opción C revisited).
+- E-async-states sub-track decide policy global de loading states que invalida cache-shadowing como exception.
+
+**Implementation plan:**
+- Cero refactor.
+- Opcional cleanup: mejorar el wording de los inline comments en `installedCache` y `ollamaConfigCache` para incluir explícitamente "ratificado por B6-state Fase 2 § 3.5 como sync API exception" (1-líneas adicionales). Lo hago como sub-bullet del cleanup commit post-PR ratificación.
+
+---
