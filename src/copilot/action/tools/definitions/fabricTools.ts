@@ -14,13 +14,13 @@ import {
   type PhysicalFabric,
 } from '../../../../utils/cloth/physicalFabric';
 import {
-  setFabric,
   setPieceTint,
   setPieceOpacity,
   clearPieceOpacity,
   setPieceEmission,
   clearPieceEmission,
 } from '../../../../store/simulationSlice';
+import { setPieceFabric } from '../../../../store/projectSlice';
 
 function fabricSummary(f: PhysicalFabric) {
   return {
@@ -236,15 +236,16 @@ const assignFabricTool: ToolDefinition = {
       };
     }
 
-    // Snapshot previous state for rollback
-    const prevFabricId =
-      state.simulation.pieceFabrics[pieceId] ?? state.simulation.defaultFabricId;
+    // Snapshot previous state for rollback. fabricId reads from project
+    // (source-of-truth); tint reads from sim (transient render cache, no
+    // persistent equivalent — see B10-state Par 1 § 8.2).
+    const prevFabricId = (piece as { fabricId?: string }).fabricId;
     const prevTint: string | undefined = state.simulation.pieceTints[pieceId];
 
-    // Dispatch fabric assignment
-    dispatch(setFabric({ pieceId, fabricId }));
+    // Persistent fabric assignment. Sim cache propagates via useColorwaySync.
+    dispatch(setPieceFabric({ pieceId, fabricId }));
 
-    // Optionally dispatch tint
+    // Optionally dispatch tint (transient sim-only).
     if (tint) {
       dispatch(setPieceTint({ pieceId, tint }));
     }
@@ -260,9 +261,11 @@ const assignFabricTool: ToolDefinition = {
         previousFabricId: prevFabricId,
       },
       rollback: () => {
-        dispatch(setFabric({ pieceId, fabricId: prevFabricId }));
+        // Single-field swap preserves intervening edits to other piece fields
+        // (B10-state Par 1 § 3.1.β concurrency-safety).
+        dispatch(setPieceFabric({ pieceId, fabricId: prevFabricId }));
         if (tint) {
-          // We changed the tint, so restore previous value (or reset to white if none)
+          // Restore previous tint or reset to white if none.
           dispatch(setPieceTint({ pieceId, tint: prevTint ?? '#ffffff' }));
         }
       },
