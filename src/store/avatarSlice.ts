@@ -1,7 +1,7 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { AvatarProfile, loadProfiles, saveProfile as persistProfile, deleteProfile as removeProfile } from '../utils/avatar/avatarLibrary';
 import { constrainJoint, HUMAN_JOINTS } from '../utils/avatar/jointConstraints';
-import { safeGetItem, safeSetItem } from '../utils/safeStorage';
+import { safeGetItem } from '../utils/safeStorage';
 import { NEW_PROJECT } from './actions';
 
 export interface JointRotation {
@@ -191,22 +191,39 @@ export interface SavedPose {
   createdAt: number;
 }
 
-const POSES_STORAGE_KEY = 'openclo-saved-poses';
+const LEGACY_POSES_STORAGE_KEY = 'openclo-saved-poses';
 
-function loadSavedPoses(): SavedPose[] {
-  // Sync fallback for initial state — async migration happens in loadSavedPosesFromStorage
+/** Async load: IDB primary + read-side migration from legacy LS (BUG-10 canonical). */
+export async function loadSavedPosesAsync(): Promise<SavedPose[]> {
+  const { storageGet, migrateFromLocalStorage } = await import('../utils/storage');
+  const existing = await storageGet<SavedPose[]>('avatars', 'saved-poses');
+  if (existing) return existing;
+  const migrated = await migrateFromLocalStorage<SavedPose[]>(
+    LEGACY_POSES_STORAGE_KEY,
+    'avatars',
+    'saved-poses',
+  );
+  return migrated ?? [];
+}
+
+/** Sync fallback used only by initialState. Reads the legacy LS key while it
+ *  still exists; returns [] after the first hydrate has migrated. The component
+ *  always dispatches `loadSavedPosesFromStorage(payload)` on mount with the
+ *  authoritative async-loaded list. */
+function loadSavedPosesSyncFallback(): SavedPose[] {
   try {
-    const raw = safeGetItem(POSES_STORAGE_KEY);
+    const raw = safeGetItem(LEGACY_POSES_STORAGE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch { return []; }
 }
 
-function persistPoses(poses: SavedPose[]) {
-  // Write to both IndexedDB and localStorage (for sync access)
+function persistPoses(poses: SavedPose[]): void {
+  // BUG-10: IDB-only write via canonical helper (storageSet falls back to LS
+  // internally only when IDB is unavailable). Fire-and-forget is acceptable in
+  // a reducer; errors are surfaced via the helper's existing fallback path.
   import('../utils/storage').then(({ storageSet }) => {
-    storageSet('avatars', 'saved-poses', poses);
-  });
-  safeSetItem(POSES_STORAGE_KEY, JSON.stringify(poses));
+    void storageSet('avatars', 'saved-poses', poses);
+  }).catch(() => { /* ignore */ });
 }
 
 const initialState: AvatarState = {
@@ -298,8 +315,13 @@ const avatarSlice = createSlice({
     },
     
     // ─── Custom Pose Management ───
-    loadSavedPosesFromStorage(state) {
-      state.savedPoses = loadSavedPoses();
+    /** Hydrate savedPoses from storage. Called with an explicit payload from
+     *  the component's useEffect (which awaits loadSavedPosesAsync). The
+     *  legacy zero-arg form is preserved for transitional callers — it falls
+     *  back to the sync LS read so existing users with legacy storage keep
+     *  seeing their poses until the async hydrate completes. */
+    loadSavedPosesFromStorage(state, action: PayloadAction<SavedPose[] | undefined>) {
+      state.savedPoses = action.payload ?? loadSavedPosesSyncFallback();
     },
     savePose(state, action: PayloadAction<string>) {
       const name = action.payload;
@@ -310,14 +332,13 @@ const avatarSlice = createSlice({
         joints: { ...state.pose.joints },
         createdAt: now,
       };
-      const poses = loadSavedPoses();
-      poses.push(pose);
+      const poses = [...state.savedPoses, pose];
       persistPoses(poses);
       state.savedPoses = poses;
       state.pose.activePreset = pose.id;
     },
     deleteSavedPose(state, action: PayloadAction<string>) {
-      const poses = loadSavedPoses().filter(p => p.id !== action.payload);
+      const poses = state.savedPoses.filter(p => p.id !== action.payload);
       persistPoses(poses);
       state.savedPoses = poses;
       if (state.pose.activePreset === action.payload) {
@@ -326,11 +347,11 @@ const avatarSlice = createSlice({
     },
     overwriteSavedPose(state, action: PayloadAction<string>) {
       const id = action.payload;
-      const poses = loadSavedPoses();
-      const idx = poses.findIndex(p => p.id === id);
+      const idx = state.savedPoses.findIndex(p => p.id === id);
       if (idx >= 0) {
-        poses[idx].joints = { ...state.pose.joints };
-        poses[idx].createdAt = Date.now();
+        const poses = state.savedPoses.map((p, i) =>
+          i === idx ? { ...p, joints: { ...state.pose.joints }, createdAt: Date.now() } : p,
+        );
         persistPoses(poses);
         state.savedPoses = poses;
       }
