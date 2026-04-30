@@ -13,7 +13,6 @@ import type { PluginState, PluginInfo } from '../../store/pluginSlice';
 function initialState(): PluginState {
   return {
     installedPlugins: [],
-    enabledPlugins: [],
     pluginErrors: {},
   };
 }
@@ -34,7 +33,6 @@ describe('pluginSlice', () => {
   it('should return initial state', () => {
     const state = reducer(undefined, { type: 'unknown' });
     expect(state.installedPlugins).toEqual([]);
-    expect(state.enabledPlugins).toEqual([]);
     expect(state.pluginErrors).toEqual({});
   });
 
@@ -59,11 +57,11 @@ describe('pluginSlice', () => {
       expect(state.installedPlugins).toHaveLength(0);
     });
 
-    it('should remove from enabledPlugins too', () => {
+    it('should also drop the plugin record (no parallel enabled list to clean)', () => {
       let state = reducer(initialState(), installPlugin(samplePlugin()));
       state = reducer(state, enablePlugin('com.test.plugin'));
       state = reducer(state, removePlugin('com.test.plugin'));
-      expect(state.enabledPlugins).not.toContain('com.test.plugin');
+      expect(state.installedPlugins.find(p => p.id === 'com.test.plugin')).toBeUndefined();
     });
 
     it('should clear plugin errors on remove', () => {
@@ -75,27 +73,25 @@ describe('pluginSlice', () => {
   });
 
   describe('enablePlugin', () => {
-    it('should add to enabledPlugins', () => {
+    it('should set installedPlugins[].enabled = true', () => {
       let state = reducer(initialState(), installPlugin(samplePlugin()));
       state = reducer(state, enablePlugin('com.test.plugin'));
-      expect(state.enabledPlugins).toContain('com.test.plugin');
       expect(state.installedPlugins[0].enabled).toBe(true);
     });
 
-    it('should not duplicate in enabledPlugins', () => {
+    it('should be idempotent', () => {
       let state = reducer(initialState(), installPlugin(samplePlugin()));
       state = reducer(state, enablePlugin('com.test.plugin'));
       state = reducer(state, enablePlugin('com.test.plugin'));
-      expect(state.enabledPlugins.filter(id => id === 'com.test.plugin')).toHaveLength(1);
+      expect(state.installedPlugins.filter(p => p.id === 'com.test.plugin' && p.enabled)).toHaveLength(1);
     });
   });
 
   describe('disablePlugin', () => {
-    it('should remove from enabledPlugins', () => {
+    it('should set installedPlugins[].enabled = false', () => {
       let state = reducer(initialState(), installPlugin(samplePlugin()));
       state = reducer(state, enablePlugin('com.test.plugin'));
       state = reducer(state, disablePlugin('com.test.plugin'));
-      expect(state.enabledPlugins).not.toContain('com.test.plugin');
       expect(state.installedPlugins[0].enabled).toBe(false);
     });
   });
@@ -116,13 +112,12 @@ describe('pluginSlice', () => {
   describe('setPluginState', () => {
     it('should replace entire state', () => {
       const newState: PluginState = {
-        installedPlugins: [samplePlugin()],
-        enabledPlugins: ['com.test.plugin'],
+        installedPlugins: [{ ...samplePlugin(), enabled: true }],
         pluginErrors: { 'com.test.plugin': 'warning' },
       };
       const state = reducer(initialState(), setPluginState(newState));
       expect(state.installedPlugins).toHaveLength(1);
-      expect(state.enabledPlugins).toHaveLength(1);
+      expect(state.installedPlugins[0].enabled).toBe(true);
       expect(state.pluginErrors['com.test.plugin']).toBe('warning');
     });
   });

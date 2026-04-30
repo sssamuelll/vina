@@ -158,7 +158,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
     avatarTape: { tapes: [], pendingTape: null },
     plugins: {
       installedPlugins: [],
-      enabledPlugins: [],
       pluginErrors: {},
     },
     layout: {
