@@ -525,6 +525,36 @@ Reopen B2-state if:
 5. EntityAdapter first adoption occurs — document explicitly as precedent.
 6. Selector exports generalize to >5 slices — evaluate whether mass migration of the 400 sites is now warranted.
 
+## Diagnostic types (D7 ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-d7-validation-diagnostic-types.md` (full Fase 2 doc with 3 sub-decisiones, lifecycle ortogonal verified).
+
+Two diagnostic types coexist with distinct lifecycles. They are **intentionally separate** — not drift.
+
+| Type | File | Lifecycle | Severity set | Type field | Anchors |
+|---|---|---|---|---|---|
+| `ValidationDiagnostic` | `src/utils/projectValidator.ts` | Boundary parsing during `loadProject` | 3 (`error`/`warning`/`info`) | `code: ValidationCode` enum strict | `pieceId`/`seamId`/`field` (entity-specific) |
+| `Diagnostic` | `src/diagnostics/types.ts` | Runtime user inspection (right-click → Inspect) | 4 (adds `critical`) | `category: string` free-form | `detail: string` free-form |
+
+### When to use which
+
+- **`ValidationDiagnostic`** — load-time validation rules; emit during `loadProject` to flag entries that were rejected, quarantined, or need user attention post-load. Persisted in `projectState.loadDiagnostics`.
+- **`Diagnostic`** — runtime user-triggered inspection via the Inspector subsystem (`src/diagnostics/ruleEngine.ts`). Transient in `inspectorState.diagnostics` (cleared on target change). Use `'critical'` severity for UX blockers.
+
+### Why not unified
+
+The 2 types have ortogonal lifecycles and **0 cross-type callsites** in the codebase. Severity sets, anchor models, and type field semantics differ intentionally per-lifecycle. Unifying with a base type or discriminated union would force shared fields that are unstable (severity sets diverge) without enabling any real shared utility.
+
+### Reopen triggers
+
+Reopen D7 if:
+
+1. A third Diagnostic-like type emerges with shared fields against one of the 2.
+2. A site needs to render `ValidationDiagnostic` in `InspectorTab` (or vice versa) — design adapter shape post-hoc with the concrete use case.
+3. A shared utility cross-type emerges (formatter, severity ranker, grouping helper) that requires a union type.
+4. Severity sets converge (e.g., loader emits `'critical'`, or inspector drops it).
+5. Type fields converge (e.g., `category` becomes strict enum, or `code` becomes free-form).
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
