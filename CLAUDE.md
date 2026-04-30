@@ -28,9 +28,6 @@ src/
 │   │   └── useBridge.ts       # Bridge state management hook
 │   ├── tools/           # Copilot tool definitions
 │   └── features.ts      # Feature flags (bridge mode)
-├── core/                # Semantic garment engine
-│   ├── geometry/        # Constraint-based geometry
-│   └── pattern/         # Pattern piece operations
 ├── types/
 │   └── collisionBody.ts  # CollisionBody interface
 ├── utils/
@@ -554,6 +551,42 @@ Reopen D7 if:
 3. A shared utility cross-type emerges (formatter, severity ranker, grouping helper) that requires a union type.
 4. Severity sets converge (e.g., loader emits `'critical'`, or inspector drops it).
 5. Type fields converge (e.g., `category` becomes strict enum, or `code` becomes free-form).
+
+## Layer policy (D5 ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-d5-layering-violations.md` (full Fase 2 doc with 3 sub-decisiones, 24 archivos cross-layer clasificados).
+
+The codebase organizes code by **feature ownership**, not by formal layered architecture. There is no `eslint boundaries` plugin, no `no-restricted-paths` rule, and no formal layer infrastructure. This is intentional.
+
+### Feature ownership reading
+
+A feature (e.g., copilot, skills, plugins) may have its UI live in `src/components/` AND its logic live in `src/copilot/` (or equivalent). Imports between those directories are legitimate when both belong to the same feature. The split between `components/` and `copilot/` is **organizational** (React convention), not architectural.
+
+24 cross-layer imports from `src/components/*` to `src/copilot/*` exist as of 2026-04-30. All are legitimate under feature ownership:
+
+- **Copilot Panel UI** (~13 files) — `CopilotPanel/*`, `CommandBar/CommandBar.tsx`, `shell/UnifiedBarChat.tsx`, `shell/UnifiedBarSettings.tsx`. Feature-owned by copilot.
+- **Skill marketplace UI** (~5 files) — `SkillMarketplace/*`, `ExportSkillModal/`. Sub-feature of copilot.
+- **Plugin manager UI** (~1 file) — `PluginManager/PluginManager.tsx`. Sub-feature.
+- **Setup/config UI** (~1 file) — `SetupWizard/SetupWizard.tsx`. Provider config.
+- **Cross-feature integrations** (~3 files) — `BottomPanel/BottomPanel.tsx` (proactive analysis), `TemplateLibrary/TemplateLibrary.tsx` (garment analyzer), `Workspace/Workspace.tsx` (key handler factory). Explicit entry points where shell/integration code invokes copilot logic.
+
+### Decision rule for new cross-layer imports
+
+When introducing a new `import` from `src/components/*` to `src/copilot/*`:
+
+- **Legitimate:** the importing component is part of a feature that owns code in both directories (e.g., adding a new `CopilotPanel/*` component, or extending `SkillMarketplace/`).
+- **Legitimate:** the importing component is the explicit entry point for cross-feature integration (e.g., shell layout invoking copilot via a documented function).
+- **Smell:** an unrelated component (e.g., a 2D pattern editor tool, a dialog) imports deep copilot logic without feature ownership justification. Treat as drift signal — refactor to remove the import or document why the cross-feature integration is correct.
+
+### Reopen triggers
+
+Reopen D5 if:
+
+1. A "random violation" emerges — an unrelated component imports deep copilot without feature ownership rationale.
+2. Subsystem copilot refactor reorganizes imports significantly.
+3. A separate sub-RFC introduces formal layered architecture; that sub-RFC supersedes D5.
+4. Cross-layer file count grows past ~40 (currently 24) without convention updates.
+5. An eslint plugin like `boundaries` is introduced for another reason (e.g., WASM↔JS layering); evaluate whether TS-side enforcement now applies.
 
 ## Drift-axis investigation methodology
 

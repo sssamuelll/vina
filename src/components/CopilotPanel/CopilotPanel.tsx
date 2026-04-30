@@ -1,3 +1,10 @@
+/**
+ * @module CopilotPanel
+ *
+ * Feature-owned UI for the copilot subsystem. Imports from `src/copilot/*`
+ * are legitimate per the **feature ownership** layer policy (CLAUDE.md
+ * "Layer policy" + D5 ratification doc).
+ */
 import { MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
