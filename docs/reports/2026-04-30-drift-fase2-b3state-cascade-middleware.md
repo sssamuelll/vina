@@ -200,4 +200,261 @@ Por cada cascade, las sub-decisiones que aplican:
 
 ---
 
-[Sec 3-9 pendientes — incremental push.]
+## Sección 3 — Sub-decisiones, opciones y tradeoffs
+
+Cinco sub-decisiones independientes (3.1–3.5). Cada una presenta las opciones realistas, sus tradeoffs, y mi recomendación con justificación. Sam decide eje por eje.
+
+### 3.1 — Cascade detection / marker
+
+**Pregunta:** ¿cómo se identifica que un middleware (o un dispatch específico) es producto de una cascade, no del call-site original? Sin un marker uniforme, el debugging de cascade-induced bugs es invisible (qué dispatchó qué) y la convención queda implícita.
+
+#### Opción 3.1.A — `meta.cascadeOf` flag obligatorio en todo dispatch cascadeado
+
+Cada dispatch que un middleware emita en respuesta a otra acción lleva `meta: { cascadeOf: '<sourceActionType>' }`.
+
+```ts
+store.dispatch({
+  ...updatePiece(partner),
+  meta: { cascadeOf: 'project/updatePiece' },
+});
+```
+
+- **Pros:** discoverable en Redux DevTools (cada cascade dispatch muestra su origen). Habilita lint rule (todo dispatch desde middleware debe tener `meta.cascadeOf` o estar en allowlist). Marca cascade-vs-orchestration explícitamente: si llamás desde call-site no hay `cascadeOf`; si llamás desde middleware sí.
+- **Cons:** ruido en payloads (todos los dispatches engordan). El reducer no necesita el flag (lo ignora) → es type-level overhead. Migration cost: 5 cascadas × N dispatches = ~10-15 sites a tocar. Doesn't address el caso #5 (`undoMiddleware` self-dispatch desde public API — ¿es cascade?).
+- **Migration:** mecánica, ~10-15 dispatches a anotar + lint rule.
+
+#### Opción 3.1.B — Comentario header obligatorio + lint rule de naming, sin flag runtime
+
+Cada middleware con cascade lleva un header doc-comment estructurado:
+
+```ts
+/**
+ * @cascade
+ * shape: sym 1↔1 (mirror/instance)
+ * triggers: project/updatePiece, project/addInternalLine, ...
+ * dispatches: project/updatePiece (partner), project/addInternalLine (partner), ...
+ * guard: module-level boolean isSyncing
+ * undo: batch grouped via undo/startBatch/endBatch
+ */
+export const linkedEditingMiddleware: Middleware = ...
+```
+
+Lint rule custom (eslint plugin) verifica que todo middleware en `src/store/*Middleware.ts` cuyo body contenga `dispatch(` lleve `@cascade` header con campos required.
+
+- **Pros:** zero runtime overhead. Discoverability concentrada en el archivo, no scattered en cada dispatch. Lint rule enforce coverage — nuevo middleware con cascade obliga el header. Inventario auto-actualizable: grep `@cascade` enumera todas las cascades.
+- **Cons:** doesn't help debugging en runtime (DevTools no muestra "cascadeOf"). Lint rule custom es código a mantener. Las 3 sub-cascadas de `confirmationMiddleware` requieren múltiples `@cascade` blocks o sintaxis para sub-cases.
+- **Migration:** mecánica, ~5 archivos a anotar + 1 lint rule.
+
+#### Opción 3.1.C — Type-level marker via TypeScript template type, no convention en source
+
+Definir `CascadeAction<T> = PayloadAction<T> & { meta: { cascadeOf: string } }` en `src/store/types.ts`, y forzar que dispatches desde middleware usen ese tipo via type narrowing.
+
+- **Pros:** type-safe, no comentarios para mantener. El compilador previene cascade-sin-marker.
+- **Cons:** complexity — RTK actions tienen `meta` opcional; forzar el tipo requiere wrapper helpers o utility types invasivos. Migration cost alto: cada dispatch en middleware debe re-tiparse. Doesn't actually prevent runtime cascade-sin-marker (un cast `as` lo bypassa). El value cost-vs-benefit es bajo.
+- **Migration:** invasiva, ~10-15 dispatches a tipar + utility types.
+
+#### Opción 3.1.D — No marker uniforme; documentar en CLAUDE.md la heterogeneidad observable
+
+Aceptar que las 5 cascadas usan primitives distintas y documentar en CLAUDE.md la taxonomía (qué primitive usar para qué shape). Cada middleware mantiene su comment header informal actual; nada se enforca runtime ni lint.
+
+- **Pros:** zero migration cost. Refleja la realidad: las cascadas tienen shape distinto (`isSyncing` boolean vs `generationId` counter vs idempotent), forzar un marker uniforme oculta esa diferencia legítima.
+- **Cons:** discoverability sigue mala. Nuevo dev no sabe cuáles middlewares cascadean sin leer el código. Lint no enforce. El drift que motivó B3-state (heterogeneidad sin convención) queda intacto, solo documentado.
+- **Migration:** zero código, ~50 líneas a CLAUDE.md.
+
+#### Recomendación 3.1
+
+**Opción 3.1.B (header `@cascade` + lint rule)**, con el detalle de que el lint rule sea **inicialmente warning-only** (`severity: warn`, no `error`) durante 1 mes para detectar false positives, y que las 3 sub-cascadas de `confirmationMiddleware` usen 3 `@cascade` headers separados (uno por sub-cascade) en vez de uno consolidado.
+
+**Justificación:**
+- 3.1.A (`meta.cascadeOf`) introduce overhead runtime sin payoff debugging suficiente — el caso de uso real es "¿qué middleware dispatchó esto?", y eso ya se ve en Redux DevTools traceable via stack trace si se habilita.
+- 3.1.C (type-level) es invasivo y bypassable; cost-benefit malo.
+- 3.1.D (no convention) deja el drift intacto; no resuelve B3-state.
+- 3.1.B concentra la documentación en el archivo (alta cohesion), enforca via lint (no convention rot), no toca runtime, y migration es trivial.
+
+**Tradeoff aceptado:** runtime debugging sigue dependiendo de Redux DevTools + stack traces, no de un flag inspectable en el action object. Para los 5 casos actuales esto es suficiente; si emerge un sexto caso donde el debugging requiere flag runtime, reabrimos 3.1 con el dato concreto.
+
+---
+
+### 3.2 — Cascade vs orchestration distinction (definición operacional)
+
+**Pregunta:** ¿cómo se distingue una cascade middleware (action A → middleware → action B) de orchestration sequential (caller dispatch A → await → caller dispatch B)? La línea importa porque:
+- Cascade middleware decide undo policy uniforme (en el middleware).
+- Orchestration sequential decide error handling y loading state por fase (en el caller, scope de E-async-states).
+
+Sin línea explícita, B3-state ratifica el primero pero alguien puede aplicarlo al segundo y romper E-async-states.
+
+#### Opción 3.2.A — Definición operacional inline en CLAUDE.md + sección dedicada en cada `@cascade` header
+
+Definir en CLAUDE.md (sección "Cascade vs orchestration"):
+
+> **Cascade middleware:** un middleware en `src/store/*Middleware.ts` intercepta una action y emite uno o más dispatches secundarios sin que el call-site original sepa o controle. El call-site dispatchó 1 action; el sistema termina con N+1 actions.
+>
+> **Orchestration:** un caller (component, hook, thunk, tool implementation) dispatchea action A explícitamente, espera un resultado/state-change, dispatchea action B explícitamente. El caller controla la secuencia. Cada dispatch corresponde 1:1 a una intención del caller.
+>
+> **Test operacional:** ¿el call-site sabe que B se va a dispatchar como consecuencia de A?
+> - Sí + dispatchea B explícitamente → orchestration.
+> - No → cascade middleware.
+
+Cada `@cascade` header de Sec 3.1 declara explícitamente que es cascade (no orchestration); la documentation cement la línea.
+
+- **Pros:** definición reproducible por test. Aplica retroactivamente a cualquier middleware existente o futuro. Cementa la línea para E-async-states cuando llegue.
+- **Cons:** la prueba operacional puede ser ambigua en casos border (e.g., `useTrimTool.ts:153` llama `batchUndo(dispatch, label, () => dispatch(...))` — ¿es orchestration porque el caller dispatchea explícitamente, o cascade porque `batchUndo` envuelve los dispatches con control actions?). Necesita un caso ejemplo con resolución.
+- **Migration:** zero código, ~100 líneas a CLAUDE.md + 1 párrafo por `@cascade` header.
+
+#### Opción 3.2.B — No definición; resolver caso por caso
+
+Aceptar que cascade vs orchestration es a veces ambiguo y decidir caso por caso cuando un eje futuro lo requiera.
+
+- **Pros:** no compromete preemptivamente.
+- **Cons:** vuelve a la ambigüedad que motivó la pregunta. E-async-states cuando llegue tiene que re-litigar la línea — pierde el trabajo de inventario que B3-state ya hizo.
+- **Migration:** zero, pero deuda futura garantizada.
+
+#### Recomendación 3.2
+
+**Opción 3.2.A** con resolución explícita del caso `batchUndo()`:
+
+> **Caso `batchUndo()`:** el helper expone control actions del undoMiddleware al call-site. El call-site dispatchea acciones explícitamente (orchestration), pero el wrapping con `undo/startBatch`/`endBatch` es delegación al middleware (cascade-adjacent). **Clasificación:** orchestration con cascade-adjacent batching. El caller controla qué se dispatcha; el middleware controla cómo se agrupa en undo. No es "cascade middleware pura" porque el middleware no genera actions nuevas, solo controla snapshotting.
+
+**Justificación:** la opción B garantiza re-trabajo. La opción A con caso resuelto cementa la línea sin ambigüedad para los 5 casos actuales y para cualquier caso futuro que emerja.
+
+---
+
+### 3.3 — Undo grouping policy para cascades
+
+**Pregunta:** cuándo una cascade debe agrupar todos sus dispatches en single undo entry (BUG-7 ratificó esto para linkedEditing) vs. cuándo NO debe agrupar.
+
+Estado actual:
+- linkedEditing: agrupa (BUG-7).
+- gradingStaleness: no agrupa.
+- confirmation (a) replay: n/a (replay es single action).
+- confirmation (b)(c) tool-memory: no agrupa.
+- reactiveSolver: no agrupa (solver state, no user action).
+- undoMiddleware: es el mecanismo.
+
+#### Opción 3.3.A — Criterio operacional: agrupa si y solo si la cascade modifica el estado user-undoable (`project.*`)
+
+```
+agrupa = cascade modifica project state Y los dispatches representan UN paso de usuario semántico
+no agrupa = cascade modifica metadata/derived state Y los dispatches son consecuencia automática
+```
+
+Aplicación a las 5 cascadas:
+
+| Cascade | Modifica project? | Paso usuario único? | Decisión |
+|---|---|---|---|
+| linkedEditing | Sí (partner piece) | Sí (1 edit del usuario → 2 actualizaciones lógicamente atómicas) | **agrupa** ✓ (BUG-7) |
+| gradingStaleness | No (`grading.stale` es metadata) | n/a | **no agrupa** ✓ |
+| confirmation (a) replay | n/a (single action) | n/a | **n/a** ✓ |
+| confirmation (b)(c) tool-memory | No (`workflow.toolMemory`) | n/a | **no agrupa** ✓ |
+| reactiveSolver | Sí (project pieces vía `upsertPieceOutline`) | No (solver state derivado, no acción del usuario) | **no agrupa** ✓ |
+
+Todas las 5 cascadas tienen decisión consistente con el criterio. Documentar en CLAUDE.md y en el `@cascade` header.
+
+- **Pros:** criterio operacional único, reproducible. Las 5 cascadas actuales lo pasan sin re-decidir. Aplica a cascadas futuras.
+- **Cons:** "paso de usuario semántico" es subjetivo en bordes (e.g., si una cascade futura modifica `project.*` automáticamente como respuesta a un timer, ¿agrupa con la action anterior o no agrupa? El criterio no responde). Marcar como deuda explícita.
+- **Migration:** zero código, las 5 ya cumplen.
+
+#### Opción 3.3.B — Decision per-cascade en cada `@cascade` header, sin criterio uniforme
+
+Cada cascade declara su decisión en su header con justificación; no hay regla global.
+
+- **Pros:** flexible. No fuerza criterio sobre casos border.
+- **Cons:** convention rot — alguien agrega cascade nueva y "decide" sin un criterio comparable. Esto es exactamente el drift original.
+- **Migration:** zero.
+
+#### Recomendación 3.3
+
+**Opción 3.3.A** con la deuda explícita de "casos border (e.g., timer-driven cascade que modifica project) requieren reabrir la regla". Las 5 cascadas existentes pasan; el criterio funciona para los 5 casos reales que tenemos.
+
+---
+
+### 3.4 — Cascade depth limit / anti-loop protection
+
+**Pregunta:** ¿pueden las cascadas cascadear (depth > 1)? Si A trigger middleware M1 que dispatcha B, y B trigger middleware M2 que dispatcha C — ¿es válido?
+
+Estado actual: **ninguna cascade actual tiene depth > 1**. Todas tienen guard que previene re-entrance (boolean, generation counter, idempotent action no en triggers, meta flag preventing re-mirror).
+
+#### Opción 3.4.A — Cap formal: cascade depth = 1 (un nivel)
+
+CLAUDE.md establece: "Una cascade middleware no puede dispatchar una action que sea trigger de otra cascade middleware. Si emerge esa necesidad, el patrón correcto es orchestration explícita (caller controla la secuencia)."
+
+Detección: todas las 5 cascadas actuales tienen guard que cumplen esto. Si una cascade futura viola el cap, se detecta en review (lint rule futura puede estática-analizar trigger sets — no scope ahora).
+
+- **Pros:** simple, defendible. Previene cascade-of-cascade que es notoriamente difícil de debuggear (action chains imprevisibles). Forzar orchestration cuando hay dependency entre cascades concentra la complejidad en el call-site, no scattered en middlewares.
+- **Cons:** restrictivo si emerge un caso real donde cascade-of-cascade es genuino. La detección estática es pendiente (no scope ahora).
+- **Migration:** zero — todas las 5 ya cumplen.
+
+#### Opción 3.4.B — No cap formal; aceptar depth > 1 si la cascade tiene generation counter o idempotent guard
+
+Permitir cascade-of-cascade si el middleware tiene mecanismo de prevenir loops.
+
+- **Pros:** flexible.
+- **Cons:** abre la puerta a cascade chains imprevisibles. El debugging de "qué dispatchó qué" se vuelve recursivo. Convention rot garantizado.
+- **Migration:** zero.
+
+#### Recomendación 3.4
+
+**Opción 3.4.A.** Las 5 cascadas actuales cumplen sin esfuerzo. Cualquier caso futuro de cascade-of-cascade es smell que merece revisión, no convention default.
+
+**Tradeoff aceptado:** si emerge un caso genuino de cascade-of-cascade, se reabre 3.4 con el caso concreto. Por ahora cap = 1.
+
+---
+
+### 3.5 — Documentation / discoverability convention
+
+**Pregunta:** ¿cómo descubre un nuevo dev que un middleware cascadea, sin leer el código entero? Estado actual: discoverability es heterogénea — `linkedEditing` tiene comment inline (`:84`), `gradingStaleness` y `confirmation` tienen header del archivo, `reactiveSolver` está en CLAUDE.md, `undoMiddleware` tiene header. `meta.skipConfirmation` se documenta en exactamente 1 comment (`useScissorsTool.ts:152`).
+
+#### Opción 3.5.A — `@cascade` header obligatorio (de 3.1.B) + entrada en CLAUDE.md por cada cascade + `meta.*` flags documentados centralmente
+
+Combina:
+1. `@cascade` header en cada middleware con cascade (de 3.1.B).
+2. CLAUDE.md sección "Cascade middleware patterns" lista las 5 cascadas con resumen.
+3. CLAUDE.md sección "Action meta flags" documenta `meta.skipConfirmation` y `meta.fromToolMemory` con propósito + callsites pattern.
+
+- **Pros:** discoverability multi-nivel. Un nuevo dev puede leer CLAUDE.md (overview), o `grep '@cascade'` (enumeración), o leer header del archivo (detalle). El comment inline aislado de `useScissorsTool.ts:152` se promueve a documentation central.
+- **Cons:** triple write — CLAUDE.md + header + lint. Mantenibilidad: si una cascade cambia, hay 2 lugares a actualizar.
+- **Migration:** ~5 headers + ~80 líneas a CLAUDE.md.
+
+#### Opción 3.5.B — `@cascade` header solo, sin CLAUDE.md sección
+
+Header en archivo es la única documentation. CLAUDE.md no tiene sección dedicada.
+
+- **Pros:** single source of truth (el archivo).
+- **Cons:** discoverability requiere conocer la convention `@cascade` o saber qué archivos buscar. Nuevo dev puede missear todo el subsystem.
+- **Migration:** ~5 headers.
+
+#### Opción 3.5.C — Solo CLAUDE.md, sin header lint-enforced
+
+CLAUDE.md tiene la lista; los archivos individuales tienen comentarios informales como hoy.
+
+- **Pros:** un solo lugar para mantener.
+- **Cons:** lint no enforce; nuevo middleware con cascade puede no entrar a CLAUDE.md por descuido. Convention rot.
+- **Migration:** ~80 líneas a CLAUDE.md.
+
+#### Recomendación 3.5
+
+**Opción 3.5.A** con la salvedad de que CLAUDE.md sección sea **resumen** (1-2 líneas por cascade + cross-ref al archivo), no duplicación del header. La autoridad sigue siendo el header `@cascade`; CLAUDE.md es índice.
+
+**Justificación:**
+- 3.5.B falla en discoverability inicial (nuevo dev no sabe que existe la convention).
+- 3.5.C falla en enforce (convention rot al primer middleware nuevo).
+- 3.5.A da multi-nivel con redundancia mínima (CLAUDE.md = índice, header = autoridad).
+
+**Mantenibilidad:** la duplicación CLAUDE.md ↔ header es 1-2 líneas resumen, no contenido pleno. Cambio profundo en cascade actualiza header (autoritativo) y opcional resumen en CLAUDE.md.
+
+---
+
+### Tabla resumen Sec 3
+
+| Sub-decisión | Recomendación | Migration cost |
+|---|---|---|
+| 3.1 Marker | **3.1.B** — `@cascade` header + lint rule warning-only | ~5 headers + 1 lint rule |
+| 3.2 Cascade vs orchestration | **3.2.A** — definición operacional en CLAUDE.md + caso `batchUndo()` resuelto | ~100 líneas CLAUDE.md |
+| 3.3 Undo grouping | **3.3.A** — criterio: agrupa si modifica project Y es paso usuario único | zero (5/5 ya cumplen) |
+| 3.4 Depth limit | **3.4.A** — cap formal = 1, reabrir si emerge caso real | zero (5/5 ya cumplen) |
+| 3.5 Discoverability | **3.5.A** — `@cascade` header + CLAUDE.md sección resumen + meta flags doc | ~5 headers + ~80 líneas CLAUDE.md |
+
+**Total migration:** 5 headers + 1 lint rule + ~180 líneas a CLAUDE.md + 0 cambio runtime + 0 cambio en cascadas existentes (5/5 ya cumplen los criterios). Las 5 cascadas se preservan textualmente; B3-state cementa la convención sin tocar código de comportamiento.
+
+[Sec 4-9 pendientes — incremental push.]
+
