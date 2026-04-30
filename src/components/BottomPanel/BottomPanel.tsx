@@ -1,3 +1,12 @@
+/**
+ * @module BottomPanel
+ *
+ * Cross-feature integration: shell layout that hosts CopilotTab and
+ * invokes copilot proactive analysis on tab activation. Import from
+ * `src/copilot/reasoning/proactiveAnalysis` is an explicit entry point
+ * per the **feature ownership** layer policy (CLAUDE.md "Layer policy"
+ * + D5 ratification doc).
+ */
 import { X } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
