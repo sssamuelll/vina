@@ -146,6 +146,7 @@ const ACTION_LABELS: Record<string, string> = {
   'project/updateInternalLine': 'Edit Internal Line',
   'project/setInternalLine': 'Set Internal Line',
   'project/setFabricCode': 'Change Fabric',
+  'project/setPieceFabric': 'Change Fabric',
   'project/updateMeasurements': 'Edit Measurements',
   'project/setAvatarMode': 'Change Avatar',
   'project/setProjectName': 'Rename Project',

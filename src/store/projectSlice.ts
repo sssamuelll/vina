@@ -1221,6 +1221,25 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    /**
+     * Persistent piece fabric assignment. Source-of-truth for `pieces[].fabricId`.
+     *
+     * Use for programmatic / copilot writes where the user's intent is to apply
+     * a fabric persistently. Sim runtime cache (`simulation.pieceFabrics`) is
+     * updated derivatively via `useColorwaySync`. For transient sim-only previews
+     * (MaterialTab, SimulationView), use `simulation/setFabric` instead.
+     *
+     * Single-field shape: rollback is concurrency-safe (preserves intervening
+     * edits to other piece fields). See B10-state Par 1 ratification doc.
+     */
+    setPieceFabric(state, action: PayloadAction<{ pieceId: string; fabricId: string | undefined }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      if (piece) {
+        piece.fabricId = action.payload.fabricId;
+        piece.updatedAt = Date.now();
+        state.isDirty = true;
+      }
+    },
     batchSetFabricCode(state, action: PayloadAction<{ pieceIds: string[]; fabricCode: string }>) {
       const idSet = new Set(action.payload.pieceIds);
       for (const piece of state.pieces) {
@@ -1393,7 +1412,7 @@ export const {
   // Groups
   createGroup, renameGroup, deleteGroup, setGroupColor,
   addPiecesToGroup, removePiecesFromGroup,
-  setFabricCode, batchSetFabricCode,
+  setFabricCode, batchSetFabricCode, setPieceFabric,
   moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,

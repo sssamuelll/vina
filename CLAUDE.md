@@ -375,6 +375,64 @@ A new `meta.*` flag requires:
 
 If a flag's callsites grow past ~10 sites or a third flag is introduced, reopen B3-state Sec 3.1 to evaluate whether the convention needs hardening (lint rule for flag inventory, type-level enforcement, etc.).
 
+## Fabric assignment patterns (B10-state Par 1 ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-b10state-par1-fabric-write-surfaces.md` (full Fase 2 doc with 3 sub-decisiones, 7 write surfaces clasificadas, deudas técnicas).
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-b10state-par2-measurements-ratification.md` (Par 2 — `parametric.baseMeasurements` misclassification).
+
+### Contract: source-of-truth + transient cache + sync hook
+
+Three concerns separated by slice:
+
+```
+project.pieces[].fabricId   ← SOURCE OF TRUTH (persistent, source on reload)
+        │
+        │ + active colorway override
+        ▼
+useColorwaySync             ← uni-directional sync (project + colorway → sim)
+        │
+        ▼
+simulation.pieceFabrics     ← TRANSIENT CACHE (sim runtime, override-able by colorway)
+                              also written directly by transient-preview UI surfaces
+```
+
+**Persistent writes:** use `project/setPieceFabric` — single-field, concurrency-safe rollback, source-of-truth update. Sim cache propagates derivativamente via `useColorwaySync`.
+
+**Transient writes:** use `simulation/setFabric` — sim-only, restored to `project.fabricId` when active colorway clears. Used by MaterialTab/SimulationView (preview panels) and useColorwaySync (sync hook itself).
+
+**Reads from sim runtime** (cloth simulation, render): keep reading `simulation.pieceFabrics` — it's the derived cache that reflects current state including colorway overrides.
+
+### Write surface taxonomy
+
+| Surface | Action | Slice | Persistent? | Notes |
+|---|---|---|---|---|
+| `PieceProperties.tsx:96` | `updatePiece({...piece, fabricId})` | project | yes | Persistent properties panel, batches multiple field changes |
+| `groupTools.ts:126` + `setGroupFabric` | `setGroupFabric` | project | yes | Group operation, batches across pieces in group |
+| `MaterialTab.tsx:82` | `setFabric` | sim | **no (transient)** | Preview panel, sibling de tint/opacity/UV/textures (all transient by design) |
+| `SimulationView.tsx:257` | `setFabric` | sim | **no (transient)** | Sim sidebar, sibling de Per-Piece Freeze |
+| `useColorwaySync.ts:40,42` | `setFabric` | sim | **no (sync)** | The sync hook itself |
+| `fabricTools.applyFabricToPiece` | `setPieceFabric` | project | yes | Copilot persistent apply with concurrency-safe rollback |
+| `actionExecutor.set_fabric` | `setPieceFabric` | project | yes | Legacy copilot action shape |
+
+### When to use which
+
+**`project/setPieceFabric`** — when the user's intent is "this piece should have this fabric persistently" (copilot tools, programmatic apply, group operations done at piece-level).
+
+**`simulation/setFabric`** — when the write is a preview, simulation tweak, or sync result. Sibling of other transient sim properties (tint, opacity, UV, emission, texture overrides). The change is expected to NOT survive page reload or colorway switch unless backed by a persistent write upstream.
+
+**`updatePiece({...piece, fabricId})`** — when fabric is changing alongside other piece fields in a single user action (e.g., PieceProperties panel that batches multiple updates). Persistent equivalent of `setPieceFabric` but full-piece shape.
+
+### Reopen triggers
+
+Reopen B10-state Par 1 (per § 7 of the Fase 2 doc) if:
+
+1. A new copilot tool writes fabric and chooses `setFabric` (transient) — that means the convention from this section was missed; either the tool is misclassified or the convention is unclear.
+2. The single-field shape of `setPieceFabric` becomes insufficient (e.g., a tool needs to update fabric + outline atomically with rollback).
+3. A new UI surface needs persistent fabric write — verify it uses `setPieceFabric` or `updatePiece`, not `setFabric`.
+4. `setFabric` callsites grow past ~5 sites — evaluate if all are legitimate transient or if the convention is being violated.
+5. Lint rule for target slice enforcement is implemented (follow-up issue) — reabrir si emerge false positives or new convention edges.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:

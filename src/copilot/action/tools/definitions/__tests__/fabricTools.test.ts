@@ -5,7 +5,7 @@ function mockState(overrides: {
   pieceFabrics?: Record<string, string>;
   defaultFabricId?: string;
   pieceTints?: Record<string, string>;
-  pieces?: Array<{ id: string; name: string }>;
+  pieces?: Array<{ id: string; name: string; fabricId?: string }>;
 }): () => RootState {
   return () => ({
     simulation: {

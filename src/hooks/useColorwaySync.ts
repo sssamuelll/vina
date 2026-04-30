@@ -5,6 +5,19 @@ import { setFabric } from '../store/simulationSlice';
 import { resolveColorway } from '../utils/colorwayResolver';
 import { FABRIC_LIBRARY } from '../utils/cloth/fabricLibrary';
 
+/**
+ * Sync `project.fabricId` + active colorway → `simulation.pieceFabrics`.
+ *
+ * **Uni-directional:** project is source-of-truth, sim is derived cache.
+ * Writes to sim that bypass this sync (e.g., MaterialTab preview, SimulationView
+ * tweak) are intentional transient overrides; they are restored to
+ * `project.fabricId` when the active colorway clears (line 41-42).
+ *
+ * Not run on every dispatch — useEffect with deps array keyed on
+ * `activeColorwayId`, `colorways`, `pieces`, `defaultFabricId`.
+ *
+ * Cross-ref: B10-state Par 1 ratification (CLAUDE.md "Fabric assignment patterns").
+ */
 export function useColorwaySync(): void {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);

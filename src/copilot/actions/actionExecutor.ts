@@ -28,6 +28,7 @@ import {
   loadProject,
   linkPieces,
   unlinkPieces,
+  setPieceFabric,
 } from '../../store/projectSlice';
 import { parseDXF } from '../../utils/dxf/parser';
 import { dxfToPatternPieces } from '../../utils/dxf/converter';
@@ -44,7 +45,6 @@ import {
   startSimulation,
   pauseSimulation,
   resetSimulation,
-  setFabric,
   setFitMapMode,
 } from '../../store/simulationSlice';
 import { undo, redo } from '../../store/editorSlice';
@@ -845,13 +845,15 @@ export class CopilotActionExecutor {
         return { summary: 'Reset simulation' };
 
       case 'set_fabric':
+        // Persistent assignment per B10-state Par 1 § 3.1.β. Sim cache
+        // propagates via useColorwaySync.
         if (action.pieceId === 'all') {
           for (const piece of state.project.pieces) {
-            this.dispatch(setFabric({ pieceId: piece.id, fabricId: action.fabricId }));
+            this.dispatch(setPieceFabric({ pieceId: piece.id, fabricId: action.fabricId }));
           }
           return { summary: `Set fabric for all pieces` };
         }
-        this.dispatch(setFabric({ pieceId: action.pieceId, fabricId: action.fabricId }));
+        this.dispatch(setPieceFabric({ pieceId: action.pieceId, fabricId: action.fabricId }));
         return { summary: `Set fabric for piece` };
 
       case 'show_fit_map':
