@@ -8,8 +8,10 @@
  */
 
 import { useState, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
 import { type AgenticLoopOptions, type AgenticEvent } from '../reasoning/bridge/AgenticLoop';
 import { createDebugAgenticLoop } from '../debug/createDebugBridge';
+import { showErrorToast } from '../../store/copilotUISlice';
 
 export interface ToolCallProgress {
   name: string;
@@ -55,6 +57,7 @@ export function reduceToolCalls(prev: ToolCallProgress[], event: AgenticEvent): 
 }
 
 export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopReturn {
+  const dispatch = useDispatch();
   const [toolCalls, setToolCalls] = useState<ToolCallProgress[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
@@ -76,6 +79,10 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
         case 'complete':
           setResponse(event.content);
           break;
+        case 'error':
+          dispatch(showErrorToast(event.error));
+          setIsRunning(false);
+          break;
       }
     };
 
@@ -85,7 +92,7 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
     } finally {
       setIsRunning(false);
     }
-  }, [options]);
+  }, [options, dispatch]);
 
   return { toolCalls, isRunning, response, run };
 }

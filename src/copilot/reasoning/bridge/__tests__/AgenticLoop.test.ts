@@ -263,6 +263,25 @@ describe('AgenticLoop', () => {
     expect(toolResult.error).toContain('Malformed JSON');
   });
 
+  it('emits loop-level error event and rethrows when send throws', async () => {
+    const send = vi.fn(async () => { throw new Error('provider 5xx'); });
+
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [],
+      actionToolDefs: [],
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+    });
+
+    const events: AgenticEvent[] = [];
+    await expect(loop.run('test', (e) => events.push(e))).rejects.toThrow('provider 5xx');
+
+    const errorEvents = events.filter(e => e.type === 'error');
+    expect(errorEvents).toHaveLength(1);
+    expect((errorEvents[0] as { type: 'error'; error: string }).error).toBe('provider 5xx');
+  });
+
   it('emits tool:error event when action tool throws', async () => {
     const mockRegistry = {
       execute: vi.fn(async () => { throw new Error('kaboom'); }),
