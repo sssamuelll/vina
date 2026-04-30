@@ -509,7 +509,7 @@ self.onmessage = async (event: MessageEvent) => {
           collisionBodies.push({
             id: '__avatar__',
             mesh: msg.mesh,
-            hash: new TriangleSpatialHash(msg.mesh, 0.05),
+            hash: new TriangleSpatialHash(msg.mesh, Math.max(0.02, currentConfig.thickness * 10)),
             friction: 0,
             margin: 0.005,
           });
@@ -520,7 +520,7 @@ self.onmessage = async (event: MessageEvent) => {
       case 'setCollisionBodies':
         collisionBodies = (msg.bodies as Array<{ id: string; mesh: CollisionMeshData; friction: number; margin: number }>).map(b => ({
           ...b,
-          hash: new TriangleSpatialHash(b.mesh, 0.05),
+          hash: new TriangleSpatialHash(b.mesh, Math.max(0.02, currentConfig.thickness * 10)),
         }));
         console.log('[WasmWorker] Collision bodies set:', collisionBodies.length, 'bodies');
         break;
@@ -528,7 +528,7 @@ self.onmessage = async (event: MessageEvent) => {
       case 'updateCollisionBody': {
         const { id, mesh, friction, margin } = msg as { id: string; mesh: CollisionMeshData; friction: number; margin: number };
         const idx = collisionBodies.findIndex(b => b.id === id);
-        const entry: WorkerCollisionBody = { id, mesh, hash: new TriangleSpatialHash(mesh, 0.05), friction, margin };
+        const entry: WorkerCollisionBody = { id, mesh, hash: new TriangleSpatialHash(mesh, Math.max(0.02, currentConfig.thickness * 10)), friction, margin };
         if (idx >= 0) collisionBodies[idx] = entry;
         else collisionBodies.push(entry);
         break;
