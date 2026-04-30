@@ -86,6 +86,80 @@ let wasmCachedMergedMesh: { vertices: Float32Array; indices: Uint32Array; pieceO
 
 /** Number of outer substeps managed by JS (collision applied between each) */
 let jsSubsteps = 15;
+
+/** Last-applied solver configuration. Init populates from msg.config; setConfig
+ *  merges partial updates so re-calling solver.configure() at runtime keeps
+ *  fields that weren't explicitly changed. */
+interface AppliedSolverConfig {
+  substeps: number;
+  damping: number;
+  gravityY: number;
+  stretchCompliance: number;
+  bendCompliance: number;
+  selfCollision: boolean;
+  thickness: number;
+  collisionMargin: number;
+  groundY: number;
+  dragCoefficient: number;
+  stretchComplianceWarp: number;
+  stretchComplianceWeft: number;
+  stretchComplianceShear: number;
+  bendComplianceWarp: number;
+  bendComplianceWeft: number;
+  internalDamping: number;
+}
+const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
+  substeps: 15,
+  damping: 0.99,
+  gravityY: -9.81,
+  stretchCompliance: 0.0,
+  bendCompliance: 0.01,
+  selfCollision: false,
+  thickness: 0.002,
+  collisionMargin: 0.005,
+  groundY: 0.0,
+  dragCoefficient: 1.0,
+  stretchComplianceWarp: 0.0,
+  stretchComplianceWeft: 0.0,
+  stretchComplianceShear: 0.001,
+  bendComplianceWarp: 1.0,
+  bendComplianceWeft: 1.0,
+  internalDamping: 0.3,
+};
+let currentConfig: AppliedSolverConfig = { ...DEFAULT_SOLVER_CONFIG };
+
+/** Push currentConfig to the Rust solver. Must be called after solver init
+ *  and after every mutation to currentConfig. */
+function applySolverConfig(): void {
+  if (!solver) return;
+  // BUG-5 (#608): self-collision is not implemented in the Rust solver
+  // — force the flag to false at this boundary regardless of currentConfig.
+  // Resolution path is deferred to A7 RFC (WASM vs CPU equivalence).
+  if (currentConfig.selfCollision) {
+    console.warn(
+      '[WasmWorker] selfCollision=true requested but the WASM solver has no implementation; ' +
+      'forcing false. Use the CPU solver tier for self-collision. Tracking: #608, A7 RFC.'
+    );
+  }
+  solver.configure(
+    1,  // substeps=1: JS manages substep loop for per-substep collision
+    currentConfig.damping,
+    currentConfig.gravityY,
+    currentConfig.stretchCompliance,
+    currentConfig.bendCompliance,
+    false,
+    currentConfig.thickness,
+    currentConfig.collisionMargin,
+    currentConfig.groundY,
+    currentConfig.dragCoefficient,
+    currentConfig.stretchComplianceWarp,
+    currentConfig.stretchComplianceWeft,
+    currentConfig.stretchComplianceShear,
+    currentConfig.bendComplianceWarp,
+    currentConfig.bendComplianceWeft,
+    currentConfig.internalDamping,
+  );
+}
 /** Pre-allocated inverse mass array for collision solver (avoids GC pressure) */
 let invMassCache: Float32Array | null = null;
 /** Pre-allocated buffer for saving positions before collision (avoids per-frame allocation) */
@@ -399,49 +473,17 @@ self.onmessage = async (event: MessageEvent) => {
           }
         }
 
-        const config = msg.config ?? {};
+        // Merge incoming config with defaults to populate the persistent
+        // currentConfig. Subsequent setConfig messages merge partial updates
+        // into this same record so all fields survive runtime changes.
+        currentConfig = { ...DEFAULT_SOLVER_CONFIG, ...(msg.config ?? {}) };
         // Store desired substeps for JS-managed collision loop, configure
         // Rust solver with substeps=1 so each solver.step() is a single substep.
         // The JS simulation loop calls step() jsSubsteps times with collision
         // correction between each, preventing particles from tunneling through
         // the avatar mesh.
-        jsSubsteps = config.substeps ?? 15;
-
-        // BUG-5 (#608): self-collision is not implemented in the Rust solver
-        // — the `self_collision` flag, `set_adjacency` setter, and adjacency
-        // buffers exist as scaffolding but no `solve_self_collision` method
-        // reads them. Force the flag to false at this boundary so callers
-        // who request self-collision get visible feedback instead of a
-        // silent no-op. Resolution path (Rust impl, JS post-process, or
-        // CPU-only-by-design) is deferred to the A7 RFC (WASM vs CPU
-        // equivalence). When that lands, replace this branch.
-        if (config.selfCollision === true) {
-          console.warn(
-            '[WasmWorker] selfCollision=true requested but the WASM solver has no implementation; ' +
-            'forcing false. Use the CPU solver tier for self-collision. Tracking: #608, A7 RFC.'
-          );
-        }
-        const selfCollisionForRust = false;
-
-        solver.configure(
-          1,  // substeps=1: JS manages substep loop for per-substep collision
-          config.damping ?? 0.99,
-          config.gravityY ?? -9.81,
-          config.stretchCompliance ?? 0.0,
-          config.bendCompliance ?? 0.01,
-          selfCollisionForRust,
-          config.thickness ?? 0.002,
-          config.collisionMargin ?? 0.005,
-          config.groundY ?? 0.0,
-          config.dragCoefficient ?? 1.0,
-          config.stretchComplianceWarp ?? 0.0,
-          config.stretchComplianceWeft ?? 0.0,
-          config.stretchComplianceShear ?? 0.001,
-          config.bendComplianceWarp ?? 1.0,
-          config.bendComplianceWeft ?? 1.0,
-          config.internalDamping ?? 0.3,
-        );
-        console.log('[WasmWorker] Solver configured with dragCoefficient =', config.dragCoefficient ?? 1.0, 'jsSubsteps =', jsSubsteps);
+        jsSubsteps = currentConfig.substeps;
+        applySolverConfig();
 
         (self as unknown as Worker).postMessage({ type: 'ready', numParticles: totalVerts });
         break;
@@ -467,7 +509,7 @@ self.onmessage = async (event: MessageEvent) => {
           collisionBodies.push({
             id: '__avatar__',
             mesh: msg.mesh,
-            hash: new TriangleSpatialHash(msg.mesh, 0.05),
+            hash: new TriangleSpatialHash(msg.mesh, Math.max(0.02, currentConfig.thickness * 10)),
             friction: 0,
             margin: 0.005,
           });
@@ -478,7 +520,7 @@ self.onmessage = async (event: MessageEvent) => {
       case 'setCollisionBodies':
         collisionBodies = (msg.bodies as Array<{ id: string; mesh: CollisionMeshData; friction: number; margin: number }>).map(b => ({
           ...b,
-          hash: new TriangleSpatialHash(b.mesh, 0.05),
+          hash: new TriangleSpatialHash(b.mesh, Math.max(0.02, currentConfig.thickness * 10)),
         }));
         console.log('[WasmWorker] Collision bodies set:', collisionBodies.length, 'bodies');
         break;
@@ -486,7 +528,7 @@ self.onmessage = async (event: MessageEvent) => {
       case 'updateCollisionBody': {
         const { id, mesh, friction, margin } = msg as { id: string; mesh: CollisionMeshData; friction: number; margin: number };
         const idx = collisionBodies.findIndex(b => b.id === id);
-        const entry: WorkerCollisionBody = { id, mesh, hash: new TriangleSpatialHash(mesh, 0.05), friction, margin };
+        const entry: WorkerCollisionBody = { id, mesh, hash: new TriangleSpatialHash(mesh, Math.max(0.02, currentConfig.thickness * 10)), friction, margin };
         if (idx >= 0) collisionBodies[idx] = entry;
         else collisionBodies.push(entry);
         break;
@@ -532,9 +574,15 @@ self.onmessage = async (event: MessageEvent) => {
         break;
 
       case 'setConfig': {
-        if (msg.config.substeps !== undefined) {
-          jsSubsteps = msg.config.substeps;
+        // BUG-4 (#607): merge every supported field into currentConfig and
+        // re-apply to the Rust solver. Previously only `substeps` was honored;
+        // other runtime physics changes (damping, gravity, drag, thickness,
+        // compliances, internal damping, ...) were silently dropped.
+        currentConfig = { ...currentConfig, ...(msg.config ?? {}) };
+        if (msg.config?.substeps !== undefined) {
+          jsSubsteps = currentConfig.substeps;
         }
+        applySolverConfig();
         break;
       }
 
