@@ -650,6 +650,69 @@ Reopen D1-real if:
 4. `pieces[].darts` becomes required (not optional cache) — evaluate whether `InternalLine{type:'dart'}` can be deprecated.
 5. Domain operations emerge for other `InternalLineType` variants (`pleatEntity.ts`, `notchEntity.ts`); evaluate whether the pattern should generalize.
 
+## Fabric type 3-tier API surface (D6 ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-d6-fabric-types.md` (full Fase 2 doc with 3 sub-decisiones, 3-tier API surface analysis).
+
+Three fabric types coexist intentionally — distinct **consumer audiences + lifecycles**, not migration drift.
+
+```
+┌─ Project layer (persisted with project) ─────────────────────┐
+│  Fabric  (src/types/types.ts:415)                            │
+│  - 11 callsites: save/load, BOM, DXF                         │
+│  - Project catalog with color/textureUrl + basic sim params  │
+│  - Stored in projectState.fabrics[]                          │
+└──────────────────────────────────────────────────────────────┘
+
+┌─ Basic API surface (in-memory) ──────────────────────────────┐
+│  FabricMaterial  (src/utils/cloth/fabricLibrary.ts:15)       │
+│  - 5 active externos: plugin system + simulationTools        │
+│  - Public API for plugin authors (PluginFabric.material)     │
+│  - 8 fields, simple shape                                    │
+│  - Registry: FABRIC_LIBRARY                                  │
+└──────────────────────────────────────────────────────────────┘
+
+┌─ Rich engineering (in-memory, primary modern) ───────────────┐
+│  PhysicalFabric  (src/utils/cloth/physicalFabric.ts:33)      │
+│  - 60 callsites: sim solver, diagnostic, render, copilot     │
+│  - 25+ fields: anisotropic warp/weft, shear, tensile, ...    │
+│  - Registry: PHYSICAL_FABRIC_LIBRARY (32 fabrics)            │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### When to use which
+
+| Use case | Type |
+|---|---|
+| Project save/load, BOM, DXF export | `Fabric` (project catalog) |
+| Plugin author defining a fabric | `FabricMaterial` (public API) |
+| Simple copilot tool needing fabric lookup | `FabricMaterial` (via `FABRIC_LIBRARY`) |
+| Cloth simulation solver | `PhysicalFabric` (engineering params) |
+| Diagnostic system fabric analysis | `PhysicalFabric` |
+| 3D render material setup | `PhysicalFabric` (textures, surface props) |
+| Modern copilot tools (search, compare, apply) | `PhysicalFabric` (rich data) |
+
+**Decision rule:** if the consumer needs anisotropic data, composition, or engineering metadata → `PhysicalFabric`. If it's a plugin author or simple lookup → `FabricMaterial`. If it's project state persistence → `Fabric`.
+
+### Why not unified
+
+Unifying would require either:
+- Killing `FabricMaterial` (Pattern 1) → API breakage for plugin authors who supply 8-field basic shape, not 25-field engineering shape.
+- Killing `PhysicalFabric` (Pattern 1 inverse) → loss of expressiveness; the basic shape can't capture anisotropic stretch warp/weft, shear, tensile strength.
+- Forcing single rich type everywhere → over-engineered for simple consumers.
+
+The 3-tier structure is the right shape — distinct consumer audiences justify distinct types.
+
+### Reopen triggers
+
+Reopen D6 if:
+
+1. Plugin author reports basic `FabricMaterial` is insufficient — evaluate upgrading plugin API to richer shape.
+2. `simulationTools` migrates to `PhysicalFabric` organically — reduces FabricMaterial active externos to 2 (only plugin system); reabrir Pattern 1 evaluation.
+3. Cross-cutting consumer emerges needing both `PhysicalFabric` AND `FabricMaterial` coordinated — evaluate bridge module pattern (similar to `dartEntity.ts` for D1-real).
+4. `Fabric` (project) merges with `PhysicalFabric` — e.g., embedding rich engineering data in project state. Reabrir scope.
+5. A fourth fabric type emerges — evaluate if N=4 justifies registry/manifest pattern.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
