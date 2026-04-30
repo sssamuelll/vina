@@ -20,7 +20,6 @@ import type { PluginState, PluginInfo } from '../../store/pluginSlice';
 function initialState(): PluginState {
   return {
     installedPlugins: [],
-    enabledPlugins: [],
     pluginErrors: {},
   };
 }
@@ -80,19 +79,19 @@ describe('pluginSlice — edge cases', () => {
   describe('enable/disable nonexistent plugin', () => {
     it('should not crash when enabling a non-installed plugin', () => {
       const state = reducer(initialState(), enablePlugin('nonexistent'));
-      // Should add to enabledPlugins but no installedPlugin to update
-      expect(state.enabledPlugins).toContain('nonexistent');
+      // No installed record to flip; state stays empty.
+      expect(state.installedPlugins).toHaveLength(0);
     });
 
     it('should not crash when disabling a non-installed plugin', () => {
       let state = reducer(initialState(), enablePlugin('nonexistent'));
       state = reducer(state, disablePlugin('nonexistent'));
-      expect(state.enabledPlugins).not.toContain('nonexistent');
+      expect(state.installedPlugins).toHaveLength(0);
     });
 
-    it('should not crash when disabling a plugin not in enabledPlugins', () => {
+    it('should not crash when disabling a plugin that was never installed', () => {
       const state = reducer(initialState(), disablePlugin('nonexistent'));
-      expect(state.enabledPlugins).toHaveLength(0);
+      expect(state.installedPlugins).toHaveLength(0);
     });
   });
 
@@ -124,7 +123,6 @@ describe('pluginSlice — edge cases', () => {
       let state = reducer(initialState(), installPlugin(makePlugin('com.test.a')));
       state = reducer(state, setPluginState(initialState()));
       expect(state.installedPlugins).toHaveLength(0);
-      expect(state.enabledPlugins).toHaveLength(0);
       expect(state.pluginErrors).toEqual({});
     });
 
@@ -135,14 +133,13 @@ describe('pluginSlice — edge cases', () => {
           makePlugin('com.test.b', false),
           makePlugin('com.test.c', true),
         ],
-        enabledPlugins: ['com.test.a', 'com.test.c'],
         pluginErrors: {
           'com.test.b': 'Failed to load',
         },
       };
       const state = reducer(initialState(), setPluginState(complexState));
       expect(state.installedPlugins).toHaveLength(3);
-      expect(state.enabledPlugins).toHaveLength(2);
+      expect(state.installedPlugins.filter(p => p.enabled)).toHaveLength(2);
       expect(state.pluginErrors['com.test.b']).toBe('Failed to load');
     });
   });
@@ -169,16 +166,14 @@ describe('pluginSlice — edge cases', () => {
     });
   });
 
-  describe('enable/disable state consistency', () => {
-    it('should keep installedPlugins.enabled in sync with enabledPlugins', () => {
+  describe('enable/disable behavior on installed plugin', () => {
+    it('should toggle installedPlugins[].enabled', () => {
       let state = reducer(initialState(), installPlugin(makePlugin('com.test.a')));
       state = reducer(state, enablePlugin('com.test.a'));
       expect(state.installedPlugins[0].enabled).toBe(true);
-      expect(state.enabledPlugins).toContain('com.test.a');
 
       state = reducer(state, disablePlugin('com.test.a'));
       expect(state.installedPlugins[0].enabled).toBe(false);
-      expect(state.enabledPlugins).not.toContain('com.test.a');
     });
 
     it('should handle enable → remove → re-install as disabled', () => {
@@ -189,7 +184,6 @@ describe('pluginSlice — edge cases', () => {
       // Re-install — should not be enabled
       state = reducer(state, installPlugin(makePlugin('com.test.a')));
       expect(state.installedPlugins[0].enabled).toBe(false);
-      expect(state.enabledPlugins).not.toContain('com.test.a');
     });
   });
 });

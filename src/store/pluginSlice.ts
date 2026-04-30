@@ -33,12 +33,14 @@ export interface PluginInfo {
 
 /**
  * Plugin slice state shape.
+ *
+ * The set of enabled plugin ids is derived from `installedPlugins.filter(p => p.enabled)`
+ * rather than stored as a parallel array — keeping two sources of truth in sync was
+ * a bug surface (BUG-13).
  */
 export interface PluginState {
   /** All installed plugins */
   installedPlugins: PluginInfo[];
-  /** Set of enabled plugin ids */
-  enabledPlugins: string[];
   /** Error messages keyed by plugin id */
   pluginErrors: Record<string, string>;
 }
@@ -47,7 +49,6 @@ export interface PluginState {
 
 const initialState: PluginState = {
   installedPlugins: [],
-  enabledPlugins: [],
   pluginErrors: {},
 };
 
@@ -72,7 +73,6 @@ const pluginSlice = createSlice({
      */
     removePlugin(state, action: PayloadAction<string>) {
       state.installedPlugins = state.installedPlugins.filter(p => p.id !== action.payload);
-      state.enabledPlugins = state.enabledPlugins.filter(id => id !== action.payload);
       delete state.pluginErrors[action.payload];
     },
 
@@ -80,9 +80,6 @@ const pluginSlice = createSlice({
      * Enable a plugin.
      */
     enablePlugin(state, action: PayloadAction<string>) {
-      if (!state.enabledPlugins.includes(action.payload)) {
-        state.enabledPlugins.push(action.payload);
-      }
       const plugin = state.installedPlugins.find(p => p.id === action.payload);
       if (plugin) {
         plugin.enabled = true;
@@ -93,7 +90,6 @@ const pluginSlice = createSlice({
      * Disable a plugin.
      */
     disablePlugin(state, action: PayloadAction<string>) {
-      state.enabledPlugins = state.enabledPlugins.filter(id => id !== action.payload);
       const plugin = state.installedPlugins.find(p => p.id === action.payload);
       if (plugin) {
         plugin.enabled = false;
@@ -119,7 +115,6 @@ const pluginSlice = createSlice({
      */
     setPluginState(state, action: PayloadAction<PluginState>) {
       state.installedPlugins = action.payload.installedPlugins;
-      state.enabledPlugins = action.payload.enabledPlugins;
       state.pluginErrors = action.payload.pluginErrors;
     },
   },
