@@ -250,6 +250,131 @@ If a third cache site emerges with the same shape, evaluate canonical helper ext
 
 Reopen B6-state Fase 2 (per § 7 reopen triggers) if any persistence drift surfaces a case that the policy doesn't cover, or if observed bugs invalidate one of the ratified opciones.
 
+## Cascade middleware patterns (B3-state ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md` (full Fase 2 doc with 5 sub-decisiones, 5 cascades inventariadas, 6 primitives, deudas técnicas).
+
+### What counts as cascade middleware
+
+A **cascade middleware** is a middleware in `src/store/*Middleware.ts` that intercepts an action and emits one or more secondary dispatches without the call-site knowing or controlling. The call-site dispatched 1 action; the system ends with N+1 actions.
+
+Cascades are legitimate if they meet **all four** criteria:
+
+1. **Has `@cascade` header** documenting shape, triggers, dispatches, guard, undo policy.
+2. **Respects undo grouping criterion**: groups dispatches into a single undo entry **only if** the cascade modifies `project.*` state AND the dispatches represent a single semantic user step. Otherwise does not group.
+3. **Depth ≤ 1**: secondary dispatches are not triggers of another cascade middleware. If cascade-of-cascade is needed, rewrite as orchestration.
+4. **Listed in this section's index below** (canonical enumeration).
+
+### Header convention
+
+Every middleware in `src/store/*Middleware.ts` whose body contains `dispatch(` must carry a `@cascade` header. For middlewares with multiple sub-cascades (e.g., `confirmationMiddleware` has 3 sub-cascadas), use one header per sub-cascade.
+
+```ts
+/**
+ * @cascade
+ * shape: sym 1↔1 (mirror/instance)
+ * triggers: project/updatePiece, project/addInternalLine, ...
+ * dispatches: project/updatePiece (partner), project/addInternalLine (partner)
+ * guard: module-level boolean isSyncing
+ * undo: batch grouped via undo/startBatch/endBatch
+ * cap-depth: 1 (isSyncing prevents re-entrance)
+ */
+export const linkedEditingMiddleware: Middleware = ...
+```
+
+A custom lint rule enforcing this header is **deferred to a follow-up issue** (B3-state Sec 4.5). Until that lint lands, enforcement is via review. Grep `@cascade` enumerates the cascade population at any moment.
+
+### Inventory (canonical enumeration)
+
+The codebase has 5 cascade middlewares with 8 sub-cascades total. Any new cascade must be added here as part of the same PR.
+
+| Middleware | Sub-cascades | Shape | Undo grouping | File |
+|---|---|---|---|---|
+| `linkedEditingMiddleware` | 1 | sym 1↔1 (mirror/instance) | groups (BUG-7) | `src/store/linkedEditingMiddleware.ts` |
+| `gradingStalenessMiddleware` | 1 | obs 1→1 idempotent | does not group (metadata) | `src/store/gradingStalenessMiddleware.ts` |
+| `confirmationMiddleware` (a) | intercept-defer-replay | replay via `meta.skipConfirmation` | n/a (single action) | `src/store/confirmationMiddleware.ts` |
+| `confirmationMiddleware` (b) | tool-memory mirror | obs 1→1 | does not group | `src/store/confirmationMiddleware.ts` |
+| `confirmationMiddleware` (c) | tool-memory auto-apply | 1→N fan-out | does not group | `src/store/confirmationMiddleware.ts` |
+| `reactiveSolverMiddleware` (a) | removePoint observation | obs 1→1 | does not group | `src/store/reactiveSolverMiddleware.ts` |
+| `reactiveSolverMiddleware` (b) | trigger chain (Phase 1 sync + Phase 2 async) | chain multi-stage | does not group (solver state, not user action) | `src/store/reactiveSolverMiddleware.ts` |
+| `undoMiddleware` | self-dispatch + control consumer | mechanism | n/a (is the mechanism) | `src/store/undoMiddleware.ts` |
+
+### `batchUndo()` helper
+
+`batchUndo(dispatch, label, fn)` (exported from `src/store/undoMiddleware.ts:102`) wraps multi-dispatch operations from call-sites in a single undo entry via `undo/startBatch`/`endBatch` control actions. 5 callers:
+
+- `src/copilot/action/tools/definitions/trimTools.ts:421, 474`
+- `src/components/PatternEditor/useTrimTool.ts:153`
+- `src/components/BottomPanel/GradingTab.tsx:174, 238`
+
+Per Cascade vs orchestration distinction below, `batchUndo()` is **orchestration with cascade-adjacent batching** — the caller controls what dispatches; the middleware controls how they group in undo.
+
+### Cascade vs orchestration distinction
+
+The distinction matters because cascade middleware decides undo policy uniformly (in the middleware), while orchestration decides error/loading policy per phase (in the caller). Conflating the two breaks the future E-async-states sub-track decision boundary.
+
+**Cascade middleware:** a middleware in `src/store/*Middleware.ts` intercepts an action and emits one or more secondary dispatches without the call-site knowing or controlling. The call-site dispatched 1 action; the system ends with N+1 actions.
+
+**Orchestration:** a caller (component, hook, thunk, tool implementation) dispatches action A explicitly, awaits a result/state-change, dispatches action B explicitly. The caller controls the sequence. Each dispatch corresponds 1:1 to an intent of the caller.
+
+**Operational test:** does the call-site know that B will be dispatched as a consequence of A?
+- Yes + dispatches B explicitly → orchestration.
+- No → cascade middleware.
+
+**Resolved case — `batchUndo()`:** the helper exposes the `undoMiddleware`'s control actions to the call-site. The caller dispatches actions explicitly (orchestration), but the wrapping with `undo/startBatch`/`endBatch` is delegation to the middleware (cascade-adjacent). Classification: **orchestration with cascade-adjacent batching**. The caller controls what is dispatched; the middleware controls how it groups in undo. Not "pure cascade middleware" because the middleware does not generate new actions, only controls snapshotting.
+
+**Resolved case — `AgenticLoop` (`src/copilot/reasoning/bridge/AgenticLoop.ts`):** sequential awaits, caller dispatches each tool execution explicitly. **Orchestration.** Out of scope of B3-state cascade convention. Error handling / loading state propagation belongs to E-async-states sub-track when it runs.
+
+### Reopen triggers
+
+Reopen B3-state Fase 2 (per § 7 of the Fase 2 doc) if any of:
+
+1. A new cascade emerges that does not fit any of the 6 inventoried primitives (boolean re-entrance, generation counter, idempotent-no-guard, meta flag, control actions, cross-slice extraReducer).
+2. A legitimate cascade-of-cascade case (depth > 1) that cannot be rewritten as orchestration.
+3. `meta.cascadeOf` runtime debugging becomes a real need (not addressable via stack trace + Redux DevTools).
+4. The lint rule (when implemented) generates persistent false positives after 1 month warning-only.
+5. An ambiguous cascade-vs-orchestration case the operational test does not resolve.
+6. E-async-states decides error handling for async chains in a way that forces re-evaluation of B3-state convention.
+
+## Action meta flags (B3-state ratified)
+
+Cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md` § 2.3 (P4 primitive) + § 4.3.
+
+The codebase uses 2 active `meta.*` flags on Redux actions, both consumed by `confirmationMiddleware`:
+
+### `meta.skipConfirmation`
+
+**Purpose:** bypass `confirmationMiddleware` destructive-action gating. Used by call-sites that have already obtained user consent through an alternate path (auto-merge cleanup, split cleanup, copilot rollback, replay after explicit confirm).
+
+**Pattern:**
+
+```ts
+dispatch({ ...removePiece(piece.id), meta: { skipConfirmation: true } });
+```
+
+**7 callsites** (canonical enumeration; new uses must be added here):
+
+- `src/copilot/action/tools/definitions/patternOpsTools.ts:133, 401, 745` — auto-merge / split cleanup / createPiece rollback.
+- `src/components/PatternEditor/useMergeTool.ts:135, 139, 140` — merge result + merge sources.
+- `src/components/PatternEditor/useScissorsTool.ts:153` — cut original (with comment-only mention at `:152`).
+- `src/components/CopilotPanel/CopilotUIOverlay.tsx:68` — replay after user confirms in dialog.
+
+### `meta.fromToolMemory`
+
+**Purpose:** internal flag used by `confirmationMiddleware` tool-memory cascade (sub-cascade c) to prevent its own re-entrance into the tool-memory mirror cascade (sub-cascade b). The auto-apply re-dispatches `tools/setToolOption` with this flag; the mirror skips when the flag is present.
+
+**Internal only** — not used at call-sites outside `src/store/confirmationMiddleware.ts`.
+
+### Policy for introducing new `meta.*` flags
+
+A new `meta.*` flag requires:
+
+1. Addition to this section with purpose + callsites pattern.
+2. Justification of why the flag is needed instead of an alternative (control actions, `@cascade` header, refactor of the consuming middleware).
+3. Inline comment at the introduction site explaining the flag's semantic.
+
+If a flag's callsites grow past ~10 sites or a third flag is introduced, reopen B3-state Sec 3.1 to evaluate whether the convention needs hardening (lint rule for flag inventory, type-level enforcement, etc.).
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
