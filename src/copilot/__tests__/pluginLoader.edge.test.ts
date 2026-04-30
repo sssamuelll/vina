@@ -353,20 +353,32 @@ describe('Plugin Storage (read/write/clear)', () => {
     localStorage.clear();
   });
 
-  it('should write and read plugin data', () => {
+  it('should write via IDB canonical and read via async helper', async () => {
     writePluginStorage('com.test.p1', { key: 'value', count: 42 });
-    const data = readPluginStorage('com.test.p1');
+    const { readPluginStorageAsync } = await import('../plugins/pluginLoader');
+    // Allow the dynamic import + fire-and-forget storageSet inside writePluginStorage
+    // to settle before reading.
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const data = await readPluginStorageAsync('com.test.p1');
     expect(data).toEqual({ key: 'value', count: 42 });
   });
 
-  it('should return null when no data stored', () => {
+  it('sync readPluginStorage returns null when legacy LS is empty', () => {
     expect(readPluginStorage('com.test.p1')).toBeNull();
   });
 
-  it('should clear plugin data', () => {
+  it('async readPluginStorageAsync returns null when nothing stored', async () => {
+    const { readPluginStorageAsync } = await import('../plugins/pluginLoader');
+    expect(await readPluginStorageAsync('com.test.p1')).toBeNull();
+  });
+
+  it('should clear plugin data', async () => {
     writePluginStorage('com.test.p1', { key: 'value' });
+    await new Promise(resolve => setTimeout(resolve, 0));
     clearPluginStorage('com.test.p1');
-    expect(readPluginStorage('com.test.p1')).toBeNull();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const { readPluginStorageAsync } = await import('../plugins/pluginLoader');
+    expect(await readPluginStorageAsync('com.test.p1')).toBeNull();
   });
 
   it('should handle corrupt localStorage gracefully', () => {
@@ -374,17 +386,21 @@ describe('Plugin Storage (read/write/clear)', () => {
     expect(readPluginStorage('com.test.p1')).toBeNull();
   });
 
-  it('should isolate storage between plugins', () => {
+  it('should isolate storage between plugins', async () => {
     writePluginStorage('com.test.p1', { a: 1 });
     writePluginStorage('com.test.p2', { b: 2 });
-    expect(readPluginStorage('com.test.p1')).toEqual({ a: 1 });
-    expect(readPluginStorage('com.test.p2')).toEqual({ b: 2 });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const { readPluginStorageAsync } = await import('../plugins/pluginLoader');
+    expect(await readPluginStorageAsync('com.test.p1')).toEqual({ a: 1 });
+    expect(await readPluginStorageAsync('com.test.p2')).toEqual({ b: 2 });
   });
 
-  it('should overwrite existing data', () => {
+  it('should overwrite existing data', async () => {
     writePluginStorage('com.test.p1', { version: 1 });
     writePluginStorage('com.test.p1', { version: 2 });
-    expect(readPluginStorage('com.test.p1')).toEqual({ version: 2 });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const { readPluginStorageAsync } = await import('../plugins/pluginLoader');
+    expect(await readPluginStorageAsync('com.test.p1')).toEqual({ version: 2 });
   });
 });
 

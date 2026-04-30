@@ -17,6 +17,7 @@ import {
   loadInstalledPluginsList,
   resetPluginManager,
   loadAndRegisterPlugin,
+  _resetInstalledPluginsCacheForTests,
 } from '../plugins/pluginManager';
 import {
   resetLoadedPlugins,
@@ -78,6 +79,7 @@ describe('Plugin Manager — edge cases', () => {
     resetLoadedPlugins();
     resetDefaultPluginRegistry();
     localStorage.clear();
+    _resetInstalledPluginsCacheForTests();
   });
 
   describe('enable already-enabled plugin', () => {

@@ -3,10 +3,10 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
   setPreset, resetPose, selectJoint, setJointRotation, mirrorJoint,
-  loadSavedPosesFromStorage, savePose, deleteSavedPose, overwriteSavedPose,
+  loadSavedPosesFromStorage, loadSavedPosesAsync, savePose, deleteSavedPose, overwriteSavedPose,
   togglePoseEditor, toggleIK,
   POSE_PRESETS, JOINT_CONSTRAINTS,
-  loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
+  loadProfilesFromStorage, loadProfilesAsync, setActiveProfile, addProfile, updateProfile, deleteProfile,
   setMorphTarget,
 } from '../../store/avatarSlice';
 import {
@@ -78,8 +78,11 @@ export default function AvatarPanel({ open, onClose }: AvatarPanelProps) {
   const [modelName, setModelName] = useState<string | null>(null);
 
   useEffect(() => {
-    dispatch(loadProfilesFromStorage());
-    dispatch(loadSavedPosesFromStorage());
+    // Sync stub for legacy LS users; async hydrate replaces with IDB-backed value.
+    dispatch(loadProfilesFromStorage(undefined));
+    dispatch(loadSavedPosesFromStorage(undefined));
+    void loadProfilesAsync().then(profiles => dispatch(loadProfilesFromStorage(profiles)));
+    void loadSavedPosesAsync().then(poses => dispatch(loadSavedPosesFromStorage(poses)));
   }, [dispatch]);
 
   // Sync gizmos with panel open state + pose section

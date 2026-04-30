@@ -2,7 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState, AppDispatch } from '../../store';
 import {
-  loadProfilesFromStorage, setActiveProfile, addProfile, updateProfile, deleteProfile,
+  loadProfilesFromStorage, loadProfilesAsync, setActiveProfile, addProfile, updateProfile, deleteProfile,
 } from '../../store/avatarSlice';
 import { updateMeasurements } from '../../store/projectSlice';
 import type { AvatarProfile } from '../../utils/avatar/avatarLibrary';
@@ -32,7 +32,8 @@ export default function AvatarView() {
   const activeProfileId = useSelector((s: RootState) => s.avatar.activeProfileId);
 
   useEffect(() => {
-    dispatch(loadProfilesFromStorage());
+    dispatch(loadProfilesFromStorage(undefined));
+    void loadProfilesAsync().then(profiles => dispatch(loadProfilesFromStorage(profiles)));
   }, [dispatch]);
 
   const handleProfileChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {

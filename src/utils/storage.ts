@@ -155,6 +155,38 @@ export async function migrateFromLocalStorage<T = unknown>(
   }
 }
 
+// ─── Canonical persistence pattern ──────────────────────────────────────────
+
+/**
+ * CANONICAL persistence pattern for project-scoped data.
+ *
+ * Use `storageSet`/`storageGet` for IDB-primary writes/reads, with
+ * `migrateFromLocalStorage()` for one-time LS legacy handover. Avoid
+ * double-write LS+IDB — see `docs/reports/2026-04-30-bug-10-fix-options.md`
+ * for rationale and a documented history of three drift waves of double-write
+ * accumulating between 2026-02-23 and 2026-03-24 before this canonical was
+ * adopted uniformly.
+ *
+ * The `saveProject`/`loadProject` pair below is the reference implementation
+ * of this pattern (write side: storageSet only; read side: storageGet first,
+ * migrateFromLocalStorage as fallback). All eight migrated sites follow the
+ * same shape:
+ *
+ *   - agent-config           (CopilotPanel)
+ *   - saved-poses            (avatarSlice)
+ *   - avatar profiles        (avatarLibrary)
+ *   - per-plugin storage     (pluginLoader)
+ *   - installed-plugins list (pluginManager)
+ *   - provider-config        (providers/types)
+ *   - ollama-config          (providers/ollama)
+ *   - fallback-provider      (errorRecovery)
+ *
+ * Out of scope of this canonical (pending B6-state Fase 2 architectural
+ * decisions): schema versioning, multi-store transactions, zod boundary
+ * parsing, and the deliberate LS-only exceptions (ProjectMemory class API,
+ * DesignLogManager, projectIO quarantine — see § 9 of the fix-options note).
+ */
+
 // ─── Convenience: Project Autosave ──────────────────────────────────────────
 
 const AUTOSAVE_KEY = 'autosave';

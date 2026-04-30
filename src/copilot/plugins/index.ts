@@ -35,6 +35,7 @@ export {
   satisfiesSemver,
   getPluginStorageKey,
   readPluginStorage,
+  readPluginStorageAsync,
   writePluginStorage,
   clearPluginStorage,
 } from './pluginLoader';

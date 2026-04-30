@@ -8,6 +8,7 @@ import {
   listOllamaModels,
   loadOllamaConfig,
   saveOllamaConfig,
+  _resetOllamaConfigCacheForTests,
 } from '../providers/ollama';
 import type { ProviderConfig, ChatMessage, ProviderToolDef } from '../providers/types';
 
@@ -730,6 +731,7 @@ describe('listOllamaModels', () => {
 describe('OllamaConfig persistence', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    _resetOllamaConfigCacheForTests();
   });
 
   it('should return defaults when nothing saved', () => {

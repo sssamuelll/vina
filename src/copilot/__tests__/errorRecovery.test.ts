@@ -610,17 +610,23 @@ describe('Fallback Provider', () => {
     expect(loaded).toEqual(config);
   });
 
-  it('should NOT store API key in localStorage', async () => {
+  it('should NOT store API key in localStorage (BUG-10: writes IDB-only)', async () => {
     await saveFallbackProvider({
       provider: 'openai',
       apiKey: 'sk-secret-key',
       model: 'gpt-4o-mini',
     });
-    const raw = localStorageMock.getItem('openclo-fallback-provider');
-    expect(raw).not.toBeNull();
-    const parsed = JSON.parse(raw!);
-    expect(parsed.apiKey).toBeUndefined();
-    expect(parsed.provider).toBe('openai');
+    // Post-BUG-10: saveFallbackProvider routes through storageSet (IDB-only).
+    // The legacy LS key is not written. In tests without IDB the LS fallback
+    // inside storageSet writes to a *different* key (`openclo:settings:...`).
+    // Either way the legacy key has no API key — verify the legacy key is
+    // empty AND none of the LS values contains the secret string.
+    expect(localStorageMock.getItem('openclo-fallback-provider')).toBeNull();
+    for (let i = 0; i < localStorageMock.length; i++) {
+      const key = localStorageMock.key(i)!;
+      const value = localStorageMock.getItem(key);
+      expect(value).not.toContain('sk-secret-key');
+    }
   });
 
   it('should store API key encrypted in sessionStorage via SecureStorage', async () => {

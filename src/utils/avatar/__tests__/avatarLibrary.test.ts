@@ -47,28 +47,25 @@ describe('avatarLibrary', () => {
     expect(female.measurements.height).toBe(168);
   });
 
-  it('save and load profile', () => {
+  it('save inserts a new profile into the working list', () => {
     const p = makeProfile('test-1', 'Test');
-    saveProfile(p);
-    const loaded = loadProfiles();
-    expect(loaded.find(x => x.id === 'test-1')).toBeTruthy();
+    const next = saveProfile(p, []);
+    expect(next.find(x => x.id === 'test-1')).toBeTruthy();
   });
 
-  it('update existing profile', () => {
+  it('save updates an existing profile in place (no duplicates)', () => {
     const p = makeProfile('test-1', 'Test');
-    saveProfile(p);
-    saveProfile({ ...p, name: 'Updated' });
-    const loaded = loadProfiles();
-    expect(loaded.filter(x => x.id === 'test-1').length).toBe(1);
-    expect(loaded.find(x => x.id === 'test-1')!.name).toBe('Updated');
+    let profiles = saveProfile(p, []);
+    profiles = saveProfile({ ...p, name: 'Updated' }, profiles);
+    expect(profiles.filter(x => x.id === 'test-1').length).toBe(1);
+    expect(profiles.find(x => x.id === 'test-1')!.name).toBe('Updated');
   });
 
-  it('delete removes profile', () => {
+  it('delete removes the profile by id from the working list', () => {
     const p = makeProfile('test-1', 'Test');
-    saveProfile(p);
-    deleteProfile('test-1');
-    const loaded = loadProfiles();
-    expect(loaded.find(x => x.id === 'test-1')).toBeUndefined();
+    const profiles = saveProfile(p, []);
+    const next = deleteProfile('test-1', profiles);
+    expect(next.find(x => x.id === 'test-1')).toBeUndefined();
   });
 });
 
