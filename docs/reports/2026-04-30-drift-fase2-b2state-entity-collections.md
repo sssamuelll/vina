@@ -400,5 +400,190 @@ Convention: usar inline `.find()` en todos los callsites, sin selectors.
 
 **Total migration:** 0 código, ~200 líneas CLAUDE.md, 1 follow-up issue. **Zero behavior change.** B2-state cementa convention transversal sin tocar slices existentes.
 
-[Sec 4-9 pendientes — incremental push.]
+## Sección 4 — Recomendación consolidada
+
+### 4.1 Migration policy (formerly Sub-decisión 3.3, folded)
+
+**Ratify status quo + criterion forward-only.** Ninguna de las 38 collections actuales (23 array + 15 Record) se migra retroactivamente. La convention de Sec 3 aplica:
+
+- A nuevas collections cuando se introducen.
+- A migrations opt-in cuando un slice se modifica por otra razón y emergen los triggers de Sub-decisión 3.2 (EntityAdapter) o 3.5 (selector helpers).
+
+**Excepción:** si emerge un caso real donde performance bottleneck verificado (frame-loop o latency-sensitive UI) está caused por O(n) lookup en una collection grande, ese caso reabre la decisión per-slice.
+
+### 4.2 Convención canónica B2-state
+
+Si Sam aprueba 3.1.A + 3.2.B + 3.4.A + 3.5.A, el canónico de B2-state queda:
+
+**Para entity collections:**
+
+1. **Default `Entity[]`** cuando hay lifecycle (CRUD + ordering importa). 23 collections actuales.
+2. **`Record<entityId, attribute>`** cuando es atributo per-entity sparse con lifecycle externo (entity vive en otro array). 15 collections actuales.
+3. **`Record<key, value>` (no-entity key)** cuando es config/metadata indexada por non-entity key.
+4. **EntityAdapter** opt-in cuando >=2 triggers aplican (size grande, lookup ratio alto, CRUD complejo, ordering+lookup simultáneos). Sin precedent actual; primera adopción debe documentarse.
+
+**Para cross-slice references:**
+
+1. **Cross-slice cache** legítima si: source-of-truth en otro slice + sync mechanism explícito (hook/middleware). Ejemplo: `pieceFabrics` (B10-state ratified).
+2. **Cross-namespace bridge** legítima si: maps IDs entre dos namespaces independientes, NO duplica entities. Ejemplo: `pieceIdentityMap`.
+3. **Cross-slice ID reference** legítima si: referencia subset de IDs, lookup vía selector cross-slice. Ejemplo: `generatedPieceIds`.
+4. **Anti-pattern:** duplicación de fields cross-slice sin sync mechanism o bridge claro.
+
+**Para lookup convention:**
+
+1. **Forward-only:** nuevos callsites usan selectors `selectXById` exportados con `createSelector` (precedent bomSlice / B4-state). Slices con collections relevantes exportan selectors cuando son tocados por otra razón (opportunistic).
+2. **Existing 400 callsites** quedan intactos. Migration opt-in via lint warning (follow-up issue).
+
+### 4.3 Mapping de collections existentes a la convención
+
+Las 38 collections actuales pasan los criterios canónicos sin cambio de código:
+
+| Categoría | Cantidad | Status |
+|---|---|---|
+| Array entity (3.1.A row 1) | 23 | ✓ ratificado |
+| Record per-entity attribute (3.1.A row 2) | ~10 | ✓ ratificado |
+| Record non-entity metadata (3.1.A row 3) | ~5 | ✓ ratificado |
+| EntityAdapter (3.1.A row 4) | 0 | n/a (sin precedent, opt-in 3.2.B futuro) |
+| Cross-slice cache | 1 (`pieceFabrics`) | ✓ B10-state Par 1 ratified |
+| Cross-namespace bridge | 1 (`pieceIdentityMap`) | ✓ ratificado en este doc |
+| Cross-slice ID reference | 1 (`generatedPieceIds`) | ✓ ratificado en este doc |
+| Selector exports `createSelector` | 1 slice (`bomSlice`) | ✓ B4-state ratified, precedent forward |
+| Inline `.find(p => p.id ===)` callsites | ~400 | preserved (forward-only migration) |
+
+**Zero behavior change.** B2-state cementa convention + documentation, no behavior.
+
+---
+
+## Sección 5 — Plan de migración Fase 3
+
+**Nota:** Fase 3 es trabajo separado, mínimo. Los pasos:
+
+### 5.1 Commit 1 (único de código) — CLAUDE.md anchoring
+
+Agregar sección "Entity collections shape policy (B2-state ratified)" a CLAUDE.md. Contenido:
+
+1. **Shape decision table** (3.1.A) — cuándo usar array, Record `<entityId>`, Record `<key>`, EntityAdapter. Test operacional.
+2. **EntityAdapter adoption policy** (3.2.B) — triggers para opt-in (>=2 de 4).
+3. **Cross-slice references** (3.4.A) — 3 categorías legítimas (cache, bridge, ID reference) + anti-pattern.
+4. **Selector convention forward-only** (3.5.A) — pattern bomSlice + cuándo extender + opportunistic migration policy.
+5. **Inventory snapshot** (resumido) — 23 array + 15 Record + 0 EntityAdapter actuales.
+6. **Reopen triggers.**
+
+Total ~200 líneas. Atomic commit, doc-only.
+
+### 5.2 Follow-up issue — Custom eslint rule (severity:medium)
+
+Issue title: `[audit-followup] Custom eslint rule for selectXById usage on slice entity collections (B2-state)`.
+
+Spec:
+- Detect `.find(p => p.id === X)` patterns en components/hooks/copilot tools.
+- Check si existe `selectXById` exportado por el slice correspondiente.
+- Warn (severity:warn inicial, error después de 1 mes sin false positives) sugiriendo usar el selector.
+- Mirror semántico de #659 (@cascade lint) y #662 (fabric target slice lint).
+
+### 5.3 No otros commits
+
+No introduce selectors per-slice en este Fase 3. Ese trabajo es opportunistic post-B2-state cuando un slice se modifica por otra razón.
+
+---
+
+## Sección 6 — Cross-refs y dependencias
+
+### 6.1 Inputs
+
+- `docs/reports/2026-04-28-drift-inventory-fase1.md` § B2-state.
+- `docs/reports/2026-04-28-drift-fase2-classification.md` (eje (b)).
+- B10-state Par 1 ratificación (PR #661 merged) — precedent del pattern source-of-truth + cache.
+- B10-state Par 2 ratificación (PR #660 merged) — precedent del shape "ratify by misclassification" (no aplica directamente; B2-state es ratify por convention transversal, distinto shape).
+- B4-state ratificación (closed) — precedent bomSlice selectors export.
+- B6-state ratificación (closed) — module-level caches ratified como exception (out-of-scope de B2-state).
+- CLAUDE.md secciones existentes: "Persistence policy", "Cascade middleware patterns", "Action meta flags", "Fabric assignment patterns".
+
+### 6.2 Outputs
+
+- **Si aprobado:** Fase 3 commit (~200 líneas CLAUDE.md) + issue follow-up para lint rule.
+- **B2-state cerrado:** convention transversal cementada para entity collections. Próximas additions consultar la sección.
+- **Inputs hacia ejes futuros:** ningún output material hacia (b)/(c) restantes — B2-state es convention forward-only, no produce constraints sobre ejes pendientes.
+
+### 6.3 No-conflicts (out-of-scope verificado)
+
+- **B10-state Par 1 (fabric pattern)** — la convention de B2-state generaliza pero no re-litiga el caso fabric. `pieceFabrics` ratificado como cross-slice cache; B2-state cita en 3.4.
+- **B4-state (selectors export)** — ratificación bomSlice queda; B2-state extiende a forward-only convention vs ratification cosmética.
+- **B6-state (persistence)** — module-level caches out-of-scope.
+- **B5-state (middleware patterns)** — no afectado.
+- **B3-state (cascade middleware)** — no afectado.
+
+### 6.4 Co-existence con ejes abiertos
+
+- **A3, B10-state Par 3 (arrangementOverrides), D1-real, D3, D4, D6, D7:** ningún conflict directo. B2-state es transversal sin clamps específicos sobre esos ejes.
+- **C1, C4 (RFCs rendering):** RFCs trabajan a otro nivel (rendering pipeline), no entity collections.
+- **E-async-states sub-track:** B2-state no decide async loading state shape — eso queda a E-async-states.
+
+---
+
+## Sección 7 — Reopen triggers
+
+B2-state ratificación queda revisable si emerge:
+
+1. **Performance bottleneck verificado** en una entity collection causado por O(n) lookup. Reabrir Sub-decisión 3.2 evaluando si EntityAdapter o Record refactor del slice específico es el right fix.
+2. **Nueva collection no encaja en las 4 categorías** de Sub-decisión 3.1 (e.g., shape híbrido legítimo, queue/stack semantic, etc.). Reabrir 3.1 con el caso concreto.
+3. **Cross-slice reference nuevo no encaja en las 3 categorías** legítimas (e.g., un caso real de "duplicate fields cross-slice por razón legítima"). Reabrir 3.4 con el caso concreto.
+4. **Lint rule (follow-up issue) genera false positives** persistentes después de 1 mes warning-only. Reabrir 3.5 evaluando si la convention debe relajarse.
+5. **EntityAdapter primera adoption** ocurre — el primer slice que adopte EntityAdapter debe documentarse explícitamente como precedent. Si emerge en context donde la convention 3.2.B no cubre, reabrir 3.2.
+6. **Selector exports per-slice se generalizan a >5 slices** — evaluar si es momento de mass migration de los 400 sites o si forward-only sigue siendo el right call (3.5.B reabre).
+
+---
+
+## Sección 8 — Deuda técnica explícita post-ratificación
+
+1. **400 `.find(p => p.id === X)` callsites siguen intactos.** El convention forward-only los preserva. Migration es opportunistic + lint-driven. Sin commitment de cleanup mass.
+2. **EntityAdapter primera adoption no agendada.** Si emerge un caso real con triggers 3.2.B, alguien va a tener que pioneer la integration. Sin RTK adapter precedent, el primer slice paga el costo de aprender la API. Aceptable.
+3. **Selector exports per-slice no introducidos en este Fase 3.** Solo bomSlice los tiene (B4-state). El primer slice candidate (probably `projectSlice` con `selectPieceById`) no migra en B2-state. Deuda explícita: cuando un slice se toque por otra razón, considerar exportar selectors.
+4. **Cross-slice reference convention sin lint enforcement.** Las 3 categorías legítimas (cache/bridge/ID ref) se documentan en CLAUDE.md pero sin lint rule. Si un caso futuro viola la convention (denormalization sin coordinación), depende de review humano. Aceptable porque cross-slice patterns son raros (3 casos en todo el codebase).
+5. **Triggers de Sub-decisión 3.2 no son enforce-able estáticamente.** "Size grande" o "lookup ratio alto" requiere profiling/observation, no static analysis. Aceptable como heurística post-hoc.
+
+---
+
+## Sección 9 — Decisión pendiente y siguiente paso
+
+### 9.1 Pregunta a Sam
+
+¿Aprobás las 4 sub-decisiones tal como recomendado en Sec 3 (3.1.A + 3.2.B + 3.4.A + 3.5.A)?
+
+Si **sí, todo aprobado:**
+- Marco PR #663 ready-for-review.
+- Sec 4-9 quedan como ratificación final.
+- Fase 3 commit (CLAUDE.md anchoring ~200 líneas) sobre este branch.
+- Follow-up issue para lint rule selector pattern (severity:medium).
+- Inventory annotation post-merge.
+
+Si **alguna sub-decisión querés cambiar:**
+- Indicame cuál (3.1, 3.2, 3.4, 3.5) y qué opción preferís.
+- Re-edito Sec 4 (recomendación consolidada) con el cambio.
+- Re-pusheo.
+
+Si **el scope del eje cambia** (e.g., Sam decide que migration de los 400 sites SÍ entra a Fase 3, o EntityAdapter mandatory forward, etc.):
+- STOP. Reabro Sec 1 con el scope ampliado.
+- Re-evalúo el inventory y opciones.
+
+### 9.2 Estado del PR
+
+- Sec 1-9 ✅ ready.
+- PR #663 en draft, con 2 commits (Sec 1-2, Sec 3).
+- Pendiente Sec 4-9 commit (este).
+- Pendiente Fase 3 commit (CLAUDE.md anchoring).
+
+### 9.3 Calibración estimate vs actual
+
+- Estimate Sec 1-2: ~1.5h. Actual: ~1h.
+- Estimate Sec 3: ~2-3h. Actual: ~1.5h.
+- Estimate Sec 4-9: ~1-2h. Actual: ~1h.
+- **Total Fase 2 doc: ~3.5h actual vs 5-9h estimate.** Factor ~0.4-0.6x. Causa: el sweep cerró clean sin sub-decisiones inesperadas, y framing "ratify status quo" simplificó la redacción.
+
+**Total esperado Fase 3 (no en este PR):** ~30-45min para CLAUDE.md anchoring + open lint follow-up issue.
+
+---
+
+**FIN DEL DOC.** Esperando verde de Sam para promover PR a ready-for-review + arrancar Fase 3 commit.
+
 
