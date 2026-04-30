@@ -189,6 +189,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
   - `store.getState()` directo al singleton (2 callsites en `CopilotPanel`).
   - **Middleware dispatching en cascada** — fuente del bug B7 (linkedEditing+undo).
 
+> **Cierre 2026-04-30 — B3-state ratificado (PR #658 merged).** Fase 2 doc en `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`. Sweep capturó 5 cascadas distintas con 6 primitives en 4 combinaciones; las 5 ya cumplen los 4 criterios canónicos (header `@cascade`, undo grouping criterion, depth ≤ 1, canonical inventory). Ratificado vía consistency-alignment, no real-fix — convención cementada en CLAUDE.md ("Cascade middleware patterns" + "Cascade vs orchestration distinction" + "Action meta flags") + 8 headers `@cascade` en los 5 middlewares; **zero behavior change**. Out-of-scope explícito: orchestration sequential (AgenticLoop → E-async-states), error handling de cascade async chains (E-async-states), `NEW_PROJECT` extraReducer (B12-state ya canonical), undo internals (BUG-7 ya ratificó). Lessons anchored: regla emergente sobre severity:medium para follow-up issues que defieren enforcement automático (issue #659 lint rule custom). Hallazgo colateral capturado: issue #657 (CLAUDE.md path stale para copilot bridge) fuera de scope. Calibración: 5h actual vs 6-10h estimate (factor 0.5-0.8x — sweep cerró limpio + precedente fresco BUG-7 ahorró tiempo).
+
 ### B4-state — Selectors / derivaciones
 - **Estado:** drift cosmético.
 - Variantes: inline `useSelector` (mayoría), selectores nombrados solo en `bomSlice.ts` (5 selectores), 0 usos de `createSelector` (reselect).
