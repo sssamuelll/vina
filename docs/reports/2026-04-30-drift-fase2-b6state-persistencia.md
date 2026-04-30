@@ -818,3 +818,234 @@ Result: IDB unavailable → silent LS fallback. LS quota exceeded → silent fai
 - User-reported data loss attributable a silent fallback → reconsidering Option A.
 
 ---
+
+## 4. Recomendaciones consolidadas
+
+Resumen accionable de las 8 sub-decisiones de Sec 3. Cada renglón = (sub-decisión, opción recomendada, confianza, costo Fase 3 si se ratifica).
+
+| # | Sub-decisión | Recomendación | Confianza | Costo Fase 3 |
+|---|---|---|---|---|
+| 1 | Política IDB-vs-LS | Opción B — shape-based criterion greppable (≤1KB + sync + per-browser → LS; resto → IDB) | **Alta** | Migración bucket B (4 sites) ~6-10h |
+| 2 | Schema versioning | Opción B — opt-in con helpers `storageSetVersioned`/`storageGetVersioned` | Media | Add helpers ~2h; sin migración retroactiva |
+| 3 | Multi-store transactions | Opción C — defer con triggers explícitos | **Alta** | Cero (comentarios inline ~30min) |
+| 4 | zod boundary parsing | Opción B — mandatory user-generated, optional internal config | Media-alta | Add zod a saved-poses + installed plugins ~3-5h |
+| 5 | Sync API policy | Opción A — ratificar cache-shadowing como exception | **Alta** | Cero |
+| 6 | LS-only exception list | (Tratado en Sec 5; 4 buckets) | — | Bucket B migration ~6-10h (overlap con #1); resto ratificación cero-cost |
+| 7 | Skill persistence | Ratificar separación + rename a `migrateLegacySkills()` | **Alta** | ~30min rename |
+| 9 | Migration window policy | Opción B — indefinite no remove + comentario inline | Media | Cero |
+| 10 | Storage quota / IDB unavailable | Opción B — telemetry hook (depends on E-async-states) | Media | Add hook stub ~1-2h |
+
+### Costo total estimado Fase 3 (si todas las recomendaciones se ratifican)
+
+**Optimista**: ~12-18h. Incluye migrations bucket B (overlap con sub-decisión #1), zod schemas para 2 sites mandatory (#4), rename skill persistence (#7), telemetry hook stub (#10).
+
+**Pesimista (con bucket C decisiones individuales)**: ~18-24h. Incluye border-line decisions per-site, posibles refactors de consumers sync.
+
+### Decisiones de mayor blast radius
+
+Las que requieren tu atención más cuidadosa para review:
+
+1. **Sub-decisión #1 (política IDB-vs-LS)** — define el criterio que clasifica los 15 LS sites. Si el criterio cambia (e.g., diferente threshold de tamaño, diferente definición de "sync access required"), todos los 4 buckets de Sec 5 se reclasifican.
+2. **Sub-decisión #4 (zod boundary parsing)** — la tabla per-site clasifica 8 sites canonical. Reclasificar afecta cantidad de schemas que Fase 3 debe escribir.
+3. **Sub-decisión #2 (schema versioning)** — opt-in vs mandatory afecta forever boilerplate per shape. Si en review preferís Opción A (mandatory), reabrir es costoso post-Fase 3.
+
+Las otras 5 sub-decisiones son menor blast radius — fácilmente revisables sin reabrir scope.
+
+---
+
+## 5. LS-only exception list
+
+15 LS sites totales clasificados en 4 buckets para policy ratification. Bucket A se ratifica directo (no decision needed); B agrupa migration candidates Fase 3; C requiere mini-decisión per-site; D documenta slice-internal patterns.
+
+### 5.1 Bucket A — Trivially LS-only (5 sites, ratify policy direct)
+
+Ratificación: **LS-only intentional, no migration**. Cumple el criterio de la sub-decisión #1: shape ≤1KB + sync-access required for render path or sub-millisecond user input + per-browser UX.
+
+| File:Line | Key | Shape | Razón LS-only |
+|---|---|---|---|
+| `teachingContext.ts:43` | `openclo-teaching-mode` | `boolean` | UI flag, ephemeral per session; no cross-machine value. |
+| `debug/debugAPI.ts:23-24` | `openclo-debug-bridge` | `string` ('true'/'false') | Debug flag; dev-only; no cross-machine. |
+| `debug/DebugStore.ts:26` | `openclo-debug-records` | Array of debug events | Debug records buffer; ephemeral; bounded by retention; dev-only. |
+| `Toolbar3D.tsx:30` | `SUBTOOL_STORAGE_KEY` | Subtool selection JSON (~100B) | UI state; sub-millisecond access during 3D render. |
+| `UnifiedBar.tsx:105` | `openclo-bar-position` | `{ x: number, y: number }` | Capsule floating position; sub-millisecond access during drag handler; per-browser UX. |
+
+### 5.2 Bucket B — Clear migration candidates a IDB canonical (4 sites, Fase 3 migration)
+
+Migración: **Adoptar canonical IDB pattern post-policy ratification**. Cumple criterio user-generated config persistente con cross-machine sync value.
+
+| File:Line | Key actual | Shape | Target IDB store + key | Notas Fase 3 |
+|---|---|---|---|---|
+| `costManager.ts:253, 356` | `openclo-budget`, `openclo-cost-history-{...}` | Budget number + cost history array | `settings: copilot-budget`, `settings: copilot-cost-history` | History puede crecer; considerar bounded retention en migration. |
+| `userPreferences.ts:586` | `openclo-copilot-preferences` | `{ theme, language, modelDefaults: {...} }` | `settings: user-preferences` | User-generated config; cross-machine sync value alto. |
+| `skills/marketplace.ts:39, 124` | `openclo-marketplace-registry-url`, `openclo-installed-skills` | URL string + skill metadata array | `settings: marketplace-config` (ambos en un blob) | Note: skill DB separado (`openclo_skills_v1`) maneja skill *runtime data*; este blob es solo metadata + registry config. |
+| `ShortcutRegistry.ts:178` | `openclo-shortcuts` | Shortcuts dict `{ [actionId]: keyCombo }` | `settings: shortcuts` | User-defined; cross-machine sync value alto. |
+
+**Migration path por site (Fase 3)**:
+1. Add async loader (`load{X}Async`) con IDB-first + `migrateFromLocalStorage` fallback.
+2. Add async writer routing through `storageSet`.
+3. Update consumers (likely ~1-2 callers each) — cache pattern si sync API needed (sub-decisión #5).
+4. Mantener legacy LS key constant per § 3.7 (indefinite, no remove).
+
+### 5.3 Bucket C — Border-line, decisión per-site (3 sites + 1 verification)
+
+Cada uno con mini-decisión explícita:
+
+#### `AgentSettings.tsx:67` — language pref con `localStorage.setItem` raw
+
+**Sub-decisión:**
+- Sub-A: Migrate al canonical (ratifica criterio sub-decisión #1: cross-machine value para language pref).
+- Sub-B: Wrap en `safeSetItem` y queda LS-only (consistencia con `teachingContext`/`debug`).
+
+**Recomendación: Sub-A** (canonical migration). Razones:
+- Language pref es persistent user-config con cross-machine value evidente (usuario que setea español en laptop espera mismo en desktop).
+- Aligned con sub-decisión #1 criterion para bucket B.
+- Costo equivalente al de bucket B sites (~1h dev).
+
+#### `webgpuDetect.ts:44` — WebGPU feature flag
+
+**Sub-decisión:**
+- Sub-A: Migrate al canonical (cross-machine value: hardware capability persistente).
+- Sub-B: LS-only (feature detection re-corre on first load anyway; valor es cache).
+- Sub-C: Settings store dedicado con TTL (e.g., revalidate cada 7 días).
+
+**Recomendación: Sub-B** (LS-only). Razones:
+- WebGPU detection es per-browser per-device; cross-machine sync introduce confusión (laptop ARM vs desktop x86 puede diferir).
+- Cache value ya es ephemeral by design (re-detected on first load if cache miss).
+- Sub-C (TTL) es over-engineering para un boolean.
+
+#### `SetupWizard.tsx:113` — onboarding completion flag
+
+**Sub-decisión:**
+- Sub-A: Migrate al canonical (cross-machine "this user already onboarded").
+- Sub-B: LS-only (per-browser fresh onboarding por simplicidad; second device welcome is OK).
+
+**Recomendación: Sub-A** (canonical migration). Razones:
+- Cross-machine value: usuario que completa onboarding en laptop no debería re-do en desktop.
+- Single-bit flag con shape estable; migration trivial.
+- Aligned con bucket B criterion.
+
+### 5.4 Bucket D — Slice-internal LS persistence (2 sites)
+
+Slice-managed persistence (no canonical, no middleware). Documentación de patrón:
+
+#### `layoutSlice.ts:53` (slice-internal `safeSetItem` helper)
+
+**Decisión: Migrate al canonical en Fase 3.**
+
+Razones:
+- Layout state es shape >1KB (copilot position, tabs, primaryView, splitRatio, bottomPanel) — fuera del threshold sub-decisión #1 para LS-only.
+- Cross-machine sync value: usuario que prefer copilot left en desktop probablemente espera mismo en laptop.
+- Cost moderate (~3h): replace `loadLayoutFromStorage`/`saveToStorage` con async via `storageSet`/`storageGet`; sync fallback de LS legacy en initialState (igual que saved-poses).
+
+#### `workflowSlice.ts:99` (slice-internal envelope con versioning + zod)
+
+**Decisión: Mantener slice-internal, ratificar como precedente de versioning.**
+
+Razones:
+- Workflow state requiere versioning + strict zod (mature precedente de sub-decisión #2).
+- Migrar al canonical IDB introduce overhead (cache pattern para sync access en confirmation middleware) sin clear benefit — workflow state es small + sync-required.
+- Documenta inline en `workflowSlice.ts` el rationale: "Slice-internal LS persistence ratificada per B6-state Fase 2 § 5.4 — versioning + zod precedent. Sub-millisecond sync access required for confirmation middleware."
+
+### 5.5 Resumen de buckets
+
+| Bucket | Count | Acción | Costo Fase 3 |
+|---|---|---|---|
+| A — Trivially LS-only | 5 | Ratificar policy, comment inline | ~30min total |
+| B — Clear migration | 4 | Adoptar canonical IDB | ~6-10h total |
+| C — Border-line | 3 | Aplicar per-site decisión recomendada (2 migrate + 1 LS-only) | ~3h total |
+| D — Slice-internal | 2 | layoutSlice migrate; workflowSlice ratificar | ~3h total |
+
+**Total bucket A/B/C/D**: ~12-15h Fase 3 (overlap con sub-decisión #1 migration).
+
+---
+
+## 6. Cross-references / out-of-scope
+
+Items que cruzan B6-state pero no entran a su scope, capturados explícitamente:
+
+- **#644** AgentConfig → ProviderConfig migration. Shape/schema decision — eje D6 (fabric tipos x3) tiene shape similar para tipos de configuración. Tracked separately.
+- **#645** AgenticLoop error surfacing 3-surfaces inconsistency. Input directo a E-async-states sub-track. La sub-decisión #10 de B6-state (storage quota / IDB unavailable) interactúa con E-async-states cuando arranque (telemetry hook integration).
+- **`projectSchema.ts`** — JSON file boundary, NOT IDB read boundary. B6-state ratifica que la zod boundary parsing (sub-decisión #4) es policy a aplicar al **read IDB**; el JSON file path queda separate concern.
+- **SecureStorage architecture** (`src/copilot/security/secureStorage.ts`). Encrypted secrets en sessionStorage AES-GCM. Boundary "non-secrets en IDB, secrets en SecureStorage" se ratifica acá. Lifecycle / encryption design es separate concern.
+- **Plugin sandbox storage** (`PluginBridge.ts:622`). Boundary de aislamiento de plugins. Out of cualquier eje del audit.
+- **3 LS-only legitimate** (ProjectMemory, DesignLogManager, projectIO quarantine) — ya tratados en BUG-10 § 9. Ratificación final acá:
+  - **ProjectMemory**: Class API explícitamente dual con functional API IDB-async. Ratificada como exception. Documentar inline el split.
+  - **DesignLogManager**: Per-project session log. **Sub-decisión menor**: migrar a canonical IDB? Recomendación: **migrate** (consistency con per-project memory pattern, low cost). Costo ~2h.
+  - **projectIO quarantine**: Deliberately LS-only por resilience (Safari private mode survival). Ratificada como exception explícita. Documentar inline.
+
+### Issues nuevas que B6-state genera (todavía no abiertas)
+
+Después de tu ratificación, abrir:
+
+- `[audit-followup] B6-state policy ratification — Fase 3 migrations` (severity:low, audit, follow-up). Lista las 4+3+1+1 = ~9 migrations que Fase 3 debe ejecutar.
+- `[audit-followup] B6-state Sec 3.6 — rename SkillPersistence.migrateFromLocalStorage to migrateLegacySkills` (severity:low). Naming collision fix.
+- `[audit-followup] B6-state Sec 3.8 — telemetry hook in storage.ts for IDB-unavailable / quota-exhaustion events` (severity:low, audit, follow-up). Hook stub + integration con E-async-states.
+
+---
+
+## 7. Decisión revisable: triggers para reabrir post-cierre
+
+Esta sección hace explícitos los criterios que justifican reabrir B6-state como sub-RFC posterior. Sin ellos, la ratificación es **stable**.
+
+### Triggers de reapertura
+
+1. **Sub-decisión #1 (IDB-vs-LS)**: si en future eje aparece un site que claramente cumple el criterio LS-only legitimate pero falla a otra dimensión (e.g., cross-machine value emerge tras feature evolution), reclasificar y reabrir el criterio.
+2. **Sub-decisión #2 (versioning)**: shape change shipped sin versioning donde después se necesitó migration urgent → reabrir como `B-revised` con enforcement (custom ESLint rule o tipo wrapper que requiere envelope).
+3. **Sub-decisión #3 (multi-store)**: bug report de inconsistencia inter-store que no se resuelve con read-side cleanup → reabrir como Opción A (transaction wrapper).
+4. **Sub-decisión #4 (zod boundary)**: corruption bug observado en uno de los 4 sites clasificados como "internal" → reclasificar y agregar zod.
+5. **Sub-decisión #5 (sync API)**: bug observado de "stale cached value" en producción, o tercer cache site emerge → reabrir como Opción C (canonical helper extraction).
+6. **Sub-decisión #6 (LS exception list)**: cualquier site bucket A reabierto por evolución de features (ej. "teaching mode" se vuelve cross-machine).
+7. **Sub-decisión #9 (migration window)**: acumulación de >5 distintos `migrateFromLocalStorage` paths en archivos individuales → reabrir como Opción A o C con tracking explícito.
+8. **Sub-decisión #10 (storage quota)**: E-async-states ratifica policy de surfacing degraded states → integrar storage telemetry en that policy.
+
+### Triggers que NO justifican reapertura
+
+- Sub-decisión #7 (skill persistence): el rename + ratificación está cerrado. Si emerge necesidad de absorber skill DB en canonical, eso es eje propio (no sub-decisión de B6-state).
+- Cambios en SecureStorage architecture: separate concern.
+- Issues #644 (AgentConfig migration) o E-async-states activación: no afectan B6-state policy.
+
+### Cuándo cerrar B6-state como axis
+
+B6-state se considera **cerrado** cuando:
+
+1. Esta nota está mergeada en main (PR #653 cerrado).
+2. Fase 3 migrations (los ~9 sites identificados en buckets B, C-migrate, D-migrate, plus DesignLogManager) están mergeadas.
+3. Issues de follow-up (#3 issues nuevas en Sec 6) están abiertas y trackeadas.
+4. Inventory annotation post-merge en `docs/reports/2026-04-28-drift-inventory-fase1.md` captura el closure (mismo pattern que B11/B12/C5/C7/B4/B5/C8/D1/BUG-10).
+
+Ningún trigger preventa este closure path.
+
+---
+
+## 8. Lo que NO decide
+
+Para evitar pre-empt de ejes futuros:
+
+- **Multi-store transaction API design** — defer per § 3.3 Opción C. Si Fase 3 emerge necesidad, eje propio.
+- **Versioning enforcement automation** — defer per § 3.2 Opción B. ESLint rule o type wrapper son future option, no current scope.
+- **zod schemas concretos para los 5 sites IDB sin parse** — § 3.4 ratifica policy; los schemas concretos los escribe Fase 3.
+- **SecureStorage refactor** — completely out of scope.
+- **Plugin sandbox storage policy** — out of scope.
+- **Storage quota UX (warning banner, status indicator)** — depends on E-async-states. § 3.8 ratifica telemetry hook only.
+- **Migration cleanup commits** — § 3.7 Opción B (indefinite). Future eje puede revisitarlo.
+
+---
+
+## 9. Cross-references
+
+- **Issue principal**: [#613](https://github.com/sssamuelll/openclo/issues/613) (BUG-10, cerrado vía PR #652)
+- **Note input**: [`docs/reports/2026-04-30-bug-10-fix-options.md`](./2026-04-30-bug-10-fix-options.md) (mergeada en main vía PR #646)
+- **Implementation precedent**: PR #652 (merged → `7274c25`)
+- **Inventory entry**: `docs/reports/2026-04-28-drift-inventory-fase1.md` líneas 186–195 (B6-state pre-investigation)
+- **Classification entry**: `docs/reports/2026-04-28-drift-fase2-classification.md` § (b) eje B6-state
+- **Methodology rules anchors**: regla 1 v2 (`001ea93`), regla 1 v3 (`36ba16b`), inventory misclassification rule (CLAUDE.md "Inventory misclassification is itself drift to capture")
+- **Related future ejes**:
+  - E-async-states (B8-state + D2 + D8) — sub-decisión #5 (sync API) + #10 (storage quota) interactúan.
+  - C1 RFC (buffer lifecycle Three.js) — independiente.
+  - A2 / A4 / A6 / A7 (Rust↔WASM↔JS bridge) — independientes.
+- **Origin commits del double-write (BUG-10 history)**: `4f6f5fa` (2026-02-23), `4a115f73` (2026-03-02), `84c9d18a` (2026-03-23), `e2e66212` (2026-03-24).
+- **Adversarial self-review pendiente**: antes de marcar PR #653 como ready-for-review, hacer pase con regla 1 v3 + adversarial self-review (precedente C5: catched B1 PolyPen latent bug). Específicamente:
+  - Verificar que la tabla de § 3.4 (zod classification) cubre los 8 sites canonical sin gaps.
+  - Verificar que los 15 LS sites de § 5 cubren todos los `localStorage.setItem`/`safeSetItem` en producción (re-grep al final).
+  - Verificar que la sub-decisión #1 criterion no excluye casos border que aparezcan en review.
+
