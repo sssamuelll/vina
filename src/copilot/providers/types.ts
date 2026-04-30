@@ -159,9 +159,13 @@ export interface StoredProviderConfig {
 }
 
 /**
- * Load provider config synchronously from localStorage only (no API key).
- * Returns config with `apiKey: ''`. Use for initial render to avoid flash;
- * call `loadProviderConfig()` to hydrate the encrypted API key.
+ * Load provider config synchronously from the legacy localStorage key (no
+ * API key). Returns config with `apiKey: ''`. Use for initial render to avoid
+ * flash; call `loadProviderConfig()` to hydrate the encrypted API key and
+ * pick up any IDB-canonical (BUG-10) writes that happened in another tab.
+ *
+ * After legacy LS is migrated to IDB this returns null; the async
+ * `loadProviderConfig` is the source of truth.
  */
 export function loadProviderConfigSync(): ProviderConfig | null {
   try {
@@ -179,20 +183,29 @@ export function loadProviderConfigSync(): ProviderConfig | null {
 }
 
 /**
- * Load provider config from localStorage + apiKey from SecureStorage.
+ * Load provider config from IDB canonical (BUG-10) + apiKey from SecureStorage.
+ * Read-side migration from legacy LS happens via `migrateFromLocalStorage` so
+ * existing users keep their saved provider after upgrade.
+ *
  * @returns ProviderConfig or null if not set
  */
 export async function loadProviderConfig(): Promise<ProviderConfig | null> {
   try {
-    const saved = localStorage.getItem(PROVIDER_STORAGE_KEY);
-    if (!saved) return null;
-    const config: StoredProviderConfig = JSON.parse(saved);
-    // Retrieve apiKey from SecureStorage (encrypted, async)
-    const apiKey = (await SecureStorage.get(`${config.provider}-apikey`)) ?? '';
+    const { storageGet, migrateFromLocalStorage } = await import('../../utils/storage');
+    let stored = await storageGet<StoredProviderConfig>('settings', 'provider-config');
+    if (!stored) {
+      stored = (await migrateFromLocalStorage<StoredProviderConfig>(
+        PROVIDER_STORAGE_KEY,
+        'settings',
+        'provider-config',
+      )) ?? undefined;
+    }
+    if (!stored) return null;
+    const apiKey = (await SecureStorage.get(`${stored.provider}-apikey`)) ?? '';
     return {
-      provider: config.provider as ProviderConfig['provider'],
-      model: config.model ?? '',
-      baseUrl: config.baseUrl,
+      provider: stored.provider as ProviderConfig['provider'],
+      model: stored.model ?? '',
+      baseUrl: stored.baseUrl,
       apiKey,
     };
   } catch { /* ignore */ }
@@ -200,7 +213,7 @@ export async function loadProviderConfig(): Promise<ProviderConfig | null> {
 }
 
 /**
- * Save provider config to localStorage (no secrets) + apiKey to SecureStorage.
+ * Save provider config to IDB canonical (BUG-10) + apiKey to SecureStorage.
  * @param config - Provider configuration to save
  */
 export async function saveProviderConfig(config: ProviderConfig): Promise<void> {
@@ -209,12 +222,12 @@ export async function saveProviderConfig(config: ProviderConfig): Promise<void> 
   if (!stored) {
     console.warn('[SecureStorage] API key could not be stored; it may be lost on page refresh');
   }
-  // Store non-secret config in localStorage
+  // Store non-secret config in IDB canonical (BUG-10).
   const storedConfig: StoredProviderConfig = {
     provider: config.provider,
     model: config.model,
     baseUrl: config.baseUrl,
   };
-  import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'provider-config', storedConfig); }).catch(() => {});
-  try { localStorage.setItem(PROVIDER_STORAGE_KEY, JSON.stringify(storedConfig)); } catch { /* ignore */ }
+  const { storageSet } = await import('../../utils/storage');
+  await storageSet('settings', 'provider-config', storedConfig);
 }
