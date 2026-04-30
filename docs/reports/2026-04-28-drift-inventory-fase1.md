@@ -233,6 +233,16 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
   - `project.avatar.measurements` vs `parametric.baseMeasurements` (resuelto con OR hardcoded en `reactiveSolverMiddleware.ts:233`).
   - `project.arrangementOverrides` vs `simulation.arrangementSnapshot` (conceptos distintos pero confundibles).
 
+> **Cierre 2026-04-30 — B10-state ratificado en 2 sub-ejes (PRs #660 + #661 merged).**
+>
+> **Par 1** (`pieces[].fabricId` vs `simulation.pieceFabrics`) — `docs/reports/2026-04-30-drift-fase2-b10state-par1-fabric-write-surfaces.md`. Hybrid scope: el inventario malclasificó como "kill the legacy"; la realidad es source-of-truth (project) + transient cache (sim) + sync hook uni-direccional. Ratificado UI surfaces transient (MaterialTab, SimulationView) + migrate copilot 3 sites (fabricTools, actionExecutor x2) a nueva action `project/setPieceFabric` single-field con concurrency-safe rollback. CLAUDE.md sección "Fabric assignment patterns" cementa el contrato. Lessons anchored: regla técnica sobre concurrency-safety como criterio primary para action shape de tool rollbacks (single-field preserva ediciones intermedias del usuario; full snapshot las pierde silently). Issue #662 follow-up para custom eslint rule (severity:medium) que enforce target slice convention.
+>
+> **Par 2** (`avatar.measurements` vs `parametric.baseMeasurements`) — `docs/reports/2026-04-30-drift-fase2-b10state-par2-measurements-ratification.md`. Cuarta misclassification del audit (después de C7, B12-state, B5-state, D1-cosmetic) cerrada por ratification. Los dos campos NO son fuentes superpuestas: avatar.measurements = body del usuario, parametric.baseMeasurements = snapshot del SIZE base del template paramétrico activo. Single setter, single dispatcher, fallback explícito en `reactiveSolverMiddleware.ts:235` ratifica estructuralmente el dual purpose. 4 reopen triggers nombrados + 1 deuda técnica (snapshot vs recompute). Zero código.
+>
+> **Par 3** (`arrangementOverrides` vs `arrangementSnapshot`) — out-of-scope de B10-state Fase 2. Inventario lo nombra como "conceptos distintos pero confundibles", lo cual sugiere misclassification similar a Par 2. Si emerge necesidad concreta de drift fix ahí, abrir como sub-eje separado.
+>
+> Calibración: 4.5h actual vs 7-9h estimate combinado (factor 0.5-0.6x — investigación adicional previa cerró decisión Opción β).
+
 ### B11-state — Generación de IDs
 - **Estado:** drift real.
 - Variantes:
