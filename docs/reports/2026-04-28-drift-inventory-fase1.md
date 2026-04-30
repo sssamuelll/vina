@@ -387,6 +387,8 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 - `Diagnostic` (`diagnostics/types.ts:103`) — para inspector.
 - Campos parecidos (severity, message, detail), tipos distintos, sin adaptador.
 
+> **Cierre 2026-04-30 — D7 ratificado (PR #665 merged).** Fase 2 doc en `docs/reports/2026-04-30-drift-fase2-d7-validation-diagnostic-types.md`. Sweep refresh confirmó que los 2 types siguen separados sin tercer Diagnostic-like, sin cross-type callsites, sin shared utilities. **Caracterización original "campos parecidos" reformulada:** los 2 types tienen 4 diferencias estructurales intencionales (severity sets 3 vs 4 con `'critical'`, type field `code: ValidationCode` enum strict vs `category: string` free-form, anchors entity-specific vs `detail: string` free-form, lifecycle boundary parsing vs runtime inspection). 3 sub-decisiones ratificadas: 3.1.A ratify separados (descartar BaseDiagnostic prematuro N=2 + discriminated union sin shared utilities reales), 3.2.A sin adapter (YAGNI; reopen trigger nombrado para cross-type rendering need), 3.3.A JSDoc × 2 + CLAUDE.md section "Diagnostic types (D7 ratified)". Migration: 0 código + ~12 líneas JSDoc + ~30 líneas CLAUDE.md + 0 follow-up issue. **Octava ratify-by-convention del audit** (C7, B12, B5, D1-cosmetic, B6 partial, B10-Par2, B2 → D7). Deuda explícita: `ValidationCode` enum no exportado fuera de `projectValidator.ts` — trivial, sin follow-up issue (costo de tracking mayor que de fixearlo on-demand). Calibración: 2.5h Fase 2 actual vs 3-4h estimate (factor 0.6-0.8x).
+
 ### D8 ★ — Cobertura de loading / error / empty UI
 - **Estado:** drift real con brechas críticas. (Solapa con B8-state.)
 - Brechas:
