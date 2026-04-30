@@ -27,21 +27,24 @@ import CopilotInput from './CopilotInput';
 import { ProgressMessage } from './ProgressMessage';
 import './CopilotPanel.css';
 import type { ChatMessage, ProviderToolDef } from '../../copilot/providers/types';
-import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
+import { storageGet, storageSet, migrateFromLocalStorage } from '../../utils/storage';
 
-const AGENT_STORAGE_KEY = 'openclo-agent-config';
+const LEGACY_AGENT_STORAGE_KEY = 'openclo-agent-config';
+const DEFAULT_AGENT_CONFIG: AgentConfig = { type: 'builtin', name: 'Built-in (Templates)' };
 
-function loadAgentConfig(): AgentConfig {
-  try {
-    const saved = safeGetItem(AGENT_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch { /* ignore */ }
-  return { type: 'builtin', name: 'Built-in (Templates)' };
+async function loadAgentConfig(): Promise<AgentConfig> {
+  const existing = await storageGet<AgentConfig>('settings', 'agent-config');
+  if (existing) return existing;
+  const migrated = await migrateFromLocalStorage<AgentConfig>(
+    LEGACY_AGENT_STORAGE_KEY,
+    'settings',
+    'agent-config',
+  );
+  return migrated ?? DEFAULT_AGENT_CONFIG;
 }
 
-function saveAgentConfig(config: AgentConfig) {
-  import('../../utils/storage').then(({ storageSet }) => { storageSet('settings', 'agent-config', config); });
-  safeSetItem(AGENT_STORAGE_KEY, JSON.stringify(config));
+async function saveAgentConfig(config: AgentConfig): Promise<void> {
+  await storageSet('settings', 'agent-config', config);
 }
 
 function getProvider(config: ProviderConfig) {
@@ -69,10 +72,12 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [agentConfig, setAgentConfig] = useState<AgentConfig>(loadAgentConfig);
+  const [agentConfig, setAgentConfig] = useState<AgentConfig>(DEFAULT_AGENT_CONFIG);
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfigSync);
 
-  // Hydrate API key asynchronously (SecureStorage uses Web Crypto)
+  // Hydrate persisted state asynchronously: agent-config from IDB (BUG-10),
+  // provider config API key from SecureStorage (Web Crypto).
+  useEffect(() => { loadAgentConfig().then(setAgentConfig); }, []);
   useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
   const [isMobile, setIsMobile] = useState(false);
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
@@ -231,8 +236,8 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
       const label = PROVIDER_OPTIONS.find(p => p.value === config.provider)?.label || config.provider;
       setAgentConfig({ type: 'builtin', name: label });
     } else {
-      setAgentConfig({ type: 'builtin', name: 'Built-in (Templates)' });
-      saveAgentConfig({ type: 'builtin', name: 'Built-in (Templates)' });
+      setAgentConfig(DEFAULT_AGENT_CONFIG);
+      void saveAgentConfig(DEFAULT_AGENT_CONFIG);
     }
   }, []);
 
