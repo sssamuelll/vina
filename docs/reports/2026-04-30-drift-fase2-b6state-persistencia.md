@@ -176,3 +176,101 @@ Sweep (B6-state inventory) clasificó los 12 según shape + uso. Sec 5 los segre
 - `workflowSlice.ts:99` — slice-internal envelope con versioning + zod (precedente)
 
 ---
+
+## 3. Opciones por sub-decisión
+
+Cada sub-decisión presenta opciones con tradeoffs concretos. La opción recomendada se identifica al final de cada sub-sección con confianza calibrada. La consolidación final está en Sec 4.
+
+### 3.1 Política IDB-vs-LS
+
+**Decisión**: criterio greppable que clasifica cada shape persistido como "IDB-canonical" vs "LS-only legitimate".
+
+#### Opción A — IDB-canonical para *todos* los shapes persistidos (LS solo como fallback automático del wrapper)
+
+**Propuesta:**
+- Todo dato que sobrevive page reload pasa por `storageSet`/`storageGet`.
+- LS solo se usa como fallback automático cuando IDB no está disponible (Safari private mode, settings disabled, quota exhaustion). Nunca como primary, nunca como sync access path.
+- Excepciones legítimas se ratifican explícitamente (ver Sec 5 buckets) y son enumerable.
+
+**Pros:**
+- Política única, fácil de razonar y enforcer.
+- Elimina la categoría "LS ad-hoc" — toda escritura LS es legitimate-by-policy o resilience-fallback.
+- Compatible con extension futura (versioning, zod boundary, transactions) sin partir un grupo de sites.
+- Migra naturalmente los 4 sitios del bucket B (clear migration candidates).
+
+**Contras:**
+- Forces async API en sitios sync hoy (los 5 sitios sync — bucket B + algunos del bucket C). Requiere refactor de consumers + loading states.
+- Para data <1KB con render-time read (capsule position, subtool state), la latencia de IDB read en mount es perceptible (~5ms vs ~0.1ms LS). UX impact en sitios donde el render path depende del valor.
+- Bucket A (4 sitios trivially LS-only) violaría policy si forzamos IDB → necesita exception explícita.
+
+**Migration path:**
+- Bucket B (4 sitios): adoptar canonical igual que BUG-10. Read-side migration via `migrateFromLocalStorage`. Los 4 son user-config persistente, son perfectos candidates.
+- Bucket A: ratificar como exception list explícita.
+- Bucket C: caso por caso (Sec 5).
+- Bucket D: layoutSlice migra al canonical; workflowSlice queda como precedente (su versioning ya cubre el read boundary).
+
+#### Opción B — Shape-based separation explícita (criterio greppable)
+
+**Propuesta:**
+- Criterio greppable: "small (<1KB) + sync-accessible + per-browser UI state" → LS-only legitimate. Resto → IDB-canonical.
+- Ejemplos de la línea: capsule position (LS, <100B), language pref (IDB, <50B pero cross-machine sync), theme (LS por simplicidad o IDB para sync-across-devices — depende), shortcuts (IDB).
+- Cada site documenta inline `// LS-only: <reason>` o `// IDB-canonical (BUG-10 pattern)`.
+
+**Pros:**
+- Reconoce la realidad UX: <1KB sync-access es un caso real con costo medible (drag handlers, render path).
+- Formaliza la línea que el codebase ya usa implícitamente.
+- Compatibility-first: no fuerza refactor de los 4 sitios trivially-LS.
+
+**Contras:**
+- "<1KB" es threshold arbitrario; bordeline cases (3KB layout) requieren decisión per-site.
+- Two-policy implementation cognitive overhead para el equipo: "¿es LS o IDB?" requiere check de criterio cada vez.
+- Si "cross-machine sync" entra al criterio, fuerza re-clasificación de muchos sites (theme, language, layout) que históricamente fueron LS.
+
+**Migration path:**
+- Bucket A: queda LS-only ratificado.
+- Bucket B: migra a IDB (los 4 son persistente cross-machine candidates).
+- Bucket C: caso por caso aplicando el criterio.
+- Bucket D: depende — layoutSlice (<5KB sync-access para UI 2D/3D split) probablemente queda LS; workflowSlice (versioned, schema-validated) queda LS también.
+
+#### Opción C — Mantener status quo + ratificar política implícita
+
+**Propuesta:**
+- Cada slice/módulo mantiene su política actual.
+- B6-state documenta lo que existe sin imponer cambio.
+- Future drift se evalúa case-by-case.
+
+**Pros:**
+- Cero migración. Cero cost ahora.
+- Preserva todas las decisiones históricas implícitas.
+
+**Contras:**
+- **Anti-patrón explícito del audit**. Ratificación cobarde: documenta drift sin resolverlo.
+- Los 4 sitios del bucket B (clear migration candidates por shape user-config) seguirían perpetuando el smell que motivó BUG-10 (LS sin policy, future drift accumulation).
+- No hay criterio para preventar que el próximo dev introduzca otro double-write o LS-only sin ratificar.
+
+**Migration path:** ninguno.
+
+#### Recomendación 3.1
+
+**Opción B con confianza alta.** Criterio:
+
+```
+LS-only legitimate IFF:
+  shape size ≤ 1KB
+  AND sync-access required for render path or sub-millisecond user input
+  AND per-browser UX (no cross-machine value gain)
+ELSE: IDB-canonical (with cache pattern only if sync API contract breaking)
+```
+
+**Razones:**
+
+1. La realidad UX es heterogénea — capsule drag handlers (sub-millisecond access para drag smoothness) y user shortcuts (cross-machine sync useful) tienen perfiles distintos. Una política única (Opción A) ignora ese gradiente.
+2. El cost-benefit del criterio greppable es positivo: 4 sitios bucket A se ratifican fácil; 4 sitios bucket B migran con clear payoff; 3 sitios bucket C usan el criterio para resolver per-site.
+3. La opción A es teóricamente más limpia pero introduce loading-state UX en 4 sitios donde el cost (sub-millisecond read path) es real y el benefit (cross-machine sync) es nulo.
+
+**Confianza alta** porque:
+- El criterio ya está implícito en el codebase pre-BUG-10 (los 4 sitios bucket A son obvious LS).
+- Los precedentes (workflowSlice, layoutSlice) son consistent con shape-based separation.
+- El cost de aplicar el criterio caso por caso es bounded (15 sitios totales, todos enumerados).
+
+---
