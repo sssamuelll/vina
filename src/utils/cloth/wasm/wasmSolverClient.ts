@@ -29,6 +29,7 @@
 
 import type { SeamInitData } from '../clothWorker';
 import type { CollisionMeshData } from '../collisionMesh';
+import { type SolverCapabilities, WASM_CAPABILITIES } from '../solverCapabilities';
 
 export interface PieceMeshData {
   pieceId: string;
@@ -77,6 +78,19 @@ export class WasmSolverClient {
   onSnapshotDeleted?: (id: string) => void;
   onConstraintsUpdated?: () => void;
   onEdgeData?: (ids: Int32Array, lengths: Float32Array) => void;
+
+  /**
+   * Solver capability surface (A7 ratified, § 3.3 Option C).
+   *
+   * Declares which physics features this tier supports. Update protocol:
+   * flags flip to `true` as per-feature port follow-up issues land.
+   * LRA and fold are permanently `false` (ratified CPU-only-by-design).
+   *
+   * Cross-ref: `src/utils/cloth/solverCapabilities.ts`.
+   */
+  get capabilities(): SolverCapabilities {
+    return WASM_CAPABILITIES;
+  }
 
   /**
    * Initialize with merged multi-piece mesh data and seam connections.
