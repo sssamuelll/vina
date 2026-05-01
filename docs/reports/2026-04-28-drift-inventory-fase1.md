@@ -159,13 +159,14 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 
 ### A7 ★ — WASM vs CPU solver: equivalencia comportamental
 - **Estado:** drift real con consecuencias funcionales.
+- **2026-05-01 — RATIFIED + REAL FIX (PR #675 merged, segundo RFC bloque (c) cerrado).** Pattern 2.5 EXTEND **(tercer data point post-A3 + C1 — sub-rule promoted to robust pattern 3/3 consistent shape).** Sweep refresh confirmed: 2 of original 6 divergencias closed via bug fixes pre-A7 (BUG-2 friction, BUG-3 seam compliance). Remaining 4 + BUG-5 absorbed = **5 real feature gaps** + 2 architectural diffs (adaptive substeps location, velocity clamp location). Per-feature classification (§ 3.1): **3 ports** (self-collision, pressure, piece stiffness) + **2 ratify-CPU-only-with-UI-surface** (LRA — Sam override from initial (a) lean per CPU 8.1× speedup post-PR-589; fold — UX impact bajo) + **2 architectural ratifies** (adaptive substeps + JS-side adaptive cadence; velocity clamp already parity). **Decoupled Fase 3 per § 3.6 Option B** (B6-state precedent): A7 closure landed policy ratification + CLAUDE.md section + UI surface (`SimulationStatusOverlay` extension) + capability surface skeleton (`solverCapabilities.ts` con `SolverCapabilities` + `CPU_CAPABILITIES` + `WASM_CAPABILITIES`) + architectural docs JSDoc (TS-only per Sam directive, NO Rust changes en closure). Per-feature ports queued as follow-up issues. **Primer use de 3.6 decoupling pattern en bloque (c)** (track adoption en future RFCs A6/A4/A2/C4). Calibración: ~8h Fase 2 vs 7-8h estimate (factor 1.0x — most complex RFC del bloque (c) por per-feature multiplication × 7 features); ~3h Fase 3 closure vs 3-5h estimate. Total: ~11h. BUG-5 #608 still OPEN; closes when self-collision port follow-up lands. Cross-ref: `docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md` (full RFC, 1499 líneas).
 - 6 divergencias documentadas:
-  1. Adaptive substeps solo CPU (10–30 vs WASM fijo en 15).
-  2. Velocity clamp: CPU en `postSolve`; WASM en JS wrapper externo.
-  3. Friction de cuerpo no funcional en WASM (bug B2).
-  4. Self-collision no operativa en WASM (bug B5).
-  5. LRA / pressure / fold / piece stiffness solo CPU (4 features ausentes en Rust).
-  6. Seam compliance siempre 0 en WASM (bug B3).
+  1. Adaptive substeps solo CPU (10–30 vs WASM fijo en 15). **→ ratificado architectural diff; JS-side adaptive cadence queued como follow-up.**
+  2. Velocity clamp: CPU en `postSolve`; WASM en JS wrapper externo. **→ ratificado architectural diff (already parity, location only).**
+  3. Friction de cuerpo no funcional en WASM (bug B2). **→ CLOSED via BUG-2 fix (#605).**
+  4. Self-collision no operativa en WASM (bug B5). **→ Port path ratified (§ 3.1.1 (a)). Closes via self-collision port follow-up issue.**
+  5. LRA / pressure / fold / piece stiffness solo CPU (4 features ausentes en Rust). **→ Mixed: pressure + piece stiffness queued para port (§ 3.1.3 + 3.1.5); LRA + fold ratify CPU-only + UI surface (§ 3.1.2 + 3.1.4).**
+  6. Seam compliance siempre 0 en WASM (bug B3). **→ CLOSED via BUG-3 fix (#606).**
 
 ---
 
