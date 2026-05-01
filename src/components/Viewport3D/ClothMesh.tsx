@@ -29,6 +29,7 @@ import {
 } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../utils/cloth/physicalFabric';
 import { cmToM } from '../../utils/geometry';
+import { useDisposable } from './hooks/useDisposable';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -390,6 +391,7 @@ export default function ClothMesh({ piece, isSelected, color, position, onFitMap
     geometryRef.current = geo;
     return geo;
   }, [meshData]);
+  useDisposable(staticGeometry);
 
   if (!staticGeometry) return null;
 

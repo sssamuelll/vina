@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import * as THREE from 'three';
+import { useDisposable } from './hooks/useDisposable';
 
 interface Props {
   livePositions?: Float32Array;
@@ -33,6 +34,7 @@ export default function SelectedVertexRenderer({ livePositions }: Props) {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
     return geo;
   }, [livePositions, selectedVertices]);
+  useDisposable(geometry);
 
   if (!geometry) return null;
 
