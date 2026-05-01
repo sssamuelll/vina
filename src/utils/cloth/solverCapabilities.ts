@@ -33,6 +33,17 @@ export interface SolverCapabilities {
   fold: boolean;
   /** Per-piece stiffness multipliers (compliance scaling). */
   pieceStiffness: boolean;
+  /**
+   * TSL execution model — when `true`, the consumer drives frames via
+   * `useFrame` (or equivalent), and the client's `start()`/`stop()` are
+   * no-ops. When `false` (or unset), the client manages its own animation
+   * loop internally (postMessage worker for CPU/WASM,
+   * `requestAnimationFrame` for Neural).
+   *
+   * Per A6 RFC § 3.1 Constraint B (TSL execution model anomaly).
+   * Currently only `GpuSolverClient` reports `true`.
+   */
+  frameDriven?: boolean;
 }
 
 /**
