@@ -74,3 +74,63 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   fold: false,
   pieceStiffness: false,
 });
+
+/**
+ * GPU TSL/WebGPU solver capabilities (post-A6-closure state).
+ *
+ * **`selfCollision: false` despite scaffolded TSL kernels** —
+ * `tslSelfCollision.ts` exports `makeSelfCollisionComputeNodes` which is
+ * imported and conditionally instantiated in `tslSolver.ts:634` (gated by
+ * `config.selfCollision && buffers.scBuffers`). However:
+ * - Default `config.selfCollision = false` (`gpuSolver.ts:62`).
+ * - `selfCollisionNodes.{hashCount,prefixSum,scatter,resolve,apply}Node`
+ *   are NEVER dispatched in `GarmentSimulation.tsx:380-435` substep loop
+ *   (only stretch/bend/seam/wind/grab/postSolve/etc. are computed).
+ *
+ * Same shape as BUG-5 was for WASM tier (scaffolded but no wiring).
+ * Capability stays `false` until the kernels are dispatched per substep
+ * AND a default-on path or explicit toggle is wired through the consumer.
+ *
+ * `lra`, `pressure`, `fold`, `pieceStiffness` — no GPU implementation
+ * exists. Same as WASM CPU-only-by-design gaps (A7 § 3.1).
+ *
+ * `frameDriven: true` — TSL solver compute is dispatched by the consumer
+ * via `useFrame` in `GarmentSimulation.tsx`. `GpuSolverClient.start()`
+ * is documented as no-op for the TSL path. Per A6 § 3.1 Constraint B.
+ */
+export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
+  selfCollision: false,
+  lra: false,
+  pressure: false,
+  fold: false,
+  pieceStiffness: false,
+  frameDriven: true,
+});
+
+/**
+ * Neural drape solver capabilities (post-A6-closure state).
+ *
+ * All physics flags `false` — Neural drape is ML inference (PBNS/HOOD-style
+ * model via ONNX Runtime Web), not a physics solver. The model contract
+ * predicts draped vertex positions from a rest mesh + body pose; it does
+ * not produce constraint outputs (no self-collision detection, no LRA
+ * geodesic constraints, no pressure forces, no fold compliance, no
+ * per-piece stiffness multipliers).
+ *
+ * Verified by sweep: 0 grep hits in `neuralDrapeClient.ts` for any
+ * physics constraint identifier (selfCollision, lra, pressure, fold,
+ * pieceStiffness, stiffnessMultiplier).
+ *
+ * `frameDriven: false` — Neural manages its own animation loop
+ * internally via `requestAnimationFrame`. `start()` enables the loop;
+ * `stop()` cancels via `cancelAnimationFrame`. Consumer does NOT drive
+ * frames. Per A6 § 3.1 Constraint B.
+ */
+export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
+  selfCollision: false,
+  lra: false,
+  pressure: false,
+  fold: false,
+  pieceStiffness: false,
+  frameDriven: false,
+});

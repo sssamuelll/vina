@@ -16,6 +16,8 @@
  * @module neuralDrapeClient
  */
 
+import { type SolverCapabilities, NEURAL_CAPABILITIES } from '../solverCapabilities';
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface OrtSession {
@@ -91,6 +93,19 @@ export class NeuralDrapeClient {
   onFrame?: (positions: Float32Array) => void;
   onReady?: () => void;
   onError?: (error: string) => void;
+
+  /**
+   * Solver capability surface — declares which physics features and
+   * execution modes this tier supports. Per A6 § 3.4 Option A
+   * (capability extension to GPU + Neural).
+   *
+   * All physics flags `false` — Neural drape is ML inference, not a
+   * physics solver. `frameDriven: false` because Neural manages its
+   * own animation loop via `requestAnimationFrame` (see `start()`).
+   */
+  get capabilities(): SolverCapabilities {
+    return NEURAL_CAPABILITIES;
+  }
 
   constructor(config?: NeuralDrapeConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
