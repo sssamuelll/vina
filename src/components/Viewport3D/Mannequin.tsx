@@ -1,8 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { cmToM } from '../../utils/geometry';
+import { useDisposable } from './hooks/useDisposable';
 
 /**
  * Parametric dress form mannequin built with LatheGeometry.
@@ -100,8 +101,7 @@ export default function Mannequin() {
     geo.computeVertexNormals();
     return geo;
   }, [measurements]);
-  // BUG-9 (#612): inline dispose pending C1 canonical pattern.
-  useEffect(() => () => bodyGeometry.dispose(), [bodyGeometry]);
+  useDisposable(bodyGeometry);
 
   const standGeometry = useMemo(() => {
     const points = buildStandProfile();
@@ -109,8 +109,7 @@ export default function Mannequin() {
     geo.computeVertexNormals();
     return geo;
   }, []);
-  // BUG-9 (#612): inline dispose pending C1 canonical pattern.
-  useEffect(() => () => standGeometry.dispose(), [standGeometry]);
+  useDisposable(standGeometry);
 
   return (
     <group userData={{ opencloRole: 'avatar' }}>
