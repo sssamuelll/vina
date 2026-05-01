@@ -152,8 +152,8 @@ export interface DartOptions {
  * (intake, apex, legs, foldDirection, capShape) for domain operations.
  *
  * Convert via `extractDartFromInternal` / `extractDarts` from
- * `src/utils/dartEntity.ts`. See CLAUDE.md "Dart representation (D1-real
- * ratified)" for the full contract.
+ * `src/utils/dartEntity.ts`. See `docs/reports/2026-04-30-drift-fase2-d1real-dart-internalline.md`
+ * for the full contract.
  */
 export interface Dart {
   id: string;
@@ -200,7 +200,7 @@ export interface GrainLine {
  * the rest (`'notch'`, `'fold'`, `'pleat'`, `'topstitch'`, `'reference'`)
  * are storage-only by design.
  *
- * Cross-ref: CLAUDE.md "Dart representation (D1-real ratified)".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d1real-dart-internalline.md`.
  */
 export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch' | 'reference';
 
@@ -420,7 +420,7 @@ export type CornerType =
  * (`src/utils/cloth/physicalFabric.ts`). For plugin/copilot basic shape,
  * see `FabricMaterial` (`src/utils/cloth/fabricLibrary.ts`).
  *
- * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d6-fabric-types.md`.
  */
 export interface Fabric {
   id: string;

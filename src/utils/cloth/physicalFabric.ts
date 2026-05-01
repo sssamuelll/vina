@@ -10,7 +10,7 @@
  * public API surface for plugin authors and simple copilot tools — NOT a
  * deprecating legacy. The two types serve distinct consumer audiences.
  *
- * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d6-fabric-types.md`.
  *
  * @module physicalFabric
  */
@@ -44,7 +44,7 @@ export type FabricSource = 'library' | 'custom' | 'lab-tested' | 'community';
  * (`src/utils/cloth/fabricLibrary.ts`). For project catalog entries, see
  * `Fabric` (`src/types/types.ts`).
  *
- * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d6-fabric-types.md`.
  */
 export interface PhysicalFabric {
   /** Unique ID (slug format) */

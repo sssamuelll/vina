@@ -569,8 +569,7 @@ function handleWorkerResult(result: BuildPieceResult): void {
  *
  * Holds 2 sub-cascadas — see @cascade headers per branch below.
  *
- * cross-ref: CLAUDE.md "Cascade middleware patterns",
- *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
+ * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
 export const reactiveSolverMiddleware: Middleware<{}, any> = (store) => {

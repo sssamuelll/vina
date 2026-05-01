@@ -21,7 +21,7 @@
  * intentionally kept as the basic shape that plugin authors can supply
  * without needing the 25+ engineering fields of `PhysicalFabric`.
  *
- * Cross-ref: D6 ratification doc, CLAUDE.md "Fabric type 3-tier API surface".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d6-fabric-types.md`.
  */
 export interface FabricMaterial {
   /** Human-readable name */

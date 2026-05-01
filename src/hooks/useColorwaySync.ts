@@ -16,7 +16,7 @@ import { FABRIC_LIBRARY } from '../utils/cloth/fabricLibrary';
  * Not run on every dispatch — useEffect with deps array keyed on
  * `activeColorwayId`, `colorways`, `pieces`, `defaultFabricId`.
  *
- * Cross-ref: B10-state Par 1 ratification (CLAUDE.md "Fabric assignment patterns").
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-b10state-par1-fabric-write-surfaces.md`.
  */
 export function useColorwaySync(): void {
   const dispatch = useDispatch();

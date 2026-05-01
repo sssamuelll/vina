@@ -263,7 +263,7 @@ const simulationSlice = createSlice({
      * `project/setPieceFabric` for persistent writes (e.g., copilot tools,
      * programmatic apply). Persistent writes propagate to sim via `useColorwaySync`.
      *
-     * Cross-ref: B10-state Par 1 ratification (CLAUDE.md "Fabric assignment patterns").
+     * Cross-ref: `docs/reports/2026-04-30-drift-fase2-b10state-par1-fabric-write-surfaces.md`.
      */
     setFabric(state, action: PayloadAction<{ pieceId: string; fabricId: string }>) {
       state.pieceFabrics[action.payload.pieceId] = action.payload.fabricId;

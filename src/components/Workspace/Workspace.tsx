@@ -4,7 +4,7 @@
  * Shell-level integration: workspace root that wires global key shortcuts
  * including copilot ones. Import from `src/copilot/keyboardShortcuts` is
  * an explicit shell-feature integration per the **feature ownership** layer
- * policy (CLAUDE.md "Layer policy" + D5 ratification doc).
+ * policy (`docs/reports/2026-04-30-drift-fase2-d5-layering-violations.md`).
  */
 import { Undo2, Redo2, Plus, MessageSquare, Search } from 'lucide-react';
 import { useEffect, useCallback, useState, useRef, useMemo } from 'react';

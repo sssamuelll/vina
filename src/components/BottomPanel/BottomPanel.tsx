@@ -4,8 +4,8 @@
  * Cross-feature integration: shell layout that hosts CopilotTab and
  * invokes copilot proactive analysis on tab activation. Import from
  * `src/copilot/reasoning/proactiveAnalysis` is an explicit entry point
- * per the **feature ownership** layer policy (CLAUDE.md "Layer policy"
- * + D5 ratification doc).
+ * per the **feature ownership** layer policy
+ * (`docs/reports/2026-04-30-drift-fase2-d5-layering-violations.md`).
  */
 import { X } from 'lucide-react';
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';

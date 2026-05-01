@@ -2,8 +2,8 @@
  * @module CopilotPanel
  *
  * Feature-owned UI for the copilot subsystem. Imports from `src/copilot/*`
- * are legitimate per the **feature ownership** layer policy (CLAUDE.md
- * "Layer policy" + D5 ratification doc).
+ * are legitimate per the **feature ownership** layer policy
+ * (`docs/reports/2026-04-30-drift-fase2-d5-layering-violations.md`).
  */
 import { MessageSquare } from 'lucide-react';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -81,7 +81,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
    * and project switch. For persistent LLM context, use `memoryRef.current`
    * (ProjectMemory class). Dual maintenance via `recordMessage` helper.
    *
-   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   * Cross-ref: `docs/reports/2026-05-01-drift-fase2-d4-copilotpanel-composition.md`.
    */
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
@@ -105,7 +105,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
    * `recordMessage` helper. `.save()` called explicitly at end of
    * turn to batch persistence.
    *
-   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   * Cross-ref: `docs/reports/2026-05-01-drift-fase2-d4-copilotpanel-composition.md`.
    */
   const memoryRef = useRef(new ProjectMemory(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -184,7 +184,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
    * Note: `memoryRef.current.save()` is called separately at end of turn to
    * batch persistence (not auto-saved per addMessage).
    *
-   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   * Cross-ref: `docs/reports/2026-05-01-drift-fase2-d4-copilotpanel-composition.md`.
    */
   const recordMessage = useCallback((
     msg: DisplayMessage,
