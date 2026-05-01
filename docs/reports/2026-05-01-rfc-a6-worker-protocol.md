@@ -1384,7 +1384,107 @@ A6 closure shape confirma Pattern 2.5 hybrid extend:
 
 **Code delta closure:** positive (additions only — interface decl + capability constants + JSDoc + CLAUDE.md). Concrete classes change `implements ClothSolverClient`. NO restructuring per-tier optimizations.
 
-If confirmed post-merge, **4/4 robust pattern consistent shape** — anchor consolidation. Sub-rule promotes from "robust pattern (3/3)" to "robust pattern (4/4 — anchor stable)".
+If confirmed post-merge, **4/4 robust pattern consistent shape** — anchor consolidation with calibration caveat captured in § 4.5. Sub-rule promotes from "robust pattern (3/3)" to "robust pattern (4/4 — anchor stable, bounded variant)".
+
+---
+
+### 4.5 F3 finding: interface scope reduction (post-compile-gate, pre-Commit-4)
+
+**STATUS:** documented as F3 closure (Commit 3.5), NOT post-merge amendment. Per Sam directive — "audit philosophy: code y doc ship consistent. Amendment post-merge sería ratificación por inercia — exactly el anti-patrón que el audit philosophy ataca."
+
+#### 4.5.1 Finding
+
+Pre-F3 plan (Sec 5.2 Commit 1 original) declared interface with 7+ members:
+- `initMultiPiece` (uniform signature with optional generic config).
+- `start()`, `stop()`, `dispose()`.
+- Callbacks `onFrame?`, `onReady?`, `onError?` as optional fields.
+- `capabilities` getter.
+
+F3 Commit 3 (`implements ClothSolverClient` compile gate) revealed **two structural divergences** that Sec 2.4 inventory had documented as "convergent by convention" but were less complete than assumed:
+
+**Divergence 1 — Init seam type (TS2416 compile error):**
+
+```
+src/utils/cloth/gpu/gpuSolverClient.ts(102,9): error TS2416:
+Property 'initMultiPiece' in type 'GpuSolverClient' is not assignable
+to the same property in base type 'ClothSolverClient'.
+  Type '(pieces: PieceMeshData[],
+        seamPairs?: { pieceAId: string; pieceBId: string;
+                      vertexPairs: [number, number][]; }[] | undefined)
+        => Promise<void>'
+  is not assignable to type
+   '(pieces: PieceMeshData[],
+     seams?: SeamInitData[] | undefined,
+     config?: unknown) => Promise<void>'.
+    Property 'vertexPairs' is missing in type 'SeamInitData'
+    but required in type
+    '{ pieceAId: string; pieceBId: string; vertexPairs: [number, number][]; }'.
+```
+
+GPU client uses different seam shape (`{pieceAId, pieceBId, vertexPairs}`) than CPU/WASM (`SeamInitData[]`). Forcing uniform = runtime translation in GPU client = behavioral change beyond closure scope.
+
+**Divergence 2 — Callback signature:**
+
+CPU's `FrameCallback = (positions, numParticles, triIds) => void` (3 required params) NOT assignable to interface `onFrame?: (positions: Float32Array) => void` (1 required). TypeScript strict function types correctly rejects.
+
+Forcing uniform = emit `numParticles`/`triIds` via separate `onMeshData` event = behavioral change.
+
+#### 4.5.2 Resolution applied
+
+Interface scope reduced to **truly convergent surface only:**
+
+```ts
+interface ClothSolverClient {
+  start(): void;
+  stop(): void;
+  dispose(): void | Promise<void>;
+  readonly capabilities: SolverCapabilities;
+}
+```
+
+**Dropped from interface:** `initMultiPiece`, `onFrame`, `onReady`, `onError`, `onEdgeData`. JSDoc on the interface explicitly documents the divergence — load-bearing per Sam directive ("Sin JSDoc explícito, future contributors van a asumir que el interface es la superficie completa").
+
+This is the **honest minimal core**. Per Sam pushback warning verbatim:
+> "Hard uniform interface que rompa per-tier perf es donde voy a pushback duro."
+
+Forcing uniform init/callbacks would have crossed that line.
+
+#### 4.5.3 Pattern 2.5 extend bounded reframe
+
+Pattern 2.5 extend 4to data point status: **probable confirmed con caveat scope reducido.**
+
+- Pattern (existing legitimate + drift = gaps + add coverage) **holds.**
+- Coverage shipped is **narrower than initially planned**: lifecycle anchor (4 members) + capability surface extension (GPU + Neural) + `frameDriven` flag + Neural reframe partial. NO `initMultiPiece` polymorphic anchor; NO callback uniform emit.
+- NOT Pattern 2 ratify-only — real anchor extracted, real capability extension landed.
+- NOT Pattern 1 refactor — no per-tier optimization broken.
+- **Bounded extend** with calibration caveat: gap assessment from inventory (Sec 2.4) was optimistic; method-name-similar can hide signature-different (see proposed methodology sub-rule § 4.5.5).
+
+Robust pattern 4/4 anchor stable preserved con caveat methodológico. Sub-rule promotion path post-merge:
+
+> Pattern 2.5 extend variants — promoted to robust pattern (4/4 data points: A3 + C1 + A7 + A6). A6 anchors **bounded variant** — when compile gate reveals convergence-by-convention is less complete than inventory captured, scope-reduction-on-trigger is a viable closure path (vs full revert/reopen).
+
+#### 4.5.4 `#UUU` consumer migration scope split
+
+Original `#UUU consumer migration — useSimulationLifecycle polymorphic dispatch` underestimated cross-tier dispatch weight. With init + callbacks dropped from interface, the follow-up now carries the FULL weight of polymorphic init/callback dispatch without interface anchor.
+
+**Resolution: split into 2 follow-ups.**
+
+| Original | Split into |
+|---|---|
+| `#UUU consumer migration` (~3-5h) | `#UUU-init` (~2-3h) per-tier polymorphic init dispatch — factory pattern that maps tier identity to constructor + per-tier init args resolution from common config shape |
+|  | `#UUU-callbacks` (~2-3h) per-tier polymorphic callback emission — wrapper layer that adapts `(positions)` → `(positions, numParticles, triIds)` for CPU consumer code, OR migrates CPU emission to single-arg + emit mesh data via separate `onMeshData` event |
+
+Aggregate `#UUU-*` cost ~4-6h vs original ~3-5h — slightly higher reflecting accurate scope.
+
+#### 4.5.5 Methodology finding (proposed sub-rule, anchor in CLAUDE.md post-merge)
+
+Per Sam directive — sub-rule worth anchoring for futuros ejes (A2, A4, C4 still pending — same risk class):
+
+> **Compile-gate convergence verification.** Inventory que clasifica métodos como "convergent by convention" puede sobrestimar uniformity. Las method names + arg counts pueden coincidir mientras los SHAPES estructurales divergen (e.g., 3-arg callback vs 1-arg, distinct seam types). El compile gate del interface implementation (`implements`) revela structural divergence que grep no captura. Para futuros ejes proposing interface extraction, anticipá esta clase de finding y considerá **scope-reduction-on-trigger** como path viable, no solo full revert/reopen.
+
+**Sub-regla derivative de "verify divergence, don't assume uniformity by grep"** — extends to "method-name-similar can hide signature-different".
+
+Anchor location: CLAUDE.md "Drift-axis investigation methodology" section, after "Sub-sweeps son contextuales" sub-rule. Defer concrete anchoring to post-merge cleanup commit (NOT in this F3 sequence — keeps F3 commits atomic per audit philosophy).
 
 ---
 
@@ -1395,6 +1495,20 @@ If confirmed post-merge, **4/4 robust pattern consistent shape** — anchor cons
 This RFC's branch (`drift/a6-worker-protocol`) lands the **A6 closure proper** (interface decl + capability extension + CLAUDE.md + Neural reframe + JSDoc). Per-feature decoupled work goes to **separate branches** as follow-up issues land.
 
 ### 5.2 A6 closure Fase 3 commit sequence (atomic per audit rules)
+
+**Commit sequence revised post-§ 4.5 (interface scope reduction).** Original plan was 6 commits; actual sequence is 7 commits (Commit 3.5 added inline post-compile-gate trigger, per Sam directive "doc amendment IN F3, NO post-merge"):
+
+1. ✅ **Commit 1** (landed `454e1da7`) — `solverProtocol.ts` module + `ClothSolverClient` interface + extended `SolverCapabilities` (`frameDriven` flag).
+2. ✅ **Commit 2** (landed `987775f7`) — capability extension to GPU + Neural (constants + getter, verified values).
+3. ✅ **Commit 3** (landed `ea5a34fe`) — concrete classes `implements ClothSolverClient` (compile gate). **Triggered scope reduction; init + callbacks dropped from interface.**
+4. **Commit 3.5** (this commit) — § 4.5 amendment articulating finding + Pattern 2.5 extend bounded reframe + `#UUU` split rationale + JSDoc divergence note in `solverProtocol.ts`.
+5. **Commit 4** — NeuralDrapeClient header reframe (Constraint C — partial enforce + partial reframe per Q4.5 finding).
+6. **Commit 5** — CLAUDE.md "Cloth solver client interface (A6 ratified)" section reflecting reduced scope.
+7. **Commit 6** — JSDoc on `useSimulationLifecycle.ts` consumers (dispatch examples + `#UUU-init`/`#UUU-callbacks` migration target).
+
+**Total A6 closure F3:** ~5-7h aggregate (revised from ~5-8h estimate; docs-heavy post-Commit-3, code mostly landed). Pace consistent.
+
+#### Original commit plan (pre-§ 4.5, preserved for reference)
 
 **Commit 1 — `solverProtocol.ts` module + `ClothSolverClient` interface decl + extended `SolverCapabilities`.**
 

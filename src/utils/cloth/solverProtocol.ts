@@ -30,17 +30,30 @@ export type { SeamInitData } from './clothWorker';
 export type { PieceMeshData } from './wasm/wasmSolverClient';
 
 /**
- * Canonical cloth solver client interface — lifecycle subset.
+ * Cloth solver client lifecycle interface (A6 ratified).
  *
- * Implementations:
+ * Minimal core convergent across 4 tiers (CPU/WASM/GPU/Neural).
+ *
+ * NOT in interface (per-tier divergent shape, see Sec 2.4 + 4.5):
+ * - initMultiPiece: GPU uses `{ pieceAId, pieceBId, vertexPairs }[]`;
+ *   CPU/WASM use `SeamInitData[]`; Neural takes no seams.
+ * - onFrame callback: CPU emits `(positions, numParticles, triIds)`;
+ *   GPU/WASM/Neural emit `(positions)`. Behavioral split required to unify.
+ * - setConfig / setters: per-tier shape (A2 territory).
+ *
+ * Polymorphic init/callback dispatch is consumer responsibility
+ * (`#UUU` follow-up — split into `#UUU-init` + `#UUU-callbacks`
+ * per A6 § 4.5 calibration).
+ *
+ * ---
+ *
+ * **Implementations:**
  * - `ClothWorkerClient` (CPU TS, postMessage worker).
  * - `WasmSolverClient` (WASM Rust, postMessage worker + WASM module).
  * - `GpuSolverClient` (GPU TSL/WebGPU, main-thread, useFrame-driven).
  * - `NeuralDrapeClient` (Neural ML, main-thread, ONNX Runtime Web).
  *
  * **Lifecycle expectations:**
- * - `initMultiPiece` is async; resolves when the solver is ready to receive
- *   subsequent calls. Multiple init calls require `dispose()` between.
  * - `start()`/`stop()` toggle the simulation loop. For tiers with
  *   `capabilities.frameDriven === true` (GPU/TSL), `start()` is a no-op
  *   and the consumer must drive frames via `useFrame` (or equivalent).
@@ -48,23 +61,11 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  *   `Promise<void>` depending on tier (Neural is async due to ONNX session
  *   release; others are sync).
  *
- * **Tier-specific methods NOT in the interface** (live on concrete classes):
- * snapshots (save/restore/delete), `setWind`, `setPins`/`clearPins`,
+ * **Tier-specific methods (concrete-class only)** — consumer casts when
+ * needed: snapshots (save/restore/delete), `setWind`, `setPins`/`clearPins`,
  * `setElastics`, `setCollisionMesh`/`setCollisionBodies`/etc., `setBrushParams`,
  * `grabStart`/`grabMove`/`grabRelease`, `getTslSolver`,
- * `getPositionStorageAttribute`, etc. Consumer casts to concrete type when
- * tier-specific access is needed.
- *
- * **Callbacks NOT in the interface** (live on concrete classes by convention):
- * `onFrame`, `onReady`, `onError`, `onEdgeData`. All 4 tiers expose these
- * fields by convention but signatures vary slightly per tier (CPU's
- * `FrameCallback` carries `(positions, numParticles, triIds)`; WASM/GPU/
- * Neural use `(positions)` only). Consumer code that wires callbacks must
- * assign per concrete-class type; polymorphic dispatch via this interface
- * is restricted to the lifecycle subset above. A future migration toward
- * uniform callback signatures (e.g., emit `numParticles`/`triIds` via a
- * separate `onMeshData` event) is a possible follow-up but explicitly
- * out of A6 scope.
+ * `getPositionStorageAttribute`, etc.
  *
  * **Setter migrations queued** (post-A6, decoupled per § 3.6.C):
  * - `#XXX` setWind canonical signature with capability gate.
@@ -72,7 +73,9 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  * - `#ZZZ` setFabric resolution moved to consumer.
  * - `#WWW` gravity bundled into setConfig.
  * - `#VVV` error shape uniform across 4 tiers.
- * - `#UUU` consumer polymorphic dispatch.
+ * - `#UUU-init` + `#UUU-callbacks` consumer polymorphic dispatch (split
+ *   per A6 § 4.5 — original `#UUU` underestimated cross-tier dispatch
+ *   weight without interface anchor for init/callbacks).
  *
  * **CRITICAL CAVEAT — pin semantics divergence (per A6 RFC Q2 resolution):**
  * The future canonical `setPins?(pins)` method (post-`#YYY`) accepts
@@ -90,7 +93,7 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  * positional implementations). A future lint rule may catch this; until
  * then JSDoc + review enforce.
  *
- * @see docs/reports/2026-05-01-rfc-a6-worker-protocol.md § 4.1 Q2
+ * @see docs/reports/2026-05-01-rfc-a6-worker-protocol.md § 4.1 Q2 + § 4.5
  */
 export interface ClothSolverClient {
   // ─── Lifecycle ──────────────────────────────────────────────────────
