@@ -400,10 +400,23 @@ self.onmessage = async (event: MessageEvent) => {
           wasmExports = wasmModule.wasm;
           console.log('[WasmWorker] Got memory from module.wasm');
         } else {
-          console.warn('[WasmWorker] Could not access WebAssembly.Memory — positions will be zero!',
-            'initResult type:', typeof initResult,
-            'initResult keys:', exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
-            'module keys:', Object.keys(wasmModule).slice(0, 10));
+          // A3 Sec 3.2.A: surface silent fallback as UI error via postMessage.
+          // Previously console.warn-only — user saw frozen cloth without
+          // explanation. Now flows through wasmSolverClient onError callback
+          // (consumer responsible for showErrorToast / overlay UX).
+          const errorMsg =
+            'WASM solver init failed: WebAssembly.Memory not accessible. ' +
+            'Cloth simulation will not run. Try refreshing the page.';
+          console.error('[WasmWorker]', errorMsg, {
+            initResultType: typeof initResult,
+            initResultKeys: exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
+            moduleKeys: Object.keys(wasmModule).slice(0, 10),
+          });
+          self.postMessage({
+            type: 'error',
+            code: 'wasm_memory_unavailable',
+            message: errorMsg,
+          });
         }
 
         // Merge pieces using the standard utility (ensures consistent vertex mapping)
