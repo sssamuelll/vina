@@ -889,6 +889,81 @@ Reopen A3 if:
 5. **Telemetry beyond WASM→JS boundary needed** (Sentry-like, metrics dashboard) — reopen scope; A3 only adds boundary counters, broader telemetry separate eje.
 6. **CPU fallback fails or unreliable** — A3 ratifies CPU fallback as safety net; if breaks, reopen with concrete failure mode.
 
+## Three.js disposable lifecycle (C1 ratified)
+
+Cross-ref: `docs/reports/2026-05-01-rfc-c1-buffer-lifecycle.md` (full RFC with 6 opciones articuladas, 7 sites inventariados, Pattern 2.5 extend variant data point).
+
+Cross-ref: `docs/reports/2026-04-28-c1-rfc-input-bug9-analysis.md` (BUG-9 input doc with 5 sites + variations).
+
+### Canonical pattern
+
+Use `useDisposable` (`src/components/Viewport3D/hooks/useDisposable.ts`) to register cleanup for any Three.js disposable resource (BufferGeometry, Material, Texture, RenderTarget, etc.) created via `useMemo` in a React component:
+
+```tsx
+import { useDisposable } from './hooks/useDisposable';  // or relative path
+
+const geometry = useMemo(() => new THREE.BufferGeometry(...), [deps]);
+useDisposable(geometry);
+```
+
+Hook accepts `T | null | undefined`; null/undefined are no-ops. Multi-geo coupled sites call the hook once per geometry:
+
+```tsx
+const { fineGeo, sectionGeo } = useMemo(() => /* ... */, [deps]);
+useDisposable(fineGeo);
+useDisposable(sectionGeo);
+```
+
+### Decision rule
+
+When introducing a new Three.js disposable in a React component, ask:
+
+- **Is the disposable created via `useMemo` in a React component?** → use `useDisposable(value)`.
+- **Is the disposable a module-level singleton** (alive for app lifetime, e.g., `PinRenderer.tsx:26-45`)? → no cleanup needed; document with inline comment.
+- **Is the disposable function-scoped transient** (created → used → disposed in the same function call, e.g., exporters, `bvh.ts:95-199`)? → no hook needed; dispose inline at end of function scope.
+- **Is the disposable created in `useEffect` body** (e.g., TSL material in `GarmentSimulation.tsx:608-622`)? → keep inline `useEffect` cleanup. C1 explicitly defers `useEffect`-based material/texture lifecycle to a future RFC if drift emerges.
+- **Is the disposable a Worker/client** (e.g., `ClothWorkerClient.dispose()`)? → orthogonal domain, not C1's `useDisposable`. Use the existing client lifecycle pattern.
+
+### Inventory snapshot (2026-05-01)
+
+7 sites in scope, all migrated to `useDisposable`:
+
+| Site | File | Shape |
+|---|---|---|
+| 1 | `Mannequin.tsx:104` (bodyGeometry) | pure recipe |
+| 2 | `Mannequin.tsx:112` (standGeometry, deps `[]`) | pure recipe |
+| 3 | `FloorGrid.tsx:70-71` (fineGeo + sectionGeo) | multi-geo coupled (2× hook calls) |
+| 4 | `PieceMesh.tsx:127` (geometry) | nullable |
+| 5 | `GarmentSimulation.tsx:267` (staticGeometry) | nullable + wrapper-object destructure |
+| 6 | `SelectedVertexRenderer.tsx:36` (geometry) | nullable (was leak gap, now fixed) |
+| 7 | `ClothMesh.tsx:393` (staticGeometry) | mutate-in-place + ref-store (was leak gap, now fixed) |
+
+Sites 1-5 were inline-fixed by BUG-9 (#612); migrated to `useDisposable` in this RFC closure. Sites 6, 7 were missed by BUG-9 inventory (sweep extension found them); cleanup added in this RFC closure.
+
+### Out-of-scope (per RFC § 1.2)
+
+- **Materials lifecycle** in `useEffect`-based pattern (e.g., `EdgeHighlight.tsx:44-68` Line wrapping geo + material; `GarmentSimulation.tsx:608-622` TSL `MeshStandardNodeMaterial`). Distinct abstraction shape — useEffect coordinates create + side-effect + cleanup as a unit. Future RFC may address materials lifecycle separately if drift emerges (reopen trigger #1).
+- **Texture lifecycle** managed by `TextureManager` singleton service (`src/utils/textures/TextureManager.ts`). Caching concern, not lifecycle hook.
+- **Module-level singleton geos/materials** (`PinRenderer.tsx`, `AnchorPoints.tsx`). Intentionally never disposed; alive for app lifetime.
+- **Function-scoped transient** (exporters, `bvh.ts`, `meshImporter.ts`, `commandsToShape` helpers). Created and disposed within a function call; not lifecycle.
+- **Worker/client `.dispose()`** (`useSimulationLifecycle`, `useMeshing`, `wasmSolverClient`, `clothWorkerClient`). Web Worker lifecycle, not Three.js GPU resources. Same name, different domain.
+- **Ref-based older idiom** (`Sew3DTool.tsx:77-98` PiecePickMesh). Functionally correct but predates BUG-9. Migrate opportunistically when the file is touched for another reason (B2-state forward-only precedent).
+
+### Reopen triggers
+
+Reopen C1 if:
+
+1. **N≥3 materials/textures lifecycle leak sites uncovered** that don't fit `useDisposable`'s `{ dispose(): void }` shape — opens RFC-C1bis or sub-decision dedicated.
+2. **A new Three.js disposable shape emerges** that doesn't fit any of the inventoried 7 site variations.
+3. **Lint rule generates >5% false positives** after 1 month warning-only — reopen to evaluate split-rule (per F's enforcement model) or to relax the canonical convention.
+4. **Site 7's ref-store anti-pattern** (`geometryRef.current = geo` inside useMemo at `ClothMesh.tsx:391`) generates a real bug — reopen the deferred deuda técnica.
+5. **`useDisposable` becomes a hot path overhead** (per-render `useEffect` registration measurable in profiling).
+6. **Inventory grows past 20 sites** — re-evaluate whether E's uniform pattern still serves or whether sub-classification emerges.
+
+### Lint rule (follow-up issue)
+
+Custom eslint rule that warns when a `useMemo` body creates `new THREE.*Geometry` (or `Material`, `Texture`, etc.) without a subsequent `useDisposable(value)` call on the returned value. Bundles with the existing lint-rule cluster (#659 @cascade, #662 fabric write target slice, #664 selectXById usage). Tracking issue opened post-merge.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
