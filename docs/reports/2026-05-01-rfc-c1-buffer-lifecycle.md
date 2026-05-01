@@ -280,8 +280,375 @@ Para C1, este precedent es relevant en Sec 3 evaluation: BUG-1 eligió localized
 
 ---
 
-## Sec 3+ pendiente
+## 3. Sub-decisiones
 
-Sec 3 (Sub-decisiones — articulación formal de las 6 opciones de helper extraction shape, sub-decisión 3.2 cleanup at 2 missed sites, sub-decisión 3.3 documentation strategy) en el siguiente commit.
+Tres sub-decisiones ortogonales. **Cada una se decide independientemente**: helper extraction shape (3.1), cleanup at missed sites (3.2), documentation strategy (3.3). El agent puede elegir Opción A para 3.1 y aún así adoptar 3.2 + 3.3, o cualquier combinación.
 
-Sec 4 (Recomendación consolidada), Sec 5 (Migration plan), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes.
+### 3.1 Helper extraction shape (las 6 opciones)
+
+#### 3.1.0 Pre-requisito — site shape decomposition explícita
+
+Antes de articular las opciones, mapear cada site a su shape canónica. La decomposition decide qué tan competitive son las opciones helper-friendly (B/F) vs uniform (E) vs status-quo (A).
+
+| Shape | Sites | Helper-friendly? |
+|---|---|---|
+| Pure recipe (single non-null) | 1, 2 | ✅ Yes — fits `T = factory()` cleanly |
+| Nullable | 4, 6 | ⚠️ Yes con variant `T \| null` |
+| Multi-geo coupled | 3 | ❌ No — splitting useMemo decouples lifecycle artifically |
+| Nullable + wrapper destructure | 5 | ❌ No — forcing helper changes return shape |
+| Mutate-in-place + ref store | 7 | ❌ No — helper internalizes geo, breaks `geometryRef.current` consumers |
+
+**Decomposition counts:**
+
+- **Helper-friendly** (pure or nullable variant): **4/7** (Sites 1, 2, 4, 6).
+- **Helper-awkward**: **3/7** (Sites 3, 5, 7).
+
+Esto NO es un gap dramatic (4 vs 3 ≈ 57% vs 43%). Per Sam's matrix:
+- Si N >> M → F (helper for common case + inline for variations) gana.
+- Si N ≈ M o M > N → E (uniform disposer-ref) o A (no helper) ganan.
+
+4/7 vs 3/7 es **N ≈ M**. La decision space queda abierta entre F (asumiendo el ergonomic gain on majority justifica el split convention), E (uniform), A (no helper, just close the gaps).
+
+#### 3.1.1 Opción A — Status quo + cleanup at 2 missed sites
+
+**Shape:** ratificar el inline pattern de BUG-9 fix como canonical. Add cleanup en Sites 6, 7. No introducir helper.
+
+```tsx
+// Canonical pattern (per-site):
+const geometry = useMemo(() => new THREE.BufferGeometry(), [deps]);
+useEffect(() => () => geometry.dispose(), [geometry]);
+
+// Nullable variant:
+const geometry = useMemo(() => /* may return null */ null, [deps]);
+useEffect(() => () => { geometry?.dispose(); }, [geometry]);
+
+// Multi-geo coupled (Site 3):
+const { fineGeo, sectionGeo } = useMemo(() => /* ... */, [deps]);
+useEffect(() => () => { fineGeo.dispose(); sectionGeo.dispose(); }, [fineGeo, sectionGeo]);
+```
+
+**Pros:**
+- Zero abstraction overhead.
+- Zero migration cost (5 BUG-9 sites already in this shape).
+- Each site is fully transparent — newcomer reads the pattern in place, no helper to grep.
+- Generalizable to materials/textures lifecycle in future without API change (it's just "useEffect cleanup").
+
+**Cons:**
+- Convention enforcement is by code review only. No grep-able canonical helper name → newcomers can introduce new leak sites without it being caught by lint.
+- Discoverability low. A newcomer searching "how do I dispose Three.js geometry in this codebase" finds N inline patterns, not 1 documented helper.
+- Repetition cost: 2 lines per site, every site (5 + 2 = 7 sites currently, growing as Three.js usage grows).
+
+**Per-site applicability:** ✅ all 7 sites uniform.
+
+#### 3.1.2 Opción B — `useDisposableGeometry<T>(factory, deps): T` (pure recipes only)
+
+**Shape:** narrow helper, pure recipe only.
+
+```tsx
+function useDisposableGeometry<T extends THREE.BufferGeometry>(
+  factory: () => T,
+  deps: React.DependencyList,
+): T {
+  const geometry = useMemo(factory, deps);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return geometry;
+}
+
+// Sites 1, 2 migrate cleanly:
+const bodyGeometry = useDisposableGeometry(() => {
+  const points = buildProfile(measurements).map(p => new THREE.Vector2(p.radius, p.y));
+  const geo = new THREE.LatheGeometry(points, 48);
+  geo.computeVertexNormals();
+  return geo;
+}, [measurements]);
+```
+
+**Pros:**
+- 1 line per site (Sites 1, 2 only).
+- Discoverable: grep `useDisposableGeometry` finds canonical sites.
+- Lint rule potencial: "any useMemo creating `new THREE.*Geometry` should use this helper."
+
+**Cons (per-site evidence, NO descarte arbitrario):**
+- **Site 3 (FloorGrid multi-geo coupled):** would have to call helper twice with split useMemo, which:
+  - Duplicates the dep array (current: 1× `[size, cellSize, sectionEvery]`; would become 2×).
+  - Decouples geos that ARE coupled in real lifecycle (they always change together because they're produced by the same shared computation).
+  - Forces re-running the shared loop building both arrays, doubling work.
+  - **Awkward shape preserved → Site 3 stays inline.**
+- **Site 4 (PieceMesh nullable):** factory signature `() => T` doesn't accept null. Caller would either:
+  - Throw on null (bad — null is legitimate for degenerate outline).
+  - Wrap with separate null check + bypass helper.
+  - **Awkward shape preserved → Site 4 stays inline OR helper needs nullable variant (B').**
+- **Site 5 (GarmentSimulation nullable + wrapper):** same as Site 4 plus wrapper-object destructure forced to change shape (`const { staticGeometry } = ...` → `const staticGeometry = ...`). The wrapper exists because the useMemo originally returned multiple values; even if currently only `staticGeometry`, changing it is local refactor for no helper benefit.
+  - **Awkward shape preserved → Site 5 stays inline.**
+- **Site 6 (SelectedVertexRenderer nullable):** same as Site 4.
+  - **Awkward shape preserved → Site 6 stays inline OR B' nullable variant.**
+- **Site 7 (ClothMesh mutate-in-place + ref):** factory creates geo, helper returns it. But other useEffects in the component need `geometryRef.current` (line 337: per-frame position mutation; line 372: fit map color attribute). Caller would have to manually `geometryRef.current = staticGeometry;` after the hook call — but that's a side-effect outside any effect, anti-pattern equivalent to current code (already has the smell).
+  - **Awkward shape preserved → Site 7 stays inline.**
+
+**Per-site applicability:** ✅ 2/7 (Sites 1, 2). ❌ 5/7 awkward.
+
+#### 3.1.3 Opción B' — Nullable-aware variant `useDisposableGeometry<T>(factory: () => T | null, deps): T | null`
+
+**Shape:** B with nullable factory return type.
+
+```tsx
+function useDisposableGeometry<T extends THREE.BufferGeometry>(
+  factory: () => T | null,
+  deps: React.DependencyList,
+): T | null {
+  const geometry = useMemo(factory, deps);
+  useEffect(() => () => { geometry?.dispose(); }, [geometry]);
+  return geometry;
+}
+```
+
+**Pros:** covers Sites 1, 2, 4, 6 (4/7 helper-friendly).
+
+**Cons:** Sites 3, 5, 7 same awkwardness as B.
+
+**Per-site applicability:** ✅ 4/7 (Sites 1, 2, 4, 6). ❌ 3/7 awkward.
+
+(B' is essentially the "F common case helper". Articulated separately because F also includes "ratify inline for variations" as part of the convention.)
+
+#### 3.1.4 Opción C — Generalized `useDisposable<T>(factory, deps, disposer?)`
+
+**Shape:** factory accepts arbitrary T, optional custom disposer for non-Three.js cases.
+
+```tsx
+function useDisposable<T>(
+  factory: () => T,
+  deps: React.DependencyList,
+  disposer?: (value: T) => void,
+): T {
+  const value = useMemo(factory, deps);
+  useEffect(() => {
+    return () => {
+      if (disposer) disposer(value);
+      else if (value && typeof (value as { dispose?: () => void }).dispose === 'function') {
+        (value as { dispose: () => void }).dispose();
+      }
+    };
+  }, [value]);
+  return value;
+}
+
+// Site 3 with multi-geo via custom disposer:
+const { fineGeo, sectionGeo } = useDisposable(
+  () => /* ... */,
+  [size, cellSize, sectionEvery],
+  ({ fineGeo, sectionGeo }) => { fineGeo.dispose(); sectionGeo.dispose(); }
+);
+
+// Site 5 with wrapper:
+const { staticGeometry } = useDisposable(
+  () => /* ... */,
+  [pieceMeshes, activePieces, avatarMeasurements],
+  ({ staticGeometry }) => { staticGeometry?.dispose(); }
+);
+```
+
+**Pros:**
+- Single helper covers all variants via the optional `disposer` arg.
+- Generalizable to materials/textures/render-targets uniformly.
+- The "what to dispose" logic stays at call site (callers know their structure).
+
+**Cons:**
+- API surface ambiguous: when do you pass a disposer? When does default work? Newcomers must learn both code paths.
+- TypeScript inference: `T` may be a structural type; the runtime `typeof X.dispose === 'function'` check is a duck-type smell — no compile-time guarantee.
+- Sites 1, 2 (pure recipe) gain no convenience over A — same number of lines.
+- Site 7 still problematic: helper internalizes creation; caller still needs to wire `geometryRef.current` separately.
+- Magic level high: the default disposer behavior (ducktype check) is subtle and easy to miss when reading.
+
+**Per-site applicability:** ✅ 6/7 with custom disposer for variations. ❌ Site 7 still awkward (ref-store concern unsolved).
+
+#### 3.1.5 Opción D — Hybrid 2-tier (`useDisposableGeometry` simple + `useDisposable` low-level)
+
+**Shape:** RTK precedent (createSlice high-level + createReducer low-level). Simple helper for common case, escape hatch for variations.
+
+```tsx
+// Tier 1: simple (covers Sites 1, 2, 4, 6)
+function useDisposableGeometry<T extends THREE.BufferGeometry>(
+  factory: () => T | null,
+  deps: React.DependencyList,
+): T | null { /* same as B' */ }
+
+// Tier 2: low-level escape hatch (covers Sites 3, 5, 7)
+function useDisposable<T>(
+  value: T | null,
+  deps: React.DependencyList,
+  disposer: (value: T) => void,
+): void {
+  useEffect(() => {
+    return () => { if (value) disposer(value); };
+  }, deps);  // eslint-disable-line react-hooks/exhaustive-deps
+}
+```
+
+**Pros:**
+- Common case stays ergonomic (1 line).
+- Escape hatch articulated as 1st-class API, not as "fall back to inline".
+- Discoverable: 2 helpers to grep, both documented.
+- RTK pattern precedent in the React ecosystem.
+
+**Cons:**
+- 2 helpers to maintain + 2 doc surfaces.
+- Choice paralysis: when to use which? Convention needed (e.g., "use simple unless your site has multi-geo / wrapper / external ref").
+- Sites 3, 5, 7 use Tier 2 which is structurally similar to inline cleanup of A — minor real benefit over A for those sites.
+
+**Per-site applicability:** ✅ 4/7 Tier 1, ✅ 3/7 Tier 2 (with caveat that Site 7 still has the ref-store concern but Tier 2 doesn't internalize creation, so the ref pattern stays as-is).
+
+#### 3.1.6 Opción E — Disposer-ref hook (caller computes, hook registers)
+
+**Shape:** caller computes the value via useMemo (or useState, or useRef — any source), hook just registers cleanup.
+
+```tsx
+function useDisposable<T extends { dispose(): void }>(value: T | null | undefined): void {
+  useEffect(() => {
+    return () => { value?.dispose(); };
+  }, [value]);
+}
+
+// Site 1:
+const bodyGeometry = useMemo(() => {
+  const points = buildProfile(measurements).map(p => new THREE.Vector2(p.radius, p.y));
+  const geo = new THREE.LatheGeometry(points, 48);
+  geo.computeVertexNormals();
+  return geo;
+}, [measurements]);
+useDisposable(bodyGeometry);
+
+// Site 3 (multi-geo coupled):
+const { fineGeo, sectionGeo } = useMemo(() => /* ... */, [deps]);
+useDisposable(fineGeo);
+useDisposable(sectionGeo);
+
+// Site 4 (nullable):
+const geometry = useMemo(() => /* may return null */, [piece.outline]);
+useDisposable(geometry);  // null-safe via TS type
+
+// Site 5 (nullable + wrapper):
+const { staticGeometry } = useMemo(() => /* ... */, [deps]);
+useDisposable(staticGeometry);
+
+// Site 7 (mutate-in-place + ref):
+const staticGeometry = useMemo(() => /* ... + geometryRef.current = geo */, [meshData]);
+useDisposable(staticGeometry);  // ref store stays as-is
+```
+
+**Pros:**
+- **Uniform across all 7 sites** — heterogeneity en creation, not en cleanup.
+- Low-magic: caller controls the value, hook just registers a disposer for it. No factory abstraction.
+- Generalizable to materials/textures/render-targets without API change (any `{ dispose(): void }` works).
+- Site 7's `geometryRef.current = geo` smell stays as-is (it's an existing code smell, orthogonal to C1) but doesn't block helper adoption.
+- Multi-geo Site 3: caller calls `useDisposable(fineGeo); useDisposable(sectionGeo);` — two cleanup registrations, semantically equivalent to current `useEffect(() => () => { a.dispose(); b.dispose(); })`. No artifical decoupling.
+- Lint rule follow-up: "every useMemo creating `new THREE.*Geometry` (or `Material`, etc.) should be paired with `useDisposable(value)`".
+
+**Cons (honest tradeoff per Sam tactical heads-up):**
+- **2 lines per site instead of 1** (vs Opciones B/B'/D Tier 1 that return the value). Visual cost on common case (Sites 1, 2 pure recipes).
+  ```tsx
+  // Opción E: 2 lines per site
+  const geometry = useMemo(() => new BufferGeometry(...), [deps]);
+  useDisposable(geometry);
+
+  // Opción F (B' + ratify inline for variations): 1 line on common case
+  const geometry = useDisposableGeometry(() => new BufferGeometry(...), [deps]);
+  ```
+- Discoverability cost: caller must remember to call `useDisposable(value)` after every useMemo. The omission produces the SAME bug as today (silent leak). Mitigation: lint rule.
+- For Sites 1, 2 pure recipes (the 2/7 simplest case), the 2-line cost is real ergonomic regression vs B/B'/F where the helper returns the value.
+
+**Per-site applicability:** ✅ all 7 sites uniform.
+
+#### 3.1.7 Opción F — Hybrid helper for common case + ratify inline for variations + cleanup gaps
+
+**Shape:** B' nullable-aware helper, used for Sites 1, 2, 4, 6. Sites 3, 5, 7 stay inline. 2 missed sites get inline cleanup added (overlap with 3.2).
+
+```tsx
+function useDisposableGeometry<T extends THREE.BufferGeometry>(
+  factory: () => T | null,
+  deps: React.DependencyList,
+): T | null { /* same as B' */ }
+
+// Sites 1, 2, 4, 6 — 1 line:
+const bodyGeometry = useDisposableGeometry(() => {
+  const points = ...; const geo = new THREE.LatheGeometry(points, 48); geo.computeVertexNormals(); return geo;
+}, [measurements]);
+
+// Sites 3, 5, 7 — stay inline (canonical inline pattern documented):
+const { fineGeo, sectionGeo } = useMemo(() => /* ... */, [deps]);
+useEffect(() => () => { fineGeo.dispose(); sectionGeo.dispose(); }, [fineGeo, sectionGeo]);
+```
+
+**Pros:**
+- Ergonomic 1-line on majority case (4/7 sites).
+- Variations get explicit ratification of inline pattern (no awkward forced fit).
+- Convention split is articulated: "use helper for pure or nullable; inline for multi-geo / wrapper / external ref".
+- Lint rule still possible: "any `useMemo creating new THREE.BufferGeometry` returning a single geo or single nullable geo should use the helper".
+
+**Cons:**
+- 2 conventions in the codebase (helper for common, inline for variations). Newcomer must learn the boundary rule.
+- Lint rule for split convention is harder to write than uniform "always use useDisposable".
+- The 4 vs 3 split is not overwhelming; the "common case wins" argument depends on whether 4/7 majority is enough to justify the split.
+- If new sites emerge that fall into the variations bucket (multi-geo, wrapper, ref), the inline pattern continues to grow — convention drift risk over time.
+
+**Per-site applicability:** ✅ 4/7 helper. ✅ 3/7 inline (canonically).
+
+#### 3.1.8 Comparison summary table
+
+| Opción | Shape | Sites helper | Sites inline | Lines per site (helper) | Lines per site (variation) | Generalizable to materials/textures? | Lint enforceability |
+|---|---|---|---|---|---|---|---|
+| A | inline only | 0/7 | 7/7 | n/a | 2 | ✅ (no API change) | ❌ (no canonical name) |
+| B | helper pure-only | 2/7 | 5/7 | 1 | 2 | ⚠️ partial | ⚠️ partial |
+| B' | helper nullable-aware | 4/7 | 3/7 | 1 | 2 | ⚠️ partial | ⚠️ partial |
+| C | generalized `useDisposable(factory, deps, disposer?)` | 6/7 | 1/7 (Site 7) | 1-3 | 2 | ✅ | ⚠️ ducktype magic |
+| D | 2-tier (simple + low-level) | 4/7 + 3/7 | 0/7 | 1 / 2-3 | n/a | ✅ | ⚠️ choice rule |
+| E | uniform `useDisposable(value)` | 7/7 | 0/7 | 2 | n/a | ✅ | ✅ uniform |
+| F | hybrid (B' + ratify inline) | 4/7 | 3/7 | 1 | 2 | ⚠️ partial | ⚠️ partial |
+
+**Note on "generalizable to materials/textures":** out of scope per § 1.2 but relevant as a tiebreaker if multiple opciones score similarly. ✅ means: if a future RFC extends to materials, the API doesn't need to change. ⚠️ means: API would need a parallel helper or extension.
+
+#### 3.1.9 Decision space narrowed
+
+Per Sam tactical recommendation post-Sec-2 + per the decomposition above:
+
+- **B alone is dominated by B'** (B' covers strictly more sites with the same shape). B is articulated only as a stepping stone to understand B'.
+- **C (generalized factory + disposer)** carries ducktype magic + Site 7 ref-store concern unsolved + no convenience win over A on Sites 1-2. **Likely rejected**.
+- **D (2-tier)** has the same shape as F but with the variations promoted to a formal Tier 2 helper. **D vs F is essentially the same recommendation** with different doc surface. Decision is style preference: "2 helpers" vs "1 helper + ratified inline".
+- **A, E, F** are the three contenders with substantive shape differences:
+  - A (no helper) — minimal, status quo + close gaps.
+  - E (uniform `useDisposable(value)`) — uniform, low-magic, generalizable.
+  - F (hybrid helper + inline) — ergonomic on majority, convention split.
+
+Sec 4 (next commit) gives the consolidated recommendation across A vs E vs F (with D as variant of F).
+
+### 3.2 Cleanup at 2 missed sites — independent decision
+
+**Shape:** add `useEffect(() => () => { geometry?.dispose(); }, [geometry]);` at `SelectedVertexRenderer.tsx:35` (after the useMemo) and `ClothMesh.tsx:392` (after the staticGeometry useMemo).
+
+**Cost:** ~6 líneas total (3 per site including comment + import if needed).
+
+**Confidence en leak shape:** structural (per § 2.4). No profile required.
+
+**Independence from 3.1:** the cleanup addition is required regardless of helper extraction shape. If 3.1 selects:
+- **A**: cleanup is the entire 3.1 + 3.2 work.
+- **B/B'/F**: cleanup at the 2 sites uses the inline shape (since Site 6 is nullable and Site 7 is ref-store, both helper-awkward in some opciones).
+- **E**: cleanup at the 2 sites uses `useDisposable(geometry)` after the useMemo.
+
+**Recommendation (intrinsic to 3.2):** ratify the cleanup additions as immediate scope of C1 RFC implementation, regardless of 3.1 outcome. Pattern 2.5 extend mínimo. Sec 4 articulates the integration.
+
+### 3.3 Documentation strategy
+
+**Shape:** ratify-by-default per audit pattern. Three layers:
+
+1. **JSDoc on the canonical helper** (if 3.1 selects helper extraction): describe usage, the 7 site shapes covered, when to use the helper vs inline, examples.
+2. **CLAUDE.md section** (similar to existing sections like "Persistence policy", "Cascade middleware patterns", "Fabric assignment patterns"): canonical pattern + decision rule + reopen triggers + cross-ref to this RFC.
+3. **Inline comments at site-of-introduction** (when a new dev adds a Three.js disposable): brief reminder + grep-able convention name.
+
+**Cost:** ~50-80 lines combined (docstring + CLAUDE.md section + inline). Out of scope for Sec 3 articulation; wired up in Sec 5 migration plan.
+
+**No alternative articulated** — documentation strategy is the tail of every drift audit closure. No reason to deviate from precedent.
+
+---
+
+## Sec 4+ pendiente
+
+Sec 4 (Recomendación consolidada — la elección entre A vs E vs F + integration con 3.2 + commitment a 3.3), Sec 5 (Migration plan multi-step), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes.
