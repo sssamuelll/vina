@@ -76,6 +76,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /**
+   * UI display messages (DisplayMessage[]). Transient — cleared on unmount
+   * and project switch. For persistent LLM context, use `memoryRef.current`
+   * (ProjectMemory class). Dual maintenance via `recordMessage` helper.
+   *
+   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   */
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -91,6 +98,15 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [sessionCostLabel, setSessionCostLabel] = useState('');
 
   const costManagerRef = useRef(new CostManager(project.id));
+  /**
+   * Persistent LLM context via ProjectMemory class (localStorage,
+   * MAX_MESSAGES=50 rolling window). Auto-loaded on construct in
+   * `_load()`. Dual-maintained con `messages` useState via
+   * `recordMessage` helper. `.save()` called explicitly at end of
+   * turn to batch persistence.
+   *
+   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   */
   const memoryRef = useRef(new ProjectMemory(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
@@ -156,6 +172,33 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     setSessionCostLabel('');
   }, [project.id]);
 
+  /**
+   * Coordinated dual-write: appends to UI messages AND ProjectMemory.
+   *
+   * UI display (`messages` useState) is transient — cleared on unmount/project
+   * switch. Persistent LLM context lives in `memoryRef.current` (ProjectMemory
+   * class, localStorage). This helper concentrates the dual maintenance for the
+   * 2 paired sites (user message + assistant message) to prevent UI/context
+   * desync if a future handler forgets one side.
+   *
+   * Note: `memoryRef.current.save()` is called separately at end of turn to
+   * batch persistence (not auto-saved per addMessage).
+   *
+   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   */
+  const recordMessage = useCallback((
+    msg: DisplayMessage,
+    memoryToolsCalled?: string[]
+  ) => {
+    setMessages(prev => [...prev, msg]);
+    memoryRef.current.addMessage({
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp,
+      ...(memoryToolsCalled && { toolsCalled: memoryToolsCalled }),
+    });
+  }, []);
+
   const isProviderMode = providerConfig !== null && (
     providerConfig.provider === 'ollama' || providerConfig.provider === 'claude-bridge' || providerConfig.apiKey.length > 0
   );
@@ -169,9 +212,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const handleProviderSend = useCallback(async (text: string) => {
     if (!providerConfig || !text.trim()) return;
 
-    const userMsg: DisplayMessage = { role: 'user', content: text, timestamp: Date.now() };
-    setMessages(prev => [...prev, userMsg]);
-    memoryRef.current.addMessage({ role: 'user', content: text, timestamp: Date.now() });
+    recordMessage({ role: 'user', content: text, timestamp: Date.now() });
     setInput('');
     setIsLoading(true);
 
@@ -190,19 +231,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
           success: tc.status === 'done',
         })),
       };
-      setMessages(prev => [...prev, assistantMsg]);
+      recordMessage(assistantMsg, agenticHook.toolCalls.map(tc => tc.name));
 
       // Track cost estimate (rough)
       const estimatedTokens = text.length * 4 + content.length;
       costManagerRef.current.trackUsage(providerConfig.provider, estimatedTokens, content.length, providerConfig.model);
       setSessionCostLabel(costManagerRef.current.formatSessionCost());
 
-      memoryRef.current.addMessage({
-        role: 'assistant',
-        content,
-        timestamp: Date.now(),
-        toolsCalled: agenticHook.toolCalls.map(tc => tc.name),
-      });
       memoryRef.current.save();
 
       if (costManagerRef.current.shouldWarn()) {
@@ -225,7 +260,7 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
     } finally {
       setIsLoading(false);
     }
-  }, [providerConfig, isMobile, agenticHook]);
+  }, [providerConfig, isMobile, agenticHook, recordMessage]);
 
   const handleSend = useCallback(async () => {
     const text = input.trim();
