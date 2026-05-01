@@ -63,6 +63,7 @@ Each closed eje has a full RFC in `docs/reports/`. Read the doc before introduci
 | A3 | Cross-boundary error handling Rust↔TS: defensive Rust + CPU fallback + TS NaN guards + Result-pattern for new fallible exports | `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md` |
 | A6 | Cloth solver client interface (`ClothSolverClient`): 4-member lifecycle subset; init/callbacks tier-specific | `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` |
 | A7 | WASM vs CPU solver capabilities: per-feature port-or-ratify; `SolverCapabilities` surface; per-feature ports queued (#676-681) | `docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md` |
+| A4 | Cross-language geometry/mesh ops Rust↔TS reformulated to TS-internal cross-tier; spatial hash roles ortogonales; topology extraction cleavage ratified; bend rest semantics closed pre-A4 via BUG-1 | `docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md` |
 
 ## Common Tasks
 
