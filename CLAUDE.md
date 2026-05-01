@@ -821,6 +821,74 @@ Reopen D4 if:
 4. **Third dual-paired site emerges** (e.g., system message persistence + UI display) — reabrir 3.1 evaluating hook extraction.
 5. **`messages` useState diverges semantically from `memoryRef` data** (UI displays graphics not in CopilotMessage shape) — evaluate new bridge module pattern (similar to `dartEntity.ts`).
 
+## Cross-boundary error handling (A3 ratified)
+
+Cross-ref: `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md` (full Fase 2 doc with 4 sub-decisiones, claims verification table, Pattern 2.5 hybrid extend analysis).
+
+The xpbd-wasm Rust crate ↔ TS workers/clients boundary has **distinct, intentional patterns** for different concerns. Don't conflate.
+
+### Layer responsibilities
+
+| Layer | Responsibility | Pattern |
+|---|---|---|
+| **Rust crate** (`crates/xpbd-wasm/src/lib.rs`) | Cloth simulation hot path | Defensively written (0 panic paths empíricamente). `console_error_panic_hook` adopted as preventive insurance. |
+| **WASM exports** | Zero-copy positions/velocities reads | Pointer-based (`*const f32`). Performance-critical hot path — NO Result types, NO fallibility wrapping. |
+| **TS worker** (`wasmSolverWorker.ts`) | Run solver loop + apply collision/elastic + NaN guard at boundary | Try/catch around init; postMessage error for init failures (`code: 'wasm_memory_unavailable'`); NaN guard with telemetry counter (`wasmNaNCount`) on both collision + non-collision branches. |
+| **TS client** (`wasmSolverClient.ts`) | Worker lifecycle + error surfacing to consumer | Worker error event handler + `'error'` postMessage handler both invoke `this.readyReject` (init phase) + optional `this.onError?.(msg)` callback (consumer responsible for UI surface). |
+| **Consumer** (e.g., GarmentSimulation) | UX response to errors | Provide `onError` callback to `wasmSolverClient`. Surface as showErrorToast / overlay. |
+
+### Result-pattern convention (forward-only)
+
+For **new fallible Rust→TS exports**, use the discriminated union `{ ok: true | false }` shape (precedent: `projectSchema.ts:411` `parseOpenCloProject` ratified by B6-state):
+
+```rust
+#[wasm_bindgen]
+pub fn validate_pattern_geometry(input: &[f32]) -> JsValue {
+    match validate_internal(input) {
+        Ok(result) => serde_wasm_bindgen::to_value(&Ok::<_, ValidationError>(result)).unwrap(),
+        Err(e) => serde_wasm_bindgen::to_value(&Err::<ValidationResult, _>(e)).unwrap(),
+    }
+}
+```
+
+```ts
+type ValidationResult =
+  | { ok: true; data: ValidationData }
+  | { ok: false; error: { code: string; message: string; details?: unknown } };
+
+const result: ValidationResult = wasm.validate_pattern_geometry(input);
+if (!result.ok) {
+  // Caller decides UX: toast, log, retry, etc.
+}
+```
+
+**Apply when:**
+- New one-shot fallible operation (init, configure, validate).
+- Failure is recoverable (caller can react).
+- NOT in hot path zero-copy reads (positions, velocities).
+
+**Do NOT migrate** existing zero-copy exports retroactively — performance-critical hot path preserved as-is.
+
+### Decision rule for new code
+
+When introducing new Rust→TS interaction:
+
+- **Hot loop / zero-copy** (positions, velocities, per-frame): pointer-based, no Result. Trust defensive Rust + post-step NaN guard.
+- **One-shot fallible** (init, validate, configure): Result-pattern via JsValue serialization. Caller-decides UX.
+- **Init failure path:** worker postMessage `{ type: 'error', code, message }` → client `onError` callback → consumer UI surface.
+- **Runtime NaN at boundary:** TS-side guard with telemetry counter, reset to prevPos. Don't try to fix in Rust unless source is identified.
+
+### Reopen triggers
+
+Reopen A3 if:
+
+1. **Rust crate gets `unwrap()` accidentally introduced** (e.g., new feature) — `panic_hook` catches in browser console; if frequent, evaluate lint enforcement of defensive coding.
+2. **`code: 'wasm_memory_unavailable'` actually fires in production** — telemetry signals frequency; if recurring, root-cause beyond UI surface (e.g., wasm-bindgen API issue).
+3. **`wasmNaNCount` grows past significant threshold** — signals Rust solver edge case; reopen with concrete repro.
+4. **New fallible Rust→TS export** introduced and Result-pattern bypassed — verify in code review; if convention drift, reopen 3.4 evaluating lint rule.
+5. **Telemetry beyond WASM→JS boundary needed** (Sentry-like, metrics dashboard) — reopen scope; A3 only adds boundary counters, broader telemetry separate eje.
+6. **CPU fallback fails or unreliable** — A3 ratifies CPU fallback as safety net; if breaks, reopen with concrete failure mode.
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:

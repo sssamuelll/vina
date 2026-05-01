@@ -1,6 +1,30 @@
 /**
  * Wasm XPBD Solver Worker — runs Rust Wasm solver off the main thread.
  *
+ * **Cross-boundary error handling (A3 ratified):**
+ *
+ * - **Rust crate (`crates/xpbd-wasm/src/lib.rs`):** defensively written, 0 panic
+ *   paths. `console_error_panic_hook` adopted as preventive insurance — if
+ *   future code introduces a panic, browser console gets useful error message
+ *   with location/stack trace context (instead of opaque WebAssembly.RuntimeError).
+ *
+ * - **WASM init failure** (memory not accessible, e.g., stale JS bindings):
+ *   surfaces via `postMessage({ type: 'error', code: 'wasm_memory_unavailable' })`.
+ *   Flows through `wasmSolverClient.onError` callback. Consumers responsible
+ *   for UI surface (showErrorToast / overlay).
+ *
+ * - **NaN guard at WASM→JS post-step boundary:** both collision and non-collision
+ *   branches reset NaN positions to `prevView` (continuity preserved) and
+ *   increment cumulative telemetry counter `wasmNaNCount`. Rate-limited console.warn
+ *   (first occurrence + every 100th) signals NaN events without spam.
+ *
+ * - **Zero-copy positions reads** (hot path): `Float32Array` views over WASM
+ *   memory. No Result types in signatures — fallibility implicit. Forward-only
+ *   convention: new fallible exports use Result-pattern (see CLAUDE.md
+ *   "Cross-boundary error handling" + `projectSchema.ts:411` precedent).
+ *
+ * Cross-refs: A3 Fase 2 doc, CLAUDE.md "Cross-boundary error handling".
+ *
  * @module wasmSolverWorker
  */
 
@@ -167,6 +191,17 @@ let preCollisionBuf: Float32Array | null = null;
 
 const FRAME_BUDGET_MS = 14;
 
+/**
+ * A3 Sec 3.3.A: telemetry counter for NaN detected in WASM positions buffer.
+ * Pre-existing NaN guard (lines below) silently reset to prevPos; this counter
+ * adds debugability — counts cumulative NaN occurrences post-step. Rate-limited
+ * console.warn (first occurrence + every 100th cumulative) avoids spam while
+ * surfacing the signal.
+ *
+ * Cross-ref: A3 Fase 2 doc Sec 3.3.A, CLAUDE.md "Cross-boundary error handling".
+ */
+let wasmNaNCount = 0;
+
 /** Maximum particle velocity (m/s). Matches JS solver's maxVelocity.
  * Without this, the Rust solver's 900Hz substep rate amplifies constraint
  * corrections into extreme velocities that compound exponentially. */
@@ -243,16 +278,19 @@ function simulationLoop(): void {
       }
 
       // NaN guard: if any position went NaN, reset to previous valid positions.
-      let hasNaN = false;
+      // A3 Sec 3.3.A: added telemetry counter — was silent reset, now signals
+      // cumulative NaN occurrences via rate-limited console.warn.
+      let nanThisStep = 0;
       for (let i = 0; i < n3; i++) {
         if (posView[i] !== posView[i]) {
-          hasNaN = true;
-          break;
+          posView[i] = prevView[i];
+          nanThisStep++;
         }
       }
-      if (hasNaN) {
-        for (let i = 0; i < n3; i++) {
-          if (posView[i] !== posView[i]) posView[i] = prevView[i];
+      if (nanThisStep > 0) {
+        wasmNaNCount += nanThisStep;
+        if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
+          console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (collision branch)`);
         }
       }
 
@@ -333,6 +371,30 @@ function simulationLoop(): void {
       }
     }
 
+    // A3 Sec 3.3.A: NaN guard in non-collision branch (parallel to collision
+    // branch above). Pre-A3 only collision branch had guard — non-collision
+    // path could propagate NaN positions to render. Now consistent across
+    // branches with shared telemetry counter `wasmNaNCount`.
+    if (wasmExports?.memory) {
+      const posPtr = solver.positions_ptr();
+      const prevPtr = solver.prev_positions_ptr();
+      const posView = new Float32Array(wasmExports.memory.buffer, posPtr, n * 3);
+      const prevView = new Float32Array(wasmExports.memory.buffer, prevPtr, n * 3);
+      let nanThisStep = 0;
+      for (let i = 0; i < n * 3; i++) {
+        if (posView[i] !== posView[i]) {
+          posView[i] = prevView[i];
+          nanThisStep++;
+        }
+      }
+      if (nanThisStep > 0) {
+        wasmNaNCount += nanThisStep;
+        if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
+          console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (no-collision branch)`);
+        }
+      }
+    }
+
     // Clamp velocity even without collision — Rust solver has no internal clamp
     if (wasmExports?.memory) {
       const velPtr = solver.velocities_ptr();
@@ -400,10 +462,23 @@ self.onmessage = async (event: MessageEvent) => {
           wasmExports = wasmModule.wasm;
           console.log('[WasmWorker] Got memory from module.wasm');
         } else {
-          console.warn('[WasmWorker] Could not access WebAssembly.Memory — positions will be zero!',
-            'initResult type:', typeof initResult,
-            'initResult keys:', exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
-            'module keys:', Object.keys(wasmModule).slice(0, 10));
+          // A3 Sec 3.2.A: surface silent fallback as UI error via postMessage.
+          // Previously console.warn-only — user saw frozen cloth without
+          // explanation. Now flows through wasmSolverClient onError callback
+          // (consumer responsible for showErrorToast / overlay UX).
+          const errorMsg =
+            'WASM solver init failed: WebAssembly.Memory not accessible. ' +
+            'Cloth simulation will not run. Try refreshing the page.';
+          console.error('[WasmWorker]', errorMsg, {
+            initResultType: typeof initResult,
+            initResultKeys: exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
+            moduleKeys: Object.keys(wasmModule).slice(0, 10),
+          });
+          self.postMessage({
+            type: 'error',
+            code: 'wasm_memory_unavailable',
+            message: errorMsg,
+          });
         }
 
         // Merge pieces using the standard utility (ensures consistent vertex mapping)

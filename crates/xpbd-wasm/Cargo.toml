@@ -9,6 +9,11 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 wasm-bindgen = "0.2"
+# A3 ratified: preventive insurance — produces useful console.error con
+# context si Rust crate accidentally panics (e.g., future code with
+# `unwrap()`). Crate is currently defensively written with 0 panic paths,
+# but this safety net catches regressions. Cross-ref: D6/D4/A3 docs.
+console_error_panic_hook = "0.1"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
