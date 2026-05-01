@@ -76,6 +76,13 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [isOpen, setIsOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /**
+   * UI display messages (DisplayMessage[]). Transient — cleared on unmount
+   * and project switch. For persistent LLM context, use `memoryRef.current`
+   * (ProjectMemory class). Dual maintenance via `recordMessage` helper.
+   *
+   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   */
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -91,6 +98,15 @@ export default function CopilotPanel({ isColumn = false, onClose }: CopilotPanel
   const [sessionCostLabel, setSessionCostLabel] = useState('');
 
   const costManagerRef = useRef(new CostManager(project.id));
+  /**
+   * Persistent LLM context via ProjectMemory class (localStorage,
+   * MAX_MESSAGES=50 rolling window). Auto-loaded on construct in
+   * `_load()`. Dual-maintained con `messages` useState via
+   * `recordMessage` helper. `.save()` called explicitly at end of
+   * turn to batch persistence.
+   *
+   * Cross-ref: D4 ratification doc, CLAUDE.md "CopilotPanel composition".
+   */
   const memoryRef = useRef(new ProjectMemory(project.id));
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
