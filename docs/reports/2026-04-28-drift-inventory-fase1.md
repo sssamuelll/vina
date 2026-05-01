@@ -267,10 +267,11 @@ Estos aparecieron mientras inventariábamos. Son comportamientos genuinamente in
 
 ### C1 ★ — Buffer / attribute lifecycle Three.js
 - **Estado:** drift real (con leaks documentados — bug B9).
+- **2026-05-01 — RATIFIED + REAL FIX (PR #673 merged, primer RFC bloque (c) cerrado).** Pattern 2.5 EXTEND (segundo data point post-A3 — sub-rule established 2/2 consistent shape). Sweep refresh expandió inventory de 5 BUG-9 sites → 7 sites totales (+2 missed: SelectedVertexRenderer + ClothMesh:382). Recommendation Opción E (`useDisposable<T extends { dispose(): void }>(value)`) con confidence medium-high; A y F articulados como contenders defendibles. Implementation 4 commits Fase 3: hook + 10 tests (51fc5b93), refactor 5 BUG-9 inline sites (3118975c), fix 2 leak gaps Sites 6+7 (ed64b84e), CLAUDE.md "Three.js disposable lifecycle (C1 ratified)" section (ec63f3a2). Helper extracted en `src/components/Viewport3D/hooks/useDisposable.ts`. Lint rule deferred a follow-up issue (mirror semántico de #659/#662/#664). Site 7 ref-store anti-pattern preservado como deuda técnica § 8.1 (orthogonal a C1). Calibración Fase 2+3: ~6h vs estimate 6-8h, factor 0.75x consistent con audit promedio. Cross-ref: `docs/reports/2026-05-01-rfc-c1-buffer-lifecycle.md` (full RFC).
 - Variantes:
-  - `new BufferGeometry` imperativo en `useMemo` sin cleanup (~8 sitios; leaks).
+  - `new BufferGeometry` imperativo en `useMemo` sin cleanup (~8 sitios; leaks). **→ 7 sitios reales post-sweep; todos migrated a useDisposable.**
   - `StorageBufferAttribute` TSL (lifecycle gestionado por `GpuSolverClient`, correcto).
-  - `Float32BufferAttribute` inline en geometrías paramétricas (FloorGrid, Mannequin — leak).
+  - `Float32BufferAttribute` inline en geometrías paramétricas (FloorGrid, Mannequin — leak). **→ FloorGrid + Mannequin fixed via useDisposable; ratified post-merge.**
 
 ### C2 — Scene graph patterns / R3F
 - **Estado:** drift real, parcialmente justificado.
