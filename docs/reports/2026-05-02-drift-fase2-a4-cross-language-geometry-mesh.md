@@ -452,7 +452,7 @@ Ratify the CPU/GPU+WASM cleavage as legitimate intentional design. Add JSDoc on 
   - **Preserves type consistency** in CPU path (Int32Array everywhere for topology).
   - **No algorithm change** — sorted-edge approach in CPU has its own validation + numerical determinism guarantees.
   - **Discoverability via JSDoc** — future dev sees explicit cross-doc.
-  - **Pattern 2.5 ratify-as-is** — light touch, document the intentional cleavage.
+  - **Ratify-by-convention con JSDoc cross-doc** — light touch, document the intentional cleavage. Distinto de Pattern 2.5: no hay surgical addition de helper ni removal de inline drift; solo cross-doc instrumentation. Mismo bucket que D7 (Diagnostic types ortogonales).
 - **Cons:** **dual maintenance** — bug fix in topology extraction logic touches both sites. Mitigated by:
   - The two algorithms are stable + simple (deduplication + 4-tuple build).
   - No bug history pointing to drift between the two (BUG-1 was a different axis: angle vs distance, not topology).
@@ -596,7 +596,7 @@ Single atomic commit with all 6 JSDoc additions (sites #1-6 in § 4 table). Titl
 Body:
 - Cross-doc trail for A4 closure.
 - Variant 1: spatial hash roles ratified (regla 13 misclassification).
-- Variant 2: CPU/GPU+WASM topology extraction cleavage ratified (Pattern 2.5 ratify-as-is).
+- Variant 2: CPU/GPU+WASM topology extraction cleavage ratified-by-convention con JSDoc cross-doc; Pattern 2.5 lite (helper compartido) disponible como reopen path § 7 #1-2.
 - Variant 3: bend rest semantics already closed (BUG-1 #604); cross-ref added.
 
 ### 5.4 Commit 4 — CLAUDE.md ratification row
@@ -649,7 +649,7 @@ Post-verify-gates-clean, mark PR ready-for-review.
 - **A4 cerrado:** Pattern ratify-by-convention (regla 13 + 1) con light cross-doc + 1 ratify-by-inertia.
 - **Cuarto eje (c) RFC cerrado:** A4 después de C1 + A7 + A6. (c) bloque progress: 4/6, pending A2 + C4.
 - **Inventory misclassification ratification 7th case** (regla 13 lineage: B12-state + C7 + B5-state + D1-cosmetic + D5 + ... + A4). Reinforces "62% rule" calibration.
-- **Pattern 2.5 ratify-as-is variant** — distinct from 2.5 cleanup / 2.5 lite / 2.5 extend / 2.5 extend bounded. **5th variant of Pattern 2.5 hybrid** if Sam classifies it as such, OR ratify-by-convention if cleavage is genuinely intentional. Open for Sam interpretation.
+- **Classification: ratify-by-convention con JSDoc cross-doc**. Pattern 2.5 hybrid sigue 3 variants confirmadas (cleanup / lite / extend); A4 variant 2 closure NO es Pattern 2.5 — JSDoc-only sin surgical addition ni removal. Bucket correcto: ratify-by-convention con cross-doc, mismo shape que D7 (`ValidationDiagnostic` vs `Diagnostic` ortogonal roles). Reviewer call (2026-05-02) — Pattern 2.5 ambiguity flag closed.
 
 ### 6.3 No-conflicts (out-of-scope verificado)
 
