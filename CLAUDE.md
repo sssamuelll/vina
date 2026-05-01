@@ -1185,24 +1185,44 @@ Three variants ratify the underlying pattern as intentional; differ in shape of 
 
 **Diagnostic refinement:** ¿el "drift" puede addresarse con additions sin restructuring del pattern existente? → Pattern 2.5 extend. ¿Removing artifacts? → Pattern 2.5 cleanup. ¿Surgical helper para inline pattern? → Pattern 2.5 lite. Si requires restructuring → Pattern 1.
 
-#### Pattern 2.5 extend variant — second data point (anchored 2026-05-01 after C1)
+#### Pattern 2.5 extend — robust pattern (promoted 2026-05-01 after A7 confirms 3/3 data points)
 
-C1 (Three.js `useMemo + BufferGeometry` lifecycle) confirms generalizable shape de A3 (cross-boundary error handling). Both ejes:
+Confirmed across 3 distinct domains:
 
-- **Pattern existing legitimate:** defensive Rust + CPU fallback en A3; inline `useEffect dispose` en C1 (BUG-9 fix).
-- **Gaps en cobertura específica:** silent fallback `positions=0` sin UI surface en A3 (3 gaps — panic hook + UI + NaN telemetry); 2 missed leak sites (SelectedVertexRenderer + ClothMesh:382) en C1 + lack of canonical helper name for discoverability.
-- **Resolution:** extract canonical para discoverability + add coverage to gaps + ratify pattern + lint rule follow-up.
+- **A3** (cross-language error handling Rust↔TS) — first data point, anchored 2026-05-01.
+- **C1** (Three.js disposable lifecycle) — second data point, established 2/2.
+- **A7** (WASM vs CPU feature equivalence) — third data point, **promoted to robust pattern 3/3**.
 
-**Sub-rule status: established (2/2 data points consistent shape).**
+Shape consistent across all 3 ejes: pattern existing legitimate + drift consiste en gaps en cobertura específica + extraction de canonical para discoverability/enforcement + add coverage to gaps + ratify pattern as-is. Distinct from Pattern 2 ratify (no code change), Pattern 2.5 cleanup (remove artifacts), Pattern 2.5 lite (surgical helper), Pattern 1 real refactor (restructure).
 
-Pattern 2.5 extend cabe cuando:
-1. Pattern existing es legitimate (verified via sweep refresh + git blame).
-2. Drift consiste en gaps en cobertura específicos (not the pattern itself).
-3. Extraction de canonical agrega discoverability + enforcement sin restructurar el pattern.
+**Diagnóstico criteria for future ejes:**
 
-Si emerge tercer data point con same shape: confirmation redundante. Si emerge un caso que NO encaja (e.g., Pattern 2.5 extend con scope variations): sub-rule se refina con variant nueva.
+1. Pattern existing es legitimate (multi-precedent confirma — sweep refresh + git blame + consumer analysis).
+2. Drift identified como gaps en surfaces específicos, no como structural issue del pattern.
+3. Resolution shape: extract canonical (helper / hook / convention) + add coverage to N gaps + ratify pattern + lint rule follow-up.
+4. Code delta typically positive (additions only) o net-zero (helper added + inline removed).
 
-**Origen 2.5 extend (C1):** 7 sites totales del pattern `useMemo + new BufferGeometry`. 5 inline-fixed por BUG-9 (#612), 2 missed por inventory window (SelectedVertexRenderer, ClothMesh:382). Sweep refresh per regla 1 v2/v3 expandió inventory +40% (5→7 sites). Pattern (inline `useEffect dispose`) ratificado as intentional + canonical helper `useDisposable` extracted para discoverability + lint rule deferred a follow-up issue (#674) bundling con cluster existing (#659/#662/#664). Cleanup = add coverage al 2 missed + extract canonical + add CLAUDE.md section. Code delta positivo (+1384 / -17 incluyendo RFC doc). Pattern ratificado as intentional; coverage extends sin restructuring.
+Default expectation: Pattern 2.5 extend cabe en architectural ejes con existing infrastructure + bounded gap scope.
+
+**Calibración shipping-rate (3/3 data points):**
+
+Across the 3 data points (A3 + C1 + A7), Pattern 2.5 extend closure pace ranged 0.6x-1.0x del nominal estimate:
+
+| Eje | Estimate F2 | Actual F2 | Factor | Shape |
+|---|---|---|---|---|
+| A3 | 5-7h | ~4h | ~0.6x | uniform (single-domain cross-language) |
+| C1 | 4-6h | ~5h | ~0.75-0.8x | uniform (single-pattern useMemo + dispose) |
+| A7 | 6-9h | ~8h | ~1.0x | per-feature multiplication (× 7 features) |
+
+**Calibración rule:** Pattern 2.5 extend ejes con per-feature multiplication tienden a 1.0x; ejes con uniform shape tienden a 0.6-0.8x. Future RFC predictivo data point.
+
+**Origen A3 (first data point):** xpbd-wasm Rust crate (defensively written, 0 panic paths, CPU fallback existente) + TS workers (distributed NaN guards). Sweep refutó 2/3 inventario claims empíricamente. Drift = gaps en cobertura específicos (panic_hook missing, UI surface absent, NaN telemetry counter ausente, Result-pattern convention sin documentar). Cleanup = add coverage to each gap. Pattern ratificado as intentional; coverage extends sin restructuring. Code delta: +827 líneas docs + Cargo dep.
+
+**Origen C1 (second data point):** 7 sites totales del pattern `useMemo + new BufferGeometry`. 5 inline-fixed por BUG-9 (#612), 2 missed por inventory window (SelectedVertexRenderer, ClothMesh:382). Sweep refresh per regla 1 v2/v3 expandió inventory +40% (5→7 sites). Pattern (inline `useEffect dispose`) ratificado as intentional + canonical helper `useDisposable` extracted para discoverability + lint rule deferred a follow-up issue (#674) bundling con cluster existing (#659/#662/#664). Cleanup = add coverage al 2 missed + extract canonical + add CLAUDE.md section. Code delta positivo (+1384 / -17 incluyendo RFC doc). Pattern ratificado as intentional; coverage extends sin restructuring.
+
+**Origen A7 (third data point):** 5 real feature gaps + 2 architectural diffs en CPU vs WASM cloth solver equivalence. Per-feature classification (§ 3.1) ratificada mixed: 3 ports + 2 ratify-CPU-only-with-UI + 2 architectural ratifies + 0 defers. Decoupled Fase 3 per § 3.6 (B6-state precedent): A7 closure landed policy + capability surface skeleton + UI surface + architectural docs; per-feature ports queued as follow-up issues #676-681. Pattern (CPU+WASM coexistence) ratificado as intentional + capability surface extracted para discoverability + lint rule deferred. Code delta closure: +194 líneas TS + 70 CLAUDE.md + 1499 RFC doc. Per-feature ports (~18-27h aggregate) queued.
+
+**Status post-A7:** **robust pattern with 3 data points consistent shape.** Future ejes hitting same shape (existing legitimate + bounded gaps + canonical extraction) confirm redundantly. Future ejes deviating require sub-rule refinement con variant nueva.
 
 ### Distinguishing re-implementation from intentional feature
 
