@@ -16,6 +16,9 @@
  * by both extractors, so the WASM worker can feed the Rust solver the values
  * it expects without modifying the shared extractor (which TSL still needs to
  * return angles).
+ *
+ * Variant 3 of A4 Fase 2 (`docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md`
+ * § 2.5). Closed pre-A4 via this helper — A4 ratifies the seam by inertia.
  */
 
 /**

@@ -418,7 +418,13 @@ export class XPBDClothSolver {
     this.triNormalSign = new Float32Array(this.triIds.length / 3);
     this.uvs = meshData.uvs;
 
-    // Build constraints from mesh topology
+    // CPU-side topology extraction. Uses sorted-edge `findTriNeighbors` to
+    // build stretch edge pairs + bend quads. Stores ids as `Int32Array`
+    // (type-consistent with `triIds: Int32Array`). Equivalent in output to the
+    // GPU/WASM path's `extractStretchConstraints` + `extractBendConstraints`
+    // (gpu/gpuBuffers.ts) but with a different dedup algorithm + different
+    // array type. Ratified as intentional cleavage in A4 Fase 2 § 3.2 — see
+    // `docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md`.
     const neighbors = findTriNeighbors(this.triIds);
     const numTris = this.triIds.length / 3;
     const edgeIdsList: number[] = [];

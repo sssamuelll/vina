@@ -48,7 +48,18 @@ function nextPrime(n: number): number {
 }
 
 /**
- * Spatial hash grid for O(n) rebuild, O(1) amortized neighbor queries.
+ * Spatial hash grid for particle-vs-particle self-collision (cloth ↔ itself).
+ *
+ * Domain: indexed by particle ID; counting-sort flat `Int32Array` cellStart +
+ * cellEntries. Rebuilt every frame from current positions (positions move
+ * every step). O(n) rebuild, O(1) amortized neighbor queries.
+ *
+ * Distinct from `TriangleSpatialHash` (triangleCollision.ts) which indexes
+ * triangle IDs for kinematic body collision. See A4 Fase 2
+ * (`docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md`
+ * § 2.4) for the role separation ratification.
+ *
+ * CPU-only: WASM tier lacks self-collision (gap tracked in #608, A7 § 3.1.1).
  */
 export class SpatialHashGrid {
   private invCellSize: number;

@@ -146,6 +146,12 @@ export function classifyEdgeType(uvA: [number, number], uvB: [number, number]): 
 /**
  * Extract stretch (distance) constraints from triangle mesh.
  * Each unique edge becomes a constraint.
+ *
+ * GPU/WASM-side topology extractor. Returns `Uint32Array` ids (compatible with
+ * both WebGPU storage buffers + Rust WASM `set_stretch_with_types` API). The
+ * CPU equivalent lives inline in `xpbdSolver.ts` constructor (lines ~421-456)
+ * with `Int32Array` ids and a sorted-edge dedup. See A4 Fase 2 § 3.2 for the
+ * cleavage ratification.
  */
 export function extractStretchConstraints(
   positions: Float32Array,
@@ -196,6 +202,13 @@ export function extractStretchConstraints(
  * Extract bending constraints from triangle mesh.
  * For each internal edge (shared by 2 triangles), create a bend constraint
  * between the 4 vertices of the two triangles.
+ *
+ * Returns rest **dihedral angles** (radians). The TSL/WebGPU bend solver
+ * consumes angles directly; the WASM and CPU solvers consume **distances**
+ * instead — WASM converts via `bendRestDistances.ts:computeBendRestDistances`
+ * at the worker boundary (BUG-1 fix, PR #604), CPU computes distances inline
+ * (xpbdSolver.ts:564-568). The angle/distance seam is ratified in A4 Fase 2
+ * § 2.5; the dual-extractor cleavage in § 3.2.
  */
 export function extractBendConstraints(
   positions: Float32Array,
