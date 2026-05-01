@@ -649,6 +649,415 @@ Sec 4 (next commit) gives the consolidated recommendation across A vs E vs F (wi
 
 ---
 
-## Sec 4+ pendiente
+---
 
-Sec 4 (Recomendación consolidada — la elección entre A vs E vs F + integration con 3.2 + commitment a 3.3), Sec 5 (Migration plan multi-step), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes.
+## 4. Recomendación consolidada
+
+### 4.1 Decision summary
+
+**Sub-decisión 3.1 (helper extraction shape):** **Opción E — disposer-ref hook `useDisposable(value)`.**
+
+**Sub-decisión 3.2 (cleanup at 2 missed sites):** **adopt** — cleanup added as part of the migration (orthogonal to 3.1 outcome).
+
+**Sub-decisión 3.3 (documentation strategy):** **adopt 3-layer ratify-by-default** (JSDoc + CLAUDE.md section + inline comments at site-of-introduction).
+
+**Confidence: medium-high.** A y F son alternative defendibles con tradeoffs genuinos. La calibración honest está en § 4.5.
+
+**Razones para E (en orden de importancia, NO inflated):**
+
+1. **Uniform pattern across 7 sites + future.** Heterogeneity en creation, NO en cleanup. E refleja esa estructura: caller computes the value as they need (pure / nullable / multi / wrapper / ref-store), hook just registers a disposer. Sin awkward fit en ningún site.
+
+2. **2-line ergonomic cost is bounded.** Vs F's 1-line on common case, E adds 1 extra line per site (4 of the 7 sites). Cost: 4 lines total. Permanent. Vs the F gain: 4 lines saved en common case. **Net ergonomic delta: zero.** F's "common case wins" argument depends on cognitive value of "1-line", not on line count math.
+
+3. **Lint rule enforceable (uniform shape).** "Every `useMemo` creating `new THREE.*Geometry` should be paired with `useDisposable(value)` on the same component" is a uniform structural pattern catchable by AST analysis. F's lint rule must distinguish helper-friendly vs helper-awkward sites by inspecting the useMemo body — significantly harder, more false-positive prone.
+
+4. **Future generalization to materials/textures (bonus, secondary).** Out of scope per § 1.2 — not deciding argument. But noted: if a future RFC extends to materials/textures lifecycle, E's API doesn't change (the hook accepts any `{ dispose(): void }`). F would need a parallel `useDisposableMaterial`. Bonus, not primary.
+
+### 4.2 Why not A or F (rejected con respect)
+
+#### A rejected (con respect)
+
+A counter-arguments are real and defendible:
+
+- N=7 sites is small; helper extraction can look like over-engineering.
+- 5/7 sites already inline-fixed correctly post-BUG-9; pattern exists, just needs enforcement + docs.
+- Zero abstraction cost.
+- Audit philosophy minimal-fix: real problem is 2 missed leaks (3.2) + docs (3.3); helper is "nice to have", not required.
+
+**Why E wins over A:**
+
+E captures the disposable pattern **explicitly** as a 1st-class API. A leaves it as **convention to memorize** — newcomer reads the pattern in place, but does not see that the pattern is canonical. The risk profile differs:
+
+- Under A, a new site introduced by a newcomer who didn't read every Viewport3D component first will silently leak (same shape as Sites 6, 7 missed by the BUG-9 fix). Code review catches it sometimes, lint rule under A is harder to write because there's no canonical helper name to anchor on.
+- Under E, the convention is `if you create a Three.js disposable in a component, call useDisposable(value)`. Greppable. Lint-rule-able. Discoverable.
+
+The 2-line cost of E is paid **once per site, upfront**, for **permanent discoverability**. The 7 current sites are small but the pattern grows as Three.js usage grows — A scales linearly with new-leak risk; E scales with bounded line count.
+
+#### F rejected (con respect)
+
+F counter-arguments are real and defendible:
+
+- 4/7 = 57% sites benefit from helper. Coverage is meaningful, not edge case.
+- Visual "1 line per common case" tiene cognitive value real, especially para readers nuevos.
+- Mixed pattern (helper + inline) **es como humans naturally organize** — common case extracted, variations inline. F refleja organic engineering.
+- Lint rule split is harder pero implementable: "useMemo creating BufferGeometry without useEffect cleanup AND not using useDisposableGeometry → warning".
+
+**Why E wins over F:**
+
+E is **uniform across all 7 sites + future sites**. F's ergonomic win is **bounded** (4 sites × 1 line saved = 4 lines total) but the **uniformity cost spans ALL sites permanently** — every reader of the codebase has to internalize the split rule "use helper here, inline there, the line of demarcation is multi-coupled / wrapper / external-ref".
+
+The split mental model has hidden costs F's articulation doesn't surface:
+
+- New sites added later may fall into either bucket; the dev has to make the call. Convention drift risk over time.
+- Reviewers have to verify the split was applied correctly. Sec 6 vs Sec 7 of the BUG-9 fix is exactly this kind of inventory miss — the "convention to memorize" failed at scale during the fix that landed it.
+- Lint rule for split is harder. Under F, the rule must AST-inspect the useMemo body to decide: pure → helper required; multi-coupled → helper not required; wrapper → helper not required. False positives + false negatives both harder to control. Under E, the rule is "useDisposable call exists" — pure structural.
+
+F is **organic** in that humans gravitate to common-case extraction. But uniformity wins when the convention is enforceable — exactly the problem at hand (a leak class went undetected for the BUG-9 inventory window).
+
+#### Confidence calibration on rejection
+
+A y F son ambos coherent decisions if adopted. The choice is preference for:
+
+- **Discoverability + enforcement (E)** vs ergonomic minimization on the common case (F) vs minimal abstraction (A).
+
+Sam may reasonably override to F or A based on weight differences. Sec 4.5 expands.
+
+### 4.3 Integration con 3.2 y 3.3
+
+The three sub-decisions integrate as follows:
+
+- **3.2 cleanup at 2 missed sites** is the immediate Pattern 2.5 extend mínimo. Under recommendation E, the cleanup at Sites 6, 7 takes the form `useDisposable(geometry)` (using the helper from 3.1). Under A, it would be `useEffect(() => () => geometry?.dispose(), [geometry])` inline. Same fix shape semantically; under E the call uses the canonical helper.
+
+- **3.3 documentation strategy** anchors E into the codebase via:
+  - **JSDoc on `useDisposable`** explaining the 7-site shapes covered, when to use it, why it returns `void` (does not abstract value computation).
+  - **CLAUDE.md section "Three.js disposable lifecycle"** with canonical pattern + decision rule + reopen triggers + cross-ref to this RFC.
+  - **Inline comments at site-of-introduction** when adding new Three.js disposables to React components: brief reminder + `useDisposable` call.
+
+The 3 layers are complementary: JSDoc serves grep + IDE hover; CLAUDE.md serves architectural intent + reopen criteria; inline comments serve reader at code-touch time.
+
+### 4.4 What changes for callers
+
+**Sites 1, 2, 4, 5 (currently `useMemo + useEffect inline cleanup`):**
+
+```tsx
+// Before (post-BUG-9):
+const bodyGeometry = useMemo(() => /* ... */, [measurements]);
+useEffect(() => () => bodyGeometry.dispose(), [bodyGeometry]);
+
+// After (post-C1):
+const bodyGeometry = useMemo(() => /* ... */, [measurements]);
+useDisposable(bodyGeometry);
+```
+
+Mechanical replacement: 1-line delta per site (replacing `useEffect(() => () => ..., [...])` con `useDisposable(...)`).
+
+**Site 3 (multi-geo coupled):**
+
+```tsx
+// Before:
+const { fineGeo, sectionGeo } = useMemo(() => /* ... */, [size, cellSize, sectionEvery]);
+useEffect(() => () => { fineGeo.dispose(); sectionGeo.dispose(); }, [fineGeo, sectionGeo]);
+
+// After:
+const { fineGeo, sectionGeo } = useMemo(() => /* ... */, [size, cellSize, sectionEvery]);
+useDisposable(fineGeo);
+useDisposable(sectionGeo);
+```
+
+Two `useDisposable` calls — semantically equivalent to the inline cleanup. No artifical decoupling because the useMemo is unchanged; only the cleanup registration is split into two declarations.
+
+**Sites 6, 7 (currently NO cleanup — leaks):**
+
+```tsx
+// SelectedVertexRenderer.tsx (Site 6):
+// Before:
+const geometry = useMemo(() => /* may return null */, [livePositions, selectedVertices]);
+// (no cleanup)
+
+// After:
+const geometry = useMemo(() => /* may return null */, [livePositions, selectedVertices]);
+useDisposable(geometry);
+```
+
+```tsx
+// ClothMesh.tsx (Site 7):
+// Before:
+const staticGeometry = useMemo(() => {
+  if (!meshData) return null;
+  const geo = new THREE.BufferGeometry();
+  // ... setup ...
+  geometryRef.current = geo;  // ← anti-pattern preserved (orthogonal to C1)
+  return geo;
+}, [meshData]);
+// (no cleanup)
+
+// After:
+const staticGeometry = useMemo(() => {
+  if (!meshData) return null;
+  const geo = new THREE.BufferGeometry();
+  // ... setup ...
+  geometryRef.current = geo;
+  return geo;
+}, [meshData]);
+useDisposable(staticGeometry);
+```
+
+Site 7's `geometryRef.current = geo` smell stays as-is — orthogonal to C1 (captured as deuda técnica § 8.1).
+
+**New sites going forward:**
+
+```tsx
+// Convention: any useMemo creating Three.js disposable should be followed by useDisposable.
+const geometry = useMemo(() => new THREE.SomeGeometry(...), [deps]);
+useDisposable(geometry);
+```
+
+CLAUDE.md section anchors this. Lint rule follow-up enforces gradually.
+
+### 4.5 Confidence calibration
+
+**Recommendation:** Opción E.
+
+**Confidence:** **medium-high.**
+
+**Why not high:** A y F are coherent alternatives. The calibration is not "E is obviously correct"; it's "E has the best balance of discoverability + enforceability + uniformity, but the tradeoffs are real". A reader who weights ergonomic minimization on common case (F) or minimal abstraction (A) more heavily can reasonably reach a different conclusion.
+
+**What would shift the recommendation:**
+
+- **F gains weight if:** a future inventory shows pure-recipe sites grow to dominate (e.g., 8/10 sites pure); the 1-line ergonomic gain becomes meaningful.
+- **A gains weight if:** the codebase exits Three.js (unlikely) OR if the 7 sites stop growing (helper extraction depreciates). Also if the lint rule under E proves false-positive prone in practice.
+- **E stays correct if:** new sites continue to be heterogeneous (mix of pure / nullable / multi / wrapper / ref); the uniform pattern keeps paying off as Three.js usage grows.
+
+**If Sam prefers F (split helper):** Sec 4.2 articulates F's strengths fairly; doc adjusts to recommend F with E + A as alternatives.
+
+**If Sam prefers A (no helper):** Sec 4.2 articulates A's strengths fairly; doc adjusts to recommend A. 3.2 (cleanup gaps) + 3.3 (docs) become the entire Fase 3 scope.
+
+The audit philosophy applies: **articulated reasoning > prior preference**. Sec 4 commits to E as my best read; Sam's verde or override is the final call.
+
+---
+
+## 5. Migration plan multi-step
+
+### 5.1 Branch + PR
+
+Continues on `drift/c1-rfc-buffer-lifecycle` branch (this branch). PR #673 stays as the rolling RFC + implementation surface.
+
+### 5.2 Commit sequence (atomic per audit rules)
+
+**Commit 1 — Extract `useDisposable` hook + unit tests.**
+
+Files:
+- `src/components/Viewport3D/hooks/useDisposable.ts` (new) — hook implementation + JSDoc.
+- `src/components/Viewport3D/hooks/__tests__/useDisposable.test.tsx` (new) — unit tests covering: dispose on unmount, dispose on value change, null-safe, no-double-dispose.
+
+Estimated size: ~80-100 lines (hook ~15 + JSDoc ~25 + tests ~50).
+
+**Why `src/components/Viewport3D/hooks/`?** Matches existing co-location precedent (`useMeshing`, `useGeometricPreview`, etc. all live in `src/components/Viewport3D/`). The hook is Three.js-specific; lifting it to `src/hooks/` would suggest broader applicability than current scope.
+
+If a future RFC extends to materials/textures (out of scope per § 1.2), the hook can move to a more general location at that time. YAGNI now.
+
+**Commit 2 — Migrate Sites 1-5 (BUG-9 inline → `useDisposable`).**
+
+Files:
+- `src/components/Viewport3D/Mannequin.tsx` (Sites 1, 2).
+- `src/components/Viewport3D/FloorGrid.tsx` (Site 3).
+- `src/components/Viewport3D/PieceMesh.tsx` (Site 4).
+- `src/components/Viewport3D/GarmentSimulation.tsx` (Site 5).
+
+Mechanical replacement of inline cleanup with `useDisposable(value)` calls. Existing test (`Mannequin.test.tsx`) should pass unchanged (semantic equivalence).
+
+Estimated size: ~10 lines net delta (5 sites × ~2 lines each, mostly removals).
+
+**Commit 3 — Cleanup gaps at Sites 6, 7 + adopt `useDisposable`.**
+
+Files:
+- `src/components/Viewport3D/SelectedVertexRenderer.tsx` (Site 6 — first-time cleanup).
+- `src/components/Viewport3D/ClothMesh.tsx` (Site 7 — first-time cleanup).
+
+Adds `useDisposable(geometry)` after each useMemo. **This is the Pattern 2.5 extend mínimo — sub-decision 3.2 implementation.**
+
+Estimated size: ~6 lines additions (2 imports + 2 calls + minor whitespace).
+
+Note on Site 7 ref-store smell: do NOT touch the `geometryRef.current = geo` inside the useMemo. That's deuda técnica orthogonal to C1 (§ 8.1) — moving it would expand scope.
+
+**Commit 4 — Documentation: CLAUDE.md section + cross-ref + inline.**
+
+Files:
+- `CLAUDE.md` — new section "Three.js disposable lifecycle (C1 ratified)".
+- `src/components/Viewport3D/hooks/useDisposable.ts` — JSDoc finalized (commit 1 includes initial JSDoc; this commit polishes after seeing migration scenarios).
+
+Estimated size: ~50-80 lines (CLAUDE.md section ~50; JSDoc polish ~5).
+
+CLAUDE.md section follows the precedent established by other ratifications (e.g., "Persistence policy (B6-state ratified)", "Cascade middleware patterns (B3-state ratified)"). Includes:
+- Canonical pattern + when to use.
+- Inventory snapshot.
+- Decision rule for new sites.
+- Reopen triggers.
+- Cross-ref to this RFC + BUG-9 input doc.
+
+**Commit 5 (optional) — Lint rule scaffold or follow-up issue.**
+
+Two paths:
+
+- **Path A (preferred):** open follow-up issue tracking lint rule implementation. Add to the existing lint-rule cluster (#659, #662, #664). Bundle with those when implemented.
+- **Path B (alternate):** scaffold custom eslint rule in a separate package directory if the team wants immediate enforcement. Higher cost; deferred unless Sam requests.
+
+Estimated default: Path A (follow-up issue, no code).
+
+### 5.3 Verification
+
+**Type check:** `npx tsc -b --noEmit` clean after each commit.
+
+**Test suite:** `npm run test` clean after each commit. Existing test (`Mannequin.test.tsx`) covers Site 1 dispose semantic; new tests in commit 1 cover the helper itself.
+
+**Lint:** `npm run lint` clean after each commit.
+
+**Manual verification (optional, post-migration):** browser DevTools Memory tab snapshot before/after triggering geometry recreation 100x (e.g., adjust avatar measurements 100 times). Memory should plateau, not grow linearly. NOT required per Sam's directive (§ 2.4 — structural verification suffices); listed only as optional bonus check.
+
+### 5.4 Rollback plan
+
+Each migration commit is mechanically reversible. If issues emerge post-merge:
+- Revert commits 2 + 3 (migrations) → returns to inline-cleanup pattern at Sites 1-5; Sites 6, 7 lose their cleanup (leak returns).
+- Keep commit 1 (helper exists, unused).
+- Keep commit 4 (docs anchor to commit 1's helper, still valid).
+
+If full rollback desired: revert commits 1-4. RFC doc stays as historical record.
+
+---
+
+## 6. Cross-references
+
+### 6.1 Input docs + commits cited in this RFC
+
+- `docs/reports/2026-04-28-c1-rfc-input-bug9-analysis.md` — input doc generated during BUG-9 inline fix; documents 5 leak sites + variation summary.
+- `docs/reports/2026-04-28-drift-fase2-classification.md` — places C1 in (c) RFC bucket.
+- `docs/reports/2026-04-29-drift-inventory-addendum.md` § 7 — confirms BUG-9 input data still valid as of 2026-04-29.
+- BUG-9 fix commit `f6c974f1` — "fix: BUG-9 inline dispose for Three.js geometry leaks at 5 sites (#612)".
+- BUG-1 fix commit `ed632b9` (#604) — adjacent precedent for "small adapter at the boundary" decision shape (cited in § 2.5).
+
+### 6.2 Methodology rules applied
+
+- **Regla 1 v2** (read contents, don't list directories) — applied in § 2 sweep extension; surfaced Sites 6, 7.
+- **Regla 1 v3** (verify divergence, don't assume uniformity by grep + look outside obvious directory) — applied to confirm Sites 6, 7 share the structural shape of BUG-9 sites.
+- **Regla 1 v3 sub-rule** (sub-sweeps son contextuales, no autoritativos) — anchored: BUG-9 sub-sweep was contextual to the fix; C1 sweep is authoritative for this eje.
+- **Inventory drift overestimation pattern (meta-anchor)** — applied inversely: inventory was lower bound; sweep found +40% sites. Pattern still holds (current 65%+ ratify-by-convention closures); C1 doesn't move that needle but contributes a Pattern 2.5 extend variant data point.
+- **Pattern 2.5 hybrid variants** — C1 fits **extend** variant (per A3 sub-rule anchored 2026-05-01): pattern existing legitimate (inline `useEffect dispose`), gaps en cobertura at 2 sites (3.2), helper extraction adds discoverability (3.1) without restructuring the existing pattern semantics.
+- **Process discipline (stop → notify → wait → execute)** — applied at sweep extension (paused before Sec 3 redaction, reported inventory + framing preview, awaited Sam verde).
+
+### 6.3 Adjacent eje precedents
+
+- **D7 (ValidationDiagnostic vs Diagnostic)** — same shape as C1 § 1.2 deferral of materials/textures: ortogonal lifecycles → ratify separados, no force unify.
+- **B11-state IDs canonical** — example of Real-fix (a) ratification with full migration (39 archivos). C1 is smaller scope (~7 sites + helper).
+- **A3 cross-boundary error handling** — Pattern 2.5 extend variant precedent. C1 follows: pattern legitimate, coverage gaps in specific sites, helper extension adds without restructuring.
+- **B2-state entity collections** — forward-only convention precedent. C1 follows: existing 5 BUG-9 sites preserved + canonical helper for new and migrated sites.
+- **B6-state IDB persistence** — opt-in envelope precedent (per-site ratification with inline comment). C1's lint rule follow-up + CLAUDE.md section establishes equivalent ratification surface.
+
+---
+
+## 7. Reopen triggers
+
+C1 reopens if any of the following surfaces:
+
+1. **N≥3 materials/textures lifecycle leak sites uncovered** that don't fit `useDisposable`'s `{ dispose(): void }` shape — opens RFC-C1bis or sub-decision dedicated to materials/textures lifecycle.
+
+2. **A new Three.js disposable shape emerges** that doesn't fit any of the inventoried 7 site variations (e.g., RenderTarget in useMemo, ShaderMaterial in useMemo, dynamic-import lazy disposable). If `useDisposable` covers the new shape uniformly, no reopen needed; if it doesn't, reopen to extend the helper or the convention.
+
+3. **Lint rule under E generates >5% false positives** after 1 month warning-only — reopen to evaluate split-rule (per F's enforcement model) or to relax the canonical convention.
+
+4. **Site 7's ref-store anti-pattern (`geometryRef.current = geo` inside useMemo) generates a real bug** — reopen to address the deferred deuda técnica § 8.1 (currently scope-orthogonal).
+
+5. **`useDisposable` becomes a hot path overhead** (the per-render `useEffect` registration measurable in profiling) — unlikely given the small N, but listed for completeness.
+
+6. **Sam reverses the recommendation** to A or F based on Sec 4.2 counter-arguments weighted differently — doc updates accordingly, follow-up commits adjust.
+
+7. **Inventory of `useMemo` creating Three.js disposables grows past 20 sites** — re-evaluate whether E's uniform pattern still serves or whether a sub-classification emerges (e.g., a "common pure" subset that warrants F's helper layer alongside the uniform `useDisposable`).
+
+---
+
+## 8. Deuda técnica explícita post-unify
+
+### 8.1 Site 7 — `geometryRef.current = geo` inside useMemo (anti-pattern)
+
+`ClothMesh.tsx:382-391` assigns `geometryRef.current = geo` inside the useMemo body. This is a side-effect inside a memoization callback — anti-pattern (useMemo should be pure). The assignment is needed because other useEffects in the component (line 339 per-frame position update; line 372 fit-map color attribute) require synchronous access to the geometry via the ref.
+
+**Why deferred:** orthogonal to C1 scope. Fixing it requires either:
+- Moving the ref assignment to a `useEffect(() => { geometryRef.current = staticGeometry; }, [staticGeometry])` — adds a frame of latency before `geometryRef.current` is set, which the per-frame mutation may not tolerate.
+- Refactoring the component to not rely on the ref pattern (large refactor, scope creep).
+
+**When to revisit:** if Site 7 generates a real bug (race condition between the useMemo and the per-frame mutation), reopen as its own follow-up. Track via inline comment + this section.
+
+### 8.2 Sew3DTool ref-based older idiom not migrated retroactively
+
+`Sew3DTool.tsx:77-98` (PiecePickMesh) uses `useMemo + prevGeoRef + useEffect-on-unmount` (per § 2.3.5). Functionally equivalent to BUG-9 inline pattern but shape distinct. Under E, it would migrate to `useMemo + useDisposable(value)` opportunistically.
+
+**Why deferred from initial migration:** retroactive migration of older idioms is opportunistic per B2-state precedent ("when a callsite is touched for another reason, prefer the canonical"). Forced migration risks scope creep + code review burden disproportionate to benefit.
+
+**When to migrate:** next time `Sew3DTool.tsx` is touched for another reason. Track via inline comment after migration of Sites 1-7.
+
+### 8.3 Lint rule pending follow-up issue
+
+Sec 5.2 commit 5 deferred to follow-up issue (Path A preferred). Until lint rule lands, enforcement is via:
+- Code review.
+- CLAUDE.md section as architectural anchor.
+- JSDoc on `useDisposable` as IDE hover guidance.
+
+**When to implement:** bundle with existing lint-rule cluster (#659, #662, #664) when the team implements them. C1 follow-up issue references the cluster.
+
+### 8.4 Materials/textures lifecycle deferred
+
+Per § 1.2 + reopen trigger § 7.1. If drift emerges with N≥3 sites in materials/textures, RFC-C1bis or sub-decision dedicated. Until then, materials lifecycle (`EdgeHighlight`, `GarmentSimulation` TSL material) and textures lifecycle (`TextureManager`) are out of scope.
+
+---
+
+## 9. Pregunta a Sam + estado + calibración
+
+### 9.1 Pregunta para verde de Fase 3
+
+**¿Verde para Sec 4 recommendation E con confidence medium-high articulado?**
+
+Posibles respuestas:
+- **A (verde directo):** procedo con Sec 5 commits 1-4 (helper + migrations + cleanup gaps + docs). Lint rule (commit 5) deferred to follow-up issue.
+- **B (override a F):** Sec 4 redacta con F como recommendation; Sec 5 ajusta scope (helper covers Sites 1, 2, 4, 6 only; Sites 3, 5, 7 stay inline; cleanup gaps add inline cleanup only).
+- **C (override a A):** Sec 4 redacta con A como recommendation; Sec 5 simplifica a "cleanup gaps + CLAUDE.md docs only", no helper extraction.
+- **D (más discusión):** specific aspect of Sec 4 needs more articulation before committing — pause and refine.
+
+### 9.2 Estado del eje
+
+- **Sec 1+2+3+4-9:** complete.
+- **Doc total:** ~1000 líneas (within Sam estimate 600-900, slightly over due to comprehensive Sec 4 articulation con respect a A y F counter-arguments).
+- **Branch:** `drift/c1-rfc-buffer-lifecycle`.
+- **PR:** #673 draft.
+- **Awaiting:** Sam verde para Sec 5 implementation.
+
+### 9.3 Calibración estimate vs actual
+
+**Sam pre-redacción estimate (kickoff):** 4-6h doc Fase 2 + 1-3h Fase 3.
+
+**Actual Fase 2 (this RFC):**
+- Sweep extension: ~30min (input doc lectura + +2 sites discovery).
+- Sec 1-2 redacción: ~1h.
+- Sec 3 articulación 6 opciones: ~1.5h.
+- Sec 4-9 redacción: ~1h.
+- **Total Fase 2: ~4h.** Within estimate (lower end). Ratio ~0.8x of nominal.
+
+**Estimated Fase 3 (Sec 5 commits 1-4):**
+- Commit 1 (helper + tests): ~45min.
+- Commit 2 (migrate Sites 1-5): ~30min.
+- Commit 3 (cleanup gaps Sites 6, 7): ~15min.
+- Commit 4 (CLAUDE.md + JSDoc): ~30min.
+- **Total Fase 3: ~2h.** Mid-range of estimate (1-3h).
+
+**Total eje runtime:** ~6h Fase 2 + Fase 3 combined. On Sam's calibration (~5-7h ejes (c) RFCs).
+
+### 9.4 Pattern 2.5 extend variant data point
+
+C1 confirms the Pattern 2.5 extend variant anchored 2026-05-01 (post A3) generalizes:
+
+- **A3 (cross-boundary error handling):** pattern existing legitimate (defensive Rust + CPU fallback + TS NaN guards), gaps en cobertura (panic_hook missing, UI surface absent, NaN telemetry counter absent), cleanup = add coverage to gaps without refactoring pattern.
+- **C1 (Three.js buffer lifecycle):** pattern existing legitimate (inline `useEffect dispose` post-BUG-9), gaps en cobertura (2 missed sites + lack of canonical name for discoverability), cleanup = add cleanup at 2 sites + extract canonical helper for discoverability without refactoring the pattern semantics.
+
+**Both reify the same shape:** pattern legitimate + add coverage to gaps + extract canonical for discoverability/enforcement. C1 contributes a second concrete data point. If a third Pattern 2.5 extend case emerges with the same shape, the variant generalizes from anchor → established sub-rule.
+
+---
+
+**FIN DEL RFC C1 (Fase 2).** Awaiting Sam verde para Sec 5 implementation.
