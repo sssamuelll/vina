@@ -165,6 +165,11 @@ function applySolverConfig(): void {
       'forcing false. Use the CPU solver tier for self-collision. Tracking: #608, A7 RFC.'
     );
   }
+  // Architectural location (A7 ratified, § 3.1.6): substeps=1 hardcoded
+  // because JS-side outer loop manages substep cadence. CPU TS solver
+  // (xpbdSolver.ts:1447) has internal adaptive substeps (10-30 based on
+  // velocity); JS-side adaptive cadence for WASM tier queued as A7
+  // follow-up. Cross-ref A7 RFC § 3.1.6.
   solver.configure(
     1,  // substeps=1: JS manages substep loop for per-substep collision
     currentConfig.damping,
