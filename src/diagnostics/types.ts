@@ -111,7 +111,7 @@ export type DiagnosticSeverity = 'info' | 'warning' | 'critical' | 'error';
  * For load-time validation, use `ValidationDiagnostic` from
  * `src/utils/projectValidator.ts`.
  *
- * Cross-ref: D7 ratification doc, CLAUDE.md "Diagnostic types".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d7-validation-diagnostic-types.md`.
  */
 export interface Diagnostic {
   severity: DiagnosticSeverity;

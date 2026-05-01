@@ -6,9 +6,7 @@
  * UI consumers gate feature toggles or surface tier-aware warnings based on
  * `capabilities`. Capability flags update as port follow-up issues land.
  *
- * Cross-ref:
- * - `docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md` (full RFC).
- * - `CLAUDE.md` § "WASM vs CPU solver capabilities (A7 ratified)".
+ * Cross-ref: `docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md` (full RFC).
  *
  * **Skeleton scope (A7 closure):** these constants reflect the post-A7-closure
  * state. Full implementation (dynamic capability negotiation, per-instance

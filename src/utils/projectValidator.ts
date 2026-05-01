@@ -39,7 +39,7 @@ export type ValidationCode =
  * For runtime user inspection (right-click → Inspect), use `Diagnostic`
  * from `src/diagnostics/types.ts`.
  *
- * Cross-ref: D7 ratification doc, CLAUDE.md "Diagnostic types".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d7-validation-diagnostic-types.md`.
  */
 export interface ValidationDiagnostic {
   severity: 'error' | 'warning' | 'info';

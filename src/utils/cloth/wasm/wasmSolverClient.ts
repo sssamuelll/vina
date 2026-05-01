@@ -22,7 +22,7 @@
  *   `wasmNaNCount` (worker-scope; not surfaced to client by default — debug
  *   API can be added if frequency monitoring needed in production).
  *
- * Cross-refs: A3 Fase 2 doc, CLAUDE.md "Cross-boundary error handling".
+ * Cross-ref: `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md`.
  *
  * @module wasmSolverClient
  */

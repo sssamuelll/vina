@@ -8,7 +8,6 @@
  *
  * Cross-ref:
  * - `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` (full RFC).
- * - `CLAUDE.md` § "Cloth solver client interface (A6 ratified)".
  * - `solverCapabilities.ts` — A7 capability skeleton extended with
  *   `frameDriven` flag (Constraint B of A6 § 3.1).
  *

@@ -204,8 +204,7 @@ function safeClone<T>(value: T): T | null {
  * guard: batchDepth counter suppresses snapshots inside explicit batches
  * undo: this middleware IS the grouping mechanism for other cascades
  * cap-depth: n/a (self-dispatch is idempotent — each editor/undo consumes stack)
- * cross-ref: CLAUDE.md "Cascade middleware patterns",
- *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
+ * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`,
  *            BUG-7 fix-options doc (batch grouping precedent)
  */
 export const undoMiddleware: Middleware = (store) => (next) => (action: any) => {

@@ -20,10 +20,10 @@
  *
  * - **Zero-copy positions reads** (hot path): `Float32Array` views over WASM
  *   memory. No Result types in signatures — fallibility implicit. Forward-only
- *   convention: new fallible exports use Result-pattern (see CLAUDE.md
- *   "Cross-boundary error handling" + `projectSchema.ts:411` precedent).
+ *   convention: new fallible exports use Result-pattern (see A3 doc
+ *   + `projectSchema.ts:411` precedent).
  *
- * Cross-refs: A3 Fase 2 doc, CLAUDE.md "Cross-boundary error handling".
+ * Cross-ref: `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md`.
  *
  * @module wasmSolverWorker
  */
@@ -203,7 +203,7 @@ const FRAME_BUDGET_MS = 14;
  * console.warn (first occurrence + every 100th cumulative) avoids spam while
  * surfacing the signal.
  *
- * Cross-ref: A3 Fase 2 doc Sec 3.3.A, CLAUDE.md "Cross-boundary error handling".
+ * Cross-ref: `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md` Sec 3.3.A.
  */
 let wasmNaNCount = 0;
 

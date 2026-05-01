@@ -105,8 +105,7 @@ function debouncedPersist(getState: () => unknown) {
  *
  * Holds 3 sub-cascadas — see @cascade headers per branch below.
  *
- * cross-ref: CLAUDE.md "Cascade middleware patterns",
- *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
+ * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`
  */
 export const confirmationMiddleware: Middleware = (storeApi) => (next) => (rawAction: unknown) => {
   const action = rawAction as ActionLike;

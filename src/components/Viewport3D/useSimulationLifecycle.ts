@@ -57,8 +57,7 @@
  * }
  *
  * Cross-ref: `src/utils/cloth/solverProtocol.ts` (interface),
- *            `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` § 4.5,
- *            CLAUDE.md § "Cloth solver client interface (A6 ratified)".
+ *            `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` § 4.5.
  */
 
 import { useRef, useEffect, useCallback, useState } from 'react';

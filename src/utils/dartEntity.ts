@@ -14,7 +14,7 @@
  * live here intentionally — concentrating bridge + ops in a single
  * cohesive module.
  *
- * Cross-ref: D1-real ratification doc, CLAUDE.md "Dart representation".
+ * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d1real-dart-internalline.md`.
  *
  * @module dartEntity
  */

@@ -81,8 +81,7 @@ function locatePieceForAction(action: ActionLike, state: ProjectStateShape): Pat
  * guard: module-level boolean isSyncing (prevents re-entrance)
  * undo: batch grouped via undo/startBatch/endBatch (BUG-7 #610 precedent)
  * cap-depth: 1 (isSyncing bypasses re-entry; partner dispatches no-op)
- * cross-ref: CLAUDE.md "Cascade middleware patterns",
- *            docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md
+ * cross-ref: `docs/reports/2026-04-30-drift-fase2-b3state-cascade-middleware.md`
  */
 export const linkedEditingMiddleware: Middleware = (store) => (next) => (action: unknown) => {
   if (isSyncing) return next(action);
