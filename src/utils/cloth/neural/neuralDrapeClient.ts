@@ -17,6 +17,7 @@
  */
 
 import { type SolverCapabilities, NEURAL_CAPABILITIES } from '../solverCapabilities';
+import type { ClothSolverClient } from '../solverProtocol';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -73,7 +74,7 @@ const DEFAULT_CONFIG: Required<NeuralDrapeConfig> = {
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 
-export class NeuralDrapeClient {
+export class NeuralDrapeClient implements ClothSolverClient {
   private config: Required<NeuralDrapeConfig>;
   private ort: OrtModule | null = null;
   private session: OrtSession | null = null;

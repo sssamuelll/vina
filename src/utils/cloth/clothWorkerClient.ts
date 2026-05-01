@@ -10,6 +10,7 @@
 import type { ClothSimConfig, SphereCollider, CapsuleCollider } from './xpbdSolver';
 import type { WorkerInMessage, WorkerOutMessage, SeamInitData } from './clothWorker';
 import { type SolverCapabilities, CPU_CAPABILITIES } from './solverCapabilities';
+import type { ClothSolverClient } from './solverProtocol';
 
 /**
  * Callback for receiving simulation frames.
@@ -30,7 +31,7 @@ export type FrameCallback = (positions: Float32Array, numParticles: number, triI
  * client.dispose();
  * ```
  */
-export class ClothWorkerClient {
+export class ClothWorkerClient implements ClothSolverClient {
   private worker: Worker | null = null;
   private readyResolve: (() => void) | null = null;
   private readyReject: ((e: Error) => void) | null = null;

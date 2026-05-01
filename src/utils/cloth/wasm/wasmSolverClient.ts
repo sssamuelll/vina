@@ -30,6 +30,7 @@
 import type { SeamInitData } from '../clothWorker';
 import type { CollisionMeshData } from '../collisionMesh';
 import { type SolverCapabilities, WASM_CAPABILITIES } from '../solverCapabilities';
+import type { ClothSolverClient } from '../solverProtocol';
 
 export interface PieceMeshData {
   pieceId: string;
@@ -65,7 +66,7 @@ export interface WasmSolverConfig {
   internalDamping?: number;
 }
 
-export class WasmSolverClient {
+export class WasmSolverClient implements ClothSolverClient {
   private worker: Worker | null = null;
   private readyResolve: (() => void) | null = null;
   private readyReject: ((e: Error) => void) | null = null;

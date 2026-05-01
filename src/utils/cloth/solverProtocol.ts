@@ -21,8 +21,6 @@
  */
 
 import type { SolverCapabilities } from './solverCapabilities';
-import type { SeamInitData } from './clothWorker';
-import type { PieceMeshData } from './wasm/wasmSolverClient';
 
 // Re-export cross-tier shared types (A6 § 3.1 Constraint A — shared types
 // location). The origen sigue siendo el archivo donde fueron definidos
@@ -57,6 +55,17 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  * `getPositionStorageAttribute`, etc. Consumer casts to concrete type when
  * tier-specific access is needed.
  *
+ * **Callbacks NOT in the interface** (live on concrete classes by convention):
+ * `onFrame`, `onReady`, `onError`, `onEdgeData`. All 4 tiers expose these
+ * fields by convention but signatures vary slightly per tier (CPU's
+ * `FrameCallback` carries `(positions, numParticles, triIds)`; WASM/GPU/
+ * Neural use `(positions)` only). Consumer code that wires callbacks must
+ * assign per concrete-class type; polymorphic dispatch via this interface
+ * is restricted to the lifecycle subset above. A future migration toward
+ * uniform callback signatures (e.g., emit `numParticles`/`triIds` via a
+ * separate `onMeshData` event) is a possible follow-up but explicitly
+ * out of A6 scope.
+ *
  * **Setter migrations queued** (post-A6, decoupled per § 3.6.C):
  * - `#XXX` setWind canonical signature with capability gate.
  * - `#YYY` setPins canonical batch shape (with caveat below).
@@ -86,25 +95,16 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
 export interface ClothSolverClient {
   // ─── Lifecycle ──────────────────────────────────────────────────────
 
-  /**
-   * Initialize the solver with merged multi-piece mesh data and optional
-   * seam connections + tier-specific config.
-   *
-   * @param pieces Array of per-piece mesh data (vertices, triIds, optional
-   *   uvs, etc.).
-   * @param seams Optional seam connections between pieces. Tiers that don't
-   *   model seams (e.g., Neural) silently ignore.
-   * @param config Optional tier-specific solver config. Type is `unknown`
-   *   on the interface; concrete classes type-narrow to their respective
-   *   config shape (`ClothSimConfig`, `WasmSolverConfig`, `GpuSolverConfig`,
-   *   `NeuralDrapeConfig`). A2 RFC may canonicalize cross-tier in the future.
-   * @returns Resolves when the solver is ready to receive subsequent calls.
-   */
-  initMultiPiece(
-    pieces: PieceMeshData[],
-    seams?: SeamInitData[],
-    config?: unknown,
-  ): Promise<void>;
+  // **NOTE: `initMultiPiece` is NOT in this interface.** Init shape diverges
+  // structurally per tier (CPU+WASM `seams: SeamInitData[]`; GPU
+  // `seamPairs: { pieceAId, pieceBId, vertexPairs }[]`; Neural takes only
+  // `pieces`). Forcing a uniform init signature would require runtime
+  // translation in GPU client (cost: behavioral change, scope creep
+  // beyond A6 closure). All 4 concrete classes DO expose
+  // `async initMultiPiece(pieces, ...): Promise<void>` by convention,
+  // but with tier-specific subsequent params. Polymorphic init dispatch
+  // is consumer responsibility — see `#UUU consumer migration`
+  // follow-up for a factory-pattern unification.
 
   /**
    * Start the simulation loop.
@@ -126,30 +126,6 @@ export interface ClothSolverClient {
    * — both shapes are compatible with `await`.
    */
   dispose(): void | Promise<void>;
-
-  // ─── Callbacks (settable) ───────────────────────────────────────────
-
-  /**
-   * Frame callback — invoked when the solver produces new positions.
-   *
-   * For postMessage tiers (CPU/WASM), invoked on `frame` postMessage receive.
-   * For main-thread tiers (Neural), invoked from internal animation loop.
-   * For frame-driven tiers (GPU/TSL), invoked from consumer's `useFrame`
-   * (typically after `renderer.compute(...)` dispatches).
-   */
-  onFrame?: (positions: Float32Array) => void;
-
-  /** Ready callback — invoked when `initMultiPiece` completes successfully. */
-  onReady?: () => void;
-
-  /**
-   * Error callback — invoked on solver errors (init failure, runtime error,
-   * GPU device lost, model load failure).
-   *
-   * Currently `string` only. Future migration to structured shape (per
-   * A6 § 3.3 + `#VVV` follow-up) will pass `SolverError` instead.
-   */
-  onError?: (msg: string) => void;
 
   // ─── Capabilities ───────────────────────────────────────────────────
 

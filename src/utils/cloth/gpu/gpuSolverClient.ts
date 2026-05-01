@@ -17,6 +17,7 @@ import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolv
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
+import type { ClothSolverClient } from '../solverProtocol';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
@@ -38,7 +39,7 @@ export interface GpuSolverClientCallbacks {
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 
-export class GpuSolverClient {
+export class GpuSolverClient implements ClothSolverClient {
   private solver: GpuClothSolver;
   private running: boolean = false;
   private animFrameId: number | null = null;
