@@ -5,15 +5,44 @@
  * Uses ONNX Runtime Web (loaded from CDN) for neural cloth prediction,
  * with an analytical drape fallback when no model is available.
  *
- * Architecture:
- * - Input: garment mesh vertices (flat) + body pose (joint angles)
- * - Output: predicted draped vertex positions
- * - Model: PBNS/HOOD-style network (ONNX format, ~2-10MB)
- * - Fallback: analytical gravity drape (fast but less accurate)
+ * **Architecture:**
+ * - Input: garment mesh vertices (flat) + body pose (joint angles).
+ * - Output: predicted draped vertex positions.
+ * - Model: PBNS/HOOD-style network (ONNX format, ~2-10MB).
+ * - Fallback: analytical gravity drape (fast but less accurate).
  *
- * Drop-in replacement for GpuSolverClient / WasmSolverClient / ClothWorkerClient.
+ * **Interface contract (post-A6 Constraint C resolution — partial enforce + partial reframe):**
+ *
+ * Implements `ClothSolverClient` (cf. `../solverProtocol.ts`) for the
+ * **lifecycle subset**: `start()`, `stop()`, `dispose()`, and `capabilities`.
+ * The original "Drop-in replacement" claim is now **type-enforced for that
+ * subset** — TypeScript guarantees Neural can substitute any other
+ * `ClothSolverClient` for those four members.
+ *
+ * The "drop-in" framing was previously aspirational across the FULL surface
+ * (init + callbacks + setters); A6 § 4.5 documented why that's structurally
+ * unenforceable without behavioral changes (init seam shape divergence; CPU
+ * 3-arg `FrameCallback` vs single-arg shape; per-tier setter divergence).
+ * Those parts remain **by-convention only** until the `#UUU-init` +
+ * `#UUU-callbacks` consumer migration follow-ups land. Specifically:
+ *
+ * - `initMultiPiece(pieces)` — Neural takes no seams, no config. CPU/WASM
+ *   take `SeamInitData[]` + tier-specific config; GPU takes a different
+ *   `seamPairs` shape. Polymorphic init = consumer responsibility.
+ * - `onFrame: (positions: Float32Array) => void` — Neural's single-arg
+ *   shape matches WASM/GPU but NOT CPU's 3-arg `FrameCallback`. Consumer
+ *   wiring must reconcile per-tier.
+ * - All physics setters (snapshots, wind, pins, fabric, gravity) are
+ *   tier-specific concrete-class methods, NOT in the interface. Neural
+ *   exposes none of these — it's ML inference, not a physics solver.
+ *
+ * **Capability surface:** all physics flags `false`; `frameDriven: false`
+ * (Neural manages its own animation loop via `requestAnimationFrame`).
+ * See `NEURAL_CAPABILITIES` for the full declaration + rationale.
  *
  * @module neuralDrapeClient
+ * @see docs/reports/2026-05-01-rfc-a6-worker-protocol.md § 4.5
+ * @see ../solverProtocol.ts (ClothSolverClient interface)
  */
 
 import { type SolverCapabilities, NEURAL_CAPABILITIES } from '../solverCapabilities';
