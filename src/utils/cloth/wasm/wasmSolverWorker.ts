@@ -167,6 +167,17 @@ let preCollisionBuf: Float32Array | null = null;
 
 const FRAME_BUDGET_MS = 14;
 
+/**
+ * A3 Sec 3.3.A: telemetry counter for NaN detected in WASM positions buffer.
+ * Pre-existing NaN guard (lines below) silently reset to prevPos; this counter
+ * adds debugability — counts cumulative NaN occurrences post-step. Rate-limited
+ * console.warn (first occurrence + every 100th cumulative) avoids spam while
+ * surfacing the signal.
+ *
+ * Cross-ref: A3 Fase 2 doc Sec 3.3.A, CLAUDE.md "Cross-boundary error handling".
+ */
+let wasmNaNCount = 0;
+
 /** Maximum particle velocity (m/s). Matches JS solver's maxVelocity.
  * Without this, the Rust solver's 900Hz substep rate amplifies constraint
  * corrections into extreme velocities that compound exponentially. */
@@ -243,16 +254,19 @@ function simulationLoop(): void {
       }
 
       // NaN guard: if any position went NaN, reset to previous valid positions.
-      let hasNaN = false;
+      // A3 Sec 3.3.A: added telemetry counter — was silent reset, now signals
+      // cumulative NaN occurrences via rate-limited console.warn.
+      let nanThisStep = 0;
       for (let i = 0; i < n3; i++) {
         if (posView[i] !== posView[i]) {
-          hasNaN = true;
-          break;
+          posView[i] = prevView[i];
+          nanThisStep++;
         }
       }
-      if (hasNaN) {
-        for (let i = 0; i < n3; i++) {
-          if (posView[i] !== posView[i]) posView[i] = prevView[i];
+      if (nanThisStep > 0) {
+        wasmNaNCount += nanThisStep;
+        if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
+          console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (collision branch)`);
         }
       }
 
@@ -330,6 +344,30 @@ function simulationLoop(): void {
         posView[j3] -= correction * nx;
         posView[j3 + 1] -= correction * ny;
         posView[j3 + 2] -= correction * nz;
+      }
+    }
+
+    // A3 Sec 3.3.A: NaN guard in non-collision branch (parallel to collision
+    // branch above). Pre-A3 only collision branch had guard — non-collision
+    // path could propagate NaN positions to render. Now consistent across
+    // branches with shared telemetry counter `wasmNaNCount`.
+    if (wasmExports?.memory) {
+      const posPtr = solver.positions_ptr();
+      const prevPtr = solver.prev_positions_ptr();
+      const posView = new Float32Array(wasmExports.memory.buffer, posPtr, n * 3);
+      const prevView = new Float32Array(wasmExports.memory.buffer, prevPtr, n * 3);
+      let nanThisStep = 0;
+      for (let i = 0; i < n * 3; i++) {
+        if (posView[i] !== posView[i]) {
+          posView[i] = prevView[i];
+          nanThisStep++;
+        }
+      }
+      if (nanThisStep > 0) {
+        wasmNaNCount += nanThisStep;
+        if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
+          console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (no-collision branch)`);
+        }
       }
     }
 
