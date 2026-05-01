@@ -1028,11 +1028,17 @@ Pattern 2.5 hybrid emerges when intentional pattern coexists con surgical drift 
 
 - **2.5 lite** (D4 CopilotPanel composition): intentional pattern (dual representation) coexists con minor drift (dual maintenance inline at N sites). Cleanup = surgical helper que captura el pattern + migrate N callsites. Code delta typically ~10-20 líneas net.
 
-Both variants ratify the underlying pattern as intentional; differ in shape of cleanup needed. Distinct from Pattern 1 (which would refactor the pattern itself, not just clean up artifacts).
+- **2.5 extend** (A3 cross-boundary errors): pattern existing legitimate (defensive Rust + CPU fallback + distributed TS NaN guards) but **coverage has gaps** in specific surfaces (preventive `panic_hook` missing, silent fallback UI surface absent, NaN telemetry counter absent at WASM→JS boundary, contracts implícitos sin Result-pattern convention). Cleanup = **add coverage** to the gaps without refactoring the pattern. Code delta typically positive (additions only) — distinct from cleanup (negative delta) y lite (small surgical net).
+
+Three variants ratify the underlying pattern as intentional; differ in shape of cleanup needed. Distinct from Pattern 1 (which would refactor the pattern itself, not just clean up artifacts or add coverage).
 
 **Diagnóstico:** ¿el "drift" es artifact (Pattern 2.5) o substantive (Pattern 1)? Si removing the artifact preserves the pattern's intent → Pattern 2.5. Si removing requires re-designing the pattern → Pattern 1.
 
 **Origen:** D4 (CopilotPanel `messages` + `memoryRef` dual representation) — 2 dual-paired sites donde `setMessages + memoryRef.addMessage` viven inline sin abstraction. Surgical fix = `recordMessage` helper que concentra la coordination (~5-8 líneas net change). Pattern (dual UI/persistent representation) ratificado as intentional; helper cleanup surgical sin scope creep.
+
+**Origen 2.5 extend (A3):** xpbd-wasm Rust crate (defensively written, 0 panic paths, CPU fallback existente) + TS workers (distributed NaN guards en CPU/GPU/collision subsystems). Sweep refutó 2/3 inventario claims empíricamente — pattern existing legitimate. Drift = **gaps en cobertura** específicos: missing `console_error_panic_hook` preventive, silent fallback `wasmSolverWorker.ts:402-407` "positions will be zero" sin UI surface, NaN telemetry counter ausente at WASM→JS boundary (existing collision-branch guard had no counter; non-collision branch had no guard at all), Result-pattern convention sin documentar para new fallible exports. Cleanup = add coverage to each gap (1 Cargo dep + UI surface + telemetry counter + extend non-collision branch + Result convention forward-only). Pattern (defensive Rust + CPU fallback + TS guards) ratificado as intentional; coverage extends to gaps sin restructuring.
+
+**Diagnostic refinement:** ¿el "drift" puede addresarse con additions sin restructuring del pattern existente? → Pattern 2.5 extend. ¿Removing artifacts? → Pattern 2.5 cleanup. ¿Surgical helper para inline pattern? → Pattern 2.5 lite. Si requires restructuring → Pattern 1.
 
 ### Distinguishing re-implementation from intentional feature
 
