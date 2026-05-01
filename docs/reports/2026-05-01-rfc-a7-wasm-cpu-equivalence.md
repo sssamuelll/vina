@@ -220,6 +220,354 @@ For clarity, the following adjacent concerns are explicitly out of A7 scope:
 
 ---
 
-## Sec 3+ pendiente
+---
 
-Sec 3 (6 sub-decisiones articuladas con per-feature analysis y tradeoffs explícitos), Sec 4 (recomendación consolidada per-feature), Sec 5 (Migration plan multi-step), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes.
+## 3. Sub-decisiones (parte 1 — § 3.1)
+
+Six sub-decisiones ortogonales. § 3.1 (per-feature classification) es load-bearing — su outcome cascadea sobre 3.2-3.6. Por eso este commit articula 3.1 only; 3.2-3.6 vienen en commit subsiguiente para review granular.
+
+### 3.1 Per-feature classification
+
+Per Sam directive, cada feature articulada con 5 fields:
+
+1. **Current status** (CPU / WASM / architectural diff).
+2. **Port cost estimate** (Rust líneas + complexity factor).
+3. **Use case** (cuándo se usa el feature; UX impact).
+4. **Decision space** ((a) port to WASM / (b) ratify CPU-only-by-design + UI surface / (c) defer to A7' o C4).
+5. **Recommendation con calibration honest** (alta / media / baja confianza, A y B alternatives respetadas).
+
+The 5 real feature gaps get the full decision space. The 2 architectural differences (adaptive substeps location, velocity clamp location) get simpler ratify articulation (NOT port questions per § 1.2 + Sam directive).
+
+#### 3.1.1 Self-collision (BUG-5 absorbed) — special sub-granularity (4 sub-options)
+
+**Current status:** CPU has full implementation (`src/utils/cloth/selfCollision.ts` referenced from `xpbdSolver.ts:14`; activation at line 1126). WASM has scaffolding (`self_collision: bool` field + `set_adjacency` setter), **no `solve_self_collision` function**. JS-side worker forces `selfCollision: false` con explicit warning (`wasmSolverWorker.ts:159-165`) cita "BUG-5 (#608), A7 RFC".
+
+**Port cost estimate:** ~200-400 Rust líneas (algorithm: SpatialHashGrid data structure + collision detection + collision response + neighbor skipping via adjacency). Complexity factor: **medium-high** — not just translation, requires data structure design choice (Vec-based hash buckets vs alternative). Reference is the CPU TS implementation; algorithm is well-known.
+
+**Use case:** needed for any cloth that can fold over itself — sleeves, pleats, body-hugging garments, multi-layer drapes. High visual impact when missing: cloth passes through itself, layered garments collapse onto avatar without visual depth, pleats resolve incorrectly. **Production frequency: high** (any non-trivial garment).
+
+**Sub-decision space (4 sub-options per § 2.3):**
+
+##### (a) Port complete algorithm to Rust
+
+**Pros:**
+- Closes BUG-5 #608 definitively.
+- Default tier (WASM) gains feature parity for high-impact UX feature.
+- Existing Rust scaffolding (~30L flag + setter) leveraged, not wasted.
+- Algorithm well-known; CPU TS is reference; NaN guards (A3) cover boundary.
+
+**Cons:**
+- Highest port cost of the 5 features (~200-400L Rust + spatial hash data structure + tests + integration).
+- Spatial hash data structure design adds A4 territory overlap (cross-language data structure parity question).
+- Estimated implementation: ~10-15h Fase 3.
+
+**Confidence shift if selected:** A7 closure shape becomes Pattern 1-leaning real-fix for self-collision specifically (other features may stay extend variant).
+
+##### (b) Hybrid: scaffolding + JS-side spatial hash + Rust collision response
+
+**Pros (articulated honest, expected to be rejected):**
+- Spatial hash stays in JS (where SpatialHashGrid is already implemented). Rust handles only the collision response math (per-particle constraint solve).
+- Avoids cross-language data structure design.
+- Incremental — could be a stepping stone to (a) later.
+
+**Cons:**
+- **Architectural smell.** Per-step JS↔Rust round-trip for every cloth particle pair: build hash in JS, send candidate pairs to Rust as flat array, Rust solves per-pair, returns position deltas to JS. Cost dominated by serialization, not solve.
+- Cache locality lost. The CPU TS implementation iterates the spatial hash + solves collision in the same hot loop, exploiting CPU cache. Splitting forces multiple passes.
+- Defeats the WASM speed advantage. The presumed reason to port to WASM is performance; (b) erases that by making serialization the bottleneck.
+- Hybrid code is harder to reason about, harder to test, harder to debug.
+
+**Likely outcome:** **Rejected.** Worst-of-both-worlds. Articulated honest because Sam directive: "(b) es probable smell — articulalo honest aunque lo descartes."
+
+##### (c) Defer entirely to A7' o BUG-5 dedicated work
+
+**Pros:**
+- Zero A7 implementation cost.
+- A7 closes scope-clean, focused on the other 4 feature gaps.
+
+**Cons:**
+- BUG-5 #608 stays OPEN indefinitely.
+- The "use the CPU tier for self-collision" workaround in `wasmSolverWorker.ts:165` becomes permanent without explicit ratification.
+- High-impact UX feature gap silently persists for default tier users.
+
+**Likely outcome:** **Disrecommended** if A7 selects (a) for any other feature — A7 should not be inconsistent (port some, defer self-collision). If A7 selects (b)-CPU-only-by-design across all features, then (c) for self-collision is consistent with that philosophy. Otherwise (c) is uncomfortable scope-clipping.
+
+##### (d) Ratify CPU-only-by-design (close BUG-5 con explicit rationale)
+
+**Pros:**
+- Closes BUG-5 #608 (different shape than (a), but closure is closure).
+- Forces explicit UX surface: "self-collision requires CPU tier; switching tiers" warning when user enables self-collision config + is on WASM tier.
+- Frees A7 from highest-cost port; aligns with B6-state ratify-by-convention precedent.
+
+**Cons:**
+- Requires explicit rationale for CPU-only — "spatial hash performance-bounded, WASM port doesn't materially improve perf" is the most defensible argument, but **unverified** (no WASM-vs-CPU bench data, per § 2.5).
+- Tier choice forced upon user: enable self-collision → switch to CPU tier (slower). User UX degraded.
+- Existing Rust scaffolding becomes dead code; commit removing the dead `set_adjacency` + flag is a follow-up.
+
+**Likely outcome:** Defensible if performance argument is strong (which would require bench data we don't have). Otherwise (a) is preferable.
+
+##### Self-collision sub-recommendation (preview, formal en § 4)
+
+**Lean: (a) Port complete algorithm to Rust.** Confidence: **medium**.
+
+Reasoning:
+- Scaffolding ya invertida (~30L) — port leverages existing Rust footprint.
+- Algorithm well-known + reference exists in CPU.
+- Closes BUG-5 con clear closure.
+- (b) hybrid es smell, (c) is uncomfortable scope-clipping if any other feature gets (a), (d) requires unverified perf argument.
+
+**Counter:** if Fase 3 estimate balloons past ~15h or if the spatial hash data structure design opens A4 overlap (cross-language data structure question), revisit (d) with explicit perf bench.
+
+#### 3.1.2 LRA (Long Range Attachments)
+
+**Current status:** CPU has full implementation (`src/utils/cloth/longRangeAttachments.ts` 189 lines — Dijkstra geodesic distance from pinned vertices + soft constraint enforcement). Activation at `xpbdSolver.ts:1133` ("LRA as hard limit after all soft constraints"). WASM **not in API** (no field, no setter, no warning).
+
+**Port cost estimate:** ~300-400 Rust líneas (Dijkstra over typed arrays + binary min-heap priority queue + constraint enforcement). Complexity factor: **medium** — algorithmic translation; CPU TS uses optimized binary heap (per PR #589). Reference exists; deterministic algorithm.
+
+**Use case:** prevents stretchy cloth from looking unrealistic when pinned at multiple points (e.g., a long sleeve hanging from a shoulder pin droops indefinitely without LRA). Quality feature for realism. **Production frequency: medium-high** (any pinned garment with significant span).
+
+**Decision space:**
+
+##### (a) Port to WASM
+
+**Pros:**
+- Closes the silent-absence gap — currently WASM users get LRA disabled without knowing.
+- Algorithm is self-contained (single file, no cross-cutting state in CPU implementation).
+- PR #589 demonstrated the binary-heap design is performant; same shape ports cleanly.
+
+**Cons:**
+- 300-400 Rust líneas — second-largest port after self-collision.
+- LRA is rebuilt periodically (`rebuildLRA()` line 663) — need to expose a `rebuild_lra` setter from WASM with similar invalidation semantics.
+- Dijkstra priority queue ports require typed-array choices in Rust (Vec<u32> + custom heap, or `BinaryHeap<Reverse<...>>`); design choice non-trivial.
+
+##### (b) Ratify CPU-only-by-design + UI surface
+
+**Pros:**
+- CPU LRA is already fast (8.1× speedup post-PR #589, ~14ms at N=20000).
+- WASM LRA gains may be marginal (15-30% perhaps, not 8×).
+- Lower implementation cost: docs + UI surface saying "LRA on WASM tier currently unsupported, switch to CPU tier for LRA-enabled cloth".
+
+**Cons:**
+- Quality feature gap persists for default tier.
+- Inconsistent with (a)-self-collision (if A7 picks (a) for self-collision, why not LRA?).
+- "WASM doesn't help here" requires bench data we don't have.
+
+##### (c) Defer to A7' o C4
+
+Same shape as self-collision (c) — A7 doesn't address LRA, BUG-related issue stays open if filed.
+
+**LRA sub-recommendation (preview):**
+
+**Lean: (a) Port to WASM.** Confidence: **medium-low**.
+
+Reasoning:
+- Algorithm well-known + self-contained.
+- Closes silent-absence gap (currently users don't know LRA is off).
+- Cost moderate (~300-400L) but bounded.
+
+**Counter:** CPU LRA is already fast post-PR-589. If WASM port doesn't deliver materially better perf (requires bench), (b) is preferable on cost-benefit. **Lower confidence than self-collision** because the perf argument matters more here (LRA is rebuilt on dep changes; self-collision runs every step).
+
+#### 3.1.3 Pressure (per-piece)
+
+**Current status:** CPU has full implementation: `setPiecePressures` (lines 974-1026, ~52L) + `applyPressureForces` (lines 1033-1085+, ~50-80L) + `particlePressure: Float32Array` storage + `triNormalSign: Int8Array` for outward normal flipping. Activation at `xpbdSolver.ts:798` ("Apply internal pressure (inflation) forces"). WASM **not in API**.
+
+**Port cost estimate:** ~120-150 Rust líneas (per-piece config + per-particle pressure storage + per-triangle normal sign + force application math). Complexity factor: **low-medium** — math is straightforward (cross product + force distribution to 3 vertices); per-piece bookkeeping uses vertex offsets/counts (already a pattern in WASM solver via `set_pins` indices).
+
+**Use case:** garment inflation effect — puffer jackets, balloon sleeves, lampshade skirts. **Stylistic UX feature**, niche. Production frequency: low-medium (specific garment styles).
+
+**Decision space:**
+
+##### (a) Port to WASM
+
+**Pros:**
+- Smallest of the 3 algorithmic ports (~120-150L vs 200-400 for self-collision and 300-400 for LRA).
+- Math is parallelizable (per-triangle force distribution is independent across triangles).
+- Self-contained — only depends on `pos`, `triIds`, `invMass` (all already in WASM struct).
+- Closes silent-absence gap.
+
+**Cons:**
+- UX impact bajo (stylistic feature, not quality-critical).
+- The per-piece normal-sign computation (`triNormalSign`) adds bookkeeping that's tied to the rest pose (computed once on init); needs careful invalidation if `restPos` changes.
+
+##### (b) Ratify CPU-only-by-design + UI surface
+
+**Pros:**
+- Stylistic feature; users on WASM tier likely don't enable pressure.
+- Defer cost; revisit if user demand emerges.
+
+**Cons:**
+- Inconsistency with other features if A7 picks (a) elsewhere.
+- Silent-absence persists.
+
+##### (c) Defer
+
+Same shape as before.
+
+**Pressure sub-recommendation (preview):**
+
+**Lean: (a) Port to WASM.** Confidence: **medium**.
+
+Reasoning:
+- Lowest port cost of the 3 algorithmic gaps.
+- Math straightforward, parallelizable.
+- Closes silent-absence gap.
+
+**Counter:** UX impact bajo (stylistic), so (b) defensible on cost-benefit if Fase 3 budget is tight. But the cost is low enough that (a) likely wins.
+
+#### 3.1.4 Fold (bending compliance overrides)
+
+**Current status:** CPU has `setFoldConstraints` (lines 1212-1244, ~33L) + `clearFoldConstraints` (lines 1247-1252, ~6L). Mechanism: modifies existing bending constraints' rest length + compliance to encode target crease angle. NOT a separate solve step — overlay on existing bend constraints. WASM **not in API**.
+
+**Port cost estimate:** ~40-50 Rust líneas (lookup map for edge → bending constraint index + per-fold rest length / compliance override + reset mechanism via saved originals). Complexity factor: **low** — modifies arrays already present in WASM struct (`bend_rest_angles`, `bend_compliance` after BUG-1 fix).
+
+**Use case:** target dihedral angles for crisp creases (origami-style folds, structured pleats). **Stylistic UX feature**, niche. Production frequency: low (specific pattern designs).
+
+**Decision space:**
+
+##### (a) Port to WASM
+
+**Pros:**
+- Smallest port (~40-50L).
+- Trivial mechanism (lookup + array modify).
+- Closes silent-absence gap.
+
+**Cons:**
+- Stylistic feature; UX impact bajo.
+
+##### (b) Ratify CPU-only-by-design + UI surface
+
+**Pros:**
+- Stylistic; users likely don't enable on WASM tier.
+- Defer cost.
+
+**Cons:**
+- Silent-absence persists.
+
+##### (c) Defer
+
+Same shape.
+
+**Fold sub-recommendation (preview):**
+
+**Lean: (b) Ratify CPU-only-by-design + UI surface.** Confidence: **low-medium**.
+
+Reasoning:
+- Stylistic feature with low production frequency.
+- Cost-benefit weak even at small port size — most users won't notice the absence.
+- (b) is consistent with audit philosophy "minimal-fix when feature impact is bounded" (B5-state precedent).
+
+**Counter:** if A7 closes consistently across features (a)-port-all, fold ports cheaply. If cost budget is generous, (a) is fine. **Lowest-impact feature in the inventory.**
+
+#### 3.1.5 Piece stiffness (per-piece compliance multipliers)
+
+**Current status:** CPU has `applyPieceStiffness` (lines 588-628, ~40L). Mechanism: divides stretch and bend compliance for constraints whose vertices belong to a piece by the per-piece multiplier. Called once after init; modifies arrays in place. WASM **not in API**.
+
+**Port cost estimate:** ~30-50 Rust líneas (vertex-to-piece lookup table + per-constraint compliance scaling + max-stiffness selection across vertex pieces). Complexity factor: **low** — trivial array modify.
+
+**Use case:** per-piece variation in fabric stiffness (e.g., interfaced collar vs main body, structured shoulder vs relaxed sleeve). **Common feature** for realistic garment construction. Production frequency: medium-high.
+
+**Decision space:**
+
+##### (a) Port to WASM
+
+**Pros:**
+- Smallest port (~30-50L).
+- Trivial implementation (modifies existing compliance arrays).
+- Closes silent-absence gap for a common production feature.
+
+**Cons:**
+- Need to expose `apply_piece_stiffness` setter from WASM and decide on call timing (after init? after each fabric change?).
+
+##### (b) Ratify CPU-only-by-design + UI surface
+
+**Pros:**
+- Defer cost.
+
+**Cons:**
+- Common production feature; silent-absence has higher UX impact than fold/pressure.
+
+##### (c) Defer
+
+Same shape.
+
+**Piece stiffness sub-recommendation (preview):**
+
+**Lean: (a) Port to WASM.** Confidence: **medium-high**.
+
+Reasoning:
+- Smallest port cost in the inventory (~30-50L, lower than even fold).
+- Common production feature (interfaced collar, structured shoulder, etc.).
+- Trivial implementation; bounded complexity.
+
+**Counter:** if A7 closes (b)-all to maintain pattern uniformity, this gets ratified. But uniformity for its own sake is weak argument here — port cost is small enough that (a) is the cleaner choice.
+
+#### 3.1.6 Adaptive substeps (architectural difference, NOT port question)
+
+**Current status:** CPU has `adaptiveSubsteps: boolean` config + logic at line 1447 (10-30 substeps based on max velocity). WASM Rust core has no adaptive logic; `wasmSolverWorker.ts:169` hardcodes Rust internal substeps to 1, manages outer substep loop in JS side. JS-side currently uses fixed `substeps: 15` (from `wasmSolverWorker.ts:136`).
+
+**Decision space (NOT (a)/(b)/(c) per Sam directive — this is architectural ratify, not port question):**
+
+##### (b)-architectural — Ratify JS-side substep management as canonical for WASM tier
+
+**Pros:**
+- JS-side already has the substep loop machinery (fixed at 15).
+- Adapting cadence in JS-side is straightforward (compute max velocity post-step, scale next-step's substep count). Adds ~10-15 lines to `wasmSolverWorker.ts:218-310` step loop.
+- Avoids touching Rust core for a JS-side decision (substep count is orchestration, not physics).
+
+**Cons:**
+- JS-side max velocity computation requires reading positions + previous positions on every step — already done for NaN guard, so essentially free.
+- The "fixed 15" hardcoded value loses adaptive benefit (CPU adapts 10-30); if not addressed, this is silent quality regression.
+
+**Recommendation:** **Adopt (b) with explicit follow-up to add JS-side adaptive cadence to `wasmSolverWorker.ts`.** Confidence: **high** (architectural location is clear, work is small and bounded).
+
+The follow-up work (~10-15 lines in `wasmSolverWorker.ts` to compute max velocity post-step + scale next-step substep count) is in scope of A7 Fase 3 if A7 closes consistently. Out of scope for ports of features 1-5; but in scope for "ratify architectural diffs" track.
+
+#### 3.1.7 Velocity clamp (architectural difference, ALREADY parity)
+
+**Current status:** CPU has `maxVelocity: 5.0` clamp in `postSolve` (lines 1373, 1457). WASM Rust core has no `maxVelocity` clamp; JS-side wrapper applies clamping post-step at `wasmSolverWorker.ts:332` ("Clamp velocity magnitude to prevent explosions. The Rust solver's post_solve has no maxVelocity clamp..."). Effectively parity; just architectural location difference.
+
+**Decision space:**
+
+##### (b)-architectural — Ratify current parity
+
+**Pros:**
+- Already parity at the user-observable level; both tiers clamp to 5 m/s by default.
+- The location difference is documented inline in `wasmSolverWorker.ts:332`.
+- Zero work to ratify; just § 3.5 doc of the architectural choice.
+
+**Cons:**
+- The architectural choice is undocumented in any RFC or canonical anchor. § 3.5 closes this gap.
+
+**Recommendation:** **Adopt (b)-architectural ratify. Zero implementation cost.** Confidence: **high**.
+
+#### 3.1.8 Per-feature decision summary table
+
+| Feature | Lean | Confidence | Cost (Fase 3) |
+|---|---|---|---|
+| **Self-collision** | **(a) Port complete** | medium | ~10-15h (200-400L Rust + tests) |
+| **LRA** | **(a) Port to WASM** | medium-low | ~8-12h (300-400L Rust + tests) |
+| **Pressure** | **(a) Port to WASM** | medium | ~4-6h (120-150L Rust + tests) |
+| **Fold** | **(b) Ratify CPU-only + UI surface** | low-medium | ~1-2h (UI surface + docs) |
+| **Piece stiffness** | **(a) Port to WASM** | medium-high | ~2-3h (30-50L Rust + tests) |
+| **Adaptive substeps** | **(b)-architectural ratify + JS-side adaptive** | high | ~1-2h (10-15 JS líneas + tests) |
+| **Velocity clamp** | **(b)-architectural ratify (already parity)** | high | 0h (docs only) |
+
+**Aggregated outcome (preview, formal en § 4):**
+
+- 4 ports (self-collision, LRA, pressure, piece stiffness) — ~24-36h Fase 3 estimate.
+- 1 ratify CPU-only (fold) — ~1-2h.
+- 2 architectural ratifications (adaptive substeps + velocity clamp) — ~1-2h combined.
+- **Total Fase 3 estimate: ~26-40h** if all 4 ports executed.
+
+**Pattern 2.5 extend mixed shape confirmed:** 4 ports + 1 ratify CPU-only + 2 architectural ratifies + 0 deferrals. Mixed per-feature decisions, no uniform port-all or ratify-all.
+
+**Tercer Pattern 2.5 extend data point** (post-A3, post-C1): if A7 closes in this shape, sub-rule established 2/2 → confirmation redundant 3/3. The aggregate cost (~26-40h) is significantly larger than the previous 2 data points (A3 ~5h, C1 ~6h); but the pattern shape is identical (existing legitimate, gaps in coverage, extract canonical / add coverage without restructuring).
+
+**Calibration note:** the recommendation lean is preview, not commit. Fold + LRA are weakest confidence — Sam's verde or override on those specifically would help. § 3.2 (interface) and § 3.4 (parity testing) decisions in the next commit may further inform per-feature decisions if cost shifts dramatically.
+
+---
+
+## Sec 3 (parte 2 — § 3.2-3.6) pendiente
+
+Sec 3b (interface decision + flag granularity bounded CPU-vs-WASM + parity testing strategy + documentation strategy + roadmap implications) en commit subsiguiente. **Awaiting Sam verde on § 3.1 per-feature classification before continuing.**
+
+Sec 4 (recomendación consolidada per-feature + integration), Sec 5 (Migration plan multi-step), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes post-Sec 3b.
