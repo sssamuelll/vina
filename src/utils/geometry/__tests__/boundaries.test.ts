@@ -38,4 +38,20 @@ describe('importerToMetres', () => {
     importerToMetres(scene);
     expect(scene.scale.x).toBeCloseTo(0.002, 10);
   });
+  it('scales scene.position alongside scale (mm → m)', () => {
+    const scene = new Object3D();
+    scene.position.set(100, 1800, -50);
+    importerToMetres(scene);
+    expect(scene.position.x).toBeCloseTo(0.1, 10);
+    expect(scene.position.y).toBeCloseTo(1.8, 10);
+    expect(scene.position.z).toBeCloseTo(-0.05, 10);
+  });
+  it('leaves position at origin untouched (off-feet pivot regression guard)', () => {
+    const scene = new Object3D();
+    scene.position.set(0, 0, 0);
+    importerToMetres(scene);
+    expect(scene.position.x).toBe(0);
+    expect(scene.position.y).toBe(0);
+    expect(scene.position.z).toBe(0);
+  });
 });

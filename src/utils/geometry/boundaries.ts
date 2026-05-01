@@ -21,10 +21,19 @@ export function metresToImporter(metres: number): number {
 /**
  * Apply mm → m scale to a Three.js scene returned by importMesh.
  *
- * importMesh emits scenes in mm coordinate space. This mutates the scene's
- * top-level scale so the rendered tree matches Three.js metre convention.
+ * importMesh emits scenes in mm coordinate space — both geometry AND the
+ * top-level `scene.position` (set by importMesh's centering pass to feet-on-
+ * ground in mm units). This mutates both `scale` and `position` so the
+ * rendered tree matches Three.js metre convention.
+ *
+ * Scaling `scale` alone leaves `position` at mm magnitude, which the parent
+ * frame interprets as metres — placing the scene 1000× off (e.g., an avatar
+ * with hip-pivot source lands at y ≈ 900 m instead of 0.9 m). Both must
+ * convert symmetrically.
+ *
  * Caller should follow with `scene.updateMatrixWorld(true)` before reads.
  */
 export function importerToMetres(scene: Object3D): void {
   scene.scale.multiplyScalar(0.001);
+  scene.position.multiplyScalar(0.001);
 }
