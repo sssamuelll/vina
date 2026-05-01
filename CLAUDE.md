@@ -757,6 +757,70 @@ Reopen D3 if:
 4. 9th zod schema file introduced with use case outside the 3 niches — evaluate if a new niche emerges.
 5. Second consumer of measurement-input-paired pattern (range + number paired + static min/max from config + simple onChange) — reabrir D3 § 3.2 (`MeasurementInput` extract decision).
 
+## CopilotPanel composition (D4 ratified)
+
+Cross-ref: `docs/reports/2026-05-01-drift-fase2-d4-copilotpanel-composition.md` (full Fase 2 doc with 3 sub-decisiones, 11 useState classified, dual representation analysis).
+
+`CopilotPanel.tsx` is a coordination layer (368 lines, 11 useState) — **NOT a mega-component**. UI presentation already extracted into 10 sub-components + 2 hooks for separate concerns.
+
+### Architecture
+
+```
+src/components/CopilotPanel/
+├─ CopilotPanel.tsx ............. coordination layer (11 useState, 368 lines)
+│
+├─ Sub-components (10) .......... UI presentation (already extracted)
+│  ├─ CopilotHeader, CopilotInput, CopilotMessages, CopilotEmptyState
+│  ├─ CopilotConfirmDialog, CopilotToast, CopilotPlanView, CopilotActionLog
+│  └─ CopilotSidePanel, CopilotUIOverlay, ProgressMessage/
+│
+├─ Hooks (2 separate concerns) .. NOT chat state
+│  ├─ useCopilotKeyboardShortcuts (Escape key handler)
+│  └─ useCopilotUI (action feedback for copilot agent actions)
+│
+└─ recordMessage helper ......... dual-write coordination (D4 ratified)
+   └─ inline useCallback (1 consumer, YAGNI for full hook extraction)
+```
+
+### 11 useState classification
+
+| Bucket | useState | Persistence |
+|---|---|---|
+| **UI state** (5) | `isOpen`, `showSettings`, `isFullscreen`, `isMobile`, `expandedTools` | None (transient) |
+| **Settings state** (2) | `agentConfig`, `providerConfig` | **IDB persistent** (hydrated async on mount) |
+| **Run state** (2) | `isLoading`, `sessionCostLabel` | None (transient) |
+| **Session/display** (1) | `messages` | None — **dual con `memoryRef`** (see below) |
+| **Input state** (1) | `input` | None (transient) |
+
+### Dual representation: `messages` + `memoryRef`
+
+Two intentional representations of the conversation:
+
+| Layer | What | Persistence |
+|---|---|---|
+| `messages: DisplayMessage[]` (useState) | UI rendering with `toolCalls` metadata (success status) | Transient — cleared on unmount/project switch |
+| `memoryRef.current: ProjectMemory` (useRef) | LLM context with `toolsCalled` (just names) | Persistent — `localStorage` (`openclo_memory_<projectId>`), MAX_MESSAGES=50 rolling window |
+
+**Bridge: `recordMessage` helper** concentrates the dual maintenance. Writes both `setMessages` + `memoryRef.addMessage`. `memoryRef.current.save()` called explicitly at end of turn to batch persistence.
+
+**Why dual?** UI shows current session messages (visual freshness, no clutter on reopen). Persistent memory preserves LLM context for stronger continuity across sessions. Distinct lifecycles, distinct shapes (DisplayMessage UI vs CopilotMessage memory).
+
+### UI re-hydration on mount: pending product decision
+
+Current behavior: on panel close + reopen, `messages` useState starts empty `[]` while `memoryRef.current.messages` has persisted history. UI does not re-hydrate from memory automatically.
+
+**Status:** current behavior is **NOT documented as intentional** for the panel-close case. The comment at `CopilotPanel.tsx:155` ("Clear UI messages when switching projects to prevent cross-project context leak") applies to project switch only. UX decision pending — see follow-up issue.
+
+### Reopen triggers
+
+Reopen D4 if:
+
+1. **Second consumer of coordination logic** (e.g., new mobile panel, alternative chat UI) — reabrir 3.1 evaluating full `useCopilotChat` hook extraction with N=2 evidence.
+2. **`recordMessage` helper grows past ~10 lines** (e.g., adding rate limiting, retry logic) — evaluate if full hook extraction now justifies.
+3. **Product decides UI re-hydration policy** (issue resolved) — reabrir 3.3 with decision + JSDoc/code change.
+4. **Third dual-paired site emerges** (e.g., system message persistence + UI display) — reabrir 3.1 evaluating hook extraction.
+5. **`messages` useState diverges semantically from `memoryRef` data** (UI displays graphics not in CopilotMessage shape) — evaluate new bridge module pattern (similar to `dartEntity.ts`).
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
