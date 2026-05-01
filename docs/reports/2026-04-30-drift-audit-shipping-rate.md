@@ -1,14 +1,14 @@
 # Drift audit shipping rate (2026-04-27 → 2026-05-01)
 
-**Snapshot, no análisis.** Captura el throughput observado del audit hasta el cierre del primer (c) RFC.
+**Snapshot, no análisis.** Captura el throughput observado del audit hasta el cierre del segundo (c) RFC.
 
-**Última actualización:** post-merge C1 (PR #673). **Primer RFC bloque (c) CERRADO.** 21 ejes acumulados. Próxima actualización: cuando se cierre el segundo (c) RFC o E-async-states sub-track milestone.
+**Última actualización:** post-merge A7 (PR #675). **Segundo RFC bloque (c) CERRADO.** 22 ejes acumulados. Próxima actualización: cuando se cierre el tercer (c) RFC o E-async-states sub-track milestone.
 
 ---
 
 ## Ejes
 
-**Cerrados:** 21 ejes acumulados (incluye sub-cierres B10-state Par 1+2).
+**Cerrados:** 22 ejes acumulados (incluye sub-cierres B10-state Par 1+2).
 
 | ID | Cierre | Tipo |
 |---|---|---|
@@ -33,12 +33,13 @@
 | **D4** | **Pattern 2.5 lite** (CopilotPanel composition: recordMessage helper + dual representation docs) | **(b) decisión** |
 | **A3** | **Pattern 2.5 extend** (cross-boundary error handling: panic_hook + UI surface + NaN telemetry + Result convention) | **(b) decisión** |
 | **C1** | **Pattern 2.5 extend** (Three.js useDisposable hook + 7 sites migrated + 2 leak gaps fixed; sub-rule established 2/2 data points consistent) | **(c) RFC** |
+| **A7** | **Pattern 2.5 extend** (WASM vs CPU equivalence: 3 ports queued + 2 ratify-CPU-only-with-UI + 2 architectural; capability surface skeleton + decoupled F3 — primer use bloque (c); sub-rule promoted to robust pattern 3/3 data points) | **(c) RFC** |
 
-**Categorías:** 7 mecánicos + 13 (b) decisión + **1 (c) RFC**.
+**Categorías:** 7 mecánicos + 13 (b) decisión + **2 (c) RFCs**.
 
 **Bloque (a) mecánicos cerrado completamente.** 7/7 mecánicos closed.
 **Bloque (b) entero CERRADO completamente.** 13/13 (b) closed (incluye state, dominio, arquitectónico).
-**Bloque (c) primer RFC cerrado.** 1/6 (c) closed.
+**Bloque (c) progress: 2/6 RFCs cerrados (C1 + A7).** 4 restantes: A2, A4, A6, C4.
 
 ---
 
@@ -52,11 +53,11 @@
 
 ## Documentación
 
-- 21 Fase 2 docs (ratifications + decision docs + 1 RFC).
+- 22 Fase 2 docs (ratifications + decision docs + 2 RFCs).
 - 2 notas fix-options (BUG-7, BUG-10).
 - 1 inventory addendum (2026-04-29).
-- 1 audit shipping rate (este doc, ya updated post-C1).
-- **~14000-15000 líneas de doc en 5+ días** (delta C1: +1063 RFC doc + ~75 CLAUDE.md C1 section + 19 Pattern 2.5 sub-rule established + ~3 inventory annotation).
+- 1 audit shipping rate (este doc, ya updated post-A7).
+- **~15500-16500 líneas de doc en 5+ días** (delta A7 post-C1: +1499 RFC doc + 70 CLAUDE.md A7 section + 32 Pattern 2.5 robust pattern promotion + 7 inventory annotation + 56 shipping rate update).
 
 ---
 
@@ -66,7 +67,7 @@
 - Regla 1 v3 — Verify divergence, don't assume uniformity by grep + look outside obvious directory.
 - Regla 1 v3 sub-section — Sub-sweeps son contextuales, no autoritativos.
 - **Inventory drift overestimation pattern** (meta-anchor, anchored 2026-04-30 after 10 ratify-by-convention closures).
-- **Pattern 2.5 hybrid variants** (sub-rule, anchored 2026-05-01 after D4): cleanup (D6) + lite (D4) + **extend (A3 ratified, C1 confirmed — sub-rule established 2/2 data points)**.
+- **Pattern 2.5 hybrid variants** (sub-rule, anchored 2026-05-01 after D4): cleanup (D6) + lite (D4) + **extend (A3 + C1 + A7 — sub-rule promoted to robust pattern 3/3 data points consistent shape, post-A7)**.
 - Audit philosophy — when to fix the real problem vs align for consistency.
 - Verifying external infrastructure without implicit truncation.
 - Inventory misclassification is itself drift to capture.
@@ -83,18 +84,29 @@
 - CopilotPanel composition (D4 ratified).
 - **Cross-boundary error handling (A3 ratified).**
 - **Three.js disposable lifecycle (C1 ratified).**
+- **WASM vs CPU solver capabilities (A7 ratified).**
 
-**22 secciones / regla anchored** (delta: +1 desde snapshot previo — C1 Three.js disposable lifecycle; plus Pattern 2.5 extend variant promoted to **established** sub-rule status with second data point).
+**23 secciones / regla anchored** (delta: +1 desde snapshot previo — A7 WASM vs CPU solver capabilities; plus Pattern 2.5 extend variant **promoted to robust pattern** with third data point 3/3 consistent).
 
 ---
 
 ## Issues open as follow-up
 
-**~26 follow-up issues abiertos** post-cierre acumulado.
+**~32 follow-up issues abiertos** post-cierre acumulado.
 
-Lint-rule cluster: #659 (@cascade), #662 (fabric target slice), #664 (selectXById usage), **#674 (useDisposable enforcement)**. Plus #671 (D4 product UX UI re-hydration question).
+Lint-rule cluster: #659 (@cascade), #662 (fabric target slice), #664 (selectXById usage), #674 (useDisposable enforcement). Plus #671 (D4 product UX UI re-hydration question).
 
-Total commits en main since 2026-04-27: ~175.
+**A7 follow-up issues (6 nuevos):**
+- #676 self-collision port (severity:medium, ~12-18h con buffer).
+- #677 pressure port (severity:medium, ~4-6h).
+- #678 piece stiffness port (severity:medium, ~2-3h).
+- #679 LRA UI surface (severity:low, ~1-2h).
+- #680 fold UI surface (severity:low, ~1-2h).
+- #681 capability surface full impl (severity:medium, depends on C4).
+
+**Total Fase 3 work distributed via A7 follow-ups: ~21-32h pending across 6 issues.**
+
+Total commits en main since 2026-04-27: ~190.
 
 ---
 
@@ -124,17 +136,27 @@ Total commits en main since 2026-04-27: ~175.
 | **D4** | **4-5h** | **~3h** | **~0.6-0.75x** | **Refinamientos de Sam pre-Sec 3 redujo scope** |
 | **A3** | **5-7h** | **~4h** | **~0.6-0.7x** | **Cross-language sweep + claims verification cerró space pre-redacción** |
 | **C1** | **6-8h** | **~6h** (5h F2 + 1h F3) | **~0.75x** | **BUG-9 input doc pre-redactado + Pattern 2.5 extend framing pre-anclado + sweep refresh expandió 5→7 sites** |
+| **A7** | **6-9h** | **~11h** (8h F2 + 3h F3 closure) | **~1.0x** | **Most complex RFC del bloque (c) — per-feature multiplication × 7 features + Sec 3a/3b split overhead + LRA mid-flight override consolidation. Decoupled F3 primer use bloque (c).** |
 
-**Promedio actualizado:** factor ~0.55x del estimate inicial. **Causa dominante reaffirmada:** ratification path (consistency-alignment, canonical pre-existente, misclassification reclassified, Pattern 2.5 hybrid variants) en lugar de unify XL.
+**Promedio actualizado:** factor ~0.55x del estimate inicial (A7's 1.0x es outlier; pace overall 0.5-1.0x según complejidad). **Causa dominante reaffirmada:** ratification path (consistency-alignment, canonical pre-existente, misclassification reclassified, Pattern 2.5 hybrid variants) en lugar de unify XL.
 
-### Patrón shape común para los (b) y primer (c)
+### Patrón shape común para los (b) y primeros 2 (c)
 
-13/21 ejes (62%) son **ratify-by-convention** (incluye Pattern 2 ratify clean + Pattern 2.5 cleanup/lite/extend hybrid variants). 8/21 ejes (38%) cerraron como real-fix (B11-state IDs canonical, C5 helper unify, B6-state Fase 3 pendiente, BUG migrations, B3-state cascade convention, B10-state Par 1 hybrid copilot migration, A3 partial extend, **C1 helper extraction + leak fixes**).
+13/22 ejes (59%) son **ratify-by-convention** (incluye Pattern 2 ratify clean + Pattern 2.5 cleanup/lite/extend hybrid variants). 9/22 ejes (41%) cerraron como real-fix (B11-state IDs canonical, C5 helper unify, B6-state Fase 3 pendiente, BUG migrations, B3-state cascade convention, B10-state Par 1 hybrid copilot migration, A3 partial extend, C1 helper extraction + leak fixes, **A7 capability skeleton + UI surface + per-feature ports queued**).
 
-**Pattern 2.5 hybrid robust con 3 variants — sub-rule established post-C1:**
+**Pattern 2.5 hybrid robust con 3 variants — sub-rule promoted to robust pattern post-A7:**
 - Pattern 2.5 cleanup (D6) — remove dead code/artifacts.
 - Pattern 2.5 lite (D4) — surgical helper para inline drift.
-- Pattern 2.5 extend (A3 + **C1**) — add coverage to gaps without refactoring pattern. **Sub-rule established 2/2 data points consistent shape.**
+- Pattern 2.5 extend (A3 + C1 + **A7**) — add coverage to gaps without refactoring pattern. **Sub-rule promoted to robust pattern 3/3 data points consistent shape.**
+
+### 3.6 Decoupling pattern primer use bloque (c)
+
+A7 fue **primer use** del decoupling pattern (RFC closure ratifies policy + per-feature implementations queued as follow-up issues; precedent B6-state Fase 3 deferral). Future RFCs (A2, A4, A6, C4) may inherit este shape si:
+- Per-feature/per-decision multiplication justifica scope distribution.
+- Ratification policy decidable independent of implementations.
+- Risk distribution beneficia atomicity per feature.
+
+Track adoption: si 3+ RFCs futuros adopt 3.6 decoupling, anchor as canonical sub-rule en CLAUDE.md (similar al promotion path Pattern 2.5 extend variant).
 
 ---
 
@@ -142,26 +164,39 @@ Total commits en main since 2026-04-27: ~175.
 
 - **0 ejes (a) restantes.** Bloque (a) cerrado completamente.
 - **0 ejes (b) restantes.** Bloque (b) cerrado completamente.
-- **5 ejes (c) RFC pendientes:** A2, A4, A6, A7, C4. (C1 cerrado.)
+- **4 ejes (c) RFC pendientes:** A2, A4, A6, C4. (C1 + A7 cerrados.)
 - **1 sub-track compuesto pendiente:** E-async-states (B8-state + D2 + D8 fusionados).
 
 ---
 
-## Implicaciones para forward planning post-C1
+## Implicaciones para forward planning post-A7
 
-**Pace observado para (c) RFCs:** primer RFC cerrado en ~6h vs 6-8h estimate (factor 0.75x). **Pace estimate revisado para (c) RFCs restantes: 0.6-0.8x del nominal** si shape continúa siendo Pattern 2.5 extend (probable post-A7 dado precedent fresco). Si emerge un Pattern 1 real refactor entre los restantes (e.g., A7 closure requires WASM solver rewrite para paridad CPU), factor sube a ~0.9-1.0x.
+**Pace observado para (c) RFCs (2 data points):**
+- **C1:** ~6h vs 6-8h estimate (0.75x), uniform shape (single-pattern useMemo + dispose).
+- **A7:** ~11h vs 6-9h estimate (1.0x), per-feature multiplication × 7 features.
 
-**Total runway revisado** para cerrar 5 (c) RFCs restantes + E-async-states sub-track:
-- 5 RFCs × ~6h promedio (post-C1 calibration) = 30h ≈ 4-5 días pace single-eje.
+**Calibración rule (Pattern 2.5 extend):** uniform shape ejes tienden 0.6-0.8x; per-feature multiplication ejes tienden 1.0x. Future RFCs predictivo según shape.
+
+**Pace estimate revisado para 4 (c) RFCs restantes:** 0.6-1.0x del nominal según shape:
+- A6 (worker message protocol): per-message-type multiplication probable → ~1.0x.
+- A2 (cross-boundary serialization): single-type analysis probable → ~0.6-0.8x.
+- A4 (geometry/mesh ops cross-language): similar a A3 → ~0.6-0.8x.
+- C4 (4-tier coexistence): most complex, per-tier × per-feature → ~1.0x+.
+
+**Total runway revisado** para cerrar 4 (c) RFCs restantes + E-async-states sub-track:
+- 4 RFCs × ~7-10h promedio (post-A7 calibration) = 28-40h ≈ 4-6 días pace single-eje.
 - E-async-states ~15-25h additional.
-- **Combined: ~5-8 días adicionales** post-C1.
+- **Combined: ~5-8 días adicionales** post-A7.
 
-**Sam tactical advice para (c) ordering (post-C1 update):**
+**Sam tactical advice para (c) ordering (post-A7 update):**
 - ~~**C1** — cerrado.~~
-- **A7** (WASM vs CPU equivalence) — **next**. Scope ampliado por BUG-5 absorbed; A3 pone el error handling foundation. C1 Pattern 2.5 extend confirma sub-rule, posible aplica a A7 si feature gaps son additions sin restructuring del solver.
-- **A2 + A6** (bridge layer) — same domain, posible sub-track dedicated.
-- **A4** (Geometry/mesh ops Rust↔TS) — cross-language similar a A3.
-- **C4** (TSL/WebGPU/WASM/CPU coexistence) — most architectural; defer al final.
+- ~~**A7** — cerrado.~~
+- **A6 next** porque A7's § 3.2 deferred interface design a A6 como direct input. A7's capability skeleton informa A6 interface design.
+- **A2** después en bundle con A6 (ambos bridge layer).
+- **A4** después de A6 (cross-language similar a A3 + C1 precedents).
+- **C4** último (most architectural; herda inputs de A7's § 3.3 capability surface + A6's interface decision).
+
+**E-async-states sub-track** puede arrancar en paralelo cuando la cadencia lo permita.
 
 ### Lint-rule cluster (deuda técnica explícita)
 
@@ -169,7 +204,8 @@ Total commits en main since 2026-04-27: ~175.
 - #659 — @cascade header on store middlewares (B3-state).
 - #662 — fabric write target slice (B10-state Par 1).
 - #664 — selectXById usage (B2-state).
-- **#674 — useDisposable enforcement (C1).**
+- #674 — useDisposable enforcement (C1).
+- _(A7 lint rule deferred al issue capability surface full impl #681 — bundles with C4 framing.)_
 
 Possible bundle en single plugin con 4 rules (decision al implementador).
 
@@ -196,18 +232,19 @@ Esta property emerge naturalmente del workflow audit (atomic commits, doc-first 
 
 ---
 
-## Bloque (a) + (b) + primer (c) milestone summary (2026-05-01)
+## Bloque (a) + (b) + 2 (c) RFCs milestone summary (2026-05-01)
 
-**5+ días, 21 ejes cerrados, ~14000-15000 líneas de doc, 22 methodology rules anchored.**
+**5+ días, 22 ejes cerrados, ~15500-16500 líneas de doc, 23 methodology rules anchored.**
 
-- 7 mecánicos + 13 (b) decisión + **1 (c) RFC** cerrados.
+- 7 mecánicos + 13 (b) decisión + **2 (c) RFCs** cerrados (C1 + A7).
 - 14-15 BUGs implementados + 1 ratificado misclassified.
-- Meta-anchor pattern detection + Pattern 2.5 hybrid variants framework establecido + **sub-rule extend established (2/2 data points)**.
-- ~26 follow-up issues open (4 lint-rule cluster + product UX questions + tracking items).
-- **Audit restart-safe property anchored** post-C1 (fresh agent successful pickup via priming + main-as-truth).
+- Meta-anchor pattern detection + Pattern 2.5 hybrid variants framework establecido + **sub-rule extend promoted to robust pattern (3/3 data points consistent shape: A3 + C1 + A7)**.
+- ~32 follow-up issues open (4 lint-rule cluster + 6 A7 per-feature ports + UI surfaces + capability surface impl + product UX questions + tracking items).
+- **Audit restart-safe property anchored** post-C1 (confirmed across A7 closure as well).
+- **3.6 Decoupling pattern primer use** en bloque (c) (A7); track adoption en future RFCs (A2/A4/A6/C4).
 
-Bloque (a) + (b) cerrados completamente. Bloque (c) iniciado con primer RFC. Próximo eje: A7 (WASM vs CPU equivalence).
+Bloque (a) + (b) cerrados completamente. Bloque (c) progress: 2/6 RFCs. Próximo eje: A6 (worker message protocol asimétrico — A7's § 3.2 deferred interface design hereda).
 
 ---
 
-**FIN DEL SNAPSHOT.** Próxima actualización: cuando se cierre el segundo (c) RFC o E-async-states milestone.
+**FIN DEL SNAPSHOT.** Próxima actualización: cuando se cierre el tercer (c) RFC (A6 next) o E-async-states milestone.
