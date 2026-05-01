@@ -566,8 +566,391 @@ The follow-up work (~10-15 lines in `wasmSolverWorker.ts` to compute max velocit
 
 ---
 
-## Sec 3 (parte 2 — § 3.2-3.6) pendiente
+---
 
-Sec 3b (interface decision + flag granularity bounded CPU-vs-WASM + parity testing strategy + documentation strategy + roadmap implications) en commit subsiguiente. **Awaiting Sam verde on § 3.1 per-feature classification before continuing.**
+## 3. Sub-decisiones (parte 2 — § 3.2-3.6)
 
-Sec 4 (recomendación consolidada per-feature + integration), Sec 5 (Migration plan multi-step), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes post-Sec 3b.
+Per-feature classification (§ 3.1) was load-bearing — its outcome (3 ports + 2 ratify-CPU-only + 2 architectural ratifies, post-LRA override per Sam directive) cascades to the remaining sub-decisions. Each sub-decision below assumes the per-feature outcome of § 3.1.
+
+**Note on LRA override (Sam directive post-3a verde):** § 3.1.2 lean was originally (a) port. Sam override to (b) ratify CPU-only + UI surface adopted. Reasoning consolidated in Sec 4 (recomendación consolidada). The remaining sub-decisions in § 3.2-3.6 reflect the post-override aggregate (3 ports + 2 ratify-with-UI + 2 architectural).
+
+### 3.2 Solver-agnostic interface
+
+**Scope clarification:** A7's § 1.2 explicitly defers worker message protocol unification to **A6 territory**. § 3.2 articulates options for A7's Fase 3 plan — does it include interface refactoring, or stay scope-narrow on per-feature equivalence?
+
+#### Option A — Extract `ClothSolverInterface` as part of A7 Fase 3
+
+**Shape:**
+
+```ts
+// Hypothetical (NOT proposed for A7 — preview only)
+interface ClothSolverInterface {
+  init(meshData: ClothMeshData): Promise<void>;
+  setStretch(ids: Uint32Array, restLengths: Float32Array): void;
+  setBend(ids: Uint32Array, restAngles: Float32Array): void;
+  setSeamsWithCompliance(ids: Uint32Array, target: Float32Array, compliance: Float32Array): void;
+  setPins(indices: Uint32Array, positions: Float32Array): void;
+  setWind(wx: number, wy: number, wz: number): void;
+  step(dt: number): void;
+  // Tier-specific (optional):
+  setSelfCollisionAdjacency?(offsets: Uint32Array, neighbors: Uint32Array): void;
+  setPressures?(offsets: PieceOffset[], pressures: number[]): void;
+  applyPieceStiffness?(offsets: PieceOffset[], multipliers: number[]): void;
+}
+```
+
+Both `ClothWorkerClient` (CPU) and `WasmSolverClient` (WASM) implement this interface. Optional methods (?) marked for tier-specific features.
+
+**Pros:**
+- Forces consistent API shape across tiers.
+- Type system enforces feature parity for non-optional methods.
+- Future tiers (WebGPU/TSL) plug in cleanly.
+
+**Cons:**
+- **A6 territory.** Interface design is the A6 RFC's responsibility — A7 binding it pre-empts that scope.
+- Optional methods (?) make the interface a leaky abstraction; consumers must check capability anyway.
+- Refactor cost: existing call sites in 5+ files need migration to interface-typed handles.
+- Significant Fase 3 scope addition (~6-10h beyond per-feature ports).
+
+#### Option B — Status quo (per-call site decision, no interface)
+
+**Shape:** current state. Each consumer (`useSimulationLifecycle`, `ClothMesh`, etc.) picks tier explicitly via `WasmSolverClient` or `ClothWorkerClient` and uses tier-specific API.
+
+**Pros:**
+- Zero refactor cost.
+- Tier-specific behavior stays explicit at call sites.
+- A6 RFC keeps full design space open for future interface decisions.
+
+**Cons:**
+- Divergence over time as new methods land.
+- Consumers duplicate tier-aware logic.
+- Adding a new tier would touch many call sites.
+
+#### Option C — Hybrid: minimal interface for shared methods only
+
+**Shape:** extract interface covering ONLY the methods that exist identically in both tiers (Sites 1-6 from § 2.2 — stretch, bend, seams, wind, pins, friction). Tier-specific methods stay on concrete classes.
+
+**Pros:**
+- Captures the parity that already exists.
+- Bounded scope (~6 methods in interface).
+- Doesn't pre-empt A6.
+
+**Cons:**
+- Two-tier API surface (interface + concrete) adds complexity.
+- The 3 newly-ported features (self-collision, pressure, piece stiffness) become concrete-class methods, not interface methods — the very features A7 ports gain inconsistent typing.
+
+#### Recommendation per § 3.2
+
+**Lean: Option B (status quo, defer abstraction to A6).** Confidence: **high**.
+
+Reasoning:
+- A7 scope is per-feature equivalence, not API design.
+- A6 RFC owns interface design; pre-empting it generates re-work risk.
+- The new ports (self-collision, pressure, piece stiffness) add 3 concrete methods to `WasmSolverClient` that mirror existing CPU client methods. Once both tiers have the methods, A6 can extract the interface cleanly.
+- No call site benefits from an interface today; the abstraction is YAGNI under current scope.
+
+**Counter:** if A6 RFC opens before A7 Fase 3 implementation lands, reconcile — A6 may want A7's per-feature ports to land via a new interface from day 1. Cross-ref dependency noted in § 6.
+
+### 3.3 Feature flag granularity for CPU vs WASM choice
+
+**Scope clarification (per Sam directive Q3 verbatim):** § 3.3 is bounded to **CPU vs WASM binary choice** only. Tier selection across all 4 solvers (CPU/WASM/WebGPU/TSL) is **C4 territory**, NOT A7. A7's § 3.3 decision is direct input to C4 when C4 RFC opens.
+
+#### Option A — Per-feature flags
+
+**Shape:**
+
+```ts
+{
+  useWasmSolver: true,                  // master flag
+  useWasmSelfCollision: false,          // per-feature override
+  useWasmLRA: false,                    // n/a for ratify CPU-only
+  useWasmPressure: true,
+  useWasmFold: false,                   // n/a for ratify CPU-only
+  useWasmPieceStiffness: true,
+}
+```
+
+**Pros:**
+- Maximum granularity — user can enable WASM tier for solver speed but force CPU for specific features.
+- Useful for testing / debugging — toggle a feature off in WASM without switching tier.
+
+**Cons:**
+- High flag count, high configuration complexity.
+- Most users won't tune at this granularity; flags become noise.
+- Flag explosion as new features land.
+
+#### Option B — Monolithic (`useWasmSolver` master flag, current state)
+
+**Shape:** single `useWasmSolver` boolean. Per-feature differences are silent (current state for non-self-collision features) or warned (current state for self-collision).
+
+**Pros:**
+- Simplest configuration.
+- Current state — zero migration.
+
+**Cons:**
+- Silent feature absence for LRA / fold post-A7 (would persist after ratify CPU-only).
+- User can't reason about which features are available on the active tier.
+
+#### Option C — Tier-based with capability surface
+
+**Shape:** master `useWasmSolver` flag + WASM tier exposes `capabilities` object indicating which features it supports:
+
+```ts
+// WasmSolverClient
+get capabilities() {
+  return {
+    selfCollision: true,    // post-port
+    lra: false,             // ratified CPU-only
+    pressure: true,         // post-port
+    fold: false,            // ratified CPU-only
+    pieceStiffness: true,   // post-port
+  };
+}
+```
+
+UI consumers gate feature toggles based on `capabilities`:
+
+```tsx
+{!capabilities.lra && (
+  <Warning>LRA requires CPU tier. Enable LRA → switch tier or skip on WASM.</Warning>
+)}
+```
+
+**Pros:**
+- Single flag controls tier; capabilities surface communicates feature availability.
+- UI gates user actions intelligently — no silent absence.
+- Capabilities object can grow without flag explosion.
+- Compatible with future tiers — WebGPU/TSL would expose own capabilities.
+
+**Cons:**
+- Adds capability checking at consumer sites (UI mostly).
+- Slightly more code than Option B.
+
+#### Recommendation per § 3.3
+
+**Lean: Option C (tier-based with capability surface).** Confidence: **medium-high**.
+
+Reasoning:
+- Aligns with the per-feature decisions: 2 features stay CPU-only-by-design (LRA, fold), needing UI surface — capabilities object is the natural carrier.
+- Simpler than per-feature flags (Option A) — not flag explosion.
+- Better UX than monolithic (Option B) — no silent absence post-A7.
+- Forward-compatible with C4 RFC's broader tier orchestration.
+
+**Counter:** if C4 RFC selects a fundamentally different orchestration model (e.g., explicit user tier choice with no capability negotiation), § 3.3 may need to align. Cross-ref noted in § 6 + § 7 reopen trigger.
+
+### 3.4 Parity testing strategy
+
+Three options per Sam directive Q2. Each articulated with honest cost.
+
+#### Option A — Formal parity tests (epsilon tolerance)
+
+**Shape:** test infrastructure that runs CPU and WASM solvers on identical input + asserts output equivalence within epsilon. Requires:
+
+- Deterministic seeds (CPU and WASM use same RNG + same initial conditions).
+- Fixture corpus (mesh + constraints + step count + expected output trajectory).
+- Epsilon thresholds per feature (cloth simulation has accumulated drift; epsilon must account for non-deterministic floating-point ordering).
+
+**Pros:**
+- High confidence in port correctness.
+- Catches algorithmic divergence (e.g., WASM solver uses subtly different formula → output diverges past epsilon).
+- Future-proof — new features ship with parity tests by default.
+
+**Cons:**
+- Significant upfront cost (~5-10h infrastructure: seeds, corpus, threshold tuning).
+- Floating-point determinism is hard cross-language (Rust f32 vs JS f32 not bit-equivalent in all operations; SIMD differences matter).
+- May generate false positives requiring tuning over time.
+- Implementation may justify follow-up sub-track post-A7.
+
+#### Option B — Bench-based perf assertions
+
+**Shape:** extends existing `bench/_lib.ts` infrastructure to run WASM-vs-CPU performance comparisons with threshold gates.
+
+**Pros:**
+- Catches perf regressions (e.g., new WASM port slower than expected).
+- Uses existing bench infrastructure (~2-4h to extend).
+
+**Cons:**
+- Doesn't catch correctness divergence (perf same, output different is possible).
+- Limited safety net for ports.
+
+#### Option C — Status quo (integration tests + manual smoke)
+
+**Shape:** existing integration tests cover happy paths; manual smoke verification for edge cases per port. No formal parity infrastructure.
+
+**Pros:**
+- Zero infra cost.
+- Pragmatic for small port count.
+
+**Cons:**
+- Accepts risk of subtle divergence going undetected.
+- Manual verification per port — burden on each implementer.
+- Integration tests cover happy path, not edge case equivalence.
+
+#### Per-port implication of § 3.4 choice
+
+| Port | If A (formal) | If B (bench) | If C (status quo) |
+|---|---|---|---|
+| Self-collision | Parity test asserts collision response output equivalence | Bench measures collision pair detection rate | Manual smoke: sleeve folding test |
+| Pressure | Parity test asserts inflation force per particle | Bench measures force application speed | Manual smoke: puffer jacket inflation test |
+| Piece stiffness | Parity test asserts compliance scaling output | Bench measures multiplier application | Manual smoke: interfaced collar stiffness test |
+
+#### Recommendation per § 3.4
+
+**Lean: Option C (status quo, integration tests + manual smoke per port).** Confidence: **medium**.
+
+Reasoning:
+- 3 ports is small enough that manual smoke per port is tractable.
+- Existing integration tests (Mannequin, GarmentSimulation) cover the happy paths.
+- Formal parity infrastructure (Option A) requires ~5-10h before any port lands; cost-benefit weak for 3 ports.
+- If Fase 3 decoupling is selected (§ 3.6 Option B per Sam recommendation), each port follow-up issue can include manual smoke checklist.
+
+**Counter:**
+- Self-collision is the most complex port; an Option A subset for self-collision specifically might be justified. Sam pre-decision: "probable (c) o hybrid (a-for-self-collision, c-for-others)". Hybrid is defensible.
+- If a port lands and a subtle divergence emerges in production, reopen § 3.4 with concrete repro and consider Option A retroactive.
+
+**Hybrid sub-option** (consistent with Sam pre-decision): Option A for self-collision specifically (highest port complexity); Option C for the other 2 ports (pressure, piece stiffness — straightforward math). The infrastructure cost (~5-10h) lands once with self-collision port; subsequent ports can opt in if desired.
+
+**Lean updated:** **Option C primary, with hybrid (A-for-self-collision) optional if Fase 3 budget permits.** Confidence: medium.
+
+### 3.5 Documentation strategy
+
+3-layer ratify-by-default per audit pattern (consistent with C1, B6-state, B3-state, B10-state Par 1, etc.).
+
+#### Layer 1 — JSDoc on new WASM solver methods
+
+For each newly-ported feature, JSDoc on:
+- New TS-side wrapper methods on `WasmSolverClient` (e.g., `setSelfCollisionAdjacency`, `setPressures`, `applyPieceStiffness`).
+- New worker message types in `wasmSolverClient.ts` ↔ `wasmSolverWorker.ts` protocol.
+- Rust-side `pub fn` rustdoc covering parameter contract + algorithmic notes.
+
+JSDoc explains:
+- What the method does (mirror of CPU equivalent).
+- When to call (init-time vs per-step).
+- Capability surface integration (per § 3.3 Option C).
+
+#### Layer 2 — CLAUDE.md "CPU vs WASM solver capabilities" section
+
+New section in CLAUDE.md following the precedent of "Three.js disposable lifecycle (C1 ratified)", "Persistence policy (B6-state ratified)", etc.
+
+Content:
+- Cross-ref to A7 RFC.
+- Capability table (canonical inventory of which features are on which tier).
+- Decision rule for new physics features (default: port if cost ≤ ~6h, ratify CPU-only if cost > ~10h or UX impact bajo).
+- Reopen triggers.
+
+#### Layer 3 — UI surface for ratified-CPU-only features
+
+For LRA and fold (ratified CPU-only per § 3.1):
+- Capability indicator in render settings panel (or wherever tier choice is exposed).
+- Warning when user enables an unsupported feature on WASM tier (e.g., "LRA enabled but active tier is WASM. LRA will not apply. Switch tier or disable LRA.").
+- Optional auto-tier-switch with explicit user confirmation.
+
+The exact UI shape is left to the implementer; A7 ratifies that a surface exists, not its visual design.
+
+#### Recommendation per § 3.5
+
+**Lean: 3-layer ratify-by-default (JSDoc + CLAUDE.md + UI surface).** Confidence: **high**.
+
+Reasoning:
+- Audit precedent — 22 ratifications use 3-layer doc strategy.
+- UI surface (Layer 3) is the new addition specific to A7 — closes the silent-absence gap for the 2 ratify-CPU-only features.
+- Layer 3 deferred to follow-up issue if Fase 3 decoupled (§ 3.6 Option B).
+
+### 3.6 Roadmap implications + bundled vs decoupled Fase 3
+
+**Sub-question raised by Sam directive:** does A7 Fase 3 include ports inline, or ratify policy + defer ports to follow-up sub-tracks?
+
+#### Option A — Bundled Fase 3 (single PR)
+
+**Shape:** A7 Fase 3 implements all 3 ports + 2 UI surfaces + 2 architectural ratifies + docs in one PR.
+
+**Pros:**
+- A7 ships meaningful WASM extension — 3 features actually ported.
+- Single review cycle for the whole policy + implementation.
+- No risk of ports stalling in queue post-merge.
+
+**Cons:**
+- ~20-30h commit en un solo PR. Long review cycle.
+- Risk of regressions across ports (one port introduces issue that other ports inherit).
+- Bundling distinct concerns (3 unrelated ports + 2 UI surfaces + docs) in single atomic commit unit.
+
+#### Option B — Decoupled Fase 3 (minimal A7 closure + per-feature follow-up issues)
+
+**Shape:** A7 Fase 3 implements:
+- CLAUDE.md "CPU vs WASM solver capabilities" section.
+- UI surface for ratified-CPU-only features (LRA + fold).
+- Capability surface skeleton (`capabilities: { ... }` on `WasmSolverClient` with all flags initially false except those already in parity).
+- Architectural ratifies (adaptive substeps + velocity clamp docs).
+
+Per-feature ports go to follow-up issues (severity:medium):
+- `#XXX self-collision port (12-18h)`
+- `#YYY pressure port (4-6h)`
+- `#ZZZ piece-stiffness port (2-3h)`
+- `#WWW LRA UI surface implementation (1-2h, may bundle with fold)`
+- `#VVV fold UI surface implementation (1-2h, may bundle with LRA)`
+
+Each port issue closes its capability flag (`capabilities.selfCollision = true` etc.) when the port lands.
+
+**Pros:**
+- A7 closes fast (~3-5h Fase 3 minimal). Pace consistent with audit (RFC closes ~7-8h doc + minimal Fase 3).
+- Each port is a focused PR with its own review.
+- Risk distributed — port issue per feature.
+- Pace consistency with audit (similar to B6-state Fase 2 ratify + Fase 3 deferred to follow-ups #654-656).
+- Atomicity per feature — each port is a clean atomic commit.
+
+**Cons:**
+- Ports may stall in queue post-A7 closure.
+- Audit closure shape: policy ratified, features queued — less satisfying than "shipped 3 features".
+- Capability flags initially false for unported features → user-visible feature gap until ports land.
+
+#### Per Sam directive recommendation (verbatim)
+
+> Mi recomendación: decouple. Razones:
+> 1. Audit philosophy "atomicity por commit": un solo commit bundleando self-collision + pressure + piece stiffness ports bundles distinct concerns.
+> 2. Risk management: Rust port issues (borrow checker, WASM memory layout) son discoverable per-feature.
+> 3. Pace consistency: A7 (RFC) cierra con ~7-8h doc + 3-5h Fase 3 minimal — consistente con bloque (c) pace.
+> 4. Precedent B6-state: similar shape (policy + per-feature follow-ups).
+
+#### Recommendation per § 3.6
+
+**Lean: Option B (decoupled Fase 3) per Sam directive.** Confidence: **high**.
+
+Reasoning (consolidated from Sam directive + audit precedent):
+- B6-state precedent: policy ratified + per-feature follow-up issues (#654-656).
+- Atomicity per commit / per feature.
+- Risk distribution (per-feature port issues discoverable in isolation).
+- Audit pace consistency (RFC closes within ~10-13h total Fase 2 + minimal Fase 3).
+
+**Counter (articulated honest):** Option A (bundled) is defensible if the team wants A7 to ship features visibly in main vs queue them in follow-up issues. The ports are independent enough that bundling doesn't cross-contaminate; the ~20-30h aggregate is large but bounded. If Sam's preference reverses to (A), this section adjusts.
+
+### 3.7 Sub-decisions integration preview
+
+Aggregate post-3.1 (LRA override) + 3.2-3.6:
+
+| Sub-decision | Lean | Confidence |
+|---|---|---|
+| 3.1 Per-feature classification | 3 ports + 2 ratify-CPU-only-with-UI + 2 architectural | varies per feature |
+| 3.2 Solver-agnostic interface | (B) status quo, defer to A6 | high |
+| 3.3 Feature flag granularity (CPU-vs-WASM) | (C) tier-based with capability surface | medium-high |
+| 3.4 Parity testing strategy | (C) status quo, optional hybrid (A-for-self-collision) | medium |
+| 3.5 Documentation strategy | 3-layer (JSDoc + CLAUDE.md + UI surface) | high |
+| 3.6 Roadmap (bundled vs decoupled) | (B) decoupled per Sam directive | high |
+
+**Aggregate Fase 3 estimate (decoupled, per § 3.6 Option B):**
+
+- A7 closure Fase 3: ~3-5h (CLAUDE.md section + UI surface for LRA + fold + capability skeleton + architectural docs).
+- Per-feature ports queued as follow-up issues:
+  - Self-collision: ~12-18h (with buffer per Sam directive).
+  - Pressure: ~4-6h.
+  - Piece stiffness: ~2-3h.
+- **Distributed total: ~18-27h ports** + ~3-5h A7 closure = ~21-32h aggregate.
+
+**vs bundled (§ 3.6 Option A):** ~20-30h all-in single PR.
+
+The aggregate is similar; the difference is timing distribution and risk shape.
+
+---
+
+## Sec 4+ pendiente
+
+Sec 4 (recomendación consolidada per-feature + integration con 3.2-3.6 + LRA override consolidation), Sec 5 (Migration plan multi-step — decoupled per § 3.6 Option B with self-collision buffer 12-18h), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes.
