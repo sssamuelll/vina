@@ -536,5 +536,292 @@ Migrate `positions_ptr()`, `velocities_ptr()`, etc. to return Result.
 
 **Total migration:** Rust changes (Cargo + init + rebuild + sync) + ~25 líneas TS + ~80 líneas docs (JSDoc + CLAUDE.md). **~3-5h Fase 3.**
 
-[Sec 4-9 pendientes — incremental push.]
+## Sección 4 — Recomendación consolidada
+
+Si Sam aprueba 3.1.A + 3.2.A + 3.3.A + 3.4.A, los cambios resultantes son:
+
+| # | Cambio | Archivo | Tipo |
+|---|---|---|---|
+| 1 | Add `console_error_panic_hook` Cargo dep + init en constructor | `crates/xpbd-wasm/Cargo.toml` + `crates/xpbd-wasm/src/lib.rs` | Rust (1 dep + 1 line) |
+| 2 | WASM rebuild + sync (BOTH `xpbd_wasm.js` + `xpbd_wasm_bg.wasm`) | `public/wasm/` | build artifact |
+| 3 | Surface silent fallback "positions will be zero" via `postMessage error` + telemetry counter | `src/utils/cloth/wasm/wasmSolverWorker.ts:402-407` | TS (~10 líneas) |
+| 4 | NaN guard post-step + telemetry counter + reset to prevPos | `src/utils/cloth/wasm/wasmSolverWorker.ts simulationLoop` | TS (~15 líneas) |
+| 5 | JSDoc en `wasmSolverClient` + `wasmSolverWorker` cross-boundary contracts | `src/utils/cloth/wasm/*.ts` | docs (~20 líneas) |
+| 6 | Section CLAUDE.md "Cross-boundary error handling (A3 ratified)" + Result-pattern convention | `CLAUDE.md` | docs (~60 líneas) |
+
+**Total migration:**
+- Rust: 1 dep + 1 init line + rebuild + sync.
+- TS: ~25 líneas (silent fallback UI + NaN boundary guard).
+- Docs: ~80 líneas (JSDoc + CLAUDE.md).
+
+**~3-5h Fase 3.** Zero behavior change para hot path (zero-copy positions reads preserved).
+
+---
+
+## Sección 5 — Plan de migración Fase 3
+
+**Critical:** Per CLAUDE.md "WASM Sync Requirement" — Rust changes require **BOTH** `xpbd_wasm.js` AND `xpbd_wasm_bg.wasm` copied to `public/wasm/`. If only `.wasm` is copied, worker falls back to CPU silently.
+
+### 5.1 Commit 1 — Rust: add `console_error_panic_hook`
+
+Atomic commit en Rust crate:
+
+```toml
+# crates/xpbd-wasm/Cargo.toml
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"  # NEW
+```
+
+```rust
+// crates/xpbd-wasm/src/lib.rs — in XpbdSolver::new() or similar entry point:
+pub fn new(positions: &[f32], inv_mass: &[f32]) -> XpbdSolver {
+    console_error_panic_hook::set_once();  // NEW
+    // ... existing constructor
+}
+```
+
+### 5.2 Commit 2 — WASM rebuild + sync (BOTH files)
+
+```bash
+cd crates/xpbd-wasm
+wasm-pack build --target web --out-dir pkg
+
+# CRITICAL: Copy BOTH files
+cp pkg/xpbd_wasm.js public/wasm/
+cp pkg/xpbd_wasm_bg.wasm public/wasm/
+```
+
+**Verification post-build:**
+
+```bash
+ls -la public/wasm/xpbd_wasm.js public/wasm/xpbd_wasm_bg.wasm
+# Both should have recent timestamps.
+
+git diff public/wasm/
+# Should show BOTH files modified.
+```
+
+**Smoke test:**
+- Start dev server, open app, trigger cloth simulation.
+- Verify console shows `[WasmWorker] Got memory from init result` (or equivalent success log).
+- If console shows `[WasmSolver] CPU fallback active` or `[WasmWorker] Could not access WebAssembly.Memory`: **STOP** — JS bindings stale, re-do step 5.2.
+
+**Anti-pattern protection:** ironically, A3 Fase 3 Commit 1+2 is exactly the silent fallback pattern A3 Sec 3.2 addresses. Don't fall into it during your own implementation.
+
+### 5.3 Commit 3 — TS: surface silent fallback as UI error
+
+`wasmSolverWorker.ts:402-407` change:
+
+```ts
+// BEFORE:
+} else {
+  console.warn('[WasmWorker] Could not access WebAssembly.Memory — positions will be zero!',
+    'initResult type:', typeof initResult, /* ... */);
+}
+
+// AFTER:
+} else {
+  const errorMsg = 'WASM solver init failed: WebAssembly.Memory not accessible. ' +
+                   'Cloth simulation will not run.';
+  console.error('[WasmWorker]', errorMsg, {
+    initResultType: typeof initResult,
+    initResultKeys: exportsLike ? Object.keys(exportsLike).slice(0, 10) : 'null/void',
+    moduleKeys: Object.keys(wasmModule).slice(0, 10),
+  });
+  self.postMessage({
+    type: 'error',
+    code: 'wasm_memory_unavailable',
+    message: errorMsg,
+  });
+}
+```
+
+`wasmSolverClient.ts` already has worker error event handler (línea 75); the `'error'` postMessage flows through and triggers `onError` callback.
+
+### 5.4 Commit 4 — TS: NaN guard at WASM→JS post-step boundary
+
+`wasmSolverWorker.ts simulationLoop`, post-step:
+
+```ts
+// Module-level telemetry counter:
+let wasmNaNCount = 0;
+
+function simulationLoop(): void {
+  if (!running || !solver || !wasmExports) return;
+  // ... existing step code
+
+  // NEW: NaN guard at WASM→JS boundary
+  const posView = new Float32Array(wasmExports.memory.buffer,
+                                   solver.positions_ptr(), n * 3);
+  const prevView = new Float32Array(wasmExports.memory.buffer,
+                                    solver.prev_positions_ptr(), n * 3);
+
+  let nanThisStep = 0;
+  for (let i = 0; i < n * 3; i++) {
+    if (!Number.isFinite(posView[i])) {
+      posView[i] = prevView[i];
+      nanThisStep++;
+    }
+  }
+
+  if (nanThisStep > 0) {
+    wasmNaNCount += nanThisStep;
+    if (wasmNaNCount === 1 || wasmNaNCount % 100 === 0) {
+      console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} total cumulative`);
+    }
+  }
+
+  // ... rest of existing step code (postMessage with positions, etc.)
+}
+```
+
+### 5.5 Commit 5 — Docs: JSDoc en cross-boundary surfaces
+
+JSDoc en `wasmSolverClient.ts` + `wasmSolverWorker.ts` documentando:
+- Cross-boundary contract (zero-copy positions reads, no Result types en hot path).
+- `panic_hook` adoption (errors surface via console.error con context, not silent abort).
+- Silent fallback now surfaces as `postMessage error` (consumers should hook `onError`).
+- NaN boundary guard with telemetry counter (`wasmNaNCount`).
+- Result-pattern convention forward-only para new fallible exports.
+
+### 5.6 Commit 6 — CLAUDE.md anchoring
+
+Section "Cross-boundary error handling (A3 ratified)" agregada a CLAUDE.md. ~60 líneas.
+
+Contenido:
+- Pattern existing legitimate (defensive Rust + CPU fallback + distributed TS NaN guards).
+- Extends:
+  - `console_error_panic_hook` adopted (preventive insurance).
+  - Silent fallback (`positions will be zero`) surfaces as UI error.
+  - NaN boundary guard at WASM→JS post-step.
+  - Result-pattern convention forward-only para new fallible exports (cross-ref `projectSchema.ts:411`).
+- Decision rule: cuándo usar Result-pattern vs zero-copy.
+- Reopen triggers (5 nombrados en Sec 7).
+
+### 5.7 Follow-up issue (optional)
+
+**Issue:** `[product/audit-followup] WASM init failure UI: surface as toast or error overlay?`
+
+A3 implements `postMessage error` + console.error con context. Consumer (`wasmSolverClient.ts onError` callback) decides UX. Question: should app-level handler dispatch to `showErrorToast` o full error overlay?
+
+Severity:medium o low según product call. Out-of-scope A3 ratification (technical question of UX shape, not architecture).
+
+---
+
+## Sección 6 — Cross-refs y dependencias
+
+### 6.1 Inputs
+
+- `docs/reports/2026-04-28-drift-inventory-fase1.md` § A3 (claims A/B/C — 2/3 refuted empíricamente).
+- `docs/reports/2026-04-29-drift-inventory-addendum.md` (`projectSchema.ts` precedent confirmed).
+- D6 ratification (PR #668 merged) — Pattern 2.5 cleanup precedent.
+- D4 ratification (PR #670 merged) — Pattern 2.5 lite precedent.
+- B6-state ratification — `projectSchema.ts:411` Result pattern precedent.
+- BUG-15 (closed) — TS-side error UI precedent (AgenticLoop loop-level error event toast).
+- Meta-anchor "Inventory drift overestimation pattern" + "Pattern 2.5 hybrid variants" sub-rule.
+- `crates/xpbd-wasm/src/lib.rs` (Rust crate, 824 líneas).
+- `src/utils/cloth/wasm/wasmSolverClient.ts` + `wasmSolverWorker.ts` (TS consumers).
+- `src/utils/cloth/longRangeAttachments.ts`, `interfacing.ts`, `triangleCollision.ts`, `gpuSolverClient.ts`, `tslSolver.ts` (TS NaN guards distribuidos).
+
+### 6.2 Outputs
+
+- **Si aprobado:** Fase 3 (6 commits + 1 optional follow-up issue).
+- **A3 cerrado:** Pattern 2.5 hybrid extend ratificación.
+- **Bloque (b) entero cerrado:** A3 es último (b). Audit pivota a (c) RFCs + E-async-states sub-track.
+- **20ª ratificación del audit con Pattern 2.5 third variant** (cleanup D6, lite D4, **extend A3**). Pattern 2.5 robust con 3 ejemplos.
+- **Sub-rule meta-anchor update post-merge:** Pattern 2.5 extend variant añadido a "Pattern 2.5 hybrid variants" section.
+
+### 6.3 No-conflicts (out-of-scope verificado)
+
+- **Defensive Rust pattern** preserved (sin refactor).
+- **CPU fallback mechanism** (`webgpuDetect`) sin cambio.
+- **TS NaN guards en CPU/GPU/collision** sin cambio.
+- **Zero-copy positions reads** (hot path) preserved — Result-pattern convention forward-only.
+- **selfCollision feature gap** (#608) tracked elsewhere — out-of-scope.
+- **`updateConstraints` TODO** tracked en code — out-of-scope.
+
+### 6.4 Co-existence con ejes abiertos
+
+- **A7 RFC** (WASM vs CPU equivalence) — A3 ratifies error handling pattern; A7 RFC decides feature parity. No conflict; A3 input to A7 (error handling pattern documented).
+- **C1 RFC** (Three.js buffer lifecycle) — unrelated.
+- **C4 RFC** (TSL/WebGPU/WASM/CPU coexistence) — A3 ratifies error handling for WASM tier; C4 may extend to GPU tier with similar pattern. A3 acts as precedent.
+- **E-async-states** sub-track — A3 NaN counter + silent fallback UI surfacing is loading/error state for sim subsystem; E-async-states will absorb broader async states pattern. No direct conflict.
+
+---
+
+## Sección 7 — Reopen triggers
+
+A3 ratificación queda revisable si emerge:
+
+1. **Rust crate gets a `unwrap()` accidentally introduced** (e.g., new feature) — `panic_hook` catches in console; reopen 3.1 if frequent panics suggest defensive coding policy needs lint enforcement.
+2. **Silent fallback "positions will be zero" actually fires en production** — telemetry counter signals frequency; reopen 3.2 evaluating if root cause fix (e.g., wasm-bindgen API issue) is needed beyond UI surface.
+3. **NaN boundary counter (`wasmNaNCount`) grows past significant threshold** in production — signals Rust solver edge case bug; reopen with concrete repro.
+4. **New fallible Rust→TS export** is introduced — verify Result-pattern convention followed; reopen 3.4 if convention bypassed (or if pattern needs extension for new shape).
+5. **Telemetry beyond WASM→JS boundary needed** (Sentry-like reporting, metrics dashboard) — reopen scope; A3 only adds counters at boundary, broader telemetry is separate eje.
+6. **CPU fallback fails or becomes unreliable** — A3 ratifies CPU fallback as safety net; if it breaks, reopen with concrete failure mode.
+
+---
+
+## Sección 8 — Deuda técnica explícita post-ratificación
+
+1. **`console_error_panic_hook` is preventive only.** No lint rule prevents future `unwrap()` introduction. Defensive coding remains empirical convention. Aceptable porque: (i) crate is small (824 líneas, 1 file); (ii) review humano + `panic_hook` safety net cubren el riesgo.
+
+2. **Silent fallbacks #2 + #3 (selfCollision, updateConstraints)** are tracked elsewhere (#608, A7 RFC; TODO comment). A3 doesn't address them — out-of-scope. Future eje may consolidate them with similar UI surfacing pattern.
+
+3. **NaN boundary counter is module-scoped, not exposed to debug API.** Currently logged via `console.warn`. If future debugging requires programmatic access, add via `getWasmNaNCount()` helper (deferred until concrete use case).
+
+4. **Result-pattern convention not enforced via lint.** Discoverability depends on CLAUDE.md + JSDoc. Future fallible export written ad-hoc would be caught in code review only. Aceptable porque (i) new fallible exports are rare; (ii) `projectSchema.ts` precedent visible.
+
+5. **Cross-boundary contract documentation is aspirational.** Rust API signatures (`*const f32` pointers) don't communicate fallibility. JSDoc on TS-side surfaces it; if Rust signature changes (e.g., return Option<XpbdSolver> for failure-prone construction), JSDoc must update. Triple-write risk (Rust JSDoc + TS JSDoc + CLAUDE.md).
+
+6. **WASM rebuild manual.** No CI step verifies BOTH files synced. Future drift if dev rebuilds Rust without copying both. Acceptable porque CLAUDE.md "WASM Sync Requirement" already documents; potential future issue if pain emerges (lint or pre-commit hook).
+
+---
+
+## Sección 9 — Decisión pendiente y siguiente paso
+
+### 9.1 Pregunta a Sam
+
+¿Aprobás las 4 sub-decisiones tal como recomendado en Sec 3 (3.1.A + 3.2.A + 3.3.A + 3.4.A)?
+
+Si **sí, todo aprobado:**
+- Marco PR ready-for-review.
+- Sec 4-9 quedan como ratificación final.
+- Fase 3 (6 commits sobre este branch + WASM rebuild verification + 1 optional follow-up issue).
+- Inventory annotation post-merge.
+- Sub-rule meta-anchor update post-merge: Pattern 2.5 variants ahora con 3 ejemplos (cleanup D6, lite D4, **extend A3**).
+
+Si **alguna sub-decisión querés cambiar:**
+- Indicame cuál (3.1, 3.2, 3.3, 3.4).
+- Re-edito Sec 4 + Sec 5 con el cambio.
+
+Si **el scope del eje cambia:**
+- STOP. Reabro Sec 1.
+
+### 9.2 Estado del PR
+
+- Sec 1-9 ✅ ready.
+- PR #672 draft, 2 commits incrementales (Sec 1-2, Sec 3).
+- Pendiente Sec 4-9 commit (este).
+- Pendiente Fase 3 commits (6).
+
+### 9.3 Calibración estimate vs actual
+
+- Estimate Fase 2 doc: ~5-7h. Actual hasta ahora: ~3h Sec 1-3.
+- **Total Sec 1-9 esperado: ~4h.** Factor ~0.6-0.8x del estimate.
+- Causa: cross-language sweep ya cerró space de decisión (claims refuted empíricamente + 4 sub-decisiones identificadas pre-redacción) + meta-anchor predictivo redujo framing time.
+- **Total esperado Fase 3:** ~3-5h con WASM rebuild + sync verification crítica.
+
+### 9.4 Heads up Fase 3
+
+Critical paths:
+- Commit 1+2 (Rust + WASM rebuild) require `wasm-pack` installed locally + sync BOTH files.
+- Verification post-rebuild: app smoke test debe mostrar WASM solver running, NO CPU fallback warning.
+- Si WASM bindings stale (solo `.wasm` copied): **STOP** y re-do — sería ironic fall into the same silent fallback pattern A3 addresses.
+
+---
+
+**FIN DEL DOC.** Esperando verde de Sam para promover PR a ready-for-review + arrancar Fase 3.
+
 
