@@ -1,6 +1,30 @@
 /**
  * Wasm XPBD Solver Worker — runs Rust Wasm solver off the main thread.
  *
+ * **Cross-boundary error handling (A3 ratified):**
+ *
+ * - **Rust crate (`crates/xpbd-wasm/src/lib.rs`):** defensively written, 0 panic
+ *   paths. `console_error_panic_hook` adopted as preventive insurance — if
+ *   future code introduces a panic, browser console gets useful error message
+ *   with location/stack trace context (instead of opaque WebAssembly.RuntimeError).
+ *
+ * - **WASM init failure** (memory not accessible, e.g., stale JS bindings):
+ *   surfaces via `postMessage({ type: 'error', code: 'wasm_memory_unavailable' })`.
+ *   Flows through `wasmSolverClient.onError` callback. Consumers responsible
+ *   for UI surface (showErrorToast / overlay).
+ *
+ * - **NaN guard at WASM→JS post-step boundary:** both collision and non-collision
+ *   branches reset NaN positions to `prevView` (continuity preserved) and
+ *   increment cumulative telemetry counter `wasmNaNCount`. Rate-limited console.warn
+ *   (first occurrence + every 100th) signals NaN events without spam.
+ *
+ * - **Zero-copy positions reads** (hot path): `Float32Array` views over WASM
+ *   memory. No Result types in signatures — fallibility implicit. Forward-only
+ *   convention: new fallible exports use Result-pattern (see CLAUDE.md
+ *   "Cross-boundary error handling" + `projectSchema.ts:411` precedent).
+ *
+ * Cross-refs: A3 Fase 2 doc, CLAUDE.md "Cross-boundary error handling".
+ *
  * @module wasmSolverWorker
  */
 

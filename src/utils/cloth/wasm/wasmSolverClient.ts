@@ -5,6 +5,25 @@
  * All heavy work (Wasm loading, constraint extraction, simulation loop)
  * runs in a dedicated Web Worker — never blocks the main thread.
  *
+ * **Error handling contract (A3 ratified):**
+ *
+ * - Worker errors flow through worker error event handler + `'error'`
+ *   postMessage. Both invoke `this.readyReject` (for init phase) and
+ *   `this.onError?.(msg)` callback (for runtime errors). Consumers should
+ *   provide `onError` callback to surface as UI error (showErrorToast).
+ *   If `onError` not provided, error is still logged to console.error via
+ *   the worker.
+ *
+ * - WASM init failure (memory unavailable due to stale bindings) surfaces
+ *   with `code: 'wasm_memory_unavailable'`. Other runtime errors use
+ *   generic worker error handler.
+ *
+ * - For NaN events, see `wasmSolverWorker.ts` post-step telemetry counter
+ *   `wasmNaNCount` (worker-scope; not surfaced to client by default — debug
+ *   API can be added if frequency monitoring needed in production).
+ *
+ * Cross-refs: A3 Fase 2 doc, CLAUDE.md "Cross-boundary error handling".
+ *
  * @module wasmSolverClient
  */
 
