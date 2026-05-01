@@ -697,4 +697,362 @@ Reasoning:
 
 ---
 
-**FIN Sec 3.1 + 3.2.** Sec 3.3-3.5 (error shape + capability extension + setter per-method) en commit subsiguiente. Sec 3.6-3.7 (F3 + docs) en commit closure.
+---
+
+## 3. Sub-decisiones (parte 2 — § 3.3 + § 3.4 + § 3.5)
+
+### 3.3 Error shape uniformity (A3 extend)
+
+**Pregunta:** post-A3, WASM worker error message tiene `code` field structured (`{ type: 'error'; code: 'wasm_memory_unavailable' \| ...; message: string }`). CPU + GPU + Neural tienen `{ message: string }` only. ¿Uniform shape `{ code, message }` across 4 tiers, Result-pattern como en A3 § 3.4 forward-only, o status quo divergent?
+
+#### Option 3.3.A — Uniform `{ type: 'error'; code: string; message: string }` extending A3
+
+Adopt WASM's structured shape across CPU + GPU + Neural error paths.
+
+```ts
+// solverProtocol.ts (post-3.1.C):
+export type SolverErrorCode =
+  | 'wasm_memory_unavailable'
+  | 'wasm_init_failed'
+  | 'cpu_init_failed'
+  | 'gpu_device_lost'
+  | 'gpu_adapter_unavailable'
+  | 'neural_model_load_failed'
+  | 'neural_inference_failed'
+  | 'mesh_invalid'
+  | 'config_invalid'
+  | string;  // forward-compat for new codes
+
+export interface SolverError {
+  type: 'error';
+  code: SolverErrorCode;
+  message: string;
+  details?: Record<string, unknown>;  // optional per-error context
+}
+```
+
+Migration:
+- CPU `clothWorker.ts:294,525` + `clothWorkerClient.ts:394` — wrap error events in `{ code, message }`.
+- GPU `gpuSolverClient.ts` — no worker but `onError(message)` callback can pass `code` parameter o wrap en SolverError.
+- Neural `neuralDrapeClient.ts` — same pattern.
+- Existing WASM shape preserved + extends.
+
+**Pros:**
+- Aligned con A3 precedent (already adopted en WASM).
+- Consumer code can branch on `code` for tier-aware UX (e.g., 'gpu_device_lost' → fallback prompt; 'wasm_memory_unavailable' → refresh prompt).
+- Telemetry-ready (counter per error code).
+- Forward-compat with new error sources via string union.
+
+**Cons:**
+- Migration touches 4 clients (CPU + GPU + Neural new code paths; WASM existing).
+- Per-tier code enum design — agree on canonical set (mitigation: `string` fallback for ad-hoc).
+
+#### Option 3.3.B — Result-pattern adoption (per A3 § 3.4 forward-only)
+
+Adopt `projectSchema.ts:411`-style Result discriminated union for error returns:
+
+```ts
+type SolverInitResult =
+  | { ok: true }
+  | { ok: false; error: SolverError };
+
+interface ClothSolverClient {
+  initMultiPiece(pieces, seams?, config?): Promise<SolverInitResult>;
+  // ... other fallible methods return Result
+}
+```
+
+**Pros:**
+- Aligned with A3 § 3.4 Result-pattern convention forward-only (B6-state precedent `projectSchema.ts`).
+- Caller-decides UX explícito per call.
+- Never throws across boundary.
+
+**Cons:**
+- **Overkill for solver client errors.** Solver errors son inherently async events (worker crash, GPU device lost mid-frame, model load failure during animation), NOT synchronous return values. Result-pattern fits boundary-parsing of synchronous data; solver async errors flow naturally via `onError` callback.
+- Migration cost high — every fallible method needs Result return type + caller-side branching.
+- A3 already did the lift WASM-side via `onError` callback; doubling with Result on every method reduces clarity.
+
+#### Option 3.3.C — Status quo (CPU keeps `{ message }`, WASM keeps `{ code, message }`)
+
+No change.
+
+**Pros:**
+- Zero migration cost.
+
+**Cons:**
+- Drift persists. Cross-tier consumer code can't reason on `code` unless tier is WASM.
+- Pattern 2.5 extend "add coverage to gaps" goal not met.
+
+#### Recommendation per § 3.3
+
+**Lean: Option 3.3.A (uniform `{ code, message }` extending A3).** Confidence: **high**.
+
+Reasoning:
+- Pre-emptive Sam directive: "(a) uniform `{code, message}` extending A3" — Result-pattern overkill aquí; A3 already hizo el lift.
+- Consumer code (UI surfacing per A3 § 3.2 + future tier-aware UX) gains structured signal.
+- Telemetry-ready out-of-the-box.
+- Migration bounded — 4 client error paths, ~15-20 líneas TS aggregate.
+
+**Counter:**
+- 3.3.B Result-pattern: defensible si solver client API moves to fully-Result-typed (B6-state precedent generalized). Pero solver errors son async events (worker crash mid-step, GPU device lost mid-frame), flow naturally via `onError` callback — Result on every method is overkill.
+- 3.3.C status quo: leaves CPU + GPU + Neural without structured signal. Pattern 2.5 extend gap not closed.
+
+**Tradeoff aceptado:** SolverErrorCode enum may need iterative extension as new error sources emerge (`string` fallback mitigates).
+
+---
+
+### 3.4 Capability surface across 4 tiers (A7 extend)
+
+**Pregunta:** post-A7, `solverCapabilities.ts` defines `SolverCapabilities` interface + `CPU_CAPABILITIES` + `WASM_CAPABILITIES` constants + getter en CPU + WASM clients. **GPU + Neural NO have capability getter.** ¿Add getter a GPU + Neural, module-level constants, o capability negotiation API?
+
+#### Option 3.4.A — Add `capabilities` getter a GPU + Neural clients (parallel A7 pattern)
+
+Mirror A7 pattern: add `GPU_CAPABILITIES` + `NEURAL_CAPABILITIES` constants + getter on each client.
+
+```ts
+// solverCapabilities.ts (extend post-A7):
+export const GPU_CAPABILITIES: Readonly<SolverCapabilities & { frameDriven: true }> = Object.freeze({
+  selfCollision: true,         // GPU TSL has self-collision (tslSelfCollision.ts)
+  lra: false,                  // GPU NOT supporting LRA currently
+  pressure: false,             // GPU NOT supporting per-piece pressure
+  fold: false,                 // GPU NOT supporting fold
+  pieceStiffness: false,       // GPU NOT supporting piece stiffness
+  frameDriven: true,           // TSL execution model (Constraint B from 3.1)
+});
+
+export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities & { frameDriven: false }> = Object.freeze({
+  selfCollision: false,
+  lra: false,
+  pressure: false,
+  fold: false,
+  pieceStiffness: false,
+  frameDriven: false,          // Neural runs animation loop internally
+});
+
+// Add to SolverCapabilities interface:
+export interface SolverCapabilities {
+  selfCollision: boolean;
+  lra: boolean;
+  pressure: boolean;
+  fold: boolean;
+  pieceStiffness: boolean;
+  frameDriven?: boolean;  // NEW: TSL execution model flag (3.1 Constraint B)
+}
+```
+
+GPU client:
+```ts
+get capabilities(): SolverCapabilities {
+  return GPU_CAPABILITIES;
+}
+```
+
+Neural client:
+```ts
+get capabilities(): SolverCapabilities {
+  return NEURAL_CAPABILITIES;
+}
+```
+
+**Pros:**
+- Parallel pattern al A7 — consistent shape across 4 tiers.
+- Minimal lift (~10 líneas TS per client + 2 constants).
+- `frameDriven` capability flag absorbs Constraint B (TSL execution model) cleanly.
+- Consumer code can polymorphically query `client.capabilities.X` regardless of tier.
+
+**Cons:**
+- GPU capability flags need verification — does GPU actually support self-collision (via `tslSelfCollision.ts`)? Needs sweep verification before flag set.
+- Adding capability requires update across 4 constants — discipline (mitigation: lint rule deferred to follow-up issue, A7 § 3.6 deferred).
+
+#### Option 3.4.B — Module-level constants only (no per-instance getter)
+
+Skip the getter; consumers import constants directly.
+
+```ts
+// Consumer:
+import { GPU_CAPABILITIES, WASM_CAPABILITIES } from './solverCapabilities';
+
+if (tier === 'gpu' && GPU_CAPABILITIES.lra) { ... }
+```
+
+**Pros:**
+- Even simpler (no getter method required).
+- Constants are static — no per-instance overhead.
+
+**Cons:**
+- Consumer code needs to know tier identity to look up constants. The getter pattern decouples this — `client.capabilities.lra` works regardless of tier.
+- Less polymorphic than 3.4.A; reduces value of interface (3.1.C requires `capabilities` on the interface).
+- Diverges from A7 pattern (CPU + WASM use getter).
+
+#### Option 3.4.C — Capability negotiation API
+
+Dynamic capability negotiation between client and consumer:
+
+```ts
+client.requestCapabilities(['lra', 'selfCollision']) → returns granted capabilities;
+client.onCapabilityChange = (caps) => { ... };  // GPU device lost → caps revoked
+```
+
+**Pros:**
+- Handles dynamic capability changes (GPU device lost mid-session, Neural model swap).
+
+**Cons:**
+- Massive overkill for current capability surface (5 static flags).
+- No actual use case — current capabilities are static per tier.
+- Pre-empts dynamic features (capability change events) without driver.
+
+#### Recommendation per § 3.4
+
+**Lean: Option 3.4.A (add getter a GPU + Neural).** Confidence: **high**.
+
+Reasoning:
+- Pre-emptive Sam directive: "(a) add getter a GPU + Neural" — minimal lift, fills A7 gap directly.
+- Parallel pattern al A7 ratificado (CPU + WASM getter shape).
+- `frameDriven` capability flag clean carrier for Constraint B (TSL execution model).
+- Consumer polymorphic dispatch via `client.capabilities.X` works across 4 tiers.
+- 3.1.C interface requires `capabilities` on the interface — Option 3.4.A satisfies.
+
+**Pre-Sec 3 sweep needed for GPU capability flags:**
+- Does GPU client/TSL solver actually support self-collision? Verify `tslSelfCollision.ts` is wired into the solver path.
+- Does GPU support any of LRA/pressure/fold/piece-stiffness? Currently assumed `false` for all 5 features beyond self-collision.
+
+If GPU sweep reveals different capability state, adjust `GPU_CAPABILITIES` accordingly. Lean does NOT change.
+
+**Tradeoff aceptado:** capability flag enum extension across N tiers requires discipline (lint rule deferred per A7 § 3.6 to follow-up issue, bundles with #674 useDisposable + #659 @cascade + #662 fabric + #664 selectXById).
+
+---
+
+### 3.5 Setter divergence per-method classification
+
+**Pregunta:** setter divergencias (wind, pins, fabric, gravity, snapshots) tienen drivers distintos. ¿Uniform method signatures, ratify via capabilities, or per-method canonical?
+
+Per Sam directive: "single sub-decision pero require per-setter classification en el análisis (wind = CPU implementation gap; pins single vs batch = API shape choice; fabric = CPU resolution helper portable; gravity = bundled-in-setConfig). Forzar uniform shape across todos sería straw-man — distintos drivers, distintas resoluciones."
+
+Per-setter classification:
+
+#### 3.5.1 — `wind`
+
+**Current state:**
+- CPU: NO live wind. `// CPU solver does not support live wind updates yet` (`useSimulationLifecycle.ts:491`).
+- WASM: `setWind(force: [number, number, number])` — 1 arg.
+- GPU: `setWind(force: [number, number, number], dragCoefficient?: number)` — 2 args, drag coefficient optional.
+- Neural: NO wind support (no inflation forces in ML model).
+
+**Driver:** CPU is the implementation gap (feature absence, not API shape). WASM vs GPU differ on `dragCoefficient` arg.
+
+**Resolution lean:** CPU wind is a feature gap → A7-style decision (port WASM wind to CPU, or ratify CPU-no-wind via capability flag). **Out of A6 scope.** A6 ratifies the **interface signature**: `setWind?(force, dragCoefficient?)` optional method on interface, capability-gated via `wind: boolean` flag (new). GPU's 2-arg vs WASM's 1-arg reconciles via optional `dragCoefficient` parameter — both implementations accept the canonical signature; WASM ignores `dragCoefficient`.
+
+**Open question:** is GPU's `dragCoefficient` semantically the same as WASM's would be? Verify before merge. If divergent semantics, separate setter (`setWindDrag(coef)`) preferable.
+
+#### 3.5.2 — `pins`
+
+**Current state:**
+- CPU: `pinParticle(index: number)` / `unpinParticle(index: number)` — single-pin shape.
+- WASM: `setPins(pins: Array<{vertexIndex, position}>)` / `clearPins()` — batch shape.
+- GPU + Neural: NEITHER (no pin support).
+
+**Driver:** API shape choice (single vs batch). Both shapes functionally complete; question is canonical.
+
+**Resolution lean:** Canonical batch shape (WASM-style). Reasoning:
+- Batch is more efficient at scale (fewer postMessage calls for many pins).
+- Single-pin shape encodable as batch-of-one.
+- WASM's `setPins` is the more recent API (older CPU used incremental).
+- 3.5.1 wind reconciliation precedent: optional uniform signature.
+
+Migration: CPU adopts `setPins`/`clearPins` shape; existing `pinParticle`/`unpinParticle` deprecated (or kept as thin wrappers calling `setPins([{idx, pos}])`).
+
+**Open question:** does CPU need pin position info, or just index? WASM stores `position` (the pin target); if CPU pins are positional, `setPins(batch)` is correct; if CPU pins are "freeze at current position", just index suffices and shape diverges. Verify.
+
+#### 3.5.3 — `fabric`
+
+**Current state:**
+- CPU: `setFabric(fabricId: string)` — resolves fabric → physics config locally (`physicalFabric.ts` lookup + `setConfig` internally).
+- WASM/GPU/Neural: NEITHER (use direct `setConfig` with resolved physics fields).
+
+**Driver:** CPU resolution helper portable. Either:
+- Push `setFabric` to other tiers (each client resolves locally).
+- Move resolution to consumer-side (every consumer calls `setConfig(getPhysicalFabric(id))`).
+
+**Resolution lean:** Move resolution to consumer-side. Reasoning:
+- `setFabric` is a convenience helper, not a primitive solver operation.
+- Already partially the case — `useSimulationLifecycle` calls `getPhysicalFabric(fabricId)` for non-CPU tiers and dispatches via `setConfig`.
+- Removing `setFabric` from CPU client unifies dispatch shape across 4 tiers.
+
+Migration: CPU `setFabric(fabricId)` deprecated; consumers call `client.setConfig(getPhysicalFabric(fabricId))`.
+
+**Open question:** is `setFabric` used by callers other than `useSimulationLifecycle`? If many callers, consider keeping as thin wrapper for backward compat. Verify.
+
+#### 3.5.4 — `gravity`
+
+**Current state:**
+- CPU: `setGravity(gravity: [number, number, number])` — separate setter.
+- WASM: via `setConfig({ gravityY })` — bundled.
+- GPU: via config — bundled.
+- Neural: via config — bundled.
+
+**Driver:** bundled-in-setConfig vs separate setter.
+
+**Resolution lean:** Canonical bundled (`setConfig({gravityY})`). Reasoning:
+- 3 of 4 tiers already bundle.
+- `gravityY` is a single float; `setConfig({gravityY: -9.81})` is concise.
+- Removing `setGravity` reduces interface surface.
+- Consistent with `wind` (both are scene-level forces via config).
+
+Migration: CPU `setGravity(vec)` deprecated; bundle into `setConfig({gravityX, gravityY, gravityZ})` (CPU uses 3-component vector currently, vs WASM's `gravityY` only — verify). Likely CPU's 3-component is over-engineered (gravity is typically Y-axis only); A6 may simplify to `gravityY` matching WASM, or keep 3-component on CPU's `ClothSimConfig`.
+
+**Open question:** does CPU use 3-component gravity intentionally (e.g., simulating gravity in different orientations)? If yes, keep CPU's richer shape; WASM/GPU/Neural ratify `gravityY` only as their subset.
+
+#### 3.5.5 — `snapshots` (saveSnapshot / restoreSnapshot / deleteSnapshot)
+
+**Current state:**
+- CPU: ✅ all three methods.
+- WASM: ✅ all three methods.
+- GPU + Neural: NEITHER.
+
+**Driver:** GPU + Neural don't support snapshots (no obvious use case). Capability gate.
+
+**Resolution lean:** Optional methods on interface, capability-gated via new `snapshots: boolean` flag. CPU + WASM = `true`; GPU + Neural = `false`.
+
+#### 3.5.6 — `applyInitialTriangleCollision` (WASM only)
+
+**Current state:** WASM only. CPU triggers initial collision pass automatically via existing logic; GPU + Neural don't need it.
+
+**Driver:** WASM-specific lifecycle quirk (init-time settling).
+
+**Resolution lean:** Keep on WASM concrete class only, NOT in interface. Capability flag NOT needed (it's a tier-internal lifecycle detail).
+
+#### 3.5.7 — Aggregate setter recommendation
+
+**Lean: Option (c) per-method canonical (per Sam directive).**
+
+| Method | Canonical signature | Capability flag | Notes |
+|---|---|---|---|
+| `setWind` | `setWind?(force, dragCoefficient?): void` | `wind: boolean` | CPU gap is A7-style feature port |
+| `setPins`/`clearPins` | Batch shape (WASM-style) | `pins: boolean` | CPU migrates from single-pin |
+| `setFabric` | DEPRECATED | n/a | Move resolution to consumer |
+| `setGravity` | DEPRECATED — bundle into `setConfig` | n/a | Verify CPU 3-component vs WASM Y-only |
+| Snapshots | Optional methods | `snapshots: boolean` | CPU + WASM `true`; GPU + Neural `false` |
+| `applyInitialTriangleCollision` | WASM concrete-class only | n/a | Tier-internal lifecycle |
+
+Confidence: **medium-high**.
+
+Reasoning:
+- Per Sam directive: per-setter analysis required; uniform-everywhere is straw-man.
+- Drivers distintos (CPU gap vs API choice vs convenience helper vs bundled-vs-separate) require distinct resolutions.
+- 3.4 capability surface absorbs `wind`, `pins`, `snapshots` flags.
+
+**Decoupled to follow-ups (per § 3.6 hybrid lean):**
+- Setter migration implementation (deprecate + replace) — per-method follow-up issues.
+- Interface declaration of optional setters — A6 closure declares; per-method consumer migration deferred.
+
+**Critical open questions for Sec 4:**
+- 3.5.1 — GPU `dragCoefficient` semantics same as WASM hypothetical?
+- 3.5.2 — CPU pins positional or freeze-at-current?
+- 3.5.3 — `setFabric` callers beyond `useSimulationLifecycle`?
+- 3.5.4 — CPU 3-component gravity intentional?
+
+Sweep these in Sec 4 recomendación pre-F3.
+
+---
+
+**FIN Sec 3.3 + 3.4 + 3.5.** Sec 3.6 (decoupled vs bundled F3) + Sec 3.7 (docs) en commit closure.
