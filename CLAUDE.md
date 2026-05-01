@@ -1115,6 +1115,25 @@ Three variants ratify the underlying pattern as intentional; differ in shape of 
 
 **Diagnostic refinement:** ¿el "drift" puede addresarse con additions sin restructuring del pattern existente? → Pattern 2.5 extend. ¿Removing artifacts? → Pattern 2.5 cleanup. ¿Surgical helper para inline pattern? → Pattern 2.5 lite. Si requires restructuring → Pattern 1.
 
+#### Pattern 2.5 extend variant — second data point (anchored 2026-05-01 after C1)
+
+C1 (Three.js `useMemo + BufferGeometry` lifecycle) confirms generalizable shape de A3 (cross-boundary error handling). Both ejes:
+
+- **Pattern existing legitimate:** defensive Rust + CPU fallback en A3; inline `useEffect dispose` en C1 (BUG-9 fix).
+- **Gaps en cobertura específica:** silent fallback `positions=0` sin UI surface en A3 (3 gaps — panic hook + UI + NaN telemetry); 2 missed leak sites (SelectedVertexRenderer + ClothMesh:382) en C1 + lack of canonical helper name for discoverability.
+- **Resolution:** extract canonical para discoverability + add coverage to gaps + ratify pattern + lint rule follow-up.
+
+**Sub-rule status: established (2/2 data points consistent shape).**
+
+Pattern 2.5 extend cabe cuando:
+1. Pattern existing es legitimate (verified via sweep refresh + git blame).
+2. Drift consiste en gaps en cobertura específicos (not the pattern itself).
+3. Extraction de canonical agrega discoverability + enforcement sin restructurar el pattern.
+
+Si emerge tercer data point con same shape: confirmation redundante. Si emerge un caso que NO encaja (e.g., Pattern 2.5 extend con scope variations): sub-rule se refina con variant nueva.
+
+**Origen 2.5 extend (C1):** 7 sites totales del pattern `useMemo + new BufferGeometry`. 5 inline-fixed por BUG-9 (#612), 2 missed por inventory window (SelectedVertexRenderer, ClothMesh:382). Sweep refresh per regla 1 v2/v3 expandió inventory +40% (5→7 sites). Pattern (inline `useEffect dispose`) ratificado as intentional + canonical helper `useDisposable` extracted para discoverability + lint rule deferred a follow-up issue (#674) bundling con cluster existing (#659/#662/#664). Cleanup = add coverage al 2 missed + extract canonical + add CLAUDE.md section. Code delta positivo (+1384 / -17 incluyendo RFC doc). Pattern ratificado as intentional; coverage extends sin restructuring.
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
