@@ -951,6 +951,549 @@ The aggregate is similar; the difference is timing distribution and risk shape.
 
 ---
 
-## Sec 4+ pendiente
+---
 
-Sec 4 (recomendación consolidada per-feature + integration con 3.2-3.6 + LRA override consolidation), Sec 5 (Migration plan multi-step — decoupled per § 3.6 Option B with self-collision buffer 12-18h), Sec 6 (Cross-references), Sec 7 (Reopen triggers), Sec 8 (Deuda técnica explícita), Sec 9 (Pregunta a Sam + estado + calibración) — commits subsiguientes.
+## 4. Recomendación consolidada
+
+### 4.1 Per-feature consolidated decisions (final tabla)
+
+Final per-feature decisions post-§ 3.1 + LRA override per Sam directive:
+
+| Feature | Final lean | Confidence | Cost (Fase 3 follow-up) |
+|---|---|---|---|
+| **Self-collision** | **(a) Port complete to Rust** | medium | ~12-18h (con buffer per Sam Q4) |
+| **LRA** | **(b) Ratify CPU-only + UI surface** ← Sam override from (a) | medium | ~1-2h UI surface |
+| **Pressure** | **(a) Port to WASM** | medium | ~4-6h |
+| **Fold** | **(b) Ratify CPU-only + UI surface** | low-medium | ~1-2h UI surface |
+| **Piece stiffness** | **(a) Port to WASM** | medium-high | ~2-3h |
+| **Adaptive substeps** | **(b)-architectural ratify + JS-side adaptive cadence** | high | ~1-2h |
+| **Velocity clamp** | **(b)-architectural ratify (already parity)** | high | 0h (docs only) |
+
+**Aggregate post-LRA-override:**
+- 3 ports (self-collision, pressure, piece stiffness): ~18-27h.
+- 2 ratify-CPU-only-with-UI-surface (LRA, fold): ~2-4h combined.
+- 2 architectural ratifies (adaptive substeps + JS-side adaptive, velocity clamp parity): ~1-2h combined.
+- **Total Fase 3 distributed: ~21-33h aggregate.**
+- **A7 closure Fase 3 proper: ~3-5h** (per § 3.6 Option B decoupled).
+
+### 4.2 Sub-decisions integration
+
+The 6 sub-decisiones cascadan coherentemente sobre 3.1:
+
+```
+§ 3.1 (per-feature) → 3 ports + 2 ratify-CPU-only + 2 architectural
+        ↓
+§ 3.2 (interface)  → status quo + defer to A6
+        │           Reasoning: new ports add concrete methods to
+        │                      WasmSolverClient mirroring CPU client;
+        │                      A6 extracts cleanly post-A7.
+        ↓
+§ 3.3 (flag granularity) → tier-based with capability surface
+        │           Reasoning: 2 ratify-CPU-only features need UI
+        │                      surface; capabilities object natural
+        │                      carrier; forward-compatible with C4.
+        ↓
+§ 3.4 (parity testing)   → status quo + optional (A) for self-collision
+        │           Reasoning: 3 ports tractable manually; formal
+        │                      parity infra cost-benefit weak; self-
+        │                      collision complexity may justify (A)
+        │                      hybrid for that one port.
+        ↓
+§ 3.5 (documentation)    → 3-layer (JSDoc + CLAUDE.md + UI surface)
+        │           Reasoning: audit precedent (22 ratifications);
+        │                      UI surface specific to A7 closes
+        │                      silent-absence gap for ratify-CPU-only.
+        ↓
+§ 3.6 (roadmap F3)       → decoupled per Sam directive (B6-state precedent)
+                    Reasoning: atomicity per commit + risk distribution
+                               + pace consistency + B6-state precedent.
+```
+
+**Cross-eje boundaries enforced:**
+- § 3.2 defers interface design → **A6 territory** (worker message protocol asimétrico).
+- § 3.3 bounded a CPU-vs-WASM only → tier selection 4-way is **C4 territory**.
+- § 3.4 hybrid (A-for-self-collision) ratifies that formal parity infra lands ONCE with the highest-complexity port; subsequent ports opt in.
+
+### 4.3 LRA override consolidation (Sam directive verbatim)
+
+§ 3.1.2 original lean was (a) port to WASM with confidence medium-low. Sam directive override to (b) ratify CPU-only + UI surface. Reasoning verbatim from Sam directive 2026-05-01:
+
+> Tus razones para (b):
+> - CPU LRA ya 8.1× fast post-PR-589.
+> - 0 WASM-vs-CPU bench data — port duplicates optimized algorithm sin clear performance unlock.
+> - Port cost ~8-12h es el segundo más grande del list, detrás de self-collision.
+>
+> Razones adicionales para (b):
+> - UX surface cleaner que silent absence: "LRA requires CPU tier" warning cuando user enable LRA con WASM tier active.
+> - C4 territory hereda input limpio cuando handle tier selection 4-way.
+> - Cost reduction: ~18-28h aggregate vs ~26-40h.
+>
+> Implementación de UI surface para LRA ratify:
+> - LRA enable toggle warning si WASM tier active.
+> - Auto-switch to CPU tier (transparent) si feature gates tier.
+> - O explicit user choice "use CPU tier for LRA" vs "skip LRA on WASM".
+>
+> NO es C4 (tier selection 4-way) — es feature-gates-tier (binary WASM has it / WASM doesn't) que A7 puede decide solo.
+
+**Override accepted.** Final lean for LRA: **(b) ratify CPU-only + UI surface.**
+
+The original lean (a) was medium-low confidence — the lowest of the inventory — driven by the cost-benefit ratio (~8-12h port for marginal perf gain over already-fast CPU LRA). Sam's override pushes the calibration honest into the decision, replacing silent absence with explicit UX surface.
+
+**Aggregate cost reduction confirmed:** ~18-27h ports vs ~26-36h pre-override. ~30% reduction.
+
+### 4.4 Confidence calibration overall
+
+Per-feature confidence distribution post-override:
+
+| Confidence | Count | Features |
+|---|---|---|
+| **High** | 2 | Adaptive substeps, Velocity clamp |
+| **Medium-high** | 1 | Piece stiffness |
+| **Medium** | 3 | Self-collision, LRA, Pressure |
+| **Low-medium** | 1 | Fold |
+
+**Overall A7 confidence: medium-high.** No feature is at "low confidence" — every decision has explicit reasoning + counter-arguments respected.
+
+Per-sub-decision confidence:
+
+| Sub-decision | Confidence |
+|---|---|
+| 3.1 (per-feature) | varies (high to low-medium per feature) |
+| 3.2 (interface) | high |
+| 3.3 (flag granularity) | medium-high |
+| 3.4 (parity testing) | medium |
+| 3.5 (docs) | high |
+| 3.6 (roadmap decoupled) | high |
+
+**Counter respected:** if Fase 3 budget is generous and the team prefers bundled (Option A) for visibility of A7 closure shipping features, override is defensible. If LRA override should reverse to (a) port post-bench-data, reopen § 3.1.2.
+
+### 4.5 What changes for callers
+
+Per-feature implication for downstream consumers:
+
+#### Self-collision (post-port follow-up)
+- `WasmSolverClient` gains `setSelfCollisionAdjacency(offsets, neighbors)` method.
+- `wasmSolverWorker.ts:159-165` warning removed; `selfCollision: true` flag becomes effective.
+- BUG-5 #608 closes via the port follow-up issue.
+- `capabilities.selfCollision = true` post-port.
+
+#### LRA (ratify CPU-only + UI surface)
+- `WasmSolverClient` does NOT gain `setLRA` method.
+- `capabilities.lra = false` permanently for WASM tier.
+- UI surface: warning when LRA enabled + WASM active. Optional auto-tier-switch.
+
+#### Pressure (post-port follow-up)
+- `WasmSolverClient` gains `setPiecePressures(offsets, pressures)` method.
+- `capabilities.pressure = true` post-port.
+
+#### Fold (ratify CPU-only + UI surface)
+- `WasmSolverClient` does NOT gain `setFoldConstraints` method.
+- `capabilities.fold = false` permanently for WASM tier.
+- UI surface: warning when fold enabled + WASM active.
+
+#### Piece stiffness (post-port follow-up)
+- `WasmSolverClient` gains `applyPieceStiffness(offsets, multipliers)` method.
+- `capabilities.pieceStiffness = true` post-port.
+
+#### Adaptive substeps (architectural ratify + JS-side adaptive)
+- `wasmSolverWorker.ts` gains JS-side adaptive cadence logic (~10-15 lines): post-step max velocity computation + scale next-step substep count (10-30 range matching CPU).
+- No Rust-side change.
+- WASM tier matches CPU adaptive substep behavior.
+
+#### Velocity clamp (architectural ratify, already parity)
+- No code changes.
+- JSDoc + CLAUDE.md anchors the architectural location difference.
+
+### 4.6 Decision rationale summary
+
+A7 RFC ratifies a **mixed per-feature equivalence policy** for the WASM cloth solver:
+
+1. **Port high-impact UX features** where cost is bounded and impact is clear (self-collision, pressure, piece stiffness).
+2. **Ratify CPU-only-by-design + UI surface** for features where port cost-benefit is weak (LRA — already optimized in CPU; fold — stylistic UX bajo).
+3. **Architectural ratifies** for features where the divergence is location, not behavior (adaptive substeps, velocity clamp).
+4. **Decoupled Fase 3** ratifies policy in A7 closure; ports queued as per-feature follow-up issues for incremental delivery + risk distribution.
+5. **No interface refactoring** in A7 — A6 RFC owns that decision.
+6. **Capability surface** as the canonical UX mechanism for tier-aware features; forward-compatible with C4.
+
+**Pattern 2.5 extend mixed shape confirmed** as audit hypothesis. **Tercer data point** post-A3, post-C1: sub-rule established 2/2 → confirmation redundante 3/3 if A7 closes in this shape. § 9.4 expands.
+
+---
+
+## 5. Migration plan multi-step (decoupled per § 3.6 Option B)
+
+### 5.1 Branch + PR
+
+This RFC's branch (`drift/a7-wasm-cpu-equivalence`) lands the **A7 closure proper** (policy ratification + UI surface + capability skeleton + architectural docs). Per-feature ports go to **separate branches** as follow-up issues land.
+
+### 5.2 A7 closure Fase 3 commit sequence (atomic per audit rules)
+
+**Commit 1 — CLAUDE.md "WASM vs CPU solver capabilities (A7 ratified)" section.**
+
+Files:
+- `CLAUDE.md` — new section.
+
+Estimated size: ~80-120 líneas (matching precedent of "Three.js disposable lifecycle (C1 ratified)" ~75 líneas + "Persistence policy (B6-state ratified)" ~60 líneas).
+
+Content:
+- Cross-ref to A7 RFC.
+- Canonical capability table (per-feature CPU vs WASM status).
+- Decision rule for new physics features (default: port if cost ≤ ~6h, ratify CPU-only if cost > ~10h or UX impact bajo).
+- Reopen triggers (per § 7).
+- Cross-ref to A6, C4 explicit handoffs.
+
+**Commit 2 — UI surface for ratified-CPU-only features (LRA + fold).**
+
+Files (estimated, may evolve during implementation):
+- `src/components/Viewport3D/RenderSettingsPanel.tsx` (or wherever LRA/fold toggles live).
+- New UI component for capability warning (e.g., `src/components/Viewport3D/TierCapabilityWarning.tsx`).
+
+Estimated size: ~50-100 líneas TS.
+
+Content:
+- Warning when user enables LRA + active tier is WASM (or fold + WASM).
+- Two UX options for resolution (decision deferred to implementer — both are valid):
+  - (a) Modal asking "Switch to CPU tier?" with explicit confirmation.
+  - (b) Inline indicator + manual tier-switch button.
+
+**Commit 3 — Capability surface skeleton.**
+
+Files:
+- `src/utils/cloth/wasm/wasmSolverClient.ts` — add `capabilities` getter.
+- `src/utils/cloth/clothWorkerClient.ts` — add `capabilities` getter (CPU has all features → all true).
+
+Estimated size: ~40-80 líneas TS.
+
+Content:
+```ts
+// WasmSolverClient.ts (added):
+get capabilities(): SolverCapabilities {
+  return {
+    selfCollision: false,    // updated to true post-port
+    lra: false,              // permanently false (ratified CPU-only)
+    pressure: false,         // updated to true post-port
+    fold: false,             // permanently false (ratified CPU-only)
+    pieceStiffness: false,   // updated to true post-port
+  };
+}
+
+// ClothWorkerClient.ts (added):
+get capabilities(): SolverCapabilities {
+  return {
+    selfCollision: true,
+    lra: true,
+    pressure: true,
+    fold: true,
+    pieceStiffness: true,
+  };
+}
+```
+
+`SolverCapabilities` type definition lives in a shared module (e.g., `src/utils/cloth/types.ts` or new `solverCapabilities.ts`).
+
+**Commit 4 — Architectural docs (JSDoc on existing methods).**
+
+Files:
+- `src/utils/cloth/xpbdSolver.ts` — JSDoc on `adaptiveSubsteps` config + `maxVelocity` clamp explaining tier-architectural decision.
+- `src/utils/cloth/wasm/wasmSolverWorker.ts` — JSDoc on substep loop + velocity clamp explaining JS-side equivalent.
+- `crates/xpbd-wasm/src/lib.rs` — rustdoc on `step()` explaining hardcoded internal substeps=1 + rationale.
+
+Estimated size: ~30-50 líneas docs (no code changes, only doc strings).
+
+**Total A7 closure Fase 3: ~3-5h.**
+
+### 5.3 Per-feature follow-up issues (ports queued)
+
+Per § 3.6 Option B (decoupled), each port lands as separate PR after A7 merge. Issues opened with severity labels mirror cluster precedent.
+
+#### #XXX Self-collision port (severity:medium)
+
+**Body template:**
+
+```
+## Context
+
+A7 RFC closure (PR #675, merged 2026-05-XX) ratified Opción (a) Port complete algorithm to Rust for self-collision (per § 3.1.1).
+
+Cross-ref:
+- docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md § 3.1.1
+- BUG-5 #608 (closes when this lands)
+
+## Scope
+
+Port `solveSelfCollision` (CPU TS implementation in `src/utils/cloth/selfCollision.ts`) to Rust crate `crates/xpbd-wasm/src/lib.rs`.
+
+Algorithm: SpatialHashGrid (build per-step) + collision detection per particle pair + collision response (position correction with thickness margin) + neighbor skipping via adjacency.
+
+## Estimated effort
+
+12-18h with buffer (per Sam directive Q4).
+
+Breakdown estimate:
+- SpatialHashGrid Rust impl: ~80-120L (~3-4h con tests).
+- Triangle collision Rust impl: ~80-150L (~3-5h).
+- Adjacency consumer en solver: ~20-50L (~1-2h).
+- Worker hookup + set_adjacency call: ~10-20L (~30min).
+- Parity testing (optional § 3.4 hybrid (A) for self-collision) + integration: ~30-50L (~2-3h).
+
+Buffer: +3-5h if Rust borrow checker or WASM memory layout issues emerge.
+
+## Acceptance criteria
+
+- [ ] `solve_self_collision` function implemented in Rust crate.
+- [ ] `set_adjacency` setter wired up from `wasmSolverWorker.ts`.
+- [ ] `selfCollision: true` config flag becomes effective on WASM tier.
+- [ ] Existing CPU self-collision tests pass for both tiers (manual smoke or formal parity per § 3.4 decision).
+- [ ] `wasmSolverWorker.ts:159-165` warning removed.
+- [ ] `WasmSolverClient.capabilities.selfCollision = true`.
+- [ ] BUG-5 #608 closes.
+
+## Acceptance gates
+
+- `npx tsc -b --noEmit && npm run test && npm run lint` clean.
+- WASM rebuild verified (`pkg/xpbd_wasm.js + .wasm` synced to `public/wasm/`).
+- Manual smoke test: cloth folding test passes.
+```
+
+#### #YYY Pressure port (severity:medium)
+
+Similar shape, lighter scope (~4-6h). Body cites § 3.1.3.
+
+#### #ZZZ Piece-stiffness port (severity:low)
+
+Cheap port (~2-3h). Body cites § 3.1.5.
+
+#### #WWW LRA UI surface implementation (severity:low)
+
+If commit 2 (Fase 3 closure) doesn't fully implement, follow-up issue. Body cites § 3.1.2 + § 3.3.
+
+#### #VVV Fold UI surface implementation (severity:low)
+
+Same shape as LRA UI. May bundle with LRA in single PR.
+
+#### #UUU Capability surface full implementation (severity:medium)
+
+If commit 3 skeleton is partial, follow-up for full implementation. May depend on C4 framing.
+
+### 5.4 Verification
+
+**A7 closure (commits 1-4):**
+- `npx tsc -b --noEmit` clean per commit.
+- `npm run test` clean per commit (no functional changes; docs + UI + skeleton only).
+- `npm run lint` clean per commit.
+
+**Per-feature ports (separate branches/PRs):**
+- Same gates as A7 closure plus WASM rebuild verification.
+- Manual smoke test per feature (§ 3.4 status quo).
+- Optional formal parity test for self-collision specifically (§ 3.4 hybrid (A)).
+
+### 5.5 Rollback plan
+
+Each A7 closure commit (1-4) is mechanically reversible. Per-feature port commits (in follow-up branches) are independent — rollback of one port doesn't affect others.
+
+---
+
+## 6. Cross-references
+
+### 6.1 Input docs cited in this RFC
+
+- `docs/reports/2026-04-28-drift-inventory-fase1.md` § A7 — original entry (6 divergencias).
+- `docs/reports/2026-04-29-drift-inventory-addendum.md` § 7 — confirms BUG-5 absorbed, scope context.
+- `docs/reports/2026-04-28-drift-fase2-classification.md` — places A7 in (c) RFC bucket.
+
+### 6.2 Adjacent eje precedents
+
+- **A3 closure (PR #672, merged 2026-05-01)** — Pattern 2.5 extend variant first data point. A7 leverages 4 patterns:
+  - `console_error_panic_hook` adopted (preventive insurance).
+  - Result-pattern convention forward-only (for new fallible exports).
+  - NaN guards en WASM→JS boundary (covers new physics features).
+  - Silent fallback UI surface pattern (extends to capability surface in A7).
+- **C1 closure (PR #673, merged 2026-05-01)** — Pattern 2.5 extend variant second data point. Sub-rule established 2/2. A7 may add 3rd data point.
+- **B6-state ratification** — precedent for "policy ratified + per-feature follow-ups" (cited in § 3.6 Option B reasoning).
+- **D7 ratification** — precedent for "ortogonal lifecycles → ratify separados" (LRA + fold ratify CPU-only follows similar shape).
+
+### 6.3 Cross-eje boundaries (explicit handoffs)
+
+- **A6 RFC** (worker message protocol asimétrico) — A7's § 3.2 defers interface design here. A7's per-feature port methods (setSelfCollisionAdjacency, setPiecePressures, applyPieceStiffness) become candidate methods for A6's interface extraction.
+- **C4 RFC** (TSL/WebGPU/WASM/CPU coexistence) — A7's § 3.3 capability surface is direct input. C4 may extend tier-based capabilities to all 4 tiers.
+- **A2 RFC** (cross-boundary serialization `ClothSimConfig`) — A7's port follow-ups may add new fields to shared config (e.g., `pressureEnabled`, `pieceStiffnessMultipliers`). A2 designs canonical shape.
+- **A4 RFC** (Geometry/mesh ops Rust↔TS) — A7's self-collision port may need spatial hash data structure. Design choice (separate Rust crate vs inline in xpbd-wasm) is partially A4 territory.
+
+### 6.4 BUG-5 #608 closure path
+
+BUG-5 #608 is **OPEN** at A7 closure time. A7 ratifies the **port path** for self-collision (§ 3.1.1 Option (a)). Issue closes when the self-collision port follow-up issue lands (#XXX).
+
+A7 closure does NOT close BUG-5; the port implementation does. A7 establishes the canonical resolution path and queues the implementation work.
+
+### 6.5 Methodology rules applied
+
+- **Regla 1 v2** (read contents) — applied to xpbdSolver.ts and lib.rs to verify per-feature implementation status.
+- **Regla 1 v3** (verify divergence + look outside obvious directory) — confirmed bench/ has CPU-only data + 0 WASM-vs-CPU comparison.
+- **Inventory drift overestimation pattern** (meta-anchor) — original A7 inventory said "6 divergencias"; refined to 5 real gaps + 2 architectural diffs (2 of original 6 were closed by bug fixes pre-A7).
+- **Pattern 2.5 hybrid variants extend** — A7 fits the variant: pattern existing legitimate (CPU+WASM coexistence), gaps en cobertura (5 features), extraction de canonical (capability surface + UI) without restructuring.
+- **Process discipline (stop → notify → wait → execute)** — applied at sweep extension + Sec 3a/3b split + LRA override.
+
+---
+
+## 7. Reopen triggers
+
+A7 reopens if any of:
+
+### Per-feature triggers
+
+1. **Self-collision port stalls** — if the follow-up issue stays open >3 months without progress, reevaluate (a) Port vs (d) Ratify CPU-only.
+2. **LRA UX impact reported** — if users on WASM tier hit confusion from LRA absence, evaluate override back to (a) port.
+3. **Pressure port reveals subtle divergence** — if integration tests catch CPU vs WASM output mismatch post-port, reopen § 3.4 with (A) formal parity tests.
+4. **Fold UX impact reported** — same as LRA. Currently low priority (UX impact bajo by audit hypothesis).
+5. **Piece stiffness port simpler than estimated** — if cost <2h, document calibration learning.
+6. **Adaptive substeps JS-side adaptive logic generates regressions** — reopen § 3.1.6 to evaluate Rust-side port.
+
+### Per-sub-decision triggers
+
+7. **A6 RFC opens** — reconcile § 3.2 (interface deferral) with A6's design. If A6 wants A7's per-feature ports to land via interface from day 1, sequence A6 first.
+8. **C4 RFC opens** — reconcile § 3.3 (capability surface) with C4's tier orchestration. If C4 selects different model, adapt § 3.3.
+9. **Formal parity testing infrastructure built (per § 3.4 (A) hybrid)** — document the infrastructure as canonical follow-up.
+10. **Capability surface generates false positives or missed cases** — reopen § 3.3.
+
+### Methodology triggers
+
+11. **Pattern 2.5 extend variant fourth data point** (post-A3, C1, A7) — if shape consistent, sub-rule promoted to "robust pattern" in CLAUDE.md (per Sam directive).
+12. **A7 Fase 3 decoupled (B) shows ports stalling** — reopen § 3.6 to evaluate bundled (A) for remaining ports.
+
+---
+
+## 8. Deuda técnica explícita post-unify
+
+### 8.1 Self-collision Rust scaffolding incomplete (until port follow-up lands)
+
+`crates/xpbd-wasm/src/lib.rs:33-34` defines `self_collision: bool` field + lines 205-209 define `set_adjacency` setter, but no `solve_self_collision` function. Until the port follow-up issue lands, this scaffolding is **dead code**. Acceptable as deuda técnica because:
+- Removing scaffolding now would require re-adding it post-port (negative work).
+- Scaffolding serves as a marker for the planned port path.
+
+**When to address:** when self-collision port follow-up lands (closes BUG-5 #608).
+
+### 8.2 LRA + fold permanent silent absence on WASM tier (pre-UI-surface)
+
+Until A7 closure commit 2 (UI surface) lands, LRA and fold remain silently absent on WASM tier. `wasmSolverWorker.ts:159-165` warning exists for self-collision only — LRA and fold have no warning today.
+
+**When to address:** A7 closure commit 2 (Fase 3 minimal). Mitigation built into A7 closure scope.
+
+### 8.3 Capability surface skeleton ≠ full implementation
+
+A7 closure commit 3 lands a **skeleton** capability surface (`get capabilities()` returning hardcoded values per current state). Full implementation (e.g., dynamic capability negotiation, capability-aware tier auto-switch logic) deferred to follow-up issue per § 3.6.
+
+**When to address:** capability surface full implementation issue (severity:medium, body cites § 3.3 + C4 framing).
+
+### 8.4 Site 7 (`ClothMesh.tsx:391`) ref-store anti-pattern (cross-eje deuda from C1)
+
+C1 RFC § 8.1 documented the `geometryRef.current = geo` inside useMemo anti-pattern in `ClothMesh.tsx:391` as deferred deuda técnica (orthogonal to C1 scope). A7 does NOT address this; it remains deferred.
+
+**When to address:** if Site 7 generates a real bug (race condition between useMemo and per-frame mutation), reopen via C1 § 7 reopen trigger #4.
+
+### 8.5 No WASM-vs-CPU bench data exists
+
+Per § 2.5, all bench files measure CPU TS implementations only. A7 ratifies decisions without WASM-vs-CPU performance data:
+- Self-collision port presumed faster on WASM (unverified).
+- LRA ratify CPU-only presumes WASM port wouldn't deliver materially better perf (unverified, but defensible given CPU is already 8.1× post-PR-589).
+
+**When to address:** if any port's perf gain is suspected insufficient post-implementation, add WASM-vs-CPU benchmark to existing `bench/_lib.ts` infrastructure as opportunistic follow-up.
+
+### 8.6 Lint rule for new physics features following A7 convention
+
+Custom eslint rule that warns when a new method is added to `xpbdSolver.ts` that:
+- Doesn't have a parallel method in `lib.rs` (port path), OR
+- Doesn't have a `capabilities.X = false` declaration (ratify CPU-only path).
+
+Bundles with existing lint-rule cluster (#659 @cascade, #662 fabric write, #664 selectXById, #674 useDisposable). Follow-up issue at A7 merge.
+
+**When to address:** post-merge cleanup commit (similar to C1 #674 lint rule follow-up).
+
+---
+
+## 9. Pregunta a Sam + estado + calibración
+
+### 9.1 Pregunta para verde de Fase 3
+
+**¿Verde para A7 closure Fase 3 (4 commits decoupled per § 3.6 Option B)?**
+
+Posibles respuestas:
+- **A (verde directo):** procedo con commits 1-4 (CLAUDE.md section + UI surface + capability skeleton + architectural docs). Per-feature ports queue como follow-up issues (severity:medium per § 5.3 templates).
+- **B (override LRA):** revierto LRA override post-Sec-4 articulation y procedo con (a) port para LRA. Sec 5 ajusta scope (LRA port follow-up issue añade ~8-12h, total aggregate ~26-39h).
+- **C (override fold):** Sec 4 ajusta a (a) port para fold uniformity. Sec 5 ajusta (LRA UI surface deferred / fold port queued).
+- **D (override Fase 3 to bundled):** A7 Fase 3 bundles all ports + UI + docs en single PR (~20-30h). Sec 5 reescribe.
+- **E (más discusión):** specific Sec 4 aspect needs refinement.
+
+### 9.2 Estado del eje
+
+- **Sec 1+2+3a+3b+4-9:** complete.
+- **Doc total:** ~1300-1400 líneas (within Sam estimate 1000-1600, mid-range due to per-feature articulation × 7 features × per-option detail).
+- **Branch:** `drift/a7-wasm-cpu-equivalence`.
+- **PR:** #675 (currently draft; ready-for-review post-this-commit-merge).
+- **Awaiting:** Sam verde para A7 Fase 3 minimal (3-5h).
+
+### 9.3 Calibración estimate vs actual
+
+**Sam pre-redacción estimate:** ~7-8h Fase 2 (per-sweep). Probably the most complex RFC of bloque (c).
+
+**Actual Fase 2 (this RFC):**
+- Sweep extension: ~1h (feature parity table empirical verification + BUG-5 issue check + bench review + canonical infrastructure search).
+- Sec 1-2: ~1h (scope + inventory + landscape + table).
+- Sec 3a (per-feature classification): ~2h (7 features × 5 fields each + 4 self-collision sub-options).
+- Sec 3b (5 sub-decisiones): ~2h.
+- Sec 4-9: ~2h.
+- **Total Fase 2: ~8h.** Mid-range of estimate. Factor ~1.0x of nominal.
+
+**Estimated A7 closure Fase 3 (decoupled per § 3.6):**
+- Commit 1 (CLAUDE.md): ~1h.
+- Commit 2 (UI surface LRA + fold): ~1.5h.
+- Commit 3 (capability skeleton): ~1h.
+- Commit 4 (architectural docs): ~0.5h.
+- **Total A7 closure: ~3-5h.** Mid-range of decoupled estimate.
+
+**Per-feature port follow-ups (queued):**
+- Self-collision: ~12-18h (with buffer per Sam Q4).
+- Pressure: ~4-6h.
+- Piece stiffness: ~2-3h.
+- LRA + fold UI surface: ~1-2h (may bundle with closure commit 2).
+- **Total distributed ports: ~18-27h.**
+
+**Aggregate (closure + ports):** ~21-32h.
+
+### 9.4 Pattern 2.5 extend variant data point analysis (3rd)
+
+A7 reifies the same shape as A3 (cross-boundary error handling) and C1 (Three.js buffer lifecycle) for the **third time**:
+
+- **Pattern existing legitimate** (CPU+WASM coexistence with feature parity post-bugs).
+- **Gaps en cobertura específica** (5 features, 2 architectural diffs).
+- **Resolution:** extract canonical (capability surface + UI surface for UX-aware ratification) + add coverage to gaps (per-feature ports queued) + ratify pattern + lint rule follow-up.
+
+**Sub-rule status post-A7 closure:** **confirmation redundante 3/3.**
+
+Per Sam directive previo (post-C1):
+> Si emerge tercer data point con same shape: confirmation redundante. Si emerge un caso que NO encaja: sub-rule se refina con variant nueva.
+
+A7 fits the same shape → no refinement needed. Sub-rule remains **established** (was 2/2 post-C1).
+
+**Optional promotion** (per Sam directive 2026-05-01 post-Sec-3b):
+> Update meta-anchor Pattern 2.5 extend variant — tercer data point logged (A3 + C1 + A7). Si shape consistent, sub-rule "established 2/2" → confirmation redundante 3/3 → maybe promote to "robust pattern" en CLAUDE.md.
+
+If A7 closes in this shape, post-merge cleanup commit may promote the sub-rule from "established 2/2" → "robust pattern with 3 data points (A3 + C1 + A7)" en CLAUDE.md Pattern 2.5 hybrid variants section.
+
+### 9.5 Calibración honest vs prior calibration
+
+A7 estimate factor was 1.0x (~8h actual vs ~7-8h estimate) — first time the audit hits ~1x factor. Causes:
+
+1. **Most complex RFC of bloque (c)** — per-feature analysis × 7 features inherently multiplies vs single-feature C1 or A3.
+2. **2 commits split (Sec 3a/3b)** — Sam's split directive added review checkpoint overhead (~30min extra) but reduced risk of contamination cascade.
+3. **LRA override mid-flight** — Sam directive post-3a verde added ~30min consolidation work in Sec 4.
+
+These are not "audit slowed down" — they're calibration confirming that complex RFCs land at ~1x, while simpler ratifications land at ~0.5-0.7x. Audit pace is healthy.
+
+### 9.6 Audit cumulative state
+
+- **22 ejes cerrados** (7 mecánicos + 13 (b) decisión + 2 (c) RFCs — A7 será el segundo (c) post-cierre).
+- **Sub-rule Pattern 2.5 extend variant established → robust pattern (post-A7)**.
+- **Pace estimate calibration:** factor 0.5-1.0x del nominal según complejidad. Promedio 0.65x.
+
+---
+
+**FIN DEL RFC A7 (Fase 2).** Awaiting Sam verde para A7 closure Fase 3 minimal (4 commits decoupled).
