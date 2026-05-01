@@ -125,13 +125,32 @@ export interface ClothSimConfig {
   selfCollision: boolean;
   /** Cloth thickness for self-collision in meters (default 0.002 = 2mm) */
   clothThickness: number;
-  /** Enable adaptive substepping (default true) */
+  /**
+   * Enable adaptive substepping (default true).
+   *
+   * **Architectural location (A7 ratified, § 3.1.6):** adaptive substeps live
+   * in this CPU TS solver. The WASM solver (`crates/xpbd-wasm/src/lib.rs`)
+   * has no internal adaptive logic; `wasmSolverWorker.ts` hardcodes Rust
+   * internal substeps to 1 and manages the outer substep loop in JS-side.
+   * JS-side adaptive cadence is queued as A7 follow-up (~10-15 líneas in
+   * `wasmSolverWorker.ts`); cross-ref A7 RFC § 5.2 commit 4 + § 3.1.6.
+   */
   adaptiveSubsteps: boolean;
   /** Minimum substeps for adaptive mode (default 10) */
   minSubsteps: number;
   /** Maximum substeps for adaptive mode (default 30) */
   maxSubsteps: number;
-  /** Max velocity threshold in m/s for adaptive substeps and velocity clamping (default 5.0) */
+  /**
+   * Max velocity threshold in m/s for adaptive substeps and velocity clamping
+   * (default 5.0).
+   *
+   * **Architectural location (A7 ratified, § 3.1.7):** velocity clamp lives
+   * in this CPU solver's `postSolve`. The WASM solver has no `maxVelocity`
+   * clamp internally; `wasmSolverWorker.ts:332` applies clamping post-step
+   * from JS-side wrapper. Both tiers reach user-observable parity (5 m/s
+   * default); the location difference is documented architectural choice.
+   * Cross-ref A7 RFC § 3.1.7.
+   */
   maxVelocity: number;
   /** Enable Long Range Attachments (default true) */
   enableLRA: boolean;

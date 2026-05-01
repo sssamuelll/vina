@@ -9,6 +9,7 @@
 
 import type { ClothSimConfig, SphereCollider, CapsuleCollider } from './xpbdSolver';
 import type { WorkerInMessage, WorkerOutMessage, SeamInitData } from './clothWorker';
+import { type SolverCapabilities, CPU_CAPABILITIES } from './solverCapabilities';
 
 /**
  * Callback for receiving simulation frames.
@@ -42,6 +43,16 @@ export class ClothWorkerClient {
 
   /** Whether the simulation is currently running. */
   isRunning = false;
+
+  /**
+   * Solver capability surface (A7 ratified, § 3.3 Option C).
+   *
+   * CPU TS solver supports all physics features. Cross-ref:
+   * `src/utils/cloth/solverCapabilities.ts`.
+   */
+  get capabilities(): SolverCapabilities {
+    return CPU_CAPABILITIES;
+  }
 
   /**
    * Initialize the worker and load mesh data.

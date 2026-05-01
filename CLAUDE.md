@@ -889,6 +889,76 @@ Reopen A3 if:
 5. **Telemetry beyond WASM→JS boundary needed** (Sentry-like, metrics dashboard) — reopen scope; A3 only adds boundary counters, broader telemetry separate eje.
 6. **CPU fallback fails or unreliable** — A3 ratifies CPU fallback as safety net; if breaks, reopen with concrete failure mode.
 
+## WASM vs CPU solver capabilities (A7 ratified)
+
+Cross-ref: `docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md` (full RFC with 6 sub-decisiones, 7 features classified, Pattern 2.5 extend variant third data point).
+
+Cross-ref: `docs/reports/2026-04-29-drift-inventory-addendum.md` § 7 (BUG-5 absorbed into A7 scope).
+
+### Canonical capability table
+
+The cloth simulation has 4 active solver tiers (`SolverTier = 'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape'`). Among the two relevant to A7 (WASM and CPU TS):
+
+| Feature | CPU (`xpbdSolver.ts`) | WASM (`crates/xpbd-wasm/src/lib.rs`) | A7 disposition |
+|---|---|---|---|
+| Stretch (XPBD) | ✅ | ✅ | Parity (post BUG-1) |
+| Bend (XPBD) | ✅ | ✅ | Parity (post BUG-1) |
+| Seams + per-seam compliance | ✅ | ✅ | Parity (post BUG-3) |
+| Wind | ✅ | ✅ | Parity |
+| Pinning | ✅ | ✅ | Parity |
+| Body friction | ✅ | ✅ | Parity (post BUG-2) |
+| **Self-collision** | ✅ | ⚠️ scaffolded, no impl | **Port to WASM** (queued — BUG-5 #608 closure path) |
+| **LRA** | ✅ | ❌ | **Ratify CPU-only-by-design + UI surface** (CPU LRA already 8.1× post-PR-589) |
+| **Pressure (per-piece)** | ✅ | ❌ | **Port to WASM** (queued) |
+| **Fold (bending overrides)** | ✅ | ❌ | **Ratify CPU-only-by-design + UI surface** (UX impact bajo) |
+| **Piece stiffness** | ✅ | ❌ | **Port to WASM** (queued, smallest port) |
+| Adaptive substeps | ✅ inline | JS-side outer loop fixed=15 | **Architectural ratify + JS-side adaptive cadence** (queued) |
+| Velocity clamp | ✅ in postSolve | ✅ JS-side wrapper post-step | Architectural parity (location only) |
+
+### Decision rule for new physics features
+
+When introducing a new physics feature in CPU TS solver, ask:
+
+- **Cost to port to WASM is ≤ ~6h?** → port to WASM by default (parity preserved).
+- **Cost to port is > ~10h or UX impact is bajo?** → ratify CPU-only-by-design + UI surface (capability indicator + tier-switch hint).
+- **Architectural location difference (JS-side vs Rust-side)?** → ratify with explicit doc; not a port question.
+- **WebGPU/TSL solver also affected?** → C4 RFC territory; A7 binds CPU vs WASM only.
+
+### Capability surface (per § 3.3 Option C)
+
+Both `WasmSolverClient` and `ClothWorkerClient` expose a `capabilities: SolverCapabilities` getter declaring which features are supported on that tier. UI consumers gate feature toggles or surface tier-aware warnings based on `capabilities`. Capability flags update as ports land:
+
+```ts
+// src/utils/cloth/wasm/wasmSolverClient.ts (post-A7 closure):
+get capabilities(): SolverCapabilities {
+  return {
+    selfCollision: false,    // → true post-port follow-up
+    lra: false,              // permanently false (ratified CPU-only)
+    pressure: false,         // → true post-port follow-up
+    fold: false,             // permanently false (ratified CPU-only)
+    pieceStiffness: false,   // → true post-port follow-up
+  };
+}
+```
+
+### Per-feature follow-up issues (decoupled Fase 3 per § 3.6 Option B)
+
+Per-feature ports queued as separate follow-up issues post-A7 merge. Each port's PR closes its capability flag (`capabilities.X = true`). Reference issue numbers anchored post-merge in inventory annotation.
+
+### Reopen triggers
+
+Reopen A7 if:
+1. Self-collision port stalls >3 months without progress — reevaluate (a) Port vs (d) Ratify CPU-only.
+2. LRA UX impact reported (users on WASM hit confusion from absence) — evaluate override back to (a) port.
+3. Pressure port reveals subtle CPU-vs-WASM divergence — reopen § 3.4 with formal parity tests.
+4. A6 RFC opens — reconcile § 3.2 (interface deferral) with A6's design.
+5. C4 RFC opens — reconcile § 3.3 (capability surface) with C4's tier orchestration.
+6. Pattern 2.5 extend variant fourth data point with same shape → robust pattern stable; no further data points needed.
+
+### Lint rule (follow-up issue)
+
+Custom eslint rule that warns when a new method is added to `xpbdSolver.ts` without a parallel method in `lib.rs` (port path) or a `capabilities.X = false` declaration (ratify CPU-only path). Bundles with existing lint-rule cluster (#659 @cascade, #662 fabric write, #664 selectXById, #674 useDisposable). Tracking issue post-merge.
+
 ## Three.js disposable lifecycle (C1 ratified)
 
 Cross-ref: `docs/reports/2026-05-01-rfc-c1-buffer-lifecycle.md` (full RFC with 6 opciones articuladas, 7 sites inventariados, Pattern 2.5 extend variant data point).

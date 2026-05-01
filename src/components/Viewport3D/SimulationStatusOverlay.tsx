@@ -60,6 +60,14 @@ export function SimulationStatusOverlay() {
           ⚠️ No body collision
         </div>
       )}
+      {solverTier === 'wasm' && (
+        <div
+          style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
+          title="WASM tier does not support LRA (long range attachments), self-collision, fold constraints, per-piece pressure, or per-piece stiffness. Switch to CPU tier for full feature parity. See A7 RFC."
+        >
+          ⚠️ Limited features (LRA, self-collision, fold, pressure, piece stiffness disabled — use CPU tier)
+        </div>
+      )}
     </div>
   );
 }
