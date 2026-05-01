@@ -952,6 +952,20 @@ Cuando git blame muestra **"declared deprecation intent + unused bridge function
 
 **Origen:** D6 (`Fabric` / `FabricMaterial` / `PhysicalFabric`) — `physicalFabric.ts:8` decía "FabricMaterial remains for backward compatibility" + bridge `toBasicMaterial` con 0 callsites productivos. Sweep refresh reveló FabricMaterial role evolucionó a "basic public API surface for plugins" sin re-documentation. Ratificado como 3-tier API surface, dead bridge removed (-60 líneas net).
 
+#### Pattern 2.5 hybrid variants (anchored 2026-05-01 after D4)
+
+Pattern 2.5 hybrid emerges when intentional pattern coexists con surgical drift requiring small fix. Distinct from Pattern 2 pure ratify (no code change) and Pattern 1 real refactor (significant code change). Variants observed:
+
+- **2.5 cleanup** (D6 fabric types): declared deprecation intent + unused bridge function. Cleanup = remove dead code + reframe doc-drift. Code delta typically negative.
+
+- **2.5 lite** (D4 CopilotPanel composition): intentional pattern (dual representation) coexists con minor drift (dual maintenance inline at N sites). Cleanup = surgical helper que captura el pattern + migrate N callsites. Code delta typically ~10-20 líneas net.
+
+Both variants ratify the underlying pattern as intentional; differ in shape of cleanup needed. Distinct from Pattern 1 (which would refactor the pattern itself, not just clean up artifacts).
+
+**Diagnóstico:** ¿el "drift" es artifact (Pattern 2.5) o substantive (Pattern 1)? Si removing the artifact preserves the pattern's intent → Pattern 2.5. Si removing requires re-designing the pattern → Pattern 1.
+
+**Origen:** D4 (CopilotPanel `messages` + `memoryRef` dual representation) — 2 dual-paired sites donde `setMessages + memoryRef.addMessage` viven inline sin abstraction. Surgical fix = `recordMessage` helper que concentra la coordination (~5-8 líneas net change). Pattern (dual UI/persistent representation) ratificado as intentional; helper cleanup surgical sin scope creep.
+
 ### Distinguishing re-implementation from intentional feature
 
 When an axis suspects "X re-implements Y", **verify the semantics before assuming drift.** Re-implementation with deliberately different semantics is a feature, not a drift.
