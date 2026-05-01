@@ -10,6 +10,55 @@
  * copy-pasted for WASM and CPU paths.
  *
  * Extracted from GarmentSimulation.tsx for separation of concerns.
+ *
+ * ─── Tier dispatch convention (post-A6) ─────────────────────────────────────
+ *
+ * Per A6 RFC § 4.5, the cloth solver `ClothSolverClient` interface declares
+ * only the lifecycle subset (`start`/`stop`/`dispose`/`capabilities`) — init,
+ * callbacks, and setters remain per-tier divergent (structural shapes that
+ * cannot be uniformly typed without behavioral changes).
+ *
+ * Until the consumer migration follow-ups land, this hook hand-rolls the
+ * 4-rama dispatch (GPU / WASM / CPU / Neural) with tier-specific init args,
+ * callback wiring, and setter access.
+ *
+ * **Migration target (`#UUU-init` + `#UUU-callbacks` follow-ups):**
+ *
+ * - `#UUU-init`: factory pattern that maps tier identity to constructor +
+ *   per-tier init args resolution from a common config shape. The 4 init
+ *   call sites below (gpuClient.initMultiPiece*, wasmClient.initMultiPiece,
+ *   client.init+initMultiPiece, neuralClient.initMultiPiece) collapse into
+ *   a single tier-aware factory call.
+ *
+ * - `#UUU-callbacks`: wrapper layer that adapts `(positions)` →
+ *   `(positions, numParticles, triIds)` for CPU consumer code, OR
+ *   migrates CPU emission to single-arg + emits mesh data via separate
+ *   `onMeshData` event. Currently CPU's `FrameCallback` 3-arg shape
+ *   diverges from WASM/GPU/Neural's single-arg `(positions)` — the
+ *   `onFrame` assignment at lines 269/321/359/388 sees this as
+ *   loose-typed compatibility (TypeScript bivariance under non-strict
+ *   contexts), but a polymorphic dispatch would surface the divergence.
+ *
+ * **Polymorphic lifecycle dispatch IS available now** — any of the 4
+ * client refs can be cast to `ClothSolverClient` and invoked uniformly
+ * for `start()`, `stop()`, `dispose()`, and `capabilities` reads:
+ *
+ * @example
+ * // Polymorphic stop across whichever tier is currently active:
+ * const active: ClothSolverClient | null =
+ *   gpuClientRef.current ?? wasmClientRef.current ??
+ *   clientRef.current ?? neuralClientRef.current;
+ * if (active) {
+ *   if (active.capabilities.frameDriven) {
+ *     // GPU/TSL — useFrame manages dispatch; start() is a no-op.
+ *   } else {
+ *     active.start();
+ *   }
+ * }
+ *
+ * Cross-ref: `src/utils/cloth/solverProtocol.ts` (interface),
+ *            `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` § 4.5,
+ *            CLAUDE.md § "Cloth solver client interface (A6 ratified)".
  */
 
 import { useRef, useEffect, useCallback, useState } from 'react';
