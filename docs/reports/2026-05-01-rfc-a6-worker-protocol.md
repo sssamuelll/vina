@@ -1055,4 +1055,167 @@ Sweep these in Sec 4 recomendación pre-F3.
 
 ---
 
-**FIN Sec 3.3 + 3.4 + 3.5.** Sec 3.6 (decoupled vs bundled F3) + Sec 3.7 (docs) en commit closure.
+---
+
+## 3. Sub-decisiones (parte 3 — § 3.6 + § 3.7)
+
+### 3.6 Decoupled vs bundled Fase 3
+
+**Pregunta:** ¿A6 Fase 3 implementa todo inline (interface + capability extension + error shape unification + setter migration + consumer migration), o ratifica policy + decopla per-tier/per-method follow-up issues per A7 § 3.6 precedent?
+
+#### Option 3.6.A — Bundled Fase 3 (single PR)
+
+**Shape:** A6 closure implements:
+- Interface declaration (`solverProtocol.ts`).
+- Capability extension to GPU + Neural.
+- Error shape uniform (`{ code, message }` 4 tiers).
+- Setter per-method migration (wind, pins, fabric, gravity, snapshots).
+- Consumer migration (`useSimulationLifecycle` polymorphic dispatch).
+- CLAUDE.md section + JSDoc.
+
+**Pros:**
+- A6 ships meaningful interface — consumers use it from day 1.
+- Single review cycle.
+- No queue stalling.
+
+**Cons:**
+- ~15-25h aggregate single PR. Long review.
+- Risk of regressions across migrations.
+- Bundling distinct concerns (interface decl + setter migrations + consumer refactor).
+- Pre-emptive Sam directive: "Decoupling es default por scope, no obligación. Si Fase 2 reveals que interface + capability extension cabe ≤5h, considerá bundle todo."
+
+#### Option 3.6.B — Fully decoupled (minimal A6 closure + N follow-up issues)
+
+**Shape:** A6 closure implements ONLY:
+- CLAUDE.md "Cloth solver client interface (A6 ratified)" section.
+- Architectural ratifies (constraint docs).
+
+Per-feature implementations queued:
+- `#XXX interface declaration` (~3h).
+- `#YYY capability extension to GPU + Neural` (~1-2h).
+- `#ZZZ error shape uniform` (~2-3h).
+- `#WWW setter per-method migration` (5+ issues, 1-3h each).
+- `#VVV consumer migration` (~3-5h).
+
+**Pros:**
+- A6 closes very fast (~2-3h F3 minimal).
+- Per-feature focused PRs.
+- Risk distributed.
+
+**Cons:**
+- A6 ships policy without interface — no anchor in code.
+- All consumers depend on follow-ups landing for any value.
+- NeuralDrapeClient drop-in claim NOT enforced until interface lands → claim stays aspirational longer.
+- Pre-emptive Sam directive: "Lo que SÍ entra al A6 closure: interface declaration o capability-dispatch convention — sin esto no hay anchor."
+
+#### Option 3.6.C — Hybrid decoupling (Sam pre-emptive lean)
+
+**Shape:** A6 closure implements (IN closure, ~3-5h F3):
+- `solverProtocol.ts` module — interface declaration `ClothSolverClient` (3.1.C lean).
+- Capability extension a GPU + Neural — `GPU_CAPABILITIES` + `NEURAL_CAPABILITIES` constants + getter on each client.
+- `frameDriven` capability flag (3.1 Constraint B carrier).
+- CLAUDE.md "Cloth solver client interface (A6 ratified)" section.
+- NeuralDrapeClient header reframe (Constraint C resolution).
+
+Decoupled to follow-up issues (queued post-merge):
+- `#XXX setter per-method migration — wind canonical signature + capability gate` (~2-3h).
+- `#YYY setter per-method migration — pins canonical batch shape` (~2-3h).
+- `#ZZZ setter migration — fabric resolution moved to consumer` (~1-2h).
+- `#WWW setter migration — gravity bundled into setConfig` (~1-2h).
+- `#VVV error shape uniform across 4 tiers` (~2-3h, follows A3 pattern).
+- `#UUU consumer migration — useSimulationLifecycle polymorphic dispatch` (~3-5h, depends on interface + capability).
+
+**Pros:**
+- Captures architectural anchor en A6 closure (interface + capability surface) — drift root addressed.
+- Per-feature migrations decoupled with clear precedent (B6-state Fase 3 deferred + A7 § 3.6 decoupling).
+- A6 closes fast (~3-5h F3) consistente con audit pace.
+- NeuralDrapeClient drop-in claim becomes real for lifecycle subset (interface) — Constraint C resolved.
+- Risk distributed per-feature.
+- Consumer migration is large enough (3-5h) to warrant own PR.
+
+**Cons:**
+- Setter API divergencias persist until follow-ups land.
+- Error shape stays divergent (3 of 4 tiers without `code` field) until #VVV lands.
+
+#### Recommendation per § 3.6
+
+**Lean: Option 3.6.C (hybrid decoupling per Sam directive).** Confidence: **high**.
+
+Reasoning:
+- Sam directive verbatim: "(c) hybrid decoupling. Lo que SÍ entra al A6 closure: Interface declaration (TS) o capability-dispatch convention — sin esto no hay anchor. Capability getter extension a GPU + Neural — surgical, ~1-2h. CLAUDE.md section + canonical doc. NeuralDrapeClient header reframe o enforcement."
+- Audit precedent: B6-state Fase 3 deferred to follow-up issues (#654-656), A7 closure decoupled per-feature ports (#676-681). 4to data point del decoupling pattern.
+- A6 closure size manageable (~3-5h F3 consistent con audit pace).
+- Drift root addressed by interface + capability extension; per-method migrations are mechanical (deferred without architectural risk).
+
+**Threshold check (Sam directive):** "Si Fase 2 reveals que interface + capability extension cabe ≤5h, considerá bundle todo."
+
+Sec 5 (migration plan) will revisit threshold post-Sec 4 recomendación. If interface + capability ≤5h AND error shape uniform ≤2h, total ≤7h is borderline bundled. Tradeoff — bundled gives ship-features-visible value, decoupled gives clean atomicity per feature.
+
+**Pre-emptive lean stays decoupled** unless Sec 4 sweep reveals migration is trivially atomic (interface decl is 1 file, capability extension is 4 lines per client, header reframe is 1 line — total ~30 minutes of code + tests).
+
+---
+
+### 3.7 Documentation strategy
+
+3-layer ratify-by-default per audit precedent (consistent with C1, A7, B6-state, B3-state, B10-state Par 1, etc.).
+
+#### Layer 1 — JSDoc on interface + new methods
+
+For the interface declaration:
+- `solverProtocol.ts` — JSDoc on `ClothSolverClient` interface explaining each method's contract, capability gates, lifecycle expectations.
+- `SolverCapabilities` interface — JSDoc per flag explaining what feature the flag gates + which tier supports.
+- `SolverError` shape — JSDoc on error code semantics + `details` field convention.
+- New per-tier capability constants (`GPU_CAPABILITIES`, `NEURAL_CAPABILITIES`) — JSDoc explaining flag rationale + reopen triggers.
+
+JSDoc explains:
+- What the method does (uniform contract).
+- When to call (init-time vs per-step vs lifecycle-bound).
+- Capability gate (which `capabilities.X` flag must be `true`).
+- Cross-ref to A6 RFC.
+
+#### Layer 2 — CLAUDE.md "Cloth solver client interface (A6 ratified)" section
+
+New section in CLAUDE.md following the precedent of "Three.js disposable lifecycle (C1 ratified)", "WASM vs CPU solver capabilities (A7 ratified)", "Persistence policy (B6-state ratified)", etc.
+
+Content (estimated ~80-120 líneas):
+- Cross-ref to A6 RFC.
+- Canonical interface shape (`ClothSolverClient`).
+- Decision rule for new solver client: must implement interface + declare capabilities + use uniform error shape (post-#VVV).
+- Capability flag inventory + which tier supports what (table).
+- Setter migration status (initially: pre-migration — flag follow-up issues).
+- Reopen triggers (per § 7).
+- Cross-ref to A2, A4, C4, A7 explicit handoffs.
+
+#### Layer 3 — Dispatch examples on consumers (JSDoc)
+
+For `useSimulationLifecycle.ts`:
+- JSDoc explaining tier cascade + how interface + capability dispatch should be used.
+- Example pattern for polymorphic dispatch:
+
+```ts
+/**
+ * Dispatch wind force across tiers via capability gate.
+ *
+ * @example
+ * if (client.capabilities.wind) {
+ *   client.setWind?.(force, dragCoefficient);
+ * }
+ */
+```
+
+- Inline comments at each tier branch (CPU/WASM/GPU/Neural) explaining migration target post-A6.
+
+This layer is documentation-only en A6 closure; actual polymorphic dispatch implementation deferred a `#UUU consumer migration` follow-up issue.
+
+#### Recommendation per § 3.7
+
+**Lean: 3-layer (JSDoc + CLAUDE.md + dispatch examples).** Confidence: **high**.
+
+Reasoning:
+- Audit precedent — 22 ratifications use 3-layer doc strategy.
+- Layer 3 (dispatch examples) is the new addition specific to A6 — guides future consumers post-decoupled-migration.
+- Layer 3 deferred from polymorphic dispatch implementation (separate follow-up issue) — A6 closure documents intent + example.
+
+---
+
+**FIN Sec 3.** 7 sub-decisiones articuladas. Sec 4-9 en commit closure.
