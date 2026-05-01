@@ -16,6 +16,8 @@ import { createTslBuffers, createSBA, type TslBufferSet, type FabricComplianceCo
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
+import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
+import type { ClothSolverClient } from '../solverProtocol';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
@@ -37,7 +39,7 @@ export interface GpuSolverClientCallbacks {
 
 // ─── Client ─────────────────────────────────────────────────────────────────
 
-export class GpuSolverClient {
+export class GpuSolverClient implements ClothSolverClient {
   private solver: GpuClothSolver;
   private running: boolean = false;
   private animFrameId: number | null = null;
@@ -78,6 +80,20 @@ export class GpuSolverClient {
     device.addEventListener('uncapturederror', (event) => {
       console.error('[GpuSolverClient] WebGPU uncaptured error:', (event as GPUUncapturedErrorEvent).error);
     });
+  }
+
+  /**
+   * Solver capability surface — declares which physics features and
+   * execution modes this tier supports. Per A6 § 3.4 Option A
+   * (capability extension to GPU + Neural).
+   *
+   * Currently all physics flags `false` (selfCollision is scaffolded
+   * but unwired — see `GPU_CAPABILITIES` JSDoc). `frameDriven: true`
+   * signals consumers to dispatch frames via `useFrame` rather than
+   * calling `start()`.
+   */
+  get capabilities(): SolverCapabilities {
+    return GPU_CAPABILITIES;
   }
 
   /**

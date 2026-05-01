@@ -959,6 +959,102 @@ Reopen A7 if:
 
 Custom eslint rule that warns when a new method is added to `xpbdSolver.ts` without a parallel method in `lib.rs` (port path) or a `capabilities.X = false` declaration (ratify CPU-only path). Bundles with existing lint-rule cluster (#659 @cascade, #662 fabric write, #664 selectXById, #674 useDisposable). Tracking issue post-merge.
 
+## Cloth solver client interface (A6 ratified)
+
+Cross-ref: `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` (full RFC, 1861 líneas, 7 sub-decisiones + § 4.5 F3 finding amendment).
+
+### Canonical interface — minimal core convergent across 4 tiers
+
+`src/utils/cloth/solverProtocol.ts` declares `ClothSolverClient` — the lifecycle subset implemented by all 4 cloth solver clients (CPU `ClothWorkerClient`, WASM `WasmSolverClient`, GPU `GpuSolverClient`, Neural `NeuralDrapeClient`):
+
+```ts
+interface ClothSolverClient {
+  start(): void;
+  stop(): void;
+  dispose(): void | Promise<void>;
+  readonly capabilities: SolverCapabilities;
+}
+```
+
+This is the **honest minimal core** — the 4 members that converge structurally across tiers without requiring runtime translation or behavioral changes. Per A6 § 3.1.C ratification + § 4.5 post-compile-gate scope reduction.
+
+### What is NOT in the interface (per-tier divergent shape)
+
+The following are exposed by all 4 concrete classes by convention but **NOT type-enforced** — signatures diverge structurally:
+
+- **`initMultiPiece`** — GPU uses `{pieceAId, pieceBId, vertexPairs}[]`; CPU/WASM use `SeamInitData[]`; Neural takes no seams. Forcing uniform = runtime translation in GPU client = behavioral change.
+- **`onFrame` callback** — CPU emits `(positions, numParticles, triIds)`; GPU/WASM/Neural emit `(positions)` only. Forcing uniform = behavioral split (e.g., separate `onMeshData` event).
+- **`setConfig` and other setters** (`setWind`, `setPins`, `setFabric`, `setGravity`, `setElastics`, snapshots, etc.) — per-tier shape. Some are A2 territory (config shape cross-language); others are setter migrations queued as follow-ups.
+
+Polymorphic init/callback dispatch is **consumer responsibility** — `useSimulationLifecycle.ts` 4-rama hand-rolled cascade until `#UUU-init` + `#UUU-callbacks` follow-ups land.
+
+### Capability surface (extends A7 § 3.3)
+
+`src/utils/cloth/solverCapabilities.ts` exports per-tier capability constants. A6 extends A7's CPU + WASM coverage to GPU + Neural and adds optional `frameDriven` flag (Constraint B from § 3.1):
+
+| Tier | selfCollision | lra | pressure | fold | pieceStiffness | frameDriven |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| CPU (`CPU_CAPABILITIES`) | ✅ | ✅ | ✅ | ✅ | ✅ | (false) |
+| WASM (`WASM_CAPABILITIES`) | ❌ | ❌ (perm) | ❌ | ❌ (perm) | ❌ | (false) |
+| GPU (`GPU_CAPABILITIES`) | ❌ (scaffolded but unwired — same shape as BUG-5 was for WASM) | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Neural (`NEURAL_CAPABILITIES`) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+
+`frameDriven: true` signals consumer to dispatch frames via `useFrame` (consumer-driven); `start()`/`stop()` are no-ops. `frameDriven: false` (or unset) = client manages own animation loop.
+
+### Decision rule for new solver clients
+
+When introducing a new cloth solver tier (e.g., server-side solver, CUDA solver):
+
+1. **Implement `ClothSolverClient`** — the 4-member lifecycle subset is type-enforced. Compile gate validates.
+2. **Declare capability constants** — add `<TIER>_CAPABILITIES` to `solverCapabilities.ts`. Set physics flags honestly (verify wiring; don't claim `selfCollision: true` if scaffolded-but-unwired).
+3. **Declare `frameDriven` honestly** — `true` if consumer drives frames via `useFrame`; `false` if client manages own loop.
+4. **Init + callbacks remain tier-specific** — each new tier defines its own `initMultiPiece` shape + callback signatures. Polymorphic dispatch responsibility lives in consumers (`useSimulationLifecycle.ts`).
+5. **Document concrete-class methods + JSDoc cross-ref** — methods not in interface are tier-specific; JSDoc must reference `solverProtocol.ts` ClothSolverClient + the divergence note.
+
+### Constraint C — NeuralDrapeClient drop-in claim resolution
+
+NeuralDrapeClient previously claimed (header verbatim): "Drop-in replacement for GpuSolverClient / WasmSolverClient / ClothWorkerClient."
+
+Post-A6: **partial enforce + partial reframe.**
+- TYPE-ENFORCED for lifecycle subset (`start`/`stop`/`dispose`/`capabilities`) via `implements ClothSolverClient`.
+- BY-CONVENTION ONLY for init + callbacks + setters until `#UUU-init` + `#UUU-callbacks` land.
+
+Header rewritten to articulate this honestly; no aspirational claims preserved.
+
+### Setter migrations queued (decoupled per § 3.6.C hybrid)
+
+Per A6 § 4.5.4 split:
+
+| Issue | Scope | Estimate |
+|---|---|---|
+| `#XXX setWind canonical signature` | wind capability gate + canonical sig `(force, dragCoefficient?)` | ~2-3h |
+| `#YYY setPins canonical batch shape` | hybrid sig with optional `position?` field; CPU freeze-at-current vs WASM positional caveat | ~2-3h |
+| `#ZZZ setFabric → consumer resolution` | deprecate CPU `setFabric(fabricId)`; consumers call `setConfig(getPhysicalFabric(id))` | ~1-2h |
+| `#WWW gravity → setConfig bundle` | deprecate `setGravity` separate setter; bundle into `setConfig({gravityX?, gravityY, gravityZ?})` | ~1-2h |
+| `#VVV error shape uniform 4 tiers` | extend A3 `{type, code, message}` to CPU + GPU + Neural | ~2-3h |
+| `#UUU-init` consumer polymorphic init | factory pattern that maps tier identity to constructor + per-tier args resolution | ~2-3h |
+| `#UUU-callbacks` consumer polymorphic callback | wrapper layer or single-arg migration with `onMeshData` split | ~2-3h |
+
+### Reopen triggers
+
+Reopen A6 if:
+
+1. **5th solver tier emerges** (server-side, CUDA, etc.) — verify `ClothSolverClient` interface accommodates. If not, reopen § 3.1.
+2. **C4 RFC selects orchestration model** that conflicts with capability surface (e.g., explicit user tier choice with no capability negotiation). Reopen § 3.4.
+3. **NeuralDrapeClient divergence breaks consumer code** post-reframe — would mean "drop-in" claim was never functionally tested under all consumers. Reopen Constraint C.
+4. **TSL execution model evolves** (TSL gains worker support, or non-TSL paths in GPU client removed) — reopen Constraint B + `frameDriven` flag relevance.
+5. **New solver client lands without `implements ClothSolverClient`** — drift returns. Reopen with concrete instance.
+6. **Setter migration follow-ups stall >3 months** — reopen § 3.5 with timeline forced.
+7. **Capability flag explosion** (>10 flags) — reopen § 3.4 evaluating capability negotiation API.
+8. **GPU `selfCollision` capability flips to `true`** without `selfCollisionNodes` actually dispatched in compute loop — verify wiring; capability claim must match runtime behavior.
+
+### Cross-references
+
+- A2 RFC (config shape cross-language) — A6 binds method shape; A2 binds config shape. Setter type generic in A6, A2 will canonicalize.
+- A4 RFC (geometry/mesh ops cross-language) — A6 binds where types live (`solverProtocol.ts` re-exports); A4 binds what they mean.
+- C4 RFC (4-way tier orchestration) — A6 capability surface is direct input. C4 decides tier auto-switch + fallback policy.
+- A7 RFC (per-feature physics parity) — A6 inherits capability skeleton + extends to GPU + Neural. A7 follow-ups (#676-681) close per-feature ports.
+
 ## Three.js disposable lifecycle (C1 ratified)
 
 Cross-ref: `docs/reports/2026-05-01-rfc-c1-buffer-lifecycle.md` (full RFC with 6 opciones articuladas, 7 sites inventariados, Pattern 2.5 extend variant data point).
