@@ -15,6 +15,7 @@
  */
 
 import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
+import { useDisposable } from './hooks/useDisposable';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -264,9 +265,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     return { staticGeometry: geo };
   }, [pieceMeshes, activePieces, avatarMeasurements]);
-  // BUG-9 (#612): inline dispose pending C1 canonical pattern. staticGeometry
-  // is null when there are no piece meshes, hence the optional chain.
-  useEffect(() => () => { staticGeometry?.dispose(); }, [staticGeometry]);
+  useDisposable(staticGeometry);
 
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
 
