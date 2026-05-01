@@ -92,6 +92,20 @@ export function pointToTriangleDist(
   return { dist, side: edgeSide, nx: nnx, ny: nny, nz: nnz };
 }
 
+/**
+ * Spatial hash for triangle-vs-particle collision (cloth ↔ kinematic body).
+ *
+ * Domain: indexed by triangle ID; AABB-expanded grid over a static triangle
+ * mesh. Built once per kinematic body, immutable for the body's lifetime.
+ * Storage shape: `Map<key, Int32Array>` per-bucket.
+ *
+ * Distinct from `SpatialHashGrid` (selfCollision.ts) which indexes particle
+ * IDs for self-collision and rebuilds every frame. See A4 Fase 2
+ * (`docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md`
+ * § 2.4) for the role separation ratification.
+ *
+ * Shared between CPU + WASM solver tiers (xpbdSolver.ts + wasmSolverWorker.ts).
+ */
 export class TriangleSpatialHash {
   private readonly buckets: Map<number, Int32Array>;
   private readonly cellInv: number;
