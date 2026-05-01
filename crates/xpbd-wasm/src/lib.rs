@@ -75,6 +75,14 @@ impl XpbdSolver {
     /// Create a new solver with particle positions and inverse masses.
     #[wasm_bindgen(constructor)]
     pub fn new(positions: &[f32], inv_mass: &[f32]) -> XpbdSolver {
+        // A3 ratified: install panic hook on first solver instantiation.
+        // `set_once` is idempotent — safe to call multiple times. If Rust
+        // code panics, browser console gets useful error message with
+        // location and context, instead of opaque `WebAssembly.RuntimeError`.
+        // Crate is defensively written (0 panic paths today); this is
+        // preventive insurance for future regressions.
+        console_error_panic_hook::set_once();
+
         let num_particles = inv_mass.len();
         let positions = positions.to_vec();
         let prev_positions = positions.clone();
