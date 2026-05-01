@@ -986,7 +986,7 @@ The following are exposed by all 4 concrete classes by convention but **NOT type
 - **`onFrame` callback** — CPU emits `(positions, numParticles, triIds)`; GPU/WASM/Neural emit `(positions)` only. Forcing uniform = behavioral split (e.g., separate `onMeshData` event).
 - **`setConfig` and other setters** (`setWind`, `setPins`, `setFabric`, `setGravity`, `setElastics`, snapshots, etc.) — per-tier shape. Some are A2 territory (config shape cross-language); others are setter migrations queued as follow-ups.
 
-Polymorphic init/callback dispatch is **consumer responsibility** — `useSimulationLifecycle.ts` 4-rama hand-rolled cascade until `#UUU-init` + `#UUU-callbacks` follow-ups land.
+Polymorphic init/callback dispatch is **consumer responsibility** — `useSimulationLifecycle.ts` 4-rama hand-rolled cascade until `#688` + `#689` follow-ups land.
 
 ### Capability surface (extends A7 § 3.3)
 
@@ -1017,7 +1017,7 @@ NeuralDrapeClient previously claimed (header verbatim): "Drop-in replacement for
 
 Post-A6: **partial enforce + partial reframe.**
 - TYPE-ENFORCED for lifecycle subset (`start`/`stop`/`dispose`/`capabilities`) via `implements ClothSolverClient`.
-- BY-CONVENTION ONLY for init + callbacks + setters until `#UUU-init` + `#UUU-callbacks` land.
+- BY-CONVENTION ONLY for init + callbacks + setters until `#688` + `#689` land.
 
 Header rewritten to articulate this honestly; no aspirational claims preserved.
 
@@ -1027,13 +1027,13 @@ Per A6 § 4.5.4 split:
 
 | Issue | Scope | Estimate |
 |---|---|---|
-| `#XXX setWind canonical signature` | wind capability gate + canonical sig `(force, dragCoefficient?)` | ~2-3h |
-| `#YYY setPins canonical batch shape` | hybrid sig with optional `position?` field; CPU freeze-at-current vs WASM positional caveat | ~2-3h |
-| `#ZZZ setFabric → consumer resolution` | deprecate CPU `setFabric(fabricId)`; consumers call `setConfig(getPhysicalFabric(id))` | ~1-2h |
-| `#WWW gravity → setConfig bundle` | deprecate `setGravity` separate setter; bundle into `setConfig({gravityX?, gravityY, gravityZ?})` | ~1-2h |
-| `#VVV error shape uniform 4 tiers` | extend A3 `{type, code, message}` to CPU + GPU + Neural | ~2-3h |
-| `#UUU-init` consumer polymorphic init | factory pattern that maps tier identity to constructor + per-tier args resolution | ~2-3h |
-| `#UUU-callbacks` consumer polymorphic callback | wrapper layer or single-arg migration with `onMeshData` split | ~2-3h |
+| `#683 setWind canonical signature` | wind capability gate + canonical sig `(force, dragCoefficient?)` | ~2-3h |
+| `#684 setPins canonical batch shape` | hybrid sig with optional `position?` field; CPU freeze-at-current vs WASM positional caveat | ~2-3h |
+| `#685 setFabric → consumer resolution` | deprecate CPU `setFabric(fabricId)`; consumers call `setConfig(getPhysicalFabric(id))` | ~1-2h |
+| `#686 gravity → setConfig bundle` | deprecate `setGravity` separate setter; bundle into `setConfig({gravityX?, gravityY, gravityZ?})` | ~1-2h |
+| `#687 error shape uniform 4 tiers` | extend A3 `{type, code, message}` to CPU + GPU + Neural | ~2-3h |
+| `#688` consumer polymorphic init | factory pattern that maps tier identity to constructor + per-tier args resolution | ~2-3h |
+| `#689` consumer polymorphic callback | wrapper layer or single-arg migration with `onMeshData` split | ~2-3h |
 
 ### Reopen triggers
 

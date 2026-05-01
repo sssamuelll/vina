@@ -41,9 +41,9 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  *   GPU/WASM/Neural emit `(positions)`. Behavioral split required to unify.
  * - setConfig / setters: per-tier shape (A2 territory).
  *
- * Polymorphic init/callback dispatch is consumer responsibility
- * (`#UUU` follow-up — split into `#UUU-init` + `#UUU-callbacks`
- * per A6 § 4.5 calibration).
+ * Polymorphic init/callback dispatch is consumer responsibility —
+ * see `#688` (init factory) + `#689` (callback adapter) follow-ups
+ * (split per A6 § 4.5.4 calibration).
  *
  * ---
  *
@@ -68,17 +68,18 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  * `getPositionStorageAttribute`, etc.
  *
  * **Setter migrations queued** (post-A6, decoupled per § 3.6.C):
- * - `#XXX` setWind canonical signature with capability gate.
- * - `#YYY` setPins canonical batch shape (with caveat below).
- * - `#ZZZ` setFabric resolution moved to consumer.
- * - `#WWW` gravity bundled into setConfig.
- * - `#VVV` error shape uniform across 4 tiers.
- * - `#UUU-init` + `#UUU-callbacks` consumer polymorphic dispatch (split
- *   per A6 § 4.5 — original `#UUU` underestimated cross-tier dispatch
- *   weight without interface anchor for init/callbacks).
+ * - `#683` setWind canonical signature with capability gate.
+ * - `#684` setPins canonical batch shape (with caveat below).
+ * - `#685` setFabric resolution moved to consumer.
+ * - `#686` gravity bundled into setConfig.
+ * - `#687` error shape uniform across 4 tiers.
+ * - `#688` (init factory pattern) + `#689` (callback adapter) consumer
+ *   polymorphic dispatch (split per A6 § 4.5.4 — original single `#UUU`
+ *   underestimated cross-tier dispatch weight without interface anchor
+ *   for init/callbacks).
  *
  * **CRITICAL CAVEAT — pin semantics divergence (per A6 RFC Q2 resolution):**
- * The future canonical `setPins?(pins)` method (post-`#YYY`) accepts
+ * The future canonical `setPins?(pins)` method (post-`#684`) accepts
  * `position?: [number, number, number]` as optional field. **Semantics
  * diverge by tier:**
  * - **CPU (`ClothWorkerClient`):** ignores `position` even if present.
@@ -106,8 +107,8 @@ export interface ClothSolverClient {
   // beyond A6 closure). All 4 concrete classes DO expose
   // `async initMultiPiece(pieces, ...): Promise<void>` by convention,
   // but with tier-specific subsequent params. Polymorphic init dispatch
-  // is consumer responsibility — see `#UUU consumer migration`
-  // follow-up for a factory-pattern unification.
+  // is consumer responsibility — see `#688` (init factory) + `#689`
+  // (callback adapter) follow-ups for a factory-pattern unification.
 
   /**
    * Start the simulation loop.
@@ -160,7 +161,7 @@ export interface ClothSolverClient {
  * Per A3 § 3.4 Result-pattern convention + A6 § 3.3 Option A (uniform
  * error shape across 4 tiers). Currently only adopted on WASM tier
  * (`wasm_memory_unavailable`); migration to CPU + GPU + Neural tiers
- * deferred to `#VVV` follow-up issue.
+ * deferred to `#687` follow-up issue.
  *
  * Consumer code branching on `code` should handle unknown codes
  * gracefully — the `string` fallback keeps the union forward-compat
@@ -181,7 +182,7 @@ export type SolverErrorCode =
 /**
  * Canonical solver error shape — emitted via worker postMessage (CPU/WASM)
  * or surfaced via callback (GPU/Neural). Migration to uniform shape across
- * all 4 tiers is deferred per A6 § 3.6.C decoupling — `#VVV` follow-up.
+ * all 4 tiers is deferred per A6 § 3.6.C decoupling — `#687` follow-up.
  */
 export interface SolverError {
   type: 'error';

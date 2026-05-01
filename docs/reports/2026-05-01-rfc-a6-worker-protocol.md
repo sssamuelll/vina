@@ -1091,11 +1091,11 @@ Sweep these in Sec 4 recomendación pre-F3.
 - Architectural ratifies (constraint docs).
 
 Per-feature implementations queued:
-- `#XXX interface declaration` (~3h).
-- `#YYY capability extension to GPU + Neural` (~1-2h).
-- `#ZZZ error shape uniform` (~2-3h).
-- `#WWW setter per-method migration` (5+ issues, 1-3h each).
-- `#VVV consumer migration` (~3-5h).
+- `#683 (placeholder, see Sec 5.3 for canonical issue numbers post-merge)` (~3h).
+- `#684 (placeholder)` (~1-2h).
+- `#685 (placeholder)` (~2-3h).
+- `#686 setter per-method migration` (5+ issues, 1-3h each).
+- `#687 (placeholder)` (~3-5h).
 
 **Pros:**
 - A6 closes very fast (~2-3h F3 minimal).
@@ -1118,12 +1118,12 @@ Per-feature implementations queued:
 - NeuralDrapeClient header reframe (Constraint C resolution).
 
 Decoupled to follow-up issues (queued post-merge):
-- `#XXX setter per-method migration — wind canonical signature + capability gate` (~2-3h).
-- `#YYY setter per-method migration — pins canonical batch shape` (~2-3h).
-- `#ZZZ setter migration — fabric resolution moved to consumer` (~1-2h).
-- `#WWW setter migration — gravity bundled into setConfig` (~1-2h).
-- `#VVV error shape uniform across 4 tiers` (~2-3h, follows A3 pattern).
-- `#UUU consumer migration — useSimulationLifecycle polymorphic dispatch` (~3-5h, depends on interface + capability).
+- `#683 setter per-method migration — wind canonical signature + capability gate` (~2-3h).
+- `#684 setter per-method migration — pins canonical batch shape` (~2-3h).
+- `#685 setter migration — fabric resolution moved to consumer` (~1-2h).
+- `#686 setter migration — gravity bundled into setConfig` (~1-2h).
+- `#687 error shape uniform across 4 tiers` (~2-3h, follows A3 pattern).
+- `#688 + #689 consumer migration (split per § 4.5.4 into init factory + callback adapter)` (~3-5h, depends on interface + capability).
 
 **Pros:**
 - Captures architectural anchor en A6 closure (interface + capability surface) — drift root addressed.
@@ -1135,7 +1135,7 @@ Decoupled to follow-up issues (queued post-merge):
 
 **Cons:**
 - Setter API divergencias persist until follow-ups land.
-- Error shape stays divergent (3 of 4 tiers without `code` field) until #VVV lands.
+- Error shape stays divergent (3 of 4 tiers without `code` field) until #687 lands.
 
 #### Recommendation per § 3.6
 
@@ -1180,7 +1180,7 @@ New section in CLAUDE.md following the precedent of "Three.js disposable lifecyc
 Content (estimated ~80-120 líneas):
 - Cross-ref to A6 RFC.
 - Canonical interface shape (`ClothSolverClient`).
-- Decision rule for new solver client: must implement interface + declare capabilities + use uniform error shape (post-#VVV).
+- Decision rule for new solver client: must implement interface + declare capabilities + use uniform error shape (post-#687).
 - Capability flag inventory + which tier supports what (table).
 - Setter migration status (initially: pre-migration — flag follow-up issues).
 - Reopen triggers (per § 7).
@@ -1205,7 +1205,7 @@ For `useSimulationLifecycle.ts`:
 
 - Inline comments at each tier branch (CPU/WASM/GPU/Neural) explaining migration target post-A6.
 
-This layer is documentation-only en A6 closure; actual polymorphic dispatch implementation deferred a `#UUU consumer migration` follow-up issue.
+This layer is documentation-only en A6 closure; actual polymorphic dispatch implementation deferred a `#688` (init factory) + `#689` (callback adapter) consumer migration follow-up issue.
 
 #### Recommendation per § 3.7
 
@@ -1297,7 +1297,7 @@ Confidence: **medium.** Divergence is real; resolution shape selected; implement
 
 (Redux action `setFabric({pieceId, fabricId})` is a separate symbol — different semantics, dispatches via store, not via client.)
 
-**Migration cost low** — ~2 callsites + remove method from CPU client. Deferred to `#ZZZ setFabric resolution moved to consumer` follow-up issue (per § 3.6 hybrid lean).
+**Migration cost low** — ~2 callsites + remove method from CPU client. Deferred to `#685 setFabric resolution moved to consumer` follow-up issue (per § 3.6 hybrid lean).
 
 **Resolution:** Deprecate `setFabric` on CPU concrete class (NOT in interface). Consumers call `setConfig(getPhysicalFabric(fabricId))` directly.
 
@@ -1317,7 +1317,7 @@ Confidence: **high.**
 
 Or simpler: deprecate `setGravity` completely; consumers always use `setConfig`. CPU's 3-component is rarely used in practice; if a consumer needs it, they call `setConfig({gravityX, gravityY, gravityZ})`.
 
-**Resolution:** Deprecate `setGravity` separate method. `gravityY` (or full vector) goes via `setConfig`. Migration in `#WWW gravity bundled into setConfig` follow-up issue.
+**Resolution:** Deprecate `setGravity` separate method. `gravityY` (or full vector) goes via `setConfig`. Migration in `#686 gravity bundled into setConfig` follow-up issue.
 
 Confidence: **medium-high.**
 
@@ -1343,7 +1343,7 @@ Final per-decision recommendations post-Sec 3 + open questions:
 |---|---|---|---|
 | 3.1 Interface extraction | **3.1.C** hybrid minimal core (`ClothSolverClient` interface) + Constraint A (`solverProtocol.ts` module) + Constraint B (`frameDriven` capability) + Constraint C (Neural enforce + reframe header) | medium-high | ~2-3h |
 | 3.2 Init shape uniformity | **3.2.C** hybrid uniform sig + generic config + optional tier-specific options | medium-high | ~1h (interface decl only; concrete classes already have `initMultiPiece`) |
-| 3.3 Error shape (A3 extend) | **3.3.A** uniform `{ type, code, message }` 4 tiers | high | **DECOUPLED** — `#VVV` follow-up (~2-3h) |
+| 3.3 Error shape (A3 extend) | **3.3.A** uniform `{ type, code, message }` 4 tiers | high | **DECOUPLED** — `#687` follow-up (~2-3h) |
 | 3.4 Capability surface (A7 extend) | **3.4.A** add getter to GPU + Neural + `frameDriven` flag | high | ~1-2h |
 | 3.5 Setter divergence (per-method) | **(c) per-method canonical** | medium-high | **DECOUPLED** — 4 follow-up issues (~6-10h aggregate) |
 | 3.6 F3 strategy | **3.6.C** hybrid decoupling | high | (governs this table) |
@@ -1365,7 +1365,7 @@ Bundling decision per Sec 5 migration plan:
 
 - **Closure scope (per § 3.6.C lean):** interface decl + capability extension + Neural reframe + CLAUDE.md + JSDoc. ~3-5h. Borderline.
 - **Bundle option:** add error shape uniform (3.3.A) to closure if total stays ≤7h. Adds ~2-3h.
-- **Pre-emptive lean:** decoupled per § 3.6.C. Error shape uniform NOT in closure — `#VVV` follow-up issue. Reasoning: error migration touches CPU + GPU + Neural new code paths; cleaner per-tier focused PR.
+- **Pre-emptive lean:** decoupled per § 3.6.C. Error shape uniform NOT in closure — `#687` follow-up issue. Reasoning: error migration touches CPU + GPU + Neural new code paths; cleaner per-tier focused PR.
 
 **Final closure scope:** decoupled per § 3.6.C. Threshold not met for full bundling; bundle option rejected to preserve atomicity.
 
@@ -1463,18 +1463,18 @@ Robust pattern 4/4 anchor stable preserved con caveat methodológico. Sub-rule p
 
 > Pattern 2.5 extend variants — promoted to robust pattern (4/4 data points: A3 + C1 + A7 + A6). A6 anchors **bounded variant** — when compile gate reveals convergence-by-convention is less complete than inventory captured, scope-reduction-on-trigger is a viable closure path (vs full revert/reopen).
 
-#### 4.5.4 `#UUU` consumer migration scope split
+#### 4.5.4 `#688` + `#689` consumer migration scope split
 
-Original `#UUU consumer migration — useSimulationLifecycle polymorphic dispatch` underestimated cross-tier dispatch weight. With init + callbacks dropped from interface, the follow-up now carries the FULL weight of polymorphic init/callback dispatch without interface anchor.
+Original `#688 + #689 consumer migration (split per § 4.5.4 into init factory + callback adapter)` underestimated cross-tier dispatch weight. With init + callbacks dropped from interface, the follow-up now carries the FULL weight of polymorphic init/callback dispatch without interface anchor.
 
 **Resolution: split into 2 follow-ups.**
 
 | Original | Split into |
 |---|---|
-| `#UUU consumer migration` (~3-5h) | `#UUU-init` (~2-3h) per-tier polymorphic init dispatch — factory pattern that maps tier identity to constructor + per-tier init args resolution from common config shape |
-|  | `#UUU-callbacks` (~2-3h) per-tier polymorphic callback emission — wrapper layer that adapts `(positions)` → `(positions, numParticles, triIds)` for CPU consumer code, OR migrates CPU emission to single-arg + emit mesh data via separate `onMeshData` event |
+| `#688` (init factory) + `#689` (callback adapter) consumer migration (~3-5h) | `#688` (~2-3h) per-tier polymorphic init dispatch — factory pattern that maps tier identity to constructor + per-tier init args resolution from common config shape |
+|  | `#689` (~2-3h) per-tier polymorphic callback emission — wrapper layer that adapts `(positions)` → `(positions, numParticles, triIds)` for CPU consumer code, OR migrates CPU emission to single-arg + emit mesh data via separate `onMeshData` event |
 
-Aggregate `#UUU-*` cost ~4-6h vs original ~3-5h — slightly higher reflecting accurate scope.
+Aggregate aggregate cost ~4-6h vs original ~3-5h — slightly higher reflecting accurate scope.
 
 #### 4.5.5 Methodology finding (proposed sub-rule, anchor in CLAUDE.md post-merge)
 
@@ -1501,10 +1501,10 @@ This RFC's branch (`drift/a6-worker-protocol`) lands the **A6 closure proper** (
 1. ✅ **Commit 1** (landed `454e1da7`) — `solverProtocol.ts` module + `ClothSolverClient` interface + extended `SolverCapabilities` (`frameDriven` flag).
 2. ✅ **Commit 2** (landed `987775f7`) — capability extension to GPU + Neural (constants + getter, verified values).
 3. ✅ **Commit 3** (landed `ea5a34fe`) — concrete classes `implements ClothSolverClient` (compile gate). **Triggered scope reduction; init + callbacks dropped from interface.**
-4. **Commit 3.5** (this commit) — § 4.5 amendment articulating finding + Pattern 2.5 extend bounded reframe + `#UUU` split rationale + JSDoc divergence note in `solverProtocol.ts`.
+4. **Commit 3.5** (this commit) — § 4.5 amendment articulating finding + Pattern 2.5 extend bounded reframe + `#688` + `#689` split rationale + JSDoc divergence note in `solverProtocol.ts`.
 5. **Commit 4** — NeuralDrapeClient header reframe (Constraint C — partial enforce + partial reframe per Q4.5 finding).
 6. **Commit 5** — CLAUDE.md "Cloth solver client interface (A6 ratified)" section reflecting reduced scope.
-7. **Commit 6** — JSDoc on `useSimulationLifecycle.ts` consumers (dispatch examples + `#UUU-init`/`#UUU-callbacks` migration target).
+7. **Commit 6** — JSDoc on `useSimulationLifecycle.ts` consumers (dispatch examples + `#688`/`#689` migration target).
 
 **Total A6 closure F3:** ~5-7h aggregate (revised from ~5-8h estimate; docs-heavy post-Commit-3, code mostly landed). Pace consistent.
 
@@ -1661,14 +1661,14 @@ Content:
 - Canonical interface shape `ClothSolverClient`.
 - Decision rule for new solver client.
 - Capability flag inventory + per-tier table.
-- Setter migration status (initially: pre-migration, pending #XXX-#WWW follow-ups).
+- Setter migration status (initially: pre-migration, pending #683-#686 follow-ups).
 - Reopen triggers (per § 7).
 - Cross-ref to A2, A4, C4, A7.
 
 **Commit 6 — JSDoc on consumers (dispatch examples).**
 
 Files:
-- `src/components/Viewport3D/useSimulationLifecycle.ts` — JSDoc on tier cascade explaining post-A6 dispatch convention + future polymorphic dispatch (deferred to `#UUU` consumer migration).
+- `src/components/Viewport3D/useSimulationLifecycle.ts` — JSDoc on tier cascade explaining post-A6 dispatch convention + future polymorphic dispatch (deferred to `#688` + `#689` consumer migration).
 
 Estimated size: ~30-50 líneas docs (JSDoc + inline comments at tier branches).
 
@@ -1678,29 +1678,29 @@ Estimated size: ~30-50 líneas docs (JSDoc + inline comments at tier branches).
 
 Per § 3.6.C, each follow-up lands as separate PR after A6 merge. Issues opened with `severity:medium` mirror cluster precedent (A7 #676-681).
 
-#### `#XXX setter migration — wind canonical signature` (severity:medium, ~2-3h)
+#### `#683 setter migration — wind canonical signature` (severity:medium, ~2-3h)
 
 Migrate to canonical `setWind?(force, dragCoefficient?)` on interface. CPU implements (port from WASM if feature port lands per A7 lint scope) or capability-gates. Capability flag `wind: boolean` added to `SolverCapabilities`.
 
-#### `#YYY setter migration — pins canonical batch shape` (severity:medium, ~2-3h)
+#### `#684 setPins canonical batch shape with freeze-vs-positional caveat` (severity:medium, ~2-3h)
 
 Migrate CPU `pinParticle`/`unpinParticle` → `setPins(batch)`/`clearPins()`. Hybrid signature with optional `position` field per Q2 resolution (caveat in JSDoc + future lint rule). Capability flag `pins: boolean`.
 
-#### `#ZZZ setter migration — fabric resolution moved to consumer` (severity:medium, ~1-2h)
+#### `#685 setter migration — fabric resolution moved to consumer` (severity:medium, ~1-2h)
 
 Deprecate CPU `setFabric(fabricId)`. Migrate 2 callsites (`useSimulationLifecycle:365`, `ClothMesh:288,330`) to `setConfig(getPhysicalFabric(fabricId))`. Remove method from CPU client.
 
-#### `#WWW setter migration — gravity bundled into setConfig` (severity:low, ~1-2h)
+#### `#686 setter migration — gravity bundled into setConfig` (severity:low, ~1-2h)
 
 Deprecate CPU `setGravity(vec)`. Bundle into `setConfig({gravityX?, gravityY, gravityZ?})`. WASM/GPU/Neural ratify `gravityY` only as subset.
 
-#### `#VVV error shape uniform across 4 tiers` (severity:medium, ~2-3h)
+#### `#687 error shape uniform across 4 tiers` (severity:medium, ~2-3h)
 
 Migrate CPU + GPU + Neural error paths to `{ type: 'error'; code: string; message: string }` shape (post-A3 WASM precedent). Define canonical `SolverErrorCode` enum. Telemetry-ready.
 
-#### `#UUU consumer migration — useSimulationLifecycle polymorphic dispatch` (severity:medium, ~3-5h)
+#### `#688 + #689 consumer migration (split per § 4.5.4 into init factory + callback adapter)` (severity:medium, ~3-5h)
 
-Refactor `useSimulationLifecycle.ts` 4-rama dispatch to polymorphic via `ClothSolverClient` interface + capability checks. Depends on #XXX + #YYY + #ZZZ + #WWW landing first (or stub interface).
+Refactor `useSimulationLifecycle.ts` 4-rama dispatch to polymorphic via `ClothSolverClient` interface + capability checks. Depends on #683 + #684 + #685 + #686 landing first (or stub interface).
 
 ### 5.4 Verification gates per closure commit
 
@@ -1745,7 +1745,7 @@ Pre-merge, verify:
 - **Si aprobado:** Fase 3 closure (6 commits sobre este branch).
 - **A6 cerrado:** Pattern 2.5 hybrid extend ratification (4to data point del robust pattern). Sub-rule consolidation: anchor stable a 4/4 consistent shape post-merge.
 - **Bloque (c) progress: 3/6 RFCs cerrados (C1 + A7 + A6).** 3 restantes: A2, A4, C4.
-- **6 follow-up issues** queued (#XXX-#UUU) — setter migrations + error uniform + consumer migration. Aggregate ~10-15h work distributed.
+- **6 follow-up issues** queued (`#683`-`#689`) — setter migrations + error uniform + consumer migration. Aggregate ~10-15h work distributed.
 - **CLAUDE.md** + 23ª anchored methodology section ("Cloth solver client interface (A6 ratified)").
 
 ### 6.3 No-conflicts (out-of-scope verificado)
@@ -1782,11 +1782,11 @@ A6 ratificación queda revisable si emerge:
 
 ## 8. Deuda técnica explícita post-ratificación
 
-1. **Setter migrations (4 follow-up issues) decoupled.** Until `#XXX-#WWW` land, setter API divergencias persist. Acceptable porque interface declares uniform shape (forward-only convention), drift is on the implementation side.
+1. **Setter migrations (4 follow-up issues) decoupled.** Until `#683-#686` land, setter API divergencias persist. Acceptable porque interface declares uniform shape (forward-only convention), drift is on the implementation side.
 
-2. **Error shape uniform decoupled (`#VVV`).** CPU + GPU + Neural keep `{ message: string }` until #VVV lands. Consumer code `code`-aware UX (per A3 § 3.2 follow-up) is partial — only WASM tier has structured signal.
+2. **Error shape uniform decoupled (`#687`).** CPU + GPU + Neural keep `{ message: string }` until #687 lands. Consumer code `code`-aware UX (per A3 § 3.2 follow-up) is partial — only WASM tier has structured signal.
 
-3. **Consumer migration decoupled (`#UUU`).** `useSimulationLifecycle.ts` 4-rama dispatch persists until #UUU lands. Polymorphic dispatch documented in JSDoc (Commit 6) but not implemented in A6 closure.
+3. **Consumer migration decoupled (`#688 + #689`).** `useSimulationLifecycle.ts` 4-rama dispatch persists until `#688` + `#689` land. Polymorphic dispatch documented in JSDoc (Commit 6) but not implemented in A6 closure.
 
 4. **TSL execution model accommodation via capability flag.** `frameDriven: true` flag signals consumer to dispatch via `useFrame` instead of `start()`. Not formally enforced — consumer can call `start()` on GPU client (no-op). Mitigation: JSDoc warning on GPU `start()` + lint rule (deferred per § 3.6).
 
@@ -1816,7 +1816,7 @@ Si **sí, todo aprobado:**
 - Fase 3 closure (6 commits sobre este branch).
 - Inventory annotation post-merge.
 - Sub-rule meta-anchor update post-merge: Pattern 2.5 extend variant **promoted to 4/4 robust pattern** (anchor stable).
-- 6 follow-up issues opened (`#XXX-#UUU`).
+- 6 follow-up issues opened (`#683`-`#689`).
 
 Si **alguna sub-decisión querés cambiar:**
 - Indicame cuál (3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7).
