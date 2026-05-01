@@ -713,6 +713,50 @@ Reopen D6 if:
 4. `Fabric` (project) merges with `PhysicalFabric` — e.g., embedding rich engineering data in project state. Reabrir scope.
 5. A fourth fabric type emerges — evaluate if N=4 justifies registry/manifest pattern.
 
+## zod usage policy (D3 ratified)
+
+Cross-ref: `docs/reports/2026-05-01-drift-fase2-d3-forms-inputs-zod.md` (full Fase 2 doc with 3 sub-decisiones, 8 zod source files inventariados, 180 UI inputs verified).
+
+zod is scoped to **3 specific niches**. UI form validation is **out of scope by design**.
+
+### In scope
+
+| Niche | Examples | Why zod |
+|---|---|---|
+| **Boundary parsing** | `projectSchema.ts`, `avatarLibrary.ts`, plugin manifest validation | Trust boundary on external/serialized input — DoS bounds, key allowlists, forward-compat (`loose()`) |
+| **Persistence with versioning** | `workflowSlice.ts`, `userPreferences.ts`, `usageRecordSchema.ts` | Roundtripped storage shape with `version` envelope for schema evolution (precedente B6-state) |
+| **Tool argument validation** | `validation.ts`, `registry.ts` (copilot tools) | Runtime parse before tool execute — protects against malformed LLM output |
+
+### Out of scope
+
+**UI form validation.** HTML attrs (`type="number"`, `min`, `max`, `step`) + `Number()`/`parseFloat()` inline parsing are sufficient for the input shapes currently in the codebase.
+
+Empirical baseline (verified 2026-05-01):
+- 180 `<input>` tags across components, 0 use zod.
+- 0 alternative form libraries (no react-hook-form, formik, yup, @tanstack/react-form).
+- 0 multi-field forms with cross-validation rules.
+- Single-value setters with HTML attrs sufficient — schema overhead would distort cost-benefit.
+
+### Decision rule for new code
+
+When introducing validation logic, ask:
+
+- **Is the input crossing a trust boundary** (untrusted JSON, file load, network, plugin)? → zod boundary parsing.
+- **Is the data persisted with version envelope** for forward-compat? → zod persistence schema.
+- **Is the input a tool argument from LLM output**? → zod tool arg validation (use centralized registry).
+- **Is the input a single user-facing value** (slider, number field, text input)? → HTML attrs + `Number()`/`parseFloat()` inline. Don't introduce zod for single-value UI inputs.
+- **Is the input a multi-field form with cross-validation rules** (e.g., `bust ≥ chest ≥ waist`)? → reabrir D3 (reopen trigger 7.1) — current policy doesn't cover; evaluate zod-in-UI with concrete case.
+
+### Reopen triggers
+
+Reopen D3 if:
+
+1. Multi-field form with cross-validation rules emerges (HTML attrs don't support cross-field rules) — evaluate zod adoption in UI with concrete scope.
+2. Alternative form library introduced (react-hook-form, formik) — evaluate integration with zod schemas.
+3. Duplication emerges between UI input rules and zod schema rules (e.g., `min={140} max={200}` in UI hardcoded duplicates `z.number().min(140).max(200)` in schema).
+4. 9th zod schema file introduced with use case outside the 3 niches — evaluate if a new niche emerges.
+5. Second consumer of measurement-input-paired pattern (range + number paired + static min/max from config + simple onChange) — reabrir D3 § 3.2 (`MeasurementInput` extract decision).
+
 ## Drift-axis investigation methodology
 
 When investigating a drift axis that may span multiple naming conventions (e.g., the same kind of helper named `uid` / `cid` / `generateId` / `genXxxId` / etc.), grep on the **underlying primitive**, not on the canonical name. For ID generators specifically:
