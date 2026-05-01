@@ -1214,6 +1214,23 @@ Sub-sweeps hechos durante investigación de un eje (capturados como Apéndice o 
 
 Aplicación: cuando un Fase 2 doc futuro afirma "sweep ya pre-done en Apéndice X de eje Y", el refresh contra estado actual del codebase NO es opcional — es validation requerida. Si diverge >50%, declarar el sweep propio como autoritativo y notar la divergencia explícitamente en el doc; no rebuild la metodología del Apéndice X, capturar el delta y proceder.
 
+#### Compile-gate convergence verification (anchored 2026-05-01 post-A6)
+
+Inventory que clasifica métodos como "convergent by convention" puede sobrestimar uniformity. Las method names + arg counts pueden coincidir mientras los **shapes estructurales divergen** (e.g., 3-arg callback vs 1-arg, distinct seam types). El compile gate del interface implementation (`implements`) revela structural divergence que grep no captura.
+
+**Sub-regla derivative de "verify divergence, don't assume uniformity by grep"** — extends to "method-name-similar can hide signature-different".
+
+Para futuros ejes proposing interface extraction:
+
+1. **Anticipá esta clase de finding.** Sec 2 inventory que dice "convergent by convention" debe ser validated structurally — si los compile gate trigger un TS2416 al hacer `implements`, el inventory estaba optimistic.
+2. **Considerá scope-reduction-on-trigger como path viable**, no solo full revert/reopen.
+3. **Doc amendment IN F3** (NOT post-merge) cuando el trigger fires. Audit philosophy "code y doc ship consistent" + amendment post-merge sería ratificación por inercia.
+4. **JSDoc divergence note load-bearing** en el archivo del interface, NO solo en CLAUDE.md. Future contributors leen el código, no solo el doc; sin JSDoc explícito van a asumir el interface es la superficie completa, intentar polymorphic dispatch sobre métodos no-interface, y romperse en compile o (peor) agregar runtime translation silently.
+
+**Origen:** A6 Fase 3 (2026-05-01) compile gate Commit 3 reveló TS2416 error — GPU `initMultiPiece` `seamPairs` shape no asignable a interface's `SeamInitData[]` + CPU `FrameCallback` 3-arg no asignable a interface 1-arg `onFrame`. Sec 2.4 inventory había documentado estos como "convergent by convention" — error en compile reveló less complete than assumed. Resolution: scope-reduction-on-trigger (interface reduced from 7+ members to 4-member lifecycle subset only). Doc amendment IN F3 vía Commit 3.5. Cross-ref `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` § 4.5.
+
+**Aplicabilidad para audit forward:** A2 (cross-boundary serialization), A4 (geometry/mesh ops cross-language), C4 (4-tier coexistence) — todos con riesgo similar de proponer interface/protocol extraction sin pre-verify structural divergence. Anticipá compile-gate trigger, considerá scope-reduction como path principal, articulá divergence en JSDoc del archivo del interface + en el RFC doc.
+
 ### Inventory drift overestimation pattern (anchored 2026-04-30 after 10 ratify-by-convention closures)
 
 **Inventarios iniciales de drift sobrestiman drift real sistematicamente.** De los primeros 16 ejes cerrados del audit, **10 (62%) cerraron como ratify-by-convention** — el "drift" inventoriado resultó ser pattern intencional sin documentation.
