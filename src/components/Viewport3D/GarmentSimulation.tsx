@@ -40,6 +40,8 @@ import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
+import { mapClothSimConfigToWasmSolverConfig } from '../../utils/cloth/configBridge';
+import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -329,13 +331,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   useEffect(() => {
     const mode = SIMULATION_MODES[simulationMode];
     substepsRef.current = mode.substeps;
-    // GPU/TSL path
+    // GPU/TSL path (per-tier shape ratified A6 § 3.1.C).
     if (tslSolverRef.current) {
       tslSolverRef.current.updateConfig({ substeps: mode.substeps });
     }
-    // WASM / CPU-Worker paths
-    clients.wasm?.setConfig({ substeps: mode.substeps });
-    clients.cpu?.setConfig({ numSubsteps: mode.substeps });
+    // CPU + WASM via shared CPU shape + bridge translation (A2 § 3.2.B).
+    const cpuPartial: Partial<ClothSimConfig> = { numSubsteps: mode.substeps };
+    clients.cpu?.setConfig(cpuPartial);
+    clients.wasm?.setConfig(mapClothSimConfigToWasmSolverConfig(cpuPartial));
   }, [simulationMode, tslSolverRef, clients]);
 
   // ─── Animation recording + playback ────────────────────────────────────────
