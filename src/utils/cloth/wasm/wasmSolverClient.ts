@@ -41,6 +41,25 @@ export interface PieceMeshData {
   uvs?: Float32Array;
 }
 
+/**
+ * Configuration for the WASM XPBD solver (16 fields, all optional).
+ *
+ * **Cross-tier cleavage ratified A2 Fase 2 § 2.4 + § 3.2.B.** Mirrors the
+ * subset of `ClothSimConfig` (`xpbdSolver.ts`) shared with the WASM tier,
+ * with renamed fields: `substeps` (CPU `numSubsteps`), `thickness` (CPU
+ * `clothThickness`), `stretchCompliance` (CPU `stretchingCompliance`),
+ * `bendCompliance` (CPU `bendingCompliance`), `gravityY` (CPU `gravity[1]`).
+ *
+ * WASM-only field: `collisionMargin` (CPU uses `clothThickness` for both
+ * inflation + margin — see `setCapsuleColliders` margin assignment in
+ * `xpbdSolver.ts`). Subtle architectural cleavage preserved per A2 § 2.5.
+ *
+ * For UI bridges writing to both CPU + WASM, use
+ * `mapClothSimConfigToWasmSolverConfig` (`configBridge.ts`) — write the
+ * canonical CPU `ClothSimConfig` shape, helper translates.
+ *
+ * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
+ */
 export interface WasmSolverConfig {
   substeps?: number;
   damping?: number;

@@ -38,7 +38,12 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  *   CPU/WASM use `SeamInitData[]`; Neural takes no seams.
  * - onFrame callback: CPU emits `(positions, numParticles, triIds)`;
  *   GPU/WASM/Neural emit `(positions)`. Behavioral split required to unify.
- * - setConfig / setters: per-tier shape (A2 territory).
+ * - setConfig / setters: per-tier shape ratified A2 § 3.2.B (CPU
+ *   `Partial<ClothSimConfig>` 23 fields; WASM `Partial<WasmSolverConfig>`
+ *   16 optional fields with renames). UI bridges use
+ *   `mapClothSimConfigToWasmSolverConfig` (`configBridge.ts`) for cross-
+ *   tier writes from canonical CPU shape. See
+ *   `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
  *
  * Polymorphic init/callback dispatch is consumer responsibility —
  * see `#688` (init factory) + `#689` (callback adapter) follow-ups
@@ -70,7 +75,11 @@ export type { PieceMeshData } from './wasm/wasmSolverClient';
  * - `#683` setWind canonical signature with capability gate.
  * - `#684` setPins canonical batch shape (with caveat below).
  * - `#685` setFabric resolution moved to consumer.
- * - `#686` gravity bundled into setConfig.
+ * - `#686` gravity: closed by A2 § 3.4.A as ratified per-tier divergence.
+ *   CPU keeps `setGravity([x, y, z])` (vector); WASM uses
+ *   `setConfig({ gravityY })` (scalar Y only; Rust ABI today exposes
+ *   only `gravity_y` in `configure()`). Future Rust ABI expansion to full
+ *   gravity vector captured as separate follow-up (A2 § 6.5 #1).
  * - `#687` error shape uniform across 4 tiers.
  * - `#688` (init factory pattern) + `#689` (callback adapter) consumer
  *   polymorphic dispatch (split per A6 § 4.5.4 — original single `#UUU`

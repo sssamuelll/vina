@@ -64,6 +64,7 @@ Each closed eje has a full RFC in `docs/reports/`. Read the doc before introduci
 | A6 | Cloth solver client interface (`ClothSolverClient`): 4-member lifecycle subset; init/callbacks tier-specific | `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` |
 | A7 | WASM vs CPU solver capabilities: per-feature port-or-ratify; `SolverCapabilities` surface; per-feature ports queued (#676-681) | `docs/reports/2026-05-01-rfc-a7-wasm-cpu-equivalence.md` |
 | A4 | Cross-language geometry/mesh ops Rust↔TS reformulated to TS-internal cross-tier; spatial hash roles ortogonales; topology extraction cleavage ratified; bend rest semantics closed pre-A4 via BUG-1 | `docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md` |
+| A2 | Cross-boundary serialization Rust↔TS: variant A (zero-copy reads) + variant B (init copies) ratified-as-is; variant C (config field-by-field) Pattern 2.5 lite — `configBridge` helper for shared subset CPU↔WASM + per-tier divergence ratified for non-shared fields; `bendCompliance` defaults aligned (latent → eliminated) | `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md` |
 
 ## Common Tasks
 

@@ -102,7 +102,29 @@ function vecSetCross(
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 /**
- * Configuration for the XPBD cloth simulation.
+ * Configuration for the XPBD cloth simulation (CPU TS solver).
+ *
+ * **Cross-tier cleavage ratified A2 Fase 2 § 2.4 + § 3.2.B.** This is the
+ * canonical CPU-side shape (23 fields, named camelCase). WASM tier uses a
+ * different shape (`WasmSolverConfig` in `wasm/wasmSolverClient.ts`, 16
+ * optional fields with renamed camelCase: `numSubsteps`→`substeps`,
+ * `clothThickness`→`thickness`, `stretchingCompliance`→`stretchCompliance`,
+ * `bendingCompliance`→`bendCompliance`, `gravity[1]`→`gravityY`).
+ *
+ * 8 CPU-only fields (A7 ratified): `groundFriction`, `adaptiveSubsteps`
+ * (§ 3.1.6), `min/maxSubsteps`, `maxVelocity` (§ 3.1.7), `enableLRA`, `dt`,
+ * `windForce` (WASM tier uses separate `setWind()` API).
+ *
+ * For UI bridge layers writing to both tiers, use
+ * `mapClothSimConfigToWasmSolverConfig` (`configBridge.ts`) — write the CPU
+ * shape once, helper translates to WASM shape.
+ *
+ * Defaults convention: per `CLAUDE/methodology.md` § 15, the Rust
+ * `XpbdSolver::new()` constructor is canonical for cross-tier shared field
+ * defaults. CPU defaults must match for shared fields; CPU-only fields
+ * independent. See A2 § 3.1.
+ *
+ * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
  */
 export interface ClothSimConfig {
   /** Number of XPBD substeps per frame (more = stiffer, default 15) */
