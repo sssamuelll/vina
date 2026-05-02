@@ -24,12 +24,20 @@ export function SimulationStatusOverlay() {
   const particleCount = useSelector((s: RootState) => s.simulation.particleCount);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const bodyCollision = useSelector((s: RootState) => s.simulation.bodyCollision);
+  const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
 
   if (simulationState === 'idle') return null;
 
   const tier = TIER_INFO[solverTier] ?? TIER_INFO['none'];
   const fps = frameTimeMs > 0 ? Math.round(1000 / frameTimeMs) : 0;
   const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
+
+  // Tool tier coverage per C4 RFC § 2.3: steam brush is GPU-only;
+  // mesh grab is GPU + WASM. CPU + Neural have no tool dispatch.
+  // SolverCapabilities.tools mirrors this for capability-aware consumers.
+  const toolUnsupported =
+    (activeTool3D === 'steamBrush' && solverTier !== 'webgpu') ||
+    (activeTool3D === 'meshGrab' && solverTier !== 'webgpu' && solverTier !== 'wasm');
 
   return (
     <div style={{
@@ -66,6 +74,18 @@ export function SimulationStatusOverlay() {
           title="WASM tier does not support LRA (long range attachments), self-collision, fold constraints, per-piece pressure, or per-piece stiffness. Switch to CPU tier for full feature parity. See A7 RFC."
         >
           ⚠️ Limited features (LRA, self-collision, fold, pressure, piece stiffness disabled — use CPU tier)
+        </div>
+      )}
+      {toolUnsupported && (
+        <div
+          style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
+          title={
+            activeTool3D === 'steamBrush'
+              ? 'Steam brush requires the WebGPU tier (TSL kernels write per-particle velocity damping). Switch to WebGPU tier (opt-in via localStorage) when upstream Three.js fix lands. See C4 RFC § 2.3.'
+              : 'Mesh grab requires the WebGPU or WASM tier (CPU has no positional pin; Neural has no per-particle interactivity). Switch to WASM or WebGPU tier. See C4 RFC § 2.3.'
+          }
+        >
+          ⚠️ Active tool ({activeTool3D === 'steamBrush' ? 'steam brush' : 'mesh grab'}) not supported on this tier
         </div>
       )}
     </div>
