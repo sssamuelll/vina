@@ -21,8 +21,8 @@
  *   `windForce` flows through separate `setWind()` API on `WasmSolverClient`
  *   (per A6 § 3.6 #683 follow-up).
  * - **1 WASM-only field absent:** `collisionMargin`. CPU uses `clothThickness`
- *   for both inflation + margin (`xpbdSolver.ts:730`). Subtle architectural
- *   cleavage preserved per A2 § 2.5.
+ *   for both inflation + margin (see `setCapsuleColliders` margin assignment
+ *   in `xpbdSolver.ts`). Subtle architectural cleavage preserved per A2 § 2.5.
  *
  * **Forward-only convention:** new shared field added to `ClothSimConfig`
  * should also be mapped here (declare in Rust constructor first per
@@ -50,7 +50,13 @@ export function mapClothSimConfigToWasmSolverConfig(
 ): Partial<WasmSolverConfig> {
   const out: Partial<WasmSolverConfig> = {};
   if (cpu.numSubsteps !== undefined) out.substeps = cpu.numSubsteps;
-  if (cpu.gravity !== undefined) out.gravityY = cpu.gravity[1];
+  if (cpu.gravity !== undefined) {
+    if (Array.isArray(cpu.gravity) && cpu.gravity.length === 3 && typeof cpu.gravity[1] === 'number') {
+      out.gravityY = cpu.gravity[1];
+    } else if (process.env.NODE_ENV !== 'production') {
+      console.warn('[configBridge] gravity must be [number, number, number]; got', cpu.gravity);
+    }
+  }
   if (cpu.damping !== undefined) out.damping = cpu.damping;
   if (cpu.stretchingCompliance !== undefined) out.stretchCompliance = cpu.stretchingCompliance;
   if (cpu.bendingCompliance !== undefined) out.bendCompliance = cpu.bendingCompliance;

@@ -259,11 +259,11 @@ impl XpbdSolver {
     /// `AppliedSolverConfig` + `DEFAULT_SOLVER_CONFIG` + `applySolverConfig`
     /// callsite (worker) + `WasmSolverConfig` (client).
     ///
-    /// Constructor defaults at `lib.rs:113-130` are canonical for cross-tier
-    /// shared field defaults per `CLAUDE/methodology.md` § 15 — TS-side
-    /// `DEFAULT_SOLVER_CONFIG` (`wasmSolverWorker.ts:135`) and CPU
-    /// `ClothSimConfig` defaults (`xpbdSolver.ts:383-407`) MUST match for
-    /// shared fields.
+    /// Rust constructor `XpbdSolver::new()` defaults are canonical for
+    /// cross-tier shared field defaults per `CLAUDE/methodology.md` § 15 —
+    /// TS `DEFAULT_SOLVER_CONFIG` const en `wasmSolverWorker.ts` and CPU
+    /// `ClothSimConfig` constructor defaults en `xpbdSolver.ts` MUST match
+    /// for shared fields.
     ///
     /// Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,

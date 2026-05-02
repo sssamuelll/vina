@@ -115,4 +115,11 @@ describe('mapClothSimConfigToWasmSolverConfig', () => {
   it('preserves numeric zero (0 should not be dropped)', () => {
     expect(mapClothSimConfigToWasmSolverConfig({ damping: 0, groundY: 0 })).toEqual({ damping: 0, groundY: 0 });
   });
+
+  it('handles invalid gravity shape defensively', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(mapClothSimConfigToWasmSolverConfig({ gravity: [] as any })).toEqual({});
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(mapClothSimConfigToWasmSolverConfig({ gravity: [0] as any })).toEqual({});
+  });
 });

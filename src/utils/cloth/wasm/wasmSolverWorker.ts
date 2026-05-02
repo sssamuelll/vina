@@ -35,6 +35,7 @@ import type { PathCommand, Elastic, SemanticEdge } from '../../../types/types';
 import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 import { computeBendRestDistances } from './bendRestDistances';
+import type { WasmSolverConfig } from './wasmSolverClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -123,37 +124,23 @@ let jsSubsteps = 15;
  * so every field reaches `solver.configure(...)` at runtime.
  *
  * **A2 Fase 2 § 2.4.3 ratified** — WASM worker shape (16 required fields,
- * matching `WasmSolverConfig` client surface but non-optional). Cross-tier
- * cleavage: CPU `ClothSimConfig` (23 fields, different naming) lives in
- * `xpbdSolver.ts`. See A2 § 3.2.B for `configBridge.ts` translation helper.
+ * derived as `Required<WasmSolverConfig>` to eliminate dual-maintenance
+ * hazard. Adding a field to `WasmSolverConfig` automatically exigirá su
+ * inicialización en `DEFAULT_SOLVER_CONFIG` (compile error en lugar de
+ * silent drift). Cross-tier cleavage: CPU `ClothSimConfig` (23 fields,
+ * different naming) lives in `xpbdSolver.ts`. See A2 § 3.2.B for
+ * `configBridge.ts` translation helper.
  *
  * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
  */
-interface AppliedSolverConfig {
-  substeps: number;
-  damping: number;
-  gravityY: number;
-  stretchCompliance: number;
-  bendCompliance: number;
-  selfCollision: boolean;
-  thickness: number;
-  collisionMargin: number;
-  groundY: number;
-  dragCoefficient: number;
-  stretchComplianceWarp: number;
-  stretchComplianceWeft: number;
-  stretchComplianceShear: number;
-  bendComplianceWarp: number;
-  bendComplianceWeft: number;
-  internalDamping: number;
-}
+type AppliedSolverConfig = Required<WasmSolverConfig>;
 /**
  * **Defaults convention (`CLAUDE/methodology.md` § 15 + A2 § 3.1):** Rust
- * constructor (`crates/xpbd-wasm/src/lib.rs:113-130`) is canonical for
- * cross-tier shared field defaults. This record MUST match field-by-field
- * with the Rust constructor's defaults. CPU `ClothSimConfig` defaults
- * (`xpbdSolver.ts:383-407`) MUST match for shared fields; CPU-only fields
- * independent.
+ * constructor `XpbdSolver::new()` (en `crates/xpbd-wasm/src/lib.rs`) is
+ * canonical for cross-tier shared field defaults. This record MUST match
+ * field-by-field with the Rust constructor's defaults. CPU `ClothSimConfig`
+ * constructor defaults (en `xpbdSolver.ts`) MUST match for shared fields;
+ * CPU-only fields independent.
  *
  * Aligned 2026-05-02 (A2 closure): `bendCompliance: 1.0` matches CPU + per-
  * edge consensus. `selfCollision: false` divergence preserved as faithful

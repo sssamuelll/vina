@@ -51,8 +51,8 @@ export interface PieceMeshData {
  * `bendCompliance` (CPU `bendingCompliance`), `gravityY` (CPU `gravity[1]`).
  *
  * WASM-only field: `collisionMargin` (CPU uses `clothThickness` for both
- * inflation + margin per `xpbdSolver.ts:730`). Subtle architectural cleavage
- * preserved per A2 § 2.5.
+ * inflation + margin — see `setCapsuleColliders` margin assignment in
+ * `xpbdSolver.ts`). Subtle architectural cleavage preserved per A2 § 2.5.
  *
  * For UI bridges writing to both CPU + WASM, use
  * `mapClothSimConfigToWasmSolverConfig` (`configBridge.ts`) — write the
