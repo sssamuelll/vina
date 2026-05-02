@@ -42,6 +42,14 @@ import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import { mapClothSimConfigToWasmSolverConfig } from '../../utils/cloth/configBridge';
 import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
+import {
+  dispatchBrushStroke,
+  dispatchBrushClear,
+  dispatchGrabInit,
+  dispatchGrabMove,
+  dispatchGrabRelease,
+  type GrabState,
+} from '../../utils/cloth/toolDispatch';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 
@@ -130,10 +138,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const brushCursorRef = useRef<THREE.Mesh>(null);
   const grabDragging = useRef(false);
   const grabCursorRef = useRef<THREE.Mesh>(null);
-  // CPU-side grab state for WASM/CPU solver fallback
-  const grabIndices = useRef<number[]>([]);
-  const grabBasePositions = useRef<Float32Array | null>(null);
-  const grabStartPoint = useRef<[number, number, number]>([0, 0, 0]);
+  // Mesh grab state shared with toolDispatch helper (WASM tier needs indices +
+  // base positions + start point for delta-based positional pin updates).
+  const grabStateRef = useRef<GrabState>({
+    indices: [],
+    basePositions: null,
+    startPoint: [0, 0, 0],
+  });
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
@@ -777,18 +788,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     console.log(`[Pin Tool] Added pin at vertex ${nearestIdx}, position:`, pinPosition);
   }, [activeTool3D, dispatch, pinStrength, positionsRef]);
 
-  // ─── Steam brush interaction ──────────────────────────────────────────────
+  // ─── Steam brush + mesh grab interaction (via toolDispatch helper, C4) ────
 
   const handleBrushStroke = useCallback((point: THREE.Vector3) => {
-    const gpuClient = clientsRef.current.gpu;
-    if (gpuClient) {
-      gpuClient.setBrushParams(
-        [point.x, point.y, point.z],
-        steamBrush.radius,
-        steamBrush.strength,
-      );
-    }
-  }, [steamBrush.radius, steamBrush.strength]);
+    dispatchBrushStroke(
+      { point: [point.x, point.y, point.z], radius: steamBrush.radius, strength: steamBrush.strength },
+      { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+    );
+  }, [steamBrush.radius, steamBrush.strength, tslSolverRef, positionsRef]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     // Skip if manual raycaster already started interaction (TSL mode)
@@ -800,50 +807,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     } else if (activeTool3D === 'meshGrab') {
       e.stopPropagation();
       grabDragging.current = true;
-      const center: [number, number, number] = [e.point.x, e.point.y, e.point.z];
-      // Write grab uniforms directly to tslSolverRef (bypasses stale gpuClient ref)
-      const solver = tslSolverRef.current;
-      const wasmClient = clientsRef.current.wasm;
-      if (solver) {
-        const g = solver.grabNodes;
-        g.grabCenterX.value = center[0];
-        g.grabCenterY.value = center[1];
-        g.grabCenterZ.value = center[2];
-        g.grabRadius.value = meshGrab.radius;
-        g.grabStrength.value = meshGrab.strength;
-        g.grabActive.value = 1;
-        g.grabInitPending.value = 1;
-      } else if (wasmClient && positionsRef.current) {
-        // WASM fallback: use setPins to grab particles near the click point
-        const positions = positionsRef.current;
-        const rSq = meshGrab.radius * meshGrab.radius;
-        const indices: number[] = [];
-        const N = positions.length / 3;
-        for (let i = 0; i < N; i++) {
-          const dx = positions[i * 3] - center[0];
-          const dy = positions[i * 3 + 1] - center[1];
-          const dz = positions[i * 3 + 2] - center[2];
-          if (dx * dx + dy * dy + dz * dz < rSq) {
-            indices.push(i);
-          }
-        }
-        if (indices.length > 0) {
-          grabIndices.current = indices;
-          grabStartPoint.current = center;
-          const base = new Float32Array(indices.length * 3);
-          for (let j = 0; j < indices.length; j++) {
-            const i = indices[j];
-            base[j * 3] = positions[i * 3];
-            base[j * 3 + 1] = positions[i * 3 + 1];
-            base[j * 3 + 2] = positions[i * 3 + 2];
-          }
-          grabBasePositions.current = base;
-          wasmClient.setPins(indices.map((idx, j) => ({
-            vertexIndex: idx,
-            position: [base[j * 3], base[j * 3 + 1], base[j * 3 + 2]] as [number, number, number],
-          })));
-        }
-      }
+      dispatchGrabInit(
+        { point: [e.point.x, e.point.y, e.point.z], radius: meshGrab.radius, strength: meshGrab.strength },
+        { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+        grabStateRef.current,
+      );
     }
   }, [activeTool3D, handleBrushStroke, meshGrab.radius, meshGrab.strength, positionsRef, tslSolverRef]);
 
@@ -863,74 +831,48 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       }
       if (!grabDragging.current) return;
       e.stopPropagation();
-      // Write grab center directly to tslSolverRef (bypasses stale gpuClient ref)
-      const solver = tslSolverRef.current;
-      const wasmClient = clientsRef.current.wasm;
-      if (solver) {
-        solver.grabNodes.grabCenterX.value = e.point.x;
-        solver.grabNodes.grabCenterY.value = e.point.y;
-        solver.grabNodes.grabCenterZ.value = e.point.z;
-      } else if (wasmClient && grabIndices.current.length > 0 && grabBasePositions.current) {
-        const dx = e.point.x - grabStartPoint.current[0];
-        const dy = e.point.y - grabStartPoint.current[1];
-        const dz = e.point.z - grabStartPoint.current[2];
-        const base = grabBasePositions.current;
-        const indices = grabIndices.current;
-        wasmClient.setPins(indices.map((idx, j) => ({
-          vertexIndex: idx,
-          position: [base[j * 3] + dx, base[j * 3 + 1] + dy, base[j * 3 + 2] + dz] as [number, number, number],
-        })));
-      }
+      dispatchGrabMove(
+        { point: [e.point.x, e.point.y, e.point.z] },
+        { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+        grabStateRef.current,
+      );
     }
-  }, [activeTool3D, handleBrushStroke, tslSolverRef]);
+  }, [activeTool3D, handleBrushStroke, positionsRef, tslSolverRef]);
 
   const releaseGrab = useCallback(() => {
     if (!grabDragging.current) return;
     grabDragging.current = false;
-    // Write directly to tslSolverRef (bypasses stale gpuClient ref)
-    const solver = tslSolverRef.current;
-    const wasmClient = clientsRef.current.wasm;
-    if (solver) {
-      solver.grabNodes.grabActive.value = 0;
-    } else if (wasmClient && grabIndices.current.length > 0) {
-      wasmClient.clearPins();
-      grabIndices.current = [];
-      grabBasePositions.current = null;
-    }
-  }, [tslSolverRef]);
+    dispatchGrabRelease(
+      { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+      grabStateRef.current,
+    );
+  }, [positionsRef, tslSolverRef]);
 
   const handlePointerUp = useCallback(() => {
     brushDragging.current = false;
-    const gpuClient = clientsRef.current.gpu;
-    if (gpuClient) {
-      gpuClient.setBrushParams([0, 0, 0], 0, 0);
-    }
+    dispatchBrushClear({ gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current });
     releaseGrab();
-  }, [releaseGrab]);
+  }, [releaseGrab, positionsRef, tslSolverRef]);
 
   const handlePointerLeave = useCallback(() => {
     if (brushCursorRef.current) brushCursorRef.current.visible = false;
     if (grabCursorRef.current) grabCursorRef.current.visible = false;
-    const gpuClient = clientsRef.current.gpu;
-    if (!brushDragging.current && gpuClient) {
-      gpuClient.setBrushParams([0, 0, 0], 0, 0);
+    if (!brushDragging.current) {
+      dispatchBrushClear({ gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current });
     }
     releaseGrab();
-  }, [releaseGrab]);
+  }, [releaseGrab, positionsRef, tslSolverRef]);
 
   // Global pointerup to handle drag release outside mesh
   useEffect(() => {
     const handleGlobalUp = () => {
       brushDragging.current = false;
-      const gpuClient = clientsRef.current.gpu;
-      if (gpuClient) {
-        gpuClient.setBrushParams([0, 0, 0], 0, 0);
-      }
+      dispatchBrushClear({ gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current });
       releaseGrab();
     };
     window.addEventListener('pointerup', handleGlobalUp);
     return () => window.removeEventListener('pointerup', handleGlobalUp);
-  }, [releaseGrab]);
+  }, [releaseGrab, positionsRef, tslSolverRef]);
 
   // ─── Manual raycasting for TSL mode ───────────────────────────────────────
   // R3F pointer events (onPointerMove/Down) depend on Three.js raycasting which
@@ -985,24 +927,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         if (activeTool3D === 'steamBrush' && brushDragging.current) {
           handleBrushStroke(hit);
         } else if (activeTool3D === 'meshGrab' && grabDragging.current) {
-          // Write grab center directly to tslSolverRef (bypasses stale gpuClient ref)
-          const solver = tslSolverRef.current;
-          const wasmClient = clientsRef.current.wasm;
-          if (solver) {
-            solver.grabNodes.grabCenterX.value = hit.x;
-            solver.grabNodes.grabCenterY.value = hit.y;
-            solver.grabNodes.grabCenterZ.value = hit.z;
-          } else if (wasmClient && grabIndices.current.length > 0 && grabBasePositions.current) {
-            const dx = hit.x - grabStartPoint.current[0];
-            const dy = hit.y - grabStartPoint.current[1];
-            const dz = hit.z - grabStartPoint.current[2];
-            const base = grabBasePositions.current;
-            const indices = grabIndices.current;
-            wasmClient.setPins(indices.map((idx, j) => ({
-              vertexIndex: idx,
-              position: [base[j * 3] + dx, base[j * 3 + 1] + dy, base[j * 3 + 2] + dz] as [number, number, number],
-            })));
-          }
+          dispatchGrabMove(
+            { point: [hit.x, hit.y, hit.z] },
+            { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+            grabStateRef.current,
+          );
         }
       }
     };
@@ -1016,47 +945,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         handleBrushStroke(hit);
       } else if (activeTool3D === 'meshGrab') {
         grabDragging.current = true;
-        const center: [number, number, number] = [hit.x, hit.y, hit.z];
-        // Write grab uniforms directly to tslSolverRef (bypasses stale gpuClient ref)
-        const solver = tslSolverRef.current;
-        const wasmClient = clientsRef.current.wasm;
-        if (solver) {
-          const g = solver.grabNodes;
-          g.grabCenterX.value = center[0];
-          g.grabCenterY.value = center[1];
-          g.grabCenterZ.value = center[2];
-          g.grabRadius.value = meshGrab.radius;
-          g.grabStrength.value = meshGrab.strength;
-          g.grabActive.value = 1;
-          g.grabInitPending.value = 1;
-        } else if (wasmClient && positionsRef.current) {
-          const positions = positionsRef.current;
-          const rSq = meshGrab.radius * meshGrab.radius;
-          const indices: number[] = [];
-          const N = positions.length / 3;
-          for (let i = 0; i < N; i++) {
-            const dx = positions[i * 3] - center[0];
-            const dy = positions[i * 3 + 1] - center[1];
-            const dz = positions[i * 3 + 2] - center[2];
-            if (dx * dx + dy * dy + dz * dz < rSq) indices.push(i);
-          }
-          if (indices.length > 0) {
-            grabIndices.current = indices;
-            grabStartPoint.current = center;
-            const base = new Float32Array(indices.length * 3);
-            for (let j = 0; j < indices.length; j++) {
-              const i = indices[j];
-              base[j * 3] = positions[i * 3];
-              base[j * 3 + 1] = positions[i * 3 + 1];
-              base[j * 3 + 2] = positions[i * 3 + 2];
-            }
-            grabBasePositions.current = base;
-            wasmClient.setPins(indices.map((idx, j) => ({
-              vertexIndex: idx,
-              position: [base[j * 3], base[j * 3 + 1], base[j * 3 + 2]] as [number, number, number],
-            })));
-          }
-        }
+        dispatchGrabInit(
+          { point: [hit.x, hit.y, hit.z], radius: meshGrab.radius, strength: meshGrab.strength },
+          { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+          grabStateRef.current,
+        );
       }
     };
 
