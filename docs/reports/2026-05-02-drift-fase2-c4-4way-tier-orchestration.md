@@ -46,7 +46,7 @@ C4 cierra el último (c) RFC del audit (post-A2 closure 2026-05-02 `d37add43` �
 - **4 tiers, no 3** — Neural agregado post-A6 (Tier 4). 7° caso de inventory misclassification (regla 13 lineage: B12 + C7 + B5 + D1-cosmetic + D5 + A4 + A2 + **C4**).
 - **Tool surface es feature-bounded por design** — Steam brush (GPU velocity damping) + mesh grab (GPU uniforms / WASM positional pin) son tier-specific feature manifestations, no drift uniforme. CPU TS + Neural carecen de tool dispatch porque sus models físicos no soportan la operación.
 - **Pre-existing canonical hook composition** — `useSimulationLifecycle.ts` (575L) + `useCollisionBodies.ts` (40L) + `useMeshing.ts` (180L) ya orquestran los 4 tiers via composition. NO TierCoordinator class en codebase; NO tool dispatcher helper; SI hook-based pattern canónico.
-- **Bifurcation count bounded** — 11 sites en `GarmentSimulation.tsx` (1 archivo); +7 sites en `useSimulationLifecycle.ts` para setters/cleanup; +2 en `useMeshing` warm-start; +1 en `useCollisionBodies` pin sync. Total **~22 tier-dispatch sites en 4 archivos React-layer**. Bounded scope.
+- **Bifurcation count bounded** — 14 tier-aware dispatch sites en `GarmentSimulation.tsx` (1 archivo); de éstas, **5 son per-tier bifurcations** (`if (solver) ... else if (wasmClient)` shape: `handlePointerDown` grab + `handlePointerMove` grab + `releaseGrab` + raycaster `onDown` grab + raycaster `onMove` grab). Las otras 9 son single-tier dispatch (GPU-only o CPU+WASM-only sin bifurcation interna). Adicionalmente: +7 sites en `useSimulationLifecycle.ts` para setters/cleanup; +2 en `useMeshing` warm-start; +1 en `useCollisionBodies` pin sync. Total **~24 tier-aware dispatch sites en 4 archivos React-layer**, of which ~5 son true bifurcations strictly. Bounded scope.
 
 C4 sin reformulación → Pattern 1 refactor (TierCoordinator class + uniform tool interface), opens cross-eje cascade (reopen A2 § 7 #4 + A4 § 7 #6 + A6 § 7 #2), unbounded blast radius. C4 con reformulación (regla 13 + 14) → Pattern 2.5 extend per-feature + capability flags + UI surface, ~5-7h F2 + ~3-5h F3, mirrors A7 precedent. **Calibration favors Pattern 2.5 extend dominant** (62% rule + Pattern 2.5 extend robust 4/4 post-A6).
 
@@ -86,13 +86,13 @@ grep -rn "runTool\|dispatchTool\|toolDispatcher\|ToolDispatcher" src --include="
 # Results: src/tools/registry.ts:50 toolRegistry — but for UI tools (PolyPenTool, FabricBrush definitions), not solver tools. Different domain.
 ```
 
-Conclusion (regla 1): pre-existing canonical for **solver lifecycle + capability surface + config bridging** are present and ratified by A6/A7/A2. Pre-existing canonical for **cross-tier tool dispatch** is **absent** — the 11 bifurcations in `GarmentSimulation.tsx` are inline. Sub-decisión 3.1 articulates the resolution shape.
+Conclusion (regla 1): pre-existing canonical for **solver lifecycle + capability surface + config bridging** are present and ratified by A6/A7/A2. Pre-existing canonical for **cross-tier tool dispatch** is **absent** — the 5 per-tier bifurcations (within 14 tier-aware dispatch sites) in `GarmentSimulation.tsx` are inline. Sub-decisión 3.1 articulates the resolution shape.
 
 ### 2.2 Inventory claims verification (regla 0 + 13)
 
 | Inventory claim | Reality post-sweep | Verdict |
 |---|---|---|
-| "3 paths activos simultáneamente (WebGPU/TSL feature-flagged off, WASM default, CPU TS fallback)" | **4 tiers** activos por design: CPU + WASM + GPU + Neural. Cascade GPU→WASM→CPU→Neural en `useSimulationLifecycle.ts:295-438`. Neural agregado post-A6 (`NeuralDrapeClient` 310L `src/utils/cloth/neural/neuralDrapeClient.ts`). | **Outdated — 4 tiers, no 3.** Regla 13 reformulation (7° caso del audit). |
+| "3 paths activos simultáneamente (WebGPU/TSL feature-flagged off, WASM default, CPU TS fallback)" | **4 tiers** activos por design: CPU + WASM + GPU + Neural. Cascade GPU→WASM→CPU→Neural en `useSimulationLifecycle.ts:295-438`. Neural agregado post-A6 (`NeuralDrapeClient` 355L `src/utils/cloth/neural/neuralDrapeClient.ts`). | **Outdated — 4 tiers, no 3.** Regla 13 reformulation (7° caso del audit). |
 | "WebGPU/TSL feature-flagged off" | Confirmed: `WEBGPU_FEATURE_FLAG_KEY = 'openclo-use-webgpu'` localStorage; `useSimulationLifecycle.ts:130-132 isWebGPUFeatureEnabled() returns localStorage === 'true'` (default false). Comentario JSDoc explica "Three.js 0.183 TSL atomicAdd doesn't propagate isAtomic to StorageBufferNode → WGSL declares array<i32> instead of array<atomic<i32>>. All compute shaders silently fail. WASM XPBD solver is used until a Three.js upstream fix lands." | Confirmed. **Three.js 0.183.2** still active per `package.json`. |
 | "WASM default" | Confirmed: cascade fall-through encuentra WASM segundo (línea 360-398). `isWasmSolverAvailable()` async check con timeout 5s. | Confirmed. |
 | "CPU TS fallback" | Confirmed: tercer en cascade (líneas 400-428). `ClothWorkerClient` Web Worker tier. | Confirmed. |
@@ -122,7 +122,7 @@ Lineage de regla 13 reformulations cumulativas:
 | **CPU TS** | `clothWorker.ts` | `clothWorkerClient.ts` | 418L | All physics true. `frameDriven: undefined` (animation loop internal). | `pinParticle`/`unpinParticle` (single-pin shape). NO steam brush, NO grab. |
 | **WASM Rust** | `wasmSolverWorker.ts` | `wasmSolverClient.ts` | 380L | All physics false (post-A7-closure; ports queued #676-681). `frameDriven: undefined`. | `setPins`/`clearPins` (batch shape). USED for mesh grab fallback. NO steam brush. |
 | **GPU TSL** | *(none — main thread)* | `gpuSolverClient.ts` | 770L + `tslSolver.ts` 743L | `selfCollision: false` (scaffolded but not dispatched per substep), `lra/pressure/fold/pieceStiffness: false` (no GPU implementation). `frameDriven: true`. | `setBrushParams` (steam brush via uniforms) + `grabStart`/`grabMove`/`grabRelease` methods on client + direct `tslSolverRef.current.grabNodes.*` uniform writes. **Full tool surface** — GPU is the canonical tool tier. |
-| **Neural ML** | *(none — main thread)* | `neuralDrapeClient.ts` | 310L | All capabilities false (ML inference, not physics solver). `frameDriven: false`. | NONE — analytical drape doesn't expose per-particle interactivity. |
+| **Neural ML** | *(none — main thread)* | `neuralDrapeClient.ts` | 355L | All capabilities false (ML inference, not physics solver). `frameDriven: false`. | NONE — analytical drape doesn't expose per-particle interactivity. |
 
 **Tool coverage matrix (verified per regla 0):**
 
@@ -152,7 +152,10 @@ Lineage de regla 13 reformulations cumulativas:
 
 **Total tier-dispatch sites: ~22 across 4 React-layer files.**
 
-#### 2.4.1 `GarmentSimulation.tsx` (11 sites — tools + rendering + snapshots)
+#### 2.4.1 `GarmentSimulation.tsx` (14 tier-aware dispatch sites — tools + rendering + snapshots)
+
+> **Counting note:** of the 14 sites tabulated below, **5 are true per-tier bifurcations** with `if (solver) ... else if (wasmClient)` shape (rows tagged "GPU + WASM" en la tabla: handlePointerDown grab + handlePointerMove grab + releaseGrab + raycaster onMove + raycaster onDown). Las otras 9 son single-tier dispatch (GPU-only o CPU+WASM-only sin bifurcation). Earlier mentions de "11 bifurcations" en este doc se entienden como "tier-aware dispatch sites" (loose), not strict per-tier bifurcation count.
+
 
 | Site | Lines | Tiers | Driver |
 |---|---|---|---|
@@ -511,7 +514,7 @@ export const NEURAL_CAPABILITIES = Object.freeze({
 )}
 ```
 
-Consumer call-sites en `GarmentSimulation.tsx` collapse de 6 inline-bifurcation blocks (handlePointerDown/Move/releaseGrab + raycaster onMove/onDown + handleBrushStroke) a 6 helper invocations. Net reduction: ~150-180 líneas → ~30-40 líneas + helper 120-150L. **Slight code reduction net** + capability flags + UI surface.
+Consumer call-sites en `GarmentSimulation.tsx` collapse de 6 inline dispatch blocks (handlePointerDown/Move/releaseGrab + raycaster onMove/onDown + handleBrushStroke) a 6 helper invocations. Math: ~150-180L consumer reduction + ~120-150L helper addition = **~0-30L net (approximately neutral)**. **Net neutral; surface organization improved** + capability flags + UI surface = real value of 3.1.A is in organization + UX (capability + warning), not in raw line count.
 
 **Pros:**
 - **Dedupe both axes:** per-tier dispatch consolidated en helper; R3F handlers ↔ raycaster helper-call duplication reduced from ~80 lines to ~6 helper calls.
@@ -530,7 +533,7 @@ Consumer call-sites en `GarmentSimulation.tsx` collapse de 6 inline-bifurcation 
 
 #### Opción 3.1.B — Pattern 2.5 extend (capability flags only, ratify bifurcations)
 
-**Shape:** add `tools` sub-shape to `SolverCapabilities` + UI surface for silent-absence; ratify the 11 bifurcations as-is with JSDoc cross-doc to C4 RFC. NO helper. R3F vs raycaster duplication queued as separate eje.
+**Shape:** add `tools` sub-shape to `SolverCapabilities` + UI surface for silent-absence; ratify the 5 per-tier bifurcations + 9 single-tier dispatch sites as-is with JSDoc cross-doc to C4 RFC. NO helper. R3F vs raycaster duplication queued as separate eje.
 
 **Pros:**
 - Smaller F3 (~2-3h): capability flags + UI surface + JSDoc only.
@@ -539,7 +542,7 @@ Consumer call-sites en `GarmentSimulation.tsx` collapse de 6 inline-bifurcation 
 - Compile-gate clean.
 
 **Cons:**
-- 11 bifurcations remain (4 per-tier + 7 single-tier blocks). R3F ↔ raycaster ~80-line duplication remains.
+- 14 tier-aware dispatch sites remain (5 per-tier bifurcations + 9 single-tier blocks). R3F ↔ raycaster ~80-line duplication remains.
 - "Real fix" weight (regla 11) less satisfied for code-organization concern; capability flags address UX silent-absence but bifurcation visibility persists.
 - Future tool additions add per-site bifurcations (no helper to consolidate).
 
@@ -564,7 +567,7 @@ Consumer call-sites en `GarmentSimulation.tsx` collapse de 6 inline-bifurcation 
 
 #### Opción 3.1.D — Ratify-as-is with JSDoc cross-doc (no helper, no capability flags)
 
-**Shape:** document the 11 bifurcations + tool tier coverage matrix in C4 RFC + JSDoc on `GarmentSimulation.tsx` tool sites referencing C4. No code change.
+**Shape:** document the 14 tier-aware dispatch sites (5 bifurcations + 9 single-tier) + tool tier coverage matrix in C4 RFC + JSDoc on `GarmentSimulation.tsx` tool sites referencing C4. No code change.
 
 **Pros:**
 - Minimal F3 (~1-2h): docs only.
@@ -942,7 +945,7 @@ Refactor `GarmentSimulation.tsx` callsites to invoke helper:
 - Lines 985-1006 (raycaster onMove) → `dispatchGrabMove(...)`.
 - Lines 1015-1060 (raycaster onDown) → `dispatchGrabInit(...)`.
 
-Net consumer code reduction: ~150-180L → ~30-40L. Helper adds ~120-150L.
+Math: consumer ~150-180L → ~30-40L (~120-150L reduction); helper ~120-150L addition. **Net approximately neutral**; organizational improvement + capability flags + UI surface are the real deliverables.
 
 **Compile-gate verification (regla 4 + 8):** `npx tsc -b --noEmit` post-helper + post-callsite refactor. Anticipa zero issues — helper exports functions, no `implements` extension. Si fire (e.g., type narrowing entre `clientsRef.current.gpu` vs `tiers.gpu`), **resolver IN F3 commit**, no post-merge amendment.
 
