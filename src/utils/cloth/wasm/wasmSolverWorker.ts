@@ -137,7 +137,7 @@ const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   damping: 0.99,
   gravityY: -9.81,
   stretchCompliance: 0.0,
-  bendCompliance: 0.01,
+  bendCompliance: 1.0,
   selfCollision: false,
   thickness: 0.002,
   collisionMargin: 0.005,

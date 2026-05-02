@@ -114,7 +114,7 @@ impl XpbdSolver {
             damping: 0.99,
             substeps: 15,
             stretch_compliance: 0.0,
-            bend_compliance: 0.01,
+            bend_compliance: 1.0,
             ground_y: 0.0,
             collision_margin: 0.005,
             drag_coefficient: 1.0,
