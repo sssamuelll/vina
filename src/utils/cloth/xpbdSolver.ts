@@ -119,9 +119,9 @@ function vecSetCross(
  * `mapClothSimConfigToWasmSolverConfig` (`configBridge.ts`) — write the CPU
  * shape once, helper translates to WASM shape.
  *
- * Defaults convention: per `CLAUDE/methodology.md` § 15, Rust constructor
- * (`crates/xpbd-wasm/src/lib.rs:113-130`) is canonical for cross-tier shared
- * field defaults. CPU defaults must match for shared fields; CPU-only fields
+ * Defaults convention: per `CLAUDE/methodology.md` § 15, the Rust
+ * `XpbdSolver::new()` constructor is canonical for cross-tier shared field
+ * defaults. CPU defaults must match for shared fields; CPU-only fields
  * independent. See A2 § 3.1.
  *
  * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
