@@ -42,10 +42,38 @@ export interface SolverCapabilities {
    * Currently only `GpuSolverClient` reports `true`.
    */
   frameDriven?: boolean;
+  /**
+   * Interactive tool surface support per tier.
+   *
+   * Steam brush + mesh grab are tier-specific feature manifestations
+   * (NOT uniform drift). Per-tier coverage:
+   * - `steamBrush`: GPU-only. Velocity damping kernel writes via TSL
+   *   uniforms (zero-copy hot path). Other tiers don't expose live
+   *   velocity buffer.
+   * - `meshGrab`: GPU + WASM. GPU uses `tslSolverRef.grabNodes.*`
+   *   uniforms; WASM uses `setPins` with positional pin shape.
+   *   CPU + Neural absent (CPU has freeze-only `pinParticle`; Neural
+   *   has no positional pin in inference contract).
+   *
+   * Capability flag is documentary — consumer code (helper or inline)
+   * checks before dispatch; UI surface (`SimulationStatusOverlay`)
+   * communicates absence to user.
+   *
+   * Per C4 RFC § 3.1.A ratification.
+   *
+   * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md
+   */
+  tools?: {
+    /** Steam brush (relax cloth via velocity damping). */
+    steamBrush: boolean;
+    /** Mesh grab (drag cloth via positional displacement). */
+    meshGrab: boolean;
+  };
 }
 
 /**
- * CPU TS solver capabilities. All features supported.
+ * CPU TS solver capabilities. All physics features supported. No tools
+ * (steam brush + mesh grab are GPU/WASM-tier features per C4 RFC).
  */
 export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
@@ -53,6 +81,7 @@ export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   pressure: true,
   fold: true,
   pieceStiffness: true,
+  tools: { steamBrush: false, meshGrab: false },
 });
 
 /**
@@ -71,6 +100,12 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   pressure: false,
   fold: false,
   pieceStiffness: false,
+  /**
+   * Tools: mesh grab supported via `setPins` with positional pin shape
+   * (positional semantics per A6 RFC Q2). Steam brush absent — would
+   * require live velocity buffer access not exposed on WASM tier today.
+   */
+  tools: { steamBrush: false, meshGrab: true },
 });
 
 /**
@@ -103,6 +138,13 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   fold: false,
   pieceStiffness: false,
   frameDriven: true,
+  /**
+   * Tools: full surface. Steam brush via `setBrushParams` + TSL
+   * `brushNodes` kernel (per-particle velocity damping, zero-copy).
+   * Mesh grab via `tslSolverRef.grabNodes.*` uniforms (per-particle
+   * displacement, zero-copy). Both run in TSL compute kernels.
+   */
+  tools: { steamBrush: true, meshGrab: true },
 });
 
 /**
@@ -131,4 +173,11 @@ export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   fold: false,
   pieceStiffness: false,
   frameDriven: false,
+  /**
+   * Tools: none. Neural drape predicts vertex positions from rest mesh +
+   * body pose via ONNX inference; no per-particle interactivity in the
+   * model contract (no positional pin, no velocity buffer). Architectural
+   * exclusion per C4 RFC § 2.3.
+   */
+  tools: { steamBrush: false, meshGrab: false },
 });
