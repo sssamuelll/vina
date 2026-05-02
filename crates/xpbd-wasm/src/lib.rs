@@ -249,7 +249,23 @@ impl XpbdSolver {
         self.pin_positions.clear();
     }
 
-    /// Configure solver parameters.
+    /// Configure solver parameters (16 positional args).
+    ///
+    /// **A2 Fase 2 § 2.3 + § 3.1 ratified.** Rust ABI is the cross-language
+    /// floor — adding/renaming a parameter requires touching this signature
+    /// + struct field + constructor default + WASM rebuild + sync of BOTH
+    /// `xpbd_wasm.js` + `xpbd_wasm_bg.wasm` to `public/wasm/` (CLAUDE.md
+    /// non-negotiable) + TS-side `WasmXpbdSolver` interface +
+    /// `AppliedSolverConfig` + `DEFAULT_SOLVER_CONFIG` + `applySolverConfig`
+    /// callsite (worker) + `WasmSolverConfig` (client).
+    ///
+    /// Constructor defaults at `lib.rs:113-130` are canonical for cross-tier
+    /// shared field defaults per `CLAUDE/methodology.md` § 15 — TS-side
+    /// `DEFAULT_SOLVER_CONFIG` (`wasmSolverWorker.ts:135`) and CPU
+    /// `ClothSimConfig` defaults (`xpbdSolver.ts:383-407`) MUST match for
+    /// shared fields.
+    ///
+    /// Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
                      stretch_compliance: f32, bend_compliance: f32,
                      self_collision: bool, thickness: f32, collision_margin: f32,

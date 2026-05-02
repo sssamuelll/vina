@@ -111,9 +111,24 @@ let wasmCachedMergedMesh: { vertices: Float32Array; indices: Uint32Array; pieceO
 /** Number of outer substeps managed by JS (collision applied between each) */
 let jsSubsteps = 15;
 
-/** Last-applied solver configuration. Init populates from msg.config; setConfig
- *  merges partial updates so re-calling solver.configure() at runtime keeps
- *  fields that weren't explicitly changed. */
+/**
+ * Last-applied solver configuration. Init populates from `msg.config`;
+ * `setConfig` merges partial updates so re-calling `solver.configure()` at
+ * runtime keeps fields that weren't explicitly changed.
+ *
+ * **BUG-4 (#607) closure shape.** Pre-fix the worker `setConfig` handler
+ * extracted only `msg.config.substeps` and silently dropped other runtime
+ * updates (damping, gravity, drag, thickness, compliances, ...). The fix
+ * introduced this fully-typed record + `applySolverConfig()` centralization
+ * so every field reaches `solver.configure(...)` at runtime.
+ *
+ * **A2 Fase 2 § 2.4.3 ratified** — WASM worker shape (16 required fields,
+ * matching `WasmSolverConfig` client surface but non-optional). Cross-tier
+ * cleavage: CPU `ClothSimConfig` (23 fields, different naming) lives in
+ * `xpbdSolver.ts`. See A2 § 3.2.B for `configBridge.ts` translation helper.
+ *
+ * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
+ */
 interface AppliedSolverConfig {
   substeps: number;
   damping: number;
@@ -132,6 +147,18 @@ interface AppliedSolverConfig {
   bendComplianceWeft: number;
   internalDamping: number;
 }
+/**
+ * **Defaults convention (`CLAUDE/methodology.md` § 15 + A2 § 3.1):** Rust
+ * constructor (`crates/xpbd-wasm/src/lib.rs:113-130`) is canonical for
+ * cross-tier shared field defaults. This record MUST match field-by-field
+ * with the Rust constructor's defaults. CPU `ClothSimConfig` defaults
+ * (`xpbdSolver.ts:383-407`) MUST match for shared fields; CPU-only fields
+ * independent.
+ *
+ * Aligned 2026-05-02 (A2 closure): `bendCompliance: 1.0` matches CPU + per-
+ * edge consensus. `selfCollision: false` divergence preserved as faithful
+ * per-tier truth (BUG-5 / A7 § 3.1.1 — WASM tier lacks self-collision).
+ */
 const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   substeps: 15,
   damping: 0.99,
