@@ -977,9 +977,9 @@ Sites:
 - `crates/xpbd-wasm/src/lib.rs:111` (preceding configure or defaults block): cross-ref to A2 § 2.3 + 16-arg ABI + Rust defaults canonical convention.
 - `solverProtocol.ts:41` — extend existing comment with A2 closure: "ratified per-tier shape per A2 § 3.4 (gravity bundled in setConfig WASM-side, separate setGravity CPU-side); cross-ref `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`".
 
-### 5.8 Commit 8 — CLAUDE.md ratification row + convention anchor
+### 5.8 Commit 8 — CLAUDE.md ratification row
 
-Atomic commit titled `docs(claude): add A2 to Audit Ratifications table + Rust defaults convention`.
+Atomic commit titled `docs(claude): add A2 to Audit Ratifications table`.
 
 Add row to `CLAUDE.md` "Audit Ratifications" table:
 
@@ -987,8 +987,25 @@ Add row to `CLAUDE.md` "Audit Ratifications" table:
 | A2 | Cross-boundary serialization Rust↔TS: variant A (zero-copy reads) ratified; variant B (init copies) ABI-required ratified; variant C (config field-by-field) Pattern 2.5 lite — `configBridge` helper for shared subset + per-tier divergence ratified for non-shared fields; defaults convention anchored (Rust constructor canonical for cross-tier shared field defaults) | `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md` |
 ```
 
-Anchor convention in CLAUDE.md non-negotiables (light addition):
-> **Solver config defaults.** Rust constructor (`crates/xpbd-wasm/src/lib.rs:113-130`) is canonical for cross-tier shared field defaults. WASM worker `DEFAULT_SOLVER_CONFIG` (`wasmSolverWorker.ts:135`) MUST match field-by-field. CPU `ClothSimConfig` defaults (`xpbdSolver.ts:383-407`) MUST match for shared fields; CPU-only fields (LRA, adaptiveSubsteps, etc.) independent. Per A2 § 3.1.
+### 5.9 Commit 9 — methodology.md § 15 convention anchor
+
+Per reviewer call (2026-05-02): the convention "Rust constructor is canonical for cross-tier shared field defaults" is **audit-derived guidance** (load-bearing only for cross-tier fields), not a project-identity rule. Anchor in `CLAUDE/methodology.md` (gitignored Sam-private layer) as new section, NOT in `CLAUDE.md` non-negotiables. CLAUDE.md committed (89L thin index) reserves non-negotiables for project-identity rules respected by any developer (WASM sync, tsc -b, newId, persistence comment, no --no-verify).
+
+Atomic commit titled `docs(methodology): A2 anchor — Rust constructor canonical for cross-tier solver defaults`.
+
+Add new section to `CLAUDE/methodology.md`:
+
+```markdown
+## 15. Cross-tier solver config defaults convention
+
+**Rust constructor (`crates/xpbd-wasm/src/lib.rs:113-130`) is canonical for cross-tier shared field defaults.** WASM worker `DEFAULT_SOLVER_CONFIG` (`wasmSolverWorker.ts:135`) MUST match field-by-field. CPU `ClothSimConfig` defaults (`xpbdSolver.ts:383-407`) MUST match for shared fields; CPU-only fields (LRA, adaptiveSubsteps, maxVelocity, enableLRA, dt, windForce, groundFriction, min/maxSubsteps) independent.
+
+Adding a new shared field: declare in Rust struct first → mirror in WASM worker `DEFAULT_SOLVER_CONFIG` → optionally CPU `ClothSimConfig`. Adding TS-side fields without Rust source produces drift; adding Rust without TS mirror produces silent default mismatch (the bug class A2 § 2.5 captured for `bendCompliance` 0.01 vs 1.0).
+
+**Origen:** A2 Fase 2 (2026-05-02) — `bendCompliance` global default 0.01 (Rust + WASM worker) vs 1.0 (CPU) latent because per-edge population always wins; reopen trigger if per-edge logic refactors.
+```
+
+JSDoc cross-ref añadido en `wasmSolverWorker.ts:135` (`DEFAULT_SOLVER_CONFIG`) referenciando methodology.md § 15.
 
 ### 5.9 Verify gates
 
@@ -1109,7 +1126,7 @@ A2 ratificación queda revisable si emerge:
 7. **WASM gravity Y-only** — Rust `configure()` only accepts `gravity_y`; full vector would need ABI expansion. Captured § 6.4 follow-up. Today no production surface needs full-direction gravity in WASM tier.
 8. **`solverProtocol.ts` setConfig exclusion** is interface design choice — A6 § 3.1.C ratified. A2 closes the cleavage but does NOT add `setConfig?(config)` to interface. Polymorphic dispatch via consumer concrete-class casting + helper. Aceptable; reopen trigger #4 if cleavage spreads.
 9. **Pin semantics divergence** (per A6 RFC § 4.1 Q2 / `solverProtocol.ts:80-94`) — preserved. CPU ignores pin position; WASM uses pin position. Out-of-scope A2.
-10. **No lint rule enforcement** for defaults convention or helper usage. Convention is documentary (CLAUDE.md + JSDoc). Future contributor could violate. Aceptable porque (i) review humano + this Fase 2 doc visible, (ii) lint rule cost > benefit at current cleavage scale.
+10. **No lint rule enforcement** for defaults convention or helper usage. Convention is documentary (`CLAUDE/methodology.md` § 15 + JSDoc cross-ref en `wasmSolverWorker.ts:135`). Future contributor could violate. Aceptable porque (i) review humano + this Fase 2 doc visible, (ii) methodology.md is loaded session-bootstrap per ROUTER routing table, (iii) lint rule cost > benefit at current cleavage scale.
 
 ---
 
