@@ -821,8 +821,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       handleBrushStroke(e.point);
     } else if (activeTool3D === 'meshGrab') {
       e.stopPropagation();
-      grabDragging.current = true;
-      dispatchGrabInit(
+      // Only mark dragging when init actually landed on a tier — prevents
+      // "stuck dragging" state if no tier supports grab (CPU/Neural) or
+      // no particle falls within radius (WASM empty hit).
+      grabDragging.current = dispatchGrabInit(
         { point: [e.point.x, e.point.y, e.point.z], radius: meshGrab.radius, strength: meshGrab.strength },
         { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
         grabStateRef.current,
@@ -959,8 +961,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         brushDragging.current = true;
         handleBrushStroke(hit);
       } else if (activeTool3D === 'meshGrab') {
-        grabDragging.current = true;
-        dispatchGrabInit(
+        // Capture return: only mark dragging if a tier accepted the init.
+        grabDragging.current = dispatchGrabInit(
           { point: [hit.x, hit.y, hit.z], radius: meshGrab.radius, strength: meshGrab.strength },
           { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
           grabStateRef.current,

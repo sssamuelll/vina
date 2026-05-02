@@ -26,18 +26,22 @@ export function SimulationStatusOverlay() {
   const bodyCollision = useSelector((s: RootState) => s.simulation.bodyCollision);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
 
-  if (simulationState === 'idle') return null;
-
-  const tier = TIER_INFO[solverTier] ?? TIER_INFO['none'];
-  const fps = frameTimeMs > 0 ? Math.round(1000 / frameTimeMs) : 0;
-  const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
-
   // Tool tier coverage per C4 RFC § 2.3: steam brush is GPU-only;
   // mesh grab is GPU + WASM. CPU + Neural have no tool dispatch.
   // SolverCapabilities.tools mirrors this for capability-aware consumers.
   const toolUnsupported =
     (activeTool3D === 'steamBrush' && solverTier !== 'webgpu') ||
     (activeTool3D === 'meshGrab' && solverTier !== 'webgpu' && solverTier !== 'wasm');
+
+  // Render the overlay when simulation is active OR when an unsupported
+  // tool is armed in idle (user can activate steamBrush/meshGrab from the
+  // toolbar before pressing Play — without this, dragging on cloth would
+  // silent-skip with zero feedback).
+  if (simulationState === 'idle' && !toolUnsupported) return null;
+
+  const tier = TIER_INFO[solverTier] ?? TIER_INFO['none'];
+  const fps = frameTimeMs > 0 ? Math.round(1000 / frameTimeMs) : 0;
+  const isMobile = typeof navigator !== 'undefined' && /Mobi|Android/i.test(navigator.userAgent);
 
   return (
     <div style={{

@@ -170,7 +170,11 @@ export function dispatchGrabInit(
     }
     if (indices.length === 0) return false;
     state.indices = indices;
-    state.startPoint = args.point;
+    // Defensive copy: helper is exported public API; future callers may
+    // pass reused buffers (e.g., Vector3.toArray(out) pattern) where
+    // mutation post-init would corrupt the anchor for subsequent
+    // dispatchGrabMove calls.
+    state.startPoint = [args.point[0], args.point[1], args.point[2]];
     const base = new Float32Array(indices.length * 3);
     for (let j = 0; j < indices.length; j++) {
       const i = indices[j];
@@ -239,20 +243,35 @@ export function dispatchGrabMove(
 /**
  * Release mesh grab (called on pointer up / leave).
  *
+ * **Tier-agnostic cleanup** — clears every tier whose state requires it,
+ * not just the first match. Repro for the prior first-match bug:
+ * grab init en WASM populates `state.indices` → user/system swap a GPU
+ * tier (`tslSolver` becomes truthy) → release would have entered the
+ * GPU branch and skipped `wasm.clearPins`, leaking pins. Symmetric leak
+ * en reverse (started GPU, released con WASM presente, TSL `grabActive`
+ * staying at 1).
+ *
  * Tier coverage:
  * - GPU (TSL): sets `grabActive = 0` so TSL kernel skips grab dispatch.
- * - WASM: calls `clearPins()` and resets `state.indices` + `state.basePositions`.
- * - CPU + Neural: silent no-op.
+ * - WASM: calls `clearPins()` (only when `state.indices` non-empty so
+ *   we don't ping the worker for inactive sessions).
+ * - State always reset (idempotent — safe to call multiple times).
+ * - CPU + Neural: silent no-op (no tier surface).
  */
 export function dispatchGrabRelease(
   tiers: ClothToolTiers,
   state: GrabState,
 ): void {
+  // Clear GPU uniforms if tslSolver present.
   if (tiers.tslSolver) {
     tiers.tslSolver.grabNodes.grabActive.value = 0;
-  } else if (tiers.wasm && state.indices.length > 0) {
-    tiers.wasm.clearPins();
-    state.indices = [];
-    state.basePositions = null;
   }
+  // Clear WASM pins if state has indices, regardless of which tier
+  // dispatched init (mid-session tier swaps must not leak pin state).
+  if (tiers.wasm && state.indices.length > 0) {
+    tiers.wasm.clearPins();
+  }
+  // Always reset state (idempotent).
+  state.indices = [];
+  state.basePositions = null;
 }

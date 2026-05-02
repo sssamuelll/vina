@@ -213,16 +213,19 @@ describe('dispatchGrabInit — WASM path', () => {
 
   it('mutates state.startPoint defensively (caller buffer reuse safe)', () => {
     const wasm = makeWasmMock();
-    const positions = new Float32Array([0, 0, 0]);
+    // Place particle exactly at the click point so it falls within radius
+    // and the defensive-copy code path is exercised.
+    const positions = new Float32Array([1, 2, 3]);
     const tiers = makeTiers({ wasm, positions });
     const state = makeEmptyState();
 
     const reusedPoint: [number, number, number] = [1, 2, 3];
-    dispatchGrabInit(
+    const ok = dispatchGrabInit(
       { point: reusedPoint, radius: 0.5, strength: 1.0 },
       tiers,
       state,
     );
+    expect(ok).toBe(true);
     // Mutating caller's buffer post-init must not corrupt anchor.
     reusedPoint[0] = 999;
     reusedPoint[1] = 999;

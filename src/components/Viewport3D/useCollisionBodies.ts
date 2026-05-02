@@ -7,10 +7,14 @@
  *
  * Extracted from GarmentSimulation.tsx for separation of concerns.
  *
- * **Tier coverage (post-C4):** WASM only. CPU has `pinParticle(idx)`
- * (single-pin freeze-only — no positional pin); GPU + Neural have no pin
- * surface. Per C4 RFC § 2.4.4, pin sync coverage gap is bounded + acceptable
- * (WASM is the canonical pin tier post-A6 batch shape `setPins`).
+ * **Tier coverage (post-C4):** this hook syncs Redux pin state to the WASM
+ * `setPins` surface (positional batch). Other tiers' pin/freeze surfaces
+ * are exposed via different hooks: GPU `freezePieces` via
+ * `useSimulationLifecycle` (per-piece freeze, not vertex pin); CPU
+ * `pinParticle` (single-pin freeze, different shape) via
+ * `clothWorkerClient`. Neural has no per-particle interactivity.
+ * Pin sync coverage gap captured C4 RFC § 2.4.4; WASM is canonical for
+ * positional pin batch post-A6.
  *
  * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md § 2.4.4
  */
