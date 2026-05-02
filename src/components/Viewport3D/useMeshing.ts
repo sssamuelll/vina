@@ -12,6 +12,13 @@
  * useMeshing → pieceMeshes → placedMeshes → useSimulationLifecycle → clients
  *
  * Extracted from GarmentSimulation.tsx for separation of concerns.
+ *
+ * **Warm-start tier coverage (post-C4):** CPU + WASM only. GPU and Neural
+ * have no `updateConstraints` equivalent (GPU uses TSL kernel rest-length
+ * buffers; Neural is inference-based with no live constraint surface).
+ * Bounded gap per C4 RFC § 2.4.3.
+ *
+ * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md § 2.4.3
  */
 
 import { useRef, useEffect, useState } from 'react';

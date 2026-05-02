@@ -789,6 +789,21 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   }, [activeTool3D, dispatch, pinStrength, positionsRef]);
 
   // ─── Steam brush + mesh grab interaction (via toolDispatch helper, C4) ────
+  //
+  // Tool dispatch consolidated to `src/utils/cloth/toolDispatch.ts` per C4
+  // RFC § 3.1.A. Helper internalizes per-tier semantic divergence:
+  // - GPU (TSL): writes uniforms to `tslSolverRef.brushNodes` /
+  //   `.grabNodes` (zero-copy hot path).
+  // - WASM: mesh grab via `setPins` (positional pin shape; CRITICAL
+  //   caveat per A6 RFC Q2 — see solverProtocol.ts JSDoc).
+  // - CPU + Neural: silent no-op. Capability flags
+  //   (`SolverCapabilities.tools`) document the matrix; UI surface in
+  //   `SimulationStatusOverlay` communicates absence to user.
+  //
+  // R3F handlers (handlePointerDown/Move) duplicate manual raycaster
+  // dispatch (onDown/onMove) for TSL geometry-sync workaround — both
+  // routes call the same helper; underlying duplication captured as
+  // separate rendering eje (C4 RFC § 6.5).
 
   const handleBrushStroke = useCallback((point: THREE.Vector3) => {
     dispatchBrushStroke(

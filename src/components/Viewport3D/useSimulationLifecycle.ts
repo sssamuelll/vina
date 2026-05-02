@@ -58,6 +58,26 @@
  *
  * Cross-ref: `src/utils/cloth/solverProtocol.ts` (interface),
  *            `docs/reports/2026-05-01-rfc-a6-worker-protocol.md` § 4.5.
+ *
+ * ─── Hook composition canonical (post-C4 ratification) ───────────────────────
+ *
+ * Per C4 RFC § 3.5.A, this hook is the **de facto tier coordinator** for the
+ * 4-way solver orchestration. Together with `useCollisionBodies` (pin sync)
+ * and `useMeshing` (warm-start dispatch), the 3-hook composition owns:
+ *
+ * - **Tier selection cascade** (lines 295-438): GPU → WASM → CPU → Neural.
+ *   Driven by `WEBGPU_FEATURE_FLAG_KEY` opt-in + per-tier availability checks.
+ * - **Setter dispatch** (lines 524-561): wind / freeze / elastics distributed
+ *   across per-tier `useEffect`s. Per-tier divergence ratified by A6 § 3.5
+ *   (setter migrations queued #683-689) + A2 § 3.4 (gravity per-tier).
+ * - **Cleanup cascade** (lines 449-457, 466-474, 478-483): all 4 tiers
+ *   disposed unconditionally (`?.dispose()`).
+ *
+ * **NO TierCoordinator class** — sub-decisión 3.5.A ratified hook composition
+ * as canonical. Class extraction (3.5.B) would have triggered cross-eje
+ * cascade reopens (A2 § 7 #4 + A4 § 7 #6 + A6 § 7 #2). See C4 RFC.
+ *
+ * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md § 3.5
  */
 
 import { useRef, useEffect, useCallback, useState } from 'react';

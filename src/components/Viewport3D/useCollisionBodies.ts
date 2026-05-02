@@ -6,6 +6,13 @@
  * handles only runtime pin sync which is a reactive effect on pinnedVertices.
  *
  * Extracted from GarmentSimulation.tsx for separation of concerns.
+ *
+ * **Tier coverage (post-C4):** WASM only. CPU has `pinParticle(idx)`
+ * (single-pin freeze-only — no positional pin); GPU + Neural have no pin
+ * surface. Per C4 RFC § 2.4.4, pin sync coverage gap is bounded + acceptable
+ * (WASM is the canonical pin tier post-A6 batch shape `setPins`).
+ *
+ * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md § 2.4.4
  */
 
 import { useEffect } from 'react';
