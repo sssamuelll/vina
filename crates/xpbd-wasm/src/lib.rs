@@ -215,6 +215,34 @@ impl XpbdSolver {
     }
 
     /// Set adjacency for self-collision.
+    ///
+    /// CSR (Compressed Sparse Row) representation of per-particle
+    /// triangle-shared neighbors. Used by `solve_self_collision` to skip
+    /// connected pairs (avoiding pushing apart particles that share an edge
+    /// in the mesh).
+    ///
+    /// # Arguments
+    ///
+    /// * `offsets` — Length `num_particles + 1`. `offsets[i]..offsets[i+1]`
+    ///   gives the slice of `neighbors` corresponding to particle `i`. Must
+    ///   be monotonic non-decreasing. `offsets[num_particles]` equals
+    ///   `neighbors.len()` (CSR sentinel).
+    /// * `neighbors` — Flat array of triangle-shared neighbor indices.
+    ///   Length equals `offsets[num_particles]`.
+    ///
+    /// # Example
+    ///
+    /// For a 3-particle mesh where every particle shares a triangle with
+    /// the other two:
+    /// - `offsets   = [0, 2, 4, 6]`
+    /// - `neighbors = [1, 2, 0, 2, 0, 1]`
+    ///
+    /// # Empty CSR
+    ///
+    /// Calling with empty `offsets` is treated as a no-op by
+    /// `solve_self_collision` (defensive fallback — preferable to running
+    /// with broken physics). New callers should populate the CSR before
+    /// enabling self-collision.
     pub fn set_adjacency(&mut self, offsets: &[u32], neighbors: &[u32]) {
         self.adjacency_offsets = offsets.to_vec();
         self.adjacency_neighbors = neighbors.to_vec();
@@ -320,7 +348,8 @@ impl XpbdSolver {
             self.solve_bend(sdt);
             self.solve_seams(sdt);
             // Self-collision after soft constraints, before ground clamp —
-            // mirrors CPU TS ordering (`xpbdSolver.ts:1173`).
+            // mirrors CPU TS ordering (`xpbdSolver.ts` step(): self-collision
+            // runs after `solveSeams`, before `solveGroundCollision`).
             if self.self_collision {
                 self.solve_self_collision();
             }
@@ -568,17 +597,42 @@ impl XpbdSolver {
     ///
     /// Bit-exact port of `solveSelfCollision` in
     /// `src/utils/cloth/selfCollision.ts`. Cell size = `2.0 * thickness`
-    /// matches CPU heuristic (`xpbdSolver.ts:494`). Adjacency consumed
-    /// from the CSR pair (`adjacency_offsets`, `adjacency_neighbors`)
-    /// populated via `set_adjacency` from the worker (#608 wires that
-    /// call once the WASM rebuild lands). When the CSR is empty the
-    /// adjacency check is a no-op range and every candidate falls
-    /// through to the distance filter — same contract as the TS
-    /// reference's optional `adjacency` parameter.
+    /// matches CPU heuristic. Adjacency consumed from the CSR pair
+    /// (`adjacency_offsets`, `adjacency_neighbors`) populated via
+    /// `set_adjacency` from `wasmSolverWorker.ts` post-`set_triangles`
+    /// init.
+    ///
+    /// # Defensive fallbacks
+    ///
+    /// - `thickness <= 0.0` or `num_particles == 0` → no-op return.
+    /// - `adjacency_offsets` empty → no-op return. Worker happy-path always
+    ///   populates the CSR; this guard catches future re-init reordering /
+    ///   test harness / hot-swap bugs from silently running broken physics
+    ///   (every triangle-connected neighbor would be treated as
+    ///   non-adjacent → cloth tearing). Fail-loud-by-no-op is preferable to
+    ///   garbage output.
+    /// - Per-pair NaN distance² → `continue`. Matches A3 § 3.3 NaN-guard
+    ///   parity with the CPU side; upstream constraint solvers
+    ///   (stretch/bend/seam/elastic) producing NaN must not propagate
+    ///   through self-collision corrections.
     fn solve_self_collision(&mut self) {
         if self.thickness <= 0.0 || self.num_particles == 0 {
             return;
         }
+
+        // CSR must be populated for correct triangle-shared neighbor skip.
+        // Early return is preferable to running self-collision against an
+        // empty adjacency: every connected pair would be treated as
+        // non-adjacent and pushed apart, tearing the mesh along every
+        // shared edge.
+        if self.adjacency_offsets.is_empty() {
+            return;
+        }
+        debug_assert_eq!(
+            self.adjacency_offsets.len(),
+            self.num_particles + 1,
+            "CSR offsets must have num_particles + 1 entries (sentinel at end)"
+        );
 
         let cell_size = 2.0 * self.thickness;
         self.spatial_hash.set_cell_size(cell_size);
@@ -646,6 +700,16 @@ impl XpbdSolver {
                 let dy = self.positions[ix + 1] - self.positions[jx + 1];
                 let dz = self.positions[ix + 2] - self.positions[jx + 2];
                 let dist2 = dx * dx + dy * dy + dz * dz;
+
+                // NaN guard — A3 § 3.3 parity with CPU side. Upstream
+                // constraint solvers can leave NaN positions; without this
+                // check `dist2 >= thickness_sq` and `dist2 == 0.0` both
+                // fall false on NaN, the `sqrt` and `1.0/dist` propagate
+                // NaN, and the position update infects two more particles
+                // per pair (silent NaN cascade across the mesh).
+                if !dist2.is_finite() {
+                    continue;
+                }
 
                 if dist2 >= thickness_sq || dist2 == 0.0 {
                     continue;
@@ -981,6 +1045,18 @@ impl SpatialHashGrid {
     /// `((xi*92837111) ^ (yi*689287499) ^ (zi*283923481)) % tableSize`,
     /// then negative-modulo correction. `wrapping_mul` matches JS implicit
     /// ToInt32 wraparound (mod 2^32, signed reinterpretation).
+    ///
+    /// # Bit-exactness precondition
+    ///
+    /// Bit-exact match with the TS reference (`selfCollision.ts:hashCoords`)
+    /// holds for `|xi|, |yi|, |zi| < ~2^25`. Beyond that, individual
+    /// products like `xi * 92837111` exceed `Number.MAX_SAFE_INTEGER`
+    /// (`2^53`) in JS, where TS double-precision arithmetic diverges from
+    /// Rust's `i32::wrapping_mul`. Realistic cell coords (positions in
+    /// metres / cell size `2 * thickness ≈ 0.004 m`) yield `|coord| < 2^15`
+    /// for any practical garment scene — precondition satisfied by
+    /// construction. A future caller passing extreme integer coords (e.g.
+    /// from a mis-scaled mesh in millimetres) could drift silently.
     fn hash_coords(&self, xi: i32, yi: i32, zi: i32) -> usize {
         let a = xi.wrapping_mul(92_837_111);
         let b = yi.wrapping_mul(689_287_499);
@@ -1257,5 +1333,53 @@ mod tests {
             "expected dist(p0, p2) ≈ thickness 0.1, got {}",
             dist_02
         );
+    }
+
+    /// NaN guard regression (reviewer pre-merge HIGH #2). Upstream constraint
+    /// solvers can leave a NaN position in the buffer; without the
+    /// `is_finite` check inside `solve_self_collision` the corruption would
+    /// cascade across every pair the NaN particle is hashed near.
+    #[test]
+    fn solve_self_collision_handles_nan_position() {
+        let positions = vec![
+            f32::NAN, 0.0, 0.0,   // p0 corrupted
+            0.05, 0.0, 0.0,       // p1 healthy partner inside thickness
+        ];
+        let inv_mass = vec![1.0, 1.0];
+        let mut solver = XpbdSolver::new(&positions, &inv_mass);
+        configure_self_collision(&mut solver, 0.1);
+        // Empty CSR slice (2 particles → offsets length 3) — adjacency check
+        // is a no-op range, every candidate falls through to the distance
+        // filter where the NaN guard must catch the corruption.
+        solver.set_adjacency(&[0, 0, 0], &[]);
+
+        // Must not panic.
+        solver.solve_self_collision();
+
+        // Healthy partner stays put — NaN must NOT propagate via correction.
+        assert_eq!(solver.positions[3], 0.05);
+        assert_eq!(solver.positions[4], 0.0);
+        assert_eq!(solver.positions[5], 0.0);
+    }
+
+    /// Empty-CSR fallback regression (reviewer pre-merge CRITICAL #3). Worker
+    /// happy-path always populates adjacency before enabling self-collision,
+    /// but a future re-init reordering / hot-swap / test harness bug could
+    /// leave the CSR empty. Without the guard, every triangle-shared
+    /// neighbor would be treated as non-adjacent and pushed apart, tearing
+    /// the mesh along every shared edge. Fail-loud-by-no-op.
+    #[test]
+    fn solve_self_collision_no_op_on_empty_csr() {
+        let positions = vec![0.0, 0.0, 0.0, 0.05, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut solver = XpbdSolver::new(&positions, &inv_mass);
+        configure_self_collision(&mut solver, 0.1);
+        // Deliberately do NOT call `set_adjacency` — `adjacency_offsets`
+        // stays empty.
+
+        let pos_before = solver.positions.clone();
+        solver.solve_self_collision();
+
+        assert_eq!(solver.positions, pos_before);
     }
 }

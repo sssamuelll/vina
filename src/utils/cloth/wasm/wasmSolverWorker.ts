@@ -174,9 +174,9 @@ function applySolverConfig(): void {
   if (!solver) return;
   // Architectural location (A7 ratified, § 3.1.6): substeps=1 hardcoded
   // because JS-side outer loop manages substep cadence. CPU TS solver
-  // (xpbdSolver.ts:1447) has internal adaptive substeps (10-30 based on
-  // velocity); JS-side adaptive cadence for WASM tier queued as A7
-  // follow-up. Cross-ref A7 RFC § 3.1.6.
+  // (xpbdSolver.ts step() — adaptiveSubsteps branch) has internal adaptive
+  // substeps (10-30 based on velocity); JS-side adaptive cadence for WASM
+  // tier queued as A7 follow-up. Cross-ref A7 RFC § 3.1.6.
   solver.configure(
     1,  // substeps=1: JS manages substep loop for per-substep collision
     currentConfig.damping,
@@ -491,6 +491,14 @@ self.onmessage = async (event: MessageEvent) => {
             code: 'wasm_memory_unavailable',
             message: errorMsg,
           });
+          // Pre-fix the init handler fell through to mergeMeshes + new XpbdSolver
+          // + set_stretch/_bend/_triangles/_adjacency, which all dereference
+          // `wasmExports.memory` indirectly via wasm-bindgen views. With memory
+          // unavailable each call throws, the top-level catch posts a generic
+          // error, and the actionable `wasm_memory_unavailable` code is hidden
+          // from the consumer (`onError` UX surface). Bail here so the specific
+          // error code is the only one surfaced.
+          return;
         }
 
         // Merge pieces using the standard utility (ensures consistent vertex mapping)
