@@ -195,10 +195,10 @@ grep -rn "AsyncState\|RequestStatus\|useAsync\b\|asyncState\|loadingState\|Reque
 
 **0 `react-error-boundary` library deps.** Pure custom implementation.
 
-#### Toast slice CANONICAL (4 helpers + UI overlay)
+#### Toast slice CANONICAL (4 typed helpers + showToast base + UI overlay)
 
 - `src/store/copilotUISlice.ts:215-227` — `showToast` reducer (5-toast limit, auto-cleanup via timestamp).
-- `src/store/copilotUISlice.ts:392-422` — 4 action creators: `showUndoToast`, `showSuccessToast`, `showErrorToast`, `showInfoToast` (`showInfoToast` is implied — verified line 416 has `showErrorToast`).
+- `src/store/copilotUISlice.ts:392-432` — 4 typed action creators: `showUndoToast`, `showSuccessToast`, `showErrorToast` (pre-E-async) + `showInfoToast` (added Stage 2 commit 3 for D8 gap 4 closure). Plus the `showToast` base = **5 helpers total**. CopilotToast type union supports 5 severities (`success | error | warning | info | undo`); `warning` has no typed helper today (captured as deuda § 8 follow-up — Sam reviewer feedback).
 - `src/store/copilotUISlice.ts:246-252` — `cleanupExpiredToasts` automatic.
 - `src/store/copilotUISlice.ts:352` — NEW_PROJECT extraReducer resets toasts.
 - `src/components/CopilotPanel/CopilotToast.tsx` + `CopilotUIOverlay.tsx` — UI rendering at app root level.
@@ -866,7 +866,7 @@ Plus: `inspectorSlice` (or new `solverSlice`) gains `lastSolverError: { error, j
 
 #### Opción 3.6.A — Ratify as emerging convention (RECOMENDADA)
 
-**Shape:** anchor state machine pattern in convention table (§ 3.1.A Variant 3 row): "multi-step UX flow → discriminated union via useState." Reference 2 canonical examples. NO code change.
+**Shape:** anchor state machine pattern in convention table (§ 3.1.A "Multi-step UX flow" row, formalizing § 2.1 Variant 3): "multi-step UX flow → discriminated union via useState." Reference 2 canonical examples. NO code change.
 
 **Pros:**
 - **2 sites = emerging pattern**, not yet drift. Ratification documents intentional shape.

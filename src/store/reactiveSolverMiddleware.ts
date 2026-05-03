@@ -479,8 +479,9 @@ async function initializePool(): Promise<void> {
   // E-async D8 gap 5 closure (§ 3.5.3.A): pool errors used to be
   // console.error + internal metrics.errors[] only — no UI surface, no
   // Redux exposure. Now: dispatch to inspectorSlice.lastSolverError for
-  // visibility + rate-limited toast (5s window, mirrors A3 wasmNaNCount
-  // rate-limit pattern) for user. Variant F (toast) per D2 convention.
+  // visibility + rate-limited toast (window = SOLVER_TOAST_RATE_LIMIT_MS
+  // declared below; mirrors A3 wasmNaNCount rate-limit pattern) for user.
+  // Variant F (toast) per D2 convention.
   state.pool.onError((error: string, jobId?: string) => {
     console.error('[ReactiveSolver] Worker error:', error, jobId);
     state.metrics.errors.push(error);
@@ -496,7 +497,7 @@ async function initializePool(): Promise<void> {
     if (storeDispatch) {
       const now = Date.now();
       storeDispatch(setLastSolverError({ error, jobId, timestamp: now }) as AnyAction);
-      if (now - lastSolverToastTs > SOLVER_TOAST_RATE_LIMIT_MS) {
+      if (shouldEmitSolverToast(now, lastSolverToastTs)) {
         storeDispatch(showErrorToast(`Construction error: ${error}`) as AnyAction);
         lastSolverToastTs = now;
       }
@@ -525,7 +526,15 @@ let storeDispatch: AppDispatch | null = null;
 // errors. Worker pool can cascade failures (e.g., circular formula
 // dependency triggers N piece rebuilds). 5-second window prevents toast
 // spam while preserving signal. Mirrors A3 wasmNaNCount rate-limit shape.
-const SOLVER_TOAST_RATE_LIMIT_MS = 5000;
+//
+// `shouldEmitSolverToast` exported for direct boundary test
+// (`reactiveSolverMiddleware.test.ts > Worker pool error rate-limit`).
+// Strict `>` comparison: at exactly windowMs, comparison is false →
+// suppress (off-by-one boundary intentional, see test).
+export const SOLVER_TOAST_RATE_LIMIT_MS = 5000;
+export function shouldEmitSolverToast(now: number, lastTs: number): boolean {
+  return now - lastTs > SOLVER_TOAST_RATE_LIMIT_MS;
+}
 let lastSolverToastTs = 0;
 
 /**
