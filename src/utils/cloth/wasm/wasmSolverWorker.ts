@@ -35,6 +35,7 @@ import type { PathCommand, Elastic, SemanticEdge } from '../../../types/types';
 import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 import { computeBendRestDistances } from './bendRestDistances';
+import { buildAdjacency } from '../selfCollision';
 import type { WasmSolverConfig } from './wasmSolverClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -143,8 +144,9 @@ type AppliedSolverConfig = Required<WasmSolverConfig>;
  * CPU-only fields independent.
  *
  * Aligned 2026-05-02 (A2 closure): `bendCompliance: 1.0` matches CPU + per-
- * edge consensus. `selfCollision: false` divergence preserved as faithful
- * per-tier truth (BUG-5 / A7 § 3.1.1 — WASM tier lacks self-collision).
+ * edge consensus. `selfCollision: false` is the canonical default-off on
+ * both tiers; runtime opt-in via the config flag (port landed in #608 /
+ * A7 § 3.1.1 — WASM tier now implements self-collision in `solve_self_collision`).
  */
 const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   substeps: 15,
@@ -170,15 +172,6 @@ let currentConfig: AppliedSolverConfig = { ...DEFAULT_SOLVER_CONFIG };
  *  and after every mutation to currentConfig. */
 function applySolverConfig(): void {
   if (!solver) return;
-  // BUG-5 (#608): self-collision is not implemented in the Rust solver
-  // — force the flag to false at this boundary regardless of currentConfig.
-  // Resolution path is deferred to A7 RFC (WASM vs CPU equivalence).
-  if (currentConfig.selfCollision) {
-    console.warn(
-      '[WasmWorker] selfCollision=true requested but the WASM solver has no implementation; ' +
-      'forcing false. Use the CPU solver tier for self-collision. Tracking: #608, A7 RFC.'
-    );
-  }
   // Architectural location (A7 ratified, § 3.1.6): substeps=1 hardcoded
   // because JS-side outer loop manages substep cadence. CPU TS solver
   // (xpbdSolver.ts:1447) has internal adaptive substeps (10-30 based on
@@ -190,7 +183,7 @@ function applySolverConfig(): void {
     currentConfig.gravityY,
     currentConfig.stretchCompliance,
     currentConfig.bendCompliance,
-    false,
+    currentConfig.selfCollision,
     currentConfig.thickness,
     currentConfig.collisionMargin,
     currentConfig.groundY,
@@ -533,6 +526,29 @@ self.onmessage = async (event: MessageEvent) => {
 
         // Pass triangle indices for air drag calculation
         solver.set_triangles(triangles);
+
+        // Self-collision adjacency CSR (#608, #676 per A7 § 3.1.1).
+        // Build per-particle triangle-shared neighbor sets and flatten into a
+        // CSR pair: `offsets[numParticles+1]` (prefix-sum scan) +
+        // `neighbors[total]` (flat). The Rust `solve_self_collision` reads
+        // `offsets[i]..offsets[i+1]` to skip triangle-connected pairs (matches
+        // the TS `adjacency[i].has(j)` set lookup, just stored differently).
+        // `merged.triIds` is `Int32Array` (CPU mesh convention); the helper
+        // accepts that shape directly.
+        const adjSets = buildAdjacency(merged.triIds, numParticles);
+        const adjOffsets = new Uint32Array(numParticles + 1);
+        let adjTotal = 0;
+        for (let i = 0; i < numParticles; i++) {
+          adjOffsets[i] = adjTotal;
+          adjTotal += adjSets[i].size;
+        }
+        adjOffsets[numParticles] = adjTotal;
+        const adjNeighbors = new Uint32Array(adjTotal);
+        let adjK = 0;
+        for (let i = 0; i < numParticles; i++) {
+          for (const j of adjSets[i]) adjNeighbors[adjK++] = j;
+        }
+        solver.set_adjacency(adjOffsets, adjNeighbors);
 
         // Cache outline and edge data for elastic constraint building
         const outlines = new Map<string, PathCommand[]>();
