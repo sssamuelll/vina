@@ -88,14 +88,16 @@ export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  * WASM Rust solver capabilities (post-A7-closure state).
  *
  * Update flags here as per-feature port follow-up issues land:
- * - `selfCollision: false → true` when self-collision port lands (A7 § 3.1.1).
+ * - `selfCollision: true` (port landed in #608 / A7 § 3.1.1 — bit-exact
+ *   port of `selfCollision.ts`; `solve_self_collision` in
+ *   `crates/xpbd-wasm/src/lib.rs` consumes the `set_adjacency` CSR).
  * - `pressure: false → true` when pressure port lands (A7 § 3.1.3).
  * - `pieceStiffness: false → true` when piece stiffness port lands (A7 § 3.1.5).
  *
  * `lra` and `fold` are permanently `false` per A7 § 3.1 (ratified CPU-only).
  */
 export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
-  selfCollision: false,
+  selfCollision: true,
   lra: false,
   pressure: false,
   fold: false,

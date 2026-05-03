@@ -21,7 +21,23 @@ export class XpbdSolver {
         wasm.xpbdsolver_clear_pins(this.__wbg_ptr);
     }
     /**
-     * Configure solver parameters.
+     * Configure solver parameters (16 positional args).
+     *
+     * **A2 Fase 2 § 2.3 + § 3.1 ratified.** Rust ABI is the cross-language
+     * floor — adding/renaming a parameter requires touching this signature
+     * + struct field + constructor default + WASM rebuild + sync of BOTH
+     * `xpbd_wasm.js` + `xpbd_wasm_bg.wasm` to `public/wasm/` (CLAUDE.md
+     * non-negotiable) + TS-side `WasmXpbdSolver` interface +
+     * `AppliedSolverConfig` + `DEFAULT_SOLVER_CONFIG` + `applySolverConfig`
+     * callsite (worker) + `WasmSolverConfig` (client).
+     *
+     * Rust constructor `XpbdSolver::new()` defaults are canonical for
+     * cross-tier shared field defaults per `CLAUDE/methodology.md` § 15 —
+     * TS `DEFAULT_SOLVER_CONFIG` const en `wasmSolverWorker.ts` and CPU
+     * `ClothSimConfig` constructor defaults en `xpbdSolver.ts` MUST match
+     * for shared fields.
+     *
+     * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
      * @param {number} substeps
      * @param {number} damping
      * @param {number} gravity_y
@@ -91,6 +107,34 @@ export class XpbdSolver {
     }
     /**
      * Set adjacency for self-collision.
+     *
+     * CSR (Compressed Sparse Row) representation of per-particle
+     * triangle-shared neighbors. Used by `solve_self_collision` to skip
+     * connected pairs (avoiding pushing apart particles that share an edge
+     * in the mesh).
+     *
+     * # Arguments
+     *
+     * * `offsets` — Length `num_particles + 1`. `offsets[i]..offsets[i+1]`
+     *   gives the slice of `neighbors` corresponding to particle `i`. Must
+     *   be monotonic non-decreasing. `offsets[num_particles]` equals
+     *   `neighbors.len()` (CSR sentinel).
+     * * `neighbors` — Flat array of triangle-shared neighbor indices.
+     *   Length equals `offsets[num_particles]`.
+     *
+     * # Example
+     *
+     * For a 3-particle mesh where every particle shares a triangle with
+     * the other two:
+     * - `offsets   = [0, 2, 4, 6]`
+     * - `neighbors = [1, 2, 0, 2, 0, 1]`
+     *
+     * # Empty CSR
+     *
+     * Calling with empty `offsets` is treated as a no-op by
+     * `solve_self_collision` (defensive fallback — preferable to running
+     * with broken physics). New callers should populate the CSR before
+     * enabling self-collision.
      * @param {Uint32Array} offsets
      * @param {Uint32Array} neighbors
      */
