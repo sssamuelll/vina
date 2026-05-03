@@ -14,7 +14,8 @@ import type { Tool2D } from '../../types/types';
 import { setViewMode, setActiveTool, toggleSeamAllowance, toggleGrainlines, toggleSnapToGrid, undo, redo, setZoom2D, setPan2D, computeFitView } from '../../store/editorSlice';
 import { setActiveTool2D, setActiveTool3D } from '../../store/toolSlice';
 import { cycleCopilotPosition, setSplitRatio, setBottomPanelOpen, toggleBottomPanel, setBottomPanelTab } from '../../store/layoutSlice';
-import { loadProject } from '../../store/projectSlice';
+import { loadProject, clearLoadDiagnostics } from '../../store/projectSlice';
+import { showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import Toolbar2D from '../Toolbar2D/Toolbar2D';
@@ -211,6 +212,41 @@ export default function Workspace() {
       }
     });
   }, [dispatch]);
+
+  // ─── Validator diagnostics aggregator ───
+  // E-async D8 gap 4 closure (§ 3.5.2.A): projectSlice.loadDiagnostics is
+  // populated on loadProject but no UI consumer renders it. Aggregator below
+  // surfaces severity counts as toast (Variant F per D2 convention table
+  // § 3.2.A — transient summary). Per-diagnostic detail still in
+  // console.error/warn (validator) + state (loadDiagnostics) for inspection.
+  // Full diagnostic panel UI deferred to follow-up (E-async § 8 deuda #6).
+  //
+  // Severity coverage: errors → showErrorToast; warnings (no errors) →
+  // showInfoToast; info-only → showInfoToast (e.g., AUTO_SEAMS_DETECTED is
+  // user-actionable — must surface). After surfacing, dispatch
+  // clearLoadDiagnostics so undo/reload doesn't re-toast already-dismissed
+  // diagnostics.
+  const loadDiagnostics = useSelector((s: RootState) => s.project.loadDiagnostics);
+  useEffect(() => {
+    if (loadDiagnostics.length === 0) return;
+    const errors = loadDiagnostics.filter(d => d.severity === 'error').length;
+    const warnings = loadDiagnostics.filter(d => d.severity === 'warning').length;
+    if (errors > 0) {
+      const warnSuffix = warnings > 0 ? ` and ${warnings} warning${warnings === 1 ? '' : 's'}` : '';
+      dispatch(showErrorToast(
+        `Project loaded with ${errors} error${errors === 1 ? '' : 's'}${warnSuffix}.`
+      ));
+    } else if (warnings > 0) {
+      dispatch(showInfoToast(`Project loaded with ${warnings} warning${warnings === 1 ? '' : 's'}.`));
+    } else {
+      // Info-only diagnostics (e.g., AUTO_SEAMS_DETECTED) — surface count
+      // so user can investigate via console.error/warn or future panel.
+      dispatch(showInfoToast(`Project loaded with ${loadDiagnostics.length} note${loadDiagnostics.length === 1 ? '' : 's'}. Check console for details.`));
+    }
+    // Clear after surfacing — prevents re-toast on undo/reload restoring
+    // the same loadDiagnostics array reference.
+    dispatch(clearLoadDiagnostics());
+  }, [loadDiagnostics, dispatch]);
 
   // ─── Auto-fit 2D viewport when pieces first appear (template load) ───
   const prevPieceCount = useRef(0);

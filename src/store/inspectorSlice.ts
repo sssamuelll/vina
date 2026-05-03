@@ -6,6 +6,16 @@
  * - Extracted inspection data for that target
  * - Rule-based diagnostics derived from the data
  * - Agent analysis streamed from the LLM
+ * - Construction-related error counters (unresolvedCount, lastSolverError)
+ *
+ * **E-async ratified (§ 3.1.A)**: this slice exemplifies the canonical
+ * "per-slice async-derived state with selector access" row of the B8
+ * 6-pattern convention table — `agentError` + `agentStreaming` (LLM
+ * streaming lifecycle) + `lastSolverError` (E-async D8 gap 5 closure)
+ * all live here because they are **cross-feature persistent** state
+ * needing selector access (InspectorTab consumes via `useSelector`).
+ *
+ * Cross-ref: docs/reports/2026-05-03-drift-fase2-e-async-states.md § 3.1.A.
  *
  * @module inspectorSlice
  */
@@ -40,6 +50,17 @@ export interface InspectorState {
   agentError: string | null;
   /** Global count of construction points with resolution errors */
   unresolvedCount: number;
+  /**
+   * Last error from the parametric construction worker pool, if any.
+   *
+   * E-async D8 gap 5 closure (§ 3.5.3.A): surfaces reactiveSolverMiddleware
+   * `pool.onError` events to Redux for visibility. Adjacent to
+   * `unresolvedCount` (both are construction-related diagnostics). Toast
+   * dispatched in parallel for transient surface; this field preserves
+   * last-error detail for inspection (Redux DevTools, future panel UI).
+   * `null` = no recent error / cleared.
+   */
+  lastSolverError: { error: string; jobId?: string; timestamp: number } | null;
 }
 
 const initialState: InspectorState = {
@@ -50,6 +71,7 @@ const initialState: InspectorState = {
   agentStreaming: false,
   agentError: null,
   unresolvedCount: 0,
+  lastSolverError: null,
 };
 
 // ============================================================================
@@ -119,6 +141,16 @@ const inspectorSlice = createSlice({
     },
 
     /**
+     * Record the last solver/worker error from the reactive solver pool.
+     *
+     * E-async D8 gap 5 closure (§ 3.5.3.A): paired with rate-limited toast
+     * dispatched in parallel from the middleware. Pass `null` to clear.
+     */
+    setLastSolverError(state, action: PayloadAction<{ error: string; jobId?: string; timestamp: number } | null>) {
+      state.lastSolverError = action.payload;
+    },
+
+    /**
      * Reset the inspector to its initial (closed) state.
      */
     clearInspection() {
@@ -138,6 +170,7 @@ export const {
   setAgentStreaming,
   setAgentError,
   setUnresolvedCount,
+  setLastSolverError,
   clearInspection,
 } = inspectorSlice.actions;
 

@@ -303,6 +303,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       agentStreaming: false,
       agentError: null,
       unresolvedCount: 0,
+      lastSolverError: null,
     },
     bom: {
       entries: [],

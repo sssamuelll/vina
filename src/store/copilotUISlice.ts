@@ -3,9 +3,20 @@
  *
  * Manages visual feedback for copilot actions:
  * - Highlights for pieces, edges, points
- * - Toast notifications (undo, success, error)
+ * - Toast notifications (undo, success, error, info)
  * - Action log entries
  * - Pending confirmation dialogs
+ *
+ * **E-async ratified (§ 3.2.A Variant F)**: this slice owns the canonical
+ * Toast surface. Helpers (`showToast` base + 4 typed: `showSuccessToast`,
+ * `showErrorToast`, `showInfoToast`, `showUndoToast`) are the canonical
+ * mechanism for **user-facing transient notifications** in the D2
+ * 6-variant convention table — auto-dismiss (3-8s), 5-toast limit,
+ * NEW_PROJECT reset. NOT infrautilizado (inventory claim refuted by
+ * E-async sweep — heavy callsite distribution across copilot pipeline +
+ * boundary surfaces post-A3/BUG-15).
+ *
+ * Cross-ref: docs/reports/2026-05-03-drift-fase2-e-async-states.md § 3.2.A.
  *
  * @module copilotUISlice
  */
@@ -418,6 +429,21 @@ export function showErrorToast(message: string) {
     type: 'error',
     message,
     duration: 5000,
+  });
+}
+
+/**
+ * Show an info toast.
+ *
+ * Added per E-async D8 gap 4 closure (§ 3.5.2.A) for non-error informational
+ * notifications (e.g., validator load warnings). Symmetric with
+ * showSuccessToast / showErrorToast helpers.
+ */
+export function showInfoToast(message: string) {
+  return showToast({
+    type: 'info',
+    message,
+    duration: 4000,
   });
 }
 

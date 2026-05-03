@@ -171,6 +171,11 @@ export interface ClothSolverClient {
  * (`wasm_memory_unavailable`); migration to CPU + GPU + Neural tiers
  * deferred to `#687` follow-up issue.
  *
+ * E-async § 3.2.A + § 3.4.A ratifies SolverError as the canonical
+ * Variant A extension for **cross-tier (Rust↔TS / worker↔main) errors**
+ * in the D2 6-variant convention table. Per-tier adoption coordinated
+ * via #687 (decoupling preserved per A6 § 3.6.C).
+ *
  * Consumer code branching on `code` should handle unknown codes
  * gracefully — the `string` fallback keeps the union forward-compat
  * with new error sources.

@@ -37,7 +37,8 @@ import {
 
 import { resolveAll, mapPieceIdentity } from './constructionSlice';
 import { upsertPieceOutline, addPiece } from './projectSlice';
-import { setUnresolvedCount } from './inspectorSlice';
+import { setUnresolvedCount, setLastSolverError } from './inspectorSlice';
+import { showErrorToast } from './copilotUISlice';
 import { buildPieceWithOffset } from '../utils/construction/pieceBuilder';
 import type { FormulaContext } from '../utils/seamly2d/formulaEvaluator';
 import type { CPoint, CCurve, CPiece } from '../types/construction';
@@ -474,7 +475,13 @@ async function initializePool(): Promise<void> {
   // Set up result handler
   state.pool.onResult(handleWorkerResult);
 
-  // Set up error handler
+  // Set up error handler.
+  // E-async D8 gap 5 closure (§ 3.5.3.A): pool errors used to be
+  // console.error + internal metrics.errors[] only — no UI surface, no
+  // Redux exposure. Now: dispatch to inspectorSlice.lastSolverError for
+  // visibility + rate-limited toast (window = SOLVER_TOAST_RATE_LIMIT_MS
+  // declared below; mirrors A3 wasmNaNCount rate-limit pattern) for user.
+  // Variant F (toast) per D2 convention.
   state.pool.onError((error: string, jobId?: string) => {
     console.error('[ReactiveSolver] Worker error:', error, jobId);
     state.metrics.errors.push(error);
@@ -484,6 +491,16 @@ async function initializePool(): Promise<void> {
 
     if (jobId) {
       state.pendingJobs.delete(jobId);
+    }
+
+    // Surface to Redux + rate-limited toast (E-async § 3.5.3.A).
+    if (storeDispatch) {
+      const now = Date.now();
+      storeDispatch(setLastSolverError({ error, jobId, timestamp: now }) as AnyAction);
+      if (shouldEmitSolverToast(now, lastSolverToastTs)) {
+        storeDispatch(showErrorToast(`Construction error: ${error}`) as AnyAction);
+        lastSolverToastTs = now;
+      }
     }
   });
 
@@ -504,6 +521,21 @@ async function initializePool(): Promise<void> {
 
 // Store dispatch reference for result handler
 let storeDispatch: AppDispatch | null = null;
+
+// E-async D8 gap 5 (§ 3.5.3.A): rate-limit toast emission for solver pool
+// errors. Worker pool can cascade failures (e.g., circular formula
+// dependency triggers N piece rebuilds). 5-second window prevents toast
+// spam while preserving signal. Mirrors A3 wasmNaNCount rate-limit shape.
+//
+// `shouldEmitSolverToast` exported for direct boundary test
+// (`reactiveSolverMiddleware.test.ts > Worker pool error rate-limit`).
+// Strict `>` comparison: at exactly windowMs, comparison is false →
+// suppress (off-by-one boundary intentional, see test).
+export const SOLVER_TOAST_RATE_LIMIT_MS = 5000;
+export function shouldEmitSolverToast(now: number, lastTs: number): boolean {
+  return now - lastTs > SOLVER_TOAST_RATE_LIMIT_MS;
+}
+let lastSolverToastTs = 0;
 
 /**
  * Handle result from worker.
