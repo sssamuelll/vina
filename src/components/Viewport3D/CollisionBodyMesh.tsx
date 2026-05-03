@@ -9,7 +9,8 @@ import {
   selectCollisionBody,
 } from '../../store/collisionBodySlice';
 import type { CollisionBody } from '../../types/collisionBody';
-import { importMesh } from '../../utils/import/meshImporter';
+import { importMesh, MeshImportLimitError } from '../../utils/import/meshImporter';
+import { showErrorToast } from '../../store/copilotUISlice';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -33,17 +34,25 @@ export default function CollisionBodyMesh({ body, orbitRef }: CollisionBodyMeshP
   // drag-to-disable-orbit integration (same pattern as DraggablePiece).
   void orbitRef;
 
-  // Load mesh from URL
+  // Load mesh from URL.
+  // E-async D8 gap 1 closure (§ 3.5.1.A): dual surface — console.warn for dev
+  // telemetry + showErrorToast for user. Variant F (toast) per D2 convention
+  // table — transient + user-actionable. MeshImportLimitError-aware message.
   useEffect(() => {
     let cancelled = false;
     importMesh(body.meshUrl, body.name, {}).then(result => {
       if (cancelled) return;
       setScene(result.scene);
     }).catch(err => {
+      if (cancelled) return;
       console.warn('[CollisionBodyMesh] Failed to load:', body.name, err);
+      const msg = err instanceof MeshImportLimitError
+        ? `Collision body "${body.name}" exceeds size limit: ${err.message}`
+        : `Failed to load collision body "${body.name}": ${err instanceof Error ? err.message : 'unknown error'}`;
+      dispatch(showErrorToast(msg));
     });
     return () => { cancelled = true; };
-  }, [body.meshUrl, body.name]);
+  }, [body.meshUrl, body.name, dispatch]);
 
   // Extract animation clips from loaded scene
   useEffect(() => {
