@@ -6,6 +6,16 @@
  * - Extracted inspection data for that target
  * - Rule-based diagnostics derived from the data
  * - Agent analysis streamed from the LLM
+ * - Construction-related error counters (unresolvedCount, lastSolverError)
+ *
+ * **E-async ratified (§ 3.1.A Variant 1)**: this slice exemplifies the
+ * canonical "per-slice async-derived state" pattern in the B8 6-pattern
+ * convention table — `agentError` + `agentStreaming` (LLM streaming
+ * lifecycle) + `lastSolverError` (E-async D8 gap 5 closure) all live
+ * here because they are **cross-feature persistent** state needing
+ * selector access (InspectorTab consumes via `useSelector`).
+ *
+ * Cross-ref: docs/reports/2026-05-03-drift-fase2-e-async-states.md § 3.1.A.
  *
  * @module inspectorSlice
  */

@@ -3,9 +3,19 @@
  *
  * Manages visual feedback for copilot actions:
  * - Highlights for pieces, edges, points
- * - Toast notifications (undo, success, error)
+ * - Toast notifications (undo, success, error, info)
  * - Action log entries
  * - Pending confirmation dialogs
+ *
+ * **E-async ratified (§ 3.2.A Variant F)**: this slice owns the canonical
+ * Toast surface. Helpers (`showToast`, `showSuccessToast`, `showErrorToast`,
+ * `showInfoToast`, `showUndoToast`) are the canonical mechanism for
+ * **user-facing transient notifications** in the D2 6-variant convention
+ * table — auto-dismiss (3-8s), 5-toast limit, NEW_PROJECT reset. NOT
+ * infrautilizado (inventory claim refuted by E-async sweep — 19+
+ * callsites across copilot pipeline + boundary surfaces post-A3/BUG-15).
+ *
+ * Cross-ref: docs/reports/2026-05-03-drift-fase2-e-async-states.md § 3.2.A.
  *
  * @module copilotUISlice
  */
