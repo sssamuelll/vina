@@ -779,6 +779,163 @@ impl XpbdSolver {
     }
 }
 
+// ─── Spatial Hash Grid (self-collision) ─────────────────────────────────────
+//
+// Counting-sort flat hash for particle-vs-particle collision detection
+// (cloth ↔ itself). Bit-exact port of CPU TS reference
+// `src/utils/cloth/selfCollision.ts` (#608, #676 per A7 RFC § 3.1.1).
+//
+// Role separation vs `TriangleSpatialHash` (kinematic body collision in
+// `triangleCollision.ts`): different domain (particle-vs-particle vs
+// triangle-vs-particle), different lifecycle (rebuild-per-frame vs
+// immutable-per-body), different storage (counting-sort flat vs per-bucket
+// `Map<key, Int32Array>`). Orthogonal, not mergeable. See A4 § 2.4
+// (`docs/reports/2026-05-02-drift-fase2-a4-cross-language-geometry-mesh.md`).
+
+/// Find a prime ≥ n. Mirrors `nextPrime` in `selfCollision.ts`.
+fn next_prime(n: usize) -> usize {
+    if n <= 2 {
+        return 2;
+    }
+    let mut candidate = if n % 2 == 0 { n + 1 } else { n };
+    loop {
+        let mut is_prime = true;
+        let limit = (candidate as f64).sqrt() as usize;
+        let mut d = 3;
+        while d <= limit {
+            if candidate % d == 0 {
+                is_prime = false;
+                break;
+            }
+            d += 2;
+        }
+        if is_prime {
+            return candidate;
+        }
+        candidate += 2;
+    }
+}
+
+/// Particle-vs-particle spatial hash grid.
+///
+/// Counting-sort flat `Vec<i32>` cellStart + cellEntries. O(n) rebuild,
+/// O(1) amortized neighbor queries over a 3³ cell neighborhood.
+///
+/// Bit-exact port of CPU TS `SpatialHashGrid`. Hash multipliers preserved
+/// verbatim; `i32::wrapping_mul` matches JS bitwise ToInt32 coercion
+/// semantics (TS `*` then `^` truncates to signed 32-bit, wraps mod 2^32).
+pub struct SpatialHashGrid {
+    inv_cell_size: f32,
+    table_size: usize,
+    cell_start: Vec<i32>,
+    cell_entries: Vec<i32>,
+    cell_count: Vec<i32>,
+}
+
+impl SpatialHashGrid {
+    pub fn new(cell_size: f32) -> Self {
+        Self {
+            inv_cell_size: 1.0 / cell_size,
+            table_size: 1,
+            cell_start: Vec::new(),
+            cell_entries: Vec::new(),
+            cell_count: Vec::new(),
+        }
+    }
+
+    /// Update the cell size in place. Cheap — just refreshes the inverse.
+    /// Caller must `build` again before the next query (positions index changes).
+    pub fn set_cell_size(&mut self, cell_size: f32) {
+        self.inv_cell_size = 1.0 / cell_size;
+    }
+
+    /// Hash three integer cell coords. TS reference:
+    /// `((xi*92837111) ^ (yi*689287499) ^ (zi*283923481)) % tableSize`,
+    /// then negative-modulo correction. `wrapping_mul` matches JS implicit
+    /// ToInt32 wraparound (mod 2^32, signed reinterpretation).
+    fn hash_coords(&self, xi: i32, yi: i32, zi: i32) -> usize {
+        let a = xi.wrapping_mul(92_837_111);
+        let b = yi.wrapping_mul(689_287_499);
+        let c = zi.wrapping_mul(283_923_481);
+        let mixed = a ^ b ^ c;
+        let table = self.table_size as i32;
+        let h = mixed % table;
+        let h = if h < 0 { h + table } else { h };
+        h as usize
+    }
+
+    fn int_coord(&self, v: f32) -> i32 {
+        (v * self.inv_cell_size).floor() as i32
+    }
+
+    /// Rebuild the hash from current positions. O(n).
+    pub fn build(&mut self, positions: &[f32], num_particles: usize) {
+        self.table_size = next_prime(num_particles * 2);
+
+        if self.cell_count.len() < self.table_size {
+            self.cell_count = vec![0; self.table_size];
+            self.cell_start = vec![0; self.table_size];
+        } else {
+            self.cell_count[..self.table_size].fill(0);
+        }
+
+        if self.cell_entries.len() < num_particles {
+            self.cell_entries = vec![0; num_particles];
+        }
+
+        // Count particles per cell
+        for i in 0..num_particles {
+            let h = self.hash_coords(
+                self.int_coord(positions[i * 3]),
+                self.int_coord(positions[i * 3 + 1]),
+                self.int_coord(positions[i * 3 + 2]),
+            );
+            self.cell_count[h] += 1;
+        }
+
+        // Prefix sum → cell_start; reset cell_count to use as scatter cursor.
+        let mut start = 0i32;
+        for i in 0..self.table_size {
+            self.cell_start[i] = start;
+            start += self.cell_count[i];
+            self.cell_count[i] = 0;
+        }
+
+        // Scatter particles into entries
+        for i in 0..num_particles {
+            let h = self.hash_coords(
+                self.int_coord(positions[i * 3]),
+                self.int_coord(positions[i * 3 + 1]),
+                self.int_coord(positions[i * 3 + 2]),
+            );
+            let idx = (self.cell_start[h] + self.cell_count[h]) as usize;
+            self.cell_entries[idx] = i as i32;
+            self.cell_count[h] += 1;
+        }
+    }
+
+    /// Iterate particles in the 3³ neighborhood of (x, y, z) via callback.
+    /// Zero-allocation; callers may filter (j > i, adjacency, distance) inside `f`.
+    pub fn query<F: FnMut(usize)>(&self, x: f32, y: f32, z: f32, mut f: F) {
+        let xi0 = self.int_coord(x) - 1;
+        let yi0 = self.int_coord(y) - 1;
+        let zi0 = self.int_coord(z) - 1;
+
+        for dx in 0..3 {
+            for dy in 0..3 {
+                for dz in 0..3 {
+                    let h = self.hash_coords(xi0 + dx, yi0 + dy, zi0 + dz);
+                    let s = self.cell_start[h] as usize;
+                    let e = s + self.cell_count[h] as usize;
+                    for k in s..e {
+                        f(self.cell_entries[k] as usize);
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -844,5 +1001,38 @@ mod tests {
         // Second seam (1↔2) had compliance=0 → should pull them together.
         let dist_12 = (s.positions[6] - s.positions[3]).abs();
         assert!(dist_12 < 1e-5, "second seam should be rigid (compliance fallback to 0)");
+    }
+
+    /// SpatialHashGrid port (#608, #676 per A7 § 3.1.1) smoke test.
+    /// Mirrors the TS suite (`__tests__/selfCollision.test.ts`): particles in
+    /// the same cell, and particles in 3³-adjacent cells, both surface in the
+    /// query. (Hash collisions can return false positives at small table sizes;
+    /// the distance filter in `solve_self_collision` handles those — same
+    /// contract as the TS reference, which only asserts `.toContain`.)
+    #[test]
+    fn spatial_hash_query_finds_same_cell_neighbors() {
+        let mut grid = SpatialHashGrid::new(1.0);
+        let positions = [0.1, 0.1, 0.1, 0.2, 0.2, 0.2];
+        grid.build(&positions, 2);
+
+        let mut neighbors: Vec<usize> = Vec::new();
+        grid.query(0.1, 0.1, 0.1, |i| neighbors.push(i));
+
+        assert!(neighbors.contains(&0));
+        assert!(neighbors.contains(&1));
+    }
+
+    #[test]
+    fn spatial_hash_query_finds_adjacent_cell_neighbors() {
+        let mut grid = SpatialHashGrid::new(1.0);
+        // Particles in adjacent cells (within the 3³ neighborhood).
+        let positions = [0.5, 0.5, 0.5, 1.5, 0.5, 0.5];
+        grid.build(&positions, 2);
+
+        let mut neighbors: Vec<usize> = Vec::new();
+        grid.query(0.5, 0.5, 0.5, |i| neighbors.push(i));
+
+        assert!(neighbors.contains(&0));
+        assert!(neighbors.contains(&1));
     }
 }
