@@ -422,6 +422,21 @@ export function showErrorToast(message: string) {
 }
 
 /**
+ * Show an info toast.
+ *
+ * Added per E-async D8 gap 4 closure (§ 3.5.2.A) for non-error informational
+ * notifications (e.g., validator load warnings). Symmetric with
+ * showSuccessToast / showErrorToast helpers.
+ */
+export function showInfoToast(message: string) {
+  return showToast({
+    type: 'info',
+    message,
+    duration: 4000,
+  });
+}
+
+/**
  * Highlight a piece with animation.
  */
 export function highlightPiece(pieceId: string, style: CopilotHighlight['style'] = 'pulse', duration = 2000) {
