@@ -74,26 +74,36 @@ describe('seamInitDataToPairs', () => {
   });
 
   it('emits LOCAL piece-relative vertex indices, not global merged-mesh indices', () => {
-    // Both pieces have identical outline; the GPU client adds vertex offsets
-    // internally per-piece. If this helper accidentally returned global
-    // merged-mesh indices, pieceB's indices would all be ≥ pieceA's vertex
-    // count instead of starting at the same range.
-    const seams = [makeSeam()];
+    // Two probes against the local-index contract:
+    //
+    // (1) Same edge on both pieces (top↔top): identical outlines → identical
+    //     parameterizeEdge output → matchVertices pairs index-by-index. Every
+    //     pair must be [i, i]. If the helper had accidentally added a global
+    //     vertex offset to either side, `a === b` would fail.
+    //
+    // (2) Different edges (top↔bottom): pair indices land in different
+    //     per-edge ranges, but BOTH must stay below a single piece's full
+    //     flattened-outline vertex count. For a 100×100 square with
+    //     maxEdgeLength=15, each side flattens to 7 verts × 4 edges = 28.
+    //     A regression that returned global indices for piece B (offset by
+    //     piece A's vertex count) would push maxB to ~50 and trip the bound.
+    const SINGLE_PIECE_VERTEX_BOUND = 28;
     const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
 
-    const { vertexPairs } = seamInitDataToPairs(seams, pieces)[0];
-
-    for (const [a, b] of vertexPairs) {
-      expect(a).toBeGreaterThanOrEqual(0);
-      expect(b).toBeGreaterThanOrEqual(0);
+    const sameEdge = seamInitDataToPairs(
+      [makeSeam({ pieceBEdgeName: 'top' })],
+      pieces,
+    )[0];
+    expect(sameEdge.vertexPairs.length).toBeGreaterThan(0);
+    for (const [a, b] of sameEdge.vertexPairs) {
+      expect(a).toBe(b);
     }
 
-    const maxA = Math.max(...vertexPairs.map(([a]) => a));
-    const maxB = Math.max(...vertexPairs.map(([, b]) => b));
-    // For identical 100x100 squares with maxEdgeLength=15, each side flattens
-    // to a small bounded number of vertices; both must stay piece-local.
-    expect(maxA).toBeLessThan(100);
-    expect(maxB).toBeLessThan(100);
+    const crossEdge = seamInitDataToPairs([makeSeam()], pieces)[0];
+    const maxA = Math.max(...crossEdge.vertexPairs.map(([a]) => a));
+    const maxB = Math.max(...crossEdge.vertexPairs.map(([, b]) => b));
+    expect(maxA).toBeLessThan(SINGLE_PIECE_VERTEX_BOUND);
+    expect(maxB).toBeLessThan(SINGLE_PIECE_VERTEX_BOUND);
   });
 
   it('produces same pair count via "edge-N" fallback as via semantic edge names', () => {
@@ -122,6 +132,33 @@ describe('seamInitDataToPairs', () => {
 
     expect(half.vertexPairs.length).toBeGreaterThan(0);
     expect(half.vertexPairs.length).toBeLessThan(full.vertexPairs.length);
+  });
+
+  it('skips seams whose match resolves to zero pairs and warns loudly', () => {
+    // 10x10 outline is shorter than MAX_EDGE_LENGTH (15), so each edge has
+    // only its two endpoint vertices (t=0, t=1) — no subdivisions. A
+    // tStart/tEnd range that excludes both endpoints leaves the side empty,
+    // matchVertices returns [], and the empty-match branch fires.
+    const tinyOutline: Array<{ type: string; values: number[] }> = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [10, 0] },
+      { type: 'L', values: [10, 10] },
+      { type: 'L', values: [0, 10] },
+      { type: 'Z', values: [] },
+    ];
+    const tinyPieces: PieceWithOutline[] = [
+      { pieceId: 'A', outline: tinyOutline, edges: [{ name: 'top', segmentRange: [0, 1] }] },
+      { pieceId: 'B', outline: tinyOutline, edges: [{ name: 'bottom', segmentRange: [2, 3] }] },
+    ];
+
+    const result = seamInitDataToPairs(
+      [makeSeam({ pieceARange: [0.4, 0.6], pieceBRange: [0.4, 0.6] })],
+      tinyPieces,
+    );
+
+    expect(result).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('empty match');
   });
 
   it('skips inactive seams without warning', () => {

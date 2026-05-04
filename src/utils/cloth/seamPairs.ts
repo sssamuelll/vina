@@ -11,11 +11,12 @@
  * LOCAL piece-relative indices because `GpuSolverClient.initMultiPieceTsl`
  * adds per-piece vertex offsets internally when packing the GPU buffer.
  *
- * Per A3 § 3.4, per-seam resolution failures (missing piece, unknown edge,
- * empty match) are logged loudly via `console.warn` with `[seamPairs]`
- * prefix and skipped. This preserves CPU/WASM/GPU parity (CPU/WASM also
- * silently skip the same inputs in `buildSeamConstraints`) while making
- * the skip audible — A3's "no silent failure" bar without API divergence.
+ * Per A3 § 3.2 (silent fallback UI surfacing), per-seam resolution failures
+ * (missing piece, unknown edge, empty match) are logged loudly via
+ * `console.warn` with `[seamPairs]` prefix and skipped. CPU/WASM also skip
+ * the same inputs in `buildSeamConstraints`, but more quietly; this helper
+ * is intentionally louder so divergent input data shows up in dev tools.
+ * Net effect: same skip behavior across tiers, audibility added on GPU.
  *
  * @see #732 — GPU tier seam constraints integration.
  * @see seamAssembly.ts:buildSeamConstraints — reference implementation.
@@ -52,6 +53,9 @@ export interface PieceWithOutline {
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
 }
 
+// MUST match the literals used by `seamAssembly.buildSeamConstraints` (the
+// `parameterizeEdge` calls there, ~line 429). Desync = GPU and CPU/WASM emit
+// different vertex counts per seam edge → divergent simulation behavior.
 const CURVE_RESOLUTION = 12;
 const MAX_EDGE_LENGTH = 15;
 
