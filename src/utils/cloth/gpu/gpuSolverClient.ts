@@ -681,11 +681,23 @@ export class GpuSolverClient implements ClothSolverClient {
       console.warn('[GpuSolverClient] setTslCollisionBody called but no TSL solver active');
       return;
     }
-    if (mesh.triCount === 0) return;
+    if (mesh.triCount === 0) {
+      console.warn(
+        `[GpuSolverClient] setTslCollisionBody '${id}': input mesh has triCount=0, skipping. ` +
+          `Avatar collision is not degradable — particles will fall through any region this body would have covered.`,
+      );
+      return;
+    }
 
     // Build BVH on CPU
     const bvh = buildLinearBVH(mesh);
-    if (bvh.nodeCount === 0) return;
+    if (bvh.nodeCount === 0) {
+      console.warn(
+        `[GpuSolverClient] setTslCollisionBody '${id}': BVH build produced 0 nodes from ${mesh.triCount} triangles, skipping. ` +
+          `Likely a degenerate mesh; avatar collision will be absent for this body.`,
+      );
+      return;
+    }
 
     // Create StorageBufferAttributes for GPU upload
     const bvhNodesSBA = createSBA(bvh.nodes, 1);
