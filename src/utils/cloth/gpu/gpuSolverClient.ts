@@ -79,8 +79,12 @@ export class GpuSolverClient implements ClothSolverClient {
     this.device = device;
     // Install debug instrumentation BEFORE solver/pipeline construction so every
     // shader module created during init is captured into window.__OPENCLO_SHADERS__
-    // and `[WebGPU shader] compile error` diagnostics are surfaced. Both helpers
-    // are dev-only and idempotent — calling here does nothing in production builds.
+    // and `[WebGPU shader] compile error` diagnostics are surfaced.
+    //
+    // instrumentShaderCapture is dev-only (no-op in production).
+    // attachUncapturedErrorListener stays active in prod — an idle listener is
+    // zero-cost and surfaces validation failures that would otherwise be silently
+    // swallowed. Both helpers are idempotent.
     instrumentShaderCapture(device);
     attachUncapturedErrorListener(device);
     this.solver = new GpuClothSolver(device, config);
