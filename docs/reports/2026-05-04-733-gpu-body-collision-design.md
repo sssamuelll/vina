@@ -387,3 +387,59 @@ The reviewer's Q3 answer ("construction-only + e2e, no webgpu-headless runtime t
 - Gates: tsc clean, 4819 unit tests pass, lint clean, pre-commit OK.
 
 **Awaiting reviewer guidance.** Recommend: (1) approve a follow-up Phase 2.5 to investigate Path A (TSL toVar/storage-read minimum repro + WGSL inspection); (2) if Path A reveals a fundamental TSL limitation, switch to Path B (kernel restructure). Either path keeps the design doc's D1–D8 ratifications intact.
+
+---
+
+## 8. Phase 2.5 + 2.6 update (2026-05-04 — second attempt, time-boxed)
+
+Reviewer approved Path A reconnaissance with 4h time-box → fall to B.2 if inconclusive. Outcome: **both Path A and B.2 came up empty within the time-box.** All Phase 2.5/2.6 working-tree edits reverted; branch HEAD stays at `951cd4ac` (Phase 2 + 3 doc commit).
+
+### 8.1 Path A — TSL execution-model reconnaissance (~1h actual)
+
+- **Archeology**: tslSelfCollision.ts origin commit (`75e6f44a`) message says: *"5-node pipeline ... Uses atomic i32 accumulation (scale 1e6) matching the WGSL approach."* The atomic design was chosen to match the existing WGSL self-collision implementation, not because of an explicit `toVar` failure observation. tslGrab.ts uses storage-buffer writes inside `If`/`Loop` (e.g. `grabMaskBufNode.element(i).assign(mask)`), confirming **storage-buffer writes from inside nested Ifs DO propagate**. tslBrush, tslWind similar. **No precedent for outer-scope toVar tracking with storage-read RHS** in the existing codebase.
+- **WGSL inspection attempt**: inspecting WGSL via `device.createShaderModule` interception requires patching `navigator.gpu.requestAdapter` BEFORE the page-load module graph executes. Playwright MCP doesn't expose `addInitScript`, and post-load patches missed the GPU device construction window. Did not achieve readable WGSL.
+- **Result**: Path A inconclusive within ~1h. Fell to Path B.2 per the time-box rule.
+
+### 8.2 Path B.2 — 2-pass kernel via scratch storage buffers (~2h actual)
+
+Implemented per the reviewer's plan: split `createTslCollisionBody` into `findBestNode` + `applyPushNode`, with 6 per-particle scratch SBAs (`bestDistSBA`, `bestSideSBA`, `bestNxSBA`, `bestNySBA`, `bestNzSBA`, `foundSBA`). Pass 1 walks BVH+triangles, writes best to scratch. Pass 2 reads scratch, applies push.
+
+Updated `gpuSolverClient.setTslCollisionBody`, `tslSolver` collision-body interface (`findBestNode` + `applyPushNode` instead of single `collisionNode`), `GarmentSimulation.useFrame` substep dispatch (compute both nodes). Updated `tslSolver.test.ts` mock helper (`makeMockBody`) to match new shape. **162 GPU unit tests pass; tsc + lint clean.**
+
+**Phase 3 e2e**: cloth at floor (y=[0, 0.007]) — same failure mode as the single-pass kernel. Console showed **197 WebGPU validation warnings**: `[Invalid ComputePipeline (unlabeled)] is invalid due to a previous error.` repeated each substep dispatch.
+
+The "previous error" (root WGSL compile error from `device.createShaderModule`) was **not surfaced through the captured console**. The `device.uncapturederror` listener at `gpuSolverClient.ts:80` should log via `console.error`, but Playwright captured zero error-level messages. Either the listener isn't firing, the error level was downgraded somewhere, or the validation error happens before the listener attaches. Additional Vite restart + foundSBA (Int32Array → Float32Array) variant test produced the same 196-warning pattern, suggesting the issue is structural to my B.2 kernel, not the foundBuf type.
+
+I did not isolate the root cause. Possible structural issues with the B.2 kernel:
+
+- **Read-then-write to same storage slot in same dispatch**: `If(triValid.equal(int(1)).and(triDist.lessThan(bestDistBuf.element(i))))` reads `bestDistBuf[i]`, then conditionally writes `bestDistBuf[i].assign(triDist)`. WGSL allows this in a single thread, but TSL may emit binding declarations that conflict (e.g. `var<storage>` instead of `var<storage, read_write>`).
+- **6 scratch SBAs registered in one Fn**: each adds a binding. Compute pipelines have a max binding count per group (typically 8 or 16). Plus the existing position/prevPos/invMass/bvh/triVerts/triNormals (6 inputs) = 12 storage bindings. Could exceed group 0's binding count and need group 1 — possibly not auto-handled by TSL.
+- **uMargin appears in multiple Fns**: I created two `Fn`s in the same factory; both reference the same `uniform(margin)` node. Whether TSL deduplicates correctly across separate `Fn` instances is unverified.
+
+### 8.3 Recommendation (revised)
+
+Both paths exhausted within budget without producing a working kernel. The design doc's D1–D8 ratifications remain valid; the implementation needs a different angle.
+
+Three viable next directions, in order of preference:
+
+1. **Path B.3 — atomic emulation per `tslSelfCollision.ts`**. Mirror the proven 5-pass shape (hashCount → prefixSum → scatter → resolve → apply) but for body-collision instead of self-collision. The `resolve` pass uses `atomicAdd` to per-particle delta buffers (no outer-toVar tracking; no read-then-write conflict; binding count bounded by atomicAdd-bundled scratch). Higher complexity than B.2 but proven precedent in this codebase. **Estimate: 1–2 days.**
+
+2. **WebGPU debugging infrastructure as prerequisite**. Cannot be productive without surfacing actual WGSL compile errors. Two concrete options: (a) add `addInitScript` capability to the Playwright MCP plugin so we can patch `device.createShaderModule` pre-init, (b) wrap `gpuSolverClient`'s WebGPU device construction in a debug helper that captures every shader module's `code` field and exposes it via `window.__OPENCLO_SHADERS__` for inspection. Either pre-Phase-2.7 investment, or rolled into #742 (cross-tier parity test infra, originally scoped post-#733).
+
+3. **Punt and force WASM-only for now**. Keep `GPU_CAPABILITIES.bodyCollision: false` indefinitely. WebGPU primary path stays gated on this fix. WASM cluster (#605, #606, etc.) becomes the production tier for the foreseeable future. Honest acknowledgment of current TSL kernel difficulty.
+
+### 8.4 Calibration anchor
+
+The reviewer's Q3 answer ("construction-only + e2e, no webgpu-headless runtime tests") was correct in retrospect — webgpu-headless runtime would surface the exact WGSL compile error rather than the cascade of "previous error" warnings. **The diagnosis cost of GPU code without proper debugging tools is ~10× the development cost.** Captured for #742 follow-up urgency upgrade.
+
+Per Sam's earlier note: *"TSL execution-model limitations need anchored documentation."* This document is the anchor — future contributors hitting the toVar/storage-read issue should find this section and skip the diagnostic work.
+
+### 8.5 State at second pause
+
+- Branch `feat/733-gpu-body-collision` HEAD: `951cd4ac` (commits 1 + 2 + Phase 2+3 doc).
+- Working tree clean (Phase 2.5/2.6 attempts reverted).
+- Capability flag stays `false`.
+- Gates: tsc clean, 4819 unit tests pass, lint clean.
+- Time spent on this branch: ~7h end-to-end.
+
+**Awaiting reviewer guidance** on next direction (B.3 / debug-infra-first / punt) before further work on this branch.
