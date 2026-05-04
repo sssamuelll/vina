@@ -113,9 +113,14 @@ export function makeWindComputeNode(
   // atomicStore to be valid WGSL — without it, Dawn silently fails the
   // pipeline (#554 root cause: Three.js 0.183 AtomicFunctionNode does not
   // walk up to the parent buffer to flip isAtomic; we do it manually here).
-  // `as any` cast: `@types/three` aliases StorageBufferNode as a type (not
-  // a class), so module augmentation can't add the method. Runtime exists
-  // per `StorageBufferNode.js:273`.
+  // Two distinct `as any` casts are required per #554 fix:
+  // (1) `'int' as any` works around @types/three lacking 'int' in the
+  //     storage() type union (storage() overload gap).
+  // (2) `as any` on the storage(...) result is needed because @types/three
+  //     aliases StorageBufferNode as a type (not a class) and mistypes the
+  //     method as `setAtmoic` (typo), so module augmentation can't add the
+  //     correct method. Runtime exists per `StorageBufferNode.js:273`
+  //     (verified in three@0.183.2).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const windAccumBuf = (storage(windBuffers.windAccumSBA, 'int' as any, N * 3) as any).setAtomic(true);
 

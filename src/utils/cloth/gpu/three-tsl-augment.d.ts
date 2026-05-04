@@ -4,8 +4,9 @@
  * atomicStore, atomicAdd, and atomicLoad exist at runtime in Three.js TSL
  * (`three/src/Three.TSL.js:60-63`, re-exported from
  * `three/src/nodes/gpgpu/AtomicFunctionNode.js:186-208`) but are not yet
- * included in `@types/three`. This module augmentation adds the missing
- * type information without replacing existing declarations.
+ * included in `@types/three` (verified in three@0.183.2). This module
+ * augmentation adds the missing type information without replacing
+ * existing declarations.
  *
  * **#554 atomicAdd WGSL codegen fix path**: when a `StorageBufferNode` has
  * `.setAtomic(true)` called on it, WGSL backend emits `array<atomic<i32>>`
@@ -29,5 +30,6 @@ declare module 'three/tsl' {
 // interface), so module augmentation can't add methods to it directly. The
 // runtime method is `setAtomic(value: boolean)` per
 // `three/src/nodes/accessors/StorageBufferNode.js:273` (and the buggy typo'd
-// `setAtmoic` is what `@types/three` exposes). Callers must use an
-// `as any` cast at the callsite for now. See #554 for context.
+// `setAtmoic` is what `@types/three` exposes; verified in three@0.183.2).
+// Callers must use an `as any` cast at the callsite for now. See #554 for
+// context.
