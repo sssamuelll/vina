@@ -1,0 +1,230 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  withErrorScope,
+  attachUncapturedErrorListener,
+  instrumentShaderCapture,
+} from '../webgpuDebug';
+
+// ─── Mock device factory ───────────────────────────────────────────────────
+
+interface MockDeviceState {
+  pushedScopes: GPUErrorFilter[];
+  poppedResults: Array<GPUError | null>;
+  listeners: Map<string, EventListener[]>;
+  shaderModulesCreated: Array<{ label?: string; code: string }>;
+}
+
+function createMockDevice(poppedResults: Array<GPUError | null> = []): {
+  device: GPUDevice;
+  state: MockDeviceState;
+} {
+  const state: MockDeviceState = {
+    pushedScopes: [],
+    poppedResults: [...poppedResults],
+    listeners: new Map(),
+    shaderModulesCreated: [],
+  };
+
+  const device = {
+    pushErrorScope: vi.fn((filter: GPUErrorFilter) => {
+      state.pushedScopes.push(filter);
+    }),
+    popErrorScope: vi.fn(async () => {
+      // FIFO drain matches LIFO push if caller pre-arranges results in pop order.
+      return state.poppedResults.shift() ?? null;
+    }),
+    addEventListener: vi.fn((type: string, listener: EventListener) => {
+      const list = state.listeners.get(type) ?? [];
+      list.push(listener);
+      state.listeners.set(type, list);
+    }),
+    createShaderModule: vi.fn((descriptor: GPUShaderModuleDescriptor) => {
+      state.shaderModulesCreated.push({ label: descriptor.label, code: descriptor.code });
+      return {
+        getCompilationInfo: () => Promise.resolve({ messages: [] }),
+      } as unknown as GPUShaderModule;
+    }),
+  } as unknown as GPUDevice;
+
+  return { device, state };
+}
+
+beforeEach(() => {
+  if (typeof window !== 'undefined') {
+    delete window.__OPENCLO_SHADERS__;
+  }
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+// ─── withErrorScope ────────────────────────────────────────────────────────
+
+describe('withErrorScope', () => {
+  it('returns the result of fn', async () => {
+    const { device } = createMockDevice();
+    const result = await withErrorScope(device, 'test', () => 42);
+    expect(result).toBe(42);
+  });
+
+  it('awaits an async fn', async () => {
+    const { device } = createMockDevice();
+    const result = await withErrorScope(device, 'test', async () => {
+      await Promise.resolve();
+      return 'done';
+    });
+    expect(result).toBe('done');
+  });
+
+  it('pushes 3 error scopes in order: validation → oom → internal', async () => {
+    const { device, state } = createMockDevice();
+    await withErrorScope(device, 'test', () => undefined);
+    expect(state.pushedScopes).toEqual(['validation', 'out-of-memory', 'internal']);
+  });
+
+  it('pops 3 scopes after fn completes', async () => {
+    const { device } = createMockDevice();
+    await withErrorScope(device, 'test', () => undefined);
+    expect(device.popErrorScope).toHaveBeenCalledTimes(3);
+  });
+
+  it('pops scopes even when fn throws', async () => {
+    const { device } = createMockDevice();
+    await expect(
+      withErrorScope(device, 'test', () => { throw new Error('boom'); }),
+    ).rejects.toThrow('boom');
+    expect(device.popErrorScope).toHaveBeenCalledTimes(3);
+  });
+
+  it('logs validation error via console.error when popErrorScope returns one', async () => {
+    const validationErr = { message: 'binding count exceeded' } as GPUError;
+    const { device } = createMockDevice([
+      null,           // internal pop (innermost)
+      null,           // oom pop
+      validationErr,  // validation pop (outermost)
+    ]);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await withErrorScope(device, 'gpuSolver.init', () => undefined);
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[WebGPU validation] gpuSolver.init: binding count exceeded'),
+    );
+  });
+
+  it('logs all three error types when all scopes capture errors', async () => {
+    const { device } = createMockDevice([
+      { message: 'internal-err' } as GPUError,
+      { message: 'oom-err' } as GPUError,
+      { message: 'validation-err' } as GPUError,
+    ]);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await withErrorScope(device, 'lbl', () => undefined);
+
+    const calls = errorSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((c) => c.includes('[WebGPU validation] lbl: validation-err'))).toBe(true);
+    expect(calls.some((c) => c.includes('[WebGPU OOM] lbl: oom-err'))).toBe(true);
+    expect(calls.some((c) => c.includes('[WebGPU internal] lbl: internal-err'))).toBe(true);
+  });
+
+  it('does not log when no errors occur', async () => {
+    const { device } = createMockDevice([null, null, null]);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await withErrorScope(device, 'clean', () => undefined);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ─── attachUncapturedErrorListener ─────────────────────────────────────────
+
+describe('attachUncapturedErrorListener', () => {
+  it('adds an uncapturederror listener on first call', () => {
+    const { device, state } = createMockDevice();
+    attachUncapturedErrorListener(device);
+    expect(state.listeners.get('uncapturederror')?.length).toBe(1);
+  });
+
+  it('is idempotent — second call does not add a duplicate listener', () => {
+    const { device, state } = createMockDevice();
+    attachUncapturedErrorListener(device);
+    attachUncapturedErrorListener(device);
+    expect(state.listeners.get('uncapturederror')?.length).toBe(1);
+  });
+
+  it('logs error.message with [WebGPU uncaptured] prefix when listener fires', () => {
+    const { device, state } = createMockDevice();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    attachUncapturedErrorListener(device);
+
+    const listener = state.listeners.get('uncapturederror')![0];
+    const fakeEvent = { error: { message: 'kernel exploded' } } as GPUUncapturedErrorEvent;
+    listener(fakeEvent as unknown as Event);
+
+    expect(errorSpy).toHaveBeenCalledWith('[WebGPU uncaptured] kernel exploded');
+  });
+});
+
+// ─── instrumentShaderCapture ───────────────────────────────────────────────
+
+describe('instrumentShaderCapture', () => {
+  it('initializes window.__OPENCLO_SHADERS__ as a Map', () => {
+    const { device } = createMockDevice();
+    instrumentShaderCapture(device);
+    expect(window.__OPENCLO_SHADERS__).toBeInstanceOf(Map);
+  });
+
+  it('captures shader source under its label', () => {
+    const { device } = createMockDevice();
+    instrumentShaderCapture(device);
+
+    device.createShaderModule({ label: 'cloth_module', code: '@compute fn main() {}' });
+
+    expect(window.__OPENCLO_SHADERS__!.get('cloth_module')).toBe('@compute fn main() {}');
+  });
+
+  it('falls back to unlabeled_N for shaders without a label', () => {
+    const { device } = createMockDevice();
+    instrumentShaderCapture(device);
+
+    device.createShaderModule({ code: 'wgsl1' });
+    device.createShaderModule({ code: 'wgsl2' });
+
+    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_0')).toBe('wgsl1');
+    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_1')).toBe('wgsl2');
+  });
+
+  it('disambiguates duplicate labels with a #N suffix', () => {
+    const { device } = createMockDevice();
+    instrumentShaderCapture(device);
+
+    device.createShaderModule({ label: 'shared', code: 'a' });
+    device.createShaderModule({ label: 'shared', code: 'b' });
+
+    expect(window.__OPENCLO_SHADERS__!.get('shared')).toBe('a');
+    expect(window.__OPENCLO_SHADERS__!.get('shared#1')).toBe('b');
+  });
+
+  it('still calls the original createShaderModule and returns its result', () => {
+    const { device, state } = createMockDevice();
+    instrumentShaderCapture(device);
+
+    const result = device.createShaderModule({ label: 'x', code: 'src' });
+
+    expect(state.shaderModulesCreated).toEqual([{ label: 'x', code: 'src' }]);
+    expect(result).toBeDefined();
+  });
+
+  it('is idempotent — second call does not re-patch', () => {
+    const { device } = createMockDevice();
+    instrumentShaderCapture(device);
+    const firstPatched = device.createShaderModule;
+    instrumentShaderCapture(device);
+    const secondPatched = device.createShaderModule;
+    expect(secondPatched).toBe(firstPatched);
+  });
+});
