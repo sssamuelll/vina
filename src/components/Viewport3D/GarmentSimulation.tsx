@@ -424,7 +424,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         if (solver.bend) renderer.compute(solver.bend);
         if (solver.seam) renderer.compute(solver.seam);
         for (const body of solver.collisionBodies) {
-          // 2-pass body collision per #733 B.3 atomic emulation:
+          // 2-pass body collision (atomic-emulation pattern in tslCollision.ts):
           // findBest fills per-body atomic scratch; applyPush reads it,
           // pushes the particle, and resets the scratch for the next substep.
           renderer.compute(body.findBestNode);

@@ -25,10 +25,10 @@ export interface SolverCapabilities {
   selfCollision: boolean;
   /**
    * Body collision (cloth ↔ kinematic mesh, e.g. avatar). Each tier ships
-   * its own acceleration structure: CPU+WASM share `TriangleSpatialHash`
-   * (A4 § 2.4); GPU TSL uses a per-body BVH built via `three-mesh-bvh`
-   * and traversed in `tslCollision.ts` (#733 ratifies the GPU divergence).
-   * Neural drape has no body collision in the inference contract.
+   * its own acceleration structure: CPU+WASM share `TriangleSpatialHash`;
+   * GPU TSL uses a per-body BVH built via `three-mesh-bvh` and traversed
+   * in `tslCollision.ts`. Neural drape has no body collision in the
+   * inference contract.
    */
   bodyCollision: boolean;
   /** Long Range Attachments (Dijkstra geodesic + soft constraint). */

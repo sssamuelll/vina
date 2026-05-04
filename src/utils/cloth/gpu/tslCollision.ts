@@ -1,13 +1,14 @@
 /**
- * TSL Collision Kernel — BVH-accelerated body collision via B.3 atomic emulation.
+ * TSL Collision Kernel — BVH-accelerated body collision via atomic emulation.
  *
- * **Algorithm (#733 Phase 2, B.3 atomic emulation)**: 2-pass per-particle kernel
- * with per-body atomic scratch buffers. Sidesteps the TSL `outer-toVar.assign(
- * storage-derived-value)` codegen issue by using `atomicMin` + `atomicStore`
+ * **Algorithm (atomic emulation)**: 2-pass per-particle kernel with per-body
+ * atomic scratch buffers. Sidesteps the TSL `outer-toVar.assign(
+ * storage-derived-value)` codegen pitfall by using `atomicMin` + `atomicStore`
  * directly on storage instead of accumulating "best so far" into outer-scope
- * `toVar` slots inside nested `If`s. See `docs/reports/2026-05-04-733-gpu-body-collision-design.md`
- * § 7.2 + § 8.3 for the rationale (Path B.3 was the recommended next direction
- * after B.2 ran into 197 WGSL validation warnings).
+ * `toVar` slots inside nested `If`s. See
+ * `docs/reports/2026-05-04-733-gpu-body-collision-design.md` for the rationale
+ * (a prior toVar-based attempt produced ~200 WGSL validation warnings; the
+ * atomic-emulation pattern below was the recommended fix).
  *
  * Pass 1 — `findBestNode`: per particle, scan BVH leaves (flat iteration —
  *   no parent/child descent), for each leaf-matched triangle compute
@@ -26,15 +27,14 @@
  *   `bestTriIdxBuf[i] = -1`) for the next substep, regardless of collision.
  *
  * Detection semantics match `triangleCollision.ts:solveTriangleCollision`
- * (CPU+WASM reference, A4 § 2.4): push when `bestSide < 0` (penetrating) OR
+ * (CPU+WASM reference): push when `bestSide < 0` (penetrating) OR
  * `bestDist < margin` (close). Push direction = winning triangle's normal.
  * Friction is position-based, applied after push.
  *
  * Per-tier acceleration structure divergence is intentional: CPU+WASM share
  * `TriangleSpatialHash` (rebuilt per body, JS-side); GPU TSL uses a BVH
  * (built via `three-mesh-bvh` once per body, uploaded to GPU as flat
- * `StorageBufferAttribute`s). A4 § 2.4 ratifies the CPU+WASM convention;
- * #733 ratifies the GPU divergence as canonical for this tier.
+ * `StorageBufferAttribute`s).
  *
  * BVH node format (8 floats per node, stored in a flat StorageBufferAttribute):
  *   [minX, minY, minZ, maxX, maxY, maxZ, child/triStart, triCount]
@@ -77,7 +77,7 @@ type TslNode = any;
 
 export interface TslCollisionBody {
   id: string;
-  /** Pass 1: per-particle BVH walk, atomic min on distance, atomic store on tri idx. */
+  /** Pass 1: per-particle scan of BVH leaves, atomic min on distance, atomic store on tri idx. */
   findBestNode: ComputeNode;
   /** Pass 2: per-particle apply push using atomic load on best tri idx, then reset scratch. */
   applyPushNode: ComputeNode;
@@ -109,7 +109,7 @@ const INT32_MAX = 0x7FFFFFFF;
 
 /**
  * Create the TSL body-collision kernels for one collision body using the
- * #733 Phase 2 B.3 atomic-emulation pattern. Returns two compute nodes that
+ * atomic-emulation pattern. Returns two compute nodes that
  * MUST be dispatched in order per substep: `findBestNode` first, then
  * `applyPushNode`. The pair shares per-body atomic scratch buffers
  * (`bestDistBuf`, `bestTriIdxBuf`) sized `numParticles` × i32. Reset is
@@ -157,8 +157,8 @@ export function createTslCollisionBody(
   const triNormBuf = storage(triNormalsSBA, 'float', numTris * 3);
 
   // Atomic scratch — `setAtomic(true)` forces WGSL `array<atomic<i32>>` binding
-  // declaration with `read_write` access, which is what makes the B.3 emulation
-  // work (sidesteps the toVar/storage-derived codegen issue per § 7.2).
+  // declaration with `read_write` access, which is what makes the atomic
+  // emulation work (sidesteps the outer-toVar/storage-derived codegen pitfall).
   // `'int' as any` works around @types/three lacking 'int' in storage() type
   // (verified in three@0.183.2; same workaround as tslSelfCollision.ts).
   /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -170,8 +170,8 @@ export function createTslCollisionBody(
   const uFriction = uniform(friction);
   const uDistScale = uniform(DIST_SCALE);
   // BVH AABB filter expansion: terminal-velocity per-substep displacement is
-  // ~11mm at 9.81m/s² × (1/900s)², well above margin (5mm). Empirically (#733
-  // Phase 2 e2e), an AABB margin of 5mm leaves cloth at floor — too tight to
+  // ~11mm at 9.81m/s² × (1/900s)², well above margin (5mm). Empirically, an
+  // AABB margin of 5mm leaves cloth at floor — too tight to
   // catch fast-falling particles before they tunnel past surface leaves. 30mm
   // catches them at shin level. 100mm catches them at body — matches the CPU
   // spatial hash's effective query radius (~3 × cellSize, default 30-50mm)
@@ -275,7 +275,7 @@ export function createTslCollisionBody(
                     // computes its own distance and issues atomicMin directly —
                     // no outer-scope toVar tracking, no select(). Storage WRITES
                     // (atomicMin / atomicStore) inside nested Ifs DO propagate
-                    // (per § 8.1 + tslSelfCollision precedent).
+                    // (mirrors the tslSelfCollision precedent).
                     // greaterThanEqual/lessThanEqual missing from @types/three at runtime.
                     If(
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -359,7 +359,8 @@ export function createTslCollisionBody(
     const w = invMassBuf.element(i);
 
     // Atomic load at function-top — direct WGSL atomicLoad call, not a nested
-    // toVar.assign(storage_read). Safe per the codegen analysis in § 7.2.
+    // toVar.assign(storage_read). Safe per the codegen analysis in the design
+    // doc referenced at the top of this file.
     const bestTriIdxLoaded = atomicLoad(bestTriIdxBuf.element(i));
 
     If(w.greaterThan(float(0.0)).and(bestTriIdxLoaded.greaterThanEqual(int(0))), () => {
@@ -388,8 +389,8 @@ export function createTslCollisionBody(
       // Recompute SIDE + DIST for the winning triangle. Mirrors CPU
       // pointToTriangleDist (triangleCollision.ts:16–93). Uses two function-
       // top toVars (`bestSide`, `bestDist`) — not nested-If outer toVars
-      // assigned from a deeply nested loop, so the § 7.2 pitfall does not
-      // apply here.
+      // assigned from a deeply nested loop, so the outer-toVar codegen pitfall
+      // does not apply here.
       const apx = px.sub(ax); const apy = py.sub(ay); const apz = pz.sub(az);
       const dot = apx.mul(nnx).add(apy.mul(nny)).add(apz.mul(nnz));
 
@@ -499,7 +500,7 @@ export function createTslCollisionBody(
         });
 
         If(pushDist.greaterThan(float(0)), () => {
-          // Push particle out along normal (storage write — propagates per § 8.1).
+          // Push particle out along normal (storage write — propagates per the tslSelfCollision precedent).
           posBuf.element(i).x.addAssign(nnx.mul(pushDist));
           posBuf.element(i).y.addAssign(nny.mul(pushDist));
           posBuf.element(i).z.addAssign(nnz.mul(pushDist));

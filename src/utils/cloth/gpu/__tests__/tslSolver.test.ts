@@ -192,8 +192,9 @@ const defaultConfig: TslSolverConfig = {
 };
 
 // `TslCollisionBody` carries two ComputeNodes (findBest + applyPush) per the
-// #733 B.3 atomic-emulation pattern. Tests don't dispatch them — only verify
-// register/replace/remove book-keeping — so dummy ComputeNode placeholders work.
+// atomic-emulation pattern in tslCollision.ts. Tests don't dispatch them —
+// only verify register/replace/remove book-keeping — so dummy ComputeNode
+// placeholders work.
 type ComputeNode = import('three/src/nodes/gpgpu/ComputeNode.js').default;
 function makeMockBody(opts: {
   id: string;

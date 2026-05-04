@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // vi.hoisted runs before vi.mock hoisting, so MockSBA + setAtomicCalls are
-// available to both mocks. `setAtomicCalls` is exposed for the #554-style
-// atomic regression guards on the per-body scratch buffers (#733 B.3).
+// available to both mocks. `setAtomicCalls` is exposed for the atomic
+// regression guards on the per-body scratch buffers.
 const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
   const MockSBA = class MockSBA {
@@ -146,13 +146,13 @@ describe('createTslCollisionBody', () => {
   });
 });
 
-// ─── #733 B.3 atomic-buffer regression guards ────────────────────────────────
+// ─── Atomic-buffer regression guards ────────────────────────────────────────
 // Per-body scratch (`bestDistBuf`, `bestTriIdxBuf`) MUST be declared atomic so
 // WGSL emits `array<atomic<i32>>` with read_write access. Without this, the
-// kernel falls back to the broken B.2 toVar/storage-read codegen and produces
-// 197 validation warnings (per design doc § 8.2).
+// kernel falls back to the broken toVar/storage-read codegen and produces
+// ~200 validation warnings (per the design doc on the prior attempt).
 
-describe('#733 B.3 atomic regression guards', () => {
+describe('atomic-buffer regression guards', () => {
   it('per-body bestDist scratch is declared atomic', () => {
     buildKernel();
     // bestDist is the first atomic SBA created in the factory (Int32Array).
@@ -160,7 +160,7 @@ describe('#733 B.3 atomic regression guards', () => {
       (c) => (c.sba as { array: ArrayLike<number> }).array instanceof Int32Array,
     );
     expect(atomicI32Calls.length).toBeGreaterThanOrEqual(2);
-    // Both scratch buffers should have setAtomic(true) — see § 8.3 Path B.3.
+    // Both scratch buffers should have setAtomic(true) — see design doc rationale.
     expect(atomicI32Calls.every((c) => c.value === true)).toBe(true);
   });
 
