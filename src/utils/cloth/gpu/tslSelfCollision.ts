@@ -403,7 +403,7 @@ export function makeSelfCollisionComputeNodes(
       // array<atomic<i32>> (post-`.setAtomic(true)` for #554 fix). WGSL spec
       // requires atomicLoad for atomic<T> access even in read-only contexts.
       // Previous note ("TSL doesn't export atomicLoad") was outdated —
-      // verified Three.TSL.js:63 exports atomicLoad in 0.183.2.
+      // verified Three.TSL.js:63 exports atomicLoad in three@0.183.2.
       const count = atomicLoad(corrCountBuf.element(uint(i)));
 
       If(int(count).greaterThan(int(0)), () => {
