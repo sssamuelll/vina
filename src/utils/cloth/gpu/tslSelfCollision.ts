@@ -148,7 +148,8 @@ export function makeSelfCollisionComputeNodes(
   // cellCount/delta/corrCount need atomic access for atomicAdd/atomicStore.
   // `'int' as any` works around @types/three lacking 'int' in storage() type;
   // `as any` on the storage(...) result calls .setAtomic(true) which @types/three
-  // mistypes as `setAtmoic` (typo). Both casts required per #554 fix.
+  // mistypes as `setAtmoic` (typo). Both casts required per #554 fix
+  // (verified in three@0.183.2).
   /* eslint-disable @typescript-eslint/no-explicit-any */
   const cellCountBuf = (storage(buffers.cellCountSBA, 'int' as any, T) as any).setAtomic(true);
   const cellStartBuf = storage(buffers.cellStartSBA, 'uint', T);
