@@ -6,6 +6,7 @@ import {
   withErrorScope,
   attachUncapturedErrorListener,
   instrumentShaderCapture,
+  installEarlyDeviceHook,
 } from '../webgpuDebug';
 
 // ─── Mock device factory ───────────────────────────────────────────────────
@@ -226,5 +227,66 @@ describe('instrumentShaderCapture', () => {
     instrumentShaderCapture(device);
     const secondPatched = device.createShaderModule;
     expect(secondPatched).toBe(firstPatched);
+  });
+});
+
+// ─── installEarlyDeviceHook ────────────────────────────────────────────────
+
+describe('installEarlyDeviceHook', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalGPUAdapter: any;
+
+  beforeEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    originalGPUAdapter = (globalThis as any).GPUAdapter;
+  });
+
+  afterEach(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).GPUAdapter = originalGPUAdapter;
+  });
+
+  it('is a no-op when GPUAdapter is undefined (non-WebGPU env)', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (globalThis as any).GPUAdapter;
+    expect(() => installEarlyDeviceHook()).not.toThrow();
+  });
+
+  it('wraps requestDevice so returned devices are auto-instrumented', async () => {
+    const { device: mockDevice } = createMockDevice();
+    class FakeAdapter {
+      async requestDevice(): Promise<GPUDevice> {
+        return mockDevice;
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).GPUAdapter = FakeAdapter;
+
+    installEarlyDeviceHook();
+
+    const adapter = new FakeAdapter();
+    const device = await adapter.requestDevice();
+
+    // Auto-instrumented: shader capture installed (Map exists, listener attached).
+    expect(window.__OPENCLO_SHADERS__).toBeInstanceOf(Map);
+    // The device's createShaderModule should be patched (different identity).
+    device.createShaderModule({ label: 'auto', code: 'wgsl_auto' });
+    expect(window.__OPENCLO_SHADERS__!.get('auto')).toBe('wgsl_auto');
+  });
+
+  it('is idempotent — second call leaves prototype intact', () => {
+    class FakeAdapter {
+      async requestDevice(): Promise<GPUDevice> {
+        return null as unknown as GPUDevice;
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).GPUAdapter = FakeAdapter;
+
+    installEarlyDeviceHook();
+    const firstWrapped = FakeAdapter.prototype.requestDevice;
+    installEarlyDeviceHook();
+    const secondWrapped = FakeAdapter.prototype.requestDevice;
+    expect(secondWrapped).toBe(firstWrapped);
   });
 });

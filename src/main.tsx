@@ -21,6 +21,13 @@ initErrorTracker();
 import { clearLegacyFallbackKeys } from './copilot/errorRecovery';
 clearLegacyFallbackKeys();
 
+// WebGPU debug infrastructure — patches GPUAdapter.prototype.requestDevice so
+// every device (Three.js renderer's + GpuSolverClient's) gets shader capture
+// and uncapturederror listener installed automatically. Dev-only via
+// `import.meta.env.DEV`; production: no-op.
+import { installEarlyDeviceHook } from './utils/cloth/gpu/webgpuDebug';
+installEarlyDeviceHook();
+
 // ─── Block browser zoom (Cmd+/-, Cmd+0, Ctrl+wheel, pinch) ───
 // Zoom gestures are reserved for the 2D canvas and 3D viewport.
 document.addEventListener('keydown', (e) => {

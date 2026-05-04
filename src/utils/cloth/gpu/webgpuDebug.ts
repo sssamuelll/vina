@@ -37,6 +37,7 @@ declare global {
 
 const SHADER_PATCH_MARKER = Symbol.for('openclo.webgpuDebug.shaderPatched');
 const LISTENER_MARKER = Symbol.for('openclo.webgpuDebug.listenerAttached');
+const ADAPTER_HOOK_INSTALLED = Symbol.for('openclo.webgpuDebug.adapterHookInstalled');
 
 type MarkedDevice = GPUDevice & {
   [SHADER_PATCH_MARKER]?: true;
@@ -175,5 +176,44 @@ export function instrumentShaderCapture(device: GPUDevice): void {
     });
 
     return module;
+  };
+}
+
+/**
+ * Install a `GPUAdapter.prototype.requestDevice` hook so EVERY future device —
+ * Three.js renderer's, our solver's, anyone else's — is auto-instrumented with
+ * shader capture + uncapturederror listener.
+ *
+ * Without this, Phase 1.3 only catches shader compiles on devices we explicitly
+ * patch (see {@link instrumentShaderCapture}). The Three.js WebGPURenderer
+ * creates its own device for canvas rendering and `renderer.compute(node)` —
+ * so TSL kernel WGSL would never be captured. This hook closes that gap.
+ *
+ * Must be called BEFORE any code calls `adapter.requestDevice()`. Typical
+ * site: top of `main.tsx`, before any React rendering. Idempotent.
+ *
+ * Production: no-op (gated on `import.meta.env.DEV`).
+ */
+export function installEarlyDeviceHook(): void {
+  if (!import.meta.env.DEV) return;
+  if (typeof globalThis === 'undefined') return;
+  // GPUAdapter is the WebGPU adapter class; absent in non-WebGPU environments.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const AdapterCtor = (globalThis as any).GPUAdapter as { prototype: GPUAdapter } | undefined;
+  if (!AdapterCtor || !AdapterCtor.prototype) return;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const proto = AdapterCtor.prototype as any;
+  if (proto[ADAPTER_HOOK_INSTALLED]) return;
+  proto[ADAPTER_HOOK_INSTALLED] = true;
+
+  const originalRequestDevice = proto.requestDevice;
+  proto.requestDevice = async function patchedRequestDevice(
+    ...args: unknown[]
+  ): Promise<GPUDevice> {
+    const device: GPUDevice = await originalRequestDevice.apply(this, args);
+    instrumentShaderCapture(device);
+    attachUncapturedErrorListener(device);
+    return device;
   };
 }

@@ -35,16 +35,27 @@ future GPU kernel work.
 
 ## What it gives you
 
-`src/utils/cloth/gpu/webgpuDebug.ts` exports three primitives:
+`src/utils/cloth/gpu/webgpuDebug.ts` exports four primitives:
 
 | Helper | Catches | Active in |
 |---|---|---|
 | `withErrorScope<T>(device, label, fn)` | Validation / OOM / internal errors during a labeled async block | dev only |
 | `attachUncapturedErrorListener(device)` | Errors that escape every `withErrorScope` (notably lazy TSL pipeline compile during `renderer.compute()`) | dev + prod |
 | `instrumentShaderCapture(device)` | WGSL source for every `device.createShaderModule()` + compile errors/warnings via `getCompilationInfo()` | dev only |
+| `installEarlyDeviceHook()` | Patches `GPUAdapter.prototype.requestDevice` so EVERY future device (Three.js renderer + GpuSolverClient + future) is auto-instrumented | dev only |
 
-All three are idempotent on a given `GPUDevice`. The first two are wired by
-default in `GpuSolverClient`'s constructor.
+All four are idempotent. The early hook is installed once at `main.tsx` load
+time, before any renderer/solver constructs a device. Its purpose: solver and
+Three.js's renderer create **separate** `GPUDevice` instances (see
+`useSimulationLifecycle.ts:332-334` for the solver's `adapter.requestDevice()`).
+Without the prototype-level hook, only the device the constructor of
+`GpuSolverClient` saw would be patched — TSL canvas pipelines (which use the
+renderer's device) would never have their WGSL captured.
+
+A successful smoke test on a T-Shirt + Arrange + Simulate flow captures **79
+shaders**: 13 from the renderer's canvas init (mipmap, PMREM, vertex/fragment
+materials), plus 60 TSL compute kernels and a handful of additional
+vertex/fragment for cloth and avatar materials.
 
 ---
 
@@ -124,6 +135,7 @@ before.
 | `withErrorScope` | Pass-through. `if (!import.meta.env.DEV) return await fn();` is the first line. No scope push/pop overhead. |
 | `attachUncapturedErrorListener` | Active. An idle event listener is zero-cost until an error fires; surfacing prod GPU validation errors is more valuable than the listener-attach cost. |
 | `instrumentShaderCapture` | No-op. The `device.createShaderModule` patch is dev-only — production keeps the original method. `window.__OPENCLO_SHADERS__` is never populated. |
+| `installEarlyDeviceHook` | No-op. The `GPUAdapter.prototype.requestDevice` patch is dev-only — production leaves the prototype unmodified. |
 
 ---
 
