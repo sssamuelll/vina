@@ -9,8 +9,9 @@
  * § 7.2 + § 8.3 for the rationale (Path B.3 was the recommended next direction
  * after B.2 ran into 197 WGSL validation warnings).
  *
- * Pass 1 — `findBestNode`: per particle, walk BVH, for each leaf-matched
- *   triangle compute closest-point distance with edge fallback. Issue
+ * Pass 1 — `findBestNode`: per particle, scan BVH leaves (flat iteration —
+ *   no parent/child descent), for each leaf-matched triangle compute
+ *   closest-point distance with edge fallback. Issue
  *   `atomicMin` against `bestDistBuf[i]` (fixed-point i32 distance scaled by
  *   1e6); when this thread's value won the min, `atomicStore` the triangle
  *   index into `bestTriIdxBuf[i]`. Distance is computed via two branches
@@ -181,8 +182,9 @@ export function createTslCollisionBody(
   const uAabbMargin = uniform(Math.max(margin, 0.1));
 
   // ─── Pass 1: findBestNode ───────────────────────────────────────────────
-  // Per particle: walk BVH, for each candidate triangle compute distance,
-  // atomicMin on bestDistBuf[i], atomicStore triIdx if won.
+  // Per particle: scan BVH leaves (flat Loop over all nodes; internal nodes
+  // skipped by `triCount > 0` filter). For each candidate triangle compute
+  // distance, atomicMin on bestDistBuf[i], atomicStore triIdx if won.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const findBestFn = (Fn as any)(() => {
     const i = instanceIndex;
@@ -208,8 +210,7 @@ export function createTslCollisionBody(
 
           If(triCount.greaterThan(float(0)), () => {
             // AABB overlap test (point ± uAabbMargin vs leaf AABB).
-            // uAabbMargin = max(margin, 30mm) — wider than uMargin to catch
-            // terminal-velocity tunneling (see uAabbMargin definition above).
+            // See uAabbMargin definition above for the calibration rationale.
             If(
               px.add(uAabbMargin).greaterThanEqual(nMinX)
                 .and(px.sub(uAabbMargin).lessThanEqual(nMaxX))
