@@ -251,6 +251,25 @@ describe('instrumentShaderCapture', () => {
     const secondPatched = device.createShaderModule;
     expect(secondPatched).toBe(firstPatched);
   });
+
+  it('does not leave a phantom entry when original createShaderModule throws', () => {
+    const { device } = createMockDevice();
+    // Capture the underlying mock before patching so we can mutate its impl.
+    const originalMock = device.createShaderModule as ReturnType<typeof vi.fn>;
+    instrumentShaderCapture(device);
+
+    // Bound `original` inside the patch still calls the same vi.fn — changing
+    // its impl propagates because bind() doesn't snapshot the implementation.
+    originalMock.mockImplementationOnce(() => {
+      throw new Error('invalid descriptor');
+    });
+
+    expect(() => {
+      device.createShaderModule({ label: 'broken', code: 'invalid wgsl' });
+    }).toThrow('invalid descriptor');
+
+    expect(window.__OPENCLO_SHADERS__!.has('broken')).toBe(false);
+  });
 });
 
 // ─── installEarlyDeviceHook ────────────────────────────────────────────────

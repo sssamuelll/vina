@@ -162,9 +162,11 @@ export function instrumentShaderCapture(device: GPUDevice): void {
     while (shaders.has(key)) {
       key = `${baseLabel}#${suffix++}`;
     }
-    shaders.set(key, descriptor.code);
 
+    // Call original first so a sync throw (invalid descriptor) doesn't leave
+    // a phantom map entry. Counter advancement on throw is cosmetic.
     const module = original(descriptor);
+    shaders.set(key, descriptor.code);
 
     module.getCompilationInfo().then((info) => {
       const errs = info.messages.filter((m) => m.type === 'error');
