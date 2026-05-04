@@ -220,8 +220,16 @@ export function installEarlyDeviceHook(): void {
     ...args: unknown[]
   ): Promise<GPUDevice> {
     const device: GPUDevice = await originalRequestDevice.apply(this, args);
-    instrumentShaderCapture(device);
-    attachUncapturedErrorListener(device);
+    // Isolate instrumentation: a throw here would propagate to Three.js and
+    // surface as "no compatible adapter" downstream — indistinguishable from
+    // a real WebGPU unsupported scenario, painful to debug. Surface the
+    // failure; return the device anyway.
+    try {
+      instrumentShaderCapture(device);
+      attachUncapturedErrorListener(device);
+    } catch (e) {
+      console.error('[webgpuDebug] instrumentation failed (device returned anyway):', e);
+    }
     return device;
   };
 }

@@ -331,4 +331,35 @@ describe('installEarlyDeviceHook', () => {
     const secondWrapped = FakeAdapter.prototype.requestDevice;
     expect(secondWrapped).toBe(firstWrapped);
   });
+
+  it('isolates instrumentation throws — device still returned, error logged', async () => {
+    // Device whose createShaderModule getter throws when instrumentShaderCapture
+    // tries to bind() on it. Forces the catch path inside the requestDevice patch.
+    const brokenDevice = {} as GPUDevice;
+    Object.defineProperty(brokenDevice, 'createShaderModule', {
+      get() { throw new Error('forced instrumentation failure'); },
+    });
+    Object.defineProperty(brokenDevice, 'addEventListener', {
+      value: () => {},
+    });
+
+    class FakeAdapter {
+      async requestDevice(): Promise<GPUDevice> {
+        return brokenDevice;
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).GPUAdapter = FakeAdapter;
+
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    installEarlyDeviceHook();
+
+    const adapter = new FakeAdapter();
+    const device = await adapter.requestDevice();
+
+    expect(device).toBe(brokenDevice);
+    const calls = errorSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((c) => c.includes('[webgpuDebug] instrumentation failed'))).toBe(true);
+  });
 });
