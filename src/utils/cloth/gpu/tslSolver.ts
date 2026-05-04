@@ -34,6 +34,7 @@ import {
   instanceIndex,
   atomicStore,
   atomicAdd,
+  atomicLoad,
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
@@ -491,9 +492,10 @@ function makeNormalNormalizeFn(
     // after accumulation, so no concurrent writes — regular element access is safe.
     // (Three.js TSL doesn't export atomicLoad; each Fn() compiles to its own
     // shader, so this buffer won't be declared atomic in the normalize kernel.)
-    const nx = float(normalAccumBuf.element(base)).mul(invScale);
-    const ny = float(normalAccumBuf.element(base.add(uint(1)))).mul(invScale);
-    const nz = float(normalAccumBuf.element(base.add(uint(2)))).mul(invScale);
+    // atomicLoad required because buffer is declared array<atomic<i32>> (#554 fix).
+    const nx = float(atomicLoad(normalAccumBuf.element(base))).mul(invScale);
+    const ny = float(atomicLoad(normalAccumBuf.element(base.add(uint(1))))).mul(invScale);
+    const nz = float(atomicLoad(normalAccumBuf.element(base.add(uint(2))))).mul(invScale);
 
     const n = vec3(nx, ny, nz);
     const len2 = n.dot(n);
@@ -598,8 +600,9 @@ export function createTslSolver(
 
   // ─── GPU smooth normals (atomic accumulation) ─────────────────────
   const normalBuf = storage(buffers.normalSBA, 'vec3', N);
+  // .setAtomic(true) required for #554 fix — see three-tsl-augment.d.ts.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalAccumBuf = storage(buffers.normalAccumSBA, 'int' as any, N * 3);
+  const normalAccumBuf = (storage(buffers.normalAccumSBA, 'int' as any, N * 3) as any).setAtomic(true);
   const triIdsBuf = storage(buffers.triangleIdsSBA, 'uint', buffers.numTriangles * 3);
 
   const normalZeroFn = makeNormalZeroFn(normalAccumBuf);

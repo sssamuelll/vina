@@ -31,6 +31,7 @@ import {
   If,
   Loop,
   atomicAdd,
+  atomicLoad,
   atomicStore,
 } from 'three/tsl';
 // TSL node types vary across @types/three versions; use loose types for stability.
@@ -144,17 +145,19 @@ export function makeSelfCollisionComputeNodes(
   const adjNeighborCount = buffers.adjNeighborsSBA.array.length;
 
   // ─── Wrap SBAs as TSL storage nodes ──────────────────────────────
-  // cellCount needs atomic access → use 'int' as any (same pattern as normalAccumSBA)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const cellCountBuf = storage(buffers.cellCountSBA, 'int' as any, T);
+  // cellCount/delta/corrCount need atomic access for atomicAdd/atomicStore.
+  // `'int' as any` works around @types/three lacking 'int' in storage() type;
+  // `as any` on the storage(...) result calls .setAtomic(true) which @types/three
+  // mistypes as `setAtmoic` (typo). Both casts required per #554 fix.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  const cellCountBuf = (storage(buffers.cellCountSBA, 'int' as any, T) as any).setAtomic(true);
   const cellStartBuf = storage(buffers.cellStartSBA, 'uint', T);
   const cellEntriesBuf = storage(buffers.cellEntriesSBA, 'uint', N);
   const adjOffsetsBuf = storage(buffers.adjOffsetsSBA, 'uint', N + 1);
   const adjNeighborsBuf = storage(buffers.adjNeighborsSBA, 'uint', adjNeighborCount);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const deltaBuf = storage(buffers.deltaSBA, 'int' as any, N * 3);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const corrCountBuf = storage(buffers.corrCountSBA, 'int' as any, N);
+  const deltaBuf = (storage(buffers.deltaSBA, 'int' as any, N * 3) as any).setAtomic(true);
+  const corrCountBuf = (storage(buffers.corrCountSBA, 'int' as any, N) as any).setAtomic(true);
+  /* eslint-enable @typescript-eslint/no-explicit-any */
 
   // ─── Uniforms ────────────────────────────────────────────────────
   const uNumParticles = uniform(N);
@@ -206,7 +209,8 @@ export function makeSelfCollisionComputeNodes(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Loop(T, ({ i: cellIdx }: { i: any }) => {
-      const count = cellCountBuf.element(cellIdx);
+      // atomicLoad required because cellCountBuf is array<atomic<i32>> (#554).
+      const count = atomicLoad(cellCountBuf.element(cellIdx));
       cellStartBuf.element(cellIdx).assign(uint(runningSum));
       runningSum.addAssign(count);
       // Reset cellCount to 0 for scatter pass
@@ -302,7 +306,8 @@ export function makeSelfCollisionComputeNodes(
               });
 
               const cellStart = cellStartBuf.element(hVar);
-              const cellCount = uint(cellCountBuf.element(hVar));
+              // atomicLoad required because cellCountBuf is array<atomic<i32>> (#554).
+              const cellCount = uint(atomicLoad(cellCountBuf.element(hVar)));
 
               // Iterate entries in this cell
               // Use a fixed max bound; break early via flag
@@ -393,18 +398,19 @@ export function makeSelfCollisionComputeNodes(
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
       const idx3 = uint(i).mul(uint(3));
-      // Read accumulated corrections. This runs in a separate pass after
-      // resolve, so no concurrent writes — regular element access is safe.
-      // (Three.js TSL doesn't export atomicLoad; each Fn() compiles to its
-      // own shader, so these buffers won't be declared atomic here.)
-      const count = corrCountBuf.element(uint(i));
+      // atomicLoad required because corrCountBuf and deltaBuf are
+      // array<atomic<i32>> (post-`.setAtomic(true)` for #554 fix). WGSL spec
+      // requires atomicLoad for atomic<T> access even in read-only contexts.
+      // Previous note ("TSL doesn't export atomicLoad") was outdated —
+      // verified Three.TSL.js:63 exports atomicLoad in 0.183.2.
+      const count = atomicLoad(corrCountBuf.element(uint(i)));
 
       If(int(count).greaterThan(int(0)), () => {
         const invScale = float(1.0).div(float(count).mul(float(COLLISION_SCALE)));
 
-        const dx = float(deltaBuf.element(idx3)).mul(invScale);
-        const dy = float(deltaBuf.element(idx3.add(uint(1)))).mul(invScale);
-        const dz = float(deltaBuf.element(idx3.add(uint(2)))).mul(invScale);
+        const dx = float(atomicLoad(deltaBuf.element(idx3))).mul(invScale);
+        const dy = float(atomicLoad(deltaBuf.element(idx3.add(uint(1))))).mul(invScale);
+        const dz = float(atomicLoad(deltaBuf.element(idx3.add(uint(2))))).mul(invScale);
 
         positionBufNode.element(i).x.addAssign(dx);
         positionBufNode.element(i).y.addAssign(dy);
