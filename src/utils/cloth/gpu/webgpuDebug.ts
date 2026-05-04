@@ -203,8 +203,11 @@ export function instrumentShaderCapture(device: GPUDevice): void {
         const formatted = warns.map((m) => `  (${m.lineNum}:${m.linePos}) ${m.message}`).join('\n');
         console.warn(`[WebGPU shader '${key}'] ${warns.length} compile warning(s):\n${formatted}`);
       }
-    }).catch(() => {
-      // getCompilationInfo failure is non-fatal — shader source already captured.
+    }).catch((e) => {
+      // getCompilationInfo failure is non-fatal — shader source is already in
+      // the map. Log with the module's own prefix so a regression in the
+      // diagnostics path doesn't go silent in the diagnostics module itself.
+      console.warn(`[webgpuDebug] getCompilationInfo failed for "${key}":`, e);
     });
 
     return module;

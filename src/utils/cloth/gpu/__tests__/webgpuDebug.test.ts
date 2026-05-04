@@ -300,6 +300,36 @@ describe('instrumentShaderCapture', () => {
     expect(a?.deviceId).not.toBe(b?.deviceId);
   });
 
+  it('logs getCompilationInfo failures non-fatally with [webgpuDebug] prefix', async () => {
+    const { device } = createMockDevice();
+    const originalMock = device.createShaderModule as ReturnType<typeof vi.fn>;
+    instrumentShaderCapture(device);
+
+    // Next call to original returns a module whose getCompilationInfo rejects.
+    originalMock.mockImplementationOnce(() => {
+      return {
+        getCompilationInfo: () => Promise.reject(new Error('compilation info unavailable')),
+      } as unknown as GPUShaderModule;
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    device.createShaderModule({ label: 'broken_info', code: 'src' });
+
+    // The .catch is a microtask after the rejected promise; vi.waitFor polls
+    // until the assertion passes.
+    await vi.waitFor(() => {
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    const calls = warnSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((c) =>
+      c.includes('[webgpuDebug] getCompilationInfo failed for "broken_info"')
+    )).toBe(true);
+
+    // Source still captured in the map (failure was non-fatal).
+    expect(window.__OPENCLO_SHADERS__!.get('broken_info')?.source).toBe('src');
+  });
+
   it('does not leave a phantom entry when original createShaderModule throws', () => {
     const { device } = createMockDevice();
     // Capture the underlying mock before patching so we can mutate its impl.
