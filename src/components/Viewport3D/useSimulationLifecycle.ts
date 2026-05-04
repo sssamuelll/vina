@@ -95,6 +95,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
+import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
 import { isWebGPUAvailable, WEBGPU_FEATURE_FLAG_KEY } from '../../utils/cloth/gpu/webgpuDetect';
 import { cmToM } from '../../utils/geometry';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
@@ -360,8 +361,9 @@ export function useSimulationLifecycle({
                   dragCoefficient,
                 };
 
+                const seamPairs = seamInitDataToPairs(seamInitData, placedMeshes);
                 await withTimeout(
-                  gpuClient.initMultiPieceTsl(placedMeshes, undefined, tslSolverConfig),
+                  gpuClient.initMultiPieceTsl(placedMeshes, seamPairs, tslSolverConfig),
                   12000,
                   'TSL solver init',
                 );
