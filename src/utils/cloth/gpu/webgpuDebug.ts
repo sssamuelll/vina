@@ -97,9 +97,12 @@ export async function withErrorScope<T>(
  * Catches errors that escape every {@link withErrorScope} block — most importantly,
  * validation errors from lazy TSL pipeline compilation inside `renderer.compute()`
  * when no scope is active.
+ *
+ * Active in production too: an idle event listener has zero cost until an error
+ * fires, and prod telemetry benefits from surfacing GPU validation errors that
+ * would otherwise be silently swallowed.
  */
 export function attachUncapturedErrorListener(device: GPUDevice): void {
-  if (!import.meta.env.DEV) return;
   const d = device as MarkedDevice;
   if (d[LISTENER_MARKER]) return;
   d[LISTENER_MARKER] = true;

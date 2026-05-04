@@ -21,7 +21,7 @@ import type { ClothSolverClient } from '../solverProtocol';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
-import { withErrorScope } from './webgpuDebug';
+import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -77,12 +77,13 @@ export class GpuSolverClient implements ClothSolverClient {
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.device = device;
+    // Install debug instrumentation BEFORE solver/pipeline construction so every
+    // shader module created during init is captured into window.__OPENCLO_SHADERS__
+    // and `[WebGPU shader] compile error` diagnostics are surfaced. Both helpers
+    // are dev-only and idempotent — calling here does nothing in production builds.
+    instrumentShaderCapture(device);
+    attachUncapturedErrorListener(device);
     this.solver = new GpuClothSolver(device, config);
-
-    // Listen for uncaptured GPU errors
-    device.addEventListener('uncapturederror', (event) => {
-      console.error('[GpuSolverClient] WebGPU uncaptured error:', (event as GPUUncapturedErrorEvent).error);
-    });
   }
 
   /**
