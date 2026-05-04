@@ -443,3 +443,65 @@ Per Sam's earlier note: *"TSL execution-model limitations need anchored document
 - Time spent on this branch: ~7h end-to-end.
 
 **Awaiting reviewer guidance** on next direction (B.3 / debug-infra-first / punt) before further work on this branch.
+
+---
+
+## 9. Phase 2 closure — B.3 atomic emulation lands; calibration gap remains
+
+Reviewer + Sam approved Path B.3 (atomic emulation per `tslSelfCollision.ts` precedent) preceded by Phase 1 debug infrastructure (#742-style). Phase 1 merged in PR #743 (`14a36177` on main). This section captures Phase 2 closure on the rebased branch.
+
+### 9.1 What landed
+
+**B.3 kernel rewrite — `tslCollision.ts`.** Two-pass per-particle structure replacing the failing single-pass outer-toVar pattern:
+
+| Pass | Dispatch | Role |
+|---|---|---|
+| `findBestNode` | per-particle, BVH walk | For each leaf-matched triangle: compute closest-point distance (with edge fallback). `atomicMin(bestDistBuf[i], dist_i32)`; if THIS thread's value won, `atomicStore(bestTriIdxBuf[i], triIdx)`. No outer-scope toVar tracking. |
+| `applyPushNode` | per-particle, O(1) | `atomicLoad bestTriIdx`. If a triangle was found: re-read its vertices/normal, recompute SIDE+DIST, push along normal, apply friction. Always reset atomic scratch (`bestDistBuf[i] = INT32_MAX`, `bestTriIdxBuf[i] = -1`) for the next substep. |
+
+Per-body atomic scratch SBAs (`Int32Array(numParticles)` each, sentinel-initialized). Distance scaling is fixed-point i32 via `× 1e6` matching `tslSelfCollision.ts`'s `COLLISION_SCALE` precedent. New TSL imports surfaced via `three-tsl-augment.d.ts`: `atomicMin`, `atomicMax`. Construction-only tests + #554-style atomic regression guards in `__tests__/tslCollision.test.ts`. `TslCollisionBody` interface gains `findBestNode` + `applyPushNode` (replacing the single `collisionNode`); consumer updated in `GarmentSimulation.tsx` substep loop and `tslSolver.test.ts` mock.
+
+**Phase 1 debug infra payoff confirmed.** Phase 3 e2e against the T-Shirt + body-avatar scenario showed **zero `[WebGPU validation]` errors** and the captured shaders (`window.__OPENCLO_SHADERS__` had 80 entries with `compute#60` and `compute#61` matching findBest + applyPush) emitted clean WGSL with `array<atomic<i32>>` bindings, `atomicMin` calls, and a proper `if/else if/else` cascade for the edge-fallback side computation. The B.2 attempt's "197 unlabeled validation warnings" failure mode did not recur — Phase 1 infra (PR #743) paid back as designed: the algorithmic question could be answered from inspectable WGSL rather than runtime spelunking.
+
+### 9.2 What did NOT close — the calibration gap
+
+**Phase 3 e2e symptom progression:**
+
+| Configuration | Cloth y-bbox after T-Shirt + Dress (qualitative) |
+|---|---|
+| WASM tier (baseline) | partial drape at waist (~y=0.5–0.7m) |
+| GPU + B.3 + AABB margin = `margin` (5mm) | floor (y≈0) — same failure mode as the original #733 issue |
+| GPU + B.3 + AABB margin = 30mm | shin (~y=0.2m) |
+| GPU + B.3 + AABB margin = 100mm (current) | knee (~y=0.3–0.4m) |
+
+The widened AABB filter (`uAabbMargin = max(margin, 0.1)` = 100mm) catches more leaves per particle — explaining the cloth-position recovery from floor → knee — and aligns with the CPU `TriangleSpatialHash`'s effective query radius (~3 × cellSize, where `wasmSolverWorker.ts:630` uses `cellSize = max(0.02, thickness * 10) = 50mm`, giving ~150mm). Per-triangle perf cost is negligible since BVH still culls most leaves.
+
+But cloth still settles ~30cm below the WASM baseline. The remaining gap is NOT explained by AABB tunneling alone. Plausible remaining causes (not yet diagnosed):
+
+1. **`atomicMin` race-resolution semantics.** WGSL `atomicMin` returns the OLD value pre-op; my "if `oldDist > newDist` then `atomicStore triIdx`" pattern correctly identifies the winning thread within a single particle's loop, but if TSL's codegen for the comparison expression evaluates the new value differently from the atomicMin call, race-resolution could be incorrect. The dumped WGSL evaluates `i32((abs(nodeVar16) * object.nodeUniform7))` twice (once for atomicMin, once for the if-check); deterministic floats should agree, but worth verifying.
+2. **Per-substep convergence rate.** CPU/WASM may settle to a stable position over many substeps via a constraint-projection effect that my GPU kernel reproduces less efficiently — same-direction net displacement per substep is push (positive) vs gravity (negative); if push magnitude is consistently smaller per substep, the steady-state position drifts down.
+3. **Initial-position placement.** "Dress" auto-arrange may seed cloth at a position where front + back panels don't immediately contact body (cloth in front of torso at z>0 falls straight down past body without crossing into AABB on any axis). WASM may benefit from a stronger initial seam constraint that pulls front + back panels around body before they fall past.
+4. **Collision-substep ordering.** GPU dispatches `findBestNode` then `applyPushNode` per substep, with implicit WebGPU sync between compute pipelines. Same-substep pass-1-writes-pass-2-reads should be coherent. But cross-substep, my reset (at pass 2 tail) might not propagate to the next substep's pass 1 atomicMin if there's a hidden device-side ordering issue.
+
+### 9.3 Decision
+
+**Do NOT flip `GPU_CAPABILITIES.bodyCollision` to `true`** in this PR. The capability flag's docstring criterion is "Phase 3 e2e verifies cloth drapes on torso." The current state (cloth at knees) does not meet that criterion. Landing the kernel structure + AABB calibration as PROGRESS is correct; flipping the flag would over-claim.
+
+**Land what works:** B.3 kernel structure (replaces broken B.2), atomic regression-guard tests, AABB-margin calibration, phase 1 infra integration. These are durable improvements regardless of the remaining drape gap.
+
+**Defer to follow-up:** root-cause diagnosis of the 30cm cloth-position divergence vs WASM. Recommended next steps:
+
+1. **Instrument pass 2 with a diagnostic kernel** that pushes particles UP by 1cm whenever `bestTriIdx >= 0`, regardless of computed pushDist. If cloth lifts uniformly, pass 1 detection works at the per-particle level and the divergence is in pass 2's pushDist computation. If cloth doesn't lift, pass 1's atomicMin/atomicStore aren't propagating triIdx as expected — needs deeper TSL codegen / WebGPU implementation investigation.
+2. **Quantitative cloth bbox readback** during sim (not currently exposed via `window.__OPENCLO_*`). Adding a `window.__OPENCLO_CLOTH_BBOX__` debug surface would make subsequent calibration cycles 10× faster — same payoff math as Phase 1 debug infra. Worth doing pre-Phase-2.7 if further work continues on this branch.
+3. **Per-substep telemetry.** Count atomicMin "wins" (collisions detected) per dispatch and surface via a debug counter buffer. If wins-per-substep is ≪ expected, pass 1 detection is not happening. If wins-per-substep is healthy, the issue is in pass 2 push or inter-substep convergence.
+
+### 9.4 State at Phase 2 closure
+
+- Branch `feat/733-gpu-body-collision` HEAD: post-rebase onto current main (Phase 1 included), B.3 commits added.
+- B.3 kernel: 2-pass atomic emulation, structurally clean WGSL, zero validation errors.
+- AABB margin: 100mm (calibrated against CPU `TriangleSpatialHash` effective query radius).
+- `GPU_CAPABILITIES.bodyCollision` stays `false` (drape gap not closed).
+- Gates: tsc clean, 4855 unit tests pass (8 new for tslCollision), lint clean.
+- Phase 1 debug infra: validated in production WebGPU run — captured 80 shaders, surfaced compute#60 + compute#61 WGSL on demand, zero validation errors during sim.
+
+**Phase 2 ratifies B.3 as the right kernel structure** (per § 8.3 recommendation) and surfaces the calibration gap as a separate, narrower problem for follow-up. The TSL `outer-toVar.assign(storage-derived-value)` codegen pitfall (§ 7.2) is no longer the bottleneck; the remaining issue is calibration / convergence, not codegen.

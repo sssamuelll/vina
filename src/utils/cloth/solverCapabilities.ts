@@ -146,19 +146,23 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
 export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: false,
   /**
-   * `false` until the TSL body collision kernel patch lands (#733).
-   * The kernel exists (`tslCollision.ts`) and the BVH wire-up is complete
-   * (`gpuSolverClient.ts:setCollisionMesh` → `setTslCollisionBody` →
-   * `tslSolver.collisionBodies[]` → `GarmentSimulation.tsx:426–428`
-   * substep dispatch), but the per-triangle detection logic
-   * margin-gates iteration and lacks edge/vertex projection — particles
-   * deeper than 5 mm from any triangle plane are silently missed and
-   * cloth falls through the avatar to the floor.
+   * `false` until #733 Phase 2 e2e validates cloth draping on the body.
    *
-   * Flag flips to `true` once the kernel patch (D2 + D3 of #733 design
-   * doc) lands and Phase 3 e2e verifies cloth drapes on torso.
+   * Phase 2 (B.3 atomic emulation) landed: the 2-pass TSL kernel
+   * (`findBestNode` + `applyPushNode` in `tslCollision.ts`) compiles cleanly
+   * — Phase 1 debug infra surfaces zero `[WebGPU validation]` errors and
+   * the generated WGSL uses `atomicMin` + `atomicStore` with `array<atomic<i32>>`
+   * binding declarations as designed. The kernel structure sidesteps the
+   * TSL outer-toVar/storage-derived codegen issue (§ 7.2). However, Phase 3
+   * e2e against the T-Shirt + body-avatar scenario shows cloth still falling
+   * to floor (y≈0) instead of draping on the torso, while the WASM tier
+   * baseline at the same scenario produces a partial drape at waist height.
+   * Root cause for the divergence is not yet diagnosed — possibilities
+   * include AABB-margin tunneling at terminal-velocity fall, atomicMin/Store
+   * propagation differences between TSL Fns, or initial-position placement
+   * outside the body BVH AABB. Flag flips to `true` once the e2e gap closes.
    *
-   * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md
+   * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md § 9
    */
   bodyCollision: false,
   lra: false,
