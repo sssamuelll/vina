@@ -2,7 +2,7 @@
 
 **Date**: 2026-05-04
 **Branch**: `feat/webgpu-debug-infra` (off `e65e0253`, post-#735 merge)
-**Related**: #733 design doc § 8.4 (calibration anchor)
+**Related**: #733 (GPU body collision — calibration anchor; see "Why" below for the cost rationale)
 **Author**: developer agent (Claude Opus 4.7)
 
 ---
@@ -24,9 +24,9 @@ reaches the console because:
    message references a line number, the line isn't readable.
 
 The cost: each issue burns hours of substep-by-substep diagnostic spelunking
-to reconstruct what the WGSL compiler already knew. **Captured in #733
-design doc § 8.4: "diagnosis cost of GPU code without proper debugging tools
-is ~10× the development cost."**
+to reconstruct what the WGSL compiler already knew. **Diagnosis cost of GPU
+code without proper debug tools is ~10× the development cost** (calibration
+distilled from the three issues above).
 
 This module is the durable infra investment that pays back across all
 future GPU kernel work.
@@ -142,7 +142,6 @@ before.
 ## References
 
 - `src/utils/cloth/gpu/webgpuDebug.ts` — the module.
-- `src/utils/cloth/gpu/__tests__/webgpuDebug.test.ts` — 17 unit tests covering all 3 helpers + idempotency + dev-mode behavior.
+- `src/utils/cloth/gpu/__tests__/webgpuDebug.test.ts` — unit tests covering all 4 helpers + idempotency + dev-mode behavior.
 - `src/utils/cloth/gpu/gpuSolverClient.ts` — wire-up site (constructor + `initMultiPiece` + `initMultiPieceTsl`).
-- `docs/reports/2026-05-04-733-gpu-body-collision-design.md` § 8.4 — calibration anchor.
 - WebGPU spec: error scopes (§ 4.7), `GPUShaderModule.getCompilationInfo()` (§ 4.13.1), `uncapturederror` event (§ 4.7.4).

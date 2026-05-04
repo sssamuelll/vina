@@ -20,10 +20,9 @@
  *   - `withErrorScope` becomes a pass-through (no scope push/pop).
  *   - `attachUncapturedErrorListener` and `instrumentShaderCapture` no-op.
  *
- * Calibration anchor: design doc § 8.4 for #733 (GPU body collision) — diagnosis
- * cost of GPU code without proper debug tools is ~10× the development cost. This
- * module is the durable infra investment that pays back across all future GPU
- * kernel work.
+ * Calibration: diagnosis cost of GPU code without proper debug tools is ~10×
+ * the development cost. This module is the durable infra investment that pays
+ * back across all future GPU kernel work.
  *
  * @module webgpuDebug
  */
