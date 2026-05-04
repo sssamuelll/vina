@@ -192,4 +192,29 @@ describe('atomic-buffer regression guards', () => {
     expect(bestTriIdx).toBeDefined();
     expect(bestTriIdx!.length).toBe(numParticles);
   });
+
+  it('per-body scratch SBAs are distinct across bodies (no aliasing)', () => {
+    // Multi-body composition: each call to createTslCollisionBody must allocate
+    // its own bestDistBuf + bestTriIdxBuf. If a future refactor hoists the
+    // scratch SBAs to module scope as a perf "optimization", two bodies
+    // dispatched in sequence would race on shared atomic state and silently
+    // corrupt each other's collision results. This test is the tripwire.
+    setAtomicCalls.length = 0;
+    buildKernel({ id: 'avatar-1', numParticles: 8 });
+    const a1Scratch = setAtomicCalls
+      .map((c) => c.sba)
+      .filter((sba) => (sba as { array: ArrayLike<number> }).array instanceof Int32Array);
+
+    setAtomicCalls.length = 0;
+    buildKernel({ id: 'avatar-2', numParticles: 8 });
+    const a2Scratch = setAtomicCalls
+      .map((c) => c.sba)
+      .filter((sba) => (sba as { array: ArrayLike<number> }).array instanceof Int32Array);
+
+    expect(a1Scratch.length).toBeGreaterThanOrEqual(2);
+    expect(a2Scratch.length).toBeGreaterThanOrEqual(2);
+    // Both bestDist (idx 0) and bestTriIdx (idx 1) must be distinct allocations.
+    expect(a1Scratch[0]).not.toBe(a2Scratch[0]);
+    expect(a1Scratch[1]).not.toBe(a2Scratch[1]);
+  });
 });
