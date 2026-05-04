@@ -220,7 +220,10 @@ describe('instrumentShaderCapture', () => {
 
     device.createShaderModule({ label: 'cloth_module', code: '@compute fn main() {}' });
 
-    expect(window.__OPENCLO_SHADERS__!.get('cloth_module')).toBe('@compute fn main() {}');
+    const entry = window.__OPENCLO_SHADERS__!.get('cloth_module');
+    expect(entry?.source).toBe('@compute fn main() {}');
+    expect(entry?.label).toBe('cloth_module');
+    expect(entry?.deviceId).toMatch(/^device_\d+$/);
   });
 
   it('falls back to unlabeled_N for shaders without a label', () => {
@@ -230,8 +233,8 @@ describe('instrumentShaderCapture', () => {
     device.createShaderModule({ code: 'wgsl1' });
     device.createShaderModule({ code: 'wgsl2' });
 
-    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_0')).toBe('wgsl1');
-    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_1')).toBe('wgsl2');
+    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_0')?.source).toBe('wgsl1');
+    expect(window.__OPENCLO_SHADERS__!.get('unlabeled_1')?.source).toBe('wgsl2');
   });
 
   it('disambiguates duplicate labels with a #N suffix', () => {
@@ -241,8 +244,11 @@ describe('instrumentShaderCapture', () => {
     device.createShaderModule({ label: 'shared', code: 'a' });
     device.createShaderModule({ label: 'shared', code: 'b' });
 
-    expect(window.__OPENCLO_SHADERS__!.get('shared')).toBe('a');
-    expect(window.__OPENCLO_SHADERS__!.get('shared#1')).toBe('b');
+    expect(window.__OPENCLO_SHADERS__!.get('shared')?.source).toBe('a');
+    expect(window.__OPENCLO_SHADERS__!.get('shared#1')?.source).toBe('b');
+    // Both entries report the original label without the #1 suffix.
+    expect(window.__OPENCLO_SHADERS__!.get('shared')?.label).toBe('shared');
+    expect(window.__OPENCLO_SHADERS__!.get('shared#1')?.label).toBe('shared');
   });
 
   it('still calls the original createShaderModule and returns its result', () => {
@@ -273,6 +279,25 @@ describe('instrumentShaderCapture', () => {
 
     expect(device.createShaderModule).toBe(before);
     expect(window.__OPENCLO_SHADERS__).toBeUndefined();
+  });
+
+  it('disambiguates same-label shaders from two devices via deviceId', () => {
+    const { device: deviceA } = createMockDevice();
+    const { device: deviceB } = createMockDevice();
+    instrumentShaderCapture(deviceA);
+    instrumentShaderCapture(deviceB);
+
+    deviceA.createShaderModule({ label: 'shared_kernel', code: 'src_a' });
+    deviceB.createShaderModule({ label: 'shared_kernel', code: 'src_b' });
+
+    const a = window.__OPENCLO_SHADERS__!.get('shared_kernel');
+    const b = window.__OPENCLO_SHADERS__!.get('shared_kernel#1');
+
+    expect(a?.source).toBe('src_a');
+    expect(b?.source).toBe('src_b');
+    expect(a?.deviceId).toMatch(/^device_\d+$/);
+    expect(b?.deviceId).toMatch(/^device_\d+$/);
+    expect(a?.deviceId).not.toBe(b?.deviceId);
   });
 
   it('does not leave a phantom entry when original createShaderModule throws', () => {
@@ -336,7 +361,7 @@ describe('installEarlyDeviceHook', () => {
     expect(window.__OPENCLO_SHADERS__).toBeInstanceOf(Map);
     // The device's createShaderModule should be patched (different identity).
     device.createShaderModule({ label: 'auto', code: 'wgsl_auto' });
-    expect(window.__OPENCLO_SHADERS__!.get('auto')).toBe('wgsl_auto');
+    expect(window.__OPENCLO_SHADERS__!.get('auto')?.source).toBe('wgsl_auto');
   });
 
   it('is idempotent — second call leaves prototype intact', () => {

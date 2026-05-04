@@ -82,12 +82,18 @@ vertex/fragment for cloth and avatar materials.
 3. Pull the generated WGSL source for any shader of interest:
 
    ```js
-   for (const [label, code] of window.__OPENCLO_SHADERS__) {
-     console.log(label, code.length);
+   for (const [key, entry] of window.__OPENCLO_SHADERS__) {
+     console.log(key, entry.deviceId, entry.source.length);
    }
-   const src = window.__OPENCLO_SHADERS__.get('cloth_module');
-   copy(src);  // → clipboard
+   const entry = window.__OPENCLO_SHADERS__.get('cloth_module');
+   copy(entry.source);  // → clipboard
    ```
+
+   Each entry carries `{ source, label, deviceId }`. `label` is the original
+   (or `unlabeled_N` fallback) without the `#N` collision suffix the map key
+   may carry; `deviceId` (`device_0`, `device_1`, …) tells you which
+   `GPUDevice` produced the shader — useful for separating solver-device
+   shaders from renderer-device shaders that happen to share labels.
 
    For TSL compute nodes, the label often matches the `Fn`-name passed to
    `setLabel`, or falls through to `unlabeled_N` if none was set. Cross-

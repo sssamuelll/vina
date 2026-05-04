@@ -27,10 +27,22 @@
  * @module webgpuDebug
  */
 
+/**
+ * Captured WGSL shader entry. The map key carries an optional `#N` suffix on
+ * label collision; `label` is the original (or `unlabeled_N` fallback) without
+ * that suffix; `deviceId` distinguishes solver-device shaders from
+ * renderer-device shaders when both contribute identical labels.
+ */
+export interface ShaderEntry {
+  source: string;
+  label: string;
+  deviceId: string;
+}
+
 declare global {
   interface Window {
-    /** Map of shader label → WGSL source. Populated by {@link instrumentShaderCapture} in dev mode. */
-    __OPENCLO_SHADERS__?: Map<string, string>;
+    /** Map of shader key → {@link ShaderEntry}. Populated by {@link instrumentShaderCapture} in dev mode. */
+    __OPENCLO_SHADERS__?: Map<string, ShaderEntry>;
   }
 }
 
@@ -42,6 +54,18 @@ type MarkedDevice = GPUDevice & {
   [SHADER_PATCH_MARKER]?: true;
   [LISTENER_MARKER]?: true;
 };
+
+const deviceIds = new WeakMap<GPUDevice, string>();
+let deviceIdCounter = 0;
+
+function getOrAssignDeviceId(device: GPUDevice): string {
+  let id = deviceIds.get(device);
+  if (id === undefined) {
+    id = `device_${deviceIdCounter++}`;
+    deviceIds.set(device, id);
+  }
+  return id;
+}
 
 /**
  * Wrap a sync or async operation with WebGPU error scopes.
@@ -131,8 +155,8 @@ export function attachUncapturedErrorListener(device: GPUDevice): void {
  *
  * Browser DevTools usage:
  *   ```js
- *   for (const [label, code] of window.__OPENCLO_SHADERS__) {
- *     console.log(label, code.length);
+ *   for (const [key, entry] of window.__OPENCLO_SHADERS__) {
+ *     console.log(key, entry.deviceId, entry.source.length);
  *   }
  *   ```
  */
@@ -144,6 +168,7 @@ export function instrumentShaderCapture(device: GPUDevice): void {
 
   window.__OPENCLO_SHADERS__ = window.__OPENCLO_SHADERS__ ?? new Map();
   const shaders = window.__OPENCLO_SHADERS__;
+  const deviceId = getOrAssignDeviceId(device);
 
   const original = device.createShaderModule.bind(device);
   let unlabeledCounter = 0;
@@ -165,7 +190,7 @@ export function instrumentShaderCapture(device: GPUDevice): void {
     // Call original first so a sync throw (invalid descriptor) doesn't leave
     // a phantom map entry. Counter advancement on throw is cosmetic.
     const module = original(descriptor);
-    shaders.set(key, descriptor.code);
+    shaders.set(key, { source: descriptor.code, label: baseLabel, deviceId });
 
     module.getCompilationInfo().then((info) => {
       const errs = info.messages.filter((m) => m.type === 'error');
