@@ -23,6 +23,14 @@
 export interface SolverCapabilities {
   /** Self-collision detection (SpatialHashGrid + collision response). */
   selfCollision: boolean;
+  /**
+   * Body collision (cloth ↔ kinematic mesh, e.g. avatar). Each tier ships
+   * its own acceleration structure: CPU+WASM share `TriangleSpatialHash`
+   * (A4 § 2.4); GPU TSL uses a per-body BVH built via `three-mesh-bvh`
+   * and traversed in `tslCollision.ts` (#733 ratifies the GPU divergence).
+   * Neural drape has no body collision in the inference contract.
+   */
+  bodyCollision: boolean;
   /** Long Range Attachments (Dijkstra geodesic + soft constraint). */
   lra: boolean;
   /** Per-piece pressure (inflation forces per triangle). */
@@ -77,6 +85,7 @@ export interface SolverCapabilities {
  */
 export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
+  bodyCollision: true,
   lra: true,
   pressure: true,
   fold: true,
@@ -98,6 +107,7 @@ export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  */
 export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
+  bodyCollision: true,
   lra: false,
   pressure: false,
   fold: false,
@@ -135,6 +145,22 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  */
 export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: false,
+  /**
+   * `false` until the TSL body collision kernel patch lands (#733).
+   * The kernel exists (`tslCollision.ts`) and the BVH wire-up is complete
+   * (`gpuSolverClient.ts:setCollisionMesh` → `setTslCollisionBody` →
+   * `tslSolver.collisionBodies[]` → `GarmentSimulation.tsx:426–428`
+   * substep dispatch), but the per-triangle detection logic
+   * margin-gates iteration and lacks edge/vertex projection — particles
+   * deeper than 5 mm from any triangle plane are silently missed and
+   * cloth falls through the avatar to the floor.
+   *
+   * Flag flips to `true` once the kernel patch (D2 + D3 of #733 design
+   * doc) lands and Phase 3 e2e verifies cloth drapes on torso.
+   *
+   * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md
+   */
+  bodyCollision: false,
   lra: false,
   pressure: false,
   fold: false,
@@ -170,6 +196,13 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  */
 export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: false,
+  /**
+   * Neural drape predicts vertex positions from rest mesh + body pose via
+   * ONNX inference; body collision is not in the model contract (no
+   * collision mesh input, no per-particle resolution step). Architectural
+   * exclusion per C4 RFC § 2.3.
+   */
+  bodyCollision: false,
   lra: false,
   pressure: false,
   fold: false,
