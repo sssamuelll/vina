@@ -312,3 +312,78 @@ After D2 restructure, the friction block moves into the new "push if penetrating
 ---
 
 **Phase 1 complete. Awaiting reviewer signoff before Phase 2 implementation.**
+
+---
+
+## 7. Phase 2 + 3 update (2026-05-04 — post-execution)
+
+Reviewer Phase 1 signoff received with all 8 sub-decisions ratified and 4 open questions answered. Phase 2 was executed in three commits on `feat/733-gpu-body-collision`:
+
+| Commit | SHA | Status |
+|---|---|---|
+| `feat(gpu): add bodyCollision capability flag (#733)` | `c91ba524` | ✅ landed (CPU/WASM `true` declarative, GPU `false` until kernel fix, Neural `false` permanent) |
+| `fix(gpu): TSL body collision penetration detection (#733)` | `dbae5404` | ⚠️ **algorithm correct, runtime e2e failing — see § 7.3** |
+| `feat(gpu): flip GPU bodyCollision to true (#733)` | not committed | held — depends on e2e |
+| `test(gpu): TSL collision kernel tests (#733)` | not committed | held — depends on e2e |
+
+### 7.1 What works (verified)
+
+- **Capability flag intro lands cleanly.** All 4819 unit tests pass; lint clean; tsc clean. Pre-commit gates pass.
+- **Kernel structure compiles and dispatches.** Verified via Playwright e2e: WebGPU canvas active (`data-engine="three.js r183 webgpu"`), TSL solver initialized (`[GpuSolverClient] TSL solver initialized: { particles: 17963, stretchColors: 50, … }`), collision body registered (`TSL collision body '__avatar__': { bvhNodes: 11955, triangles: 18220, margin: 0.005, friction: 0.3 }`).
+- **Kernel runs per substep.** Diagnostic test: adding an unconditional `posBuf.element(i).y.addAssign(float(0.0001))` inside the kernel's `If(w.greaterThan(0))` lifts cloth from y=0 to y=[0.87, 1.52] — kernel is dispatched, writes propagate to position buffer, readback is current.
+- **`found` mechanism works for ~32% of particles.** Diagnostic test: `If(found.equal(int(1)), () => addAssign(0.001))` results in distribution `{below 0.1m: 12289, 0.5–1.0m: 1936, 1.0–1.5m: 3203}`. The 32% lifted are particles whose AABB ± margin overlapped a body BVH leaf — found-tracking propagates from deeply-nested If into outer-scope toVar correctly.
+- **Hardcoded normal works.** Diagnostic test: hardcoding `bestNx.assign(float(0)); bestNy.assign(float(1)); bestNz.assign(float(0))` (normal = +Y) lifts 60% to body level. So when bestN is non-zero in the apply phase, the push direction + magnitude logic operates as designed.
+
+### 7.2 What didn't work (the new finding)
+
+**Storage-read normal values do not propagate from a deeply-nested `If` into outer-scope toVar variables.** The CPU reference algorithm requires: for each candidate triangle, read its normal (`triNormBuf.element(triIdx*3 + {0,1,2})`), and if that triangle becomes the new closest, capture its normal into `bestNx/Ny/Nz` for use in the apply phase.
+
+The TSL pattern:
+```ts
+// Outer scope
+const bestNx = float(0).toVar('bestNx');
+
+// Deep nested If (BVH Loop → leaf If → triangle Loop → update-best If)
+const nnx = triNormBuf.element(tnBase);  // storage read
+If(triValid.equal(int(1)).and(triDist.lessThan(bestDist)), () => {
+  bestNx.assign(nnx);  // ← assignment doesn't take effect
+});
+
+// Apply phase
+posBuf.element(i).x.addAssign(bestNx.mul(pushDist));  // ← bestNx reads as 0
+```
+
+Verified by inverse: `bestNx.assign(float(0))` + `bestNy.assign(float(1))` (compile-time literals) **does** propagate. So the bug is specific to the case "outer-toVar.assign(storage-read)" inside a deeply-nested If, OR "outer-toVar.assign(loop-local-var-derived-from-storage-read)".
+
+**Workaround attempted (failed)**: store the best triangle *index* (`bestTriIdx = uint(0).toVar('bestTriIdx')`), then re-read the normal at apply time using the stored index. This produced the same e2e symptom (cloth at floor). Suggests the propagation issue is **not specific to storage reads on the RHS** — it may extend to loop-derived expressions involving other storage reads (`triIdx` is computed from `triStart = bvhBuf.element(...)` plus the loop counter `ti`).
+
+**Phase 3 e2e bbox**: cloth y=[0, 0.007] vs WASM tier baseline y=[0.66, 1.28]. WASM-on-floor is the same failure mode as the original #733 issue body.
+
+### 7.3 What I did NOT verify
+
+- Whether the dispatched GPU kernel actually computes `triValid` and `triDist` correctly per-triangle (no GPU debug surface available; only outputs are positions).
+- Whether the issue is specifically `bestNx.assign(loopLocalVar)` propagation, or whether the loop-local computations themselves are evaluating to zero. I did not isolate this further.
+- Whether porting CPU's `solveTriangleCollision` semantically vs reproducing it via per-triangle expressions is the right structure for TSL — the existing `tslSelfCollision.ts` uses a 5-pass atomic-accumulation approach, which sidesteps the toVar-from-storage-read issue entirely.
+
+### 7.4 Recommendation
+
+The kernel's algorithmic fix (D2 + D3 from the original design) **is correct** by inspection vs the CPU reference. But the TSL execution model has a subtlety that prevents the straightforward port from running as designed. Two paths forward:
+
+**A. Investigate the toVar/storage-read interaction in TSL.** Possible follow-up:
+- Test minimum repro: outer-toVar `bestNx`, single-Loop with single-triangle `nnx = ...storage`, verify if `bestNx.assign(nnx)` propagates.
+- Inspect the generated WGSL via Three.js debug hooks (`renderer.compile()` returns shader source).
+- Cross-check with `tslSelfCollision.ts` — does it have outer-toVars assigned from storage reads?
+
+**B. Restructure the kernel to avoid outer-scope toVar tracking entirely.** Option B.1: apply push per-triangle inside the inner Loop (no best-tracking; multiple pushes accumulate). Option B.2: 2-pass kernel (pass 1: per-particle find best, write to a per-particle scratch buffer; pass 2: apply push using scratch buffer). Option B.3: emulate `tslSelfCollision.ts`'s 5-pass atomic approach (counting-sort hash + atomic accumulation), which inverts the storage-read issue (storage reads only feed atomicAdd, not toVar assignment).
+
+The reviewer's Q3 answer ("construction-only + e2e, no webgpu-headless runtime tests") is correct in retrospect — the issue surfaced is precisely the kind that unit tests can't catch without GPU runtime. Investing in webgpu-headless infra (deferred to #742) would significantly accelerate diagnosis of issues like this one.
+
+### 7.5 State at pause
+
+- Branch `feat/733-gpu-body-collision` HEAD: `dbae5404` (commits 1 + 2).
+- Capability flag at `false` (correct — kernel doesn't pass e2e).
+- Kernel algorithm correct on paper, runtime not yet draping cloth on torso.
+- All my Phase 3 debug edits reverted; tslCollision.ts is back to commit 2 state.
+- Gates: tsc clean, 4819 unit tests pass, lint clean, pre-commit OK.
+
+**Awaiting reviewer guidance.** Recommend: (1) approve a follow-up Phase 2.5 to investigate Path A (TSL toVar/storage-read minimum repro + WGSL inspection); (2) if Path A reveals a fundamental TSL limitation, switch to Path B (kernel restructure). Either path keeps the design doc's D1–D8 ratifications intact.
