@@ -24,6 +24,11 @@ declare module 'three/tsl' {
   export function atomicStore(dest: any, value: any): void;
   export function atomicAdd(dest: any, value: any): any;
   export function atomicLoad(dest: any): any;
+  // Returns the OLD value at `dest` before the min/max operation — caller can
+  // compare returned value to `value` to detect whether THIS thread's value
+  // became the new minimum/maximum (used by #733 B.3 atomic emulation pattern).
+  export function atomicMin(dest: any, value: any): any;
+  export function atomicMax(dest: any, value: any): any;
 }
 
 // `@types/three` declares `StorageBufferNode` as a type alias (not a class /

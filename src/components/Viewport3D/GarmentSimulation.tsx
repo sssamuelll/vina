@@ -424,7 +424,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         if (solver.bend) renderer.compute(solver.bend);
         if (solver.seam) renderer.compute(solver.seam);
         for (const body of solver.collisionBodies) {
-          renderer.compute(body.collisionNode);
+          // 2-pass body collision per #733 B.3 atomic emulation:
+          // findBest fills per-body atomic scratch; applyPush reads it,
+          // pushes the particle, and resets the scratch for the next substep.
+          renderer.compute(body.findBestNode);
+          renderer.compute(body.applyPushNode);
         }
         renderer.compute(solver.groundClamp);
         // Mesh grab: lerp grabbed particles BEFORE postSolve so velocity
