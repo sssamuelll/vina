@@ -28,6 +28,7 @@ import {
   float,
   If,
   atomicAdd,
+  atomicLoad,
   atomicStore,
 } from 'three/tsl';
 // TSL node types vary across @types/three versions; use loose types for stability.
@@ -107,8 +108,16 @@ export function makeWindComputeNode(
   const N = windBuffers.numParticles;
 
   // ─── Wrap SBA as TSL storage node ───────────────────────────────
+  // `.setAtomic(true)` makes the WGSL backend emit `array<atomic<i32>>` (vs
+  // `array<i32>`) for the buffer declaration. Required for atomicAdd /
+  // atomicStore to be valid WGSL — without it, Dawn silently fails the
+  // pipeline (#554 root cause: Three.js 0.183 AtomicFunctionNode does not
+  // walk up to the parent buffer to flip isAtomic; we do it manually here).
+  // `as any` cast: `@types/three` aliases StorageBufferNode as a type (not
+  // a class), so module augmentation can't add the method. Runtime exists
+  // per `StorageBufferNode.js:273`.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const windAccumBuf = storage(windBuffers.windAccumSBA, 'int' as any, N * 3);
+  const windAccumBuf = (storage(windBuffers.windAccumSBA, 'int' as any, N * 3) as any).setAtomic(true);
 
   // ─── Uniforms (exposed for runtime updates) ─────────────────────
   const uWindX = uniform(windForce[0]);
@@ -211,10 +220,13 @@ export function makeWindComputeNode(
     If(uint(i).lessThan(uint(N)), () => {
       const base = uint(i).mul(uint(3));
 
-      // Read accumulated force (separate pass — no concurrent writes, safe without atomicLoad)
-      const fx = float(windAccumBuf.element(base));
-      const fy = float(windAccumBuf.element(base.add(uint(1))));
-      const fz = float(windAccumBuf.element(base.add(uint(2))));
+      // Read accumulated force. `atomicLoad` required because the buffer is
+      // declared `array<atomic<i32>>` (post-`.setAtomic(true)` on the storage
+      // node). WGSL spec forbids non-atomic access to `atomic<T>` types even
+      // in read-only contexts. #554 fix.
+      const fx = float(atomicLoad(windAccumBuf.element(base)));
+      const fy = float(atomicLoad(windAccumBuf.element(base.add(uint(1)))));
+      const fz = float(atomicLoad(windAccumBuf.element(base.add(uint(2)))));
 
       const invScale = float(1.0 / WIND_SCALE);
 
