@@ -21,6 +21,7 @@ import type { ClothSolverClient } from '../solverProtocol';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
+import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +41,7 @@ export interface GpuSolverClientCallbacks {
 // ─── Client ─────────────────────────────────────────────────────────────────
 
 export class GpuSolverClient implements ClothSolverClient {
+  private device: GPUDevice;
   private solver: GpuClothSolver;
   private running: boolean = false;
   private animFrameId: number | null = null;
@@ -74,12 +76,18 @@ export class GpuSolverClient implements ClothSolverClient {
   private originalInvMass: Float32Array | null = null;
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
+    this.device = device;
+    // Install debug instrumentation BEFORE solver/pipeline construction so every
+    // shader module created during init is captured into window.__OPENCLO_SHADERS__
+    // and `[WebGPU shader] compile error` diagnostics are surfaced.
+    //
+    // instrumentShaderCapture is dev-only (no-op in production).
+    // attachUncapturedErrorListener stays active in prod — an idle listener is
+    // zero-cost and surfaces validation failures that would otherwise be silently
+    // swallowed. Both helpers are idempotent.
+    instrumentShaderCapture(device);
+    attachUncapturedErrorListener(device);
     this.solver = new GpuClothSolver(device, config);
-
-    // Listen for uncaptured GPU errors
-    device.addEventListener('uncapturederror', (event) => {
-      console.error('[GpuSolverClient] WebGPU uncaptured error:', (event as GPUUncapturedErrorEvent).error);
-    });
   }
 
   /**
@@ -184,31 +192,33 @@ export class GpuSolverClient implements ClothSolverClient {
       }
     }
 
-    await this.solver.init(
-      { positions, triangles, invMass },
-      stretch,
-      bend,
-      seam,
-      triangles,
-    );
+    await withErrorScope(this.device, 'GpuSolverClient.initMultiPiece', async () => {
+      await this.solver.init(
+        { positions, triangles, invMass },
+        stretch,
+        bend,
+        seam,
+        triangles,
+      );
 
-    // Validate GPU-side positions after init (verifies buffer upload)
-    try {
-      const initPositions = await this.solver.readPositions();
-      if (initPositions) {
-        let nanCount = 0;
-        for (let i = 0; i < Math.min(initPositions.length, 300); i++) {
-          if (!isFinite(initPositions[i])) nanCount++;
+      // Validate GPU-side positions after init (verifies buffer upload)
+      try {
+        const initPositions = await this.solver.readPositions();
+        if (initPositions) {
+          let nanCount = 0;
+          for (let i = 0; i < Math.min(initPositions.length, 300); i++) {
+            if (!isFinite(initPositions[i])) nanCount++;
+          }
+          if (nanCount > 0) {
+            console.error(`[GpuSolverClient] ❌ GPU positions contain ${nanCount} NaN after init (sampled first 100 particles)`);
+          } else {
+            console.log(`[GpuSolverClient] ✅ GPU positions validated after init: ${totalVerts} particles, first 100 all finite`);
+          }
         }
-        if (nanCount > 0) {
-          console.error(`[GpuSolverClient] ❌ GPU positions contain ${nanCount} NaN after init (sampled first 100 particles)`);
-        } else {
-          console.log(`[GpuSolverClient] ✅ GPU positions validated after init: ${totalVerts} particles, first 100 all finite`);
-        }
+      } catch (e) {
+        console.warn('[GpuSolverClient] Init validation readback failed:', e);
       }
-    } catch (e) {
-      console.warn('[GpuSolverClient] Init validation readback failed:', e);
-    }
+    });
   }
 
   /**
@@ -321,36 +331,38 @@ export class GpuSolverClient implements ClothSolverClient {
       }
     }
 
-    // Create TSL buffers with per-constraint compliance
-    this.tslBuffers = createTslBuffers(
-      { positions, triangles, invMass },
-      colored,
-      bend,
-      seam,
-      fabric,
-    );
+    await withErrorScope(this.device, 'GpuSolverClient.initMultiPieceTsl', () => {
+      // Create TSL buffers with per-constraint compliance
+      this.tslBuffers = createTslBuffers(
+        { positions, triangles, invMass },
+        colored,
+        bend,
+        seam,
+        fabric,
+      );
 
-    const defaultConfig: TslSolverConfig = {
-      substeps: 15,
-      gravity: [0, -9.81, 0],
-      damping: 0.9603,
-      internalDamping: 0.3,
-      seamStiffness: 0.0,
-      groundY: 0.0,
-      dt: 1 / 60,
-      ...solverConfig,
-    };
+      const defaultConfig: TslSolverConfig = {
+        substeps: 15,
+        gravity: [0, -9.81, 0],
+        damping: 0.9603,
+        internalDamping: 0.3,
+        seamStiffness: 0.0,
+        groundY: 0.0,
+        dt: 1 / 60,
+        ...solverConfig,
+      };
 
-    this.tslSolver = createTslSolver(this.tslBuffers, defaultConfig);
-    this.zeroCopy = true; // TSL mode = zero-copy
+      this.tslSolver = createTslSolver(this.tslBuffers, defaultConfig);
+      this.zeroCopy = true; // TSL mode = zero-copy
 
-    console.log('[GpuSolverClient] TSL solver initialized:', {
-      particles: totalVerts,
-      stretchColors: colored.colorRanges.length,
-      bendConstraints: bend.ids.length / 4,
-      seamConstraints: seam ? seam.ids.length / 2 : 0,
-      hasUvs,
-      fabric: fabricCompliance ? 'custom' : 'defaults',
+      console.log('[GpuSolverClient] TSL solver initialized:', {
+        particles: totalVerts,
+        stretchColors: colored.colorRanges.length,
+        bendConstraints: bend.ids.length / 4,
+        seamConstraints: seam ? seam.ids.length / 2 : 0,
+        hasUvs,
+        fabric: fabricCompliance ? 'custom' : 'defaults',
+      });
     });
   }
 

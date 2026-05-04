@@ -5,6 +5,14 @@ import { AppErrorBoundary } from './components/ErrorBoundary/AppErrorBoundary';
 import { ShortcutProvider } from './shortcuts';
 import './index.css';
 
+// WebGPU debug infrastructure — patches GPUAdapter.prototype.requestDevice so
+// every device (Three.js renderer's + GpuSolverClient's) gets shader capture
+// and uncapturederror listener installed automatically. Dev-only; production:
+// no-op. Hoisted to first body statement so any other top-level setup that
+// might call adapter.requestDevice() sees the hook in place.
+import { installEarlyDeviceHook } from './utils/cloth/gpu/webgpuDebug';
+installEarlyDeviceHook();
+
 // Initialize tool registry
 import './tools';
 
