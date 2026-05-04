@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // vi.hoisted runs before vi.mock hoisting, so MockSBA is available to both mocks.
-const { MockSBA } = vi.hoisted(() => {
+// `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
+// call returns a node whose `.setAtomic` records {sba, value} into this array.
+const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
+  const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
   const MockSBA = class MockSBA {
     array: ArrayLike<number>;
     itemSize: number;
@@ -10,7 +13,7 @@ const { MockSBA } = vi.hoisted(() => {
       this.itemSize = itemSize;
     }
   };
-  return { MockSBA };
+  return { MockSBA, setAtomicCalls };
 });
 
 // Mock three/webgpu and three/tsl before importing.
@@ -48,7 +51,27 @@ vi.mock('three/tsl', () => {
     StorageBufferAttribute: MockSBA,
     // Fn: returns a function that, when called (the () invocation), returns a proxy
     Fn: () => () => proxy,
-    storage: () => proxy,
+    // storage: returns a per-call proxy that intercepts `.setAtomic` to capture
+    // {sba, value} for #554 regression guards. All other property/call access
+    // delegates to the chain proxy so existing tests still pass transparently.
+    storage: (...args: unknown[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const node: any = new Proxy(function () {}, {
+        get(_target, prop) {
+          if (prop === 'setAtomic') {
+            return function (value: boolean) {
+              setAtomicCalls.push({ sba: args[0], value });
+              return node;
+            };
+          }
+          return createChainProxy();
+        },
+        apply() {
+          return createChainProxy();
+        },
+      });
+      return node;
+    },
     uniform: mockUniform,
     compute: (_fn: unknown, count: number) => ({
       __tslCompute: true,
@@ -63,6 +86,7 @@ vi.mock('three/tsl', () => {
     Loop: () => proxy,
     atomicAdd: () => proxy,
     atomicStore: () => proxy,
+    atomicLoad: () => proxy,
   };
 });
 
@@ -173,5 +197,38 @@ describe('makeWindComputeNode', () => {
     const { nodes } = createTestNodes();
     expect(nodes.dragCoeff).toBeDefined();
     expect(nodes.dragCoeff.value).toBe(1.0);
+  });
+});
+
+// ─── #554 regression guard ──────────────────────────────────────────────────
+// Future refactors / Three.js upgrades could silently drop `.setAtomic(true)`,
+// regressing to WGSL `array<i32>` + Dawn warnings + silent CPU fallback. This
+// test guards against that by asserting setAtomic is invoked with `true` on
+// windAccumSBA in makeWindComputeNode.
+
+describe('#554 atomic buffer regression guard', () => {
+  it('declares array<atomic<i32>> on windAccumBuf via setAtomic(true)', () => {
+    setAtomicCalls.length = 0;
+    const numParticles = 20;
+    const buffers = createWindBuffers(numParticles);
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const mockNode = { element: () => mockNode, toAttribute: () => mockNode };
+    const mockSdt = { value: 1 / 60 / 15 };
+    makeWindComputeNode(
+      mockNode as any,
+      mockNode as any,
+      mockNode as any,
+      mockSdt as any,
+      mockNode as any,
+      buffers,
+      10,
+      [1, 0, 0],
+      1.0,
+    );
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+
+    const call = setAtomicCalls.find((c) => c.sba === buffers.windAccumSBA);
+    expect(call).toBeDefined();
+    expect(call?.value).toBe(true);
   });
 });

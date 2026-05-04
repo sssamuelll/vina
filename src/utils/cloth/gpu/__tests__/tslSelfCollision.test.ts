@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // vi.hoisted runs before vi.mock hoisting, so MockSBA is available to both mocks.
-const { MockSBA } = vi.hoisted(() => {
+// `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
+// call returns a node whose `.setAtomic` records {sba, value} into this array.
+const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
+  const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
   const MockSBA = class MockSBA {
     array: ArrayLike<number>;
     itemSize: number;
@@ -10,7 +13,7 @@ const { MockSBA } = vi.hoisted(() => {
       this.itemSize = itemSize;
     }
   };
-  return { MockSBA };
+  return { MockSBA, setAtomicCalls };
 });
 
 // Mock three/webgpu and three/tsl before importing.
@@ -45,7 +48,27 @@ vi.mock('three/tsl', () => {
     StorageBufferAttribute: MockSBA,
     // Fn: returns a function that, when called (the () invocation), returns a proxy
     Fn: () => () => proxy,
-    storage: () => proxy,
+    // storage: returns a per-call proxy that intercepts `.setAtomic` to capture
+    // {sba, value} for #554 regression guards. All other property/call access
+    // delegates to the chain proxy so existing tests still pass transparently.
+    storage: (...args: unknown[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const node: any = new Proxy(function () {}, {
+        get(_target, prop) {
+          if (prop === 'setAtomic') {
+            return function (value: boolean) {
+              setAtomicCalls.push({ sba: args[0], value });
+              return node;
+            };
+          }
+          return createChainProxy();
+        },
+        apply() {
+          return createChainProxy();
+        },
+      });
+      return node;
+    },
     uniform: () => proxy,
     instanceIndex: proxy,
     uint: () => proxy,
@@ -56,6 +79,7 @@ vi.mock('three/tsl', () => {
     Loop: () => proxy,
     atomicAdd: () => proxy,
     atomicStore: () => proxy,
+    atomicLoad: () => proxy,
   };
 });
 
@@ -142,5 +166,51 @@ describe('makeSelfCollisionComputeNodes', () => {
     expect(nodes.scatterNode).toBeDefined();
     expect(nodes.resolveNode).toBeDefined();
     expect(nodes.applyNode).toBeDefined();
+  });
+});
+
+// ─── #554 regression guards ──────────────────────────────────────────────────
+// Future refactors / Three.js upgrades could silently drop `.setAtomic(true)`,
+// regressing to WGSL `array<i32>` + Dawn warnings + silent CPU fallback. These
+// tests guard against that for each of the three atomic buffers in the
+// self-collision kernel pipeline.
+
+describe('#554 atomic buffer regression guards', () => {
+  function buildNodes() {
+    setAtomicCalls.length = 0;
+    const numParticles = 20;
+    const tableSize = 41;
+    const buffers = createSelfCollisionBuffers(
+      numParticles,
+      tableSize,
+      new Uint32Array(numParticles + 1),
+      new Uint32Array(40),
+    );
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const mockNode = { element: () => mockNode, toAttribute: () => mockNode };
+    makeSelfCollisionComputeNodes(mockNode as any, mockNode as any, buffers, 0.004);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    return buffers;
+  }
+
+  it('declares array<atomic<i32>> on cellCountBuf via setAtomic(true)', () => {
+    const buffers = buildNodes();
+    const call = setAtomicCalls.find((c) => c.sba === buffers.cellCountSBA);
+    expect(call).toBeDefined();
+    expect(call?.value).toBe(true);
+  });
+
+  it('declares array<atomic<i32>> on deltaBuf via setAtomic(true)', () => {
+    const buffers = buildNodes();
+    const call = setAtomicCalls.find((c) => c.sba === buffers.deltaSBA);
+    expect(call).toBeDefined();
+    expect(call?.value).toBe(true);
+  });
+
+  it('declares array<atomic<i32>> on corrCountBuf via setAtomic(true)', () => {
+    const buffers = buildNodes();
+    const call = setAtomicCalls.find((c) => c.sba === buffers.corrCountSBA);
+    expect(call).toBeDefined();
+    expect(call?.value).toBe(true);
   });
 });

@@ -34,6 +34,7 @@ import {
   instanceIndex,
   atomicStore,
   atomicAdd,
+  atomicLoad,
 } from 'three/tsl';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
@@ -487,13 +488,14 @@ function makeNormalNormalizeFn(
     const invScale = float(1.0 / NORMAL_SCALE);
     const base = uint(i).mul(uint(3));
 
-    // Read accumulated fixed-point i32 values. This runs in a separate pass
-    // after accumulation, so no concurrent writes — regular element access is safe.
-    // (Three.js TSL doesn't export atomicLoad; each Fn() compiles to its own
-    // shader, so this buffer won't be declared atomic in the normalize kernel.)
-    const nx = float(normalAccumBuf.element(base)).mul(invScale);
-    const ny = float(normalAccumBuf.element(base.add(uint(1)))).mul(invScale);
-    const nz = float(normalAccumBuf.element(base.add(uint(2)))).mul(invScale);
+    // atomicLoad required because normalAccumBuf is declared
+    // array<atomic<i32>> (post-`.setAtomic(true)` for #554 fix). WGSL
+    // spec requires atomicLoad for atomic<T> access even in read-only
+    // contexts. Previous note ("TSL doesn't export atomicLoad") was
+    // outdated — verified Three.TSL.js:63 exports atomicLoad in three@0.183.2.
+    const nx = float(atomicLoad(normalAccumBuf.element(base))).mul(invScale);
+    const ny = float(atomicLoad(normalAccumBuf.element(base.add(uint(1))))).mul(invScale);
+    const nz = float(atomicLoad(normalAccumBuf.element(base.add(uint(2))))).mul(invScale);
 
     const n = vec3(nx, ny, nz);
     const len2 = n.dot(n);
@@ -598,8 +600,13 @@ export function createTslSolver(
 
   // ─── GPU smooth normals (atomic accumulation) ─────────────────────
   const normalBuf = storage(buffers.normalSBA, 'vec3', N);
+  // .setAtomic(true) required for #554 fix — see three-tsl-augment.d.ts
+  // (verified in three@0.183.2). `'int' as any` works around @types/three
+  // lacking 'int' in storage() type; `as any` on the storage(...) result
+  // calls .setAtomic(true) which @types/three mistypes as `setAtmoic`
+  // (typo). Both casts required per #554 fix.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalAccumBuf = storage(buffers.normalAccumSBA, 'int' as any, N * 3);
+  const normalAccumBuf = (storage(buffers.normalAccumSBA, 'int' as any, N * 3) as any).setAtomic(true);
   const triIdsBuf = storage(buffers.triangleIdsSBA, 'uint', buffers.numTriangles * 3);
 
   const normalZeroFn = makeNormalZeroFn(normalAccumBuf);

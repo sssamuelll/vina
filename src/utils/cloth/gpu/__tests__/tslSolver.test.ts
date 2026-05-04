@@ -1,7 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
 
 // vi.hoisted runs before vi.mock hoisting, so shared mocks are available to both.
-const { MockSBA, tslExports } = vi.hoisted(() => {
+// `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
+// call returns a node whose `.setAtomic` records {sba, value} into this array.
+const { MockSBA, tslExports, setAtomicCalls } = vi.hoisted(() => {
+  const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
+
   const MockSBA = class MockSBA {
     array: Float32Array | Uint32Array | Int32Array;
     count: number;
@@ -37,11 +41,21 @@ const { MockSBA, tslExports } = vi.hoisted(() => {
   });
 
   const tslExports = {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
-    storage: (..._: any[]) => ({
-      element: () => mockElement(),
-      toAttribute: () => ({ __tslAttribute: true }),
-    }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    storage: (...args: any[]) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const node: any = {
+        element: () => mockElement(),
+        toAttribute: () => ({ __tslAttribute: true }),
+        // setAtomic must be chainable per StorageBufferNode.js:273 (returns `this`).
+        // Records each invocation for #554 regression guards.
+        setAtomic: function (this: unknown, value: boolean) {
+          setAtomicCalls.push({ sba: args[0], value });
+          return node;
+        },
+      };
+      return node;
+    },
     Fn: () => () => ({ __tslFn: true }),
     If: () => ({ Else: () => {} }),
     compute: (_fn: unknown, count: number) => ({
@@ -68,9 +82,11 @@ const { MockSBA, tslExports } = vi.hoisted(() => {
     Loop: () => {},
     atomicStore: () => {},
     atomicAdd: () => mockElement(),
+    // atomicLoad: required for read-side of atomic<i32> buffers (#554 fix).
+    atomicLoad: () => mockElement(),
   };
 
-  return { MockSBA, tslExports };
+  return { MockSBA, tslExports, setAtomicCalls };
 });
 
 // Note: three/webgpu and three/tsl resolve to the same bundle (three.webgpu.js),
@@ -486,5 +502,23 @@ describe('updateConfig', () => {
     const solver = createTslSolver(buffers, { ...defaultConfig });
     expect(solver.prevPosBufNode).toBeDefined();
     expect(solver.invMassBufNode).toBeDefined();
+  });
+});
+
+// ─── #554 regression guards ──────────────────────────────────────────────────
+// Future refactors / Three.js upgrades could silently drop `.setAtomic(true)`,
+// regressing to WGSL `array<i32>` + Dawn warnings + silent CPU fallback. These
+// tests guard against that by asserting setAtomic is invoked with `true` on
+// the specific atomic buffer per kernel.
+
+describe('#554 atomic buffer regression guards', () => {
+  it('declares array<atomic<i32>> on normalAccumBuf via setAtomic(true)', () => {
+    setAtomicCalls.length = 0;
+    const buffers = makeMockBufferSet();
+    createTslSolver(buffers, { ...defaultConfig });
+
+    const call = setAtomicCalls.find((c) => c.sba === buffers.normalAccumSBA);
+    expect(call).toBeDefined();
+    expect(call?.value).toBe(true);
   });
 });
