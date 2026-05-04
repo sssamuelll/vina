@@ -1,5 +1,5 @@
 /**
- * WebGPU debug infrastructure for dev-mode kernel diagnosis (#733 follow-up).
+ * WebGPU debug infrastructure for dev-mode kernel diagnosis.
  *
  * Three tools that surface WGSL validation errors with minutes-not-hours latency:
  *
@@ -191,10 +191,11 @@ export function instrumentShaderCapture(device: GPUDevice): void {
  * Three.js renderer's, our solver's, anyone else's — is auto-instrumented with
  * shader capture + uncapturederror listener.
  *
- * Without this, Phase 1.3 only catches shader compiles on devices we explicitly
- * patch (see {@link instrumentShaderCapture}). The Three.js WebGPURenderer
- * creates its own device for canvas rendering and `renderer.compute(node)` —
- * so TSL kernel WGSL would never be captured. This hook closes that gap.
+ * The Three.js WebGPURenderer creates its own device for canvas rendering and
+ * `renderer.compute(node)`, distinct from `GpuSolverClient`'s device. Without
+ * the prototype-level hook, only devices we explicitly pass to
+ * {@link instrumentShaderCapture} are patched — TSL kernel WGSL on the
+ * renderer's device would never be captured. This hook closes that gap.
  *
  * Must be called BEFORE any code calls `adapter.requestDevice()`. Typical
  * site: top of `main.tsx`, before any React rendering. Idempotent.
