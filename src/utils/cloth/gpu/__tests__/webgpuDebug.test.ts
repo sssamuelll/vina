@@ -139,6 +139,29 @@ describe('withErrorScope', () => {
     await withErrorScope(device, 'clean', () => undefined);
     expect(errorSpy).not.toHaveBeenCalled();
   });
+
+  it('still issues all 3 pops when one popErrorScope rejects (no scope leak)', async () => {
+    const { device } = createMockDevice();
+    let popCount = 0;
+    // 1st pop (internal, innermost): rejects — simulates device-lost mid-fn.
+    // 2nd pop (oom): resolves with a captured error.
+    // 3rd pop (validation): resolves with a captured error.
+    device.popErrorScope = vi.fn(async () => {
+      popCount++;
+      if (popCount === 1) throw new Error('device lost');
+      if (popCount === 2) return { message: 'oom-err' } as GPUError;
+      return { message: 'validation-err' } as GPUError;
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    // Should resolve cleanly — withErrorScope must not propagate the pop rejection.
+    await withErrorScope(device, 'leaky', () => undefined);
+
+    expect(popCount).toBe(3);
+    const calls = errorSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((c) => c.includes('[WebGPU OOM] leaky: oom-err'))).toBe(true);
+    expect(calls.some((c) => c.includes('[WebGPU validation] leaky: validation-err'))).toBe(true);
+  });
 });
 
 // ─── attachUncapturedErrorListener ─────────────────────────────────────────

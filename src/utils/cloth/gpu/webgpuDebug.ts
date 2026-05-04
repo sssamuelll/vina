@@ -74,18 +74,24 @@ export async function withErrorScope<T>(
   try {
     return await fn();
   } finally {
-    const internalError = await device.popErrorScope();
-    const oomError = await device.popErrorScope();
-    const validationError = await device.popErrorScope();
+    // Issue all 3 pops together so a rejection on one (device lost, malformed
+    // stack) doesn't leak the remaining scopes. WebGPU processes pops in the
+    // order they're called, so LIFO ordering is preserved: internal → oom →
+    // validation, regardless of resolution order.
+    const [internalRes, oomRes, validationRes] = await Promise.allSettled([
+      device.popErrorScope(),
+      device.popErrorScope(),
+      device.popErrorScope(),
+    ]);
 
-    if (validationError) {
-      console.error(`[WebGPU validation] ${label}: ${validationError.message}`);
+    if (validationRes.status === 'fulfilled' && validationRes.value) {
+      console.error(`[WebGPU validation] ${label}: ${validationRes.value.message}`);
     }
-    if (oomError) {
-      console.error(`[WebGPU OOM] ${label}: ${oomError.message}`);
+    if (oomRes.status === 'fulfilled' && oomRes.value) {
+      console.error(`[WebGPU OOM] ${label}: ${oomRes.value.message}`);
     }
-    if (internalError) {
-      console.error(`[WebGPU internal] ${label}: ${internalError.message}`);
+    if (internalRes.status === 'fulfilled' && internalRes.value) {
+      console.error(`[WebGPU internal] ${label}: ${internalRes.value.message}`);
     }
   }
 }
