@@ -191,6 +191,29 @@ const defaultConfig: TslSolverConfig = {
   dt: 1 / 60,
 };
 
+// `TslCollisionBody` carries two ComputeNodes (findBest + applyPush) per the
+// atomic-emulation pattern in tslCollision.ts. Tests don't dispatch them —
+// only verify register/replace/remove book-keeping — so dummy ComputeNode
+// placeholders work.
+type ComputeNode = import('three/src/nodes/gpgpu/ComputeNode.js').default;
+function makeMockBody(opts: {
+  id: string;
+  margin: number;
+  friction: number;
+  nodeCount: number;
+  triCount: number;
+}) {
+  return {
+    id: opts.id,
+    findBestNode: {} as unknown as ComputeNode,
+    applyPushNode: {} as unknown as ComputeNode,
+    margin: opts.margin,
+    friction: opts.friction,
+    nodeCount: opts.nodeCount,
+    triCount: opts.triCount,
+  };
+}
+
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('createTslSolver', () => {
@@ -464,7 +487,7 @@ describe('updateConfig', () => {
   it('setCollisionBody adds a body', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, { ...defaultConfig });
-    const body = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 };
+    const body = makeMockBody({ id: 'test', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 });
     solver.setCollisionBody(body);
     expect(solver.collisionBodies).toHaveLength(1);
     expect(solver.collisionBodies[0].id).toBe('test');
@@ -473,8 +496,8 @@ describe('updateConfig', () => {
   it('setCollisionBody replaces existing body with same id', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, { ...defaultConfig });
-    const body1 = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 };
-    const body2 = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.01, friction: 0.5, nodeCount: 20, triCount: 10 };
+    const body1 = makeMockBody({ id: 'test', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 });
+    const body2 = makeMockBody({ id: 'test', margin: 0.01, friction: 0.5, nodeCount: 20, triCount: 10 });
     solver.setCollisionBody(body1);
     solver.setCollisionBody(body2);
     expect(solver.collisionBodies).toHaveLength(1);
@@ -484,7 +507,7 @@ describe('updateConfig', () => {
   it('removeCollisionBody removes by id', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, { ...defaultConfig });
-    const body = { id: 'test', collisionNode: {} as unknown as import('three/src/nodes/gpgpu/ComputeNode.js').default, margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 };
+    const body = makeMockBody({ id: 'test', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5 });
     solver.setCollisionBody(body);
     solver.removeCollisionBody('test');
     expect(solver.collisionBodies).toHaveLength(0);

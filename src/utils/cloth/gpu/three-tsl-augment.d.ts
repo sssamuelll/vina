@@ -8,7 +8,7 @@
  * augmentation adds the missing type information without replacing
  * existing declarations.
  *
- * **#554 atomicAdd WGSL codegen fix path**: when a `StorageBufferNode` has
+ * **atomicAdd WGSL codegen pattern**: when a `StorageBufferNode` has
  * `.setAtomic(true)` called on it, WGSL backend emits `array<atomic<i32>>`
  * (not `array<i32>`). Read passes must then use `atomicLoad(buf.element(i))`
  * instead of plain `buf.element(i)` because WGSL spec requires `atomicLoad`
@@ -24,6 +24,12 @@ declare module 'three/tsl' {
   export function atomicStore(dest: any, value: any): void;
   export function atomicAdd(dest: any, value: any): any;
   export function atomicLoad(dest: any): any;
+  // Returns the OLD value at `dest` before the min/max operation — caller can
+  // compare returned value to `value` to detect whether THIS thread's value
+  // became the new minimum/maximum (used by the atomic-emulation pattern in
+  // tslCollision.ts).
+  export function atomicMin(dest: any, value: any): any;
+  export function atomicMax(dest: any, value: any): any;
 }
 
 // `@types/three` declares `StorageBufferNode` as a type alias (not a class /
@@ -31,5 +37,4 @@ declare module 'three/tsl' {
 // runtime method is `setAtomic(value: boolean)` per
 // `three/src/nodes/accessors/StorageBufferNode.js:273` (and the buggy typo'd
 // `setAtmoic` is what `@types/three` exposes; verified in three@0.183.2).
-// Callers must use an `as any` cast at the callsite for now. See #554 for
-// context.
+// Callers must use an `as any` cast at the callsite for now.

@@ -23,6 +23,14 @@
 export interface SolverCapabilities {
   /** Self-collision detection (SpatialHashGrid + collision response). */
   selfCollision: boolean;
+  /**
+   * Body collision (cloth ↔ kinematic mesh, e.g. avatar). Each tier ships
+   * its own acceleration structure: CPU+WASM share `TriangleSpatialHash`;
+   * GPU TSL uses a per-body BVH built via `three-mesh-bvh` and traversed
+   * in `tslCollision.ts`. Neural drape has no body collision in the
+   * inference contract.
+   */
+  bodyCollision: boolean;
   /** Long Range Attachments (Dijkstra geodesic + soft constraint). */
   lra: boolean;
   /** Per-piece pressure (inflation forces per triangle). */
@@ -77,6 +85,7 @@ export interface SolverCapabilities {
  */
 export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
+  bodyCollision: true,
   lra: true,
   pressure: true,
   fold: true,
@@ -98,6 +107,7 @@ export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  */
 export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: true,
+  bodyCollision: true,
   lra: false,
   pressure: false,
   fold: false,
@@ -135,6 +145,21 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  */
 export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: false,
+  /**
+   * GPU body collision — atomic-emulation kernel lands; calibration gap
+   * remains. The 2-pass TSL kernel (`findBestNode` + `applyPushNode` in
+   * `tslCollision.ts`) compiles cleanly with zero WebGPU validation errors
+   * and the expected `array<atomic<i32>>` bindings. Current runtime state on
+   * the T-Shirt + body-avatar drape scenario: cloth settles at the knees
+   * (~y=0.3-0.4m), roughly 30cm below the WASM tier baseline at the waist
+   * (~y=0.5-0.7m). Widening the AABB filter to 100mm lifted cloth from the
+   * floor up to the knee but did not close the residual divergence. The
+   * capability stays `false` until the drape gap closes. See `@see` for
+   * candidate root causes + recommended diagnostic moves.
+   *
+   * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md § 9
+   */
+  bodyCollision: false,
   lra: false,
   pressure: false,
   fold: false,
@@ -170,6 +195,13 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  */
 export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: false,
+  /**
+   * Neural drape predicts vertex positions from rest mesh + body pose via
+   * ONNX inference; body collision is not in the model contract (no
+   * collision mesh input, no per-particle resolution step). Architectural
+   * exclusion per C4 RFC § 2.3.
+   */
+  bodyCollision: false,
   lra: false,
   pressure: false,
   fold: false,
