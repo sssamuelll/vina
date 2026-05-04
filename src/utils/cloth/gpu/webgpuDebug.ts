@@ -199,7 +199,12 @@ export function instrumentShaderCapture(device: GPUDevice): void {
  * Must be called BEFORE any code calls `adapter.requestDevice()`. Typical
  * site: top of `main.tsx`, before any React rendering. Idempotent.
  *
- * Production: no-op (gated on `import.meta.env.DEV`).
+ * Production: no-op (gated on `import.meta.env.DEV`). The renderer-side device
+ * therefore has no shader capture and no uncapturederror listener in prod;
+ * renderer validation errors fail silently at the WebGPU layer but their
+ * downstream effect cascades to CPU fallback via `SolverError` → toast slice
+ * → ErrorBoundary tree. Phase 1 accepts this gap; revisit if telemetry needs
+ * a prod renderer surface.
  */
 export function installEarlyDeviceHook(): void {
   if (!import.meta.env.DEV) return;

@@ -137,6 +137,23 @@ before.
 | `instrumentShaderCapture` | No-op. The `device.createShaderModule` patch is dev-only — production keeps the original method. `window.__OPENCLO_SHADERS__` is never populated. |
 | `installEarlyDeviceHook` | No-op. The `GPUAdapter.prototype.requestDevice` patch is dev-only — production leaves the prototype unmodified. |
 
+### Accepted gap: renderer-side capture in production
+
+With `installEarlyDeviceHook` and `instrumentShaderCapture` both no-op in prod,
+the Three.js renderer's `GPUDevice` has neither shader capture nor an
+`uncapturederror` listener in production builds. The solver-side device still
+gets `attachUncapturedErrorListener` via the `GpuSolverClient` constructor
+(prod-active), so solver validation errors do surface to console.
+
+Renderer-side validation errors in production fail silently at the WebGPU
+layer, but their downstream effect — broken visuals, NaN positions, missing
+draws — cascades through existing surfaces: the simulation lifecycle hook
+catches `SolverError` and falls back to CPU; the toast slice and
+`ErrorBoundary` tree (see audit eje E ratification) surface user-visible
+failures. Telemetry-grade prod renderer capture is out of scope for Phase 1.
+Revisit when a real-world incident shows the existing fallback chain isn't
+sufficient.
+
 ---
 
 ## References
