@@ -61,6 +61,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 // ─── withErrorScope ────────────────────────────────────────────────────────
@@ -138,6 +139,17 @@ describe('withErrorScope', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await withErrorScope(device, 'clean', () => undefined);
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('is a pass-through in production mode (DEV=false): no scope push/pop', async () => {
+    vi.stubEnv('DEV', false);
+    const { device } = createMockDevice();
+
+    const result = await withErrorScope(device, 'prod', () => 'value');
+
+    expect(result).toBe('value');
+    expect(device.pushErrorScope).not.toHaveBeenCalled();
+    expect(device.popErrorScope).not.toHaveBeenCalled();
   });
 
   it('still issues all 3 pops when one popErrorScope rejects (no scope leak)', async () => {
@@ -252,6 +264,17 @@ describe('instrumentShaderCapture', () => {
     expect(secondPatched).toBe(firstPatched);
   });
 
+  it('is a no-op in production mode (DEV=false): does not patch createShaderModule', () => {
+    vi.stubEnv('DEV', false);
+    const { device } = createMockDevice();
+    const before = device.createShaderModule;
+
+    instrumentShaderCapture(device);
+
+    expect(device.createShaderModule).toBe(before);
+    expect(window.__OPENCLO_SHADERS__).toBeUndefined();
+  });
+
   it('does not leave a phantom entry when original createShaderModule throws', () => {
     const { device } = createMockDevice();
     // Capture the underlying mock before patching so we can mutate its impl.
@@ -330,6 +353,22 @@ describe('installEarlyDeviceHook', () => {
     installEarlyDeviceHook();
     const secondWrapped = FakeAdapter.prototype.requestDevice;
     expect(secondWrapped).toBe(firstWrapped);
+  });
+
+  it('is a no-op in production mode (DEV=false): leaves prototype unmodified', () => {
+    vi.stubEnv('DEV', false);
+    class FakeAdapter {
+      async requestDevice(): Promise<GPUDevice> {
+        return null as unknown as GPUDevice;
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).GPUAdapter = FakeAdapter;
+    const before = FakeAdapter.prototype.requestDevice;
+
+    installEarlyDeviceHook();
+
+    expect(FakeAdapter.prototype.requestDevice).toBe(before);
   });
 
   it('isolates instrumentation throws — device still returned, error logged', async () => {
