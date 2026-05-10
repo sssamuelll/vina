@@ -15,9 +15,6 @@ wasm-bindgen = "0.2"
 # but this safety net catches regressions. Cross-ref: D6/D4/A3 docs.
 console_error_panic_hook = "0.1"
 
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = false
-
 [profile.release]
 opt-level = 3
 lto = true
