@@ -36,7 +36,7 @@ import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 import { computeBendRestDistances } from './bendRestDistances';
 import { buildAdjacency } from '../selfCollision';
-import type { WasmSolverConfig } from './wasmSolverClient';
+import type { PieceMeshData, WasmSolverConfig } from './wasmSolverClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -501,13 +501,17 @@ self.onmessage = async (event: MessageEvent) => {
           return;
         }
 
-        // Merge pieces using the standard utility (ensures consistent vertex mapping)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array }> = msg.pieces.map((p: any) => ({
+        // Merge pieces using the standard utility (ensures consistent vertex mapping).
+        // #749: postMessage structured-clones typed arrays cleanly, so unconditional
+        // `new Float32Array(p.vertices)` was a redundant ~600KB copy on a 50k-vertex
+        // avatar. Keep an `instanceof` guard so callers passing plain arrays still
+        // work, but skip the copy in the canonical typed-array path.
+        const pieces = msg.pieces as PieceMeshData[];
+        const pieceInput: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array }> = pieces.map((p) => ({
           pieceId: p.pieceId,
-          vertices: new Float32Array(p.vertices),
-          triIds: new Int32Array(p.triIds),
-          uvs: p.uvs ? new Float32Array(p.uvs) : undefined,
+          vertices: p.vertices instanceof Float32Array ? p.vertices : new Float32Array(p.vertices),
+          triIds: p.triIds instanceof Int32Array ? p.triIds : new Int32Array(p.triIds),
+          uvs: p.uvs instanceof Float32Array ? p.uvs : (p.uvs ? new Float32Array(p.uvs) : undefined),
         }));
 
         const merged = mergeMeshes(pieceInput);
@@ -561,9 +565,8 @@ self.onmessage = async (event: MessageEvent) => {
         // Cache outline and edge data for elastic constraint building
         const outlines = new Map<string, PathCommand[]>();
         const pieceEdges = new Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const p of msg.pieces as any[]) {
-          if (p.outline) outlines.set(p.pieceId, p.outline);
+        for (const p of pieces) {
+          if (p.outline) outlines.set(p.pieceId, p.outline as PathCommand[]);
           if (p.edges) pieceEdges.set(p.pieceId, { edges: p.edges });
         }
         wasmCachedOutlines = outlines;
@@ -679,9 +682,8 @@ self.onmessage = async (event: MessageEvent) => {
 
       case 'setPins':
         if (solver && msg.indices && msg.positions) {
-          const indices = new Uint32Array(msg.indices);
-          const positions = new Float32Array(msg.positions);
-          solver.set_pins(indices, positions);
+          // #749: client transfers typed-array buffers directly. No re-wrap.
+          solver.set_pins(msg.indices as Uint32Array, msg.positions as Float32Array);
         }
         break;
 

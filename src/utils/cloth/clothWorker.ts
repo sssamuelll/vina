@@ -149,11 +149,13 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
         // Merge all pieces into one particle system
         progress('Merging meshes...');
-        // Ensure inputs are typed arrays
+        // #749: postMessage structured-clones typed arrays cleanly. Skip the
+        // unconditional re-wrap (~600KB pure-waste copy on a 50k-vertex avatar)
+        // but keep an `instanceof` guard for callers that pass plain arrays.
         const pieceMeshes = msg.pieces.map(p => ({
           pieceId: p.pieceId,
-          vertices: new Float32Array(p.vertices),
-          triIds: new Int32Array(p.triIds),
+          vertices: p.vertices instanceof Float32Array ? p.vertices : new Float32Array(p.vertices),
+          triIds: p.triIds instanceof Int32Array ? p.triIds : new Int32Array(p.triIds),
         }));
         const merged = mergeMeshes(pieceMeshes);
         cachedMergedMesh = merged;
