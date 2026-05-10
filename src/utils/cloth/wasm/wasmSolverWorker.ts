@@ -790,12 +790,15 @@ self.onmessage = async (event: MessageEvent) => {
         const numEdges = solver.num_stretch_edges();
         const idsPtr = solver.stretch_ids_ptr();
         const restPtr = solver.stretch_rest_ptr();
-        // Read from WASM memory — copy to avoid detached buffer issues
-        const stretchingIds = new Int32Array(new Uint32Array(wasmExports.memory.buffer, idsPtr, numEdges * 2)).buffer.slice(0);
+        // #750: single .slice() detaches from WASM memory; Int32Array
+        // constructor over the same buffer is a zero-copy reinterpret
+        // (vertex indices fit under 2^31).
+        const idsBuffer = new Uint32Array(wasmExports.memory.buffer, idsPtr, numEdges * 2).slice().buffer;
+        const stretchingIds = new Int32Array(idsBuffer);
         const stretchingLengths = new Float32Array(wasmExports.memory.buffer, restPtr, numEdges).slice();
         (self as unknown as Worker).postMessage(
-          { type: 'edgeData', stretchingIds: new Int32Array(stretchingIds), stretchingLengths },
-          [stretchingIds, stretchingLengths.buffer],
+          { type: 'edgeData', stretchingIds, stretchingLengths },
+          [stretchingIds.buffer, stretchingLengths.buffer],
         );
         break;
       }
