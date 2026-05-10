@@ -1106,6 +1106,12 @@ impl SpatialHashGrid {
     /// construction. A future caller passing extreme integer coords (e.g.
     /// from a mis-scaled mesh in millimetres) could drift silently.
     fn hash_coords(&self, xi: i32, yi: i32, zi: i32) -> usize {
+        debug_assert!(
+            xi.abs() < (1 << 25) && yi.abs() < (1 << 25) && zi.abs() < (1 << 25),
+            "hash_coords precondition violated: |coord| must be < 2^25 \
+             for bit-exact JS parity. Got xi={xi}, yi={yi}, zi={zi}. \
+             Likely a mesh-scale bug (positions in mm vs m?)."
+        );
         let a = xi.wrapping_mul(92_837_111);
         let b = yi.wrapping_mul(689_287_499);
         let c = zi.wrapping_mul(283_923_481);
@@ -1286,6 +1292,17 @@ mod tests {
 
         assert!(neighbors.contains(&0));
         assert!(neighbors.contains(&1));
+    }
+
+    /// #755: `hash_coords` documents a bit-exact precondition (`|coord| < 2^25`)
+    /// for parity with the TS reference. A `debug_assert!` enforces it in debug
+    /// builds so a mis-scaled mesh (e.g. positions in mm vs m) surfaces loudly
+    /// instead of silently diverging from CPU output.
+    #[test]
+    #[should_panic(expected = "hash_coords precondition violated")]
+    fn hash_coords_asserts_coord_magnitude() {
+        let grid = SpatialHashGrid::new(1.0);
+        grid.hash_coords(1 << 26, 0, 0);
     }
 
     /// Helper: configure a solver with self-collision enabled and the
