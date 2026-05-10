@@ -160,6 +160,11 @@ export class XpbdSolver {
     /**
      * Set bend constraints with edge type classification.
      * edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR (SHEAR defaults to WEFT for bending)
+     *
+     * Persists `edge_types` so `configure()` can regenerate the
+     * per-constraint compliance cache after global-field mutation
+     * (#747). Routes through `recompute_bend_compliances` — single
+     * source of truth for the cache derivation.
      * @param {Uint32Array} ids
      * @param {Float32Array} rest_angles
      * @param {Uint8Array} edge_types
@@ -228,6 +233,11 @@ export class XpbdSolver {
     /**
      * Set stretch constraints with edge type classification.
      * edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR
+     *
+     * Persists `edge_types` so `configure()` can regenerate the
+     * per-constraint compliance cache after global-field mutation
+     * (#747). Routes through `recompute_stretch_compliances` —
+     * single source of truth for the cache derivation.
      * @param {Uint32Array} ids
      * @param {Float32Array} rest_lengths
      * @param {Uint8Array} edge_types

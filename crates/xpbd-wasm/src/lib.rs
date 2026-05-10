@@ -57,11 +57,18 @@ pub struct XpbdSolver {
     stretch_compliance_weft: f32,
     stretch_compliance_shear: f32,
     stretch_compliances: Vec<f32>,  // Per-constraint compliance
+    // Per-edge classification persisted so `configure()` can regenerate
+    // `stretch_compliances` after JS-side compliance mutation. Without
+    // this, `setConfig({ stretchComplianceWarp: ... })` was silently
+    // dropped at runtime (#747). Mirrors `seam_compliance` regenerator
+    // shape from BUG-3 #606.
+    stretch_edge_types: Vec<u8>,
 
     // Anisotropic bend compliance
     bend_compliance_warp: f32,
     bend_compliance_weft: f32,
     bend_compliances: Vec<f32>,  // Per-constraint compliance
+    bend_edge_types: Vec<u8>,
 
     // Internal damping
     internal_damping: f32,
@@ -131,9 +138,11 @@ impl XpbdSolver {
             stretch_compliance_weft: 0.0,
             stretch_compliance_shear: 0.001,
             stretch_compliances: Vec::new(),
+            stretch_edge_types: Vec::new(),
             bend_compliance_warp: 1.0,
             bend_compliance_weft: 1.0,
             bend_compliances: Vec::new(),
+            bend_edge_types: Vec::new(),
             internal_damping: 0.3,
             wind: [0.0, 0.0, 0.0],
             // Initial cell size irrelevant — `solve_self_collision` calls
@@ -151,18 +160,16 @@ impl XpbdSolver {
 
     /// Set stretch constraints with edge type classification.
     /// edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR
+    ///
+    /// Persists `edge_types` so `configure()` can regenerate the
+    /// per-constraint compliance cache after global-field mutation
+    /// (#747). Routes through `recompute_stretch_compliances` —
+    /// single source of truth for the cache derivation.
     pub fn set_stretch_with_types(&mut self, ids: &[u32], rest_lengths: &[f32], edge_types: &[u8]) {
         self.stretch_ids = ids.to_vec();
         self.stretch_rest = rest_lengths.to_vec();
-
-        // Compute per-constraint compliance based on edge types
-        self.stretch_compliances = edge_types.iter().map(|&et| {
-            match et {
-                0 => self.stretch_compliance_warp,   // WARP
-                1 => self.stretch_compliance_weft,   // WEFT
-                _ => self.stretch_compliance_shear,  // SHEAR or default
-            }
-        }).collect();
+        self.stretch_edge_types = edge_types.to_vec();
+        self.recompute_stretch_compliances();
     }
 
     /// Set bend constraints.
@@ -173,17 +180,16 @@ impl XpbdSolver {
 
     /// Set bend constraints with edge type classification.
     /// edge_types: 0 = WARP, 1 = WEFT, 2 = SHEAR (SHEAR defaults to WEFT for bending)
+    ///
+    /// Persists `edge_types` so `configure()` can regenerate the
+    /// per-constraint compliance cache after global-field mutation
+    /// (#747). Routes through `recompute_bend_compliances` — single
+    /// source of truth for the cache derivation.
     pub fn set_bend_with_types(&mut self, ids: &[u32], rest_angles: &[f32], edge_types: &[u8]) {
         self.bend_ids = ids.to_vec();
         self.bend_rest = rest_angles.to_vec();
-
-        // Compute per-constraint compliance based on edge types
-        self.bend_compliances = edge_types.iter().map(|&et| {
-            match et {
-                0 => self.bend_compliance_warp,   // WARP
-                _ => self.bend_compliance_weft,   // WEFT or SHEAR (default to weft)
-            }
-        }).collect();
+        self.bend_edge_types = edge_types.to_vec();
+        self.recompute_bend_compliances();
     }
 
     /// Set seam constraints with per-constraint XPBD compliance.
@@ -336,6 +342,40 @@ impl XpbdSolver {
         self.bend_compliance_warp = bend_compliance_warp;
         self.bend_compliance_weft = bend_compliance_weft;
         self.internal_damping = internal_damping;
+
+        // #747: regenerate per-edge compliance caches from the new
+        // global anisotropic fields. Without this, `setConfig` from JS
+        // mutates the globals here but `solve_stretch`/`solve_bend`
+        // keep reading stale values cached at `set_*_with_types` time.
+        // Mirrors `seam_compliance` regenerator pattern from BUG-3 #606.
+        self.recompute_stretch_compliances();
+        self.recompute_bend_compliances();
+    }
+
+    /// Regenerate `stretch_compliances` from `stretch_edge_types` and the
+    /// current anisotropic global fields. Single source of truth shared
+    /// by `set_stretch_with_types` (init) and `configure()` (runtime
+    /// mutation per #747).
+    fn recompute_stretch_compliances(&mut self) {
+        self.stretch_compliances = self.stretch_edge_types.iter().map(|&et| {
+            match et {
+                0 => self.stretch_compliance_warp,   // WARP
+                1 => self.stretch_compliance_weft,   // WEFT
+                _ => self.stretch_compliance_shear,  // SHEAR or default
+            }
+        }).collect();
+    }
+
+    /// Regenerate `bend_compliances` from `bend_edge_types` and the
+    /// current anisotropic global fields. SHEAR maps to WEFT (matching
+    /// the original `set_bend_with_types` semantics).
+    fn recompute_bend_compliances(&mut self) {
+        self.bend_compliances = self.bend_edge_types.iter().map(|&et| {
+            match et {
+                0 => self.bend_compliance_warp,   // WARP
+                _ => self.bend_compliance_weft,   // WEFT or SHEAR (default to weft)
+            }
+        }).collect();
     }
 
     /// Set wind direction and strength (world-space force vector).
@@ -1389,5 +1429,75 @@ mod tests {
         solver.solve_self_collision();
 
         assert_eq!(solver.positions, pos_before);
+    }
+
+    /// #747 regression: after `set_stretch_with_types` populates the
+    /// per-edge compliance cache from the global anisotropic fields,
+    /// a subsequent `configure()` call MUST regenerate that cache from
+    /// the new global values. Without the regen path, JS-side
+    /// `setConfig({ stretchComplianceWarp: ... })` is silently dropped
+    /// and `solve_stretch` keeps using the cached init values.
+    #[test]
+    fn configure_regenerates_anisotropic_stretch_compliance_cache() {
+        let positions = vec![0.0; 9];
+        let inv_mass = vec![1.0; 3];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+
+        // Init: two warp-edge stretch constraints with default warp = 0.
+        s.set_stretch_with_types(&[0u32, 1, 1, 2], &[1.0, 1.0], &[0u8, 0]);
+        // Sanity: cache populated from defaults.
+        assert!(s.stretch_compliances.iter().all(|&c| c == 0.0));
+
+        // Change warp compliance via configure — cache MUST regenerate.
+        s.configure(
+            1, 0.99, 0.0,
+            0.0, 1.0, false, 0.002, 0.005, 0.0, 1.0,
+            /* warp = */ 0.05, 0.0, 0.001,
+            1.0, 1.0, 0.3,
+        );
+
+        assert!(
+            s.stretch_compliances.iter().all(|&c| (c - 0.05).abs() < 1e-9),
+            "configure() must regenerate stretch_compliances cache from new warp value"
+        );
+    }
+
+    /// #747 regression for the bend twin. Same shape as the stretch
+    /// case: SHEAR maps to WEFT (per `set_bend_with_types` semantics),
+    /// so two warp-edge bend constraints fed `warp = 1.0` initially
+    /// must reflect a `configure()`-mutated `warp = 0.25`.
+    #[test]
+    fn configure_regenerates_bend_compliance_cache() {
+        // Need 4 particles for a single 4-tuple bend constraint
+        // ([a, b, c, d]); test exercises two such constraints to prove
+        // cache regen is per-entry, not just length-aware.
+        let positions = vec![0.0; 12];
+        let inv_mass = vec![1.0; 4];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+
+        // Two warp-edge bend constraints, default warp = 1.0.
+        s.set_bend_with_types(
+            &[0u32, 1, 2, 3, 0, 1, 2, 3],
+            &[1.0, 1.0],
+            &[0u8, 0],
+        );
+        assert!(
+            s.bend_compliances.iter().all(|&c| (c - 1.0).abs() < 1e-9),
+            "init: bend cache should reflect default warp=1.0"
+        );
+
+        // Mutate warp via configure — cache MUST regenerate.
+        s.configure(
+            1, 0.99, 0.0,
+            0.0, 1.0, false, 0.002, 0.005, 0.0, 1.0,
+            0.0, 0.0, 0.001,
+            /* bend warp = */ 0.25, 1.0,
+            0.3,
+        );
+
+        assert!(
+            s.bend_compliances.iter().all(|&c| (c - 0.25).abs() < 1e-9),
+            "configure() must regenerate bend_compliances cache from new warp value"
+        );
     }
 }
