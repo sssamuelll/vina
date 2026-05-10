@@ -600,3 +600,117 @@ describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', 
     expect(renderer._attributes.delete).toHaveBeenCalledWith(bestTriIdx);
   });
 });
+
+// ─── Behavior #9 — readPositionsToCPU TSL readback (#759) ────────────────────
+//
+// Closes the Phase-1 stub that returned the SBA's stale CPU-side array with a
+// `console.warn`. The TSL branch now routes through
+// `renderer.getArrayBufferAsync(positionSBA)` so callers receive post-compute
+// positions, mirroring the WGSL `solver.readPositions()` contract
+// (`numParticles * 3` flat Float32Array). The renderer can be passed
+// explicitly or picked up from the ref captured during
+// `readbackPositionsToGeometry`. When neither is available, the method throws
+// loudly instead of silently degrading.
+
+describe('readPositionsToCPU TSL readback (behavior #9 — #759)', () => {
+  it('returns a fresh Float32Array sourced from renderer.getArrayBufferAsync (explicit renderer)', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    // 4 particles × vec3 = 12 floats. Encode a recognisable pattern so the
+    // test asserts the bytes round-trip from the renderer, not from the SBA's
+    // init-time array.
+    const expected = new Float32Array([
+      1, 2, 3,  4, 5, 6,  7, 8, 9,  10, 11, 12,
+    ]);
+    const renderer = new FakeRenderer();
+    renderer.getArrayBufferAsync = vi.fn(() => Promise.resolve(expected.buffer));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const positions = await client.readPositionsToCPU(renderer as any);
+
+    expect(positions).not.toBeNull();
+    expect(positions).toBeInstanceOf(Float32Array);
+    expect(Array.from(positions!)).toEqual(Array.from(expected));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sba = (client as any).tslSolver.positionSBA;
+    expect(renderer.getArrayBufferAsync).toHaveBeenCalledWith(sba);
+  });
+
+  it('falls back to the cached rendererRef when no renderer is passed', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    // Prime rendererRef via readbackPositionsToGeometry (same path used in
+    // production by GarmentSimulation's TSL useFrame readback).
+    const renderer = new FakeRenderer();
+    await client.readbackPositionsToGeometry(
+      renderer as unknown as Parameters<typeof client.readbackPositionsToGeometry>[0],
+      makeMockGeometry(),
+    );
+
+    const expected = new Float32Array(4 * 3);
+    expected[0] = 99;
+    renderer.getArrayBufferAsync = vi.fn(() => Promise.resolve(expected.buffer));
+
+    const positions = await client.readPositionsToCPU();
+
+    expect(positions).not.toBeNull();
+    expect(positions![0]).toBe(99);
+    expect(renderer.getArrayBufferAsync).toHaveBeenCalled();
+  });
+
+  it('strips W when the GPU buffer is padded to vec4', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    // 4 particles × vec4 = 16 floats. W=99 sentinel so a wrong copy is
+    // immediately visible.
+    const padded = new Float32Array([
+      1, 2, 3, 99,   4, 5, 6, 99,   7, 8, 9, 99,   10, 11, 12, 99,
+    ]);
+    const renderer = new FakeRenderer();
+    renderer.getArrayBufferAsync = vi.fn(() => Promise.resolve(padded.buffer));
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const positions = await client.readPositionsToCPU(renderer as any);
+
+    expect(positions).not.toBeNull();
+    expect(positions!.length).toBe(12);
+    expect(Array.from(positions!)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  });
+
+  it('throws when TSL is active and no renderer is available', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    await expect(client.readPositionsToCPU()).rejects.toThrow(/WebGPURenderer/);
+  });
+
+  it('does not emit console.warn on the happy path (stub regression)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const renderer = new FakeRenderer();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await client.readPositionsToCPU(renderer as any);
+
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('GPU readback not yet implemented'),
+    );
+
+    warnSpy.mockRestore();
+  });
+});
