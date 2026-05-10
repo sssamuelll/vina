@@ -53,7 +53,7 @@ export function mapClothSimConfigToWasmSolverConfig(
   if (cpu.gravity !== undefined) {
     if (Array.isArray(cpu.gravity) && cpu.gravity.length === 3 && typeof cpu.gravity[1] === 'number') {
       out.gravityY = cpu.gravity[1];
-    } else if (process.env.NODE_ENV !== 'production') {
+    } else if (import.meta.env.MODE !== 'production') {
       console.warn('[configBridge] gravity must be [number, number, number]; got', cpu.gravity);
     }
   }
