@@ -37,6 +37,8 @@ export interface PieceMeshData {
   vertices: Float32Array;
   triIds: Int32Array | number[];
   outline?: Array<{ type: string; values: number[] }>;
+  /** Semantic edges used to build elastic constraints in the worker. */
+  edges?: Array<{ name: string; segmentRange: [number, number] }>;
   /** UV coordinates [u0,v0, u1,v1, ...] for anisotropic stretch */
   uvs?: Float32Array;
 }
@@ -242,11 +244,14 @@ export class WasmSolverClient implements ClothSolverClient {
       positions[i * 3 + 2] = pins[i].position[2];
     }
 
-    this.worker.postMessage({
-      type: 'setPins',
-      indices: Array.from(indices),
-      positions: Array.from(positions),
-    });
+    // #749: pass typed arrays directly with transferList (zero-copy).
+    // The buffers are built locally in this function — no caller holds a
+    // reference, so transferring ownership is safe. Worker consumes the
+    // typed arrays without re-wrapping.
+    this.worker.postMessage(
+      { type: 'setPins', indices, positions },
+      [indices.buffer, positions.buffer],
+    );
   }
 
   /**
