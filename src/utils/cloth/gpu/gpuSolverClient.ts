@@ -622,17 +622,44 @@ export class GpuSolverClient implements ClothSolverClient {
 
   /**
    * Explicit CPU readback for export/fit-maps.
-   * For TSL mode: reads back from the StorageBufferAttribute's GPU buffer.
+   * For TSL mode: reads back from the StorageBufferAttribute's GPU buffer via
+   * `renderer.getArrayBufferAsync`. Falls back to the renderer cached by the
+   * first `readbackPositionsToGeometry` call when no `renderer` is passed.
    * For WGSL mode: delegates to solver.readPositions().
+   *
+   * Returns a fresh, flat `numParticles * 3` Float32Array (vec3 layout) to
+   * mirror the WGSL contract. The GPU buffer may be padded to vec4 for
+   * alignment; the W component is stripped here so callers get a uniform
+   * shape regardless of tier.
    */
-  async readPositionsToCPU(): Promise<Float32Array | null> {
+  async readPositionsToCPU(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    renderer?: any,
+  ): Promise<Float32Array | null> {
     if (this.tslSolver) {
-      // TSL mode: the SBA's backing array is stale after compute.
-      // For now, return the SBA's array — it was initialized with positions
-      // and will be stale after compute (acceptable for Phase 1).
-      // Phase 2 will add proper GPU→CPU readback for TSL buffers.
-      console.warn('[GpuSolverClient] TSL readback returns initial positions (GPU readback not yet implemented)');
-      return new Float32Array(this.tslSolver.positionSBA.array as Float32Array);
+      const r = renderer ?? this.rendererRef;
+      if (!r) {
+        throw new Error(
+          '[GpuSolverClient] readPositionsToCPU (TSL) requires a WebGPURenderer. ' +
+            'Pass one explicitly or call readbackPositionsToGeometry first to cache one.',
+        );
+      }
+      if (!this.rendererRef) this.rendererRef = r;
+      const sba = this.tslSolver.positionSBA;
+      const ab: ArrayBuffer = await r.getArrayBufferAsync(sba);
+      const raw = new Float32Array(ab);
+      const numParticles = this.tslBuffers?.numParticles ?? Math.floor(raw.length / 3);
+      if (raw.length === numParticles * 4) {
+        // vec4 (XYZW padded) → vec3 (XYZ)
+        const out = new Float32Array(numParticles * 3);
+        for (let i = 0; i < numParticles; i++) {
+          out[i * 3] = raw[i * 4];
+          out[i * 3 + 1] = raw[i * 4 + 1];
+          out[i * 3 + 2] = raw[i * 4 + 2];
+        }
+        return out;
+      }
+      return raw;
     }
     return this.solver.readPositions();
   }
