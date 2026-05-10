@@ -122,6 +122,17 @@ export interface TslSolver {
   removeCollisionBody(id: string): void;
   /** Update solver uniforms at runtime */
   updateConfig: (config: Partial<TslSolverConfig>) => void;
+  /**
+   * Release solver-owned references so GC can reclaim TSL nodes/uniforms.
+   *
+   * GPU buffers backing the SBAs in the `TslBufferSet` are NOT freed here —
+   * that is the buffer set owner's responsibility (see `destroyTslBufferSet`
+   * in `tslBuffers.ts`). Per-collision-body BVH SBAs are owned by the caller
+   * of `setCollisionBody` (see `GpuSolverClient.setTslCollisionBody`) and
+   * disposed there. This method only clears the `collisionBodies` array so
+   * the bodies' compute nodes become GC-eligible.
+   */
+  dispose(): void;
 }
 
 // ─── Uniform nodes ───────────────────────────────────────────────────────────
@@ -719,6 +730,14 @@ export function createTslSolver(
     }
   }
 
+  function dispose(): void {
+    // Drop tracked collision bodies so their compute nodes (findBest/applyPush)
+    // and per-body atomic scratch SBAs become GC-eligible. The BVH SBAs that
+    // back these bodies are owned by the caller (GpuSolverClient.setTslCollisionBody)
+    // and disposed there per body id.
+    collisionBodies.length = 0;
+  }
+
   return {
     preSolve,
     stretchColors,
@@ -746,5 +765,6 @@ export function createTslSolver(
     setCollisionBody,
     removeCollisionBody,
     updateConfig,
+    dispose,
   };
 }

@@ -10,7 +10,9 @@
 import { StorageBufferAttribute } from 'three/webgpu';
 import type { ClothMeshData, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
 import type { SelfCollisionBufferSet } from './tslSelfCollision';
+import { destroySelfCollisionBuffers } from './tslSelfCollision';
 import type { WindBufferSet } from './tslWind';
+import { destroyWindBuffers } from './tslWind';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -234,4 +236,73 @@ export function createSBA(
   itemSize: number,
 ): StorageBufferAttribute {
   return new StorageBufferAttribute(array, itemSize);
+}
+
+// ─── Disposal ──────────────────────────────────────────────────────────────
+
+/**
+ * Best-effort GPU buffer release for a single StorageBufferAttribute.
+ *
+ * Three.js 0.183 does not expose `dispose()` on `StorageBufferAttribute`; the
+ * underlying `GPUBuffer` is owned by the WebGPURenderer's backend and lives
+ * on `renderer.backend.get(attr).buffer`. The canonical release path is
+ * `renderer._attributes.delete(attr)` → `backend.destroyAttribute(attr)`
+ * → `data.buffer.destroy()` (Three.js `Attributes.js` + `WebGPUAttributeUtils.js`).
+ *
+ * When `renderer` is unavailable (e.g. the SBA was created but never consumed
+ * by a frame, so dispose() runs without a cached renderer), this is a no-op:
+ * the SBA reference is simply dropped by the caller and the WeakMap-keyed
+ * backend entry becomes GC-eligible. Without an explicit `destroy()` call the
+ * GPUBuffer leaks until WebGPU's own GC reclaims it (not guaranteed).
+ */
+export function disposeStorageBufferAttribute(
+  sba: StorageBufferAttribute | null | undefined,
+  renderer: unknown,
+): void {
+  if (!sba || !renderer) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attrs = (renderer as any)?._attributes;
+  if (!attrs || typeof attrs.delete !== 'function') return;
+  try {
+    attrs.delete(sba);
+  } catch {
+    // best-effort: dispose paths must not throw
+  }
+}
+
+/**
+ * Release every GPU buffer owned by a TslBufferSet.
+ *
+ * Iterates the 14 fixed SBA fields plus per-color stretch SBAs, then delegates
+ * self-collision and wind buffer disposal to their owning modules. See
+ * `disposeStorageBufferAttribute` for the renderer-routing rationale.
+ */
+export function destroyTslBufferSet(
+  set: TslBufferSet,
+  renderer?: unknown,
+): void {
+  const sbas: Array<StorageBufferAttribute | null> = [
+    set.positionSBA,
+    set.prevPosSBA,
+    set.velocitySBA,
+    set.invMassSBA,
+    set.normalSBA,
+    set.normalAccumSBA,
+    set.triangleIdsSBA,
+    set.grabMaskSBA,
+    set.grabOffsetSBA,
+    set.bendIdsSBA,
+    set.bendRestSBA,
+    set.bendComplianceSBA,
+    set.seamIdsSBA,
+    set.seamTargetDistSBA,
+  ];
+  for (const color of set.stretchColors) {
+    sbas.push(color.idsSBA, color.restLengthsSBA, color.complianceSBA);
+  }
+  for (const sba of sbas) {
+    disposeStorageBufferAttribute(sba, renderer);
+  }
+  if (set.scBuffers) destroySelfCollisionBuffers(set.scBuffers, renderer);
+  if (set.windBuffers) destroyWindBuffers(set.windBuffers, renderer);
 }
