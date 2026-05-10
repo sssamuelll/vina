@@ -46,16 +46,88 @@ jobs:
       - name: Build
         run: npm run build
 
+  # Rust crate gate (#748). Catches the failure mode where someone edits
+  # crates/xpbd-wasm/src/lib.rs but forgets to rebuild + copy
+  # `xpbd_wasm.{js,_bg.wasm}` into `public/wasm/`. Without this gate the app
+  # silently runs against the stale binary and the Rust unit tests never run
+  # in CI either.
+  #
+  # Toolchain is pinned (1.94) so the wasm-pack output stays byte-stable
+  # across CI runs; with `wasm-opt = false` in Cargo.toml the build is
+  # otherwise deterministic. If a future toolchain upgrade is wanted, bump
+  # the version below + regenerate `public/wasm/` in the same commit.
+  rust:
+    name: Rust crate (cargo test + clippy + WASM sync)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/xpbd-wasm -> target
+
+      - name: cargo test
+        working-directory: crates/xpbd-wasm
+        run: cargo test --all-targets
+
+      - name: cargo clippy
+        working-directory: crates/xpbd-wasm
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: wasm-pack build
+        working-directory: crates/xpbd-wasm
+        run: wasm-pack build --target web --out-dir pkg
+
+      - name: Verify committed WASM matches source build
+        run: |
+          set -euo pipefail
+          # Compare hashes of the freshly-built artifacts vs the committed
+          # `public/wasm/` copies. If they diverge, lib.rs was edited without
+          # running the WASM rebuild + copy step from CLAUDE.md non-negotiables.
+          fresh_wasm_sha=$(sha256sum crates/xpbd-wasm/pkg/xpbd_wasm_bg.wasm | cut -d' ' -f1)
+          committed_wasm_sha=$(sha256sum public/wasm/xpbd_wasm_bg.wasm | cut -d' ' -f1)
+          fresh_js_sha=$(sha256sum crates/xpbd-wasm/pkg/xpbd_wasm.js | cut -d' ' -f1)
+          committed_js_sha=$(sha256sum public/wasm/xpbd_wasm.js | cut -d' ' -f1)
+
+          fail=0
+          if [ "$fresh_wasm_sha" != "$committed_wasm_sha" ]; then
+            echo "::error file=public/wasm/xpbd_wasm_bg.wasm::Out of sync with crates/xpbd-wasm/src/. Run: cd crates/xpbd-wasm && wasm-pack build --target web --out-dir pkg && cp pkg/xpbd_wasm.{js,_bg.wasm} ../../public/wasm/"
+            echo "  fresh:     $fresh_wasm_sha"
+            echo "  committed: $committed_wasm_sha"
+            fail=1
+          fi
+          if [ "$fresh_js_sha" != "$committed_js_sha" ]; then
+            echo "::error file=public/wasm/xpbd_wasm.js::Out of sync with crates/xpbd-wasm/src/. Same fix as above."
+            echo "  fresh:     $fresh_js_sha"
+            echo "  committed: $committed_js_sha"
+            fail=1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            exit 1
+          fi
+          echo "✓ Committed WASM matches source build"
+
   # Summary job for branch protection
   ci-success:
     name: CI Success
-    needs: [validate]
+    needs: [validate, rust]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all jobs passed
         run: |
-          if [[ "${{ needs.validate.result }}" != "success" ]]; then
+          if [[ "${{ needs.validate.result }}" != "success" || "${{ needs.rust.result }}" != "success" ]]; then
             echo "CI failed"
             exit 1
           fi
