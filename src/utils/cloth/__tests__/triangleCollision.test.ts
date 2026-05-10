@@ -191,3 +191,81 @@ describe('solveTriangleCollision', () => {
     expect(pos[1]).toBeCloseTo(margin, 3);
   });
 });
+
+// Position-based friction in solveTriangleCollision is gated by BOTH
+// `friction > 0` AND a defined `prevPos`. BUG-2 (#605) hit this gate at the
+// caller side: wasmSolverWorker invoked solveTriangleCollision without
+// prevPos, so per-body friction was silently a no-op. The fix at
+// wasmSolverWorker.ts:289 wired prevView through; the tests below lock in the
+// kernel-side contract so the regression cannot recur unnoticed.
+describe('solveTriangleCollision — friction kernel (regression for BUG-2 #605)', () => {
+  // Shared sliding-particle setup: tangential displacement of 1.0 along +X
+  // while penetrating the floor plane (y = 0, normal +Y) by 0.01.
+  const SLIDE_X = 1.0;
+  const PENETRATION_Y = -0.01;
+  const MARGIN = 0.005;
+
+  function makeContactSetup() {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const pos = new Float32Array([SLIDE_X, PENETRATION_Y, 0]);
+    const prevPos = new Float32Array([0.0, PENETRATION_Y, 0]);
+    const invMass = new Float32Array([1.0]);
+    return { mesh, hash, pos, prevPos, invMass };
+  }
+
+  it('friction > 0 with prevPos undefined is silently a no-op (BUG-2 shape)', () => {
+    // This is the exact failure mode the WASM worker hit before #605 fix:
+    // body.friction was non-zero, but prevPos was never threaded through, so
+    // the kernel's `if (friction > 0 && prevPos)` guard fell through. The
+    // particle gets pushed out of penetration normally but tangent slide is
+    // untouched.
+    const { mesh, hash, pos, invMass } = makeContactSetup();
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, MARGIN, 0.5 /* friction */);
+
+    expect(pos[1]).toBeCloseTo(MARGIN, 3); // normal push still applied
+    expect(pos[0]).toBeCloseTo(SLIDE_X, 5); // tangent NOT attenuated
+  });
+
+  it('friction > 0 with prevPos provided attenuates tangent displacement (positive control)', () => {
+    // Pair to the previous test: same inputs, only difference is prevPos.
+    // The result must differ — that is precisely the BUG-2 fix contract.
+    const { mesh, hash, pos, prevPos, invMass } = makeContactSetup();
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, MARGIN, 0.5, prevPos);
+
+    expect(pos[1]).toBeCloseTo(MARGIN, 3);
+    // friction = 0.5 removes 0.5 * tangent. tangent ≈ SLIDE_X (the y-component
+    // of the post-push displacement projects onto the normal, leaving x ≈ 1.0
+    // on the tangent plane). Final x ≈ SLIDE_X * (1 - friction).
+    expect(pos[0]).toBeLessThan(SLIDE_X); // attenuated
+    expect(pos[0]).toBeGreaterThan(0); // not over-clamped to zero or beyond
+    expect(pos[0]).toBeCloseTo(SLIDE_X * 0.5, 2);
+  });
+
+  it('friction = 0 with prevPos provided leaves tangent unchanged (gate predicate)', () => {
+    // Documents the `friction > 0` half of the gate: even when prevPos is
+    // provided, friction = 0 must short-circuit the tangential damping.
+    const { mesh, hash, pos, prevPos, invMass } = makeContactSetup();
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, MARGIN, 0 /* friction */, prevPos);
+
+    expect(pos[1]).toBeCloseTo(MARGIN, 3);
+    expect(pos[0]).toBeCloseTo(SLIDE_X, 5);
+  });
+
+  it('friction is a no-op when particle is outside margin (no contact)', () => {
+    // The friction branch lives inside the contact-detected block, so a
+    // non-penetrating particle must not see any tangential damping even when
+    // friction > 0 and prevPos is provided. Locks in that the kernel does not
+    // apply drag in free flight.
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const pos = new Float32Array([SLIDE_X, 1.0, 0]); // 1m above floor, far above margin
+    const prevPos = new Float32Array([0.0, 1.0, 0]);
+    const invMass = new Float32Array([1.0]);
+
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, MARGIN, 1.0 /* high friction */, prevPos);
+
+    expect(pos[0]).toBeCloseTo(SLIDE_X, 5); // tangent untouched
+    expect(pos[1]).toBeCloseTo(1.0, 5); // position untouched
+  });
+});
