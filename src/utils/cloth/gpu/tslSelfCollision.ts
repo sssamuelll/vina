@@ -124,6 +124,43 @@ export function createSelfCollisionBuffers(
   };
 }
 
+/**
+ * Release the GPU buffers backing a SelfCollisionBufferSet.
+ *
+ * Three.js 0.183's `StorageBufferAttribute` has no `dispose()` — the underlying
+ * `GPUBuffer` lives on `renderer.backend.get(attr).buffer`. Passing the
+ * `WebGPURenderer` lets us route through `renderer._attributes.delete(attr)`
+ * which calls `backend.destroyAttribute(attr)` → `data.buffer.destroy()`. When
+ * `renderer` is omitted (e.g. dispose() ran before any frame consumed these
+ * SBAs), this is a no-op — the SBAs become GC-eligible once the caller drops
+ * its references but the GPUBuffer is not actively freed.
+ */
+export function destroySelfCollisionBuffers(
+  buffers: SelfCollisionBufferSet,
+  renderer?: unknown,
+): void {
+  if (!renderer) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attrs = (renderer as any)?._attributes;
+  if (!attrs || typeof attrs.delete !== 'function') return;
+  const sbas: StorageBufferAttribute[] = [
+    buffers.cellCountSBA,
+    buffers.cellStartSBA,
+    buffers.cellEntriesSBA,
+    buffers.adjOffsetsSBA,
+    buffers.adjNeighborsSBA,
+    buffers.deltaSBA,
+    buffers.corrCountSBA,
+  ];
+  for (const sba of sbas) {
+    try {
+      attrs.delete(sba);
+    } catch {
+      // best-effort: dispose paths must not throw
+    }
+  }
+}
+
 // ─── Compute Node Factory ───────────────────────────────────────────────────
 
 /**

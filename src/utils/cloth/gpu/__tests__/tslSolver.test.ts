@@ -526,6 +526,25 @@ describe('updateConfig', () => {
     expect(solver.prevPosBufNode).toBeDefined();
     expect(solver.invMassBufNode).toBeDefined();
   });
+
+  it('dispose clears registered collision bodies', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    solver.setCollisionBody(makeMockBody({ id: 'a', margin: 0.005, friction: 0.3, nodeCount: 1, triCount: 1 }));
+    solver.setCollisionBody(makeMockBody({ id: 'b', margin: 0.005, friction: 0.3, nodeCount: 1, triCount: 1 }));
+    expect(solver.collisionBodies).toHaveLength(2);
+    solver.dispose();
+    expect(solver.collisionBodies).toHaveLength(0);
+  });
+
+  it('dispose is idempotent and never throws on a fresh solver', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    expect(() => {
+      solver.dispose();
+      solver.dispose();
+    }).not.toThrow();
+  });
 });
 
 // ─── #554 regression guards ──────────────────────────────────────────────────

@@ -79,6 +79,29 @@ export function createWindBuffers(numParticles: number): WindBufferSet {
   };
 }
 
+/**
+ * Release the GPU buffer backing a WindBufferSet.
+ *
+ * Routes through `renderer._attributes.delete(attr)` (calls
+ * `backend.destroyAttribute(attr)` → `data.buffer.destroy()`). When the
+ * renderer is omitted, this is a no-op — see `destroySelfCollisionBuffers`
+ * for the rationale.
+ */
+export function destroyWindBuffers(
+  buffers: WindBufferSet,
+  renderer?: unknown,
+): void {
+  if (!renderer) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const attrs = (renderer as any)?._attributes;
+  if (!attrs || typeof attrs.delete !== 'function') return;
+  try {
+    attrs.delete(buffers.windAccumSBA);
+  } catch {
+    // best-effort: dispose paths must not throw
+  }
+}
+
 // ─── Compute Node Factory ───────────────────────────────────────────────────
 
 /**

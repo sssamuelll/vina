@@ -12,7 +12,14 @@
 import { GpuClothSolver, type GpuSolverConfig } from './gpuSolver';
 import { extractStretchConstraints, extractBendConstraints, colorConstraints, type SeamConstraintData } from './gpuBuffers';
 import { createPositionStorageAttribute, createNormalStorageAttribute } from './gpuStorageAttributes';
-import { createTslBuffers, createSBA, type TslBufferSet, type FabricComplianceConfig } from './tslBuffers';
+import {
+  createTslBuffers,
+  createSBA,
+  destroyTslBufferSet,
+  disposeStorageBufferAttribute,
+  type TslBufferSet,
+  type FabricComplianceConfig,
+} from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
@@ -74,6 +81,27 @@ export class GpuSolverClient implements ClothSolverClient {
   private tslBuffers: TslBufferSet | null = null;
   private pieceVertexRanges: Map<string, { start: number; count: number }> | null = null;
   private originalInvMass: Float32Array | null = null;
+
+  /**
+   * Cached WebGPURenderer reference, captured the first time a render-coupled
+   * method (`readbackPositionsToGeometry`) sees one. Required by the disposal
+   * path in `dispose()` / `initMultiPieceTsl` / `setTslCollisionBody`: Three.js
+   * 0.183 `StorageBufferAttribute` has no public `dispose()` so the
+   * canonical GPU-buffer release route is `renderer._attributes.delete(attr)`.
+   * Null until first use; disposal degrades to ref-drop without it.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private rendererRef: any = null;
+
+  /**
+   * Tracks BVH SBAs per collision body id so `setTslCollisionBody` can free
+   * the previous allocation when called again for the same id (avatar pose
+   * updates re-allocate 3 SBAs each call, see #753).
+   */
+  private collisionBodySBAs: Map<
+    string,
+    { bvhNodesSBA: StorageBufferAttribute; triVertsSBA: StorageBufferAttribute; triNormalsSBA: StorageBufferAttribute }
+  > = new Map();
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
     this.device = device;
@@ -332,6 +360,12 @@ export class GpuSolverClient implements ClothSolverClient {
     }
 
     await withErrorScope(this.device, 'GpuSolverClient.initMultiPieceTsl', () => {
+      // Re-init: free any previously-allocated TSL resources so re-init cycles
+      // (load project → simulate → load different project) don't leak GPUBuffers
+      // (#753). When the renderer hasn't been captured yet (first init), this
+      // degrades to a ref-drop — see `disposeStorageBufferAttribute`.
+      this.disposeTslResources();
+
       // Create TSL buffers with per-constraint compliance
       this.tslBuffers = createTslBuffers(
         { positions, triangles, invMass },
@@ -491,6 +525,11 @@ export class GpuSolverClient implements ClothSolverClient {
     geometry: THREE.BufferGeometry,
   ): Promise<Float32Array | null> {
     if (!this.tslSolver) return null;
+    // Capture the renderer the first time we see one so dispose() can route
+    // GPU-buffer destruction through `renderer._attributes.delete(attr)`.
+    // The renderer is stable for the lifetime of the WebGPU context, so
+    // first-write-wins is sufficient.
+    if (!this.rendererRef) this.rendererRef = renderer;
     const sba = this.tslSolver.positionSBA;
     try {
       const ab: ArrayBuffer = await renderer.getArrayBufferAsync(sba);
@@ -600,16 +639,21 @@ export class GpuSolverClient implements ClothSolverClient {
 
   /**
    * Clean up all resources.
+   *
+   * Order matters: TSL GPU buffers must be released BEFORE `solver.destroy()`
+   * because the cached `rendererRef` may share the device with the WGSL
+   * solver, and once `device` is destroyed the renderer's backend can't
+   * service `_attributes.delete()` calls.
    */
   dispose(): void {
     this.disposed = true;
     this.stop();
     this.positionAttr = null;
     this.normalAttr = null;
-    this.tslSolver = null;
-    this.tslBuffers = null;
+    this.disposeTslResources();
     this.pieceVertexRanges = null;
     this.originalInvMass = null;
+    this.rendererRef = null;
     this.solver.destroy();
   }
 
@@ -699,10 +743,21 @@ export class GpuSolverClient implements ClothSolverClient {
       return;
     }
 
+    // Re-allocation cleanup: avatar pose updates call this method repeatedly
+    // for the same body id. Without this, each call leaks 3 SBAs worth of
+    // GPUBuffer (BVH nodes, tri verts, tri normals) — #753.
+    const previous = this.collisionBodySBAs.get(id);
+    if (previous) {
+      disposeStorageBufferAttribute(previous.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.triVertsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.triNormalsSBA, this.rendererRef);
+    }
+
     // Create StorageBufferAttributes for GPU upload
     const bvhNodesSBA = createSBA(bvh.nodes, 1);
     const triVertsSBA = createSBA(bvh.triVerts, 1);
     const triNormalsSBA = createSBA(bvh.triNormals, 1);
+    this.collisionBodySBAs.set(id, { bvhNodesSBA, triVertsSBA, triNormalsSBA });
 
     // Use shared buffer nodes from the solver
     const N = this.tslSolver.numParticles;
@@ -740,6 +795,35 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   removeTslCollisionBody(id: string): void {
     this.tslSolver?.removeCollisionBody(id);
+    const tracked = this.collisionBodySBAs.get(id);
+    if (tracked) {
+      disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
+      this.collisionBodySBAs.delete(id);
+    }
+  }
+
+  /**
+   * Free all TSL-side GPU resources (buffer set + per-body BVH SBAs + solver
+   * compute-node refs). Idempotent. Used by both `dispose()` and the re-init
+   * path in `initMultiPieceTsl`.
+   */
+  private disposeTslResources(): void {
+    for (const tracked of this.collisionBodySBAs.values()) {
+      disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
+    }
+    this.collisionBodySBAs.clear();
+    if (this.tslBuffers) {
+      destroyTslBufferSet(this.tslBuffers, this.rendererRef);
+      this.tslBuffers = null;
+    }
+    if (this.tslSolver) {
+      this.tslSolver.dispose();
+      this.tslSolver = null;
+    }
   }
 
   // ─── Private ────────────────────────────────────────────────────────────
