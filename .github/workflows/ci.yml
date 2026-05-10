@@ -52,10 +52,12 @@ jobs:
   # silently runs against the stale binary and the Rust unit tests never run
   # in CI either.
   #
-  # Toolchain is pinned (1.94) so the wasm-pack output stays byte-stable
-  # across CI runs; with `wasm-opt = false` in Cargo.toml the build is
-  # otherwise deterministic. If a future toolchain upgrade is wanted, bump
-  # the version below + regenerate `public/wasm/` in the same commit.
+  # Both Rust toolchain and wasm-pack are pinned at the patch level so the
+  # wasm-pack output stays byte-stable across CI runs and matches the binaries
+  # committed to `public/wasm/`. With `wasm-opt = false` in Cargo.toml the
+  # build is otherwise deterministic. If a future toolchain or wasm-pack
+  # upgrade is wanted, bump the version below + regenerate `public/wasm/`
+  # in the same commit.
   rust:
     name: Rust crate (cargo test + clippy + WASM sync)
     runs-on: ubuntu-latest
@@ -64,8 +66,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.94.0
+        uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.94.1
           components: clippy
           targets: wasm32-unknown-unknown
 
@@ -82,8 +85,11 @@ jobs:
         working-directory: crates/xpbd-wasm
         run: cargo clippy --all-targets -- -D warnings
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Install wasm-pack 0.13.1
+        # Pinned via `cargo install --locked` so the version is reproducible
+        # across CI runs. The Swatinem cache above keeps the rebuild fast on
+        # repeat runs (~1s after first install).
+        run: cargo install wasm-pack --version 0.13.1 --locked
 
       - name: wasm-pack build
         working-directory: crates/xpbd-wasm
