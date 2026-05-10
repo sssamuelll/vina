@@ -116,23 +116,33 @@ export interface TslSolver {
   grabNodes: GrabComputeNodes;
   /** Active collision bodies (BVH-accelerated) */
   collisionBodies: TslCollisionBody[];
-  /** Add or replace a collision body */
-  setCollisionBody(body: TslCollisionBody): void;
-  /** Remove a collision body by ID */
-  removeCollisionBody(id: string): void;
+  /**
+   * Add or replace a collision body. When `body.id` matches an existing
+   * registration, the previous body's `dispose(renderer)` is invoked before
+   * the swap so its per-body atomic scratch SBAs are released. `renderer` is
+   * best-effort — without it, `dispose` only drops JS references (same
+   * semantics as `disposeStorageBufferAttribute`).
+   */
+  setCollisionBody(body: TslCollisionBody, renderer?: unknown): void;
+  /**
+   * Remove a collision body by ID, calling `body.dispose(renderer)` before
+   * splice. Best-effort without a renderer.
+   */
+  removeCollisionBody(id: string, renderer?: unknown): void;
   /** Update solver uniforms at runtime */
   updateConfig: (config: Partial<TslSolverConfig>) => void;
   /**
-   * Release solver-owned references so GC can reclaim TSL nodes/uniforms.
+   * Release solver-owned references so GC can reclaim TSL nodes/uniforms,
+   * and dispose every registered collision body's per-body atomic scratch
+   * SBAs via `body.dispose(renderer)` before clearing the array.
    *
    * GPU buffers backing the SBAs in the `TslBufferSet` are NOT freed here —
    * that is the buffer set owner's responsibility (see `destroyTslBufferSet`
    * in `tslBuffers.ts`). Per-collision-body BVH SBAs are owned by the caller
    * of `setCollisionBody` (see `GpuSolverClient.setTslCollisionBody`) and
-   * disposed there. This method only clears the `collisionBodies` array so
-   * the bodies' compute nodes become GC-eligible.
+   * disposed there.
    */
-  dispose(): void;
+  dispose(renderer?: unknown): void;
 }
 
 // ─── Uniform nodes ───────────────────────────────────────────────────────────
@@ -632,18 +642,23 @@ export function createTslSolver(
   // ─── Collision body management ──────────────────────────────────────
   const collisionBodies: TslCollisionBody[] = [];
 
-  function setCollisionBody(body: TslCollisionBody): void {
+  function setCollisionBody(body: TslCollisionBody, renderer?: unknown): void {
     const idx = collisionBodies.findIndex(b => b.id === body.id);
     if (idx >= 0) {
+      // Release the previous body's per-body atomic scratch SBAs before swap.
+      collisionBodies[idx].dispose(renderer);
       collisionBodies[idx] = body;
     } else {
       collisionBodies.push(body);
     }
   }
 
-  function removeCollisionBody(id: string): void {
+  function removeCollisionBody(id: string, renderer?: unknown): void {
     const idx = collisionBodies.findIndex(b => b.id === id);
-    if (idx >= 0) collisionBodies.splice(idx, 1);
+    if (idx >= 0) {
+      collisionBodies[idx].dispose(renderer);
+      collisionBodies.splice(idx, 1);
+    }
   }
 
   // ─── Self-collision (optional) ─────────────────────────────────────
@@ -730,11 +745,15 @@ export function createTslSolver(
     }
   }
 
-  function dispose(): void {
-    // Drop tracked collision bodies so their compute nodes (findBest/applyPush)
-    // and per-body atomic scratch SBAs become GC-eligible. The BVH SBAs that
-    // back these bodies are owned by the caller (GpuSolverClient.setTslCollisionBody)
+  function dispose(renderer?: unknown): void {
+    // Dispose each registered body's per-body atomic scratch SBAs (#771
+    // follow-up), then drop tracked collision bodies so their compute nodes
+    // (findBest/applyPush) become GC-eligible. The BVH SBAs that back these
+    // bodies are owned by the caller (GpuSolverClient.setTslCollisionBody)
     // and disposed there per body id.
+    for (const body of collisionBodies) {
+      body.dispose(renderer);
+    }
     collisionBodies.length = 0;
   }
 

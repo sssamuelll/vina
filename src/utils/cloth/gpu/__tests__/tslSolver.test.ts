@@ -202,6 +202,7 @@ function makeMockBody(opts: {
   friction: number;
   nodeCount: number;
   triCount: number;
+  dispose?: (renderer?: unknown) => void;
 }) {
   return {
     id: opts.id,
@@ -211,6 +212,7 @@ function makeMockBody(opts: {
     friction: opts.friction,
     nodeCount: opts.nodeCount,
     triCount: opts.triCount,
+    dispose: opts.dispose ?? (() => {}),
   };
 }
 
@@ -504,6 +506,31 @@ describe('updateConfig', () => {
     expect(solver.collisionBodies[0].margin).toBe(0.01);
   });
 
+  it('setCollisionBody disposes the previous body when replacing same id, propagating renderer', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const dispose1 = vi.fn();
+    const dispose2 = vi.fn();
+    const body1 = makeMockBody({ id: 'test', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5, dispose: dispose1 });
+    const body2 = makeMockBody({ id: 'test', margin: 0.01, friction: 0.5, nodeCount: 20, triCount: 10, dispose: dispose2 });
+    const renderer = { __test: 'renderer' };
+    solver.setCollisionBody(body1, renderer);
+    expect(dispose1).not.toHaveBeenCalled();
+    solver.setCollisionBody(body2, renderer);
+    expect(dispose1).toHaveBeenCalledOnce();
+    expect(dispose1).toHaveBeenCalledWith(renderer);
+    expect(dispose2).not.toHaveBeenCalled();
+  });
+
+  it('setCollisionBody does not dispose anything when body id is new', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const dispose1 = vi.fn();
+    const body1 = makeMockBody({ id: 'a', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5, dispose: dispose1 });
+    solver.setCollisionBody(body1);
+    expect(dispose1).not.toHaveBeenCalled();
+  });
+
   it('removeCollisionBody removes by id', () => {
     const buffers = makeMockBufferSet();
     const solver = createTslSolver(buffers, { ...defaultConfig });
@@ -511,6 +538,30 @@ describe('updateConfig', () => {
     solver.setCollisionBody(body);
     solver.removeCollisionBody('test');
     expect(solver.collisionBodies).toHaveLength(0);
+  });
+
+  it('removeCollisionBody disposes the body before splice, propagating renderer', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const dispose = vi.fn();
+    const body = makeMockBody({ id: 'test', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5, dispose });
+    const renderer = { __test: 'renderer' };
+    solver.setCollisionBody(body);
+    solver.removeCollisionBody('test', renderer);
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(dispose).toHaveBeenCalledWith(renderer);
+    expect(solver.collisionBodies).toHaveLength(0);
+  });
+
+  it('removeCollisionBody is no-op (no dispose) for unknown id even with renderer', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const dispose = vi.fn();
+    const body = makeMockBody({ id: 'a', margin: 0.005, friction: 0.3, nodeCount: 10, triCount: 5, dispose });
+    solver.setCollisionBody(body);
+    solver.removeCollisionBody('nonexistent', { __test: 'renderer' });
+    expect(dispose).not.toHaveBeenCalled();
+    expect(solver.collisionBodies).toHaveLength(1);
   });
 
   it('removeCollisionBody is no-op for unknown id', () => {
@@ -534,6 +585,22 @@ describe('updateConfig', () => {
     solver.setCollisionBody(makeMockBody({ id: 'b', margin: 0.005, friction: 0.3, nodeCount: 1, triCount: 1 }));
     expect(solver.collisionBodies).toHaveLength(2);
     solver.dispose();
+    expect(solver.collisionBodies).toHaveLength(0);
+  });
+
+  it('dispose calls body.dispose(renderer) on every registered body before clear', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+    const disposeA = vi.fn();
+    const disposeB = vi.fn();
+    solver.setCollisionBody(makeMockBody({ id: 'a', margin: 0.005, friction: 0.3, nodeCount: 1, triCount: 1, dispose: disposeA }));
+    solver.setCollisionBody(makeMockBody({ id: 'b', margin: 0.005, friction: 0.3, nodeCount: 1, triCount: 1, dispose: disposeB }));
+    const renderer = { __test: 'renderer' };
+    solver.dispose(renderer);
+    expect(disposeA).toHaveBeenCalledOnce();
+    expect(disposeA).toHaveBeenCalledWith(renderer);
+    expect(disposeB).toHaveBeenCalledOnce();
+    expect(disposeB).toHaveBeenCalledWith(renderer);
     expect(solver.collisionBodies).toHaveLength(0);
   });
 
