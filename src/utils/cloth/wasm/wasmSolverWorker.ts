@@ -220,6 +220,82 @@ let wasmNaNCount = 0;
 const MAX_PARTICLE_VEL = 5.0;
 const MAX_PARTICLE_VEL_SQ = MAX_PARTICLE_VEL * MAX_PARTICLE_VEL;
 
+/**
+ * Solve elastic XPBD distance constraints in JS — Rust solver has no native
+ * elastic support, so we iterate `set.constraints` and apply position
+ * corrections directly on the WASM-backed `posView`. Extracted from both
+ * branches of `simulationLoop` (#758).
+ */
+function solveElasticConstraints(
+  posView: Float32Array,
+  set: ElasticConstraintSet,
+  sdt: number,
+): void {
+  for (const c of set.constraints) {
+    const i3 = c.vertexA * 3, j3 = c.vertexB * 3;
+    const dx = posView[j3] - posView[i3];
+    const dy = posView[j3 + 1] - posView[i3 + 1];
+    const dz = posView[j3 + 2] - posView[i3 + 2];
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist < 1e-8) continue;
+    const alpha = c.compliance / (sdt * sdt);
+    const correction = (dist - c.restLength) / (2.0 + alpha);
+    const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+    posView[i3] += correction * nx;
+    posView[i3 + 1] += correction * ny;
+    posView[i3 + 2] += correction * nz;
+    posView[j3] -= correction * nx;
+    posView[j3 + 1] -= correction * ny;
+    posView[j3 + 2] -= correction * nz;
+  }
+}
+
+/**
+ * NaN guard at the WASM→JS post-step boundary. Resets NaN positions to
+ * `prevView` (continuity preserved) and increments the module-scoped
+ * cumulative counter `wasmNaNCount` (A3 § 3.3.A telemetry contract).
+ * Rate-limited console.warn: first occurrence of this step + every 100th
+ * cumulative. `branchLabel` flows into the warn message for log grep.
+ */
+function guardNaN(
+  posView: Float32Array,
+  prevView: Float32Array,
+  branchLabel: string,
+): void {
+  let nanThisStep = 0;
+  for (let i = 0; i < posView.length; i++) {
+    if (posView[i] !== posView[i]) {
+      posView[i] = prevView[i];
+      nanThisStep++;
+    }
+  }
+  if (nanThisStep > 0) {
+    wasmNaNCount += nanThisStep;
+    if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
+      console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (${branchLabel})`);
+    }
+  }
+}
+
+/**
+ * Clamp particle velocity magnitude to `MAX_PARTICLE_VEL`. Rust solver's
+ * post_solve has no internal clamp; at 900Hz substep rate, constraint
+ * corrections of 0.05m become 45 m/s and compound exponentially into cloth
+ * explosion without this gate.
+ */
+function clampVelocity(velView: Float32Array, n: number): void {
+  for (let p = 0; p < n; p++) {
+    const i3 = p * 3;
+    const vSq = velView[i3] * velView[i3] + velView[i3 + 1] * velView[i3 + 1] + velView[i3 + 2] * velView[i3 + 2];
+    if (vSq > MAX_PARTICLE_VEL_SQ) {
+      const scale = MAX_PARTICLE_VEL / Math.sqrt(vSq);
+      velView[i3] *= scale;
+      velView[i3 + 1] *= scale;
+      velView[i3 + 2] *= scale;
+    }
+  }
+}
+
 function simulationLoop(): void {
   if (!running || !solver) return;
 
@@ -258,23 +334,7 @@ function simulationLoop(): void {
 
       // Solve elastic constraints in JS (Rust solver has no native elastic support)
       if (elasticConstraintSet) {
-        for (const c of elasticConstraintSet.constraints) {
-          const i3 = c.vertexA * 3, j3 = c.vertexB * 3;
-          const dx = posView[j3] - posView[i3];
-          const dy = posView[j3 + 1] - posView[i3 + 1];
-          const dz = posView[j3 + 2] - posView[i3 + 2];
-          const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-          if (dist < 1e-8) continue;
-          const alpha = c.compliance / (sdt * sdt);
-          const correction = (dist - c.restLength) / (2.0 + alpha);
-          const nx = dx / dist, ny = dy / dist, nz = dz / dist;
-          posView[i3] += correction * nx;
-          posView[i3 + 1] += correction * ny;
-          posView[i3 + 2] += correction * nz;
-          posView[j3] -= correction * nx;
-          posView[j3 + 1] -= correction * ny;
-          posView[j3 + 2] -= correction * nz;
-        }
+        solveElasticConstraints(posView, elasticConstraintSet, sdt);
       }
 
       // Save positions before collision for velocity correction
@@ -290,21 +350,8 @@ function simulationLoop(): void {
       }
 
       // NaN guard: if any position went NaN, reset to previous valid positions.
-      // A3 Sec 3.3.A: added telemetry counter — was silent reset, now signals
-      // cumulative NaN occurrences via rate-limited console.warn.
-      let nanThisStep = 0;
-      for (let i = 0; i < n3; i++) {
-        if (posView[i] !== posView[i]) {
-          posView[i] = prevView[i];
-          nanThisStep++;
-        }
-      }
-      if (nanThisStep > 0) {
-        wasmNaNCount += nanThisStep;
-        if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
-          console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (collision branch)`);
-        }
-      }
+      // A3 Sec 3.3.A: telemetry counter + rate-limited warn (see `guardNaN`).
+      guardNaN(posView, prevView, 'collision branch');
 
       // Derive velocity from PRE-COLLISION positions (natural dynamics only).
       // Collision push corrects position but must NOT create velocity — otherwise
@@ -340,20 +387,8 @@ function simulationLoop(): void {
         }
       }
 
-      // Clamp velocity magnitude to prevent explosions.
-      // The Rust solver's post_solve has no maxVelocity clamp (unlike the JS solver
-      // which clamps to 5 m/s). At 900Hz substep rate, constraint corrections of
-      // 0.05m become 45 m/s, compounding exponentially into cloth explosion.
-      for (let p = 0; p < n; p++) {
-        const i3 = p * 3;
-        const vSq = velView[i3] * velView[i3] + velView[i3 + 1] * velView[i3 + 1] + velView[i3 + 2] * velView[i3 + 2];
-        if (vSq > MAX_PARTICLE_VEL_SQ) {
-          const scale = MAX_PARTICLE_VEL / Math.sqrt(vSq);
-          velView[i3] *= scale;
-          velView[i3 + 1] *= scale;
-          velView[i3 + 2] *= scale;
-        }
-      }
+      // Clamp velocity magnitude to prevent explosions (Rust post_solve has no clamp).
+      clampVelocity(velView, n);
     }
   } else {
     // No collision bodies — run all substeps at once (original path)
@@ -364,63 +399,24 @@ function simulationLoop(): void {
       const sdt = 1 / (60 * jsSubsteps);
       const posPtr = solver.positions_ptr();
       const posView = new Float32Array(wasmExports.memory.buffer, posPtr, n * 3);
-      for (const c of elasticConstraintSet.constraints) {
-        const i3 = c.vertexA * 3, j3 = c.vertexB * 3;
-        const dx = posView[j3] - posView[i3];
-        const dy = posView[j3 + 1] - posView[i3 + 1];
-        const dz = posView[j3 + 2] - posView[i3 + 2];
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (dist < 1e-8) continue;
-        const alpha = c.compliance / (sdt * sdt);
-        const correction = (dist - c.restLength) / (2.0 + alpha);
-        const nx = dx / dist, ny = dy / dist, nz = dz / dist;
-        posView[i3] += correction * nx;
-        posView[i3 + 1] += correction * ny;
-        posView[i3 + 2] += correction * nz;
-        posView[j3] -= correction * nx;
-        posView[j3 + 1] -= correction * ny;
-        posView[j3 + 2] -= correction * nz;
-      }
+      solveElasticConstraints(posView, elasticConstraintSet, sdt);
     }
 
     // A3 Sec 3.3.A: NaN guard in non-collision branch (parallel to collision
-    // branch above). Pre-A3 only collision branch had guard — non-collision
-    // path could propagate NaN positions to render. Now consistent across
-    // branches with shared telemetry counter `wasmNaNCount`.
+    // branch above). Shares telemetry counter `wasmNaNCount` via `guardNaN`.
     if (wasmExports?.memory) {
       const posPtr = solver.positions_ptr();
       const prevPtr = solver.prev_positions_ptr();
       const posView = new Float32Array(wasmExports.memory.buffer, posPtr, n * 3);
       const prevView = new Float32Array(wasmExports.memory.buffer, prevPtr, n * 3);
-      let nanThisStep = 0;
-      for (let i = 0; i < n * 3; i++) {
-        if (posView[i] !== posView[i]) {
-          posView[i] = prevView[i];
-          nanThisStep++;
-        }
-      }
-      if (nanThisStep > 0) {
-        wasmNaNCount += nanThisStep;
-        if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
-          console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (no-collision branch)`);
-        }
-      }
+      guardNaN(posView, prevView, 'no-collision branch');
     }
 
     // Clamp velocity even without collision — Rust solver has no internal clamp
     if (wasmExports?.memory) {
       const velPtr = solver.velocities_ptr();
       const velView = new Float32Array(wasmExports.memory.buffer, velPtr, n * 3);
-      for (let p = 0; p < n; p++) {
-        const i3 = p * 3;
-        const vSq = velView[i3] * velView[i3] + velView[i3 + 1] * velView[i3 + 1] + velView[i3 + 2] * velView[i3 + 2];
-        if (vSq > MAX_PARTICLE_VEL_SQ) {
-          const scale = MAX_PARTICLE_VEL / Math.sqrt(vSq);
-          velView[i3] *= scale;
-          velView[i3 + 1] *= scale;
-          velView[i3 + 2] *= scale;
-        }
-      }
+      clampVelocity(velView, n);
     }
   }
 
