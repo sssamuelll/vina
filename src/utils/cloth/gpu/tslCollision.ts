@@ -69,6 +69,7 @@ import {
   atomicMin,
 } from 'three/tsl';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
+import { disposeStorageBufferAttribute } from './tslBuffers';
 // TSL node types vary across @types/three versions; use loose types for stability.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TslNode = any;
@@ -85,6 +86,17 @@ export interface TslCollisionBody {
   friction: number;
   nodeCount: number;
   triCount: number;
+  /**
+   * Release the per-body atomic scratch SBAs (`bestDistSBA`, `bestTriIdxSBA`)
+   * created inside `createTslCollisionBody`. Best-effort without a renderer
+   * (mirrors `disposeStorageBufferAttribute`): drops references only — the
+   * GPUBuffer is freed when the renderer's `_attributes` WeakMap entry is
+   * cleared, which requires the renderer reference to route through.
+   *
+   * The BVH input SBAs (`bvhNodesSBA`, `triVertsSBA`, `triNormalsSBA`) are
+   * NOT freed here — they're caller-owned (see `GpuSolverClient.collisionBodySBAs`).
+   */
+  dispose(renderer?: unknown): void;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
@@ -541,5 +553,13 @@ export function createTslCollisionBody(
     friction,
     nodeCount: numNodes,
     triCount: numTris,
+    dispose(renderer?: unknown): void {
+      // Release the per-body atomic scratch SBAs captured by closure. These are
+      // the only SBAs created inside the factory; bvh/triVerts/triNormals are
+      // caller-owned. Routes through `disposeStorageBufferAttribute` for the
+      // same renderer-routing rationale documented in tslBuffers.ts.
+      disposeStorageBufferAttribute(bestDistSBA, renderer);
+      disposeStorageBufferAttribute(bestTriIdxSBA, renderer);
+    },
   };
 }

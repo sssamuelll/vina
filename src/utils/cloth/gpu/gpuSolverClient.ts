@@ -780,7 +780,7 @@ export class GpuSolverClient implements ClothSolverClient {
       friction,
     );
 
-    this.tslSolver.setCollisionBody(body);
+    this.tslSolver.setCollisionBody(body, this.rendererRef);
 
     console.log(`[GpuSolverClient] TSL collision body '${id}':`, {
       bvhNodes: bvh.nodeCount,
@@ -794,7 +794,7 @@ export class GpuSolverClient implements ClothSolverClient {
    * Remove a TSL collision body by ID.
    */
   removeTslCollisionBody(id: string): void {
-    this.tslSolver?.removeCollisionBody(id);
+    this.tslSolver?.removeCollisionBody(id, this.rendererRef);
     const tracked = this.collisionBodySBAs.get(id);
     if (tracked) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
@@ -821,7 +821,7 @@ export class GpuSolverClient implements ClothSolverClient {
       this.tslBuffers = null;
     }
     if (this.tslSolver) {
-      this.tslSolver.dispose();
+      this.tslSolver.dispose(this.rendererRef);
       this.tslSolver = null;
     }
   }

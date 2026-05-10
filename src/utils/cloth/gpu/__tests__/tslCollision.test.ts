@@ -144,6 +144,60 @@ describe('createTslCollisionBody', () => {
     const body = buildKernel({ id: '__avatar__' });
     expect(body.id).toBe('__avatar__');
   });
+
+  it('returns a body with a dispose function', () => {
+    const body = buildKernel();
+    expect(typeof body.dispose).toBe('function');
+  });
+});
+
+// ─── #771 follow-up: per-body atomic scratch SBA disposal ──────────────────
+// `createTslCollisionBody` allocates `bestDistSBA` and `bestTriIdxSBA` internal
+// to the closure. PR #771 left their lifecycle out-of-scope; this guard ensures
+// the new `dispose(renderer?)` routes both SBAs through `renderer._attributes.delete`.
+
+describe('TslCollisionBody.dispose', () => {
+  it('routes bestDistSBA and bestTriIdxSBA through renderer._attributes.delete', () => {
+    const numParticles = 8;
+    setAtomicCalls.length = 0;
+    const body = buildKernel({ numParticles });
+
+    // The two atomic SBAs registered during construction are the per-body
+    // scratch buffers (bestDist filled with INT32_MAX, bestTriIdx with -1).
+    const atomicSBAs = setAtomicCalls
+      .map((c) => c.sba as { array: Int32Array })
+      .filter((sba) => sba.array instanceof Int32Array);
+    const bestDistSBA = atomicSBAs.find((s) => s.array[0] === 0x7FFFFFFF);
+    const bestTriIdxSBA = atomicSBAs.find((s) => s.array[0] === -1);
+    expect(bestDistSBA).toBeDefined();
+    expect(bestTriIdxSBA).toBeDefined();
+
+    const deleteSpy = vi.fn();
+    const renderer = { _attributes: { delete: deleteSpy } };
+    body.dispose(renderer);
+
+    expect(deleteSpy).toHaveBeenCalledWith(bestDistSBA);
+    expect(deleteSpy).toHaveBeenCalledWith(bestTriIdxSBA);
+    expect(deleteSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('is a no-op when renderer is omitted (best-effort, references dropped)', () => {
+    const body = buildKernel();
+    expect(() => body.dispose()).not.toThrow();
+  });
+
+  it('is a no-op when renderer lacks _attributes', () => {
+    const body = buildKernel();
+    expect(() => body.dispose({})).not.toThrow();
+  });
+
+  it('swallows errors thrown by renderer._attributes.delete', () => {
+    const body = buildKernel();
+    const renderer = {
+      _attributes: { delete: () => { throw new Error('boom'); } },
+    };
+    expect(() => body.dispose(renderer)).not.toThrow();
+  });
 });
 
 // ─── Atomic-buffer regression guards ────────────────────────────────────────
