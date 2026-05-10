@@ -21,3 +21,15 @@ wasm-opt = false
 [profile.release]
 opt-level = 3
 lto = true
+
+# Clippy gate (CI: `cargo clippy --all-targets -- -D warnings`, see #748).
+# Architecturally-ratified exceptions are allowed crate-wide here; everything
+# else surfaces as warnings that fail the gate. Keep this list short and
+# document each entry.
+[lints.clippy]
+# `is_multiple_of` rewrite is a stylistic suggestion in `next_prime`; the
+# `n % 2 == 0` form mirrors the TS reference (`selfCollision.ts:nextPrime`)
+# and the bit-exactness contract (A4 RFC § 2.4) values cross-language
+# readability over micro-stylistic tightening. Track separately if a wider
+# stylistic pass becomes worthwhile.
+manual_is_multiple_of = "allow"

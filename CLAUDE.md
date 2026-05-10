@@ -8,7 +8,7 @@ Browser-based garment CAD with AI copilot and real-time XPBD cloth simulation. B
 
 ## Non-Negotiables
 
-- **WASM sync.** When modifying `crates/xpbd-wasm/src/lib.rs`, copy BOTH `xpbd_wasm.js` AND `xpbd_wasm_bg.wasm` to `public/wasm/`. JS-only copy = silent CPU fallback.
+- **WASM sync.** When modifying `crates/xpbd-wasm/src/lib.rs`, copy BOTH `xpbd_wasm.js` AND `xpbd_wasm_bg.wasm` to `public/wasm/`. JS-only copy = silent CPU fallback. CI's `rust` job runs `cargo test` + `cargo clippy -D warnings` + `wasm-pack build` + a Node-side smoke test (`scripts/verify-wasm-smoke.mjs`) that loads the committed binary and runs `XpbdSolver.step()` once (#748). A truly stale binary that fails to load or panics on `step()` is caught here.
 - **Typecheck command.** Use `npx tsc -b --noEmit` (build mode), NOT bare `tsc --noEmit`. Root tsconfig has `"files": []` and returns clean vacuously. Pre-commit hook uses `-b`; manual verification must match.
 - **IDs.** Use `newId()` from `src/utils/ids.ts` (v4 UUID via `crypto.randomUUID()`). State-encoded composite IDs (e.g., `pin_${vertexIndex}`, `auto-seam-${rankIndex}`) marked `// state-encoded ID` are preserved — do not replace.
 - **Persistence.** IDB canonical via `storageSet`/`storageGet` from `src/utils/storage.ts`. Never write LS+IDB in parallel. Inline shape comment required at every `storageSet` callsite: `// shape: <Type> v<N> — opt-in envelope: <yes|no>`. LS-only writes need inline justification.

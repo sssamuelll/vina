@@ -46,16 +46,80 @@ jobs:
       - name: Build
         run: npm run build
 
+  # Rust crate gate (#748). Catches the failure mode where someone edits
+  # crates/xpbd-wasm/src/lib.rs but forgets to rebuild + copy
+  # `xpbd_wasm.{js,_bg.wasm}` into `public/wasm/`. Without this gate the app
+  # silently runs against the stale binary and the Rust unit tests never run
+  # in CI either.
+  #
+  # The gate has two layers:
+  #   1. `cargo test` + `cargo clippy` catch source-level regressions (clippy
+  #      uses `-D warnings`; allowed exceptions live in Cargo.toml's
+  #      `[lints.clippy]`).
+  #   2. `wasm-pack build` confirms the source still compiles to wasm32, and
+  #      `scripts/verify-wasm-smoke.mjs` loads the *committed* binary and
+  #      runs `XpbdSolver.step()` once to catch stale binaries that no
+  #      longer load or panic on a basic step.
+  #
+  # We deliberately do NOT byte-compare the freshly-built wasm-pack output
+  # against the committed `public/wasm/` copies. wasm-pack output is not
+  # bit-stable across CI/local environment differences even with Rust +
+  # wasm-pack pinned at the patch level (Ubuntu glibc, transitive
+  # wasm-bindgen-cli install path, build-host linker variations). Chasing
+  # byte-exactness produced false-positive failures with no actionable
+  # signal — see the #748 history. The smoke test is the practical
+  # surrogate.
+  rust:
+    name: Rust crate (cargo test + clippy + WASM smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry + target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/xpbd-wasm -> target
+
+      - name: cargo test
+        working-directory: crates/xpbd-wasm
+        run: cargo test --all-targets
+
+      - name: cargo clippy
+        working-directory: crates/xpbd-wasm
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: wasm-pack build (verifies source compiles to wasm32)
+        working-directory: crates/xpbd-wasm
+        run: wasm-pack build --target web --out-dir pkg
+
+      - name: Smoke-test committed WASM
+        run: node scripts/verify-wasm-smoke.mjs
+
   # Summary job for branch protection
   ci-success:
     name: CI Success
-    needs: [validate]
+    needs: [validate, rust]
     runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Check all jobs passed
         run: |
-          if [[ "${{ needs.validate.result }}" != "success" ]]; then
+          if [[ "${{ needs.validate.result }}" != "success" || "${{ needs.rust.result }}" != "success" ]]; then
             echo "CI failed"
             exit 1
           fi

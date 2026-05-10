@@ -306,6 +306,12 @@ impl XpbdSolver {
     /// for shared fields.
     ///
     /// Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
+    //
+    // 16 positional args ratified per A2 Fase 2 § 2.3 as the cross-language
+    // ABI floor; mirrored field-by-field in TS `WasmSolverConfig` and CPU
+    // `ClothSimConfig`. Refactoring to a struct would require touching every
+    // caller across two languages and is intentionally deferred.
+    #[allow(clippy::too_many_arguments)]
     pub fn configure(&mut self, substeps: u32, damping: f32, gravity_y: f32,
                      stretch_compliance: f32, bend_compliance: f32,
                      self_collision: bool, thickness: f32, collision_margin: f32,
@@ -912,10 +918,12 @@ impl XpbdSolver {
     fn post_solve(&mut self, sdt: f32) {
         let inv_sdt = 1.0 / sdt;
 
-        // Coulomb friction coefficients
-        let static_friction = 0.6_f32;  // μ_s - higher, prevents motion from starting
-        let kinetic_friction = 0.4_f32; // μ_k - lower, applies when already moving
-        let static_threshold = 0.01_f32; // velocity threshold for static friction
+        // Coulomb friction coefficients. The static-regime branch zeros the
+        // tangent velocity outright (effectively μ_s = ∞), so no static
+        // coefficient variable is needed; only the threshold for switching
+        // between static and kinetic regimes.
+        let kinetic_friction = 0.4_f32; // μ_k - applies when already moving
+        let static_threshold = 0.01_f32; // velocity threshold for static regime
         let ground_tolerance = 0.001_f32; // distance from ground to apply friction
 
         for i in 0..self.num_particles {
