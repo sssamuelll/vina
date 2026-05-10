@@ -42,7 +42,7 @@ pub struct XpbdSolver {
     original_inv_mass: Vec<f32>,  // Store original masses for unpinning
 
     // Config
-    gravity: [f32; 3],
+    gravity_y: f32,
     damping: f32,
     substeps: u32,
     stretch_compliance: f32,
@@ -125,7 +125,7 @@ impl XpbdSolver {
             pin_indices: Vec::new(),
             pin_positions: Vec::new(),
             original_inv_mass,
-            gravity: [0.0, -9.81, 0.0],
+            gravity_y: -9.81,
             damping: 0.99,
             substeps: 15,
             stretch_compliance: 0.0,
@@ -328,7 +328,7 @@ impl XpbdSolver {
                      internal_damping: f32) {
         self.substeps = substeps;
         self.damping = damping;
-        self.gravity[1] = gravity_y;
+        self.gravity_y = gravity_y;
         self.stretch_compliance = stretch_compliance;
         self.bend_compliance = bend_compliance;
         self.self_collision = self_collision;
@@ -470,9 +470,7 @@ impl XpbdSolver {
             self.prev_positions[idx + 2] = self.positions[idx + 2];
 
             // Apply gravity
-            self.velocities[idx] += self.gravity[0] * sdt;
-            self.velocities[idx + 1] += self.gravity[1] * sdt;
-            self.velocities[idx + 2] += self.gravity[2] * sdt;
+            self.velocities[idx + 1] += self.gravity_y * sdt;
 
             // Damping (using total_damping which includes internal damping)
             self.velocities[idx] *= total_damping;
@@ -818,14 +816,13 @@ impl XpbdSolver {
                 continue;
             }
 
-            let (v0, v1, v2) = (i0 * 3, i1 * 3, i2 * 3);
-            let (p0, p1, p2) = (i0 * 3, i1 * 3, i2 * 3);
+            let (i0_3, i1_3, i2_3) = (i0 * 3, i1 * 3, i2 * 3);
 
             // Triangle velocity (average)
             let tri_vel = [
-                (self.velocities[v0] + self.velocities[v1] + self.velocities[v2]) / 3.0,
-                (self.velocities[v0 + 1] + self.velocities[v1 + 1] + self.velocities[v2 + 1]) / 3.0,
-                (self.velocities[v0 + 2] + self.velocities[v1 + 2] + self.velocities[v2 + 2]) / 3.0,
+                (self.velocities[i0_3] + self.velocities[i1_3] + self.velocities[i2_3]) / 3.0,
+                (self.velocities[i0_3 + 1] + self.velocities[i1_3 + 1] + self.velocities[i2_3 + 1]) / 3.0,
+                (self.velocities[i0_3 + 2] + self.velocities[i1_3 + 2] + self.velocities[i2_3 + 2]) / 3.0,
             ];
 
             let speed = (tri_vel[0] * tri_vel[0] + tri_vel[1] * tri_vel[1] + tri_vel[2] * tri_vel[2]).sqrt();
@@ -835,14 +832,14 @@ impl XpbdSolver {
 
             // Edge vectors
             let e0 = [
-                self.positions[p1] - self.positions[p0],
-                self.positions[p1 + 1] - self.positions[p0 + 1],
-                self.positions[p1 + 2] - self.positions[p0 + 2],
+                self.positions[i1_3] - self.positions[i0_3],
+                self.positions[i1_3 + 1] - self.positions[i0_3 + 1],
+                self.positions[i1_3 + 2] - self.positions[i0_3 + 2],
             ];
             let e1 = [
-                self.positions[p2] - self.positions[p0],
-                self.positions[p2 + 1] - self.positions[p0 + 1],
-                self.positions[p2 + 2] - self.positions[p0 + 2],
+                self.positions[i2_3] - self.positions[i0_3],
+                self.positions[i2_3 + 1] - self.positions[i0_3 + 1],
+                self.positions[i2_3 + 2] - self.positions[i0_3 + 2],
             ];
 
             // Normal = cross(e0, e1)
@@ -982,7 +979,7 @@ impl XpbdSolver {
 
                 // Normal force = mass * gravity (pointing up against gravity)
                 // For unit mass with gravity -9.81, normal force ≈ 9.81
-                let gravity_mag = self.gravity[1].abs();
+                let gravity_mag = self.gravity_y.abs();
 
                 if tangent_speed < static_threshold {
                     // Static friction: stop horizontal motion completely
