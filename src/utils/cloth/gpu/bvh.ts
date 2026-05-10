@@ -105,8 +105,9 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
   const reorderedIndex = geometry.index!.array as Uint32Array;
 
   // ─── 3. Linearize via DFS traversal ────────────────────────────────
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- _roots is an internal property of MeshBVH
-  const buffer = (bvh as any)._roots[0] as ArrayBuffer;
+  // `cloneBuffers: false` returns the live packed-tree ArrayBuffer (zero-copy);
+  // single-geometry build → exactly one root.
+  const buffer = MeshBVH.serialize(bvh, { cloneBuffers: false }).roots[0];
   const uint32 = new Uint32Array(buffer);
   const uint16 = new Uint16Array(buffer);
   const float32 = new Float32Array(buffer);
