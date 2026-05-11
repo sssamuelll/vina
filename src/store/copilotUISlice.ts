@@ -448,6 +448,24 @@ export function showInfoToast(message: string) {
 }
 
 /**
+ * Show a warning toast.
+ *
+ * Added per #716 (E-async follow-up) for severity/helper symmetry with
+ * showSuccessToast / showErrorToast / showInfoToast / showUndoToast. The
+ * 'warning' severity already exists in CopilotToast.type union; this helper
+ * removes the verbose `showToast({ type:'warning', ... })` papercut.
+ *
+ * Cross-ref: D2 § 3.2.A Variant F (toast helpers canonical).
+ */
+export function showWarningToast(message: string) {
+  return showToast({
+    type: 'warning',
+    message,
+    duration: 4000,
+  });
+}
+
+/**
  * Highlight a piece with animation.
  */
 export function highlightPiece(pieceId: string, style: CopilotHighlight['style'] = 'pulse', duration = 2000) {
