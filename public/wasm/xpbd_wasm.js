@@ -148,12 +148,12 @@ export class XpbdSolver {
     /**
      * Set bend constraints.
      * @param {Uint32Array} ids
-     * @param {Float32Array} rest_angles
+     * @param {Float32Array} rest_distances
      */
-    set_bend(ids, rest_angles) {
+    set_bend(ids, rest_distances) {
         const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(rest_angles, wasm.__wbindgen_malloc);
+        const ptr1 = passArrayF32ToWasm0(rest_distances, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         wasm.xpbdsolver_set_bend(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
@@ -166,13 +166,13 @@ export class XpbdSolver {
      * (#747). Routes through `recompute_bend_compliances` — single
      * source of truth for the cache derivation.
      * @param {Uint32Array} ids
-     * @param {Float32Array} rest_angles
+     * @param {Float32Array} rest_distances
      * @param {Uint8Array} edge_types
      */
-    set_bend_with_types(ids, rest_angles, edge_types) {
+    set_bend_with_types(ids, rest_distances, edge_types) {
         const ptr0 = passArray32ToWasm0(ids, wasm.__wbindgen_malloc);
         const len0 = WASM_VECTOR_LEN;
-        const ptr1 = passArrayF32ToWasm0(rest_angles, wasm.__wbindgen_malloc);
+        const ptr1 = passArrayF32ToWasm0(rest_distances, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
         const ptr2 = passArray8ToWasm0(edge_types, wasm.__wbindgen_malloc);
         const len2 = WASM_VECTOR_LEN;
