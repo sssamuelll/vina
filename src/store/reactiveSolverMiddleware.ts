@@ -35,6 +35,8 @@ import {
   detectCapabilities,
 } from '../workers/workerProtocol';
 
+import { createTimeWindowLimiter } from '../utils/rateLimit';
+
 import { resolveAll, mapPieceIdentity } from './constructionSlice';
 import { upsertPieceOutline, addPiece } from './projectSlice';
 import { setUnresolvedCount, setLastSolverError } from './inspectorSlice';
@@ -480,8 +482,9 @@ async function initializePool(): Promise<void> {
   // console.error + internal metrics.errors[] only — no UI surface, no
   // Redux exposure. Now: dispatch to inspectorSlice.lastSolverError for
   // visibility + rate-limited toast (window = SOLVER_TOAST_RATE_LIMIT_MS
-  // declared below; mirrors A3 wasmNaNCount rate-limit pattern) for user.
-  // Variant F (toast) per D2 convention.
+  // declared below, via `solverToastLimiter` from `utils/rateLimit.ts`;
+  // mirrors A3 wasmNaNCount rate-limit pattern) for user. Variant F
+  // (toast) per D2 convention.
   state.pool.onError((error: string, jobId?: string) => {
     console.error('[ReactiveSolver] Worker error:', error, jobId);
     state.metrics.errors.push(error);
@@ -495,11 +498,9 @@ async function initializePool(): Promise<void> {
 
     // Surface to Redux + rate-limited toast (E-async § 3.5.3.A).
     if (storeDispatch) {
-      const now = Date.now();
-      storeDispatch(setLastSolverError({ error, jobId, timestamp: now }) as AnyAction);
-      if (shouldEmitSolverToast(now, lastSolverToastTs)) {
+      storeDispatch(setLastSolverError({ error, jobId, timestamp: Date.now() }) as AnyAction);
+      if (solverToastLimiter.tryEmit()) {
         storeDispatch(showErrorToast(`Construction error: ${error}`) as AnyAction);
-        lastSolverToastTs = now;
       }
     }
   });
@@ -525,17 +526,11 @@ let storeDispatch: AppDispatch | null = null;
 // E-async D8 gap 5 (§ 3.5.3.A): rate-limit toast emission for solver pool
 // errors. Worker pool can cascade failures (e.g., circular formula
 // dependency triggers N piece rebuilds). 5-second window prevents toast
-// spam while preserving signal. Mirrors A3 wasmNaNCount rate-limit shape.
-//
-// `shouldEmitSolverToast` exported for direct boundary test
-// (`reactiveSolverMiddleware.test.ts > Worker pool error rate-limit`).
-// Strict `>` comparison: at exactly windowMs, comparison is false →
-// suppress (off-by-one boundary intentional, see test).
+// spam while preserving signal. Mirrors A3 wasmNaNCount rate-limit shape;
+// helper extracted to `src/utils/rateLimit.ts` (#715). Magnitude constant
+// kept exported as feature-level regression guard (boundary test).
 export const SOLVER_TOAST_RATE_LIMIT_MS = 5000;
-export function shouldEmitSolverToast(now: number, lastTs: number): boolean {
-  return now - lastTs > SOLVER_TOAST_RATE_LIMIT_MS;
-}
-let lastSolverToastTs = 0;
+const solverToastLimiter = createTimeWindowLimiter(SOLVER_TOAST_RATE_LIMIT_MS);
 
 /**
  * Handle result from worker.

@@ -15,8 +15,8 @@
  *
  * - **NaN guard at WASM→JS post-step boundary:** both collision and non-collision
  *   branches reset NaN positions to `prevView` (continuity preserved) and
- *   increment cumulative telemetry counter `wasmNaNCount`. Rate-limited console.warn
- *   (first occurrence + every 100th) signals NaN events without spam.
+ *   increment cumulative telemetry counter via `nanLogLimiter`. Rate-limited
+ *   console.warn (first occurrence + every 100th) signals NaN events without spam.
  *
  * - **Zero-copy positions reads** (hot path): `Float32Array` views over WASM
  *   memory. No Result types in signatures — fallibility implicit. Forward-only
@@ -36,6 +36,7 @@ import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 import { computeBendRestDistances } from './bendRestDistances';
 import { buildAdjacency } from '../selfCollision';
+import { createCountSamplingLimiter } from '../../rateLimit';
 import type { PieceMeshData, WasmSolverConfig } from './wasmSolverClient';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -208,11 +209,12 @@ const FRAME_BUDGET_MS = 14;
  * Pre-existing NaN guard (lines below) silently reset to prevPos; this counter
  * adds debugability — counts cumulative NaN occurrences post-step. Rate-limited
  * console.warn (first occurrence + every 100th cumulative) avoids spam while
- * surfacing the signal.
+ * surfacing the signal. Limiter helper extracted to `utils/rateLimit.ts` (#715).
  *
  * Cross-ref: `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md` Sec 3.3.A.
  */
-let wasmNaNCount = 0;
+const WASM_NAN_LOG_SAMPLING_N = 100;
+const nanLogLimiter = createCountSamplingLimiter(WASM_NAN_LOG_SAMPLING_N);
 
 /** Maximum particle velocity (m/s). Matches JS solver's maxVelocity.
  * Without this, the Rust solver's 900Hz substep rate amplifies constraint
@@ -253,9 +255,9 @@ function solveElasticConstraints(
 /**
  * NaN guard at the WASM→JS post-step boundary. Resets NaN positions to
  * `prevView` (continuity preserved) and increments the module-scoped
- * cumulative counter `wasmNaNCount` (A3 § 3.3.A telemetry contract).
- * Rate-limited console.warn: first occurrence of this step + every 100th
- * cumulative. `branchLabel` flows into the warn message for log grep.
+ * cumulative counter via `nanLogLimiter` (A3 § 3.3.A telemetry contract).
+ * Rate-limited console.warn: first occurrence + every Nth cumulative.
+ * `branchLabel` flows into the warn message for log grep.
  */
 function guardNaN(
   posView: Float32Array,
@@ -270,9 +272,8 @@ function guardNaN(
     }
   }
   if (nanThisStep > 0) {
-    wasmNaNCount += nanThisStep;
-    if (wasmNaNCount === nanThisStep || wasmNaNCount % 100 === 0) {
-      console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${wasmNaNCount} cumulative (${branchLabel})`);
+    if (nanLogLimiter.tryEmit(nanThisStep)) {
+      console.warn(`[WasmWorker] NaN detected in positions buffer: ${nanThisStep} this step, ${nanLogLimiter.count} cumulative (${branchLabel})`);
     }
   }
 }
@@ -403,7 +404,7 @@ function simulationLoop(): void {
     }
 
     // A3 Sec 3.3.A: NaN guard in non-collision branch (parallel to collision
-    // branch above). Shares telemetry counter `wasmNaNCount` via `guardNaN`.
+    // branch above). Shares telemetry counter `nanLogLimiter` via `guardNaN`.
     if (wasmExports?.memory) {
       const posPtr = solver.positions_ptr();
       const prevPtr = solver.prev_positions_ptr();

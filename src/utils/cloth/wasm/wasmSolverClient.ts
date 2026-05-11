@@ -19,8 +19,8 @@
  *   generic worker error handler.
  *
  * - For NaN events, see `wasmSolverWorker.ts` post-step telemetry counter
- *   `wasmNaNCount` (worker-scope; not surfaced to client by default — debug
- *   API can be added if frequency monitoring needed in production).
+ *   `nanLogLimiter.count` (worker-scope; not surfaced to client by default —
+ *   debug API can be added if frequency monitoring needed in production).
  *
  * Cross-ref: `docs/reports/2026-05-01-drift-fase2-a3-cross-boundary-errors.md`.
  *
