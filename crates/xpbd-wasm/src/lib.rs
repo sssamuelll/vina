@@ -173,9 +173,9 @@ impl XpbdSolver {
     }
 
     /// Set bend constraints.
-    pub fn set_bend(&mut self, ids: &[u32], rest_angles: &[f32]) {
+    pub fn set_bend(&mut self, ids: &[u32], rest_distances: &[f32]) {
         self.bend_ids = ids.to_vec();
-        self.bend_rest = rest_angles.to_vec();
+        self.bend_rest = rest_distances.to_vec();
     }
 
     /// Set bend constraints with edge type classification.
@@ -185,9 +185,9 @@ impl XpbdSolver {
     /// per-constraint compliance cache after global-field mutation
     /// (#747). Routes through `recompute_bend_compliances` — single
     /// source of truth for the cache derivation.
-    pub fn set_bend_with_types(&mut self, ids: &[u32], rest_angles: &[f32], edge_types: &[u8]) {
+    pub fn set_bend_with_types(&mut self, ids: &[u32], rest_distances: &[f32], edge_types: &[u8]) {
         self.bend_ids = ids.to_vec();
-        self.bend_rest = rest_angles.to_vec();
+        self.bend_rest = rest_distances.to_vec();
         self.bend_edge_types = edge_types.to_vec();
         self.recompute_bend_compliances();
     }

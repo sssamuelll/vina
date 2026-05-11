@@ -56,8 +56,8 @@ interface WasmExportsLike {
 interface WasmXpbdSolver {
   set_stretch(ids: Uint32Array, rest: Float32Array): void;
   set_stretch_with_types(ids: Uint32Array, rest_lengths: Float32Array, edge_types: Uint8Array): void;
-  set_bend(ids: Uint32Array, rest: Float32Array): void;
-  set_bend_with_types(ids: Uint32Array, rest_angles: Float32Array, edge_types: Uint8Array): void;
+  set_bend(ids: Uint32Array, rest_distances: Float32Array): void;
+  set_bend_with_types(ids: Uint32Array, rest_distances: Float32Array, edge_types: Uint8Array): void;
   set_seams_with_compliance(ids: Uint32Array, target: Float32Array, compliances: Float32Array): void;
   set_triangles(tri_ids: Uint32Array): void;
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
