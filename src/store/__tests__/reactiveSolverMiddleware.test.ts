@@ -90,7 +90,6 @@ import {
   shutdownSolver,
   getIsComputing,
   SOLVER_TOAST_RATE_LIMIT_MS,
-  shouldEmitSolverToast,
 } from '../reactiveSolverMiddleware';
 import type { CPiece, CPoint } from '../../types/construction';
 
@@ -441,53 +440,12 @@ describe('Reactive Solver Middleware', () => {
 
   // ─── Worker pool error rate-limit boundary (E-async D8 gap 5) ──────
 
-  // Direct test of the exported `shouldEmitSolverToast` pure function +
-  // the `SOLVER_TOAST_RATE_LIMIT_MS` constant. Regression guards for:
-  //  (a) magnitude — 5000ms window matches A3 wasmNaNCount precedent.
-  //  (b) strict `>` comparison — exactly windowMs delta suppresses.
-  //  (c) first-error-after-init semantics — at production Date.now(),
-  //      the initial lastSolverToastTs=0 sentinel always emits because
-  //      Date.now() returns millis-since-epoch (>> windowMs). Future
-  //      refactor that initializes lastSolverToastTs = Date.now() would
-  //      silently suppress the first error of every session.
+  // Magnitude regression guard for the feature-level constant. Behavior of
+  // the time-window limiter itself (sentinel, strict `>`, etc.) is pinned
+  // by `src/utils/__tests__/rateLimit.test.ts` (#715 helper extraction).
   describe('Worker pool error rate-limit boundary (E-async D8 gap 5)', () => {
     it('SOLVER_TOAST_RATE_LIMIT_MS is 5000ms (matches A3 precedent)', () => {
       expect(SOLVER_TOAST_RATE_LIMIT_MS).toBe(5000);
-    });
-
-    it('strict `>` comparison: exactly windowMs delta suppresses (off-by-one boundary)', () => {
-      const last = 1_000_000; // arbitrary anchor
-      expect(shouldEmitSolverToast(last + 4999, last)).toBe(false);
-      expect(shouldEmitSolverToast(last + 5000, last)).toBe(false); // boundary — suppressed
-      expect(shouldEmitSolverToast(last + 5001, last)).toBe(true);
-    });
-
-    it('first-error-after-init: with lastTs=0 + production Date.now (>> 5000ms), emits', () => {
-      // Production Date.now() returns millis since epoch (~1.7e12).
-      // With initial lastSolverToastTs = 0, the first onError always
-      // emits because (Date.now - 0) >> 5000.
-      expect(shouldEmitSolverToast(Date.now(), 0)).toBe(true);
-      expect(shouldEmitSolverToast(1_700_000_000_000, 0)).toBe(true);
-    });
-
-    it('first-error-after-init regression guard: if future refactor sets lastTs = Date.now() at init, first error suppressed', () => {
-      // Documents the regression risk. If a future refactor initializes
-      // `let lastSolverToastTs = Date.now();` instead of `= 0`, then
-      // (Date.now - Date.now) === 0, not > 5000 → first error suppressed.
-      // The current init `= 0` is intentional — this test fails if anyone
-      // changes it to Date.now() initialization.
-      const initSentinel = 0; // current behavior — must stay 0, not Date.now()
-      expect(shouldEmitSolverToast(Date.now(), initSentinel)).toBe(true);
-
-      // Anti-pattern verification (would break first-error emission):
-      const dateNowInitAntiPattern = Date.now();
-      expect(shouldEmitSolverToast(Date.now(), dateNowInitAntiPattern)).toBe(false);
-    });
-
-    it('within-window suppression: 0ms after last toast', () => {
-      // Burst case: error fires immediately after another → 0ms delta.
-      const last = 1_000_000;
-      expect(shouldEmitSolverToast(last, last)).toBe(false);
     });
   });
 });
