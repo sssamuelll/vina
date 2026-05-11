@@ -35,6 +35,13 @@ import type {
 // State
 // ============================================================================
 
+/** Shared between `InspectorState.lastSolverError` and `setLastSolverError` payload. */
+export interface SolverPoolError {
+  error: string;
+  jobId?: string;
+  timestamp: number;
+}
+
 export interface InspectorState {
   /** The element currently being inspected. null = panel closed / no selection. */
   target: InspectionTarget | null;
@@ -60,7 +67,7 @@ export interface InspectorState {
    * last-error detail for inspection (Redux DevTools, future panel UI).
    * `null` = no recent error / cleared.
    */
-  lastSolverError: { error: string; jobId?: string; timestamp: number } | null;
+  lastSolverError: SolverPoolError | null;
 }
 
 const initialState: InspectorState = {
@@ -146,7 +153,7 @@ const inspectorSlice = createSlice({
      * E-async D8 gap 5 closure (§ 3.5.3.A): paired with rate-limited toast
      * dispatched in parallel from the middleware. Pass `null` to clear.
      */
-    setLastSolverError(state, action: PayloadAction<{ error: string; jobId?: string; timestamp: number } | null>) {
+    setLastSolverError(state, action: PayloadAction<SolverPoolError | null>) {
       state.lastSolverError = action.payload;
     },
 
