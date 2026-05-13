@@ -41,9 +41,16 @@ export function collectExportScene(
     }
   }
 
-  // 3. Apply scale
+  // 3. Apply scale.
+  // regla 5 (#694, fix shape from #690 b18f4762): unit-conversion helpers must
+  // touch ALL transformation components — scaling `scale` alone leaves
+  // `position` at source-unit magnitude (the bug-#690 class). Group is fresh
+  // here with position=(0,0,0) so the multiply is a no-op today; symmetric
+  // application prevents any future caller that pre-translates from regressing.
+  // Canonical: src/utils/geometry/boundaries.ts::importerToMetres.
   if (scale !== 1.0) {
-    group.scale.set(scale, scale, scale);
+    group.scale.multiplyScalar(scale);
+    group.position.multiplyScalar(scale);
     group.updateMatrixWorld(true);
   }
 

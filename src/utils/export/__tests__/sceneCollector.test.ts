@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as THREE from 'three';
 import { collectExportScene } from '../sceneCollector';
 
@@ -133,5 +133,46 @@ describe('collectExportScene', () => {
     let meshCount = 0;
     group.traverse((obj: THREE.Object3D) => { if ((obj as THREE.Mesh).isMesh) meshCount++; });
     expect(meshCount).toBe(0);
+  });
+});
+
+// regla 5 (#694, fix shape from #690 b18f4762): unit-conversion helpers must
+// scale ALL transformation components — scaling `scale` alone leaves `position`
+// at source-unit magnitude, breaking the scene graph by orders of magnitude.
+// Current callers pass freshly constructed groups with position=(0,0,0) so the
+// bug is latent; these tests pin symmetric application to prevent the bug-#690
+// class regressing on any future caller that pre-translates the group.
+// Canonical: src/utils/geometry/boundaries.ts::importerToMetres.
+describe('regla 5 unit-conversion symmetry (#694)', () => {
+  it('applies scale to both group.scale and group.position when scale !== 1', () => {
+    const scene = new THREE.Scene();
+    const mesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial(),
+    );
+    scene.add(mesh);
+
+    const spy = vi.spyOn(THREE.Vector3.prototype, 'multiplyScalar');
+    try {
+      collectExportScene(scene, { garmentMesh: mesh, scale: 0.001 });
+      const callsWithFactor = spy.mock.calls.filter((args) => args[0] === 0.001);
+      expect(callsWithFactor).toHaveLength(2);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('scale=1 leaves transform untouched (default path)', () => {
+    const scene = new THREE.Scene();
+    const mesh = new THREE.Mesh(
+      new THREE.BufferGeometry(),
+      new THREE.MeshBasicMaterial(),
+    );
+    scene.add(mesh);
+
+    const group = collectExportScene(scene, { garmentMesh: mesh, scale: 1.0 });
+
+    expect(group.scale.toArray()).toEqual([1, 1, 1]);
+    expect(group.position.toArray()).toEqual([0, 0, 0]);
   });
 });
