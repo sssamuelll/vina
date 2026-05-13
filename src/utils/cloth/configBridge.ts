@@ -14,12 +14,14 @@
  *   shared fields (`damping`, `selfCollision`, `groundY`, `dragCoefficient`,
  *   `stretchComplianceWarp/Weft/Shear`, `bendComplianceWarp/Weft`,
  *   `internalDamping`) pass through with same name.
- * - **8 CPU-only fields silently dropped:** `groundFriction`,
- *   `adaptiveSubsteps`, `minSubsteps`, `maxSubsteps`, `maxVelocity`,
- *   `enableLRA`, `dt`, `windForce`. The first 6 are A7-ratified CPU-only
- *   architectural location; `dt` is hardcoded 1/60 in WASM worker;
- *   `windForce` flows through separate `setWind()` API on `WasmSolverClient`
- *   (per A6 § 3.6 #683 follow-up).
+ * - **8 CPU-only fields rejected at compile time** (post-#696, A2 § 8 #3
+ *   closure): `groundFriction`, `adaptiveSubsteps`, `minSubsteps`,
+ *   `maxSubsteps`, `maxVelocity`, `enableLRA`, `dt`, `windForce`. The input
+ *   narrows to `Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>>` so
+ *   TypeScript refuses these keys at the call site. The first 6 are
+ *   A7-ratified CPU-only architectural location; `dt` is hardcoded 1/60 in
+ *   WASM worker; `windForce` flows through separate `setWind()` API on
+ *   `WasmSolverClient` (per A6 § 3.6 #683 follow-up).
  * - **1 WASM-only field absent:** `collisionMargin`. CPU uses `clothThickness`
  *   for both inflation + margin (see `setCapsuleColliders` margin assignment
  *   in `xpbdSolver.ts`). Subtle architectural cleavage preserved per A2 § 2.5.
@@ -27,7 +29,11 @@
  * **Forward-only convention:** new shared field added to `ClothSimConfig`
  * should also be mapped here (declare in Rust constructor first per
  * `CLAUDE/methodology.md` § 15 — Rust constructor canonical for cross-tier
- * shared field defaults). Tier-specific fields stay in their own surface.
+ * shared field defaults). A new CPU-only field must be added to
+ * `CpuOnlyClothSimConfigKeys` below; otherwise it slips into
+ * `SharedClothSimConfigKeys` by exclusion and the helper accepts it
+ * silently (no `if` branch will pick it up — same runtime drop as pre-#696,
+ * but without the type-level signal).
  *
  * Cross-ref: `docs/reports/2026-05-02-drift-fase2-a2-cross-boundary-serialization.md`.
  *
@@ -38,15 +44,43 @@ import type { ClothSimConfig } from './xpbdSolver';
 import type { WasmSolverConfig } from './wasm/wasmSolverClient';
 
 /**
- * Translate a partial CPU `ClothSimConfig` to the equivalent WASM
- * `WasmSolverConfig` shape. CPU-only fields are silently dropped.
+ * CPU-only fields excluded from the WASM-translatable shared subset.
+ * Per-field architectural rationale documented in the module JSDoc above
+ * and mirrored in `xpbdSolver.ts:ClothSimConfig` — keep these 8 keys in sync.
+ */
+type CpuOnlyClothSimConfigKeys =
+  | 'groundFriction'
+  | 'adaptiveSubsteps'
+  | 'minSubsteps'
+  | 'maxSubsteps'
+  | 'maxVelocity'
+  | 'enableLRA'
+  | 'dt'
+  | 'windForce';
+
+/**
+ * Shared subset of `ClothSimConfig` keys translatable to `WasmSolverConfig`,
+ * derived by exclusion. New fields added to `ClothSimConfig` default to
+ * "shared" — declare them in `CpuOnlyClothSimConfigKeys` first if
+ * WASM-incompatible. Exported for caller-side annotations (e.g.,
+ * `GarmentSimulation.tsx`).
+ */
+export type SharedClothSimConfigKeys = Exclude<keyof ClothSimConfig, CpuOnlyClothSimConfigKeys>;
+
+/**
+ * Translate a partial CPU shared-subset config to the equivalent WASM
+ * `WasmSolverConfig` shape. CPU-only fields are rejected at compile time
+ * via the `Pick<ClothSimConfig, SharedClothSimConfigKeys>` narrowing
+ * (post-#696, A2 § 8 #3 closure).
  *
  * Caller intent using this helper is "set the cross-tier shared subset". For
- * CPU-only knobs (e.g., `enableLRA`, `adaptiveSubsteps`), call
- * `clients.cpu.setConfig(...)` directly without going through this helper.
+ * CPU-only knobs (e.g., `enableLRA`, `adaptiveSubsteps`) call
+ * `clients.cpu.setConfig(...)` directly with the wider
+ * `Partial<ClothSimConfig>` shape — `setConfig` on the CPU client accepts
+ * the full surface.
  */
 export function mapClothSimConfigToWasmSolverConfig(
-  cpu: Partial<ClothSimConfig>,
+  cpu: Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>>,
 ): Partial<WasmSolverConfig> {
   const out: Partial<WasmSolverConfig> = {};
   if (cpu.numSubsteps !== undefined) out.substeps = cpu.numSubsteps;

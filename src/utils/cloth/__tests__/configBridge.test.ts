@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapClothSimConfigToWasmSolverConfig } from '../configBridge';
+import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../configBridge';
 import type { ClothSimConfig } from '../xpbdSolver';
 
 describe('mapClothSimConfigToWasmSolverConfig', () => {
@@ -28,7 +28,7 @@ describe('mapClothSimConfigToWasmSolverConfig', () => {
   });
 
   it('passes through same-name shared fields unchanged', () => {
-    const input: Partial<ClothSimConfig> = {
+    const input: Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>> = {
       damping: 0.99,
       selfCollision: false,
       groundY: 0.5,
@@ -43,27 +43,34 @@ describe('mapClothSimConfigToWasmSolverConfig', () => {
     expect(mapClothSimConfigToWasmSolverConfig(input)).toEqual(input);
   });
 
-  it('silently drops CPU-only fields', () => {
-    const input: Partial<ClothSimConfig> = {
-      groundFriction: 0.5,
-      adaptiveSubsteps: true,
-      minSubsteps: 10,
-      maxSubsteps: 30,
-      maxVelocity: 5.0,
-      enableLRA: true,
-      dt: 1 / 60,
-      windForce: [1, 0, 0],
-    };
-    expect(mapClothSimConfigToWasmSolverConfig(input)).toEqual({});
+  it('rejects all 8 CPU-only fields at compile time (#696)', () => {
+    // `@ts-expect-error` itself fails the type check if the next line does
+    // NOT produce an error — that's the real assertion. The runtime calls
+    // return `{}` (no `if` branch matches), which is incidental.
+    // @ts-expect-error -- groundFriction is CPU-only (A2 § 3.1)
+    mapClothSimConfigToWasmSolverConfig({ groundFriction: 0.5 });
+    // @ts-expect-error -- adaptiveSubsteps is CPU-only (A7 § 3.1.6)
+    mapClothSimConfigToWasmSolverConfig({ adaptiveSubsteps: true });
+    // @ts-expect-error -- minSubsteps is CPU-only (A7 § 3.1.6)
+    mapClothSimConfigToWasmSolverConfig({ minSubsteps: 10 });
+    // @ts-expect-error -- maxSubsteps is CPU-only (A7 § 3.1.6)
+    mapClothSimConfigToWasmSolverConfig({ maxSubsteps: 30 });
+    // @ts-expect-error -- maxVelocity is CPU-only (A7 § 3.1.7)
+    mapClothSimConfigToWasmSolverConfig({ maxVelocity: 5.0 });
+    // @ts-expect-error -- enableLRA is CPU-only
+    mapClothSimConfigToWasmSolverConfig({ enableLRA: true });
+    // @ts-expect-error -- dt is CPU-only (WASM worker hardcodes 1/60)
+    mapClothSimConfigToWasmSolverConfig({ dt: 1 / 60 });
+    // @ts-expect-error -- windForce is CPU-only (WASM uses separate setWind() API per A6 § 3.6)
+    mapClothSimConfigToWasmSolverConfig({ windForce: [1, 0, 0] });
   });
 
   it('does not propagate undefined values', () => {
-    const input = { numSubsteps: undefined, damping: 0.5 } as Partial<ClothSimConfig>;
-    expect(mapClothSimConfigToWasmSolverConfig(input)).toEqual({ damping: 0.5 });
+    expect(mapClothSimConfigToWasmSolverConfig({ numSubsteps: undefined, damping: 0.5 })).toEqual({ damping: 0.5 });
   });
 
-  it('translates a full input correctly (mixed renames + passthrough + drops)', () => {
-    const input: Partial<ClothSimConfig> = {
+  it('translates a full input correctly (mixed renames + passthrough)', () => {
+    const input: Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>> = {
       numSubsteps: 15,
       gravity: [0, -9.81, 0],
       damping: 0.99,
@@ -79,15 +86,6 @@ describe('mapClothSimConfigToWasmSolverConfig', () => {
       bendComplianceWarp: 1.0,
       bendComplianceWeft: 1.0,
       internalDamping: 0.3,
-      // CPU-only — should be dropped:
-      groundFriction: 0.5,
-      adaptiveSubsteps: true,
-      minSubsteps: 10,
-      maxSubsteps: 30,
-      maxVelocity: 5.0,
-      enableLRA: true,
-      dt: 1 / 60,
-      windForce: [0, 0, 0],
     };
     expect(mapClothSimConfigToWasmSolverConfig(input)).toEqual({
       substeps: 15,

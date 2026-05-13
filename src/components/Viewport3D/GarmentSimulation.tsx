@@ -40,7 +40,7 @@ import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
 import { useSimulationPlayback } from '../../hooks/useSimulationPlayback';
 import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
-import { mapClothSimConfigToWasmSolverConfig } from '../../utils/cloth/configBridge';
+import { mapClothSimConfigToWasmSolverConfig, type SharedClothSimConfigKeys } from '../../utils/cloth/configBridge';
 import type { ClothSimConfig } from '../../utils/cloth/xpbdSolver';
 import {
   dispatchBrushStroke,
@@ -347,9 +347,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       tslSolverRef.current.updateConfig({ substeps: mode.substeps });
     }
     // CPU + WASM via shared CPU shape + bridge translation (A2 § 3.2.B).
-    const cpuPartial: Partial<ClothSimConfig> = { numSubsteps: mode.substeps };
-    clients.cpu?.setConfig(cpuPartial);
-    clients.wasm?.setConfig(mapClothSimConfigToWasmSolverConfig(cpuPartial));
+    // Narrowed to shared subset so the helper rejects CPU-only fields at
+    // compile time (#696, A2 § 8 #3 closure).
+    const sharedConfig: Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>> = { numSubsteps: mode.substeps };
+    clients.cpu?.setConfig(sharedConfig);
+    clients.wasm?.setConfig(mapClothSimConfigToWasmSolverConfig(sharedConfig));
   }, [simulationMode, tslSolverRef, clients]);
 
   // ─── Animation recording + playback ────────────────────────────────────────
