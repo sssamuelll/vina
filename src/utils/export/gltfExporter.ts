@@ -31,10 +31,17 @@ export async function exportToGLTF(
   const { binary = true, scale = 0.001 } = options;
   const { GLTFExporter } = await import('three/examples/jsm/exporters/GLTFExporter.js');
 
-  // Clone and scale to meters (glTF standard)
+  // Clone and scale to meters (glTF standard).
+  // regla 5 (#694, fix shape from #690 b18f4762): unit-conversion helpers must
+  // touch ALL transformation components — scaling `scale` alone leaves
+  // `position` at source-unit magnitude (the bug-#690 class). Current callers
+  // pass objects with position=(0,0,0) so the multiply is a no-op today;
+  // symmetric application prevents regression on future callers.
+  // Canonical: src/utils/geometry/boundaries.ts::importerToMetres.
   const clone = object.clone(true);
   if (scale !== 1) {
     clone.scale.multiplyScalar(scale);
+    clone.position.multiplyScalar(scale);
     clone.updateMatrixWorld(true);
   }
 
