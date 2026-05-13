@@ -221,7 +221,9 @@ describe('seamInitDataToPairs', () => {
     expect(result[0].vertexPairs).not.toEqual(result[1].vertexPairs);
   });
 
-  it('produces independent entries for a 3-piece T-junction', () => {
+  // A true geometric T-junction (3 pieces sharing a world-space vertex)
+  // is tracked separately in #741.
+  it('produces independent entries for multiple seams between disjoint piece pairs', () => {
     const pieces = [makeSquarePiece('A'), makeSquarePiece('B'), makeSquarePiece('C')];
     const seams = [
       makeSeam({ id: 's1', pieceAId: 'A', pieceBId: 'B' }),

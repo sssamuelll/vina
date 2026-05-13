@@ -16,6 +16,9 @@
  * `console.warn` with `[seamPairs]` prefix and skipped. CPU/WASM also skip
  * the same inputs in `buildSeamConstraints`, but more quietly; this helper
  * is intentionally louder so divergent input data shows up in dev tools.
+ * The asymmetry is intentional — GPU init is one-shot (warn fires once per
+ * session per bad seam input) vs CPU/WASM per-step (a warn there would
+ * flood the console unactionably).
  * Net effect: same skip behavior across tiers, audibility added on GPU.
  *
  * @see #732 — GPU tier seam constraints integration.
