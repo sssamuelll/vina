@@ -1,21 +1,23 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * OpenClo Copilot Protocol
- * 
- * The copilot is agent-agnostic. Users connect their own AI agent
- * (Claude Code, Codex, GPT, local LLM, etc.) via a simple HTTP/WebSocket interface.
- * 
- * Flow:
- * 1. User types a message in the copilot chat
- * 2. OpenClo builds a context payload (current pieces, measurements, selection)
- * 3. Payload + user message sent to the agent endpoint
- * 4. Agent responds with CopilotCommands (create piece, modify outline, etc.)
- * 5. OpenClo executes commands on the Redux store
- * 
- * Agent endpoint options:
- * - Local HTTP: POST http://localhost:{port}/copilot
- * - WebSocket: ws://localhost:{port}/copilot
- * - Built-in: direct function call (for embedded agents)
+ * OpenClo Copilot Protocol — types for agent dispatch shape.
+ *
+ * Defines `AgentConfig` (the user's choice of dispatch path:
+ * 'builtin' templates / 'http' / 'websocket') alongside the wire
+ * payload types `CopilotContext` / `CopilotResponse` / `CopilotCommand`
+ * exchanged with HTTP/WS agents. `AgentConfig` is consumed at runtime
+ * by `src/components/CopilotPanel/CopilotPanel.tsx`.
+ *
+ * **NOT redundant with `providers/types.ts:ProviderConfig`.**
+ * `AgentConfig` models WHICH dispatch path is active (built-in vs
+ * external HTTP/WS). `ProviderConfig` models WHICH LLM provider +
+ * model + API key is used (anthropic / openai / deepseek / ollama /
+ * claude-bridge). They coexist by design — `CopilotPanel.tsx` holds
+ * both states (L89-90) because a built-in agent still picks an LLM
+ * provider for its internal calls. See #644 closure for rationale.
+ *
+ * Canonical dispatcher: `src/copilot/reasoning/bridge/AgenticLoop.ts`.
+ * The deprecated `agentConnector.ts` shim was removed in #644.
  */
 
 import { PatternPiece, PathCommand, Point2D, InternalLine, BodyMeasurements } from '../types/types';
