@@ -268,4 +268,37 @@ describe('solveTriangleCollision — friction kernel (regression for BUG-2 #605)
     expect(pos[0]).toBeCloseTo(SLIDE_X, 5); // tangent untouched
     expect(pos[1]).toBeCloseTo(1.0, 5); // position untouched
   });
+
+  it('5-pass loop with refreshed prevPos attenuates inter-iteration tangent drift', () => {
+    // Mirrors the call site pattern at wasmSolverWorker.ts:659-678 (handler
+    // for 'applyInitialTriangleCollision'): 5 outer passes with prev set from
+    // a snapshot, refreshed via prev.set(positions) between iterations. In
+    // the real worker, inter-pass drift originates from multi-body push
+    // conflicts. Here we inject synthetic tangent each pass so a single body
+    // is sufficient to observe friction's attenuation contract under the
+    // refresh structure.
+    function run5Pass(friction: number): Float32Array {
+      const mesh = makeFloorPlane();
+      const hash = new TriangleSpatialHash(mesh, 2.0);
+      const pos = new Float32Array([0, PENETRATION_Y, 0]);
+      const invMass = new Float32Array([1.0]);
+      const prev = pos.slice();
+      for (let i = 0; i < 5; i++) {
+        pos[0] += 0.2;
+        pos[1] = PENETRATION_Y;
+        solveTriangleCollision(pos, invMass, 1, mesh, hash, MARGIN, friction, prev);
+        prev.set(pos);
+      }
+      return pos;
+    }
+
+    const withFriction = run5Pass(0.5);
+    const withoutFriction = run5Pass(0);
+
+    expect(withFriction[1]).toBeCloseTo(MARGIN, 3);
+    expect(withoutFriction[1]).toBeCloseTo(MARGIN, 3);
+    expect(withFriction[0]).toBeLessThan(withoutFriction[0]);
+    expect(withoutFriction[0]).toBeCloseTo(1.0, 5); // 5 * 0.2 with no damping
+    expect(withFriction[0]).toBeCloseTo(0.5, 2);    // half-attenuated each pass
+  });
 });

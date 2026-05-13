@@ -663,10 +663,18 @@ self.onmessage = async (event: MessageEvent) => {
           const positions = new Float32Array(wasmExports.memory.buffer, ptr, n * 3);
 
           const invMass = new Float32Array(n).fill(1.0);
+          // BUG-2 (#605): thread prevPos so the friction kernel gate
+          // (triangleCollision.ts:312, `friction > 0 && prevPos`) doesn't
+          // fall through here as it used to on the main loop (L350). The
+          // pre-pass has no natural prev (simulation hasn't started), so we
+          // snapshot positions and refresh between passes — friction then
+          // attenuates inter-pass tangent drift from multi-body push conflicts.
+          const prev = positions.slice();
           for (let i = 0; i < 5; i++) {
             for (const body of collisionBodies) {
-              solveTriangleCollision(positions, invMass, n, body.mesh, body.hash, body.margin, body.friction);
+              solveTriangleCollision(positions, invMass, n, body.mesh, body.hash, body.margin, body.friction, prev);
             }
+            prev.set(positions);
           }
 
           const frame = positions.slice();
