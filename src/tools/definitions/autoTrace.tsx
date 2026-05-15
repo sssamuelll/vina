@@ -29,7 +29,7 @@ export const autoTraceTool: ToolDefinition = {
   options: [
     { id: 'threshold', label: 'Edge Threshold', type: 'number', value: 50, min: 10, max: 200, step: 5 },
     { id: 'smoothing', label: 'Smoothing (px)', type: 'number', value: 2, min: 0, max: 10, step: 1 },
-    { id: 'minArea', label: 'Min Area (mm\u00B2)', type: 'number', value: 100, min: 0, max: 10000, step: 50 },
+    { id: 'minAreaPx', label: 'Min Area (px\u00B2)', type: 'number', value: 100, min: 0, max: 10000, step: 50 },
   ],
   copilot: {
     description: 'Automatically detects edges in a reference image and converts detected contours to pattern piece outlines. Uses Canny edge detection with adjustable threshold and smoothing. Contours sorted by area (largest first). / Detecta autom\u00E1ticamente bordes en una imagen de referencia y convierte los contornos en piezas de patr\u00F3n.',
