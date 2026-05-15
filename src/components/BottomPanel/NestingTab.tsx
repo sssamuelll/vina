@@ -305,17 +305,20 @@ export default function NestingTab() {
         </label>
 
         {rollWidthSelectValue === 'custom' && (
-          <input
-            type="number"
-            value={config.rollWidth}
-            min={100}
-            step={10}
-            onChange={handleCustomRollWidth}
-            title="Custom roll width (mm)"
-          />
+          <label className="nesting-unit-input">
+            <input
+              type="number"
+              value={config.rollWidth}
+              min={100}
+              step={10}
+              onChange={handleCustomRollWidth}
+              aria-label="Custom roll width in millimeters"
+            />
+            <span className="nesting-unit-suffix">mm</span>
+          </label>
         )}
 
-        <label>
+        <label className="nesting-unit-input">
           Gap:
           <input
             type="number"
@@ -323,8 +326,9 @@ export default function NestingTab() {
             min={0}
             step={1}
             onChange={handleGapChange}
-            title="Gap between pieces (mm)"
+            aria-label="Gap between pieces in millimeters"
           />
+          <span className="nesting-unit-suffix">mm</span>
         </label>
 
         {/* Stats */}

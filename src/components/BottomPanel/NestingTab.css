@@ -67,6 +67,18 @@
   outline: none;
 }
 
+.nesting-toolbar .nesting-unit-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nesting-toolbar .nesting-unit-suffix {
+  font-size: 11px;
+  color: var(--text-muted, #999);
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── Stats ──────────────────────────────────────────────────────────────── */
 
 .nesting-stats {
