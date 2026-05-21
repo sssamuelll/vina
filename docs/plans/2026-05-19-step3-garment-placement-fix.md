@@ -445,3 +445,60 @@ Nuevo: `src/utils/seamly2d/__tests__/coordinateNormalization.test.ts`. Carga `ja
 - **#518 (seams)** → sigue abierto. Ahora es el bloqueante del Jacket (ratio 0.6), T-Shirt (0.6) y Blouse (1.0). Próximo en la cadena causal.
 - **Keiko Skirt** → bug aparte (NaN / overlay), no #527. Follow-up independiente.
 - **#531 (drape)** → downstream; solo el male_shirt llega hoy porque es el único que pasa #527 + #518.
+
+## Addendum 2026-05-21 v8 — #518 (formación de seams): dos fixes reales + el jacket NO es bug de costura
+
+Continuación tras cerrar #527. Diagnóstico guiado por dato (mismo método). El #518 ("auto-seams no se forman para patrones simples") se reveló como **tres sub-problemas con causas distintas**, no uno solo.
+
+### Hallazgo 1 — las heurísticas de naming estaban muertas (camelCase + cirílico)
+
+`autoSew/namingHeuristics.ts::normalize()` no separaba camelCase y no traducía cirílico:
+
+- `scorePieceNames('FrontPanel','BackPanel')` → token único `"frontpanel"` → `has(tokens,'front')` nunca matcheaba. **0/21 pares del male_shirt** disparaban regla de naming; sus 29 seams se formaban *solo por arc-length*.
+- El jacket usa nombres rusos (Спинка/Полочка/Рукав/Комір/Подборт) ausentes del diccionario `TRANSLATIONS` (solo ES/FR/DE/IT) → **0/10 pares**.
+
+**Fix**: (a) `normalize()` separa camelCase antes de lowercasing (`/([a-zà-ɏ])([A-Z])/g`); (b) bloque de traducciones ruso/ucraniano en `TRANSLATIONS`. Resultado: jacket 0→9/10 pares con regla, male_shirt 0→12/21. El male_shirt subió **29→36 seams** (todos correctos). Blindado en `namingHeuristics.regression.test.ts`.
+
+### Hallazgo 2 — el matcher de longitud usaba tolerancia absoluta de 5 mm
+
+`autoSew/arcLengthMatcher.ts::lengthSimilarity` usaba `exp(-((diff/5)²))` con 5 mm fijos. Para edges de cientos de mm, una diferencia de 8-15 mm (normal por seam allowance + muestreo de curvas + redondeo de medidas) daba similitud ≈0. Patrones de nombres genéricos (t-shirt/blusa, todas las piezas "Detail"/"Detalle") no podían formar sus seams por longitud.
+
+**Fix**: tolerancia híbrida `max(5 mm, 8% · min(La, Lb))`. El piso absoluto protege edges chicos; la ventana relativa captura variaciones naturales en edges grandes. Blindado en `lengthTolerance.regression.test.ts`. Verificado:
+
+| Patrón | seams antes | seams después | ratio | Veredicto |
+|---|---|---|---|---|
+| Blouse | 2 (1.00) | **3 (1.50)** | ✅ cruza el gate DoD | mejora real |
+| T-Shirt | 3 (0.60) | 4 (0.80) | sigue < 1.5 (techo geométrico) | mejora parcial |
+| Male Shirt | 36 (2.12) | 37 (2.18) | sin regresión | mejora estricta |
+
+(El +1 del male_shirt es un match nuevo de alta calidad BackPanel↔CollarBase; no se cayó ninguno de los 36 originales.) Suite autoSew: 154 tests verdes.
+
+### Hallazgo 3 (el giro) — el jacket NO tiene bug de costura: su geometría está colapsada
+
+Esto fue lo importante. El jacket seguía en 3 seams (ratio 0.60) sin moverse con ninguno de los dos fixes. La hipótesis inicial fue "sub-segmentación de edges en el extractor". **Falsa.** El dato lo refutó: la pieza Спинка tenía 9 corners explícitos a 90° pero el extractor producía 1 sola edge de 1974 mm.
+
+Volcando el outline crudo: **73% de los puntos del jacket colapsan a (0,0)**. Las piezas no son piezas — son líneas de ida-y-vuelta entre 1-2 puntos reales. Causa: las fórmulas del jacket referencian **medidas en francés** (`@Lignetailledos`, `@Hauteurcarrure`, `@Longueurépaule`…) ausentes del diccionario inglés del avatar, más el `measurements.defaults: {}` vacío que el converter dropeó → defaultean a 0 → puntos al origen → geometría degenerada (54 warns del evaluator).
+
+Comparación que lo deja claro:
+
+| Patrón | unit | % puntos en origen | diagnóstico |
+|---|---|---|---|
+| jacket1_52-176 | mm | **73%** | resolución de medidas (FR + defaults vacíos) — upstream |
+| tshirt_test | cm | 0% | geometría OK, solo naming genérico |
+| patron_blusa | cm | 0% | geometría OK, solo naming genérico |
+| male_shirt | cm | 0% | funciona |
+
+**El edgeExtractor NO tiene bug** — extrae correctamente las 1-2 edges que existen en una pieza degenerada. El bloqueante del jacket es de medidas, no de costura. Ninguna mejora a seams lo mueve mientras la geometría sea basura.
+
+### Lo que queda (sub-tracks separados, no #518-costura)
+
+1. **Jacket (familia jacket1-6, todos mm + FR)**: resolución de medidas. Necesita (a) i18n de nombres de medida FR/RU→canónico en el evaluator/adapter, y (b) derivar las ~40 medidas detalladas de las 7 básicas del avatar (la lógica ya existe en `seamlyTools.ts:160-179` pero `TemplateLibrary` —la ruta del e2e— no la aplica; portarla a un helper compartido). Es el sub-track más grande y el de mayor impacto.
+2. **T-Shirt**: techo geométrico (5 piezas chicas, edges mayormente únicos) → ratio 0.80 aun con matching mejorado. No es bug de costura.
+3. **Threshold del DoD**: el gate `assemblyRatio >= 1.5` se calibró contra el male_shirt (17 piezas, rico en edges). Para patrones esqueléticos es inalcanzable estructuralmente. **Recomendación**: reemplazar el ratio crudo por un criterio de **conectividad** ("ninguna pieza huérfana / grafo de seams conexo"), que mide "ensamblado de verdad" y funciona para patrones ricos y chicos. Bajar el threshold a lo bruto (ratio≥0.5) se descartó: pondría en falso-verde seams de coincidencia de longitud.
+
+### Entregado en este paso (limpio y verde)
+
+- `namingHeuristics.ts` (camelCase + cirílico) + `namingHeuristics.regression.test.ts`.
+- `arcLengthMatcher.ts` (tolerancia híbrida) + `lengthTolerance.regression.test.ts`.
+- Gates: `tsc -b --noEmit` limpio, autoSew suite 154 verdes, lint sin errores nuevos.
+- Efecto neto: **Blouse cruza el DoD**, T-Shirt y Male Shirt mejoran sin regresión. El edgeExtractor quedó confirmado sin bug (no se tocó).

@@ -120,8 +120,18 @@ export function lengthSimilarity(lenA: number, lenB: number, tolerance = 5): num
   const maxLen = Math.max(lenA, lenB);
   const relDiff = maxLen > 0 ? diff / maxLen : 0;
 
-  // Gaussian: exp(-(diff/tolerance)^2)
-  const absSim = Math.exp(-((diff / tolerance) ** 2));
+  // #518: the Gaussian falloff used to be driven by a fixed absolute `tolerance`
+  // (default 5 mm). That is far too strict for garment edges that are hundreds of
+  // mm long — real seam partners differ by more than 5 mm purely from seam
+  // allowance, curve-sampling discretization, and measurement rounding (e.g. a
+  // t-shirt side seam of 222 mm vs 224 mm, or 293 mm vs 268 mm, never matched).
+  // Use a hybrid tolerance: the absolute floor OR 8% of the shorter edge,
+  // whichever is larger. Small edges keep the tight absolute guard (avoids
+  // spurious matches between tiny edges); large edges get a proportional window.
+  const effectiveTolerance = Math.max(tolerance, 0.08 * Math.min(lenA, lenB));
+
+  // Gaussian: exp(-(diff/effectiveTolerance)^2)
+  const absSim = Math.exp(-((diff / effectiveTolerance) ** 2));
   // Relative penalty: edges with 50%+ length mismatch are unlikely matches
   const relPenalty = relDiff > 0.5 ? 0.1 : 1 - relDiff * 0.5;
 

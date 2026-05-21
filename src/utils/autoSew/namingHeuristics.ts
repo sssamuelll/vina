@@ -51,11 +51,29 @@ const TRANSLATIONS: Record<string, string> = {
   'davanti': 'front', 'dietro': 'back', 'manica': 'sleeve', 'colletto': 'collar',
   'polsino': 'cuff', 'gonna': 'skirt', 'pantalone': 'trouser', 'corpetto': 'bodice',
   'fodera': 'lining', 'tasca': 'pocket', 'cappuccio': 'hood',
+  // Russian / Ukrainian — many converted Seamly2D patterns (jacket1-6, pants1)
+  // carry Cyrillic piece names. Without these the naming heuristic returned null
+  // for every pair and seams only formed by arc-length coincidence (#518).
+  'спинка': 'back', 'полочка': 'front', 'перед': 'front', 'передняя': 'front',
+  'задняя': 'back', 'рукав': 'sleeve', 'воротник': 'collar', 'комір': 'collar',
+  'манжета': 'cuff', 'манжет': 'cuff', 'юбка': 'skirt', 'спідниця': 'skirt',
+  'брюки': 'trouser', 'штани': 'trouser', 'лиф': 'bodice', 'подборт': 'facing',
+  'обтачка': 'facing', 'обтачкa': 'facing', 'карман': 'pocket', 'кишеня': 'pocket',
+  'капюшон': 'hood', 'кокетка': 'yoke', 'левый': 'left', 'левая': 'left',
+  'правый': 'right', 'правая': 'right', 'верх': 'upper', 'низ': 'lower',
 };
 
 /** Normalize a piece name to lowercase English tokens */
 function normalize(name: string): string[] {
   const lower = name
+    // Split camelCase / PascalCase BEFORE lowercasing so compound names like
+    // "FrontPanel" or "ShortSleeve" tokenize into ["front","panel"] / ["short",
+    // "sleeve"] and actually hit the naming rules. Without this, "FrontPanel"
+    // stayed a single token "frontpanel" and `has(tokens,'front')` never matched —
+    // so the naming heuristic silently did nothing for every camelCase pattern
+    // (#518). The range à-ɏ keeps accented Latin lowercase letters as
+    // word-internal so e.g. "Empiècement" isn't split mid-accent.
+    .replace(/([a-zà-ɏ])([A-Z])/g, '$1 $2')
     .toLowerCase()
     .replace(/[_\-./\\]/g, ' ')
     .replace(/\d+/g, ' ')
