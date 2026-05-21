@@ -61,6 +61,56 @@ describe('detectBodyRegion', () => {
   it('returns unknown for unrecognized names', () => {
     expect(detectBodyRegion(makePiece('Piece_42'))).toBe('unknown');
   });
+
+  // Added for the male_shirt baseline. Pre-fix these 7/17 pieces all
+  // returned 'unknown' and routed to the circle fallback, dragging the
+  // simulation into the canonical #531 panels-falling symptom.
+  it('detects yoke, pocket, and placket sub-pieces from name (#506 baseline fix)', () => {
+    // Yoke — defaults to back-torso (typical men's shirt yoke is across back)
+    expect(detectBodyRegion(makePiece('Yoke'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('FrontYoke'))).toBe('front-torso');
+    // Pocket — defaults to front-torso (typical front chest pocket); honors
+    // BACK_RE when present.
+    expect(detectBodyRegion(makePiece('Pocket'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('PocketRound'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('PocketFlap'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('PocketFlapRound'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('BackPocket'))).toBe('back-torso');
+    // Placket — always front (no back-placket convention).
+    expect(detectBodyRegion(makePiece('PlacketUnder'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('PlacketTop'))).toBe('front-torso');
+  });
+
+  it('multilingual sub-piece detection (yoke/pocket/placket)', () => {
+    // Spanish
+    expect(detectBodyRegion(makePiece('Canesú'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Bolsillo'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Tapeta'))).toBe('front-torso');
+    // Italian
+    expect(detectBodyRegion(makePiece('Sprone'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Tasca'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Patta'))).toBe('front-torso');
+    // German
+    expect(detectBodyRegion(makePiece('Sattel'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Tasche'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Knopfleiste'))).toBe('front-torso');
+  });
+
+  it('classifies all 17 pieces of male_shirt.json (regression for baseline #506)', () => {
+    // Exact piece names from tools/seamly2d-converter/output/male_shirt.json.
+    // Pre-fix: 7 returned 'unknown' (Yoke, Pocket×4, Placket×2).
+    // Post-fix: 0 return 'unknown' — all route to a real body region.
+    const names = [
+      'Yoke', 'FrontPanel', 'BackPanel',
+      'Pocket', 'PocketRound', 'PocketFlap', 'PocketFlapRound',
+      'Cuff', 'CuffInterface',
+      'ShortSleeve', 'FullSleeve',
+      'CollarBase', 'CollarBaseInterface', 'CollarTop', 'CollarTopInterface',
+      'PlacketUnder', 'PlacketTop',
+    ];
+    const unknowns = names.filter(n => detectBodyRegion(makePiece(n)) === 'unknown');
+    expect(unknowns, `pieces still unclassified: ${unknowns.join(', ')}`).toEqual([]);
+  });
 });
 
 describe('computePlacement', () => {
@@ -107,26 +157,68 @@ describe('placeGarmentPieces', () => {
     expect(placements[1].position[2]).toBeGreaterThan(0);
   });
 
-  it('distributes unknowns in a circle', () => {
+  it('all-unknown patterns: alternates front/back torso with X stagger (#556 fix)', () => {
+    // Pre-fix: all unknown pieces went into a 360° circle around the avatar
+    // at midTorso height, fell past the avatar collider, ended up below the
+    // waist as loose panels (canonical #531 symptom; measured baseline on
+    // male_shirt.json: 4195 cloth vertices below waistY).
+    //
+    // Post-fix: when EVERY piece is unclassified (the Seamly converter case:
+    // names like "A1, A2, ..." don't match any semantic regex), alternate
+    // pieces between front-torso and back-torso, staggered horizontally so
+    // no two pieces share coordinates. This gives the simulation a starting
+    // configuration where pieces drape against the body instead of falling
+    // off the sides.
     const pieces = [
-      makePiece('A'),
-      makePiece('B'),
-      makePiece('C'),
+      makePiece('A1'),
+      makePiece('A2'),
+      makePiece('A3'),
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
-    // All should have positions, none at exact same spot
+
+    // Even-indexed pieces go front (Z < 0), odd go back (Z > 0).
+    expect(placements[0].position[2]).toBeLessThan(0);
+    expect(placements[1].position[2]).toBeGreaterThan(0);
+    expect(placements[2].position[2]).toBeLessThan(0);
+
+    // All positions must be distinct — stacked pieces produce collinear
+    // vertices that crash the cloth solver with NaN constraints.
     const positions = placements.map(p => p.position.join(','));
-    const unique = new Set(positions);
-    expect(unique.size).toBe(3);
+    expect(new Set(positions).size).toBe(3);
   });
 
-  it('unknown pieces include X rotation to stand upright', () => {
+  it('all-unknown pieces include X rotation to stand upright', () => {
     const pieces = [makePiece('A'), makePiece('B')];
     const placements = placeGarmentPieces(pieces, MEAS);
     for (const p of placements) {
-      // X rotation must be -π/2 to stand the piece up from horizontal XZ plane
+      // X rotation must be -π/2 to stand the piece up from horizontal XZ plane.
+      // Both front-torso and back-torso placements satisfy this.
       expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 5);
     }
+  });
+
+  it('mixed-classification patterns keep the circle UX for the lone unknown', () => {
+    // When SOME pieces are classified and some aren't, the unclassified ones
+    // stay in the visible circle — it's intentional UX feedback ("user, please
+    // classify these"). The all-unknown shortcut only fires when EVERY piece
+    // is unclassified (the Seamly converter case).
+    const pieces = [
+      makePiece('Front Panel'),  // classified by name regex
+      makePiece('MysteryPiece'),  // unknown
+    ];
+    const placements = placeGarmentPieces(pieces, MEAS);
+
+    // Classified piece on torso front.
+    expect(placements[0].position[2]).toBeLessThan(0);
+
+    // Unknown sits on a circle around the avatar at midTorso height.
+    // Just sanity-check it's far enough from origin to be "in the circle"
+    // rather than stacked on the front bodice.
+    const distFromAxis = Math.hypot(
+      placements[1].position[0],
+      placements[1].position[2],
+    );
+    expect(distFromAxis).toBeGreaterThan(0.1);
   });
 
   it('does not double-toggle sleeve assignment', () => {

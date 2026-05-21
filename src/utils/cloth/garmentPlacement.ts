@@ -69,8 +69,30 @@ const COLLAR_RE = /\b(collar|cuello|colletto|col|kragen|neck.?bind)/i;
 const WAISTBAND_RE = /\b(waistband|cinturilla|pretina)/i;
 const HOOD_RE = /\b(hood|capucha|cappuccio)/i;
 const CUFF_RE = /\b(cuff|pu[ñn]o|polsino)/i;
+// Added per the male_shirt template baseline: 7/17 pieces (Yoke, Pocket×4,
+// Placket×2) were falling to the circle fallback because the regex below
+// didn't cover these common shirt sub-pieces. Each routes to torso so the
+// avatar collider catches them; sub-pieces don't have a dedicated body
+// region today, but front-torso/back-torso is a safe approximation.
+const YOKE_RE = /\b(yoke|canes[uú]|sprone|empi[èe]cement|sattel)/i;
+const POCKET_RE = /\b(pocket|bolsillo|tasca|poche|tasche)/i;
+const PLACKET_RE = /\b(placket|tapeta|patta|patte|knopfleiste)/i;
 
-function detectFromName(name: string): BodyRegion {
+/**
+ * Insert spaces at camelCase boundaries so the \b word-boundary regexes can
+ * match keywords that sit mid-name. Without this, "ShortSleeve" fails
+ * /\bsleeve/i because there's no word boundary between "Short" and "Sleeve".
+ * "ShortSleeve" → "Short Sleeve", "PocketFlapRound" → "Pocket Flap Round".
+ * Also splits letter/digit transitions ("Panel2" → "Panel 2").
+ */
+function splitCamelCase(name: string): string {
+  return name
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2');
+}
+
+function detectFromName(rawName: string): BodyRegion {
+  const name = splitCamelCase(rawName);
   if (COLLAR_RE.test(name)) return 'collar';
   if (WAISTBAND_RE.test(name)) return 'waistband';
   if (HOOD_RE.test(name)) return 'hood';
@@ -87,6 +109,18 @@ function detectFromName(name: string): BodyRegion {
     return _sleeveToggle ? 'left-sleeve' : 'right-sleeve';
   }
   if (SKIRT_RE.test(name)) return BACK_RE.test(name) ? 'back-skirt' : 'front-skirt';
+  // Sub-piece detection runs before the generic FRONT/BACK fallback so that
+  // "FrontPocket" doesn't accidentally match FRONT_RE first and lose the
+  // pocket semantic. For placement purposes both routes converge on
+  // front-torso, but the order keeps the classification honest if future
+  // code branches on the specific sub-piece type.
+  if (POCKET_RE.test(name)) return BACK_RE.test(name) ? 'back-torso' : 'front-torso';
+  // Plackets are the button strip down the front of a shirt — virtually
+  // always front. No back-placket convention to worry about.
+  if (PLACKET_RE.test(name)) return 'front-torso';
+  // Yokes on men's shirts are typically back (across upper back); honor
+  // explicit FRONT prefix when present, otherwise default to back-torso.
+  if (YOKE_RE.test(name)) return FRONT_RE.test(name) ? 'front-torso' : 'back-torso';
   if (BACK_RE.test(name)) return 'back-torso';
   if (FRONT_RE.test(name)) return 'front-torso';
   return 'unknown';
@@ -284,6 +318,28 @@ export function placeGarmentPieces(
   // (it has toggle side effects for sleeve/cuff L/R assignment)
   const regions = pieces.map(p => detectBodyRegion(p));
   const unknownCount = regions.filter(r => r === 'unknown').length;
+  // When EVERY piece is unknown, the pattern came from a source that doesn't
+  // expose category metadata (notably the Seamly2D converter, which produces
+  // technical names like "A1, A2, ..." that the regex in detectFromName can't
+  // match against semantic words like "front" or "sleeve"). The original
+  // circle fallback was visible-on-purpose UX feedback ("user, please classify
+  // these") but produces the canonical #531 drape failure: pieces fall as
+  // loose panels because they start arranged around the torso at midTorso
+  // height with no orientation toward the body, then get caught by the avatar
+  // collider at hip-level when gravity drops them. Tracked baseline (pre-fix):
+  // 4195 cloth vertices fell below waist on male_shirt.json.
+  //
+  // Heuristic fix: when ALL pieces are unclassified, alternate front-torso /
+  // back-torso by index. Not perfect — sleeves/skirts/etc. get incorrectly
+  // placed as torso too — but at least they drape on the body instead of
+  // dangling. Patterns with at least one classified piece keep the circle
+  // fallback for the unclassified remainder (the UX-feedback case still
+  // works for mixed projects).
+  //
+  // Proper long-term fix is upstream: the Seamly adapter should infer
+  // category (via catalog metadata or geometric heuristics) so pieces never
+  // arrive here as unknown. Filed as follow-up; see docs/plans for status.
+  const allUnknown = unknownCount === pieces.length && pieces.length > 0;
   let unknownIndex = 0;
 
   return pieces.map((piece, i) => {
@@ -291,7 +347,37 @@ export function placeGarmentPieces(
     const geo = outlineBBox(piece.outline);
 
     if (region === 'unknown') {
-      // Distribute unknowns in a circle around the torso, standing upright
+      if (allUnknown) {
+        // Alternate front/back torso so the avatar collider catches them
+        // and they drape, instead of falling past at hip-level. Stagger X
+        // within each side group so multiple front (or multiple back) pieces
+        // don't stack at identical coordinates — stacked pieces give the
+        // cloth solver collinear vertices and produce NaN constraints.
+        const isFront = i % 2 === 0;
+        const sideIndex = Math.floor(i / 2);
+        const halfCount = Math.ceil(pieces.length / 2);
+        const base = computePlacement(
+          isFront ? 'front-torso' : 'back-torso',
+          measurements,
+          { widthMm: geo.width, heightMm: geo.height },
+        );
+        const d = deriveDimensions(measurements);
+        // Spread sideIndex across roughly ±shoulderWidth/2; single-side groups
+        // (halfCount === 1) keep the centered position.
+        const xOffset = halfCount > 1
+          ? (sideIndex - (halfCount - 1) / 2) * (d.shoulderWidth / halfCount)
+          : 0;
+        return {
+          position: [
+            base.position[0] + xOffset,
+            base.position[1],
+            base.position[2],
+          ] as [number, number, number],
+          rotation: base.rotation,
+        };
+      }
+
+      // Mixed case: keep visible circle so user notices the unclassified piece.
       const d = deriveDimensions(measurements);
       const radius = Math.max(d.chestRadius, d.hipRadius) + 0.15;
       const angle = (unknownIndex / Math.max(unknownCount, 1)) * Math.PI * 2 - Math.PI / 2;
