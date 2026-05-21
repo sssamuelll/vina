@@ -20,6 +20,9 @@ copyclip_metrics.jsonl
 snapshot-*.md
 screenshots/
 .claude/
+
+# Local review artifacts
+OpenClo_Review_*.docx
 .github/*
 !.github/workflows/
 !.github/workflows/**
