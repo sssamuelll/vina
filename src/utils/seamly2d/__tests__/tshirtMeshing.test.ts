@@ -24,7 +24,10 @@ const SIM_MESH_CONFIG = {
   curveResolution: 12,
 };
 
-describe('T-Shirt Meshing Pipeline', () => {
+// File-level timeout: CDT meshing on Linux CI runs ~10× slower than local
+// (15s local → 60-120s CI). Default vitest 5s timeout is wildly insufficient
+// for any test that calls meshPiece(). 180s covers current + future cases.
+describe('T-Shirt Meshing Pipeline', { timeout: 180000 }, () => {
   const raw = JSON.parse(readFileSync(PATTERN_PATH, 'utf-8'));
   const adapted = adaptSeamlyPattern(raw, {});
 
@@ -81,7 +84,7 @@ describe('T-Shirt Meshing Pipeline', () => {
     }
   });
 
-  it('should mesh all 5 pieces with CDT (simulation config)', { timeout: 60000 }, () => {
+  it('should mesh all 5 pieces with CDT (simulation config)', () => {
     let meshOk = 0;
     let meshFail = 0;
 
