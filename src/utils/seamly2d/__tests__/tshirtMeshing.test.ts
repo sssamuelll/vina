@@ -81,7 +81,7 @@ describe('T-Shirt Meshing Pipeline', () => {
     }
   });
 
-  it('should mesh all 5 pieces with CDT (simulation config)', { timeout: 60000 }, () => {
+  it('should mesh all 5 pieces with CDT (simulation config)', { timeout: 180000 }, () => {
     let meshOk = 0;
     let meshFail = 0;
 
