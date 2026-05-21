@@ -38,3 +38,29 @@ docs/superpowers/
 # CLAUDE/ — local-only context routing layer (per-developer).
 # Project canonical lives in CLAUDE.md + docs/reports/.
 CLAUDE/
+
+# Local tooling state (per-developer, not project canonical)
+.cgcignore
+.superpowers/
+entities.json
+mempalace.yaml
+
+# Debug artifacts at repo root (screenshots, logs, snapshots from manual runs)
+/all-warnings.log
+/arrange-errors.txt
+/b2-*.log
+/b2v2-*.log
+/canvas-*.jpg
+/canvas-*.txt
+/drape-*.jpg
+/drape-*.txt
+/dress-test-*.png
+/nesting-*.png
+/phase1-*.png
+/phase2-*.png
+/phase2-*.yml
+/post-dress.log
+/smoke-*.png
+/webgpu-*.png
+/webgpu-*.log
+/webgpu-*.txt
