@@ -328,18 +328,33 @@ export function adaptSeamlyPattern(
     });
   }
 
-  // Seamly2D coordinates are in cm — convert to mm (OpenClo standard)
-  const CM_TO_MM = 10;
+  // Convert pattern-space coordinates to mm (OpenClo's internal standard).
+  //
+  // #527: this used to be hardcoded `const CM_TO_MM = 10`, on the assumption that
+  // every Seamly2D pattern is authored in cm. That is false — several real
+  // patterns declare `"unit": "mm"` (e.g. jacket1_52-176, jacket2-6, pants1_52-176).
+  // Scaling already-millimetre coordinates by 10 inflated those patterns 10× so
+  // their geometry spanned ~10 m instead of ~1 m. That overflowed the 2D canvas
+  // and made the CDT mesher (cdtMesher.ts) non-terminating, so the cloth never
+  // produced a mesh. cm patterns (male_shirt etc.) were unaffected because ×10 is
+  // correct for them — which is why the bug only showed up on certain patterns.
+  //
+  // Honour the declared unit instead. Unit-less patterns default to cm to
+  // preserve the historical behaviour relied on by the synthetic fixtures in the
+  // adapter tests. (This mirrors the unit-aware scale already used in
+  // seamlyTools.ts: `patternData.unit === 'cm' ? 10 : 1`.)
+  const unit = (pattern.unit ?? 'cm').toLowerCase();
+  const TO_MM = unit === 'mm' ? 1 : (unit === 'inch' || unit === 'in') ? 25.4 : 10;
   for (const pt of cPoints) {
-    pt.x *= CM_TO_MM;
-    pt.y *= CM_TO_MM;
+    pt.x *= TO_MM;
+    pt.y *= TO_MM;
   }
   for (const curve of cCurves) {
     if (curve.resolvedCommands) {
       for (const cmd of curve.resolvedCommands) {
         if (cmd.values) {
           for (let i = 0; i < cmd.values.length; i++) {
-            cmd.values[i] *= CM_TO_MM;
+            cmd.values[i] *= TO_MM;
           }
         }
       }
@@ -347,15 +362,15 @@ export function adaptSeamlyPattern(
     // Scale numeric values in curve definition
     const def = curve.definition;
     if (def.type === 'cubicBezier') {
-      if (typeof def.cp1x === 'number') def.cp1x *= CM_TO_MM;
-      if (typeof def.cp1y === 'number') def.cp1y *= CM_TO_MM;
-      if (typeof def.cp2x === 'number') def.cp2x *= CM_TO_MM;
-      if (typeof def.cp2y === 'number') def.cp2y *= CM_TO_MM;
+      if (typeof def.cp1x === 'number') def.cp1x *= TO_MM;
+      if (typeof def.cp1y === 'number') def.cp1y *= TO_MM;
+      if (typeof def.cp2x === 'number') def.cp2x *= TO_MM;
+      if (typeof def.cp2y === 'number') def.cp2y *= TO_MM;
     } else if (def.type === 'spline') {
-      if (typeof def.length1 === 'number') def.length1 *= CM_TO_MM;
-      if (typeof def.length2 === 'number') def.length2 *= CM_TO_MM;
+      if (typeof def.length1 === 'number') def.length1 *= TO_MM;
+      if (typeof def.length2 === 'number') def.length2 *= TO_MM;
     } else if (def.type === 'arc') {
-      if (typeof def.radius === 'number') def.radius *= CM_TO_MM;
+      if (typeof def.radius === 'number') def.radius *= TO_MM;
     }
   }
 
