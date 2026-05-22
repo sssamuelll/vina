@@ -1,4 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+// Read active 2D tool from Redux. Replaces stale `.tool-btn[title*=...]` selectors.
+async function getActiveTool2D(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { tools: { activeTool2D: string } } } }).__OPENCLO_STORE__;
+    return store ? store.getState().tools.activeTool2D : null;
+  });
+}
 
 test.describe('Command Palette', () => {
   test.beforeEach(async ({ page }) => {
@@ -102,8 +110,7 @@ test.describe('Command Palette', () => {
     await page.waitForTimeout(200);
 
     await expect(page.locator('.command-palette')).not.toBeVisible();
-    const activeBtn = page.locator('.tool-btn.active');
-    await expect(activeBtn).toHaveAttribute('title', /Rectangle/);
+    expect(await getActiveTool2D(page)).toBe('rectangle');
   });
 
   test('clicking a command executes it', async ({ page }) => {
@@ -114,15 +121,15 @@ test.describe('Command Palette', () => {
     await penItem.click();
     await page.waitForTimeout(200);
     await expect(page.locator('.command-palette')).not.toBeVisible();
-    const activeBtn = page.locator('.tool-btn.active');
-    await expect(activeBtn).toHaveAttribute('title', /Pen/);
+    expect(await getActiveTool2D(page)).toBe('pen');
   });
 
   test('shortcuts are displayed next to commands', async ({ page }) => {
     await page.keyboard.press('Meta+k');
     await page.waitForTimeout(300);
     const rectItem = page.locator('.palette-item').filter({ hasText: /Rectangle/ }).first();
-    await expect(rectItem.locator('.palette-item-shortcut')).toHaveText('R', { timeout: 3000 });
+    // Rectangle shortcut is 's' (Photoshop convention) — palette typically uppercases.
+    await expect(rectItem.locator('.palette-item-shortcut')).toHaveText(/^[Ss]$/, { timeout: 3000 });
   });
 
   test('search highlights matching characters', async ({ page }) => {

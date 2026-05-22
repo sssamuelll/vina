@@ -212,7 +212,7 @@ test.describe('PBR Materials', () => {
     await setupWithPiece(page);
 
     // Start simulation
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const startBtn = page.locator('button:has-text("Start Simulation")');
     if (await startBtn.isVisible({ timeout: 5000 }).catch(() => false)) {
       await expect(startBtn).toBeEnabled({ timeout: 3000 });

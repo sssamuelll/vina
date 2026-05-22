@@ -7,18 +7,18 @@ test.describe('Simulation Panel', () => {
   });
 
   test('ActivityBar shows simulation icon', async ({ page }) => {
-    const simIcon = page.locator('.activity-bar-item[title="Simulation"]');
+    const simIcon = page.locator('.activity-bar-item[aria-label="Simulation"]');
     await expect(simIcon).toBeVisible();
   });
 
   test('clicking simulation icon opens SimulationView', async ({ page }) => {
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     await expect(page.locator('text=Start Simulation')).toBeVisible();
     await expect(page.locator('text=IDLE')).toBeVisible();
   });
 
   test('particle distance slider defaults to 5mm', async ({ page }) => {
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const slider = page.locator('input[type="range"]');
     await expect(slider).toBeVisible();
     await expect(slider).toHaveValue('5');
@@ -26,21 +26,21 @@ test.describe('Simulation Panel', () => {
   });
 
   test('particle distance slider is adjustable', async ({ page }) => {
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const slider = page.locator('input[type="range"]');
     await slider.fill('3');
     await expect(page.locator('text=3mm')).toBeVisible();
   });
 
   test('Start Simulation disabled without pieces', async ({ page }) => {
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const btn = page.locator('button:has-text("Start Simulation")');
     await expect(btn).toBeDisabled();
   });
 
   test('can start simulation with a piece', async ({ page }) => {
-    // Draw rectangle
-    await page.keyboard.press('r');
+    // Draw rectangle ('s')
+    await page.keyboard.press('s');
     const svg = page.locator('svg.pattern-svg');
     const box = await svg.boundingBox();
     if (!box) throw new Error('no svg');
@@ -53,7 +53,7 @@ test.describe('Simulation Panel', () => {
     await page.waitForTimeout(500);
 
     // Open sim panel and start
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const btn = page.locator('button:has-text("Start Simulation")');
     await expect(btn).toBeEnabled();
     await btn.click();
@@ -64,8 +64,8 @@ test.describe('Simulation Panel', () => {
   });
 
   test('can pause and reset simulation', async ({ page }) => {
-    // Draw rect + start sim
-    await page.keyboard.press('r');
+    // Draw rect ('s') + start sim
+    await page.keyboard.press('s');
     const svg = page.locator('svg.pattern-svg');
     const box = await svg.boundingBox();
     if (!box) throw new Error('no svg');
@@ -75,7 +75,7 @@ test.describe('Simulation Panel', () => {
     await page.mouse.up();
     await page.waitForTimeout(500);
 
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     await page.click('button:has-text("Start Simulation")');
     await expect(page.locator('text=SIMULATING')).toBeVisible({ timeout: 5000 });
 
@@ -98,7 +98,7 @@ test.describe('Avatar & 3D View', () => {
   });
 
   test('ActivityBar shows avatar icon', async ({ page }) => {
-    await expect(page.locator('.activity-bar-item[title="Avatar"]')).toBeVisible();
+    await expect(page.locator('.activity-bar-item[aria-label="Avatar & Body"]')).toBeVisible();
   });
 
   test('3D view renders a canvas', async ({ page }) => {

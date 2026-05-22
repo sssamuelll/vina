@@ -7,7 +7,8 @@ test.describe('Pattern Editor Tools', () => {
   });
 
   test('rectangle tool draws a piece', async ({ page }) => {
-    await page.keyboard.press('r');
+    // 's' = Rectangle tool
+    await page.keyboard.press('s');
     const svg = page.locator('svg.pattern-svg');
     const box = await svg.boundingBox();
     if (!box) throw new Error('no svg');
@@ -51,8 +52,8 @@ test.describe('Sidebar Views', () => {
   });
 
   test('all ActivityBar icons visible', async ({ page }) => {
-    for (const title of ['Pattern Explorer', 'Simulation', 'Avatar']) {
-      await expect(page.locator(`.activity-bar-item[title="${title}"]`)).toBeVisible();
+    for (const label of ['Project', 'Simulation', 'Avatar & Body']) {
+      await expect(page.locator(`.activity-bar-item[aria-label="${label}"]`)).toBeVisible();
     }
   });
 

@@ -65,6 +65,7 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
             <button
               className={`activity-bar-item ${activeView === item.id ? 'active' : ''}`}
               onClick={() => handleClick(item.id)}
+              aria-label={item.label}
             >
               <span className="activity-bar-icon">{item.icon}</span>
             </button>
@@ -77,6 +78,7 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
             <button
               className={`activity-bar-item ${activeView === item.id ? 'active' : ''}`}
               onClick={() => handleClick(item.id)}
+              aria-label={item.label}
             >
               <span className="activity-bar-icon">{item.icon}</span>
             </button>
@@ -86,6 +88,7 @@ export default function ActivityBar({ activeView, onViewChange }: ActivityBarPro
           <button
             className={`activity-bar-item ${copilotOpen ? 'active' : ''}`}
             onClick={() => dispatch(toggleCopilot())}
+            aria-label="Copilot"
           >
             <span className="activity-bar-icon"><MessageSquare size={20} /></span>
           </button>

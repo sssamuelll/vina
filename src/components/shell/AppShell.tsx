@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setSplitRatio } from '../../store/layoutSlice';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import FloatingToolbar from './FloatingToolbar';
@@ -62,7 +63,11 @@ export default function AppShell() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
 
-  // ─── Divider drag (same logic as old Workspace) ─────────────────────
+  // Register all keyboard shortcut handlers (file/edit/tools/sim/etc).
+  // Without this, every shortcut in src/shortcuts/defaults.ts is a no-op.
+  useKeyboardShortcuts();
+
+  // ─── Divider drag ───────────────────────────────────────────────────
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;

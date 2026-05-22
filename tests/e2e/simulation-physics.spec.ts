@@ -26,8 +26,8 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
     await svg.click(); // Focus the 2D canvas
     await page.waitForTimeout(200);
 
-    // Activate rectangle tool
-    await page.keyboard.press('r');
+    // Activate rectangle tool ('s')
+    await page.keyboard.press('s');
     await page.waitForTimeout(200);
 
     const box = await svg.boundingBox();
@@ -48,7 +48,7 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
     await expect(piecesIndicator).toBeVisible({ timeout: 5000 });
 
     // 2. Open simulation panel and start simulation properly
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const startBtn = page.locator('button:has-text("▶ Simulate")');
     await expect(startBtn).toBeEnabled({ timeout: 5000 });
     await startBtn.click();
@@ -135,7 +135,8 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
     await svg.click();
     await page.waitForTimeout(200);
 
-    await page.keyboard.press('r');
+    // 's' = Rectangle tool
+    await page.keyboard.press('s');
     await page.waitForTimeout(200);
 
     const box = await svg.boundingBox();
@@ -152,7 +153,7 @@ test.describe('Simulation Physics (Gravity Smoke Test)', () => {
     await expect(piecesIndicator).toBeVisible({ timeout: 5000 });
 
     // 2. Start simulation via panel
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     const startBtn = page.locator('button:has-text("▶ Simulate")');
     await expect(startBtn).toBeEnabled({ timeout: 5000 });
     await startBtn.click();
