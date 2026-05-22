@@ -52,8 +52,8 @@ test.describe('Sidebar Views', () => {
   });
 
   test('all ActivityBar icons visible', async ({ page }) => {
-    for (const title of ['Pattern Explorer', 'Simulation', 'Avatar']) {
-      await expect(page.locator(`.activity-bar-item[aria-label="${title}"]`)).toBeVisible();
+    for (const label of ['Project', 'Simulation', 'Avatar & Body']) {
+      await expect(page.locator(`.activity-bar-item[aria-label="${label}"]`)).toBeVisible();
     }
   });
 

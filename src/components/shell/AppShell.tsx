@@ -67,7 +67,7 @@ export default function AppShell() {
   // Without this, every shortcut in src/shortcuts/defaults.ts is a no-op.
   useKeyboardShortcuts();
 
-  // ─── Divider drag (same logic as old Workspace) ─────────────────────
+  // ─── Divider drag ───────────────────────────────────────────────────
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDragging.current = true;

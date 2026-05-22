@@ -129,7 +129,7 @@ test.describe('Command Palette', () => {
     await page.waitForTimeout(300);
     const rectItem = page.locator('.palette-item').filter({ hasText: /Rectangle/ }).first();
     // Rectangle shortcut is 's' (Photoshop convention) — palette typically uppercases.
-    await expect(rectItem.locator('.palette-item-shortcut')).toHaveText(/[Ss]/, { timeout: 3000 });
+    await expect(rectItem.locator('.palette-item-shortcut')).toHaveText(/^[Ss]$/, { timeout: 3000 });
   });
 
   test('search highlights matching characters', async ({ page }) => {

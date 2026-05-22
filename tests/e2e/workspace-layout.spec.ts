@@ -7,8 +7,8 @@ test.describe('App loads correctly', () => {
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 10000 });
 
-    // Title bar
-    await expect(page.locator('.workspace-logo')).toHaveText('OpenClo');
+    // Title bar (LogoMenu trigger inside TopBar)
+    await expect(page.locator('.logo-menu__logo-text')).toHaveText('OpenClo');
 
     // Activity bar
     await expect(page.locator('.activity-bar-item[aria-label="Project"]')).toBeVisible();
