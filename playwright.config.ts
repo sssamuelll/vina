@@ -9,7 +9,10 @@ export default defineConfig({
       maxDiffPixelRatio: 0.01,
     },
   },
-  fullyParallel: false,
+  fullyParallel: true,
+  // CI runners (ubuntu-latest, 4 vCPU). Within each shard, 2 parallel workers
+  // gives good speedup without OOM under ANGLE+SwiftShader WebGL.
+  workers: process.env.CI ? 2 : undefined,
   retries: 1,
   reporter: 'list',
   use: {
