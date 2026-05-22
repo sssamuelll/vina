@@ -62,7 +62,7 @@ test.describe('UI Layout Cleanup', () => {
   test('Project view has save/open/new and piece list', async ({ page }) => {
     await waitForApp(page);
     // Click the Project icon in ActivityBar (first item)
-    await page.click('.activity-bar-item[title="Project"]');
+    await page.click('.activity-bar-item[aria-label="Project"]');
     await page.waitForTimeout(300);
 
     // Sidebar should show Project title
@@ -78,7 +78,7 @@ test.describe('UI Layout Cleanup', () => {
   test('Avatar & Body view has mode toggle and measurements', async ({ page }) => {
     await waitForApp(page);
     // Click the Avatar icon in ActivityBar
-    await page.click('.activity-bar-item[title="Avatar & Body"]');
+    await page.click('.activity-bar-item[aria-label="Avatar & Body"]');
     await page.waitForTimeout(300);
 
     // Sidebar should show Avatar & Body title

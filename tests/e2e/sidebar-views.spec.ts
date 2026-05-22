@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 
 async function clickActivityBarItem(page: Page, title: string) {
-  await page.click(`.activity-bar-item[title="${title}"]`);
+  await page.click(`.activity-bar-item[aria-label="${title}"]`);
   await page.waitForTimeout(300);
 }
 
@@ -18,8 +18,8 @@ test.describe('Pattern Explorer', () => {
   });
 
   test('shows piece after drawing', async ({ page }) => {
-    // Draw rect
-    await page.keyboard.press('r');
+    // Draw rect ('s' = Rectangle)
+    await page.keyboard.press('s');
     const svg = page.locator('svg.pattern-svg');
     const box = await svg.boundingBox();
     if (!box) throw new Error('no svg');

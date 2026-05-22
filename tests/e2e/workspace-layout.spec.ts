@@ -7,13 +7,13 @@ test.describe('App loads correctly', () => {
     await page.goto('/');
     await page.waitForSelector('svg.pattern-svg', { timeout: 10000 });
 
-    // Title bar
-    await expect(page.locator('.workspace-logo')).toHaveText('OpenClo');
+    // Title bar (LogoMenu trigger inside TopBar)
+    await expect(page.locator('.logo-menu__logo-text')).toHaveText('OpenClo');
 
     // Activity bar
-    await expect(page.locator('.activity-bar-item[title="Pattern Explorer"]')).toBeVisible();
-    await expect(page.locator('.activity-bar-item[title="Simulation"]')).toBeVisible();
-    await expect(page.locator('.activity-bar-item[title="Avatar"]')).toBeVisible();
+    await expect(page.locator('.activity-bar-item[aria-label="Project"]')).toBeVisible();
+    await expect(page.locator('.activity-bar-item[aria-label="Simulation"]')).toBeVisible();
+    await expect(page.locator('.activity-bar-item[aria-label="Avatar & Body"]')).toBeVisible();
 
     // Pattern editor
     await expect(page.locator('svg.pattern-svg')).toBeVisible();
@@ -122,17 +122,17 @@ test.describe('Sidebar', () => {
   });
 
   test('Pattern Explorer is open by default', async ({ page }) => {
-    const explorerItem = page.locator('.activity-bar-item[title="Pattern Explorer"]');
+    const explorerItem = page.locator('.activity-bar-item[aria-label="Project"]');
     await expect(explorerItem).toHaveClass(/active/);
   });
 
   test('clicking activity bar icon toggles sidebar view', async ({ page }) => {
     // Click simulation
-    await page.click('.activity-bar-item[title="Simulation"]');
+    await page.click('.activity-bar-item[aria-label="Simulation"]');
     await expect(page.locator('text=Start Simulation')).toBeVisible();
 
     // Click avatar
-    await page.click('.activity-bar-item[title="Avatar"]');
+    await page.click('.activity-bar-item[aria-label="Avatar & Body"]');
     await page.waitForTimeout(300);
     // Simulation content should be gone
     await expect(page.locator('text=Start Simulation')).not.toBeVisible();
@@ -140,7 +140,7 @@ test.describe('Sidebar', () => {
 
   test('clicking active icon closes sidebar', async ({ page }) => {
     // Click explorer (already active) to close
-    await page.click('.activity-bar-item[title="Pattern Explorer"]');
+    await page.click('.activity-bar-item[aria-label="Project"]');
     await page.waitForTimeout(300);
     // Sidebar should be closed/collapsed
     const sidebar = page.locator('.sidebar');
@@ -182,8 +182,8 @@ test.describe('Status Bar', () => {
   });
 
   test('piece count updates after drawing', async ({ page }) => {
-    // Draw a rectangle
-    await page.keyboard.press('r');
+    // Draw a rectangle ('s')
+    await page.keyboard.press('s');
     const svg = page.locator('svg.pattern-svg');
     const box = await svg.boundingBox();
     if (!box) throw new Error('no svg');

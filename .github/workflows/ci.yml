@@ -125,9 +125,14 @@ jobs:
   # are resolved; once green, flip `continue-on-error` to false and add `e2e`
   # to `ci-success.needs` to promote it to a required gate.
   e2e:
-    name: E2E (Playwright) — non-blocking until #506 closes
+    name: E2E shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }} (non-blocking until #506)
     runs-on: ubuntu-latest
     continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        shardIndex: [1, 2, 3, 4]
+        shardTotal: [4]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -150,14 +155,14 @@ jobs:
       - name: Install Playwright browsers (chromium only)
         run: npx playwright install --with-deps chromium
 
-      - name: Run Playwright tests
-        run: npm run test:e2e
+      - name: Run Playwright tests (shard ${{ matrix.shardIndex }}/${{ matrix.shardTotal }})
+        run: npx playwright test --shard=${{ matrix.shardIndex }}/${{ matrix.shardTotal }}
 
       - name: Upload Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shardIndex }}
           path: playwright-report/
           retention-days: 7
 
