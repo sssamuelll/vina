@@ -28,7 +28,8 @@ async function drawRect(page: Page) {
   await svg.click(); // Focus the 2D canvas
   await page.waitForTimeout(200);
 
-  await page.keyboard.press('r');
+  // 's' = Rectangle tool
+  await page.keyboard.press('s');
   await page.waitForTimeout(200);
 
   const box = await svg.boundingBox();
@@ -49,7 +50,7 @@ async function drawRect(page: Page) {
 
 async function startSimulation(page: Page) {
   // Open simulation panel via activity bar
-  await page.click('.activity-bar-item[title="Simulation"]');
+  await page.click('.activity-bar-item[aria-label="Simulation"]');
   await page.waitForTimeout(500);
 
   // Try the sidebar "▶ Simulate" button first, fall back to "Start Simulation"
@@ -309,7 +310,7 @@ test.describe('Fit Map UI', () => {
 
       // Restart simulation
       // Re-open sim panel if needed
-      const simActivity = page.locator('.activity-bar-item[title="Simulation"]');
+      const simActivity = page.locator('.activity-bar-item[aria-label="Simulation"]');
       if (await simActivity.isVisible().catch(() => false)) {
         await simActivity.click();
         await page.waitForTimeout(300);

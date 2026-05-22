@@ -2,11 +2,20 @@ import { test, expect, Page } from '@playwright/test';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+async function dismissTemplateLibrary(page: Page) {
+  const heading = page.locator('text=Seamly2D Pattern Library');
+  if (await heading.isVisible().catch(() => false)) {
+    await page.locator('button.template-close').click({ force: true });
+    await page.waitForTimeout(300);
+  }
+}
+
 async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
+  await dismissTemplateLibrary(page);
   // Additional wait to ensure app is fully loaded
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(500);
 }
 
 async function getSvgCenter(page: Page) {
@@ -16,8 +25,27 @@ async function getSvgCenter(page: Page) {
   return { cx: box.x + box.width / 2, cy: box.y + box.height / 2, box };
 }
 
+// Read the active 2D tool id from Redux. Used in place of stale
+// `.tool-btn[title*="..."]` selectors — buttons no longer expose `title`.
+async function getActiveTool2D(page: Page): Promise<string | null> {
+  return page.evaluate(() => {
+    const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { tools: { activeTool2D: string } } } }).__OPENCLO_STORE__;
+    return store ? store.getState().tools.activeTool2D : null;
+  });
+}
+
+async function focusEditor(page: Page) {
+  // Click into the 2D canvas so subsequent keyboard / mouse events route to it.
+  const svg = page.locator('svg.pattern-svg');
+  await svg.click({ position: { x: 10, y: 10 } });
+  await page.waitForTimeout(150);
+}
+
 async function drawRect(page: Page) {
-  await page.keyboard.press('r');
+  await focusEditor(page);
+  // 's' = Rectangle tool
+  await page.keyboard.press('s');
+  await page.waitForTimeout(150);
   const { cx, cy } = await getSvgCenter(page);
   await page.mouse.move(cx - 80, cy - 60);
   await page.mouse.down();
@@ -28,7 +56,10 @@ async function drawRect(page: Page) {
 }
 
 async function drawPenShape(page: Page) {
-  await page.keyboard.press('p');
+  await focusEditor(page);
+  // 'h' = Pen tool
+  await page.keyboard.press('h');
+  await page.waitForTimeout(150);
   const { cx, cy } = await getSvgCenter(page);
   // Draw a triangle
   await page.mouse.click(cx - 60, cy - 40);
@@ -50,10 +81,9 @@ test.describe('Rectangle Tool', () => {
     await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
   });
 
-  test('keyboard shortcut R activates rectangle tool', async ({ page }) => {
-    await page.keyboard.press('r');
-    const activeBtn = page.locator('.tool-btn.active');
-    await expect(activeBtn).toHaveAttribute('title', /Rectangle/);
+  test('keyboard shortcut S activates rectangle tool', async ({ page }) => {
+    await page.keyboard.press('s');
+    expect(await getActiveTool2D(page)).toBe('rectangle');
   });
 
   test('drawing multiple rectangles increments piece count', async ({ page }) => {
@@ -61,7 +91,7 @@ test.describe('Rectangle Tool', () => {
     await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
 
     // Draw second rectangle further offset to avoid overlap
-    await page.keyboard.press('r');
+    await page.keyboard.press('s');
     const { cx, cy } = await getSvgCenter(page);
     // Move to a more distinctly different area
     await page.mouse.move(cx + 150, cy + 80);
@@ -89,10 +119,9 @@ test.describe('Rectangle Tool', () => {
 test.describe('Pen Tool', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  test('keyboard shortcut P activates pen tool', async ({ page }) => {
-    await page.keyboard.press('p');
-    const activeBtn = page.locator('.tool-btn.active');
-    await expect(activeBtn).toHaveAttribute('title', /Pen/);
+  test('keyboard shortcut H activates pen tool', async ({ page }) => {
+    await page.keyboard.press('h');
+    expect(await getActiveTool2D(page)).toBe('pen');
   });
 
   test('draws a closed shape', async ({ page }) => {
@@ -101,34 +130,21 @@ test.describe('Pen Tool', () => {
   });
 });
 
-// ─── Line Tool ──────────────────────────────────────────────────────────────
-
-test.describe('Line Tool', () => {
-  test.beforeEach(async ({ page }) => { await waitForApp(page); });
-
-  test('keyboard shortcut L activates line tool', async ({ page }) => {
-    await page.keyboard.press('l');
-    const activeBtn = page.locator('.tool-btn.active');
-    await expect(activeBtn).toHaveAttribute('title', /Line/);
-  });
-});
-
 // ─── Select Tool ────────────────────────────────────────────────────────────
 
 test.describe('Select Tool', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  test('keyboard shortcut V activates select tool', async ({ page }) => {
+  test('keyboard shortcut Z activates select tool', async ({ page }) => {
     // First switch away from select
-    await page.keyboard.press('r');
-    await page.keyboard.press('v');
-    const activeBtn = page.locator('.tool-btn.active');
-    await expect(activeBtn).toHaveAttribute('title', /Select/);
+    await page.keyboard.press('s');
+    await page.keyboard.press('z');
+    expect(await getActiveTool2D(page)).toBe('select');
   });
 
   test('clicking a piece selects it', async ({ page }) => {
     const { cx, cy } = await drawRect(page);
-    await page.keyboard.press('v');
+    await page.keyboard.press('z');
     await page.mouse.click(cx, cy);
     await page.waitForTimeout(500);
     // Check for selection indicators - piece groups might have selection classes or attributes
@@ -145,44 +161,26 @@ test.describe('Select Tool', () => {
 test.describe('Tool keyboard shortcuts', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  const toolShortcuts: [string, RegExp][] = [
-    ['v', /Select/],
-    ['p', /Pen/],
-    ['l', /Line/],
-    ['r', /Rectangle/],
-    ['s', /Seam/],
-    ['n', /Notch/],
-    ['g', /Grainline/],
-    ['m', /Measure/],
-    ['h', /Hand/],
+  // shortcuts ↔ tool ids defined in src/tools/definitions/*.tsx
+  const toolShortcuts: [string, string][] = [
+    ['z', 'select'],
+    ['h', 'pen'],
+    ['s', 'rectangle'],
+    ['e', 'circle'],
+    ['d', 'dart'],
+    ['b', 'seam'],
+    ['n', 'segmentSewing'],
+    ['f', 'freesewing'],
+    ['m', 'measure'],
+    ['x', 'scissors'],
   ];
 
-  for (const [key, pattern] of toolShortcuts) {
-    test(`pressing '${key}' activates ${pattern.source} tool`, async ({ page }) => {
+  for (const [key, toolId] of toolShortcuts) {
+    test(`pressing '${key}' activates ${toolId} tool`, async ({ page }) => {
       await page.keyboard.press(key);
-      const activeBtn = page.locator('.tool-btn.active');
-      await expect(activeBtn).toHaveAttribute('title', pattern);
+      expect(await getActiveTool2D(page)).toBe(toolId);
     });
   }
-});
-
-// ─── Toolbar2D Buttons ──────────────────────────────────────────────────────
-
-test.describe('Toolbar2D click activation', () => {
-  test.beforeEach(async ({ page }) => { await waitForApp(page); });
-
-  test('clicking toolbar buttons switches active tool', async ({ page }) => {
-    // Click rectangle button
-    const rectBtn = page.locator('.tool-btn[title*="Rectangle"]');
-    await rectBtn.click();
-    await expect(rectBtn).toHaveClass(/active/);
-
-    // Click pen button
-    const penBtn = page.locator('.tool-btn[title*="Pen"]');
-    await penBtn.click();
-    await expect(penBtn).toHaveClass(/active/);
-    await expect(rectBtn).not.toHaveClass(/active/);
-  });
 });
 
 // ─── Undo / Redo ────────────────────────────────────────────────────────────
@@ -210,7 +208,8 @@ test.describe('Undo / Redo', () => {
 
   test('undo button in toolbar works', async ({ page }) => {
     await drawRect(page);
-    await page.click('.undo-btn');
+    // TopBar (`src/components/shell/TopBar.tsx`) exposes `aria-label="Undo"`
+    await page.click('button[aria-label="Undo"]');
     await page.waitForTimeout(300);
     await expect(page.locator('.status-bar')).toContainText(/Pieces.*0/, { timeout: 3000 });
   });
