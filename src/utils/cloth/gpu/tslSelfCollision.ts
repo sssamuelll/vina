@@ -34,6 +34,7 @@ import {
   atomicLoad,
   atomicStore,
 } from 'three/tsl';
+import { makeAtomicStorage } from './atomicStorage';
 // TSL node types vary across @types/three versions; use loose types for stability.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TslNode = any;
@@ -183,19 +184,13 @@ export function makeSelfCollisionComputeNodes(
 
   // ─── Wrap SBAs as TSL storage nodes ──────────────────────────────
   // cellCount/delta/corrCount need atomic access for atomicAdd/atomicStore.
-  // `'int' as any` works around @types/three lacking 'int' in storage() type;
-  // `as any` on the storage(...) result calls .setAtomic(true) which @types/three
-  // mistypes as `setAtmoic` (typo). Both casts required per #554 fix
-  // (verified in three@0.183.2).
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const cellCountBuf = (storage(buffers.cellCountSBA, 'int' as any, T) as any).setAtomic(true);
+  const cellCountBuf = makeAtomicStorage(buffers.cellCountSBA, 'int', T);
   const cellStartBuf = storage(buffers.cellStartSBA, 'uint', T);
   const cellEntriesBuf = storage(buffers.cellEntriesSBA, 'uint', N);
   const adjOffsetsBuf = storage(buffers.adjOffsetsSBA, 'uint', N + 1);
   const adjNeighborsBuf = storage(buffers.adjNeighborsSBA, 'uint', adjNeighborCount);
-  const deltaBuf = (storage(buffers.deltaSBA, 'int' as any, N * 3) as any).setAtomic(true);
-  const corrCountBuf = (storage(buffers.corrCountSBA, 'int' as any, N) as any).setAtomic(true);
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  const deltaBuf = makeAtomicStorage(buffers.deltaSBA, 'int', N * 3);
+  const corrCountBuf = makeAtomicStorage(buffers.corrCountSBA, 'int', N);
 
   // ─── Uniforms ────────────────────────────────────────────────────
   const uNumParticles = uniform(N);

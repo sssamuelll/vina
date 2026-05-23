@@ -19,7 +19,6 @@
 import { StorageBufferAttribute } from 'three/webgpu';
 import {
   Fn,
-  storage,
   uniform,
   compute,
   instanceIndex,
@@ -31,6 +30,7 @@ import {
   atomicLoad,
   atomicStore,
 } from 'three/tsl';
+import { makeAtomicStorage } from './atomicStorage';
 // TSL node types vary across @types/three versions; use loose types for stability.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TslNode = any;
@@ -131,21 +131,7 @@ export function makeWindComputeNode(
   const N = windBuffers.numParticles;
 
   // ─── Wrap SBA as TSL storage node ───────────────────────────────
-  // `.setAtomic(true)` makes the WGSL backend emit `array<atomic<i32>>` (vs
-  // `array<i32>`) for the buffer declaration. Required for atomicAdd /
-  // atomicStore to be valid WGSL — without it, Dawn silently fails the
-  // pipeline (#554 root cause: Three.js 0.183 AtomicFunctionNode does not
-  // walk up to the parent buffer to flip isAtomic; we do it manually here).
-  // Two distinct `as any` casts are required per #554 fix:
-  // (1) `'int' as any` works around @types/three lacking 'int' in the
-  //     storage() type union (storage() overload gap).
-  // (2) `as any` on the storage(...) result is needed because @types/three
-  //     aliases StorageBufferNode as a type (not a class) and mistypes the
-  //     method as `setAtmoic` (typo), so module augmentation can't add the
-  //     correct method. Runtime exists per `StorageBufferNode.js:273`
-  //     (verified in three@0.183.2).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const windAccumBuf = (storage(windBuffers.windAccumSBA, 'int' as any, N * 3) as any).setAtomic(true);
+  const windAccumBuf = makeAtomicStorage(windBuffers.windAccumSBA, 'int', N * 3);
 
   // ─── Uniforms (exposed for runtime updates) ─────────────────────
   const uWindX = uniform(windForce[0]);

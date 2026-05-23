@@ -3,8 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so MockSBA is available to both mocks.
 // `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
 // call returns a node whose `.setAtomic` records {sba, value} into this array.
-const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
+const { MockSBA, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
+  // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
+  // WGSL spec requires atomicLoad on every read of an array<atomic<T>>
+  // buffer. Symmetric to `setAtomicCalls`.
+  const atomicLoadCalls: Array<unknown> = [];
   const MockSBA = class MockSBA {
     array: ArrayLike<number>;
     itemSize: number;
@@ -13,7 +17,7 @@ const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
       this.itemSize = itemSize;
     }
   };
-  return { MockSBA, setAtomicCalls };
+  return { MockSBA, setAtomicCalls, atomicLoadCalls };
 });
 
 // Mock three/webgpu and three/tsl before importing.
@@ -44,10 +48,24 @@ vi.mock('three/tsl', () => {
   };
 
   const proxy = createChainProxy();
+
+  // Wrap callback invocation so a missing mock surface inside the body
+  // doesn't abort the whole test — partial execution still triggers
+  // atomicLoad / setAtomic side-effects we care about.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tryInvoke = (cb: unknown, arg?: any) => {
+    if (typeof cb === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (cb as (...a: any[]) => any)(arg ?? proxy); } catch { /* mock surface incomplete — partial coverage */ }
+    }
+  };
+
   return {
     StorageBufferAttribute: MockSBA,
-    // Fn: returns a function that, when called (the () invocation), returns a proxy
-    Fn: () => () => proxy,
+    // Fn: invoke callback so atomicLoad / atomicStore / setAtomic side-effects
+    // inside the kernel body fire and can be asserted on.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Fn: (cb?: (...args: any[]) => any) => () => { tryInvoke(cb); return proxy; },
     // storage: returns a per-call proxy that intercepts `.setAtomic` to capture
     // {sba, value} for #554 regression guards. All other property/call access
     // delegates to the chain proxy so existing tests still pass transparently.
@@ -75,11 +93,16 @@ vi.mock('three/tsl', () => {
     int: () => proxy,
     float: () => proxy,
     vec3: () => proxy,
-    If: () => proxy,
-    Loop: () => proxy,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    If: (_cond: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb); return proxy; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: proxy }); return proxy; },
     atomicAdd: () => proxy,
     atomicStore: () => proxy,
-    atomicLoad: () => proxy,
+    atomicLoad: (dest: unknown) => {
+      atomicLoadCalls.push(dest);
+      return proxy;
+    },
   };
 });
 
@@ -212,5 +235,15 @@ describe('#554 atomic buffer regression guards', () => {
     const call = setAtomicCalls.find((c) => c.sba === buffers.corrCountSBA);
     expect(call).toBeDefined();
     expect(call?.value).toBe(true);
+  });
+
+  it('uses atomicLoad on read passes (#554 WGSL spec compliance)', () => {
+    // Symmetric to the setAtomic guards above. The scatter / resolve / apply
+    // passes read cellCountBuf, corrCountBuf, and deltaBuf via atomicLoad —
+    // required because all three are array<atomic<i32>> (post-setAtomic).
+    // Plain `.element(i)` is a WGSL validation error.
+    atomicLoadCalls.length = 0;
+    buildNodes();
+    expect(atomicLoadCalls.length).toBeGreaterThan(0);
   });
 });
