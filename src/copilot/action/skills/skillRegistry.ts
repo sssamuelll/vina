@@ -108,7 +108,7 @@ export class SkillRegistry {
     // Try to load persisted community skills (IndexedDB may be unavailable)
     try {
       await this.persistence.open();
-      await this.persistence.migrateFromLocalStorage();
+      await this.persistence.migrateLegacySkills();
 
       const persisted = await this.persistence.getAllSkills();
       for (const skill of persisted) {

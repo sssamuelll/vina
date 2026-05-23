@@ -14,7 +14,7 @@
  */
 
 import { openDB, type IDBPDatabase } from 'idb';
-import { safeGetItem, safeSetItem, safeRemoveItem } from './safeStorage';
+import { safeGetItem, safeSetItem, safeRemoveItem, setLocalStorageQuotaHook } from './safeStorage';
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,104 @@ const DB_NAME = 'openclo';
 const DB_VERSION = 1;
 
 type StoreNames = 'projects' | 'avatars' | 'plugins' | 'settings';
+
+// ─── Telemetry hook (B6-state § 3.8) ────────────────────────────────────────
+
+/**
+ * Storage-event union surfaced via `setStorageTelemetryHook`. Each variant
+ * corresponds to a degraded-state branch inside the persistence layer:
+ *
+ * - `idb-unavailable` — fires on `storageGet` / `storageSet` catch sites
+ *   only (read/write hot paths). Lifecycle operations (`storageDel`,
+ *   `storageKeys`, `storageClear`, `storageClearAll`) intentionally do
+ *   NOT emit this event — subscribe for read/write reliability signal,
+ *   not for full lifecycle coverage. Extending to all catch sites is a
+ *   stub-stage decision; revisit if E-async-states surfaces need it.
+ *
+ *   Throttled to once-per-session — only the FIRST idb-unavailable event
+ *   in a given hook subscription is emitted. Resetting the hook via
+ *   `setStorageTelemetryHook(null)` then `setStorageTelemetryHook(newHook)`
+ *   resets the throttle.
+ *
+ * - `ls-fallback-write` — the IDB write failed and the LS fallback path
+ *   was ENTERED. This event fires when fallback begins, NOT when LS
+ *   write succeeds. If the LS write itself also fails (quota), a
+ *   separate `ls-quota-exhausted` event fires.
+ *
+ * - `ls-quota-exhausted`: `localStorage.setItem` threw a QuotaExceededError
+ *   (or its legacy Firefox equivalent) inside `safeSetItem`.
+ *
+ * Consumer integration lives in the E-async-states sub-track (toast/diag
+ * surfaces). Until then this is a no-op stub for opt-in dev visibility.
+ */
+export type StorageEvent =
+  | { type: 'idb-unavailable'; store: StoreNames; key: string }
+  | { type: 'ls-fallback-write'; store: StoreNames; key: string }
+  | { type: 'ls-quota-exhausted'; key: string };
+
+let storageTelemetryHook: ((event: StorageEvent) => void) | null = null;
+let _emittingEvent = false;
+let _idbUnavailableEmittedThisSession = false;
+
+/**
+ * Register a telemetry hook for persistence degraded-state events. Pass
+ * `null` to unregister. Hook invocation is wrapped in `try/catch`: a
+ * throwing hook must never break the user's data path.
+ *
+ * **Re-entrancy**: hooks MUST NOT perform synchronous storage writes
+ * during their own invocation. A re-entry guard drops nested events
+ * silently to prevent stack overflow, so the inner event is lost. If
+ * a hook needs to persist its own telemetry, defer via `queueMicrotask`
+ * or `setTimeout` to escape the current invocation frame.
+ */
+export function setStorageTelemetryHook(
+  hook: ((event: StorageEvent) => void) | null,
+): void {
+  storageTelemetryHook = hook;
+  // Reset throttle so a freshly-subscribed hook gets its own first signal
+  // (rather than inheriting the previous subscriber's once-per-session state).
+  _idbUnavailableEmittedThisSession = false;
+  // Subscribe / unsubscribe the safeStorage internal quota hook in lockstep.
+  if (hook) {
+    setLocalStorageQuotaHook((key) => {
+      emitStorageEvent({ type: 'ls-quota-exhausted', key });
+    });
+  } else {
+    setLocalStorageQuotaHook(null);
+  }
+}
+
+function emitStorageEvent(event: StorageEvent): void {
+  if (!storageTelemetryHook) return;
+  if (_emittingEvent) {
+    // Re-entrancy guard: a hook that synchronously triggers another
+    // storage event (e.g., by calling storageSet during its own
+    // invocation) would otherwise recurse without bound. Drop the
+    // inner event silently. Consumers needing to persist telemetry
+    // must defer via queueMicrotask / setTimeout.
+    return;
+  }
+
+  // Once-per-session throttle for idb-unavailable to avoid log flood
+  // in environments where IDB stays down for the duration of the
+  // session (Safari private mode, disabled IDB). All other event
+  // types fire every time they occur.
+  if (event.type === 'idb-unavailable' && _idbUnavailableEmittedThisSession) {
+    return;
+  }
+
+  _emittingEvent = true;
+  try {
+    storageTelemetryHook(event);
+    if (event.type === 'idb-unavailable') {
+      _idbUnavailableEmittedThisSession = true;
+    }
+  } catch {
+    // Never let a buggy telemetry hook break persistence.
+  } finally {
+    _emittingEvent = false;
+  }
+}
 
 // ─── DB Singleton ───────────────────────────────────────────────────────────
 
@@ -56,6 +154,7 @@ export async function storageGet<T = unknown>(store: StoreNames, key: string): P
     const db = await getDB();
     return await db.get(store, key) as T | undefined;
   } catch {
+    emitStorageEvent({ type: 'idb-unavailable', store, key });
     // Fallback to localStorage
     try {
       const raw = safeGetItem(`${DB_NAME}:${store}:${key}`);
@@ -75,6 +174,7 @@ export async function storageSet(store: StoreNames, key: string, value: unknown)
     const db = await getDB();
     await db.put(store, value, key);
   } catch {
+    emitStorageEvent({ type: 'ls-fallback-write', store, key });
     // Fallback to localStorage
     safeSetItem(`${DB_NAME}:${store}:${key}`, JSON.stringify(value));
   }
