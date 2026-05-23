@@ -70,6 +70,7 @@ import {
 } from 'three/tsl';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import { disposeStorageBufferAttribute } from './tslBuffers';
+import { makeAtomicStorage } from './atomicStorage';
 // TSL node types vary across @types/three versions; use loose types for stability.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TslNode = any;
@@ -168,15 +169,11 @@ export function createTslCollisionBody(
   const triVertBuf = storage(triVertsSBA, 'float', numTris * 9);
   const triNormBuf = storage(triNormalsSBA, 'float', numTris * 3);
 
-  // Atomic scratch — `setAtomic(true)` forces WGSL `array<atomic<i32>>` binding
-  // declaration with `read_write` access, which is what makes the atomic
-  // emulation work (sidesteps the outer-toVar/storage-derived codegen pitfall).
-  // `'int' as any` works around @types/three lacking 'int' in storage() type
-  // (verified in three@0.183.2; same workaround as tslSelfCollision.ts).
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  const bestDistBuf = (storage(bestDistSBA, 'int' as any, numParticles) as any).setAtomic(true);
-  const bestTriIdxBuf = (storage(bestTriIdxSBA, 'int' as any, numParticles) as any).setAtomic(true);
-  /* eslint-enable @typescript-eslint/no-explicit-any */
+  // Atomic scratch — array<atomic<i32>> binding with read_write access is what
+  // makes the atomic-emulation pattern work (sidesteps the outer-toVar /
+  // storage-derived codegen pitfall described in the file-header rationale).
+  const bestDistBuf = makeAtomicStorage(bestDistSBA, 'int', numParticles);
+  const bestTriIdxBuf = makeAtomicStorage(bestTriIdxSBA, 'int', numParticles);
 
   const uMargin = uniform(margin);
   const uFriction = uniform(friction);

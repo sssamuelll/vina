@@ -3,8 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so MockSBA + setAtomicCalls are
 // available to both mocks. `setAtomicCalls` is exposed for the atomic
 // regression guards on the per-body scratch buffers.
-const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
+const { MockSBA, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
+  // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
+  // WGSL spec requires atomicLoad on every read of an array<atomic<T>>
+  // buffer. Symmetric to `setAtomicCalls`.
+  const atomicLoadCalls: Array<unknown> = [];
   const MockSBA = class MockSBA {
     array: ArrayLike<number>;
     itemSize: number;
@@ -13,7 +17,7 @@ const { MockSBA, setAtomicCalls } = vi.hoisted(() => {
       this.itemSize = itemSize;
     }
   };
-  return { MockSBA, setAtomicCalls };
+  return { MockSBA, setAtomicCalls, atomicLoadCalls };
 });
 
 vi.mock('three/webgpu', () => ({
@@ -34,9 +38,19 @@ vi.mock('three/tsl', () => {
   };
   const proxy = createChainProxy();
 
+  // Wrap callback invocation — partial coverage on missing mock surface.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tryInvoke = (cb: unknown, arg?: any) => {
+    if (typeof cb === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (cb as (...a: any[]) => any)(arg ?? proxy); } catch { /* mock surface incomplete */ }
+    }
+  };
+
   return {
     StorageBufferAttribute: MockSBA,
-    Fn: () => () => proxy,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Fn: (cb?: (...args: any[]) => any) => () => { tryInvoke(cb); return proxy; },
     storage: (...args: unknown[]) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const node: any = new Proxy(function () {}, {
@@ -59,11 +73,16 @@ vi.mock('three/tsl', () => {
     uint: () => proxy,
     int: () => proxy,
     float: () => proxy,
-    If: () => proxy,
-    Loop: () => proxy,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    If: (_cond: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb); return proxy; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: proxy }); return proxy; },
     atomicAdd: () => proxy,
     atomicStore: () => proxy,
-    atomicLoad: () => proxy,
+    atomicLoad: (dest: unknown) => {
+      atomicLoadCalls.push(dest);
+      return proxy;
+    },
     atomicMin: () => proxy,
   };
 });
@@ -245,6 +264,16 @@ describe('atomic-buffer regression guards', () => {
     const bestTriIdx = allAtomicSBAs.find((a) => a[0] === -1);
     expect(bestTriIdx).toBeDefined();
     expect(bestTriIdx!.length).toBe(numParticles);
+  });
+
+  it('uses atomicLoad on read passes (#554 WGSL spec compliance)', () => {
+    // Symmetric to the setAtomic guards above. The applyPushNode pass reads
+    // bestTriIdxBuf via atomicLoad at function-top — required because the
+    // buffer is array<atomic<i32>>. Plain `.element(i)` is a WGSL validation
+    // error.
+    atomicLoadCalls.length = 0;
+    buildKernel();
+    expect(atomicLoadCalls.length).toBeGreaterThan(0);
   });
 
   it('per-body scratch SBAs are distinct across bodies (no aliasing)', () => {
