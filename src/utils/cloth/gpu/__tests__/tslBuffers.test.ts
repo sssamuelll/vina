@@ -25,6 +25,11 @@ vi.mock('three/tsl', () => ({
       this.itemSize = itemSize;
     }
   },
+  // Stubs required by atomicStorage.ts's module-load probe (transitively
+  // imported via tslSelfCollision / tslWind via tslBuffers). The probe asserts
+  // both `storage().setAtomic` and `atomicLoad` are callable.
+  storage: () => ({ setAtomic: function () { return this; } }),
+  atomicLoad: () => undefined,
 }));
 
 import { createTslBuffers, destroyTslBufferSet, disposeStorageBufferAttribute } from '../tslBuffers';

@@ -39,6 +39,7 @@ import {
 import type { StorageBufferAttribute } from 'three/webgpu';
 import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import type { TslBufferSet } from './tslBuffers';
+import { makeAtomicStorage } from './atomicStorage';
 import type { TslCollisionBody } from './tslCollision';
 import type { SelfCollisionComputeNodes } from './tslSelfCollision';
 import { makeSelfCollisionComputeNodes } from './tslSelfCollision';
@@ -621,13 +622,7 @@ export function createTslSolver(
 
   // ─── GPU smooth normals (atomic accumulation) ─────────────────────
   const normalBuf = storage(buffers.normalSBA, 'vec3', N);
-  // .setAtomic(true) required for #554 fix — see three-tsl-augment.d.ts
-  // (verified in three@0.183.2). `'int' as any` works around @types/three
-  // lacking 'int' in storage() type; `as any` on the storage(...) result
-  // calls .setAtomic(true) which @types/three mistypes as `setAtmoic`
-  // (typo). Both casts required per #554 fix.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const normalAccumBuf = (storage(buffers.normalAccumSBA, 'int' as any, N * 3) as any).setAtomic(true);
+  const normalAccumBuf = makeAtomicStorage(buffers.normalAccumSBA, 'int', N * 3);
   const triIdsBuf = storage(buffers.triangleIdsSBA, 'uint', buffers.numTriangles * 3);
 
   const normalZeroFn = makeNormalZeroFn(normalAccumBuf);

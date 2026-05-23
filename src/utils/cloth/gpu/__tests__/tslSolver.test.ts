@@ -3,8 +3,14 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so shared mocks are available to both.
 // `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
 // call returns a node whose `.setAtomic` records {sba, value} into this array.
-const { MockSBA, tslExports, setAtomicCalls } = vi.hoisted(() => {
+const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
+  // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
+  // every atomicLoad(buf.element(i)) call in the production code increments
+  // this counter. WGSL spec mandates atomicLoad for read passes against
+  // array<atomic<T>> buffers; a future refactor that drops it would silently
+  // fail Dawn validation. Symmetric to `setAtomicCalls`.
+  const atomicLoadCalls: Array<unknown> = [];
 
   const MockSBA = class MockSBA {
     array: Float32Array | Uint32Array | Int32Array;
@@ -40,6 +46,18 @@ const { MockSBA, tslExports, setAtomicCalls } = vi.hoisted(() => {
     greaterThanEqual: () => true,
   });
 
+  // Wrap callback invocation so a missing mock surface inside the body
+  // doesn't abort the whole test — partial execution still triggers any
+  // atomicLoad calls that fired before the throw, which is what the #554
+  // spec-compliance test asserts on.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tryInvoke = (cb: unknown, arg?: any) => {
+    if (typeof cb === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (cb as (...a: any[]) => any)(arg); } catch { /* mock surface incomplete — partial coverage */ }
+    }
+  };
+
   const tslExports = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     storage: (...args: any[]) => {
@@ -56,8 +74,12 @@ const { MockSBA, tslExports, setAtomicCalls } = vi.hoisted(() => {
       };
       return node;
     },
-    Fn: () => () => ({ __tslFn: true }),
-    If: () => ({ Else: () => {} }),
+    // Fn / If / Loop invoke their callbacks so atomicLoad calls inside kernel
+    // bodies fire and are assertable for #554 spec compliance.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Fn: (cb?: (...args: any[]) => any) => () => { tryInvoke(cb); return { __tslFn: true }; },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    If: (_cond: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb); return { Else: (elseCb?: (...args: any[]) => any) => { tryInvoke(elseCb); } }; },
     compute: (_fn: unknown, count: number) => ({
       __tslCompute: true,
       dispatchCount: count,
@@ -79,14 +101,19 @@ const { MockSBA, tslExports, setAtomicCalls } = vi.hoisted(() => {
     }),
     vec3: () => ({ __tslVec3: true }),
     instanceIndex: { __tslInstanceIndex: true },
-    Loop: () => {},
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: 0 }); },
     atomicStore: () => {},
     atomicAdd: () => mockElement(),
     // atomicLoad: required for read-side of atomic<i32> buffers (#554 fix).
-    atomicLoad: () => mockElement(),
+    // Records each invocation for the #554 spec-compliance regression test.
+    atomicLoad: (dest: unknown) => {
+      atomicLoadCalls.push(dest);
+      return mockElement();
+    },
   };
 
-  return { MockSBA, tslExports, setAtomicCalls };
+  return { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls };
 });
 
 // Note: three/webgpu and three/tsl resolve to the same bundle (three.webgpu.js),
@@ -629,5 +656,17 @@ describe('#554 atomic buffer regression guards', () => {
     const call = setAtomicCalls.find((c) => c.sba === buffers.normalAccumSBA);
     expect(call).toBeDefined();
     expect(call?.value).toBe(true);
+  });
+
+  it('uses atomicLoad on read passes (#554 WGSL spec compliance)', () => {
+    // Symmetric to the setAtomic guard above. Once a buffer is declared
+    // array<atomic<T>> via setAtomic(true), WGSL spec requires atomicLoad for
+    // ALL reads — a plain `.element(i)` read is a validation error. The
+    // normalNormalize pass in tslSolver reads normalAccumBuf via atomicLoad.
+    atomicLoadCalls.length = 0;
+    const buffers = makeMockBufferSet();
+    createTslSolver(buffers, { ...defaultConfig });
+
+    expect(atomicLoadCalls.length).toBeGreaterThan(0);
   });
 });
