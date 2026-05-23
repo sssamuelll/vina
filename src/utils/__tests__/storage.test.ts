@@ -235,5 +235,51 @@ describe('storage abstraction (localStorage fallback)', () => {
       await expect(storageSet('settings', 'x', 1)).resolves.toBeUndefined();
       expect(await storageGet('settings', 'x')).toBe(1);
     });
+
+    it('drops nested events silently to prevent stack overflow', async () => {
+      const events: StorageEvent[] = [];
+      setStorageTelemetryHook((e) => {
+        events.push(e);
+        // Synchronously trigger another event — should be dropped by the guard.
+        // We use the void IIFE pattern to fire-and-forget without awaiting
+        // (the re-entrancy guard runs synchronously inside emitStorageEvent
+        // regardless of whether the outer caller awaits the inner storageSet).
+        void storageSet('settings', 'inner', 'value');
+      });
+      await storageSet('settings', 'outer', 'value');
+      // Without the guard, this would either stack-overflow or grow without
+      // bound. With the guard, the count stays small and finite.
+      expect(events.length).toBeLessThan(10);
+    });
+
+    it('emits idb-unavailable only once per hook subscription', async () => {
+      const events: StorageEvent[] = [];
+      setStorageTelemetryHook((e) => {
+        if (e.type === 'idb-unavailable') events.push(e);
+      });
+      await storageGet('settings', 'key1');
+      await storageGet('settings', 'key2');
+      await storageGet('settings', 'key3');
+      expect(events.length).toBe(1);
+    });
+
+    it('resets the idb-unavailable throttle when a new hook is set', async () => {
+      const eventsA: StorageEvent[] = [];
+      setStorageTelemetryHook((e) => {
+        if (e.type === 'idb-unavailable') eventsA.push(e);
+      });
+      await storageGet('settings', 'key1');
+      await storageGet('settings', 'key2');
+      // First hook saw only one event (throttled after first).
+      expect(eventsA.length).toBe(1);
+
+      const eventsB: StorageEvent[] = [];
+      setStorageTelemetryHook((e) => {
+        if (e.type === 'idb-unavailable') eventsB.push(e);
+      });
+      await storageGet('settings', 'key3');
+      // Second hook gets its own first event — throttle was reset on re-subscribe.
+      expect(eventsB.length).toBe(1);
+    });
   });
 });
