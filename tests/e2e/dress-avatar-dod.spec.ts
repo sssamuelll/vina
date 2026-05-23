@@ -16,12 +16,23 @@
  *
  * ## DoD encoded here
  *
- * Open the app → load a male shirt pattern from the Template Library →
- * click "Dress" → within ≤10 s the cloth simulation produces a draped
- * garment such that:
- *   (a) at least 15 seams are formed in the project state
- *   (b) no cloth vertex falls below the avatar's waist Y position
- *       (i.e. the garment stays on the torso, doesn't fall to the floor)
+ * Open the app → load a pattern from the Template Library → click "Dress" →
+ * within ≤10 s the cloth simulation produces a draped garment such that:
+ *   (a) the pattern has ≥3 pieces (smaller templates can't form a real
+ *       garment and trivialize the connectivity check below)
+ *   (b) the seam graph forms a single connected component — every piece
+ *       participates in a seam chain that reaches every other piece
+ *       (catches orphan sleeves / split halves / unsewn panels honestly)
+ *   (c) the cloth geometry is worn on the body — bounded `nearFloorPct`,
+ *       bounded `offBodyPct`, and `maxY` reaches near the shoulder for
+ *       upper garments / waist for lower garments
+ *
+ * Note: previous revisions of this test used `assemblyRatio = seams/pieces`
+ * with a threshold of 1.5. That heuristic gave false greens on minimal
+ * templates (Blouse: 2 pieces + 3 seams between them = ratio 1.5 → passed,
+ * but visually a doubled panel). Graph connectivity is the v8 recommendation
+ * (`docs/plans/2026-05-19-step3-garment-placement-fix.md` § Hallazgo 2 +
+ * "Threshold del DoD") that scales honestly across pattern sizes.
  *
  * ## Why these assertions and not a screenshot diff (yet)
  *
@@ -271,14 +282,53 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
       // when the test passes (Playwright only auto-captures on failure).
       await page.screenshot({ path: `test-results/dress-dod-${slug}.png` });
 
-      const counts = await page.evaluate(() => {
+      // Pull piece IDs + seam piece-pair refs so we can build the seam graph
+      // and verify connectivity (v8 doc recommendation, replacing the
+      // assemblyRatio heuristic that gave false greens on 2-piece patterns
+      // like Blouse — 3 seams between 2 pieces hits ratio=1.5 but isn't a
+      // garment, just a doubled-up panel).
+      const graph = await page.evaluate(() => {
         const st = window.__OPENCLO_STORE__?.getState();
-        return {
-          seams: st?.project?.seams?.length ?? 0,
-          pieces: st?.project?.pieces?.length ?? 0,
-        };
+        const pieces = (st?.project?.pieces ?? []) as Array<{ id: string }>;
+        const seams = (st?.project?.seams ?? []) as Array<{
+          pieceA?: { pieceId?: string };
+          pieceB?: { pieceId?: string };
+        }>;
+        const pieceIds = pieces.map(p => p.id);
+        const seamPairs = seams
+          .map(s => [s.pieceA?.pieceId, s.pieceB?.pieceId])
+          .filter((p): p is [string, string] => Boolean(p[0] && p[1]));
+        return { pieceIds, seamPairs, seamCount: seams.length };
       });
-      const seamCount = counts.seams;
+
+      // Build undirected adjacency map and BFS-count connected components.
+      // Self-seams (pieceA === pieceB) collapse to a self-edge which adds the
+      // piece to its own neighbour set; that doesn't affect component
+      // discovery and keeps the piece visible in the graph.
+      const adj = new Map<string, Set<string>>();
+      graph.pieceIds.forEach(id => adj.set(id, new Set()));
+      graph.seamPairs.forEach(([a, b]) => {
+        adj.get(a)?.add(b);
+        adj.get(b)?.add(a);
+      });
+      const visited = new Set<string>();
+      let componentCount = 0;
+      for (const start of graph.pieceIds) {
+        if (visited.has(start)) continue;
+        componentCount++;
+        const queue = [start];
+        while (queue.length > 0) {
+          const node = queue.shift()!;
+          if (visited.has(node)) continue;
+          visited.add(node);
+          adj.get(node)?.forEach(n => {
+            if (!visited.has(n)) queue.push(n);
+          });
+        }
+      }
+      const orphanCount = graph.pieceIds.filter(id => (adj.get(id)?.size ?? 0) === 0).length;
+      const pieceCount = graph.pieceIds.length;
+      const seamCount = graph.seamCount;
 
       // Full geometry distribution + region-aware verdict in one pass.
       const result = await page.evaluate((region: 'upper' | 'lower') => {
@@ -352,30 +402,39 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
         };
       }, c.region);
 
-      // Assembly ratio: seams per piece. A real garment sews most of its
-      // pieces together (male_shirt: 29 seams / 17 pieces ≈ 1.7). A pattern
-      // that only spawns loose panels has a low ratio (t-shirt: 3/5 = 0.6).
-      // Empirically ≥1.5 separates assembled (male_shirt 1.71) from not
-      // (t-shirt 0.6, blouse 1.0 — both confirmed unassembled by screenshot
-      // and tiny bbox). This is a better gate than an absolute seam count
-      // because it scales with pattern size.
-      const assemblyRatio = counts.pieces > 0 ? +(seamCount / counts.pieces).toFixed(2) : 0;
-      const ASSEMBLY_MIN = 1.5;
+      // Graph-connectivity assembly gate (v8 recommendation):
+      //   (1) pieces ≥ MIN_PIECES — a real garment can't be made from 1-2
+      //       panels. The Blouse template (2 pieces, 3 seams between them)
+      //       hit assemblyRatio=1.5 but is visually a doubled panel, not a
+      //       blouse. Skipping templates with too few pieces eliminates
+      //       that false green at the source.
+      //   (2) connected components == 1 — every piece participates in a
+      //       seam chain that reaches every other piece. Catches T-Shirt
+      //       (4 seams between 5 pieces → orphan sleeves) and Jacket
+      //       (3 seams between 5 pieces → ≥2 components) honestly,
+      //       independent of total seam count.
+      const MIN_PIECES = 3;
       console.log(
-        `[diagnostic] "${c.template}" (${c.region}): pieces=${counts.pieces}, ` +
-          `seams=${seamCount}, assemblyRatio=${assemblyRatio}, ` +
+        `[diagnostic] "${c.template}" (${c.region}): pieces=${pieceCount}, ` +
+          `seams=${seamCount}, components=${componentCount}, orphans=${orphanCount}, ` +
           `geometry=${JSON.stringify(result.diag)}`,
       );
 
-      // Two independent conditions for a real draped garment:
-      //   (1) it assembled — enough seams relative to piece count.
-      //   (2) it's worn on the body — geometry verdict (not fallen/scattered).
       expect(
-        assemblyRatio,
-        `${c.template}: assemblyRatio ${assemblyRatio} < ${ASSEMBLY_MIN} — pieces ` +
-          `did not sew into a garment (${seamCount} seams / ${counts.pieces} pieces). ` +
-          `This is the #518 symptom: auto-seams not forming for this pattern.`,
-      ).toBeGreaterThanOrEqual(ASSEMBLY_MIN);
+        pieceCount,
+        `${c.template}: only ${pieceCount} pieces in template — minimum ${MIN_PIECES} ` +
+          `needed to form a real garment. With <3 pieces the seam graph is trivially ` +
+          `connected regardless of construction quality, so connectivity gating is ` +
+          `uninformative. Mark the template as incomplete or extend the catalog.`,
+      ).toBeGreaterThanOrEqual(MIN_PIECES);
+
+      expect(
+        componentCount,
+        `${c.template}: ${componentCount} connected components in the seam graph — ` +
+          `need 1 (all pieces sewn into one assembled garment). ${orphanCount} orphan ` +
+          `pieces (no seams). ${seamCount} seams / ${pieceCount} pieces. This is the ` +
+          `#518 symptom: auto-seams did not stitch the pattern into a single component.`,
+      ).toBe(1);
 
       expect(result.ok, `${c.template}: ${result.reason}`).toBe(true);
     });
