@@ -25,6 +25,7 @@ import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
 import type { ClothSolverClient } from '../solverProtocol';
+import type { LocalVertexIndex } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
@@ -137,7 +138,7 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   async initMultiPiece(
     pieces: PieceMeshData[],
-    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }>,
   ): Promise<void> {
     // Merge all pieces into a single mesh
     let totalVerts = 0;
@@ -205,8 +206,16 @@ export class GpuSolverClient implements ClothSolverClient {
       const seamIds: number[] = [];
       const seamDist: number[] = [];
       for (const sp of seamPairs) {
-        const offA = vertexOffsets.get(sp.pieceAId) ?? 0;
-        const offB = vertexOffsets.get(sp.pieceBId) ?? 0;
+        const offA = vertexOffsets.get(sp.pieceAId);
+        const offB = vertexOffsets.get(sp.pieceBId);
+        if (offA === undefined || offB === undefined) {
+          console.warn(
+            `[GpuSolverClient.initMultiPiece] seam pair refs unknown piece ` +
+            `(A=${sp.pieceAId}${offA === undefined ? ' [missing]' : ''}, ` +
+            `B=${sp.pieceBId}${offB === undefined ? ' [missing]' : ''}); skipping`
+          );
+          continue;
+        }
         for (const [a, b] of sp.vertexPairs) {
           seamIds.push(a + offA, b + offB);
           seamDist.push(0); // target: pull together
@@ -259,7 +268,7 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   async initMultiPieceTsl(
     pieces: PieceMeshData[],
-    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }>,
     solverConfig?: Partial<TslSolverConfig>,
     fabricCompliance?: FabricComplianceConfig,
   ): Promise<void> {
@@ -347,8 +356,16 @@ export class GpuSolverClient implements ClothSolverClient {
       const seamIds: number[] = [];
       const seamDist: number[] = [];
       for (const sp of seamPairs) {
-        const offA = vertexOffsets.get(sp.pieceAId) ?? 0;
-        const offB = vertexOffsets.get(sp.pieceBId) ?? 0;
+        const offA = vertexOffsets.get(sp.pieceAId);
+        const offB = vertexOffsets.get(sp.pieceBId);
+        if (offA === undefined || offB === undefined) {
+          console.warn(
+            `[GpuSolverClient.initMultiPieceTsl] seam pair refs unknown piece ` +
+            `(A=${sp.pieceAId}${offA === undefined ? ' [missing]' : ''}, ` +
+            `B=${sp.pieceBId}${offB === undefined ? ' [missing]' : ''}); skipping`
+          );
+          continue;
+        }
         for (const [a, b] of sp.vertexPairs) {
           seamIds.push(a + offA, b + offB);
           seamDist.push(0);

@@ -880,7 +880,7 @@ import { colorConstraints } from './gpuBuffers';
    */
   async initMultiPieceTsl(
     pieces: PieceMeshData[],
-    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }>, // brand: LocalVertexIndex (see src/utils/cloth/seamPairs.ts)
     solverConfig?: Partial<TslSolverConfig>,
   ): Promise<void> {
     // Merge pieces (same logic as initMultiPiece)

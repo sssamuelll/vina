@@ -210,7 +210,7 @@ class XxxClient {
 
 **Seam type diverge:**
 - CPU/WASM: `SeamInitData[]` (defined `clothWorker.ts:19`, cross-imported by WASM `wasmSolverClient.ts:30`).
-- GPU: `{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }[]` — different shape.
+- GPU: `{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }[]` — different shape. (brand: `LocalVertexIndex`, see `src/utils/cloth/seamPairs.ts` post-#738.)
 - Neural: NO seams.
 
 **`SeamInitData` cross-import es drift implícito** — WASM client importa from CPU worker file (`from '../clothWorker'`). Indica que ya hay shared types ad-hoc; sub-decisión 3.1 articula dónde viven (load-bearing).

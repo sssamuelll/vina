@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { seamInitDataToPairs, type PieceWithOutline } from '../seamPairs';
+import { SEAM_MAX_EDGE_LENGTH } from '../seamAssembly';
 import type { SeamInitData } from '../clothWorker';
 import type { PathCommand } from '../../../types/types';
 
@@ -87,7 +88,13 @@ describe('seamInitDataToPairs', () => {
     //     maxEdgeLength=15, each side flattens to 7 verts × 4 edges = 28.
     //     A regression that returned global indices for piece B (offset by
     //     piece A's vertex count) would push maxB to ~50 and trip the bound.
-    const SINGLE_PIECE_VERTEX_BOUND = 28;
+    //
+    // 100×100 square: 4 edges of length 100. Each edge subdivides into
+    // ceil(100 / SEAM_MAX_EDGE_LENGTH) segments → that many vertices per
+    // edge (the +1 endpoint of one edge IS the start vertex of the next,
+    // so total = numSegments × 4, not (numSegments + 1) × 4).
+    const VERTS_PER_EDGE = Math.ceil(100 / SEAM_MAX_EDGE_LENGTH);
+    const SINGLE_PIECE_VERTEX_BOUND = VERTS_PER_EDGE * 4;
     const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
 
     const sameEdge = seamInitDataToPairs(
@@ -239,5 +246,63 @@ describe('seamInitDataToPairs', () => {
       'B-C',
       'A-C',
     ]);
+  });
+
+  // ─── Defensive guards (#736) ──────────────────────────────────────────
+
+  it('skips self-seam (pieceAId === pieceBId) with warning', () => {
+    const result = seamInitDataToPairs(
+      [makeSeam({ pieceBId: 'A' })],
+      [makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+    expect(result).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('self-seam');
+  });
+
+  it('warns on duplicate pieceId in input array (last entry wins)', () => {
+    const result = seamInitDataToPairs(
+      [makeSeam()],
+      [makeSquarePiece('A'), makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+    // Duplicate warn fires once; seam still resolves because last A wins.
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('duplicate pieceId'));
+    expect(result).toHaveLength(1);
+  });
+
+  it('skips seams with non-finite outline values and warns', () => {
+    const badOutline: Array<{ type: string; values: number[] }> = [
+      { type: 'M', values: [NaN, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const pieces: PieceWithOutline[] = [
+      {
+        pieceId: 'A',
+        outline: badOutline,
+        edges: [{ name: 'top', segmentRange: [0, 1] }],
+      },
+      makeSquarePiece('B'),
+    ];
+    const result = seamInitDataToPairs([makeSeam()], pieces);
+    expect(result).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('non-finite outline');
+  });
+
+  // ─── Branded type (#738) ──────────────────────────────────────────────
+
+  it('returns vertexPairs typed as LocalVertexIndex tuples', () => {
+    const pairs = seamInitDataToPairs(
+      [makeSeam()],
+      [makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+    // Compile-time check — accessing pair[0] should produce a LocalVertexIndex.
+    // Value-level: branded types are still numbers at runtime, so the only
+    // structural assertion we can make here is that the tuple holds numbers.
+    expect(typeof pairs[0].vertexPairs[0][0]).toBe('number');
+    expect(typeof pairs[0].vertexPairs[0][1]).toBe('number');
   });
 });
