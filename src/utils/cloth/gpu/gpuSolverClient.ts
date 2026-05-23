@@ -206,8 +206,16 @@ export class GpuSolverClient implements ClothSolverClient {
       const seamIds: number[] = [];
       const seamDist: number[] = [];
       for (const sp of seamPairs) {
-        const offA = vertexOffsets.get(sp.pieceAId) ?? 0;
-        const offB = vertexOffsets.get(sp.pieceBId) ?? 0;
+        const offA = vertexOffsets.get(sp.pieceAId);
+        const offB = vertexOffsets.get(sp.pieceBId);
+        if (offA === undefined || offB === undefined) {
+          console.warn(
+            `[GpuSolverClient.initMultiPiece] seam pair refs unknown piece ` +
+            `(A=${sp.pieceAId}${offA === undefined ? ' [missing]' : ''}, ` +
+            `B=${sp.pieceBId}${offB === undefined ? ' [missing]' : ''}); skipping`
+          );
+          continue;
+        }
         for (const [a, b] of sp.vertexPairs) {
           seamIds.push(a + offA, b + offB);
           seamDist.push(0); // target: pull together
@@ -348,8 +356,16 @@ export class GpuSolverClient implements ClothSolverClient {
       const seamIds: number[] = [];
       const seamDist: number[] = [];
       for (const sp of seamPairs) {
-        const offA = vertexOffsets.get(sp.pieceAId) ?? 0;
-        const offB = vertexOffsets.get(sp.pieceBId) ?? 0;
+        const offA = vertexOffsets.get(sp.pieceAId);
+        const offB = vertexOffsets.get(sp.pieceBId);
+        if (offA === undefined || offB === undefined) {
+          console.warn(
+            `[GpuSolverClient.initMultiPieceTsl] seam pair refs unknown piece ` +
+            `(A=${sp.pieceAId}${offA === undefined ? ' [missing]' : ''}, ` +
+            `B=${sp.pieceBId}${offB === undefined ? ' [missing]' : ''}); skipping`
+          );
+          continue;
+        }
         for (const [a, b] of sp.vertexPairs) {
           seamIds.push(a + offA, b + offB);
           seamDist.push(0);
