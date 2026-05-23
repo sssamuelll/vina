@@ -13,6 +13,7 @@ import { startSimulation } from '../../../../store/simulationSlice';
 import { autoSew } from '../../../../utils/autoSew';
 import { buildPieceWithOffset } from '../../../../utils/construction/pieceBuilder';
 import { clearConstruction } from '../../../../store/constructionSlice';
+import { MEAS_MAPPING, deriveMeasurements } from '../../../../utils/seamly2d/measurementDerivation';
 
 // ─── Lazy-load pattern JSONs via Vite glob ──────────────────────────────────
 
@@ -111,72 +112,29 @@ const loadSeamlyPatternTool: ToolDefinition = {
     const state = getState();
     const userMeas = state.project.avatar.measurements as unknown as Record<string, number>;
 
-    // Map our measurement names (cm) to Seamly2D names (cm)
-    const measMapping: Record<string, string> = {
-      // Primary
-      height: 'height',
-      chest: 'bust_circ',
-      waist: 'waist_circ',
-      hips: 'hip_circ',
-      shoulder: 'shoulder_length',
-      armLength: 'arm_shoulder_tip_to_wrist_bent',
-      inseam: 'leg_crotch_to_floor',
-      // Torso
-      neckCirc: 'neck_circ',
-      // Vertical heights
-      kneeHeight: 'height_knee',
-      waistHeight: 'height_waist_side',
-      // Lengths back
-      neckToWaistBack: 'neck_back_to_waist_b',
-      waistToFloor: 'leg_waist_side_to_floor',
-      crotchLength: 'leg_crotch_to_floor', // alias
-      // Legs
-      kneeCirc: 'leg_knee_circ',
-      ankleCirc: 'leg_ankle_circ',
-      // Arms
-      wristCirc: 'hand_circ', // closest match
-    };
-
     // Only override measurements the pattern actually uses
     const patternDefaults = patternData.measurements?.defaults ?? {};
     const patternKeys = new Set(Object.keys(patternDefaults));
 
+    // 1:1 user-supplied → Seamly-name mapping (MEAS_MAPPING shared with TemplateLibrary)
     const overrides: Record<string, number> = {};
-    for (const [ourName, seamlyName] of Object.entries(measMapping)) {
+    for (const [ourName, seamlyName] of Object.entries(MEAS_MAPPING)) {
       if (userMeas[ourName] != null && patternKeys.has(seamlyName)) {
         overrides[seamlyName] = userMeas[ourName];
       }
     }
 
-    // Derive missing measurements ONLY if absent from both user avatar AND pattern defaults
-    // has: measurement exists in user overrides or pattern defaults
-    const has = (key: string) => overrides[key] != null || patternDefaults[key] != null;
-    // needs: pattern formulas/variables reference this measurement (scan all formula strings)
-    // For simplicity, we check if the key appears in any variable formula or pattern defaults
+    // Derive missing detail measurements (~10) from the basic 7. Logic
+    // lives in measurementDerivation.ts so the e2e path (TemplateLibrary)
+    // can use the same code — see file header for the why.
     const allFormulas = Object.values(patternData.variables ?? {}).map(v => v.formula).join(' ');
-    const needs = (key: string) => patternKeys.has(key) || allFormulas.includes(key);
-
-    const h = overrides['height'] ?? patternDefaults['height'] ?? userMeas.height ?? 168;
-    if (needs('leg_crotch_to_floor') && !has('leg_crotch_to_floor'))
-      overrides['leg_crotch_to_floor'] = userMeas.inseam ?? h * 0.45;
-    if (needs('height_waist_side') && !has('height_waist_side'))
-      overrides['height_waist_side'] = h * 0.58;
-    if (needs('height_knee') && !has('height_knee'))
-      overrides['height_knee'] = h * 0.285;
-    if (needs('neck_back_to_waist_b') && !has('neck_back_to_waist_b'))
-      overrides['neck_back_to_waist_b'] = h * 0.245;
-    if (needs('leg_waist_side_to_floor') && !has('leg_waist_side_to_floor'))
-      overrides['leg_waist_side_to_floor'] = h * 0.62;
-    if (needs('neck_circ') && !has('neck_circ'))
-      overrides['neck_circ'] = (overrides['bust_circ'] ?? patternDefaults['bust_circ'] ?? 92) * 0.395;
-    if (needs('hand_circ') && !has('hand_circ'))
-      overrides['hand_circ'] = 20;
-    if (needs('leg_knee_circ') && !has('leg_knee_circ'))
-      overrides['leg_knee_circ'] = (overrides['hip_circ'] ?? patternDefaults['hip_circ'] ?? 98) * 0.39;
-    if (needs('leg_ankle_circ') && !has('leg_ankle_circ'))
-      overrides['leg_ankle_circ'] = 23;
-    if (needs('leg_ankle_high_circ') && !has('leg_ankle_high_circ'))
-      overrides['leg_ankle_high_circ'] = (overrides['leg_ankle_circ'] ?? patternDefaults['leg_ankle_circ'] ?? 23) + 2;
+    Object.assign(overrides, deriveMeasurements({
+      userMeas,
+      patternDefaults,
+      allFormulas,
+      patternKeys,
+      existingOverrides: overrides,
+    }));
 
     // Adapt the pattern
     console.log('[loadSeamlyPattern] adapting pattern:', patternId, 'overrides:', JSON.stringify(overrides));
