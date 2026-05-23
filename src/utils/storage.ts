@@ -14,7 +14,7 @@
  */
 
 import { openDB, type IDBPDatabase } from 'idb';
-import { safeGetItem, safeSetItem, safeRemoveItem } from './safeStorage';
+import { safeGetItem, safeSetItem, safeRemoveItem, setLocalStorageQuotaHook } from './safeStorage';
 
 // ─── Schema ─────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,55 @@ const DB_NAME = 'openclo';
 const DB_VERSION = 1;
 
 type StoreNames = 'projects' | 'avatars' | 'plugins' | 'settings';
+
+// ─── Telemetry hook (B6-state § 3.8) ────────────────────────────────────────
+
+/**
+ * Storage-event union surfaced via `setStorageTelemetryHook`. Each variant
+ * corresponds to a degraded-state branch inside the persistence layer:
+ *
+ * - `idb-unavailable`: `getDB()` rejected (Safari private mode, disabled IDB).
+ * - `ls-fallback-write`: a write fell back to localStorage after IDB failed.
+ * - `ls-quota-exhausted`: `localStorage.setItem` threw a QuotaExceededError
+ *   (or its legacy Firefox equivalent) inside `safeSetItem`.
+ *
+ * Consumer integration lives in the E-async-states sub-track (toast/diag
+ * surfaces). Until then this is a no-op stub for opt-in dev visibility.
+ */
+export type StorageEvent =
+  | { type: 'idb-unavailable'; store: StoreNames; key: string }
+  | { type: 'ls-fallback-write'; store: StoreNames; key: string }
+  | { type: 'ls-quota-exhausted'; key: string };
+
+let storageTelemetryHook: ((event: StorageEvent) => void) | null = null;
+
+/**
+ * Register a telemetry hook for persistence degraded-state events. Pass
+ * `null` to unregister. Hook invocation is wrapped in `try/catch`: a
+ * throwing hook must never break the user's data path.
+ */
+export function setStorageTelemetryHook(
+  hook: ((event: StorageEvent) => void) | null,
+): void {
+  storageTelemetryHook = hook;
+  // Subscribe / unsubscribe the safeStorage internal quota hook in lockstep.
+  if (hook) {
+    setLocalStorageQuotaHook((key) => {
+      emitStorageEvent({ type: 'ls-quota-exhausted', key });
+    });
+  } else {
+    setLocalStorageQuotaHook(null);
+  }
+}
+
+function emitStorageEvent(event: StorageEvent): void {
+  if (!storageTelemetryHook) return;
+  try {
+    storageTelemetryHook(event);
+  } catch {
+    // Never let a buggy telemetry hook break persistence.
+  }
+}
 
 // ─── DB Singleton ───────────────────────────────────────────────────────────
 
@@ -56,6 +105,7 @@ export async function storageGet<T = unknown>(store: StoreNames, key: string): P
     const db = await getDB();
     return await db.get(store, key) as T | undefined;
   } catch {
+    emitStorageEvent({ type: 'idb-unavailable', store, key });
     // Fallback to localStorage
     try {
       const raw = safeGetItem(`${DB_NAME}:${store}:${key}`);
@@ -75,6 +125,7 @@ export async function storageSet(store: StoreNames, key: string, value: unknown)
     const db = await getDB();
     await db.put(store, value, key);
   } catch {
+    emitStorageEvent({ type: 'ls-fallback-write', store, key });
     // Fallback to localStorage
     safeSetItem(`${DB_NAME}:${store}:${key}`, JSON.stringify(value));
   }

@@ -10,6 +10,38 @@ const memoryFallback = new Map<string, string>();
 let _available: boolean | null = null;
 const _warnedKeys = new Set<string>();
 
+/**
+ * Internal quota-exhaustion hook. Subscribed by `storage.ts` to forward
+ * quota events into the central StorageEvent telemetry surface
+ * (B6-state § 3.8). Kept as a local hook (not the public StorageEvent
+ * surface) so safeStorage.ts stays free of any dependency on storage.ts,
+ * avoiding a circular import.
+ */
+let _quotaHook: ((key: string) => void) | null = null;
+
+/**
+ * Register an internal listener for `QuotaExceededError`-class failures
+ * inside `safeSetItem`. Pass `null` to unregister. Intended for use by
+ * `storage.ts` only.
+ *
+ * The hook is invoked on any setItem catch when the failure looks like a
+ * quota error (DOMException name `QuotaExceededError` or its legacy
+ * Firefox code 1014 `NS_ERROR_DOM_QUOTA_REACHED`).
+ */
+export function setLocalStorageQuotaHook(hook: ((key: string) => void) | null): void {
+  _quotaHook = hook;
+}
+
+/** Best-effort detection of QuotaExceededError across browsers. */
+function isQuotaError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const e = err as { name?: unknown; code?: unknown };
+  return e.name === 'QuotaExceededError'
+    || e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || e.code === 22
+    || e.code === 1014;
+}
+
 /** Test whether localStorage is usable. Cached after first call. */
 export function isStorageAvailable(): boolean {
   if (_available !== null) return _available;
@@ -52,6 +84,13 @@ export function safeSetItem(key: string, value: string): void {
     localStorage.setItem(key, value);
   } catch (err) {
     warnOnce('setItem', key, err);
+    if (isQuotaError(err) && _quotaHook) {
+      try {
+        _quotaHook(key);
+      } catch {
+        // Never let a buggy hook break persistence.
+      }
+    }
   }
 }
 

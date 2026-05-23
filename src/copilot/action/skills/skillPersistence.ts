@@ -197,10 +197,12 @@ export class SkillPersistence {
   // ─── Migration ───────────────────────────────────────────────────────────
 
   /**
-   * Migrate skills from old localStorage format.
+   * Migrate skills from legacy localStorage to this DB. Domain-specific
+   * naming intentional — distinct from the canonical migrateFromLocalStorage
+   * helper in storage.ts (BUG-10 / B6-state § 3.6).
    * @returns Number of skills migrated
    */
-  async migrateFromLocalStorage(): Promise<number> {
+  async migrateLegacySkills(): Promise<number> {
     const INSTALLED_SKILLS_KEY = 'openclo_installed_community_skills';
     let count = 0;
 
