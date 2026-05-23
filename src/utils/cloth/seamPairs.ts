@@ -38,6 +38,21 @@ import {
 import { flattenPath } from '../seam/index';
 
 /**
+ * Branded vertex index — piece-LOCAL (not merged-mesh global).
+ *
+ * The GPU consumer `GpuSolverClient.initMultiPieceTsl` adds the per-piece
+ * vertex offset internally when building the seam constraint buffer. A
+ * regression that passes global indices here would double-offset the GPU
+ * buffer and corrupt seam constraints. This brand prevents accidental
+ * cross-pollination from helpers that return global indices.
+ *
+ * Construction site: `seamInitDataToPairs` (single brand cast after
+ * `matchVertices`). All other code should treat this as opaque.
+ */
+declare const __localVertexBrand: unique symbol;
+export type LocalVertexIndex = number & { readonly [__localVertexBrand]: true };
+
+/**
  * GPU-tier seam pair: piece IDs + LOCAL (piece-relative) vertex index pairs.
  *
  * Matches the param shape consumed by `GpuSolverClient.initMultiPieceTsl`,
@@ -48,7 +63,7 @@ export interface SeamPair {
   pieceAId: string;
   pieceBId: string;
   /** [localVertexIdxInPieceA, localVertexIdxInPieceB] pairs. */
-  vertexPairs: Array<[number, number]>;
+  vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]>;
 }
 
 /**
@@ -59,6 +74,13 @@ export interface PieceWithOutline {
   pieceId: string;
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
+}
+
+function toPathCommands(outline: PieceWithOutline['outline']): PathCommand[] {
+  // Structural-to-nominal type narrowing. The caller has already validated
+  // outline shape (presence + numeric values) via hasFiniteOutline. This
+  // single boundary point makes the cast easy to grep and harden later.
+  return outline as PathCommand[];
 }
 
 function resolveSegmentRange(
@@ -72,7 +94,7 @@ function resolveSegmentRange(
   if (!match) return null;
 
   const idx = parseInt(match[1], 10);
-  const numSegments = flattenPath(piece.outline as PathCommand[]).length;
+  const numSegments = flattenPath(toPathCommands(piece.outline)).length;
   if (idx >= numSegments) return null;
   return [idx, (idx + 1) % numSegments];
 }
@@ -97,9 +119,12 @@ function hasFiniteOutline(outline: PieceWithOutline['outline']): boolean {
  *
  * @param seamData  Seams from `seamsToInitData()` — typically already filtered
  *   to active seams by the caller, but `active === false` entries are skipped
- *   defensively here as well.
+ *   defensively here as well. **Note:** if `seam.pieceARange` / `pieceBRange`
+ *   are present, this helper applies t-range filtering silently — callers
+ *   that build SeamInitData should be aware these fields gate the output.
  * @param pieces    Pieces with outlines (`PlacedMesh`-compatible).
- * @returns         `SeamPair[]` with LOCAL piece-relative vertex indices.
+ * @returns         `SeamPair[]` with LOCAL piece-relative vertex indices
+ *                  (branded as `LocalVertexIndex`).
  */
 export function seamInitDataToPairs(
   seamData: SeamInitData[],
@@ -153,7 +178,7 @@ export function seamInitDataToPairs(
     }
 
     let edgeA = parameterizeEdge(
-      pieceA.outline as PathCommand[],
+      toPathCommands(pieceA.outline),
       rangeA[0],
       rangeA[1],
       0,
@@ -161,7 +186,7 @@ export function seamInitDataToPairs(
       SEAM_MAX_EDGE_LENGTH,
     );
     let edgeB = parameterizeEdge(
-      pieceB.outline as PathCommand[],
+      toPathCommands(pieceB.outline),
       rangeB[0],
       rangeB[1],
       0,
@@ -178,7 +203,7 @@ export function seamInitDataToPairs(
       edgeB = edgeB.filter(v => v.t >= t0 && v.t <= t1);
     }
 
-    const vertexPairs = matchVertices(edgeA, edgeB);
+    const vertexPairs = matchVertices(edgeA, edgeB) as Array<[LocalVertexIndex, LocalVertexIndex]>;
     if (vertexPairs.length === 0) {
       console.warn(`[seamPairs] seam ${seam.id}: empty match`);
       continue;

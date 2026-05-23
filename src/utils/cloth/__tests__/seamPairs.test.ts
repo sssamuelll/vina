@@ -284,4 +284,18 @@ describe('seamInitDataToPairs', () => {
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toContain('non-finite outline');
   });
+
+  // ─── Branded type (#738) ──────────────────────────────────────────────
+
+  it('returns vertexPairs typed as LocalVertexIndex tuples', () => {
+    const pairs = seamInitDataToPairs(
+      [makeSeam()],
+      [makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+    // Compile-time check — accessing pair[0] should produce a LocalVertexIndex.
+    // Value-level: branded types are still numbers at runtime, so the only
+    // structural assertion we can make here is that the tuple holds numbers.
+    expect(typeof pairs[0].vertexPairs[0][0]).toBe('number');
+    expect(typeof pairs[0].vertexPairs[0][1]).toBe('number');
+  });
 });

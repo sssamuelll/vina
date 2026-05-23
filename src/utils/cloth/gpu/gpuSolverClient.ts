@@ -25,6 +25,7 @@ import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
 import type { ClothSolverClient } from '../solverProtocol';
+import type { LocalVertexIndex } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
@@ -137,7 +138,7 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   async initMultiPiece(
     pieces: PieceMeshData[],
-    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }>,
   ): Promise<void> {
     // Merge all pieces into a single mesh
     let totalVerts = 0;
@@ -259,7 +260,7 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   async initMultiPieceTsl(
     pieces: PieceMeshData[],
-    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[number, number]> }>,
+    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }>,
     solverConfig?: Partial<TslSolverConfig>,
     fabricCompliance?: FabricComplianceConfig,
   ): Promise<void> {
