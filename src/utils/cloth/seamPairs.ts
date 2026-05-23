@@ -29,7 +29,12 @@
 
 import type { PathCommand } from '../../types/types';
 import type { SeamInitData } from './clothWorker';
-import { parameterizeEdge, matchVertices } from './seamAssembly';
+import {
+  parameterizeEdge,
+  matchVertices,
+  SEAM_CURVE_RESOLUTION,
+  SEAM_MAX_EDGE_LENGTH,
+} from './seamAssembly';
 import { flattenPath } from '../seam/index';
 
 /**
@@ -55,12 +60,6 @@ export interface PieceWithOutline {
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
 }
-
-// MUST match the literals used by `seamAssembly.buildSeamConstraints` (the
-// `parameterizeEdge` calls there, ~line 429). Desync = GPU and CPU/WASM emit
-// different vertex counts per seam edge → divergent simulation behavior.
-const CURVE_RESOLUTION = 12;
-const MAX_EDGE_LENGTH = 15;
 
 function resolveSegmentRange(
   piece: PieceWithOutline,
@@ -124,16 +123,16 @@ export function seamInitDataToPairs(
       rangeA[0],
       rangeA[1],
       0,
-      CURVE_RESOLUTION,
-      MAX_EDGE_LENGTH,
+      SEAM_CURVE_RESOLUTION,
+      SEAM_MAX_EDGE_LENGTH,
     );
     let edgeB = parameterizeEdge(
       pieceB.outline as PathCommand[],
       rangeB[0],
       rangeB[1],
       0,
-      CURVE_RESOLUTION,
-      MAX_EDGE_LENGTH,
+      SEAM_CURVE_RESOLUTION,
+      SEAM_MAX_EDGE_LENGTH,
     );
 
     if (seam.pieceARange) {

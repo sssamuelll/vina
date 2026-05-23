@@ -105,6 +105,13 @@ function findPieceOffsetById(index: readonly PieceOffsetIndexEntry[], pieceId: s
   return undefined;
 }
 
+// ─── Cross-tier Constants ───────────────────────────────────────────────────
+
+/** Curve flattening resolution shared across CPU/WASM seam construction and GPU seam-pair extraction. MUST match across tiers (pair count parity invariant). */
+export const SEAM_CURVE_RESOLUTION = 12;
+/** Maximum edge length before CDT subdivision. MUST match across tiers (pair count parity invariant). */
+export const SEAM_MAX_EDGE_LENGTH = 15;
+
 // ─── Default Config ─────────────────────────────────────────────────────────
 
 /** Default seam constraint configuration. */
@@ -164,8 +171,8 @@ export function parameterizeEdge(
   edgeStart: number,
   edgeEnd: number,
   globalOffset: number = 0,
-  curveResolution: number = 12,
-  maxEdgeLength: number = 15,
+  curveResolution: number = SEAM_CURVE_RESOLUTION,
+  maxEdgeLength: number = SEAM_MAX_EDGE_LENGTH,
 ): ParameterizedVertex[] {
   const flatPoints = flattenPath(outline, curveResolution);
   if (flatPoints.length === 0) return [];
@@ -423,11 +430,11 @@ export function buildSeamConstraints(
 
     if (!edgeADef || !edgeBDef) continue;
 
-    // Default maxEdgeLength is 15 in CDT, but we should ideally pass this from config
-    const maxEdgeLength = 15;
-
-    let edgeA = parameterizeEdge(outlineA, edgeADef.segmentRange[0], edgeADef.segmentRange[1], offsetA.vertexOffset, 12, maxEdgeLength);
-    let edgeB = parameterizeEdge(outlineB, edgeBDef.segmentRange[0], edgeBDef.segmentRange[1], offsetB.vertexOffset, 12, maxEdgeLength);
+    // TODO: pass curveResolution / maxEdgeLength from config (currently
+    // pinned to SEAM_CURVE_RESOLUTION / SEAM_MAX_EDGE_LENGTH to keep CPU/
+    // WASM/GPU pair-count parity — see seamPairs.ts).
+    let edgeA = parameterizeEdge(outlineA, edgeADef.segmentRange[0], edgeADef.segmentRange[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
+    let edgeB = parameterizeEdge(outlineB, edgeBDef.segmentRange[0], edgeBDef.segmentRange[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
 
     // Apply t-range filtering: restrict parameterized vertices to the sub-range
     if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {
