@@ -240,4 +240,48 @@ describe('seamInitDataToPairs', () => {
       'A-C',
     ]);
   });
+
+  // ─── Defensive guards (#736) ──────────────────────────────────────────
+
+  it('skips self-seam (pieceAId === pieceBId) with warning', () => {
+    const result = seamInitDataToPairs(
+      [makeSeam({ pieceBId: 'A' })],
+      [makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+    expect(result).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('self-seam');
+  });
+
+  it('warns on duplicate pieceId in input array (last entry wins)', () => {
+    const result = seamInitDataToPairs(
+      [makeSeam()],
+      [makeSquarePiece('A'), makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+    // Duplicate warn fires once; seam still resolves because last A wins.
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('duplicate pieceId'));
+    expect(result).toHaveLength(1);
+  });
+
+  it('skips seams with non-finite outline values and warns', () => {
+    const badOutline: Array<{ type: string; values: number[] }> = [
+      { type: 'M', values: [NaN, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ];
+    const pieces: PieceWithOutline[] = [
+      {
+        pieceId: 'A',
+        outline: badOutline,
+        edges: [{ name: 'top', segmentRange: [0, 1] }],
+      },
+      makeSquarePiece('B'),
+    ];
+    const result = seamInitDataToPairs([makeSeam()], pieces);
+    expect(result).toEqual([]);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(warnSpy.mock.calls[0][0]).toContain('non-finite outline');
+  });
 });

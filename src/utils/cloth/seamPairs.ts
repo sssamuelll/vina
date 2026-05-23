@@ -78,6 +78,21 @@ function resolveSegmentRange(
 }
 
 /**
+ * Scan a piece outline for NaN/Infinity values. Returns true iff every
+ * numeric value across every path command is finite. Cheap O(N) walk —
+ * runs once per seam-piece lookup, not per particle, so the budget is
+ * negligible relative to `parameterizeEdge` itself.
+ */
+function hasFiniteOutline(outline: PieceWithOutline['outline']): boolean {
+  for (const cmd of outline) {
+    for (const v of cmd.values) {
+      if (!Number.isFinite(v)) return false;
+    }
+  }
+  return true;
+}
+
+/**
  * Convert `SeamInitData[]` (CPU/WASM shape) to `SeamPair[]` (GPU shape).
  *
  * @param seamData  Seams from `seamsToInitData()` — typically already filtered
@@ -93,18 +108,37 @@ export function seamInitDataToPairs(
   if (seamData.length === 0 || pieces.length === 0) return [];
 
   const pieceById = new Map<string, PieceWithOutline>();
-  for (const p of pieces) pieceById.set(p.pieceId, p);
+  const seenIds = new Set<string>();
+  for (const p of pieces) {
+    if (seenIds.has(p.pieceId)) {
+      console.warn(`[seamPairs] duplicate pieceId in input: ${p.pieceId}, last entry wins`);
+    }
+    seenIds.add(p.pieceId);
+    pieceById.set(p.pieceId, p);
+  }
 
   const pairs: SeamPair[] = [];
 
   for (const seam of seamData) {
     if (seam.active === false) continue;
 
+    if (seam.pieceAId === seam.pieceBId) {
+      console.warn(`[seamPairs] seam ${seam.id}: self-seam (pieceAId === pieceBId), skipping`);
+      continue;
+    }
+
     const pieceA = pieceById.get(seam.pieceAId);
     const pieceB = pieceById.get(seam.pieceBId);
     if (!pieceA || !pieceB) {
       console.warn(
         `[seamPairs] seam ${seam.id}: missing piece (A=${seam.pieceAId}, B=${seam.pieceBId})`,
+      );
+      continue;
+    }
+
+    if (!hasFiniteOutline(pieceA.outline) || !hasFiniteOutline(pieceB.outline)) {
+      console.warn(
+        `[seamPairs] seam ${seam.id}: non-finite outline values in piece (A=${seam.pieceAId}, B=${seam.pieceBId}), skipping`,
       );
       continue;
     }
