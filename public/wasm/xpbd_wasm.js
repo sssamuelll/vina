@@ -129,12 +129,23 @@ export class XpbdSolver {
      * - `offsets   = [0, 2, 4, 6]`
      * - `neighbors = [1, 2, 0, 2, 0, 1]`
      *
+     * # Validation (#721)
+     *
+     * Validates the CSR shape via `CSRAdjacency::new` before storing.
+     * Returns `Err` (surfaces as a JS exception via wasm-bindgen) with a
+     * human-readable diagnostic if the shape is malformed; worker should
+     * catch and log, then continue stepping with self-collision disabled
+     * (the existing `Option::None` guard in `solve_self_collision` makes
+     * this a no-op rather than tearing the mesh — same fail-loud-by-no-op
+     * shape as the empty-offsets path from #717).
+     *
      * # Empty CSR
      *
-     * Calling with empty `offsets` is treated as a no-op by
-     * `solve_self_collision` (defensive fallback — preferable to running
-     * with broken physics). New callers should populate the CSR before
-     * enabling self-collision.
+     * Calling with empty `offsets` (length 0) is also rejected — the CSR
+     * invariant requires at least the sentinel entry. Worker happy-path
+     * produces `offsets[num_particles + 1]` so this is never hit in normal
+     * flow. Internal test fixtures use `[0; num_particles + 1]` to express
+     * "no neighbors for any particle".
      * @param {Uint32Array} offsets
      * @param {Uint32Array} neighbors
      */
@@ -143,7 +154,10 @@ export class XpbdSolver {
         const len0 = WASM_VECTOR_LEN;
         const ptr1 = passArray32ToWasm0(neighbors, wasm.__wbindgen_malloc);
         const len1 = WASM_VECTOR_LEN;
-        wasm.xpbdsolver_set_adjacency(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        const ret = wasm.xpbdsolver_set_adjacency(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
     }
     /**
      * Set bend constraints.
@@ -331,6 +345,11 @@ function __wbg_get_imports() {
             getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
             getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
         },
+        __wbindgen_cast_0000000000000001: function(arg0, arg1) {
+            // Cast intrinsic for `Ref(String) -> Externref`.
+            const ret = getStringFromWasm0(arg0, arg1);
+            return ret;
+        },
         __wbindgen_init_externref_table: function() {
             const table = wasm.__wbindgen_externrefs;
             const offset = table.grow(4);
@@ -444,6 +463,12 @@ function passStringToWasm0(arg, malloc, realloc) {
 
     WASM_VECTOR_LEN = offset;
     return ptr;
+}
+
+function takeFromExternrefTable0(idx) {
+    const value = wasm.__wbindgen_externrefs.get(idx);
+    wasm.__externref_table_dealloc(idx);
+    return value;
 }
 
 let cachedTextDecoder = new TextDecoder('utf-8', { ignoreBOM: true, fatal: true });

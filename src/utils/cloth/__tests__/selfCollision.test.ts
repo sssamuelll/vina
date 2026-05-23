@@ -45,6 +45,45 @@ describe('SpatialHashGrid', () => {
   });
 });
 
+/**
+ * Bit-exact parity fixture (#720). `hashCoords` is the single arithmetic
+ * surface that has to match the Rust port byte-for-byte across language
+ * boundaries — otherwise WASM and CPU tiers route particles to different
+ * cells and silently diverge in self-collision detection.
+ *
+ * The Rust half of this fixture lives in
+ * `crates/xpbd-wasm/src/lib.rs` (`hash_coords_bit_exact_with_ts_reference`).
+ * The 8 cases below MUST match value-for-value; any change in one half
+ * requires updating the other.
+ *
+ * Cases pinned: identity, unit basis (x/y/z), all-negative-1, typical
+ * realistic cell, wrap-zone exercise (1_000_000 → JS i32 bitwise wrap kicks
+ * in but stays under the `|coord| < 2^25` JS parity bound), and a
+ * large-negative-coords case.
+ */
+describe('hashCoords bit-exact reference (parity with Rust)', () => {
+  it('matches fixture values', () => {
+    const grid = new SpatialHashGrid(0.01);
+    grid.tableSize = 10007;
+    // [xi, yi, zi, expected]. Keep in sync with Rust fixture
+    // `hash_coords_bit_exact_with_ts_reference` in
+    // `crates/xpbd-wasm/src/lib.rs`.
+    const cases: ReadonlyArray<readonly [number, number, number, number]> = [
+      [0, 0, 0, 0],
+      [1, 0, 0, 2172],
+      [0, 1, 0, 5339],
+      [0, 0, 1, 4877],
+      [-1, -1, -1, 1731],
+      [100, 200, 300, 2436],
+      [1000000, 0, 0, 2616],
+      [-1000, -2000, -3000, 8204],
+    ];
+    for (const [xi, yi, zi, expected] of cases) {
+      expect(grid.hashCoords(xi, yi, zi)).toBe(expected);
+    }
+  });
+});
+
 describe('solveSelfCollision', () => {
   // Helper: create two non-connected particles
   function makeTwoParticles(p0: [number, number, number], p1: [number, number, number]) {

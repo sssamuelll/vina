@@ -36,6 +36,7 @@ import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 import { computeBendRestDistances } from './bendRestDistances';
 import { buildAdjacency } from '../selfCollision';
+import { buildAdjacencyCSR } from './adjacencyCSR';
 import { createCountSamplingLimiter } from '../../rateLimit';
 import type { PieceMeshData, WasmSolverConfig } from './wasmSolverClient';
 
@@ -543,21 +544,26 @@ self.onmessage = async (event: MessageEvent) => {
         // `offsets[i]..offsets[i+1]` to skip triangle-connected pairs (matches
         // the TS `adjacency[i].has(j)` set lookup, just stored differently).
         // `merged.triIds` is `Int32Array` (CPU mesh convention); the helper
-        // accepts that shape directly.
+        // accepts that shape directly. Construction extracted to
+        // `buildAdjacencyCSR` (#719) for unit-test coverage.
         const adjSets = buildAdjacency(merged.triIds, numParticles);
-        const adjOffsets = new Uint32Array(numParticles + 1);
-        let adjTotal = 0;
-        for (let i = 0; i < numParticles; i++) {
-          adjOffsets[i] = adjTotal;
-          adjTotal += adjSets[i].size;
+        const { offsets: adjOffsets, neighbors: adjNeighbors } = buildAdjacencyCSR(adjSets, numParticles);
+        // #721: `set_adjacency` now returns Result<(), String>; a malformed
+        // CSR throws at the wasm-bindgen boundary. Catch + log so the worker
+        // keeps stepping (self-collision no-ops via the `Option::None`
+        // guard in `solve_self_collision`) rather than tearing down init.
+        // Worker happy-path always produces a valid CSR — this only fires
+        // on future regressions.
+        try {
+          solver.set_adjacency(adjOffsets, adjNeighbors);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[WasmWorker] set_adjacency rejected the CSR: ${message}. ` +
+            `Self-collision will no-op for this session. This is a worker bug — ` +
+            `the happy-path buildAdjacencyCSR output should always be well-formed.`,
+          );
         }
-        adjOffsets[numParticles] = adjTotal;
-        const adjNeighbors = new Uint32Array(adjTotal);
-        let adjK = 0;
-        for (let i = 0; i < numParticles; i++) {
-          for (const j of adjSets[i]) adjNeighbors[adjK++] = j;
-        }
-        solver.set_adjacency(adjOffsets, adjNeighbors);
 
         // Cache outline and edge data for elastic constraint building
         const outlines = new Map<string, PathCommand[]>();
