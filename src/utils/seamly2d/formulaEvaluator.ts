@@ -9,6 +9,7 @@
  */
 
 import { safeEval } from '../formula/safeEval';
+import { translateMeasurementName } from './measurementNameTranslation';
 
 export interface FormulaContext {
   measurements: Record<string, number>;
@@ -42,14 +43,28 @@ export function evaluateFormula(
     return '0';
   });
 
-  // Replace @MeasurementName references (Cyrillic/Unicode measurement names)
-  // Fall back to 0 if the measurement is not in context — it may be an optional measurement.
+  // Replace @MeasurementName references (Cyrillic/Unicode measurement names).
+  // Patterns authored in non-English locales reference body measurements by
+  // the localized name (e.g. `@Lignetailledos` in French → `neck_back_to_waist_b`).
+  // We try the literal name first (preserves backward-compat for patterns that
+  // already use English / already-translated names), then the canonical English
+  // translation. Unresolved names fall back to 0 with a warning — graceful
+  // degradation for optional measurements and pattern-specific ease/dart values.
   expr = expr.replace(/@([\p{L}_][\p{L}\p{N}_]*)/gu, (_match, name) => {
-    const val = context.measurements[name] ?? context.measurements[`@${name}`];
-    if (val !== undefined) return String(val);
-    // Try as variable
-    const vval = context.variables[`@${name}`] ?? context.variables[name];
-    if (vval !== undefined) return String(vval);
+    const tryLookup = (key: string): string | undefined => {
+      const val = context.measurements[key] ?? context.measurements[`@${key}`];
+      if (val !== undefined) return String(val);
+      const vval = context.variables[`@${key}`] ?? context.variables[key];
+      if (vval !== undefined) return String(vval);
+      return undefined;
+    };
+    const direct = tryLookup(name);
+    if (direct !== undefined) return direct;
+    const translated = translateMeasurementName(name);
+    if (translated !== name) {
+      const viaTx = tryLookup(translated);
+      if (viaTx !== undefined) return viaTx;
+    }
     console.warn(`[formulaEvaluator] Unresolved measurement: @${name}, defaulting to 0`);
     return '0';
   });

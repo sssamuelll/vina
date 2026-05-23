@@ -13,7 +13,7 @@ import { startSimulation } from '../../../../store/simulationSlice';
 import { autoSew } from '../../../../utils/autoSew';
 import { buildPieceWithOffset } from '../../../../utils/construction/pieceBuilder';
 import { clearConstruction } from '../../../../store/constructionSlice';
-import { MEAS_MAPPING, deriveMeasurements } from '../../../../utils/seamly2d/measurementDerivation';
+import { applyMeasMapping, deriveMeasurements } from '../../../../utils/seamly2d/measurementDerivation';
 
 // ─── Lazy-load pattern JSONs via Vite glob ──────────────────────────────────
 
@@ -112,22 +112,26 @@ const loadSeamlyPatternTool: ToolDefinition = {
     const state = getState();
     const userMeas = state.project.avatar.measurements as unknown as Record<string, number>;
 
-    // Only override measurements the pattern actually uses
+    // Map user-supplied avatar fields to Seamly2D canonical names. We
+    // include formula references in the membership check (not just the
+    // pattern's measurements.defaults keys) because most patterns ship
+    // with empty `defaults: {}` and reference measurements only inside
+    // their formula strings — gating on defaults alone would drop the
+    // mapping entirely. Shared with TemplateLibrary via
+    // `applyMeasMapping` / `deriveMeasurements` in measurementDerivation.ts.
     const patternDefaults = patternData.measurements?.defaults ?? {};
     const patternKeys = new Set(Object.keys(patternDefaults));
+    // Scan ALL formula strings (variables + construction) for measurement
+    // references. Stringifying the whole pattern is the simplest robust
+    // way to catch references that live inside per-step `length`/`angle`/
+    // `radius`/spline-node fields — pattern formulas in the catalog often
+    // reference English measurement names (e.g. `bust_arc_f`) only from
+    // construction steps, never from `pattern.variables`.
+    const allFormulas = JSON.stringify(patternData.variables ?? {}) + ' ' +
+                        JSON.stringify(patternData.construction ?? []);
+    const overrides = applyMeasMapping(userMeas, patternKeys, allFormulas);
 
-    // 1:1 user-supplied → Seamly-name mapping (MEAS_MAPPING shared with TemplateLibrary)
-    const overrides: Record<string, number> = {};
-    for (const [ourName, seamlyName] of Object.entries(MEAS_MAPPING)) {
-      if (userMeas[ourName] != null && patternKeys.has(seamlyName)) {
-        overrides[seamlyName] = userMeas[ourName];
-      }
-    }
-
-    // Derive missing detail measurements (~10) from the basic 7. Logic
-    // lives in measurementDerivation.ts so the e2e path (TemplateLibrary)
-    // can use the same code — see file header for the why.
-    const allFormulas = Object.values(patternData.variables ?? {}).map(v => v.formula).join(' ');
+    // Derive missing detail measurements (~10) from the basic 7.
     Object.assign(overrides, deriveMeasurements({
       userMeas,
       patternDefaults,

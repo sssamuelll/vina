@@ -43,6 +43,7 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
       const { buildPiece } = await import('../../utils/construction/pieceBuilder');
       const { loadConstruction } = await import('../../store/constructionSlice');
       const { addPiece } = await import('../../store/projectSlice');
+      const { applyMeasMapping, deriveMeasurements } = await import('../../utils/seamly2d/measurementDerivation');
 
       // Load the pattern JSON via Vite glob
       const modules = import.meta.glob('../../../tools/seamly2d-converter/output/*.json') as Record<string, () => Promise<{ default: unknown }>>;
@@ -51,20 +52,51 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
       const mod = await modules[key]();
       const patternData = mod.default as import('../../utils/seamly2d/seamlyAdapter').SeamlyPattern;
 
-      // Get measurements from avatar state
+      // Build OpenClo-internal-name measurement map from avatar state. Keys
+      // match `BodyMeasurements` fields; the mapping to Seamly2D canonical
+      // names happens in `applyMeasMapping`, shared with the copilot tool path.
       const m = avatar.measurements;
-      const measurements: Record<string, number> = {
+      const userMeas: Record<string, number | undefined> = {
         chest: m.chest,
         waist: m.waist,
         hips: m.hips,
         shoulderWidth: m.shoulderWidth ?? 40,
+        shoulder: m.shoulder ?? m.shoulderWidth ?? 44,
         height: m.height,
         armLength: m.armLength ?? 60,
         inseam: m.inseam ?? 80,
+        neckCirc: m.neckCirc,
+        kneeHeight: m.kneeHeight,
+        waistHeight: m.waistHeight,
+        neckToWaistBack: m.neckToWaistBack,
+        waistToFloor: m.waistToFloor,
+        crotchLength: m.crotchLength,
+        kneeCirc: m.kneeCirc,
+        ankleCirc: m.ankleCirc,
+        wristCirc: m.wristCirc,
       };
 
-      // Adapt Seamly2D pattern
-      const adapted = adaptSeamlyPattern(patternData, measurements);
+      // Translate avatar fields → Seamly2D canonical names, then derive any
+      // detail measurements (~10) the pattern references but the user did
+      // not supply. Without this, jacket patterns (empty defaults, formulas
+      // referencing `bust_arc_f`/`indent_neck_back`/etc.) saw 73% of points
+      // collapse to (0,0). Logic shared with seamlyTools.ts via
+      // measurementDerivation.ts (#506 follow-up).
+      const patternDefaults = patternData.measurements?.defaults ?? {};
+      const patternKeys = new Set(Object.keys(patternDefaults));
+      const allFormulas = JSON.stringify(patternData.variables ?? {}) + ' ' +
+                          JSON.stringify(patternData.construction ?? []);
+      const overrides = applyMeasMapping(userMeas, patternKeys, allFormulas);
+      Object.assign(overrides, deriveMeasurements({
+        userMeas,
+        patternDefaults,
+        allFormulas,
+        patternKeys,
+        existingOverrides: overrides,
+      }));
+
+      // Adapt Seamly2D pattern with the fully-derived overrides
+      const adapted = adaptSeamlyPattern(patternData, overrides);
       dispatch(loadConstruction({
         points: adapted.points,
         lines: [],
@@ -74,7 +106,7 @@ export default function TemplateLibrary({ isOpen, onClose }: Props) {
       }));
 
       // Build each piece and add to editor
-      const formulaCtx = { measurements, variables: adapted.variables ?? {} };
+      const formulaCtx = { measurements: { ...patternDefaults, ...overrides }, variables: adapted.variables ?? {} };
       for (const cPiece of adapted.pieces) {
         const builtPiece = buildPiece(cPiece, adapted.points, adapted.curves, formulaCtx);
         if (builtPiece) {

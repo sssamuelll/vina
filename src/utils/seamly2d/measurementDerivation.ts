@@ -57,6 +57,36 @@ export const MEAS_MAPPING: Record<string, string> = {
   wristCirc: 'hand_circ', // closest match
 };
 
+/**
+ * Build the initial Seamly-name-keyed overrides from a user avatar by
+ * applying `MEAS_MAPPING`. Bridges between OpenClo internal field names
+ * and the canonical Seamly2D names referenced by pattern formulas.
+ *
+ * A measurement is added to overrides if EITHER (a) the pattern declares
+ * the canonical name in its `measurements.defaults`, OR (b) the canonical
+ * name appears anywhere in the concatenated formula strings. The second
+ * branch is what unblocks the jacket family — their patterns ship with
+ * `measurements.defaults: {}` but reference `bust_arc_f`, `indent_neck_back`,
+ * etc. in formulas. The previous version of this logic gated only on
+ * `patternKeys.has(seamlyName)`, so empty defaults → empty overrides →
+ * degenerate geometry.
+ */
+export function applyMeasMapping(
+  userMeas: Record<string, number | undefined>,
+  patternKeys: Set<string>,
+  allFormulas: string,
+): Record<string, number> {
+  const overrides: Record<string, number> = {};
+  for (const [ourName, seamlyName] of Object.entries(MEAS_MAPPING)) {
+    const userVal = userMeas[ourName];
+    if (userVal == null) continue;
+    if (patternKeys.has(seamlyName) || allFormulas.includes(seamlyName)) {
+      overrides[seamlyName] = userVal;
+    }
+  }
+  return overrides;
+}
+
 export interface DeriveOptions {
   /** Avatar measurements keyed by OpenClo internal field names (height, chest, etc.) */
   userMeas: Record<string, number | undefined>;
@@ -115,6 +145,44 @@ export function deriveMeasurements(opts: DeriveOptions): Record<string, number> 
     overrides['leg_ankle_circ'] = 23;
   if (needs('leg_ankle_high_circ') && !has('leg_ankle_high_circ'))
     overrides['leg_ankle_high_circ'] = (overrides['leg_ankle_circ'] ?? patternDefaults['leg_ankle_circ'] ?? 23) + 2;
+
+  // ─── Jacket-family detail measurements ───────────────────────────────────
+  // jacket1-6 reference these English Seamly2D names directly in their
+  // construction formulas but ship with `measurements.defaults: {}` — without
+  // these derivations, 73% of jacket construction points collapse to the
+  // origin (per v8 diagnostic). Factors below are best-fit approximations
+  // and would be refined by a pattern-engineering review; the priority here
+  // is geometric non-degeneracy, not customer-grade fit accuracy.
+  const bust = overrides['bust_circ'] ?? patternDefaults['bust_circ'] ?? userMeas.chest ?? 92;
+  // Front bust arc ≈ half of full bust circumference (symmetric assumption).
+  if (needs('bust_arc_f') && !has('bust_arc_f'))
+    overrides['bust_arc_f'] = bust * 0.5;
+  // Back bust arc — same symmetric assumption, in case any pattern references it.
+  if (needs('bust_arc_b') && !has('bust_arc_b'))
+    overrides['bust_arc_b'] = bust * 0.5;
+  // Half-waist and half-hip arcs (for FR Demitour* and RU С* translations).
+  const waist = overrides['waist_circ'] ?? patternDefaults['waist_circ'] ?? userMeas.waist ?? 74;
+  if (needs('waist_arc_f') && !has('waist_arc_f'))
+    overrides['waist_arc_f'] = waist * 0.5;
+  if (needs('waist_arc_b') && !has('waist_arc_b'))
+    overrides['waist_arc_b'] = waist * 0.5;
+  const hip = overrides['hip_circ'] ?? patternDefaults['hip_circ'] ?? userMeas.hips ?? 96;
+  if (needs('hip_arc_f') && !has('hip_arc_f'))
+    overrides['hip_arc_f'] = hip * 0.5;
+  if (needs('hip_arc_b') && !has('hip_arc_b'))
+    overrides['hip_arc_b'] = hip * 0.5;
+  // Anatomical constant ~2.4 cm; not size-dependent.
+  if (needs('indent_neck_back') && !has('indent_neck_back'))
+    overrides['indent_neck_back'] = 2.4;
+  // Mid-neck ≈ 94% of neck_circ; neck_circ already derived as 39.5% of bust above.
+  if (needs('neck_mid_circ') && !has('neck_mid_circ'))
+    overrides['neck_mid_circ'] = bust * 0.395 * 0.94;
+  // Head circumference loose fit ≈ 32.8% of height (adult).
+  if (needs('head_circ') && !has('head_circ'))
+    overrides['head_circ'] = h * 0.328;
+  // Back-of-neck height ≈ 84% of total height (shoulder line drops ~16% from top).
+  if (needs('height_neck_back') && !has('height_neck_back'))
+    overrides['height_neck_back'] = h * 0.84;
 
   return overrides;
 }
