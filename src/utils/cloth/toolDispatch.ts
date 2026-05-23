@@ -255,7 +255,12 @@ export function dispatchGrabInit(
       ];
       return {
         move(point) {
-          if (released) return false;
+          if (released) {
+            devWarn(
+              `[toolDispatch] GrabHandle.move (GPU): called after release — caller bug?`,
+            );
+            return false;
+          }
           tslSolver.setGrabUniforms(point);
           lastPoint = [point[0], point[1], point[2]];
           return true;
@@ -319,7 +324,12 @@ export function dispatchGrabInit(
       let released = false;
       return {
         move(point) {
-          if (released) return false;
+          if (released) {
+            devWarn(
+              `[toolDispatch] GrabHandle.move (WASM): called after release — caller bug?`,
+            );
+            return false;
+          }
           if (state.indices.length === 0) {
             // Defensive: handle was constructed with indices populated;
             // an empty state here means external corruption.
