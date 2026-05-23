@@ -32,6 +32,16 @@ export function buildAdjacency(triIds: Int32Array, numParticles: number): Set<nu
 
 // ─── Spatial Hash Grid ──────────────────────────────────────────────────────
 
+/**
+ * Hash multipliers — bit-exact match with Rust port
+ * (`crates/xpbd-wasm/src/lib.rs` `hash_coords`). Changing these breaks
+ * WASM↔CPU physics parity. See A4 § 2.4 + #608/#676 PR #717. Parity-pinned
+ * by the bit-exact fixture test in `__tests__/selfCollision.test.ts` (#720).
+ */
+const HASH_MUL_X = 92837111;
+const HASH_MUL_Y = 689287499;
+const HASH_MUL_Z = 283923481;
+
 /** Find a prime >= n. */
 function nextPrime(n: number): number {
   if (n <= 2) return 2;
@@ -63,7 +73,14 @@ function nextPrime(n: number): number {
  */
 export class SpatialHashGrid {
   private invCellSize: number;
-  private tableSize: number;
+  /**
+   * @internal — visible only so the bit-exact parity fixture in
+   * `__tests__/selfCollision.test.ts` (#720) can pin a deterministic
+   * `tableSize` independent of `build()`'s `nextPrime(numParticles * 2)`
+   * derivation. Production callers must NOT mutate this field; `build()`
+   * derives it from the particle count.
+   */
+  tableSize: number;
 
   // Counting-sort arrays
   private cellStart: Int32Array;
@@ -78,8 +95,13 @@ export class SpatialHashGrid {
     this.cellCount = new Int32Array(0);
   }
 
-  private hashCoords(xi: number, yi: number, zi: number): number {
-    const h = ((xi * 92837111) ^ (yi * 689287499) ^ (zi * 283923481)) % this.tableSize;
+  /**
+   * @internal — exposed (non-private) only so the bit-exact parity fixture
+   * in `__tests__/selfCollision.test.ts` (#720) can drive the kernel
+   * directly. Production callers should use `build` + `query`.
+   */
+  hashCoords(xi: number, yi: number, zi: number): number {
+    const h = ((xi * HASH_MUL_X) ^ (yi * HASH_MUL_Y) ^ (zi * HASH_MUL_Z)) % this.tableSize;
     return h < 0 ? h + this.tableSize : h;
   }
 

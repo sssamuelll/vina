@@ -8,6 +8,14 @@
 
 use wasm_bindgen::prelude::*;
 
+// Hash multipliers — bit-exact match with TS reference
+// (`src/utils/cloth/selfCollision.ts` `hashCoords`). Changing these breaks
+// WASM↔CPU physics parity. See A4 § 2.4 + #608/#676 PR #717. Parity-pinned
+// by the `hash_coords_bit_exact_with_ts_reference` test below (#720).
+const HASH_MUL_X: i32 = 92_837_111;
+const HASH_MUL_Y: i32 = 689_287_499;
+const HASH_MUL_Z: i32 = 283_923_481;
+
 /// Main XPBD cloth solver.
 #[wasm_bindgen]
 pub struct XpbdSolver {
@@ -33,8 +41,12 @@ pub struct XpbdSolver {
     // Self-collision
     self_collision: bool,
     thickness: f32,
-    adjacency_offsets: Vec<u32>,
-    adjacency_neighbors: Vec<u32>,
+    // CSR adjacency for `solve_self_collision`. `None` when never populated
+    // (defensive fallback: self-collision no-ops rather than pushing all
+    // triangle-shared pairs apart and tearing the mesh — see #717 reviewer
+    // CRITICAL #3). `Some` only via `set_adjacency` which validates the CSR
+    // shape (offsets monotonic, neighbors length matches sentinel) — #721.
+    adjacency: Option<CSRAdjacency>,
 
     // Pinned vertices
     pin_indices: Vec<u32>,
@@ -120,8 +132,7 @@ impl XpbdSolver {
             seam_compliance: Vec::new(),
             self_collision: false,
             thickness: 0.002,
-            adjacency_offsets: Vec::new(),
-            adjacency_neighbors: Vec::new(),
+            adjacency: None,
             pin_indices: Vec::new(),
             pin_positions: Vec::new(),
             original_inv_mass,
@@ -145,9 +156,11 @@ impl XpbdSolver {
             bend_edge_types: Vec::new(),
             internal_damping: 0.3,
             wind: [0.0, 0.0, 0.0],
-            // Initial cell size irrelevant — `solve_self_collision` calls
-            // `set_cell_size(2.0 * thickness)` before each rebuild.
-            spatial_hash: SpatialHashGrid::new(1.0),
+            // `cell_size` is now supplied per-build inside
+            // `solve_self_collision` (`2.0 * thickness`); the empty grid
+            // starts with sentinel `inv_cell_size = 1.0` that gets
+            // overwritten on the first build.
+            spatial_hash: SpatialHashGrid::new(),
             collision_scratch: Vec::new(),
         }
     }
@@ -243,15 +256,28 @@ impl XpbdSolver {
     /// - `offsets   = [0, 2, 4, 6]`
     /// - `neighbors = [1, 2, 0, 2, 0, 1]`
     ///
+    /// # Validation (#721)
+    ///
+    /// Validates the CSR shape via `CSRAdjacency::new` before storing.
+    /// Returns `Err` (surfaces as a JS exception via wasm-bindgen) with a
+    /// human-readable diagnostic if the shape is malformed; worker should
+    /// catch and log, then continue stepping with self-collision disabled
+    /// (the existing `Option::None` guard in `solve_self_collision` makes
+    /// this a no-op rather than tearing the mesh — same fail-loud-by-no-op
+    /// shape as the empty-offsets path from #717).
+    ///
     /// # Empty CSR
     ///
-    /// Calling with empty `offsets` is treated as a no-op by
-    /// `solve_self_collision` (defensive fallback — preferable to running
-    /// with broken physics). New callers should populate the CSR before
-    /// enabling self-collision.
-    pub fn set_adjacency(&mut self, offsets: &[u32], neighbors: &[u32]) {
-        self.adjacency_offsets = offsets.to_vec();
-        self.adjacency_neighbors = neighbors.to_vec();
+    /// Calling with empty `offsets` (length 0) is also rejected — the CSR
+    /// invariant requires at least the sentinel entry. Worker happy-path
+    /// produces `offsets[num_particles + 1]` so this is never hit in normal
+    /// flow. Internal test fixtures use `[0; num_particles + 1]` to express
+    /// "no neighbors for any particle".
+    pub fn set_adjacency(&mut self, offsets: &[u32], neighbors: &[u32]) -> Result<(), String> {
+        let adj = CSRAdjacency::new(offsets.to_vec(), neighbors.to_vec())
+            .map_err(|e| e.to_string())?;
+        self.adjacency = Some(adj);
+        Ok(())
     }
 
     /// Set pinned vertices with target positions.
@@ -668,19 +694,24 @@ impl XpbdSolver {
         // Early return is preferable to running self-collision against an
         // empty adjacency: every connected pair would be treated as
         // non-adjacent and pushed apart, tearing the mesh along every
-        // shared edge.
-        if self.adjacency_offsets.is_empty() {
+        // shared edge. #721: `Option::None` now models the never-populated
+        // state (was `.is_empty()` against a pair of parallel Vecs).
+        if self.adjacency.is_none() {
             return;
         }
         debug_assert_eq!(
-            self.adjacency_offsets.len(),
-            self.num_particles + 1,
-            "CSR offsets must have num_particles + 1 entries (sentinel at end)"
+            self.positions.len(),
+            self.num_particles * 3,
+            "positions length must equal num_particles * 3 (x, y, z per particle)"
+        );
+        debug_assert_eq!(
+            self.inv_mass.len(),
+            self.num_particles,
+            "inv_mass length must equal num_particles"
         );
 
-        let cell_size = 2.0 * self.thickness;
-        self.spatial_hash.set_cell_size(cell_size);
-        self.spatial_hash.build(&self.positions, self.num_particles);
+        self.spatial_hash
+            .build(&self.positions, self.num_particles, 2.0 * self.thickness);
 
         let thickness = self.thickness;
         let thickness_sq = thickness * thickness;
@@ -694,20 +725,6 @@ impl XpbdSolver {
             let py = self.positions[ix + 1];
             let pz = self.positions[ix + 2];
 
-            // Adjacency CSR slice for particle i. Empty range if
-            // `set_adjacency` was never called (offsets stays empty)
-            // or if particle i has no triangle-shared neighbors.
-            let adj_start = self
-                .adjacency_offsets
-                .get(i)
-                .copied()
-                .unwrap_or(0) as usize;
-            let adj_end = self
-                .adjacency_offsets
-                .get(i + 1)
-                .copied()
-                .unwrap_or(adj_start as u32) as usize;
-
             // Gather candidates via spatial hash. Disjoint-field borrow:
             // `&mut self.collision_scratch` and `&self.spatial_hash` are
             // independent fields — borrow checker accepts.
@@ -716,6 +733,18 @@ impl XpbdSolver {
                 let scratch = &mut self.collision_scratch;
                 self.spatial_hash.query(px, py, pz, |j| scratch.push(j));
             }
+
+            // Snapshot the adjacency slice for particle `i` as a `Vec<u32>`
+            // copy. Avoids holding a `&CSRAdjacency` borrow across the
+            // inner loop's `self.positions[ix] += ...` mutation (would
+            // alias the same `&mut self`). Per-particle slice is 4-6
+            // entries on a triangle mesh; allocation is amortised.
+            let adj_neighbors: Vec<u32> = self
+                .adjacency
+                .as_ref()
+                .expect("adjacency: None case returned at top of function")
+                .neighbors_of(i)
+                .to_vec();
 
             for k in 0..self.collision_scratch.len() {
                 let j = self.collision_scratch[k];
@@ -729,8 +758,8 @@ impl XpbdSolver {
                 // Adjacency skip (linear scan; per-particle CSR slice is
                 // typically 4-6 entries for a triangle mesh).
                 let mut is_adjacent = false;
-                for slot in adj_start..adj_end {
-                    if self.adjacency_neighbors[slot] as usize == j {
+                for &neighbor in &adj_neighbors {
+                    if neighbor as usize == j {
                         is_adjacent = true;
                         break;
                     }
@@ -1016,6 +1045,81 @@ impl XpbdSolver {
     }
 }
 
+// ─── CSR adjacency (self-collision) ─────────────────────────────────────────
+//
+// Compressed Sparse Row representation of per-particle triangle-shared
+// neighbours, consumed by `solve_self_collision`. Introduced in #721 to
+// replace the pair of parallel `Vec<u32>` fields (`adjacency_offsets`,
+// `adjacency_neighbors`) with a typed value that *cannot* be constructed
+// with a malformed shape: `CSRAdjacency::new` validates the invariants at
+// construction time (offsets non-empty, monotonic non-decreasing, neighbors
+// length matches the CSR sentinel) so every downstream consumer can rely on
+// `neighbors_of(i)` returning a well-formed slice without re-checking.
+//
+// Cross-ref: `set_adjacency` (XpbdSolver public API) for the JS-side
+// validation contract — invalid input surfaces as a JS exception rather
+// than silently corrupting the next `solve_self_collision` call.
+
+/// CSR (Compressed Sparse Row) representation of per-particle
+/// triangle-shared neighbours.
+///
+/// # Invariants
+///
+/// - `offsets.len() >= 1` (CSR sentinel at the end requires this).
+/// - `offsets` is monotonic non-decreasing.
+/// - `neighbors.len() == *offsets.last().unwrap()` (sentinel matches).
+///
+/// All three are checked by `CSRAdjacency::new`; downstream consumers (e.g.
+/// `neighbors_of`) rely on them.
+#[derive(Debug)]
+pub struct CSRAdjacency {
+    offsets: Vec<u32>,
+    neighbors: Vec<u32>,
+}
+
+impl CSRAdjacency {
+    /// Construct a validated CSR. Returns `Err` with a diagnostic string if
+    /// the input shape is malformed. The same error string is surfaced to
+    /// JS via `XpbdSolver::set_adjacency` (wasm-bindgen `Result<(), String>`
+    /// → JS exception); worker callsite catches and logs.
+    pub fn new(offsets: Vec<u32>, neighbors: Vec<u32>) -> Result<Self, &'static str> {
+        if offsets.is_empty() {
+            return Err("CSRAdjacency: offsets must have at least one entry (CSR sentinel)");
+        }
+        let total = *offsets.last().expect("non-empty checked above") as usize;
+        if neighbors.len() != total {
+            return Err("CSRAdjacency: neighbors.len() must equal offsets[last] (CSR sentinel mismatch)");
+        }
+        for window in offsets.windows(2) {
+            if window[0] > window[1] {
+                return Err("CSRAdjacency: offsets must be monotonic non-decreasing");
+            }
+        }
+        Ok(Self { offsets, neighbors })
+    }
+
+    /// Number of particles indexed (CSR has one offset slot per particle
+    /// plus the sentinel).
+    pub fn num_particles(&self) -> usize {
+        self.offsets.len() - 1
+    }
+
+    /// Slice of triangle-shared neighbours for particle `i`. Empty when
+    /// particle `i` has no neighbours (e.g. isolated vertex). Panics if `i`
+    /// is out of range (caller should respect `num_particles()`).
+    pub fn neighbors_of(&self, particle: usize) -> &[u32] {
+        let start = self.offsets[particle] as usize;
+        let end = self.offsets[particle + 1] as usize;
+        &self.neighbors[start..end]
+    }
+
+    /// `true` when no particle has any triangle-shared neighbour. Distinct
+    /// from "never populated" (which is `Option::None` on the solver field).
+    pub fn is_empty(&self) -> bool {
+        self.neighbors.is_empty()
+    }
+}
+
 // ─── Spatial Hash Grid (self-collision) ─────────────────────────────────────
 //
 // Counting-sort flat hash for particle-vs-particle collision detection
@@ -1069,10 +1173,21 @@ pub struct SpatialHashGrid {
     cell_count: Vec<i32>,
 }
 
+impl Default for SpatialHashGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpatialHashGrid {
-    pub fn new(cell_size: f32) -> Self {
+    /// Construct an empty grid. `cell_size` is supplied to `build()` so the
+    /// invariant "inv_cell_size matches the positions just hashed" is enforced
+    /// by the call shape (was previously a separate `set_cell_size` step the
+    /// caller had to remember between every rebuild). Initial sentinel uses
+    /// `inv_cell_size = 1.0`; the value is overwritten on the first `build`.
+    pub fn new() -> Self {
         Self {
-            inv_cell_size: 1.0 / cell_size,
+            inv_cell_size: 1.0,
             table_size: 1,
             cell_start: Vec::new(),
             cell_entries: Vec::new(),
@@ -1080,10 +1195,14 @@ impl SpatialHashGrid {
         }
     }
 
-    /// Update the cell size in place. Cheap — just refreshes the inverse.
-    /// Caller must `build` again before the next query (positions index changes).
-    pub fn set_cell_size(&mut self, cell_size: f32) {
-        self.inv_cell_size = 1.0 / cell_size;
+    /// Test-only setter: pin `table_size` to a deterministic value so the
+    /// `hash_coords` bit-exact parity fixture (#720) can assert identical
+    /// outputs against the TS reference without depending on `next_prime`
+    /// behaviour. Production builds use `build()` to derive `table_size`
+    /// from particle count.
+    #[cfg(test)]
+    fn set_table_size_for_test(&mut self, n: usize) {
+        self.table_size = n;
     }
 
     /// Hash three integer cell coords. TS reference:
@@ -1109,9 +1228,9 @@ impl SpatialHashGrid {
              for bit-exact JS parity. Got xi={xi}, yi={yi}, zi={zi}. \
              Likely a mesh-scale bug (positions in mm vs m?)."
         );
-        let a = xi.wrapping_mul(92_837_111);
-        let b = yi.wrapping_mul(689_287_499);
-        let c = zi.wrapping_mul(283_923_481);
+        let a = xi.wrapping_mul(HASH_MUL_X);
+        let b = yi.wrapping_mul(HASH_MUL_Y);
+        let c = zi.wrapping_mul(HASH_MUL_Z);
         let mixed = a ^ b ^ c;
         let table = self.table_size as i32;
         let h = mixed % table;
@@ -1124,7 +1243,18 @@ impl SpatialHashGrid {
     }
 
     /// Rebuild the hash from current positions. O(n).
-    pub fn build(&mut self, positions: &[f32], num_particles: usize) {
+    ///
+    /// `cell_size` is consumed here (was previously a separate
+    /// `set_cell_size` step) so the inverse-cell-size used to bucket
+    /// positions can never drift from the value the caller intended. Use
+    /// `2.0 * thickness` for `solve_self_collision`'s overlap radius.
+    pub fn build(&mut self, positions: &[f32], num_particles: usize, cell_size: f32) {
+        debug_assert_eq!(
+            positions.len(),
+            num_particles * 3,
+            "positions length must equal num_particles * 3 (x, y, z per particle)"
+        );
+        self.inv_cell_size = 1.0 / cell_size;
         self.table_size = next_prime(num_particles * 2);
 
         if self.cell_count.len() < self.table_size {
@@ -1266,9 +1396,9 @@ mod tests {
     /// contract as the TS reference, which only asserts `.toContain`.)
     #[test]
     fn spatial_hash_query_finds_same_cell_neighbors() {
-        let mut grid = SpatialHashGrid::new(1.0);
+        let mut grid = SpatialHashGrid::new();
         let positions = [0.1, 0.1, 0.1, 0.2, 0.2, 0.2];
-        grid.build(&positions, 2);
+        grid.build(&positions, 2, 1.0);
 
         let mut neighbors: Vec<usize> = Vec::new();
         grid.query(0.1, 0.1, 0.1, |i| neighbors.push(i));
@@ -1279,10 +1409,10 @@ mod tests {
 
     #[test]
     fn spatial_hash_query_finds_adjacent_cell_neighbors() {
-        let mut grid = SpatialHashGrid::new(1.0);
+        let mut grid = SpatialHashGrid::new();
         // Particles in adjacent cells (within the 3³ neighborhood).
         let positions = [0.5, 0.5, 0.5, 1.5, 0.5, 0.5];
-        grid.build(&positions, 2);
+        grid.build(&positions, 2, 1.0);
 
         let mut neighbors: Vec<usize> = Vec::new();
         grid.query(0.5, 0.5, 0.5, |i| neighbors.push(i));
@@ -1298,7 +1428,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "hash_coords precondition violated")]
     fn hash_coords_asserts_coord_magnitude() {
-        let grid = SpatialHashGrid::new(1.0);
+        let grid = SpatialHashGrid::new();
         grid.hash_coords(1 << 26, 0, 0);
     }
 
@@ -1326,7 +1456,7 @@ mod tests {
         let mut solver = XpbdSolver::new(&positions, &inv_mass);
         configure_self_collision(&mut solver, 0.1);
         // Empty CSR (numParticles+1 zero offsets) → no adjacency skip.
-        solver.set_adjacency(&[0, 0, 0], &[]);
+        solver.set_adjacency(&[0, 0, 0], &[]).expect("valid CSR");
 
         solver.solve_self_collision();
 
@@ -1353,7 +1483,7 @@ mod tests {
         // other two. CSR offsets length = numParticles + 1.
         let offsets: Vec<u32> = vec![0, 2, 4, 6];
         let neighbors: Vec<u32> = vec![1, 2, 0, 2, 0, 1];
-        solver.set_adjacency(&offsets, &neighbors);
+        solver.set_adjacency(&offsets, &neighbors).expect("valid CSR");
 
         let pos_before = solver.positions.clone();
         solver.solve_self_collision();
@@ -1378,7 +1508,7 @@ mod tests {
         let inv_mass = vec![1.0, 0.0, 1.0];
         let mut solver = XpbdSolver::new(&positions, &inv_mass);
         configure_self_collision(&mut solver, 0.1);
-        solver.set_adjacency(&[0, 0, 0, 0], &[]);
+        solver.set_adjacency(&[0, 0, 0, 0], &[]).expect("valid CSR");
 
         solver.solve_self_collision();
 
@@ -1413,7 +1543,7 @@ mod tests {
         // Empty CSR slice (2 particles → offsets length 3) — adjacency check
         // is a no-op range, every candidate falls through to the distance
         // filter where the NaN guard must catch the corruption.
-        solver.set_adjacency(&[0, 0, 0], &[]);
+        solver.set_adjacency(&[0, 0, 0], &[]).expect("valid CSR");
 
         // Must not panic.
         solver.solve_self_collision();
@@ -1429,15 +1559,17 @@ mod tests {
     /// but a future re-init reordering / hot-swap / test harness bug could
     /// leave the CSR empty. Without the guard, every triangle-shared
     /// neighbor would be treated as non-adjacent and pushed apart, tearing
-    /// the mesh along every shared edge. Fail-loud-by-no-op.
+    /// the mesh along every shared edge. Fail-loud-by-no-op. #721: the
+    /// guard is now `self.adjacency.is_none()` (was `.is_empty()` on the
+    /// legacy parallel `Vec<u32>` fields).
     #[test]
     fn solve_self_collision_no_op_on_empty_csr() {
         let positions = vec![0.0, 0.0, 0.0, 0.05, 0.0, 0.0];
         let inv_mass = vec![1.0, 1.0];
         let mut solver = XpbdSolver::new(&positions, &inv_mass);
         configure_self_collision(&mut solver, 0.1);
-        // Deliberately do NOT call `set_adjacency` — `adjacency_offsets`
-        // stays empty.
+        // Deliberately do NOT call `set_adjacency` — `self.adjacency`
+        // stays `None`.
 
         let pos_before = solver.positions.clone();
         solver.solve_self_collision();
@@ -1513,5 +1645,123 @@ mod tests {
             s.bend_compliances.iter().all(|&c| (c - 0.25).abs() < 1e-9),
             "configure() must regenerate bend_compliances cache from new warp value"
         );
+    }
+
+    // ─── CSRAdjacency validation (#721) ─────────────────────────────────
+
+    /// CSR with the canonical 3-particle triangle (every particle shares
+    /// with the other two) constructs cleanly and `neighbors_of` returns
+    /// the right per-particle slices.
+    #[test]
+    fn csr_adjacency_accepts_valid_triangle() {
+        let adj = CSRAdjacency::new(vec![0, 2, 4, 6], vec![1, 2, 0, 2, 0, 1])
+            .expect("triangle CSR is well-formed");
+        assert_eq!(adj.num_particles(), 3);
+        assert_eq!(adj.neighbors_of(0), &[1, 2]);
+        assert_eq!(adj.neighbors_of(1), &[0, 2]);
+        assert_eq!(adj.neighbors_of(2), &[0, 1]);
+        assert!(!adj.is_empty());
+    }
+
+    /// CSR with only the sentinel offset (no neighbours for any particle)
+    /// is the canonical "0-particle / no-adjacency" shape and must
+    /// construct. `is_empty` returns `true`.
+    #[test]
+    fn csr_adjacency_accepts_sentinel_only() {
+        let adj = CSRAdjacency::new(vec![0], vec![])
+            .expect("sentinel-only CSR is well-formed");
+        assert_eq!(adj.num_particles(), 0);
+        assert!(adj.is_empty());
+    }
+
+    /// Per-particle empty slices are allowed (isolated vertex case).
+    #[test]
+    fn csr_adjacency_allows_isolated_particles() {
+        // 3 particles, particle 1 has no neighbours.
+        let adj = CSRAdjacency::new(vec![0, 1, 1, 2], vec![2, 0])
+            .expect("CSR with one isolated particle is well-formed");
+        assert_eq!(adj.neighbors_of(0), &[2]);
+        assert_eq!(adj.neighbors_of(1), &[] as &[u32]);
+        assert_eq!(adj.neighbors_of(2), &[0]);
+    }
+
+    /// Empty offsets is rejected (no sentinel entry).
+    #[test]
+    fn csr_adjacency_rejects_empty_offsets() {
+        let err = CSRAdjacency::new(vec![], vec![]).expect_err("empty offsets must be rejected");
+        assert!(err.contains("at least one entry"), "got: {err}");
+    }
+
+    /// Neighbour length mismatch with the CSR sentinel is rejected.
+    #[test]
+    fn csr_adjacency_rejects_sentinel_mismatch() {
+        let err = CSRAdjacency::new(vec![0, 2], vec![1, 2, 3])
+            .expect_err("sentinel mismatch must be rejected");
+        assert!(err.contains("sentinel mismatch"), "got: {err}");
+    }
+
+    /// Non-monotonic offsets are rejected.
+    #[test]
+    fn csr_adjacency_rejects_non_monotonic_offsets() {
+        let err = CSRAdjacency::new(vec![0, 2, 1, 6], vec![0, 0, 0, 0, 0, 0])
+            .expect_err("non-monotonic offsets must be rejected");
+        assert!(err.contains("monotonic"), "got: {err}");
+    }
+
+    /// Solver's `set_adjacency` forwards validation errors as a `Result`
+    /// (surfaces as a JS exception via wasm-bindgen at the boundary).
+    #[test]
+    fn set_adjacency_propagates_csr_validation_error() {
+        let mut solver = XpbdSolver::new(&[0.0; 6], &[1.0, 1.0]);
+        let err = solver
+            .set_adjacency(&[0, 2], &[1, 2, 3])
+            .expect_err("bad CSR must surface as Err");
+        assert!(err.contains("sentinel mismatch"), "got: {err}");
+        // Solver-side adjacency remains None on failure → solve_self_collision no-ops.
+        assert!(solver.adjacency.is_none());
+    }
+
+    /// Bit-exact parity fixture (#720). `hash_coords` is the single arithmetic
+    /// surface that has to match the TS reference (`selfCollision.ts` —
+    /// `hashCoords`) byte-for-byte across language boundaries — otherwise
+    /// WASM and CPU tiers route particles to different cells and silently
+    /// diverge in self-collision detection.
+    ///
+    /// The TS half of this fixture lives in
+    /// `src/utils/cloth/__tests__/selfCollision.test.ts` (`hashCoords
+    /// bit-exact reference`). The 8 cases below MUST match value-for-value;
+    /// any change in one half requires updating the other.
+    ///
+    /// Cases pinned: identity, unit basis (x/y/z), all-negative-1, typical
+    /// realistic cell, wrap-zone exercise (1_000_000 → wrapping_mul kicks
+    /// in but stays under the `|coord| < 2^25` JS parity bound), and a
+    /// large-negative-coords case.
+    #[test]
+    fn hash_coords_bit_exact_with_ts_reference() {
+        let mut grid = SpatialHashGrid::new();
+        grid.set_table_size_for_test(10007);
+        // (xi, yi, zi, expected_hash). Keep in sync with the TS fixture in
+        // `src/utils/cloth/__tests__/selfCollision.test.ts`.
+        let cases: [(i32, i32, i32, usize); 8] = [
+            (0, 0, 0, 0),
+            (1, 0, 0, 2172),
+            (0, 1, 0, 5339),
+            (0, 0, 1, 4877),
+            (-1, -1, -1, 1731),
+            (100, 200, 300, 2436),
+            (1_000_000, 0, 0, 2616),
+            (-1000, -2000, -3000, 8204),
+        ];
+        for (xi, yi, zi, expected) in cases {
+            let actual = grid.hash_coords(xi, yi, zi);
+            assert_eq!(
+                actual, expected,
+                "hash_coords({xi}, {yi}, {zi}) bit-exact parity broke: \
+                 got {actual}, expected {expected}. \
+                 If you changed HASH_MUL_X/Y/Z or the hashing formula, you \
+                 must update the TS fixture in selfCollision.test.ts AND \
+                 this Rust fixture in lockstep — they pin WASM↔CPU parity."
+            );
+        }
     }
 }
