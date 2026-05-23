@@ -67,11 +67,14 @@ export interface SolverCapabilities {
    * checks before dispatch; UI surface (`SimulationStatusOverlay`)
    * communicates absence to user.
    *
-   * Per C4 RFC § 3.1.A ratification.
+   * Per C4 RFC § 3.1.A ratification. Per C4 follow-up #701 the field is
+   * **required** (no `?`): every tier must declare its tool surface
+   * explicitly to prevent silent omission when a new tier constant is
+   * added.
    *
    * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md
    */
-  tools?: {
+  tools: {
     /** Steam brush (relax cloth via velocity damping). */
     steamBrush: boolean;
     /** Mesh grab (drag cloth via positional displacement). */
