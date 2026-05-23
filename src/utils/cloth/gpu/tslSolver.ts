@@ -115,6 +115,28 @@ export interface TslSolver {
   brushNodes: BrushComputeNodes;
   /** Mesh grab position displacement compute nodes (always created; grabActive=0 is a no-op) */
   grabNodes: GrabComputeNodes;
+  /**
+   * Update the TSL grab uniforms (`grabNodes.*`) without reaching into the
+   * raw `{value: number}` proxies. Per C4 follow-up #703 — encapsulates the
+   * uniform write shape so `toolDispatch.ts` doesn't depend on the per-uniform
+   * layout (`.grabNodes.<field>.value`). Refactors of the TSL grab kernel
+   * (e.g., bundling fields into a UBO struct) only need to update this method.
+   *
+   * - `point`: world-space grab center. Always written.
+   * - `opts.radius` / `opts.strength`: optional. Skip = preserve previous value
+   *   (move dispatches only push the center, leaving radius/strength alone).
+   * - `opts.active` / `opts.initPending`: `0 | 1` flags. Skip = preserve
+   *   previous value (init writes both `=1`; release writes `active=0`).
+   */
+  setGrabUniforms(
+    point: [number, number, number],
+    opts?: {
+      radius?: number;
+      strength?: number;
+      active?: 0 | 1;
+      initPending?: 0 | 1;
+    },
+  ): void;
   /** Active collision bodies (BVH-accelerated) */
   collisionBodies: TslCollisionBody[];
   /**
@@ -696,6 +718,29 @@ export function createTslSolver(
   const grabNodes = makeGrabComputeNode(posBuf, invMassBuf, grabMaskBuf, grabOffsetBuf, N);
   grabNodes.grabNumSubsteps.value = config.substeps;
 
+  /**
+   * Update grab uniforms in one call (C4 follow-up #703). Encapsulates the
+   * `.grabNodes.<field>.value` write shape so consumers don't depend on the
+   * per-uniform layout. See interface JSDoc for the partial-update semantics.
+   */
+  function setGrabUniforms(
+    point: [number, number, number],
+    opts?: {
+      radius?: number;
+      strength?: number;
+      active?: 0 | 1;
+      initPending?: 0 | 1;
+    },
+  ): void {
+    grabNodes.grabCenterX.value = point[0];
+    grabNodes.grabCenterY.value = point[1];
+    grabNodes.grabCenterZ.value = point[2];
+    if (opts?.radius !== undefined) grabNodes.grabRadius.value = opts.radius;
+    if (opts?.strength !== undefined) grabNodes.grabStrength.value = opts.strength;
+    if (opts?.active !== undefined) grabNodes.grabActive.value = opts.active;
+    if (opts?.initPending !== undefined) grabNodes.grabInitPending.value = opts.initPending;
+  }
+
   // ─── Config updater ────────────────────────────────────────────────
   function updateConfig(partial: Partial<TslSolverConfig>): void {
     if (partial.dt !== undefined || partial.substeps !== undefined) {
@@ -775,6 +820,7 @@ export function createTslSolver(
     windNodes,
     brushNodes,
     grabNodes,
+    setGrabUniforms,
     collisionBodies,
     setCollisionBody,
     removeCollisionBody,

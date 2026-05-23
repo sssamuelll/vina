@@ -46,9 +46,8 @@ import {
   dispatchBrushStroke,
   dispatchBrushClear,
   dispatchGrabInit,
-  dispatchGrabMove,
-  dispatchGrabRelease,
-  type GrabState,
+  type ClothToolTiers,
+  type GrabHandle,
 } from '../../utils/cloth/toolDispatch';
 
 const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
@@ -136,15 +135,12 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const meshRef = useRef<THREE.Mesh>(null);
   const brushDragging = useRef(false);
   const brushCursorRef = useRef<THREE.Mesh>(null);
-  const grabDragging = useRef(false);
   const grabCursorRef = useRef<THREE.Mesh>(null);
-  // Mesh grab state shared with toolDispatch helper (WASM tier needs indices +
-  // base positions + start point for delta-based positional pin updates).
-  const grabStateRef = useRef<GrabState>({
-    indices: [],
-    basePositions: null,
-    startPoint: [0, 0, 0],
-  });
+  // Mesh grab handle (C4 follow-up #702): `dispatchGrabInit` returns a typed
+  // handle whose `.move`/`.release` methods close over the per-grab tier +
+  // state. Active iff `current != null`; replaces the previous shared
+  // `GrabState` ref + boolean `grabDragging` pair.
+  const grabHandleRef = useRef<GrabHandle | null>(null);
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
@@ -798,8 +794,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   //
   // Tool dispatch consolidated to `src/utils/cloth/toolDispatch.ts` per C4
   // RFC § 3.1.A. Helper internalizes per-tier semantic divergence:
-  // - GPU (TSL): writes uniforms to `tslSolverRef.brushNodes` /
-  //   `.grabNodes` (zero-copy hot path).
+  // - GPU (TSL): writes uniforms via `tslSolver.setGrabUniforms()` /
+  //   `gpuClient.setBrushParams()` (zero-copy hot path).
   // - WASM: mesh grab via `setPins` (positional pin shape; CRITICAL
   //   caveat per A6 RFC Q2 — see solverProtocol.ts JSDoc).
   // - CPU + Neural: silent no-op. Capability flags
@@ -810,33 +806,51 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // dispatch (onDown/onMove) for TSL geometry-sync workaround — both
   // routes call the same helper; underlying duplication captured as
   // separate rendering eje (C4 RFC § 6.5).
+  //
+  // Per C4 follow-up #701, `ClothToolTiers` is a discriminated union over
+  // `kind`. `makeTiers` snapshots the per-frame refs into the canonical
+  // tagged variant. GPU wins when both GPU + WASM are present (preserves
+  // prior tier precedence; see toolDispatch tests).
+
+  const makeTiers = useCallback((): ClothToolTiers => {
+    const gpu = clientsRef.current.gpu;
+    const tslSolver = tslSolverRef.current;
+    if (gpu && tslSolver) {
+      return { kind: 'gpu', gpu, tslSolver };
+    }
+    const wasm = clientsRef.current.wasm;
+    const positions = positionsRef.current;
+    if (wasm && positions) {
+      return { kind: 'wasm', wasm, positions };
+    }
+    return { kind: 'none' };
+  }, [positionsRef, tslSolverRef]);
 
   const handleBrushStroke = useCallback((point: THREE.Vector3) => {
     dispatchBrushStroke(
       { point: [point.x, point.y, point.z], radius: steamBrush.radius, strength: steamBrush.strength },
-      { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
+      makeTiers(),
     );
-  }, [steamBrush.radius, steamBrush.strength, tslSolverRef, positionsRef]);
+  }, [steamBrush.radius, steamBrush.strength, makeTiers]);
 
   const handlePointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     // Skip if manual raycaster already started interaction (TSL mode)
-    if (grabDragging.current || brushDragging.current) return;
+    if (grabHandleRef.current || brushDragging.current) return;
     if (activeTool3D === 'steamBrush') {
       e.stopPropagation();
       brushDragging.current = true;
       handleBrushStroke(e.point);
     } else if (activeTool3D === 'meshGrab') {
       e.stopPropagation();
-      // Only mark dragging when init actually landed on a tier — prevents
-      // "stuck dragging" state if no tier supports grab (CPU/Neural) or
-      // no particle falls within radius (WASM empty hit).
-      grabDragging.current = dispatchGrabInit(
+      // Handle is null when no tier accepted init (CPU/Neural, or WASM
+      // with zero particles in radius). Caller observability comes from
+      // toolDispatch's dev-mode console.warn (#704, #706).
+      grabHandleRef.current = dispatchGrabInit(
         { point: [e.point.x, e.point.y, e.point.z], radius: meshGrab.radius, strength: meshGrab.strength },
-        { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
-        grabStateRef.current,
+        makeTiers(),
       );
     }
-  }, [activeTool3D, handleBrushStroke, meshGrab.radius, meshGrab.strength, positionsRef, tslSolverRef]);
+  }, [activeTool3D, handleBrushStroke, meshGrab.radius, meshGrab.strength, makeTiers]);
 
   const handlePointerMove = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (activeTool3D === 'steamBrush') {
@@ -852,50 +866,45 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         grabCursorRef.current.position.copy(e.point);
         grabCursorRef.current.visible = true;
       }
-      if (!grabDragging.current) return;
+      const handle = grabHandleRef.current;
+      if (!handle) return;
       e.stopPropagation();
-      dispatchGrabMove(
-        { point: [e.point.x, e.point.y, e.point.z] },
-        { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
-        grabStateRef.current,
-      );
+      handle.move([e.point.x, e.point.y, e.point.z]);
     }
-  }, [activeTool3D, handleBrushStroke, positionsRef, tslSolverRef]);
+  }, [activeTool3D, handleBrushStroke]);
 
   const releaseGrab = useCallback(() => {
-    if (!grabDragging.current) return;
-    grabDragging.current = false;
-    dispatchGrabRelease(
-      { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
-      grabStateRef.current,
-    );
-  }, [positionsRef, tslSolverRef]);
+    const handle = grabHandleRef.current;
+    if (!handle) return;
+    grabHandleRef.current = null;
+    handle.release();
+  }, []);
 
   const handlePointerUp = useCallback(() => {
     brushDragging.current = false;
-    dispatchBrushClear({ gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current });
+    dispatchBrushClear(makeTiers());
     releaseGrab();
-  }, [releaseGrab, positionsRef, tslSolverRef]);
+  }, [releaseGrab, makeTiers]);
 
   const handlePointerLeave = useCallback(() => {
     if (brushCursorRef.current) brushCursorRef.current.visible = false;
     if (grabCursorRef.current) grabCursorRef.current.visible = false;
     if (!brushDragging.current) {
-      dispatchBrushClear({ gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current });
+      dispatchBrushClear(makeTiers());
     }
     releaseGrab();
-  }, [releaseGrab, positionsRef, tslSolverRef]);
+  }, [releaseGrab, makeTiers]);
 
   // Global pointerup to handle drag release outside mesh
   useEffect(() => {
     const handleGlobalUp = () => {
       brushDragging.current = false;
-      dispatchBrushClear({ gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current });
+      dispatchBrushClear(makeTiers());
       releaseGrab();
     };
     window.addEventListener('pointerup', handleGlobalUp);
     return () => window.removeEventListener('pointerup', handleGlobalUp);
-  }, [releaseGrab, positionsRef, tslSolverRef]);
+  }, [releaseGrab, makeTiers]);
 
   // ─── Manual raycasting for TSL mode ───────────────────────────────────────
   // R3F pointer events (onPointerMove/Down) depend on Three.js raycasting which
@@ -949,29 +958,24 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       if (hit) {
         if (activeTool3D === 'steamBrush' && brushDragging.current) {
           handleBrushStroke(hit);
-        } else if (activeTool3D === 'meshGrab' && grabDragging.current) {
-          dispatchGrabMove(
-            { point: [hit.x, hit.y, hit.z] },
-            { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
-            grabStateRef.current,
-          );
+        } else if (activeTool3D === 'meshGrab' && grabHandleRef.current) {
+          grabHandleRef.current.move([hit.x, hit.y, hit.z]);
         }
       }
     };
 
     const onDown = (e: PointerEvent) => {
-      if (grabDragging.current || brushDragging.current) return; // already active
+      if (grabHandleRef.current || brushDragging.current) return; // already active
       const hit = doRaycast(e);
       if (!hit) return;
       if (activeTool3D === 'steamBrush') {
         brushDragging.current = true;
         handleBrushStroke(hit);
       } else if (activeTool3D === 'meshGrab') {
-        // Capture return: only mark dragging if a tier accepted the init.
-        grabDragging.current = dispatchGrabInit(
+        // Handle is null when no tier accepted init.
+        grabHandleRef.current = dispatchGrabInit(
           { point: [hit.x, hit.y, hit.z], radius: meshGrab.radius, strength: meshGrab.strength },
-          { gpu: clientsRef.current.gpu, wasm: clientsRef.current.wasm, tslSolver: tslSolverRef.current, positions: positionsRef.current },
-          grabStateRef.current,
+          makeTiers(),
         );
       }
     };
@@ -982,7 +986,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       canvas.removeEventListener('pointermove', onMove);
       canvas.removeEventListener('pointerdown', onDown);
     };
-  }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, positionsRef, tslSolverRef]);
+  }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, makeTiers]);
 
   if (!staticGeometry) return null;
 

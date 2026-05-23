@@ -7,16 +7,45 @@
  *
  * **Tier coverage:**
  * - GPU (TSL): full surface. Steam brush via `setBrushParams` + TSL
- *   `brushNodes` kernel; mesh grab via `tslSolverRef.grabNodes.*` uniforms.
+ *   `brushNodes` kernel; mesh grab via `tslSolverRef.setGrabUniforms()`
+ *   (which writes the TSL `grabNodes.*` uniforms internally).
  * - WASM: mesh grab only (via `setPins` with positional pin shape).
  * - CPU + Neural: no tool dispatch (capability flag protects consumer
  *   intent; `SimulationStatusOverlay` warning communicates absence).
  *
  * **Pin position semantics caveat (per A6 RFC Q2):** WASM `setPins` uses
  * positional pin (`position` field is the target coordinate the particle
- * is moved to). This helper passes `base + delta` positions — consumer
- * MUST keep `state.basePositions` and `state.startPoint` in sync via
- * `dispatchGrabInit` before calling `dispatchGrabMove`.
+ * is moved to). The `GrabHandle` returned by `dispatchGrabInit` captures
+ * `basePositions` + `startPoint` in closure; `handle.move(point)` computes
+ * `base + delta` per-particle and pushes the resulting pin positions.
+ *
+ * ## Type-design follow-ups (#701, #702, #703)
+ *
+ * - **#701 — `ClothToolTiers` is a discriminated union over `kind`.**
+ *   The previous 4-nullable bag (`{ gpu, wasm, tslSolver, positions }`)
+ *   allowed invalid combinations (e.g., `wasm` set + `positions` null).
+ *   The new shape forces the consumer to commit to one tier at construction
+ *   time; helpers `switch` on `kind` and rely on the variant's non-null
+ *   fields without runtime null-checks.
+ * - **#702 — `dispatchGrabInit` returns a `GrabHandle | null`.**
+ *   Init-before-move is encoded at the type level: callers cannot call
+ *   `move`/`release` without first owning a handle. The previous
+ *   `dispatchGrabMove(args, tiers, state)` + `dispatchGrabRelease(tiers, state)`
+ *   functions are removed; their behaviour lives on the handle. `GrabState`
+ *   is now an internal implementation detail (not exported).
+ * - **#703 — TSL grab uniform writes are encapsulated by
+ *   `TslSolver.setGrabUniforms()`.** The helper no longer reaches into
+ *   `tiers.tslSolver.grabNodes.<field>.value` — a TSL kernel refactor
+ *   touches only `tslSolver.ts`.
+ *
+ * ## Observability follow-ups (#704, #706)
+ *
+ * Every `return false` (silent-skip) path emits a `console.warn` gated on
+ * `import.meta.env.DEV`. Warnings include the relevant runtime values
+ * (radius, point, particle count) so dev-mode debugging of tier-init bugs
+ * does not require attaching a debugger. Rate-limiting + structured error
+ * IDs are out of scope and queued as separate follow-ups if a project-wide
+ * logger lands.
  *
  * @module toolDispatch
  * @see docs/reports/2026-05-02-drift-fase2-c4-4way-tier-orchestration.md
@@ -27,25 +56,35 @@ import type { WasmSolverClient } from './wasm/wasmSolverClient';
 import type { TslSolver } from './gpu/tslSolver';
 
 /**
- * Tier client refs needed for tool dispatch. Consumer typically holds
- * these inside React refs (`gpuClientRef`, `wasmClientRef`, `tslSolverRef`)
- * and `positionsRef`.
+ * Tier client refs needed for tool dispatch, expressed as a discriminated
+ * union over `kind` (C4 follow-up #701). Consumer commits to a single
+ * variant at construction time; helpers switch on `kind` and trust the
+ * variant's non-null fields.
  *
- * `tslSolver` is a separate ref because GPU client owns the solver
- * via `getTslSolver()`, and tool uniforms write directly to TSL nodes
- * (bypasses stale `gpuClient` ref per existing comment in
- * `GarmentSimulation.tsx`).
+ * - `kind: 'gpu'`: TSL/WebGPU path. `gpu` (for `setBrushParams`) and
+ *   `tslSolver` (for `setGrabUniforms`) are both required. Tools dispatch
+ *   into TSL uniforms; per-tier grab semantics are uniform-driven.
+ * - `kind: 'wasm'`: Rust WASM path. `wasm` (for `setPins`/`clearPins`)
+ *   and `positions` (the live snapshot Float32Array used to find particles
+ *   within radius) are both required. Steam brush is a silent no-op on
+ *   this variant (capability flag is `false`).
+ * - `kind: 'none'`: CPU + Neural (no tool surface). All dispatches are
+ *   silent no-ops; the variant exists so callers can construct a tiers
+ *   object unconditionally rather than guarding the call site.
+ *
+ * Previous shape (4-nullable bag) is gone; mapping for callers:
+ *
+ * ```ts
+ * // Old:
+ * { gpu: gpuClient, wasm: null, tslSolver, positions: null }
+ * // New:
+ * { kind: 'gpu', gpu: gpuClient, tslSolver }
+ * ```
  */
-export interface ClothToolTiers {
-  /** GPU client (only used here for `setBrushParams`; grab uniforms go via `tslSolver`). */
-  gpu: GpuSolverClient | null;
-  /** WASM client (mesh grab fallback via `setPins`). */
-  wasm: WasmSolverClient | null;
-  /** TSL solver instance (owns `brushNodes` + `grabNodes` uniform refs). */
-  tslSolver: TslSolver | null;
-  /** Live solver positions (used by WASM mesh grab to find particles within radius). */
-  positions: Float32Array | null;
-}
+export type ClothToolTiers =
+  | { kind: 'gpu'; gpu: GpuSolverClient; tslSolver: TslSolver }
+  | { kind: 'wasm'; wasm: WasmSolverClient; positions: Float32Array }
+  | { kind: 'none' };
 
 /** Steam brush stroke parameters (canonical world-space units). */
 export interface BrushStrokeArgs {
@@ -67,61 +106,112 @@ export interface GrabInitArgs {
   strength: number;
 }
 
-/** Mesh grab move parameters (init must precede). */
-export interface GrabMoveArgs {
-  /** Current world-space pointer position. */
-  point: [number, number, number];
+/**
+ * Handle for an active mesh grab session (C4 follow-up #702).
+ *
+ * Returned by `dispatchGrabInit` when the grab initialization landed on a
+ * tier. Holds the tier + per-grab state (indices, base positions, start
+ * point) in closure; methods `move`/`release` close over that state so
+ * the caller never needs to thread a mutable `GrabState` through.
+ *
+ * Lifecycle is encoded at the type level: `move`/`release` only exist on
+ * a handle, and a handle only exists post-init.
+ */
+export interface GrabHandle {
+  /**
+   * Update mesh grab to track the current pointer position.
+   *
+   * Tier coverage:
+   * - GPU (TSL): writes `grabCenter*` uniforms; TSL kernel computes
+   *   per-particle offset next frame.
+   * - WASM: computes delta from the init point, writes new positional
+   *   pins via `setPins(base + delta)`.
+   *
+   * @returns `true` if the dispatch landed; `false` if the handle's
+   *   tier degenerated (e.g., WASM handle whose state has no indices —
+   *   shouldn't happen post-init but defensively returns `false`).
+   */
+  move(point: [number, number, number]): boolean;
+  /**
+   * Release the mesh grab (called on pointer up / leave / abort).
+   *
+   * Tier coverage:
+   * - GPU (TSL): sets `grabActive = 0` so the TSL kernel skips grab
+   *   dispatch next frame.
+   * - WASM: calls `clearPins()` if any pins were registered at init.
+   *
+   * Idempotent — safe to call multiple times; the handle's internal state
+   * is reset on first call.
+   */
+  release(): void;
 }
 
 /**
- * Mutable state shared across mesh grab init → move → release lifecycle.
+ * Internal per-grab mutable state (WASM variant only).
  *
- * Consumer typically holds this in a single React ref
- * (`useRef<GrabState>({...})`) and passes `.current` to the helpers.
- * The helpers mutate fields in-place; React ref `.current` mutation
- * propagates without re-render (intentional — grab is a per-frame
- * interaction).
+ * Not exported. Lives inside the `GrabHandle` closure returned by
+ * `dispatchGrabInit`. Previous public `GrabState` surface is gone.
  */
-export interface GrabState {
-  /** Particle indices selected during init (WASM tier only; empty for TSL). */
+interface WasmGrabState {
+  /** Particle indices selected during init. */
   indices: number[];
-  /** Per-particle base positions captured at init. Null when inactive. */
-  basePositions: Float32Array | null;
+  /** Per-particle base positions captured at init (`indices.length * 3`). */
+  basePositions: Float32Array;
   /** Pointer location at init (used as offset origin for move delta). */
   startPoint: [number, number, number];
+}
+
+/**
+ * Dev-mode warning helper. Gated on `import.meta.env.DEV` so prod builds
+ * tree-shake the calls away. Per C4 follow-ups #704 + #706.
+ *
+ * Rate-limiting / structured error IDs are out of scope for this PR.
+ */
+function devWarn(message: string): void {
+  if (import.meta.env.DEV) {
+    console.warn(message);
+  }
 }
 
 /**
  * Apply a steam brush stroke at the given point.
  *
  * Tier coverage:
- * - GPU: writes brush uniforms via `setBrushParams` (TSL kernel reads
- *   them next frame).
- * - WASM/CPU/Neural: silent no-op (steam brush is GPU-tier feature
+ * - `kind: 'gpu'`: writes brush uniforms via `setBrushParams`.
+ * - `kind: 'wasm'` / `kind: 'none'`: silent no-op (steam brush is GPU-only
  *   per C4 RFC § 2.3; `SimulationStatusOverlay` communicates absence).
  *
- * @returns `true` if a tier accepted the dispatch, `false` if no tier
- *   supports steam brush in the current configuration.
+ * @returns `true` if a tier accepted the dispatch, `false` otherwise.
  */
 export function dispatchBrushStroke(
   args: BrushStrokeArgs,
   tiers: ClothToolTiers,
 ): boolean {
-  if (tiers.gpu) {
-    tiers.gpu.setBrushParams(args.point, args.radius, args.strength);
-    return true;
+  switch (tiers.kind) {
+    case 'gpu':
+      tiers.gpu.setBrushParams(args.point, args.radius, args.strength);
+      return true;
+    case 'wasm':
+      devWarn(
+        `[toolDispatch] dispatchBrushStroke: WASM tier active; steam brush is GPU-only (point=[${args.point[0]},${args.point[1]},${args.point[2]}], radius=${args.radius}). Silent no-op.`,
+      );
+      return false;
+    case 'none':
+      devWarn(
+        `[toolDispatch] dispatchBrushStroke: no tier present (kind='none'); tool is silent no-op (point=[${args.point[0]},${args.point[1]},${args.point[2]}], radius=${args.radius}).`,
+      );
+      return false;
   }
-  return false;
 }
 
 /**
  * Clear active steam brush (called on pointer up / leave).
  *
- * Resets brush params to zero so TSL kernel stops applying damping.
- * GPU-only no-op pattern.
+ * Resets brush params to zero so the TSL kernel stops applying damping.
+ * No-op on non-GPU variants.
  */
 export function dispatchBrushClear(tiers: ClothToolTiers): void {
-  if (tiers.gpu) {
+  if (tiers.kind === 'gpu') {
     tiers.gpu.setBrushParams([0, 0, 0], 0, 0);
   }
 }
@@ -130,148 +220,144 @@ export function dispatchBrushClear(tiers: ClothToolTiers): void {
  * Initialize a mesh grab at the given point.
  *
  * Tier coverage:
- * - GPU (TSL): writes grab uniforms; TSL `grabInitNode` runs next frame
- *   to populate per-particle mask + offset on GPU.
- * - WASM: queries `tiers.positions`, finds particles within radius,
- *   captures base positions to `state.basePositions`, calls `setPins`
- *   with positional pin shape. Mutates `state.indices`, `state.startPoint`,
- *   `state.basePositions`.
- * - CPU + Neural: silent no-op.
+ * - `kind: 'gpu'`: writes grab uniforms via `tslSolver.setGrabUniforms`
+ *   (per #703 — uniform layout is no longer leaked into this helper).
+ *   TSL `grabInitNode` populates per-particle mask + offset next frame.
+ * - `kind: 'wasm'`: queries `positions`, finds particles within radius,
+ *   captures base positions, calls `setPins` with positional pin shape.
+ * - `kind: 'none'`: silent no-op.
  *
- * @returns `true` if dispatch landed (grab is now active), `false`
- *   otherwise. False on WASM if no particles fall within radius.
+ * @returns `GrabHandle` on success (grab is now active and `move`/`release`
+ *   are bound to this tier); `null` if no tier accepted the dispatch
+ *   (e.g., no particles within radius on WASM).
  */
 export function dispatchGrabInit(
   args: GrabInitArgs,
   tiers: ClothToolTiers,
-  state: GrabState,
-): boolean {
-  if (tiers.tslSolver) {
-    const g = tiers.tslSolver.grabNodes;
-    g.grabCenterX.value = args.point[0];
-    g.grabCenterY.value = args.point[1];
-    g.grabCenterZ.value = args.point[2];
-    g.grabRadius.value = args.radius;
-    g.grabStrength.value = args.strength;
-    g.grabActive.value = 1;
-    g.grabInitPending.value = 1;
-    return true;
-  }
-  if (tiers.wasm && tiers.positions) {
-    const positions = tiers.positions;
-    const rSq = args.radius * args.radius;
-    const indices: number[] = [];
-    const N = positions.length / 3;
-    for (let i = 0; i < N; i++) {
-      const dx = positions[i * 3] - args.point[0];
-      const dy = positions[i * 3 + 1] - args.point[1];
-      const dz = positions[i * 3 + 2] - args.point[2];
-      if (dx * dx + dy * dy + dz * dz < rSq) indices.push(i);
+): GrabHandle | null {
+  switch (tiers.kind) {
+    case 'gpu': {
+      const tslSolver = tiers.tslSolver;
+      tslSolver.setGrabUniforms(args.point, {
+        radius: args.radius,
+        strength: args.strength,
+        active: 1,
+        initPending: 1,
+      });
+      let released = false;
+      // Track last grab point in closure so release() can flip `active=0`
+      // without reading uniforms back (which would re-leak the layout
+      // #703 hid behind `setGrabUniforms`).
+      let lastPoint: [number, number, number] = [
+        args.point[0],
+        args.point[1],
+        args.point[2],
+      ];
+      return {
+        move(point) {
+          if (released) return false;
+          tslSolver.setGrabUniforms(point);
+          lastPoint = [point[0], point[1], point[2]];
+          return true;
+        },
+        release() {
+          if (released) return;
+          released = true;
+          tslSolver.setGrabUniforms(lastPoint, { active: 0 });
+        },
+      };
     }
-    if (indices.length === 0) return false;
-    state.indices = indices;
-    // Defensive copy: helper is exported public API; future callers may
-    // pass reused buffers (e.g., Vector3.toArray(out) pattern) where
-    // mutation post-init would corrupt the anchor for subsequent
-    // dispatchGrabMove calls.
-    state.startPoint = [args.point[0], args.point[1], args.point[2]];
-    const base = new Float32Array(indices.length * 3);
-    for (let j = 0; j < indices.length; j++) {
-      const i = indices[j];
-      base[j * 3] = positions[i * 3];
-      base[j * 3 + 1] = positions[i * 3 + 1];
-      base[j * 3 + 2] = positions[i * 3 + 2];
+    case 'wasm': {
+      const positions = tiers.positions;
+      const wasm = tiers.wasm;
+      const rSq = args.radius * args.radius;
+      const indices: number[] = [];
+      const N = positions.length / 3;
+      for (let i = 0; i < N; i++) {
+        const dx = positions[i * 3] - args.point[0];
+        const dy = positions[i * 3 + 1] - args.point[1];
+        const dz = positions[i * 3 + 2] - args.point[2];
+        if (dx * dx + dy * dy + dz * dz < rSq) indices.push(i);
+      }
+      if (indices.length === 0) {
+        devWarn(
+          `[toolDispatch] dispatchGrabInit: WASM tier present but 0 particles in radius (radius=${args.radius}, point=[${args.point[0]},${args.point[1]},${args.point[2]}], totalParticles=${N}).`,
+        );
+        return null;
+      }
+      // Defensive copy: caller may reuse the args.point array buffer
+      // (e.g., Vector3.toArray(out) pattern) and mutating it later would
+      // corrupt the anchor for subsequent move() delta math.
+      const startPoint: [number, number, number] = [
+        args.point[0],
+        args.point[1],
+        args.point[2],
+      ];
+      const base = new Float32Array(indices.length * 3);
+      for (let j = 0; j < indices.length; j++) {
+        const i = indices[j];
+        base[j * 3] = positions[i * 3];
+        base[j * 3 + 1] = positions[i * 3 + 1];
+        base[j * 3 + 2] = positions[i * 3 + 2];
+      }
+      wasm.setPins(
+        indices.map((idx, j) => ({
+          vertexIndex: idx,
+          position: [base[j * 3], base[j * 3 + 1], base[j * 3 + 2]] as [
+            number,
+            number,
+            number,
+          ],
+        })),
+      );
+
+      const state: WasmGrabState = {
+        indices,
+        basePositions: base,
+        startPoint,
+      };
+      let released = false;
+      return {
+        move(point) {
+          if (released) return false;
+          if (state.indices.length === 0) {
+            // Defensive: handle was constructed with indices populated;
+            // an empty state here means external corruption.
+            devWarn(
+              `[toolDispatch] GrabHandle.move (WASM): state has no indices (post-init corruption?).`,
+            );
+            return false;
+          }
+          const dx = point[0] - state.startPoint[0];
+          const dy = point[1] - state.startPoint[1];
+          const dz = point[2] - state.startPoint[2];
+          const b = state.basePositions;
+          wasm.setPins(
+            state.indices.map((idx, j) => ({
+              vertexIndex: idx,
+              position: [
+                b[j * 3] + dx,
+                b[j * 3 + 1] + dy,
+                b[j * 3 + 2] + dz,
+              ] as [number, number, number],
+            })),
+          );
+          return true;
+        },
+        release() {
+          if (released) return;
+          released = true;
+          if (state.indices.length > 0) {
+            wasm.clearPins();
+          }
+          state.indices = [];
+        },
+      };
     }
-    state.basePositions = base;
-    tiers.wasm.setPins(indices.map((idx, j) => ({
-      vertexIndex: idx,
-      position: [
-        base[j * 3],
-        base[j * 3 + 1],
-        base[j * 3 + 2],
-      ] as [number, number, number],
-    })));
-    return true;
+    case 'none':
+      devWarn(
+        `[toolDispatch] dispatchGrabInit: no tier present (kind='none'); grab is silent no-op (point=[${args.point[0]},${args.point[1]},${args.point[2]}], radius=${args.radius}).`,
+      );
+      return null;
   }
-  return false;
-}
-
-/**
- * Update mesh grab to track current pointer position.
- *
- * Tier coverage:
- * - GPU (TSL): updates `grabCenter*` uniforms only. TSL kernel computes
- *   per-particle offset next frame.
- * - WASM: computes delta from `state.startPoint`, writes new positional
- *   pins via `setPins(base + delta)`.
- * - CPU + Neural: silent no-op.
- *
- * Requires `dispatchGrabInit` to have been called previously (state must
- * be populated for WASM tier).
- *
- * @returns `true` if dispatch landed.
- */
-export function dispatchGrabMove(
-  args: GrabMoveArgs,
-  tiers: ClothToolTiers,
-  state: GrabState,
-): boolean {
-  if (tiers.tslSolver) {
-    tiers.tslSolver.grabNodes.grabCenterX.value = args.point[0];
-    tiers.tslSolver.grabNodes.grabCenterY.value = args.point[1];
-    tiers.tslSolver.grabNodes.grabCenterZ.value = args.point[2];
-    return true;
-  }
-  if (tiers.wasm && state.indices.length > 0 && state.basePositions) {
-    const dx = args.point[0] - state.startPoint[0];
-    const dy = args.point[1] - state.startPoint[1];
-    const dz = args.point[2] - state.startPoint[2];
-    const base = state.basePositions;
-    tiers.wasm.setPins(state.indices.map((idx, j) => ({
-      vertexIndex: idx,
-      position: [
-        base[j * 3] + dx,
-        base[j * 3 + 1] + dy,
-        base[j * 3 + 2] + dz,
-      ] as [number, number, number],
-    })));
-    return true;
-  }
-  return false;
-}
-
-/**
- * Release mesh grab (called on pointer up / leave).
- *
- * **Tier-agnostic cleanup** — clears every tier whose state requires it,
- * not just the first match. Repro for the prior first-match bug:
- * grab init en WASM populates `state.indices` → user/system swap a GPU
- * tier (`tslSolver` becomes truthy) → release would have entered the
- * GPU branch and skipped `wasm.clearPins`, leaking pins. Symmetric leak
- * en reverse (started GPU, released con WASM presente, TSL `grabActive`
- * staying at 1).
- *
- * Tier coverage:
- * - GPU (TSL): sets `grabActive = 0` so TSL kernel skips grab dispatch.
- * - WASM: calls `clearPins()` (only when `state.indices` non-empty so
- *   we don't ping the worker for inactive sessions).
- * - State always reset (idempotent — safe to call multiple times).
- * - CPU + Neural: silent no-op (no tier surface).
- */
-export function dispatchGrabRelease(
-  tiers: ClothToolTiers,
-  state: GrabState,
-): void {
-  // Clear GPU uniforms if tslSolver present.
-  if (tiers.tslSolver) {
-    tiers.tslSolver.grabNodes.grabActive.value = 0;
-  }
-  // Clear WASM pins if state has indices, regardless of which tier
-  // dispatched init (mid-session tier swaps must not leak pin state).
-  if (tiers.wasm && state.indices.length > 0) {
-    tiers.wasm.clearPins();
-  }
-  // Always reset state (idempotent).
-  state.indices = [];
-  state.basePositions = null;
 }
