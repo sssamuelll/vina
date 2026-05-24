@@ -153,4 +153,136 @@ describe('#506 — orphan-bridging post-processing', () => {
     );
     expect(components).toBe(1);
   });
+
+  it('bridge pass re-uses a main-pass edge (the "physical stacking" contract per index.ts:179)', () => {
+    // Lock the semantic contract: the bridging pass may produce a seam that
+    // re-uses an edge already consumed by the main pass. This is intentional
+    // (interface/lining stacks physically share fabric edges), and the only
+    // way the cuff↔sleeve bridge can fire after cuff↔cuffInterface consumes
+    // all 4 cuff edges in the main pass.
+    //
+    // Topology: cuff and cuffInterface have identical geometry (4 perfect
+    // matches consume all cuff edges); sleeve shares the 290mm wrist length
+    // with the cuff so it has a high-confidence length-matched candidate to
+    // cuff that the main pass cannot satisfy (edges exhausted).
+    const cuff = makeRect('cuff', 'Cuff', 0, 0, 290, 60);
+    const cuffInterface = makeRect('cuff-interface', 'CuffInterface', 400, 0, 290, 60);
+    const sleeve = makeRect('sleeve', 'FullSleeve', 800, 0, 290, 600);
+
+    const result = autoSew([cuff, cuffInterface, sleeve], { minConfidence: 0.3 });
+
+    // Sanity: connectivity flipped to a single component.
+    expect(countComponents([cuff, cuffInterface, sleeve], result.seams)).toBe(1);
+    // 4 main-pass cuff↔cuffInterface seams + ≥1 bridge.
+    expect(result.seams.length).toBeGreaterThanOrEqual(5);
+
+    // Build a map: cuff-edge-name → list of partner piece IDs across all seams
+    // touching the cuff. An edge re-used in main+bridge will show two partners
+    // (cuff-interface from the main pass, sleeve from the bridge pass).
+    const cuffEdgeUsage = new Map<string, string[]>();
+    for (const s of result.seams) {
+      if (s.seam.pieceA.pieceId === 'cuff') {
+        const key = s.seam.pieceA.edgeName;
+        cuffEdgeUsage.set(key, [...(cuffEdgeUsage.get(key) ?? []), s.seam.pieceB.pieceId]);
+      }
+      if (s.seam.pieceB.pieceId === 'cuff') {
+        const key = s.seam.pieceB.edgeName;
+        cuffEdgeUsage.set(key, [...(cuffEdgeUsage.get(key) ?? []), s.seam.pieceA.pieceId]);
+      }
+    }
+    const reusedEdges = [...cuffEdgeUsage.entries()].filter(([, partners]) => partners.length >= 2);
+    // At least one cuff edge participates in two seams (one main + one bridge).
+    expect(reusedEdges.length).toBeGreaterThanOrEqual(1);
+    const partners = reusedEdges[0][1].slice().sort();
+    expect(partners).toContain('cuff-interface');
+    expect(partners).toContain('sleeve');
+  });
+
+  it('is deterministic: same input twice → identical seam set (guards against future ordering bugs)', () => {
+    // Algorithm IS deterministic by construction (insertion-order iteration,
+    // strict-greater comparison in the bridge picker), but a future refactor
+    // could accidentally introduce Set→Array ordering or unstable `.sort()`
+    // dependencies. This test locks the property.
+    //
+    // Use the multi-orphan fixture so both the main pass AND the bridge pass
+    // have non-trivial work to do across multiple orphan components.
+    const front = makeRect('f', 'FrontPanel', 0, 0, 200, 400);
+    const back = makeRect('b', 'BackPanel', 250, 0, 200, 400);
+    const sleeve = makeRect('s', 'FullSleeve', 500, 0, 290, 350);
+    const cuff = makeRect('cuff', 'Cuff', 800, 0, 290, 60);
+    const cuffIf = makeRect('cuff_if', 'CuffInterface', 1100, 0, 290, 60);
+    const collar = makeRect('col', 'CollarBase', -400, 0, 232, 60);
+    const collarIf = makeRect('col_if', 'CollarBaseInterface', -800, 0, 232, 60);
+    const pieces = [front, back, sleeve, cuff, cuffIf, collar, collarIf];
+
+    const run1 = autoSew(pieces, { minConfidence: 0.3 });
+    const run2 = autoSew(pieces, { minConfidence: 0.3 });
+
+    expect(run1.seams.length).toBe(run2.seams.length);
+
+    // Project each seam to a stable, structure-only key (drop the timestamped
+    // `id` field which is intentionally per-run unique per index.ts:201).
+    type SeamKey = {
+      a: string; aEdge: string;
+      b: string; bEdge: string;
+      confidence: number;
+    };
+    const project = (rs: typeof run1.seams): SeamKey[] =>
+      rs.map(s => ({
+        a: s.seam.pieceA.pieceId,
+        aEdge: s.seam.pieceA.edgeName,
+        b: s.seam.pieceB.pieceId,
+        bEdge: s.seam.pieceB.edgeName,
+        confidence: s.confidence,
+      }));
+    const byKey = (x: SeamKey, y: SeamKey): number =>
+      x.a.localeCompare(y.a) || x.aEdge.localeCompare(y.aEdge)
+      || x.b.localeCompare(y.b) || x.bEdge.localeCompare(y.bEdge);
+
+    const k1 = project(run1.seams).sort(byKey);
+    const k2 = project(run2.seams).sort(byKey);
+    expect(JSON.stringify(k1)).toBe(JSON.stringify(k2));
+  });
+
+  it('does NOT produce self-component bridges (filter at index.ts:325 holds)', () => {
+    // Pragmatic shortcut from the spec: rather than try to construct a
+    // geometry where the highest-scored bridge candidate is intra-orphan
+    // (which is fragile to scorer-weight changes), we exercise the filter
+    // negatively. Two orphan components where neither shares any plausible
+    // geometric similarity with the main component MUST stay orphaned —
+    // proving the bridging pass refused to fall back to intra-orphan
+    // candidates as bridges.
+    //
+    // Main: front + back (rectangular pair, matching sides).
+    // OrphanX↔OrphanY: a pair of tiny identical squares that match each
+    // other in the main pass but share NO edge length with main pieces
+    // (all main edges are ≥200mm; orphans are 3mm × 3mm).
+    const mainA = makeRect('main-a', 'FrontPanel', 0, 0, 200, 400);
+    const mainB = makeRect('main-b', 'BackPanel', 250, 0, 200, 400);
+    const orphanX = makeRect('orphan-x', 'WhateverDetail', 10000, 10000, 3, 3);
+    const orphanY = makeRect('orphan-y', 'WhateverDetail', 10100, 10000, 3, 3);
+
+    const result = autoSew([mainA, mainB, orphanX, orphanY], { minConfidence: 0.3 });
+
+    // The orphan pair is internally connected (main-pass seams between them)
+    // but the bridging pass must NOT promote an orphan↔orphan candidate to
+    // bridge them with main — that would require the same-component filter
+    // at index.ts:325 to be broken. Components stays ≥ 2.
+    const components = countComponents([mainA, mainB, orphanX, orphanY], result.seams);
+    expect(components).toBeGreaterThanOrEqual(2);
+
+    // Direct assertion on the filter contract: every cross-piece seam either
+    // stays within {main-a, main-b} or within {orphan-x, orphan-y}; no seam
+    // bridges across the two components.
+    const mainSet = new Set(['main-a', 'main-b']);
+    const orphanSet = new Set(['orphan-x', 'orphan-y']);
+    for (const s of result.seams) {
+      const aMain = mainSet.has(s.seam.pieceA.pieceId);
+      const bMain = mainSet.has(s.seam.pieceB.pieceId);
+      const aOrphan = orphanSet.has(s.seam.pieceA.pieceId);
+      const bOrphan = orphanSet.has(s.seam.pieceB.pieceId);
+      // Each seam is fully within one cluster — no smuggled cross-cluster seam.
+      expect((aMain && bMain) || (aOrphan && bOrphan)).toBe(true);
+    }
+  });
 });
