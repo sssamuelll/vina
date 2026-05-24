@@ -142,6 +142,57 @@ function detectFromName(rawName: string): BodyRegion {
 }
 
 /**
+ * Geometry-based body-region inference for the "all pieces unclassified"
+ * case (typical Seamly2D export where the patternmaker left names as
+ * generic "Detail"/"Деталь" — 75 hits across 23 templates in our catalog).
+ *
+ * Rank pieces by 2D area descending:
+ *   rank 0 → front-torso  (largest panel — most prominent fabric area)
+ *   rank 1 → back-torso   (second largest — typical front/back pair)
+ *   rank 2 → left-sleeve  (if tall+narrow AND pieces.length >= 4)
+ *   rank 3 → right-sleeve (if tall+narrow AND pieces.length >= 4)
+ *   rank 4+ → alternate front-torso / back-torso (sub-pieces / linings)
+ *
+ * Heuristic, not perfect. Collars/cuffs/pockets still get treated as
+ * torso panels — sub-optimal but better than the pre-F3 index-only
+ * alternation that ignored geometry. Templates with mixed
+ * classified/unclassified pieces don't go through this path — they keep
+ * the visible circle UX for the unclassified remainder. The right long-
+ * term fix is upstream classification (LLM or convention-driven) so
+ * pieces never arrive here as unknown in the first place.
+ */
+function inferRegionsFromGeometry(pieces: PatternPiece[]): BodyRegion[] {
+  const indexed = pieces.map((p, i) => {
+    const g = outlineBBox(p.outline);
+    return { i, area: g.width * g.height, width: g.width, height: g.height };
+  });
+  // Stable sort (ES2019+): ties keep input order, so synthetic test
+  // fixtures with identical geometry behave deterministically.
+  indexed.sort((a, b) => b.area - a.area);
+
+  const result: BodyRegion[] = new Array(pieces.length);
+  const sleeveEligible = pieces.length >= 4;
+
+  for (let rank = 0; rank < indexed.length; rank++) {
+    const item = indexed[rank];
+    // 1.4 aspect ratio — empirically sleeves are usually ≥2x taller than
+    // wide, but a fitted sleeve can be 1.4x. Lower threshold risks treating
+    // tall torso panels as sleeves; higher misses fitted sleeves.
+    const isTallNarrow = item.height >= item.width * 1.4;
+
+    let region: BodyRegion;
+    if (rank === 0) region = 'front-torso';
+    else if (rank === 1) region = 'back-torso';
+    else if (rank === 2 && sleeveEligible && isTallNarrow) region = 'left-sleeve';
+    else if (rank === 3 && sleeveEligible && isTallNarrow) region = 'right-sleeve';
+    else region = (rank % 2 === 0) ? 'front-torso' : 'back-torso';
+
+    result[item.i] = region;
+  }
+  return result;
+}
+
+/**
  * Determine body region from piece metadata (category + side).
  * Falls back to name-based regex for unclassified pieces.
  */
@@ -357,30 +408,39 @@ export function placeGarmentPieces(
   const allUnknown = unknownCount === pieces.length && pieces.length > 0;
   let unknownIndex = 0;
 
+  // F3 (geometry fallback): when EVERY piece is unclassified, infer regions
+  // by area ranking + sleeve shape detection. Pre-compute counts and a
+  // per-role index counter so multiple pieces sharing a role (e.g. two
+  // front-torso panels) get X-staggered instead of stacked. See
+  // inferRegionsFromGeometry() for the ranking rules.
+  const inferredRegions = allUnknown ? inferRegionsFromGeometry(pieces) : null;
+  const roleCounts = new Map<BodyRegion, number>();
+  if (inferredRegions) {
+    for (const r of inferredRegions) roleCounts.set(r, (roleCounts.get(r) ?? 0) + 1);
+  }
+  const roleEmitted = new Map<BodyRegion, number>();
+
   return pieces.map((piece, i) => {
     const region = regions[i];
     const geo = outlineBBox(piece.outline);
 
     if (region === 'unknown') {
-      if (allUnknown) {
-        // Alternate front/back torso so the avatar collider catches them
-        // and they drape, instead of falling past at hip-level. Stagger X
-        // within each side group so multiple front (or multiple back) pieces
-        // don't stack at identical coordinates — stacked pieces give the
-        // cloth solver collinear vertices and produce NaN constraints.
-        const isFront = i % 2 === 0;
-        const sideIndex = Math.floor(i / 2);
-        const halfCount = Math.ceil(pieces.length / 2);
-        const base = computePlacement(
-          isFront ? 'front-torso' : 'back-torso',
-          measurements,
-          { widthMm: geo.width, heightMm: geo.height },
-        );
+      if (allUnknown && inferredRegions) {
+        const inferred = inferredRegions[i];
+        const base = computePlacement(inferred, measurements, {
+          widthMm: geo.width,
+          heightMm: geo.height,
+        });
+        // Stagger X within each role group so multiple pieces sharing a role
+        // (e.g. front-torso #2 and #3 when N > 4) don't stack at identical
+        // coords — stacked pieces give the cloth solver collinear vertices
+        // and produce NaN constraints.
+        const total = roleCounts.get(inferred) ?? 1;
+        const sideIdx = roleEmitted.get(inferred) ?? 0;
+        roleEmitted.set(inferred, sideIdx + 1);
         const d = deriveDimensions(measurements);
-        // Spread sideIndex across roughly ±shoulderWidth/2; single-side groups
-        // (halfCount === 1) keep the centered position.
-        const xOffset = halfCount > 1
-          ? (sideIndex - (halfCount - 1) / 2) * (d.shoulderWidth / halfCount)
+        const xOffset = total > 1
+          ? (sideIdx - (total - 1) / 2) * (d.shoulderWidth / total)
           : 0;
         return {
           position: [

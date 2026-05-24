@@ -251,6 +251,95 @@ describe('placeGarmentPieces', () => {
     expect(distFromAxis).toBeGreaterThan(0.1);
   });
 
+  it('F3: infers regions by area ranking when all pieces are unclassified', () => {
+    // Simulates a Seamly2D pattern with 5 generic "Detail" pieces of varied
+    // geometry. Area ranking should map them to specific body regions
+    // instead of falling to the pre-F3 index-only alternation.
+    function rect(name: string, w: number, h: number): PatternPiece {
+      return {
+        id: name, name,
+        outline: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [w, 0] },
+          { type: 'L', values: [w, h] },
+          { type: 'L', values: [0, h] },
+          { type: 'Z', values: [] },
+        ],
+        internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+        seamAllowance: 0, layer: 1, sublayer: 0, active: true,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      };
+    }
+    const pieces = [
+      rect('Detail', 400, 400),   // area 160000 — rank 0 → front-torso
+      rect('Detail', 380, 380),   // area 144400 — rank 1 → back-torso
+      rect('Detail', 150, 500),   // area  75000, tall+narrow — rank 2 → left-sleeve
+      rect('Detail', 150, 500),   // area  75000, tall+narrow — rank 3 → right-sleeve
+      rect('Detail', 200, 200),   // area  40000 — rank 4 → front-torso (alternating)
+    ];
+    const placements = placeGarmentPieces(pieces, MEAS);
+    expect(placements).toHaveLength(5);
+
+    // Rank 0 (front-torso): Z < 0
+    expect(placements[0].position[2]).toBeLessThan(0);
+    // Rank 1 (back-torso): Z > 0
+    expect(placements[1].position[2]).toBeGreaterThan(0);
+    // Rank 2 (left-sleeve): X < 0 (sleeves placed at ±shoulderWidth/2)
+    expect(placements[2].position[0]).toBeLessThan(0);
+    // Rank 3 (right-sleeve): X > 0
+    expect(placements[3].position[0]).toBeGreaterThan(0);
+    // Rank 4 (alternating front): Z < 0
+    expect(placements[4].position[2]).toBeLessThan(0);
+
+    // No two placements share a position — stacked pieces crash the cloth
+    // solver. Use 3-decimal precision so floating-point near-equal counts.
+    const keys = placements.map(p => p.position.map(v => v.toFixed(3)).join(','));
+    expect(new Set(keys).size).toBe(5);
+  });
+
+  it('F3: holds 3-piece all-unknown back-compat behavior (alternates front/back/front)', () => {
+    // Regression for the previous all-unknown test (#556). With 3 same-area
+    // pieces, area ranking is stable (input order preserved). Sleeve
+    // detection requires N≥4 so rank 2 falls through to alternating.
+    const pieces = [makePiece('A1'), makePiece('A2'), makePiece('A3')];
+    const placements = placeGarmentPieces(pieces, MEAS);
+    expect(placements[0].position[2]).toBeLessThan(0); // rank 0 = front
+    expect(placements[1].position[2]).toBeGreaterThan(0); // rank 1 = back
+    expect(placements[2].position[2]).toBeLessThan(0); // rank 2 = front (alternating)
+    const positions = placements.map(p => p.position.join(','));
+    expect(new Set(positions).size).toBe(3);
+  });
+
+  it('F3: does not promote rank 2 to sleeve when pieces are roughly square', () => {
+    // Square-ish pieces (height < width * 1.4) stay as torso even when
+    // there are ≥4 pieces. Prevents misclassifying secondary torso panels
+    // as sleeves just because they're 3rd/4th largest.
+    function rect(w: number, h: number): PatternPiece {
+      return {
+        id: '1', name: 'Detail',
+        outline: [
+          { type: 'M', values: [0, 0] },
+          { type: 'L', values: [w, 0] },
+          { type: 'L', values: [w, h] },
+          { type: 'L', values: [0, h] },
+          { type: 'Z', values: [] },
+        ],
+        internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+        seamAllowance: 0, layer: 1, sublayer: 0, active: true,
+        createdAt: Date.now(), updatedAt: Date.now(),
+      };
+    }
+    const pieces = [
+      rect(500, 500), rect(400, 400), rect(300, 300), rect(250, 250),
+    ];
+    const placements = placeGarmentPieces(pieces, MEAS);
+    // None of these should be at the sleeve X offset (~±shoulderWidth/2 ≈ ±0.2m).
+    // Front/back torso pieces sit on the body axis with small staggers.
+    for (const p of placements) {
+      expect(Math.abs(p.position[0])).toBeLessThan(0.2);
+    }
+  });
+
   it('does not double-toggle sleeve assignment', () => {
     const pieces = [
       makePiece('Sleeve One', 'sleeve'),
