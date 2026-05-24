@@ -111,6 +111,36 @@ describe('detectBodyRegion', () => {
     const unknowns = names.filter(n => detectBodyRegion(makePiece(n)) === 'unknown');
     expect(unknowns, `pieces still unclassified: ${unknowns.join(', ')}`).toEqual([]);
   });
+
+  it('classifies Cyrillic piece names (jacket1_52-176 regression for #506 follow-up)', () => {
+    // Exact piece names from tools/seamly2d-converter/output/jacket1_52-176.json.
+    // Mix of Russian (Спинка/Полочка/Подборт/Рукав) and Ukrainian (Комір).
+    // Pre-fix: all 5 returned 'unknown' → placement fallback put them at
+    // midTorso (~40cm below shoulder) → DoD spec REACHES_UP gate failed with
+    // maxY=1.083 vs needed 1.18. Post-fix: 0 'unknown', each routes to its
+    // real body region.
+    expect(detectBodyRegion(makePiece('Спинка'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Полочка'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Подборт'))).toBe('front-torso'); // facing → front
+    expect(detectBodyRegion(makePiece('Рукав'))).toMatch(/sleeve/);
+    expect(detectBodyRegion(makePiece('Комір'))).toBe('collar');
+  });
+
+  it('covers additional Cyrillic terms for forward compatibility', () => {
+    // Russian
+    expect(detectBodyRegion(makePiece('Воротник'))).toBe('collar');
+    expect(detectBodyRegion(makePiece('Манжета'))).toMatch(/cuff/);
+    expect(detectBodyRegion(makePiece('Юбка'))).toMatch(/skirt/);
+    expect(detectBodyRegion(makePiece('Капюшон'))).toBe('hood');
+    expect(detectBodyRegion(makePiece('Пояс'))).toBe('waistband');
+    expect(detectBodyRegion(makePiece('Карман'))).toBe('front-torso'); // pocket
+    expect(detectBodyRegion(makePiece('Кокетка'))).toBe('back-torso'); // yoke
+    expect(detectBodyRegion(makePiece('Планка'))).toBe('front-torso'); // placket
+    // Ukrainian
+    expect(detectBodyRegion(makePiece('Спідниця'))).toMatch(/skirt/);
+    expect(detectBodyRegion(makePiece('Кишеня'))).toBe('front-torso'); // pocket
+    expect(detectBodyRegion(makePiece('Підборт'))).toBe('front-torso'); // facing
+  });
 });
 
 describe('computePlacement', () => {
