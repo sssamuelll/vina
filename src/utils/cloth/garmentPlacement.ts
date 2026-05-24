@@ -65,14 +65,25 @@ let _cuffToggle = false;
 // substring match on Cyrillic is safe without overmatching. Coverage:
 // Russian + Ukrainian since both appear in upstream Seamly2D samples
 // (e.g. jacket1_52-176 mixes them — "Комір" UA collar, "Спинка" RU back).
-const FRONT_RE = /\b(front|delantero|delantera|frente|davanti|devant|vorder)|полочка|перед/i;
-const BACK_RE = /\b(back|espalda|trasero|trasera|dietro|dos|r[üu]ck)|спинка|спина/i;
-const SLEEVE_RE = /\b(sleeve|manga|manica|manche|[äa]rmel)|рукав/i;
+//
+// Finnish alternates are also appended without `\b` because Finnish is
+// heavily compound (e.g. "Rintataskutaka" = chest-pocket-back), and a
+// substantial fraction of the gent_jacket_with_tummy template's 36 piece
+// names embed the root mid-word ("Alakaulus" = low-collar, "Hihayläosa" =
+// sleeve-upper-part). Roots: taka=back, etu=front, hiha=sleeve,
+// kaulus=collar, tasku=pocket, rinta=chest, sivu=side.
+const FRONT_RE = /\b(front|delantero|delantera|frente|davanti|devant|vorder)|полочка|перед|etu|rinta|sivu/i;
+const BACK_RE = /\b(back|espalda|trasero|trasera|dietro|dos|r[üu]ck)|спинка|спина|taka/i;
+const SLEEVE_RE = /\b(sleeve|manga|manica|manche|[äa]rmel)|рукав|hiha/i;
 const LEFT_RE = /\b(left|izquierd[ao]|sinistr[ao]|gauche|link)|ліви|лев/i;
 const RIGHT_RE = /\b(right|derech[ao]|destr[ao]|droit[e]?|recht)|прав/i;
 const SKIRT_RE = /\b(skirt|falda|gonna|jupe|rock)|юбка|спідниця/i;
-const COLLAR_RE = /\b(collar|cuello|colletto|col|kragen|neck.?bind)|комір|воротник/i;
-const WAISTBAND_RE = /\b(waistband|cinturilla|pretina)|пояс/i;
+const COLLAR_RE = /\b(collar|cuello|colletto|col|kragen|neck.?bind)|комір|воротник|kaulus/i;
+// `waist[ -]?band` instead of `waistband` so that splitCamelCase("WaistBand1")
+// → "Waist Band 1" still matches. The old single-token form was a silent gap
+// — any camelCase'd waistband name (real example: trousers.json "WaistBand1")
+// fell through to 'unknown' and onto the circle fallback at midTorso.
+const WAISTBAND_RE = /\b(waist[ -]?band|cinturilla|pretina)|пояс/i;
 const HOOD_RE = /\b(hood|capucha|cappuccio)|капюшон/i;
 const CUFF_RE = /\b(cuff|pu[ñn]o|polsino)|манжет/i;
 // Added per the male_shirt template baseline: 7/17 pieces (Yoke, Pocket×4,
@@ -81,7 +92,7 @@ const CUFF_RE = /\b(cuff|pu[ñn]o|polsino)|манжет/i;
 // avatar collider catches them; sub-pieces don't have a dedicated body
 // region today, but front-torso/back-torso is a safe approximation.
 const YOKE_RE = /\b(yoke|canes[uú]|sprone|empi[èe]cement|sattel)|кокетка/i;
-const POCKET_RE = /\b(pocket|bolsillo|tasca|poche|tasche)|карман|кишеня/i;
+const POCKET_RE = /\b(pocket|bolsillo|tasca|poche|tasche)|карман|кишеня|tasku/i;
 const PLACKET_RE = /\b(placket|tapeta|patta|patte|knopfleiste)|планка/i;
 // Facings (interior front strips, e.g. jacket lapels) had no name-fallback
 // before — only the category switch in detectBodyRegion handled them. With
