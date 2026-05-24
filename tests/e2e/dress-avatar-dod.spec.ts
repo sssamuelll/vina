@@ -287,19 +287,28 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
       // assemblyRatio heuristic that gave false greens on 2-piece patterns
       // like Blouse — 3 seams between 2 pieces hits ratio=1.5 but isn't a
       // garment, just a doubled-up panel).
+      //
+      // Also pull piece names (instrumentation for #506 follow-up): once
+      // connectivity fails, we need to know WHICH pieces are stranded in
+      // the orphan sub-component so we can diagnose the autoSew matching
+      // gap (missing naming heuristic vs. length-tolerance miss vs. etc).
+      // Cheap to compute (one map() over pieces); leave it on so future
+      // #506 work has the signal without having to re-instrument.
       const graph = await page.evaluate(() => {
         const st = window.__OPENCLO_STORE__?.getState();
-        const pieces = (st?.project?.pieces ?? []) as Array<{ id: string }>;
+        const pieces = (st?.project?.pieces ?? []) as Array<{ id: string; name?: string }>;
         const seams = (st?.project?.seams ?? []) as Array<{
           pieceA?: { pieceId?: string };
           pieceB?: { pieceId?: string };
         }>;
         const pieceIds = pieces.map(p => p.id);
+        const pieceNames = new Map(pieces.map(p => [p.id, p.name ?? '<unnamed>']));
         const seamPairs = seams
           .map(s => [s.pieceA?.pieceId, s.pieceB?.pieceId])
           .filter((p): p is [string, string] => Boolean(p[0] && p[1]));
-        return { pieceIds, seamPairs, seamCount: seams.length };
+        return { pieceIds, pieceNames: Array.from(pieceNames.entries()), seamPairs, seamCount: seams.length };
       });
+      const pieceNamesById = new Map(graph.pieceNames);
 
       // Build undirected adjacency map and BFS-count connected components.
       // Self-seams (pieceA === pieceB) collapse to a self-edge which adds the
@@ -312,20 +321,23 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
         adj.get(b)?.add(a);
       });
       const visited = new Set<string>();
-      let componentCount = 0;
+      const componentPieces: string[][] = []; // instrumentation: each entry = piece names in that component
       for (const start of graph.pieceIds) {
         if (visited.has(start)) continue;
-        componentCount++;
+        const componentMembers: string[] = [];
         const queue = [start];
         while (queue.length > 0) {
           const node = queue.shift()!;
           if (visited.has(node)) continue;
           visited.add(node);
+          componentMembers.push(pieceNamesById.get(node) ?? node);
           adj.get(node)?.forEach(n => {
             if (!visited.has(n)) queue.push(n);
           });
         }
+        componentPieces.push(componentMembers);
       }
+      const componentCount = componentPieces.length;
       const orphanCount = graph.pieceIds.filter(id => (adj.get(id)?.size ?? 0) === 0).length;
       const pieceCount = graph.pieceIds.length;
       const seamCount = graph.seamCount;
@@ -418,6 +430,13 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
         `[diagnostic] "${c.template}" (${c.region}): pieces=${pieceCount}, ` +
           `seams=${seamCount}, components=${componentCount}, orphans=${orphanCount}, ` +
           `geometry=${JSON.stringify(result.diag)}`,
+      );
+      // Instrumentation (#506 follow-up): dump component membership so we
+      // can see which pieces are stranded when connectivity fails. Sorted
+      // largest-first so the "main" component appears at index 0.
+      const sortedComponents = [...componentPieces].sort((a, b) => b.length - a.length);
+      console.log(
+        `[diagnostic] "${c.template}" componentNames=${JSON.stringify(sortedComponents)}`,
       );
 
       expect(

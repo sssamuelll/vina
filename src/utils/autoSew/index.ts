@@ -159,8 +159,42 @@ export function autoSew(
   // Deduplicate and filter by confidence
   const ranked = rankAndDeduplicate(safeCandidates, minConfidence);
 
+  // ── Orphan-bridging post-processing pass ─────────────────────────────────
+  //
+  // After greedy edge dedup, real patterns commonly end up with disconnected
+  // sub-components — most often interfacing pieces (Cuff↔CuffInterface,
+  // CollarBase↔CollarBaseInterface) that exhaust their parent's edges in
+  // perfect-length interface-to-parent seams before the parent can match to
+  // its downstream partner (sleeve/body). The greedy dedup is correct for
+  // structural fabric seams (a side-seam edge IS only one seam), but it
+  // over-restricts the special case of interface/lining stacks where multiple
+  // layers physically share the same fabric edge in real construction.
+  //
+  // Rather than carve out a special-case rule for "interfacing" naming (which
+  // would miss other patterns of legitimate orphans, e.g., T-shirt pieces
+  // all named "Detail" where dedup blocks a marginal-confidence bridge),
+  // we run a pattern-agnostic bridging pass: find connected components in
+  // the seam graph, and for each non-main component, add the single best
+  // candidate seam (from `safeCandidates`, NOT consumed by main dedup) that
+  // connects it to the main component. This permits exactly one edge re-use
+  // per bridge — the minimum to flip the connectivity gate without poisoning
+  // the structural seam graph with duplicates.
+  //
+  // Bridges use a lower confidence floor (`bridgeMinConfidence`) because the
+  // best bridge candidate has already lost the main dedup race; demanding the
+  // primary 0.3-0.4 threshold would defeat the entire purpose of the pass.
+  // 0.15 is loose enough to admit "Detail↔Detail" pairs with weak length sim
+  // but tight enough to reject random pieces that share no real geometry.
+  const bridgeCandidates = bridgeOrphanComponents(
+    activePieces,
+    ranked,
+    safeCandidates,
+    /* bridgeMinConfidence */ 0.15,
+  );
+  const finalRanked = [...ranked, ...bridgeCandidates];
+
   // Convert to ProposedSeam objects
-  const seams: ProposedSeam[] = ranked.map((candidate, idx) => ({
+  const seams: ProposedSeam[] = finalRanked.map((candidate, idx) => ({
     seam: {
       // state-encoded ID — see B10-state. The rank index is intentionally
       // baked into the auto-seam ID; do NOT migrate to newId().
@@ -191,7 +225,7 @@ export function autoSew(
 
   // Find unmatched edges
   const matchedEdgeKeys = new Set<string>();
-  for (const s of ranked) {
+  for (const s of finalRanked) {
     matchedEdgeKeys.add(`${s.edgeA.pieceId}:${s.edgeA.edgeIndex}`);
     matchedEdgeKeys.add(`${s.edgeB.pieceId}:${s.edgeB.edgeIndex}`);
   }
@@ -210,6 +244,110 @@ export function autoSew(
     piecesAnalyzed: activePieces.length,
     edgesExtracted: totalEdges,
   };
+}
+
+/**
+ * Find connected components in the seam graph and propose one bridging
+ * candidate per orphan component to connect it to the main (largest)
+ * component. Returns extra candidates that should be appended to the main
+ * `ranked` set.
+ *
+ * Implementation detail: this REUSES `allCandidates` (the pre-dedup list)
+ * to draw bridges from — that means each bridge is a seam that the main
+ * pipeline already scored, just lost to a higher-confidence competitor.
+ * No new geometry is computed; this is purely a graph-cover step.
+ */
+function bridgeOrphanComponents(
+  pieces: PatternPiece[],
+  rankedSeams: ScoredSeamCandidate[],
+  allCandidates: ScoredSeamCandidate[],
+  bridgeMinConfidence: number,
+): ScoredSeamCandidate[] {
+  if (pieces.length < 2) return [];
+
+  // Build adjacency from the ranked seams produced by the main pass
+  const adj = new Map<string, Set<string>>();
+  pieces.forEach(p => adj.set(p.id, new Set()));
+  for (const s of rankedSeams) {
+    adj.get(s.edgeA.pieceId)?.add(s.edgeB.pieceId);
+    adj.get(s.edgeB.pieceId)?.add(s.edgeA.pieceId);
+  }
+
+  // BFS to find connected components
+  const visited = new Set<string>();
+  const components: Set<string>[] = [];
+  for (const p of pieces) {
+    if (visited.has(p.id)) continue;
+    const queue = [p.id];
+    const members = new Set<string>();
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      members.add(id);
+      adj.get(id)?.forEach(n => {
+        if (!visited.has(n)) queue.push(n);
+      });
+    }
+    components.push(members);
+  }
+
+  if (components.length <= 1) return [];
+
+  // Largest component = "main"; everything else is an orphan to bridge
+  components.sort((a, b) => b.size - a.size);
+  const mainComponent = components[0];
+
+  const bridges: ScoredSeamCandidate[] = [];
+  // Track edges that bridges added (to prevent duplicate bridge edges across
+  // multiple orphan components landing on the same main-component edge — a
+  // single edge can host multiple stacked bridges in theory, but for the
+  // graph cover step we want one bridge per orphan).
+  const bridgeUsedOrphanEdges = new Set<string>();
+
+  for (let i = 1; i < components.length; i++) {
+    const orphanComp = components[i];
+
+    // Pick the highest-confidence candidate that has one endpoint in this
+    // orphan component and the other in the main component. Crucially, do
+    // NOT enforce edge-dedup against the main `rankedSeams` — the whole
+    // point is to allow an edge in `mainComponent` to be re-used by a
+    // bridging seam (typical case: a sleeve's wrist edge that already
+    // anchors a Sleeve↔Body seam can also anchor a Sleeve↔Cuff bridge).
+    let best: ScoredSeamCandidate | null = null;
+    for (const cand of allCandidates) {
+      if (cand.confidence < bridgeMinConfidence) continue;
+      const aInOrphan = orphanComp.has(cand.edgeA.pieceId);
+      const bInOrphan = orphanComp.has(cand.edgeB.pieceId);
+      const aInMain = mainComponent.has(cand.edgeA.pieceId);
+      const bInMain = mainComponent.has(cand.edgeB.pieceId);
+      // Need one end in orphan and other in main (covers orphan→main bridges only)
+      if (!((aInOrphan && bInMain) || (bInOrphan && aInMain))) continue;
+      // Avoid re-using an orphan-side edge for two bridges (the orphan piece
+      // would be over-constrained at one edge while another orphan edge sits
+      // free).
+      const orphanEdgeKey = aInOrphan
+        ? `${cand.edgeA.pieceId}:${cand.edgeA.edgeIndex}`
+        : `${cand.edgeB.pieceId}:${cand.edgeB.edgeIndex}`;
+      if (bridgeUsedOrphanEdges.has(orphanEdgeKey)) continue;
+
+      if (!best || cand.confidence > best.confidence) best = cand;
+    }
+
+    if (best) {
+      const orphanEdgeKey = orphanComp.has(best.edgeA.pieceId)
+        ? `${best.edgeA.pieceId}:${best.edgeA.edgeIndex}`
+        : `${best.edgeB.pieceId}:${best.edgeB.edgeIndex}`;
+      bridgeUsedOrphanEdges.add(orphanEdgeKey);
+      bridges.push(best);
+      // Merge this orphan into the main component for downstream bridges.
+      // Without this, two orphan components could each bridge to main but
+      // a third orphan-to-orphan bridge candidate would be missed.
+      orphanComp.forEach(id => mainComponent.add(id));
+    }
+  }
+
+  return bridges;
 }
 
 // Re-export default weights for the fallback import
