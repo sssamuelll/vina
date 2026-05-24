@@ -67,8 +67,12 @@ const CATALOG: CatalogEntry[] = [
     requiredMeasurements: ['chest', 'waist', 'height', 'shoulder'],
     keywords: ['block', 'sloper', 'base', 'shirt', 'camisa', 'bloque'],
     complexity: 'basic',
-    usable: true,
-    description: 'Basic shirt block/sloper for men',
+    // Upstream .sm2d has 56 construction steps across 2 draftBlocks (Back,
+    // Front) but `<pieces/>` is empty in both — by design for a sloper that
+    // exists to be COPIED into specific pieces, never used directly. Loading
+    // it would yield zero pieces and a broken Dress Avatar flow.
+    usable: false,
+    description: 'Basic shirt block/sloper for men (construction-only, no piece definitions)',
   },
   {
     id: 'patron_blusa',
@@ -115,8 +119,11 @@ const CATALOG: CatalogEntry[] = [
     requiredMeasurements: ['chest', 'waist', 'height'],
     keywords: ['moulage', 'draping', 'armhole', 'neckline', 'sisa', 'escote'],
     complexity: 'intermediate',
-    usable: true,
-    description: 'Moulage block focusing on armhole and neckline shaping',
+    // Upstream .sm2d has 91 construction steps but `<details/>` is empty —
+    // a moulage drafting exercise without piece extractions. Loading it
+    // yields zero pieces and a broken Dress Avatar flow.
+    usable: false,
+    description: 'Moulage drafting exercise (construction-only, no piece definitions)',
   },
 
   // ─── Bottoms ───
@@ -141,8 +148,12 @@ const CATALOG: CatalogEntry[] = [
     requiredMeasurements: ['waist', 'hips', 'height'],
     keywords: ['trouser', 'pants', 'pantalón', 'base', 'women'],
     complexity: 'intermediate',
-    usable: true,
-    description: 'Women\'s basic trouser block',
+    // Upstream .sm2d has 78 construction steps across 2 draftBlocks
+    // (pantalon base, trasero) but `<details/>` is empty in both — a
+    // basic trouser block without piece definitions. Loading it yields
+    // zero pieces.
+    usable: false,
+    description: 'Women\'s basic trouser block (construction-only, no piece definitions)',
   },
   {
     id: 'pants1_52-176',
@@ -203,8 +214,11 @@ const CATALOG: CatalogEntry[] = [
     requiredMeasurements: ['highBust', 'chest', 'waist'],
     keywords: ['bra', 'sujetador', 'lingerie', 'lencería', 'bh'],
     complexity: 'advanced',
-    usable: true,
-    description: 'Bra pattern with cup construction',
+    // Upstream .sm2d has 37 construction steps in the "Bra" draftBlock but
+    // `<details/>` is empty — a cup-construction drafting exercise without
+    // piece extractions. Loading it yields zero pieces.
+    usable: false,
+    description: 'Bra cup-construction drafting (construction-only, no piece definitions)',
   },
 
   // ─── Outerwear ───
