@@ -59,24 +59,37 @@ function outlineBBox(outline: PathCommand[]): { width: number; height: number } 
 let _sleeveToggle = false;
 let _cuffToggle = false;
 
-const FRONT_RE = /\b(front|delantero|delantera|frente|davanti|devant|vorder)/i;
-const BACK_RE = /\b(back|espalda|trasero|trasera|dietro|dos|r[üu]ck)/i;
-const SLEEVE_RE = /\b(sleeve|manga|manica|manche|[äa]rmel)/i;
-const LEFT_RE = /\b(left|izquierd[ao]|sinistr[ao]|gauche|link)/i;
-const RIGHT_RE = /\b(right|derech[ao]|destr[ao]|droit[e]?|recht)/i;
-const SKIRT_RE = /\b(skirt|falda|gonna|jupe|rock)/i;
-const COLLAR_RE = /\b(collar|cuello|colletto|col|kragen|neck.?bind)/i;
-const WAISTBAND_RE = /\b(waistband|cinturilla|pretina)/i;
-const HOOD_RE = /\b(hood|capucha|cappuccio)/i;
-const CUFF_RE = /\b(cuff|pu[ñn]o|polsino)/i;
+// Cyrillic alternates are appended without `\b` because JS regex word
+// boundaries are ASCII-only — `\bспинка` never matches. Seamly2D piece
+// names are typically single tokens (e.g. "Спинка", "Полочка"), so plain
+// substring match on Cyrillic is safe without overmatching. Coverage:
+// Russian + Ukrainian since both appear in upstream Seamly2D samples
+// (e.g. jacket1_52-176 mixes them — "Комір" UA collar, "Спинка" RU back).
+const FRONT_RE = /\b(front|delantero|delantera|frente|davanti|devant|vorder)|полочка|перед/i;
+const BACK_RE = /\b(back|espalda|trasero|trasera|dietro|dos|r[üu]ck)|спинка|спина/i;
+const SLEEVE_RE = /\b(sleeve|manga|manica|manche|[äa]rmel)|рукав/i;
+const LEFT_RE = /\b(left|izquierd[ao]|sinistr[ao]|gauche|link)|ліви|лев/i;
+const RIGHT_RE = /\b(right|derech[ao]|destr[ao]|droit[e]?|recht)|прав/i;
+const SKIRT_RE = /\b(skirt|falda|gonna|jupe|rock)|юбка|спідниця/i;
+const COLLAR_RE = /\b(collar|cuello|colletto|col|kragen|neck.?bind)|комір|воротник/i;
+const WAISTBAND_RE = /\b(waistband|cinturilla|pretina)|пояс/i;
+const HOOD_RE = /\b(hood|capucha|cappuccio)|капюшон/i;
+const CUFF_RE = /\b(cuff|pu[ñn]o|polsino)|манжет/i;
 // Added per the male_shirt template baseline: 7/17 pieces (Yoke, Pocket×4,
 // Placket×2) were falling to the circle fallback because the regex below
 // didn't cover these common shirt sub-pieces. Each routes to torso so the
 // avatar collider catches them; sub-pieces don't have a dedicated body
 // region today, but front-torso/back-torso is a safe approximation.
-const YOKE_RE = /\b(yoke|canes[uú]|sprone|empi[èe]cement|sattel)/i;
-const POCKET_RE = /\b(pocket|bolsillo|tasca|poche|tasche)/i;
-const PLACKET_RE = /\b(placket|tapeta|patta|patte|knopfleiste)/i;
+const YOKE_RE = /\b(yoke|canes[uú]|sprone|empi[èe]cement|sattel)|кокетка/i;
+const POCKET_RE = /\b(pocket|bolsillo|tasca|poche|tasche)|карман|кишеня/i;
+const PLACKET_RE = /\b(placket|tapeta|patta|patte|knopfleiste)|планка/i;
+// Facings (interior front strips, e.g. jacket lapels) had no name-fallback
+// before — only the category switch in detectBodyRegion handled them. With
+// Cyrillic patterns like jacket1_52-176 the LLM classifier often returns
+// empty category, so name fallback is the only line of defence. Route to
+// front-torso (where lapel facings actually live), honoring BACK_RE if
+// the piece name explicitly says back (rare but possible for back facings).
+const FACING_RE = /\b(facing|vista|guarnizione|parementure|besatz)|подборт|підборт/i;
 
 /**
  * Insert spaces at camelCase boundaries so the \b word-boundary regexes can
@@ -121,6 +134,8 @@ function detectFromName(rawName: string): BodyRegion {
   // Yokes on men's shirts are typically back (across upper back); honor
   // explicit FRONT prefix when present, otherwise default to back-torso.
   if (YOKE_RE.test(name)) return FRONT_RE.test(name) ? 'front-torso' : 'back-torso';
+  // Facings: default to front-torso (lapel facings); honor explicit BACK.
+  if (FACING_RE.test(name)) return BACK_RE.test(name) ? 'back-torso' : 'front-torso';
   if (BACK_RE.test(name)) return 'back-torso';
   if (FRONT_RE.test(name)) return 'front-torso';
   return 'unknown';
