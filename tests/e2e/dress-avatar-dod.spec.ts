@@ -265,10 +265,15 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
     const slug = c.template.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
     test(`Dress Avatar drapes "${c.template}" on the body (not fallen)`, async ({ page }) => {
-      // Load + dress + 10s sim budget + measure can exceed Playwright's 30s
-      // default for the heavier patterns (male_shirt meshes 17 pieces). Give
-      // the whole flow generous headroom so we never fail on wall-clock jitter.
-      test.setTimeout(60_000);
+      // Load + dress + 10s sim budget + measure. Linux CI runners are
+      // measurably slower than local dev — CDT meshing 17 pieces (Male Shirt)
+      // alone has needed 60-180s historically (see commits 5e091904 and
+      // 11ba2ce6 bumping the seamly meshing timeout). At 60s the full DoD
+      // flow timed out reliably on Male Shirt and was right at the edge for
+      // Pajama Top (9 pieces) — one jitter spike away from a flake. 120s
+      // gives 2x headroom over the slowest passing case (Pajama Top 60s) and
+      // a real shot at completion for Male Shirt's 17-piece meshing pass.
+      test.setTimeout(120_000);
 
       await openTemplateLibrary(page);
       await pickTemplate(page, c.template);
