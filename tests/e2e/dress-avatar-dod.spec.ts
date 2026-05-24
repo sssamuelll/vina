@@ -243,12 +243,22 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
   // wrap, so they're expected to behave poorly for reasons unrelated to the
   // pattern — we deliberately don't include trousers here so a legless-avatar
   // artifact isn't mistaken for a #531 pattern bug.
+  // Lower-region coverage is currently gapped on purpose: Keiko Skirt (the
+  // previous lower case) is the only skirt in the catalog and is < 3 pieces,
+  // so it failed the MIN_PIECES gate honestly rather than because of an
+  // autoSew bug. Trousers are excluded per the header comment (legless avatar
+  // / #531). Add a lower case back when the catalog grows a multi-piece skirt
+  // or a full dress.
+  //
+  // Blouse Pattern was also dropped from the upper set for the same MIN_PIECES
+  // reason (2 pieces — see comment block ~line 419 for why that was always a
+  // false green under the old assemblyRatio gate). Pajama Top (Wrap) replaces
+  // it as the multi-piece women's top exercising the same flow.
   const CASES = [
     { template: 'Male Shirt', region: 'upper' as const },
     { template: 'T-Shirt', region: 'upper' as const },
-    { template: 'Blouse Pattern', region: 'upper' as const },
+    { template: 'Pajama Top (Wrap)', region: 'upper' as const },
     { template: 'Jacket (Size 52)', region: 'upper' as const },
-    { template: 'Keiko Skirt', region: 'lower' as const },
   ];
 
   for (const c of CASES) {
