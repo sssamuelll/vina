@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import UnifiedBarChat from './UnifiedBarChat';
 import UnifiedBarCommands from './UnifiedBarCommands';
-import UnifiedBarSettings from './UnifiedBarSettings';
+import AgentSettings from '../../copilot/AgentSettings';
 
 export type BarMode = 'chat' | 'commands' | 'settings';
 
@@ -211,7 +211,15 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
               onOpenPanel={onOpenPanel ?? (() => {})}
             />
           )}
-          {mode === 'settings' && <UnifiedBarSettings />}
+          {mode === 'settings' && (
+            <AgentSettings
+              onSave={() => {
+                window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
+                setPanelOpen(false);
+              }}
+              onClose={() => setPanelOpen(false)}
+            />
+          )}
         </div>
       )}
     </div>

@@ -75,10 +75,10 @@ interface AgentSettingsProps {
   onSave: (config: ProviderConfig | null) => void;
   /** Called to close the settings panel */
   onClose: () => void;
-  /** Called to clear conversation */
-  onClearConversation: () => void;
-  /** Called to clear memory */
-  onClearMemory: () => void;
+  /** Called to clear conversation (optional — actions section hides if neither clear callback is provided) */
+  onClearConversation?: () => void;
+  /** Called to clear memory (optional — actions section hides if neither clear callback is provided) */
+  onClearMemory?: () => void;
   /** Current session cost summary */
   sessionCost?: CostSummary;
   /** Current project cost summary */
@@ -483,15 +483,21 @@ export default function AgentSettings({
         </div>
       </div>
 
-        {/* Actions */}
-        <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={btnSecondaryStyle} onClick={onClearConversation}>
-            🗑 Clear conversation
-          </button>
-          <button style={btnSecondaryStyle} onClick={onClearMemory}>
-            🧹 Clear memory
-          </button>
-        </div>
+        {/* Actions (hidden when neither clear callback is provided) */}
+        {(onClearConversation || onClearMemory) && (
+          <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {onClearConversation && (
+              <button style={btnSecondaryStyle} onClick={onClearConversation}>
+                🗑 Clear conversation
+              </button>
+            )}
+            {onClearMemory && (
+              <button style={btnSecondaryStyle} onClick={onClearMemory}>
+                🧹 Clear memory
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Save/Cancel - sticky at bottom */}
