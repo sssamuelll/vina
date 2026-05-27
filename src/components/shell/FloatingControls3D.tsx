@@ -1,6 +1,6 @@
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
-import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
+import { startSimulation, pauseSimulation, setViewMode3D } from '../../store/simulationSlice';
 
 export default function FloatingControls3D() {
   const dispatch = useDispatch();
@@ -36,8 +36,8 @@ export default function FloatingControls3D() {
         <button
           className="floating-3d__pill floating-3d__pill--default"
           onClick={() => {
-            if (simActive) dispatch(startSimulation());
-            else dispatch(resetSimulation());
+            if (simActive) dispatch(pauseSimulation());
+            else dispatch(startSimulation());
           }}
         >
           {simActive ? 'Pause' : 'Simulate'}

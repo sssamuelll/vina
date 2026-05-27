@@ -105,4 +105,51 @@ describe('assignFabric tool', () => {
     // Should dispatch to restore previous fabric
     expect(mockDispatch).toHaveBeenCalled();
   });
+
+  it("pieceId='default' sets the default fabric (consolidation of legacy setFabric tool)", async () => {
+    const { tools } = await import('../fabricTools');
+    const assignTool = tools.find((t: { name: string }) => t.name === 'assignFabric');
+
+    const mockDispatch = vi.fn() as unknown as AppDispatch;
+    const getState = mockState({
+      defaultFabricId: 'cotton-poplin',
+      pieces: [],
+    });
+
+    const result = await assignTool!.execute(
+      { pieceId: 'default', fabricId: 'denim-12oz' },
+      mockDispatch,
+      getState,
+    );
+
+    expect(result.success).toBe(true);
+    expect((result.data as { pieceId: string }).pieceId).toBe('default');
+    expect((result.data as { previousFabricId: string }).previousFabricId).toBe('cotton-poplin');
+    expect(mockDispatch).toHaveBeenCalled();
+    expect(result.rollback).toBeInstanceOf(Function);
+  });
+
+  it("pieceId='default' rollback restores previous defaultFabricId", async () => {
+    const { tools } = await import('../fabricTools');
+    const assignTool = tools.find((t: { name: string }) => t.name === 'assignFabric');
+
+    const mockDispatch = vi.fn() as unknown as AppDispatch;
+    const getState = mockState({
+      defaultFabricId: 'wool-crepe-200gsm',
+      pieces: [],
+    });
+
+    const result = await assignTool!.execute(
+      { pieceId: 'default', fabricId: 'denim-12oz' },
+      mockDispatch,
+      getState,
+    );
+
+    expect(result.success).toBe(true);
+
+    (mockDispatch as unknown as ReturnType<typeof vi.fn>).mockClear();
+    result.rollback!();
+
+    expect(mockDispatch).toHaveBeenCalledTimes(1);
+  });
 });
