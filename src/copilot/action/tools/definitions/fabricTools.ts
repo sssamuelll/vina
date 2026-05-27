@@ -19,6 +19,7 @@ import {
   clearPieceOpacity,
   setPieceEmission,
   clearPieceEmission,
+  setDefaultFabric,
 } from '../../../../store/simulationSlice';
 import { setPieceFabric } from '../../../../store/projectSlice';
 
@@ -186,14 +187,16 @@ const assignFabricTool: ToolDefinition = {
   name: 'assignFabric',
   description:
     'Assign a physical fabric to a pattern piece. Updates the simulation fabric and optionally sets a tint color. ' +
+    "Pass pieceId='default' to set the default fabric for all new pieces (no tint applied in default mode). " +
     'Supports rollback to restore the previous fabric assignment. ' +
-    '/ Asignar una tela física a una pieza de patrón. Actualiza la tela de simulación y opcionalmente establece un color de tinte.',
+    '/ Asignar una tela física a una pieza de patrón. Actualiza la tela de simulación y opcionalmente establece un color de tinte. ' +
+    "Pasa pieceId='default' para establecer la tela predeterminada para todas las nuevas piezas.",
   parameters: {
     type: 'object',
     properties: {
       pieceId: {
         type: 'string',
-        description: 'ID of the pattern piece to assign the fabric to / ID de la pieza de patrón',
+        description: "ID of the pattern piece, or 'default' for the default fabric of new pieces / ID de la pieza o 'default' para la tela predeterminada",
       },
       fabricId: {
         type: 'string',
@@ -201,7 +204,7 @@ const assignFabricTool: ToolDefinition = {
       },
       tint: {
         type: 'string',
-        description: 'Optional hex color tint for the fabric (e.g., "#ff0000") / Color de tinte opcional',
+        description: "Optional hex color tint for the fabric (e.g., '#ff0000'). Ignored when pieceId='default'. / Color de tinte opcional (ignorado si pieceId='default').",
       },
     },
     required: ['pieceId', 'fabricId'],
@@ -213,16 +216,7 @@ const assignFabricTool: ToolDefinition = {
 
     const state = getState();
 
-    // Validate piece exists
-    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
-    if (!piece) {
-      return {
-        success: false,
-        error: `Piece "${pieceId}" not found. Use searchFabrics or list pieces first.`,
-      };
-    }
-
-    // Validate fabric exists in the physical library
+    // Validate fabric exists in the physical library (same check for default and per-piece)
     const fabric = getPhysicalFabric(fabricId);
     if (!fabric) {
       const suggestions = searchPhysicalFabrics(fabricId);
@@ -233,6 +227,35 @@ const assignFabricTool: ToolDefinition = {
             ? `Did you mean: ${suggestions.slice(0, 3).map(f => f.id).join(', ')}?`
             : 'Use searchFabrics to find available fabrics.'
         }`,
+      };
+    }
+
+    // Default-fabric branch — applies to all new pieces, no per-piece tint.
+    if (pieceId === 'default') {
+      const prevDefaultFabricId: string = state.simulation.defaultFabricId;
+      dispatch(setDefaultFabric(fabricId));
+      return {
+        success: true,
+        data: {
+          pieceId: 'default',
+          pieceName: 'Default for new pieces',
+          fabricId: fabric.id,
+          fabricName: fabric.name,
+          tint: null,
+          previousFabricId: prevDefaultFabricId,
+        },
+        rollback: () => {
+          dispatch(setDefaultFabric(prevDefaultFabricId));
+        },
+      };
+    }
+
+    // Per-piece branch — requires piece to exist.
+    const piece = state.project.pieces.find((p: { id: string }) => p.id === pieceId);
+    if (!piece) {
+      return {
+        success: false,
+        error: `Piece "${pieceId}" not found. Use searchFabrics or list pieces first.`,
       };
     }
 
