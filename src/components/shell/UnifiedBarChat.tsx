@@ -175,7 +175,7 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
           color: 'var(--text-ghost)',
           fontSize: 'var(--text-ui)',
         }}>
-          {hasProvider ? 'Ask the AI about your design...' : 'Configure AI provider in Copilot settings...'}
+          {hasProvider ? 'Ask the AI about your design...' : 'Add an AI provider in settings to start chatting.'}
         </div>
       )}
 
