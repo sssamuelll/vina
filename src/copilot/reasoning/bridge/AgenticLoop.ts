@@ -24,6 +24,7 @@ import type { MetaToolDefinition } from './meta-tools/types';
 import type { ToolRegistry } from '../../action/tools/registry';
 import type { AppDispatch, RootState } from '../../../store';
 import { buildDomainBootstrap } from './domainBootstrap';
+import { PRESENT_TO_USER_TOOL_NAME } from './meta-tools/presentToUser';
 import { getKnowledgeStore } from '../../knowledge/KnowledgeStore';
 import type { KnowledgeSearchResult } from '../../knowledge/types';
 
@@ -159,7 +160,221 @@ export class AgenticLoop {
     while (true) {
       const response = await this.send(messages, allToolDefs, this.providerConfig);
 
-      // Text response = work is done
+      // ── presentToUser early-exit ────────────────────────────────────────
+      // Under provider modes that enforce `toolCalls.minItems: 1` (the M2
+      // shim's structured-output schema, observed 2026-05-28), the LLM
+      // cannot exit the loop by emitting empty toolCalls. Instead it
+      // signals end-of-turn by calling presentToUser({message, awaiting}).
+      // We intercept that call here BEFORE running it through the registry:
+      //   - the `message` becomes the assistant's content
+      //   - the loop exits
+      //   - any other tool calls in the same response are ignored
+      // This is the architectural fix for audit gap §3.3 (promote from
+      // convention-only to a real exit-signalling tool).
+      //
+      // Gating: `presentToUser({awaiting: "done"})` is rejected unless at
+      // least one action tool (not a meta-tool, not presentToUser itself)
+      // has been called in this conversation. Without this gate, Sonnet
+      // exploits the early-exit by calling presentToUser({awaiting: "done"})
+      // with a fabricated success message — observed repeatedly in the M2
+      // integration test runs. Rejection injects an error tool result and
+      // continues the loop, giving the LLM a chance to call the real
+      // action tools and try again. `awaiting: "confirmation"` does not
+      // gate because the agent legitimately needs to pause before acting.
+      const presentCall = response.toolCalls.find(
+        (tc) => tc.name === PRESENT_TO_USER_TOOL_NAME,
+      );
+      if (presentCall) {
+        let presentArgs: { message?: string; awaiting?: string } = {};
+        try {
+          presentArgs = JSON.parse(presentCall.arguments);
+        } catch {
+          // Malformed args — fall back to whatever content the LLM emitted
+          presentArgs = { message: response.content };
+        }
+
+        const awaiting = presentArgs.awaiting;
+        const isMetaName = (n: string): boolean =>
+          n === PRESENT_TO_USER_TOOL_NAME || this.metaTools.has(n);
+
+        // ── Grounding gate (applies to both confirmation and done) ──
+        // The LLM cannot call presentToUser as its only act in an entire
+        // conversation. There must be a non-presentToUser tool call
+        // SOMEWHERE in the messages (current response, this run's prior
+        // turns, or earlier conversation history). Without this, Sonnet
+        // skips the read-the-catalog step and proposes a hallucinated
+        // pattern in presentToUser({awaiting: "confirmation"}) directly.
+        const otherCallsInResponse = response.toolCalls.some(
+          (tc) => tc.name !== PRESENT_TO_USER_TOOL_NAME,
+        );
+        const callsInHistory = messages.some(
+          (m) =>
+            m.role === 'assistant' &&
+            Array.isArray(m.tool_calls) &&
+            m.tool_calls.some((tc) => tc.name !== PRESENT_TO_USER_TOOL_NAME),
+        );
+        const callsThisRun = this.lastToolCalls.some(
+          (tc) => tc.name !== PRESENT_TO_USER_TOOL_NAME,
+        );
+
+        if (!otherCallsInResponse && !callsInHistory && !callsThisRun) {
+          const errorMsg =
+            'presentToUser was rejected. You cannot speak to the user without first grounding ' +
+            'your response in at least one real tool call. The conversation has no tool calls yet, ' +
+            'and your current response contains no tool calls other than presentToUser. ' +
+            'You must call the relevant tools (e.g. listSeamlyPatterns to read the catalog for a ' +
+            'dressing intent) BEFORE you propose anything to the user. Whatever you would have ' +
+            'said in the message is unsupported by real state — call the tools first, then propose.';
+
+          const assistantMsg: ChatMessage = {
+            role: 'assistant',
+            content: response.content || '',
+            tool_calls: response.toolCalls,
+          };
+          if (response.reasoningContent) {
+            assistantMsg.reasoning_content = response.reasoningContent;
+          }
+          messages.push(assistantMsg);
+          messages.push({
+            role: 'tool',
+            content: JSON.stringify({ success: false, error: errorMsg }),
+            tool_call_id: presentCall.id,
+          });
+          this.lastToolCalls.push({
+            name: PRESENT_TO_USER_TOOL_NAME,
+            arguments: presentArgs as Record<string, unknown>,
+            result: { success: false, error: errorMsg },
+            duration: 0,
+            isMetaTool: true,
+          });
+          onEvent({ type: 'tool:start', name: PRESENT_TO_USER_TOOL_NAME, args: presentArgs as Record<string, unknown> });
+          onEvent({ type: 'tool:error', name: PRESENT_TO_USER_TOOL_NAME, error: errorMsg });
+          continue;
+        }
+
+        // Done-gating: require at least one action tool call BETWEEN the
+        // most recent presentToUser({awaiting: "confirmation"}) and the
+        // current presentToUser({awaiting: "done"}) call. This enforces
+        // the slice semantic propose → confirm → ACT → done. Without this
+        // temporal gate, the LLM exploits prior action tool calls from
+        // earlier in the conversation (e.g. listSeamlyPatterns from
+        // turn 1) as evidence that "work was done" — even though the
+        // user-facing post-confirmation work has not actually run.
+        // If no prior confirmation exists, fall back to a simpler "any
+        // action tool ever called" check (covers single-turn requests
+        // that don't go through a confirmation gate).
+        if (awaiting === 'done') {
+          // Scan assistant messages back-to-front for the most recent
+          // presentToUser(awaiting: "confirmation") call.
+          let lastConfirmIdx = -1;
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m.role !== 'assistant' || !m.tool_calls) continue;
+            const confirmCall = m.tool_calls.find((tc) => {
+              if (tc.name !== PRESENT_TO_USER_TOOL_NAME) return false;
+              try {
+                const args = JSON.parse(tc.arguments) as { awaiting?: string };
+                return args.awaiting === 'confirmation';
+              } catch {
+                return false;
+              }
+            });
+            if (confirmCall) {
+              lastConfirmIdx = i;
+              break;
+            }
+          }
+
+          // Count action tools either since lastConfirmIdx (if found) or
+          // anywhere in history (if no prior confirmation).
+          const searchStart = lastConfirmIdx >= 0 ? lastConfirmIdx + 1 : 0;
+          const actionsInScope = messages.slice(searchStart).some(
+            (m) =>
+              m.role === 'assistant' &&
+              Array.isArray(m.tool_calls) &&
+              m.tool_calls.some((tc) => !isMetaName(tc.name)),
+          );
+          // Also include this-run tool calls that have already executed
+          // (lastToolCalls is reset per run() but may contain action tools
+          // from THIS run before presentToUser was emitted).
+          const actionsThisRun = this.lastToolCalls.some(
+            (tc) => !tc.isMetaTool && tc.name !== PRESENT_TO_USER_TOOL_NAME,
+          );
+
+          if (!actionsInScope && !actionsThisRun) {
+            const errorMsg = lastConfirmIdx >= 0
+              ? 'presentToUser({awaiting: "done"}) was rejected. The user confirmed your previous proposal, but you have not yet called any action tool to actually execute that proposal. The Redux store has not changed since the confirmation. Call the action tools the user just approved (e.g. loadSeamlyPattern, runGarmentPipeline for a dressing flow) and then try presentToUser({awaiting: "done"}) again with REAL numbers from the tool results — never fabricated.'
+              : 'presentToUser({awaiting: "done"}) was rejected. No action tool has been called in this conversation. Call the relevant action tools required by the user\'s request first, then try presentToUser again.';
+
+            // Record the rejected attempt in messages so the LLM sees its
+            // own output + the rejection on the next turn.
+            const assistantMsg: ChatMessage = {
+              role: 'assistant',
+              content: response.content || '',
+              tool_calls: response.toolCalls,
+            };
+            if (response.reasoningContent) {
+              assistantMsg.reasoning_content = response.reasoningContent;
+            }
+            messages.push(assistantMsg);
+            messages.push({
+              role: 'tool',
+              content: JSON.stringify({ success: false, error: errorMsg }),
+              tool_call_id: presentCall.id,
+            });
+
+            // Record + emit event for visibility
+            this.lastToolCalls.push({
+              name: PRESENT_TO_USER_TOOL_NAME,
+              arguments: presentArgs as Record<string, unknown>,
+              result: { success: false, error: errorMsg },
+              duration: 0,
+              isMetaTool: true,
+            });
+            onEvent({ type: 'tool:start', name: PRESENT_TO_USER_TOOL_NAME, args: presentArgs as Record<string, unknown> });
+            onEvent({ type: 'tool:error', name: PRESENT_TO_USER_TOOL_NAME, error: errorMsg });
+
+            // Continue the while loop — let the LLM try again with the
+            // rejection context now in the message history.
+            continue;
+          }
+        }
+
+        const message = presentArgs.message ?? response.content ?? '';
+        // Push the full assistant response (with tool_calls intact) followed
+        // by a synthetic tool result for the presentToUser call. Preserving
+        // tool_calls is what lets the next turn's done-gate find the most
+        // recent presentToUser({awaiting: "confirmation"}) via the
+        // lastConfirmIdx scan. Without this, the early-exit dropped the
+        // tool_calls and the gate fell back to "any action tool ever
+        // called" which Sonnet exploited.
+        const assistantMsg: ChatMessage = {
+          role: 'assistant',
+          content: response.content || '',
+          tool_calls: response.toolCalls,
+        };
+        if (response.reasoningContent) {
+          assistantMsg.reasoning_content = response.reasoningContent;
+        }
+        messages.push(assistantMsg);
+        messages.push({
+          role: 'tool',
+          content: JSON.stringify({ success: true, data: presentArgs }),
+          tool_call_id: presentCall.id,
+        });
+        this.conversationHistory = messages.slice(1);
+        // Surface as a normal tool:start/complete pair so the UI animation
+        // is consistent with any other tool call.
+        onEvent({ type: 'tool:start', name: PRESENT_TO_USER_TOOL_NAME, args: presentArgs as Record<string, unknown> });
+        onEvent({ type: 'tool:complete', name: PRESENT_TO_USER_TOOL_NAME, result: { success: true, data: presentArgs } });
+        onEvent({ type: 'complete', content: message });
+        return message;
+      }
+
+      // Text response with no tool calls = work is done. (Kept as a fallback
+      // for providers that emit empty toolCalls naturally — the M2 shim
+      // schema rejects it, but plain-text providers without forced-min may
+      // still hit this path.)
       if (response.toolCalls.length === 0) {
         const finalAssistant: ChatMessage = { role: 'assistant', content: response.content };
         messages.push(finalAssistant);

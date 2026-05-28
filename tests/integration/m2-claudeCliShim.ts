@@ -31,11 +31,12 @@ const RESPONSE_SCHEMA = {
   properties: {
     content: {
       type: 'string',
-      description: 'Your text response to the user, in the same language as their message. Can be empty when you are calling tools and have nothing to say yet.',
+      description: 'Optional free-text accompanying your tool calls (e.g. a brief progress narration like "Cargando piezas…"). Can be empty. To actually speak to the user and exit the loop, call the presentToUser meta-tool instead — empty toolCalls is not allowed.',
     },
     toolCalls: {
       type: 'array',
-      description: 'Tools to invoke next. Empty array when you have no more tools to call (work is done, or waiting for the user).',
+      minItems: 1,
+      description: 'Tools to invoke this turn. At least one tool MUST be called every response — empty arrays are rejected by the harness. To pause and speak to the user (whether to propose a plan or to declare work done), call the special meta-tool `presentToUser`. To continue working without speaking, call the real action/meta-tools you need.',
       items: {
         type: 'object',
         properties: {

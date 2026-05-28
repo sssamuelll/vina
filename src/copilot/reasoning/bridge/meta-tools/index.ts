@@ -28,6 +28,7 @@ export { getFitMapStatsTool } from './getFitMapStats';
 export { getFitMapByPieceTool } from './getFitMapByPiece';
 export { measureAlongCurveTool } from './measureAlongCurve';
 export { compareCurvesMetaTool } from './compareCurves';
+export { presentToUserTool, PRESENT_TO_USER_TOOL_NAME } from './presentToUser';
 
 import type { MetaToolDefinition } from './types';
 import { getGarmentStateTool } from './getGarmentState';
@@ -38,6 +39,7 @@ import { getFitMapStatsTool } from './getFitMapStats';
 import { getFitMapByPieceTool } from './getFitMapByPiece';
 import { measureAlongCurveTool } from './measureAlongCurve';
 import { compareCurvesMetaTool } from './compareCurves';
+import { presentToUserTool } from './presentToUser';
 
 /**
  * Returns all registered meta-tools as an array.
@@ -53,5 +55,6 @@ export function getAllMetaTools(): MetaToolDefinition[] {
     getFitMapByPieceTool,
     measureAlongCurveTool,
     compareCurvesMetaTool,
+    presentToUserTool,
   ];
 }
