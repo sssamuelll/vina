@@ -81,10 +81,18 @@ interface AgentSettingsProps {
 
 // ─── Styles ─────────────────────────────────────────────────────────────────
 
+/**
+ * Type scale aligned with modern desktop-app conventions (Linear / Cursor /
+ * Notion baseline of ~14px body). Pre-2026-05-28 the panel scaled 9-13px
+ * across the board which was unreadable on standard DPI; bumped ~30% so
+ * labels are 12-13px, body content is 13-14px, and helper text stays at
+ * 11-12px (never below 11). Badges remain compact at 10px uppercase, but
+ * gain extra horizontal padding to keep weight visible.
+ */
 const panelStyle: React.CSSProperties = {
   background: 'var(--bg-secondary)',
   borderBottom: '1px solid var(--border)',
-  fontSize: 11,
+  fontSize: 13,
   maxHeight: '80vh',
   display: 'flex',
   flexDirection: 'column',
@@ -92,28 +100,28 @@ const panelStyle: React.CSSProperties = {
 
 const contentStyle: React.CSSProperties = {
   flex: 1,
-  padding: 16,
+  padding: 18,
   overflowY: 'auto',
 };
 
 const footerStyle: React.CSSProperties = {
   display: 'flex',
-  gap: 8,
+  gap: 10,
   justifyContent: 'flex-end',
   padding: 16,
-  paddingTop: 12,
+  paddingTop: 14,
   borderTop: '1px solid var(--border)',
   background: 'var(--bg-secondary)',
 };
 
 const sectionStyle: React.CSSProperties = {
   borderTop: '1px solid var(--border)',
-  paddingTop: 10,
-  marginTop: 14,
+  paddingTop: 14,
+  marginTop: 18,
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   color: 'var(--text-secondary)',
   fontWeight: 600,
 };
@@ -122,33 +130,33 @@ const inputStyle: React.CSSProperties = {
   background: 'var(--bg-primary)',
   border: '1px solid var(--border)',
   color: 'var(--text-primary)',
-  padding: '6px 8px',
-  borderRadius: 4,
-  fontSize: 11,
+  padding: '8px 10px',
+  borderRadius: 5,
+  fontSize: 14,
   fontFamily: "'SF Mono', 'Fira Code', monospace",
 };
 
 const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
-  marginBottom: 10,
+  gap: 6,
+  marginBottom: 12,
 };
 
 const rowStyle: React.CSSProperties = {
   display: 'flex',
   alignItems: 'center',
-  gap: 8,
-  marginBottom: 8,
+  gap: 10,
+  marginBottom: 10,
 };
 
 const btnStyle: React.CSSProperties = {
   background: 'var(--accent)',
   color: 'white',
   border: 'none',
-  padding: '6px 16px',
-  borderRadius: 4,
-  fontSize: 11,
+  padding: '8px 18px',
+  borderRadius: 5,
+  fontSize: 13,
   cursor: 'pointer',
   fontWeight: 600,
 };
@@ -157,9 +165,9 @@ const btnSecondaryStyle: React.CSSProperties = {
   background: 'transparent',
   color: 'var(--text-secondary)',
   border: '1px solid var(--border)',
-  padding: '5px 12px',
-  borderRadius: 4,
-  fontSize: 10,
+  padding: '7px 14px',
+  borderRadius: 5,
+  fontSize: 12,
   cursor: 'pointer',
 };
 
@@ -202,11 +210,11 @@ export default function AgentSettings({
   return (
     <div style={panelStyle}>
       <div style={contentStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Agent Settings</h4>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Agent Settings</h4>
           <button
             onClick={onClose}
-            style={{ ...btnSecondaryStyle, padding: '2px 8px' }}
+            style={{ ...btnSecondaryStyle, padding: '4px 10px', fontSize: 13 }}
             title="Close settings"
           >
             ✕
@@ -221,24 +229,25 @@ export default function AgentSettings({
         {/* Teaching Mode */}
         <div style={sectionStyle}>
           <div style={rowStyle}>
-            <label style={{ ...labelStyle, flex: 1 }}>Teaching Mode</label>
+            <label style={{ ...labelStyle, flex: 1, fontSize: 13 }}>Teaching Mode</label>
             <input
               type="checkbox"
               checked={teachingMode}
               onChange={(e) => setTeachingModeState(e.target.checked)}
+              style={{ width: 16, height: 16, cursor: 'pointer' }}
             />
-            <span style={{ fontSize: 9, color: 'var(--text-muted)', minWidth: 40 }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', minWidth: 40 }}>
               {teachingMode ? 'ON' : 'OFF'}
             </span>
           </div>
-          <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.5 }}>
             When on, the agent explains the WHY behind each action (patronaje education).
           </span>
         </div>
 
         {/* Language Preference */}
-        <div style={{ ...fieldStyle, marginTop: 14 }}>
-          <label style={labelStyle}>Language</label>
+        <div style={{ ...fieldStyle, marginTop: 18 }}>
+          <label style={{ ...labelStyle, fontSize: 13 }}>Language</label>
           <select
             style={inputStyle}
             value={language}
@@ -271,29 +280,29 @@ export default function AgentSettings({
             </div>
 
             <div style={sectionStyle}>
-              <label style={{ ...labelStyle, marginBottom: 6, display: 'block' }}>Token Usage</label>
+              <label style={{ ...labelStyle, fontSize: 13, marginBottom: 10, display: 'block' }}>Token Usage</label>
               <div
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '1fr 1fr 1fr',
-                  gap: 8,
-                  fontSize: 10,
+                  gap: 10,
+                  fontSize: 12,
                 }}
               >
-                <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCost(sessionCost)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>This session</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>{formatTokens(sessionCost)} tokens</div>
+                <div style={{ background: 'var(--bg-primary)', padding: 10, borderRadius: 5, textAlign: 'center' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>{formatCost(sessionCost)}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>This session</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{formatTokens(sessionCost)} tokens</div>
                 </div>
-                <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCost(projectCost)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>This project</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>{formatTokens(projectCost)} tokens</div>
+                <div style={{ background: 'var(--bg-primary)', padding: 10, borderRadius: 5, textAlign: 'center' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>{formatCost(projectCost)}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>This project</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>{formatTokens(projectCost)} tokens</div>
                 </div>
-                <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>${budgetValue.toFixed(2)}</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Budget</div>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>per month</div>
+                <div style={{ background: 'var(--bg-primary)', padding: 10, borderRadius: 5, textAlign: 'center' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: 14 }}>${budgetValue.toFixed(2)}</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 11, marginTop: 3 }}>Budget</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 10 }}>per month</div>
                 </div>
               </div>
             </div>

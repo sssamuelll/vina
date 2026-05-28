@@ -25,10 +25,10 @@ const cardStyle: React.CSSProperties = {
   background: 'var(--bg-elevated)',
   border: '1px solid var(--border)',
   borderRadius: 6,
-  padding: '10px 12px',
+  padding: '12px 14px',
   display: 'flex',
   alignItems: 'center',
-  gap: 12,
+  gap: 14,
   cursor: 'pointer',
   transition: 'border-color 0.15s ease, background 0.15s ease',
 };
@@ -43,45 +43,49 @@ const cardDisabledStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 12,
+  fontSize: 14,
   color: 'var(--text-primary)',
   fontWeight: 600,
   display: 'flex',
   alignItems: 'center',
-  gap: 6,
+  gap: 8,
+  flexWrap: 'wrap' as const,
 };
 
 const subLabelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   color: 'var(--text-muted)',
-  marginTop: 2,
+  marginTop: 4,
+  lineHeight: 1.4,
 };
 
 const badgeStyle: React.CSSProperties = {
-  fontSize: 9,
+  fontSize: 10,
   color: 'white',
   background: 'var(--accent, #6366f1)',
-  padding: '1px 6px',
+  padding: '2px 8px',
   borderRadius: 999,
-  fontWeight: 600,
-  letterSpacing: 0.3,
+  fontWeight: 700,
+  letterSpacing: 0.4,
   textTransform: 'uppercase' as const,
+  lineHeight: 1.4,
 };
 
 const iconBtnStyle: React.CSSProperties = {
   background: 'transparent',
   border: '1px solid var(--border)',
   color: 'var(--text-secondary)',
-  padding: '4px 8px',
-  borderRadius: 4,
-  fontSize: 10,
+  padding: '6px 12px',
+  borderRadius: 5,
+  fontSize: 12,
   cursor: 'pointer',
+  fontWeight: 500,
 };
 
 const toggleStyle: React.CSSProperties = {
   position: 'relative',
-  width: 30,
-  height: 16,
+  width: 36,
+  height: 20,
   background: 'var(--bg-primary)',
   borderRadius: 999,
   border: '1px solid var(--border)',
@@ -93,9 +97,9 @@ const toggleStyle: React.CSSProperties = {
 const toggleKnobStyle = (enabled: boolean): React.CSSProperties => ({
   position: 'absolute',
   top: 1,
-  left: enabled ? 15 : 1,
-  width: 12,
-  height: 12,
+  left: enabled ? 17 : 1,
+  width: 16,
+  height: 16,
   borderRadius: '50%',
   background: enabled ? 'var(--accent, #6366f1)' : 'var(--text-muted)',
   transition: 'left 0.15s ease, background 0.15s ease',

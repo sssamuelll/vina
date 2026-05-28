@@ -31,7 +31,7 @@ interface Props {
 }
 
 const labelStyle: React.CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   color: 'var(--text-secondary)',
   fontWeight: 600,
 };
@@ -39,23 +39,24 @@ const labelStyle: React.CSSProperties = {
 const fieldStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 4,
-  marginBottom: 10,
+  gap: 6,
+  marginBottom: 12,
 };
 
 const inputStyle: React.CSSProperties = {
   background: 'var(--bg-primary)',
   border: '1px solid var(--border)',
   color: 'var(--text-primary)',
-  padding: '6px 8px',
-  borderRadius: 4,
-  fontSize: 11,
+  padding: '8px 10px',
+  borderRadius: 5,
+  fontSize: 14,
   fontFamily: "'SF Mono', 'Fira Code', monospace",
 };
 
 const hintStyle: React.CSSProperties = {
-  fontSize: 9,
+  fontSize: 11,
   color: 'var(--text-muted)',
+  lineHeight: 1.5,
 };
 
 export default function DynamicProviderForm({ provider, values, onChange, providerLocked }: Props) {
@@ -85,15 +86,16 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
       {providerLocked && (
         <div
           style={{
-            fontSize: 10,
+            fontSize: 12,
             color: 'var(--text-muted)',
             background: 'var(--bg-elevated)',
-            padding: '6px 8px',
-            borderRadius: 4,
-            marginBottom: 10,
+            padding: '8px 12px',
+            borderRadius: 5,
+            marginBottom: 12,
+            lineHeight: 1.5,
           }}
         >
-          Provider: <strong>{meta.label}</strong> (cannot be changed after creation — delete and re-add to switch provider)
+          Provider: <strong style={{ color: 'var(--text-primary)' }}>{meta.label}</strong> (cannot be changed after creation — delete and re-add to switch provider)
         </div>
       )}
 
@@ -101,7 +103,7 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
       {meta.apiKey && (
         <div style={fieldStyle}>
           <label style={labelStyle}>API Key</label>
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <input
               type={showKey ? 'text' : 'password'}
               style={{ ...inputStyle, flex: 1 }}
@@ -118,10 +120,11 @@ export default function DynamicProviderForm({ provider, values, onChange, provid
                 background: 'transparent',
                 color: 'var(--text-secondary)',
                 border: '1px solid var(--border)',
-                padding: '5px 10px',
-                borderRadius: 4,
-                fontSize: 10,
+                padding: '7px 12px',
+                borderRadius: 5,
+                fontSize: 12,
                 cursor: 'pointer',
+                fontWeight: 500,
               }}
               aria-label={showKey ? 'Hide key' : 'Show key'}
             >
