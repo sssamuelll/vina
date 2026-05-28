@@ -1,3 +1,14 @@
+> **SUPERSEDED — 2026-05-28.** This polish spec targets the VS Code-style UI
+> (ActivityBar + Sidebar + BottomPanel) that is being deleted per the MVP v1
+> housekeeping P1. The new canonical shell is **UnifiedBar** (chat / commands
+> / settings modes) per `docs/specs/UX-VISION.md`. A new polish spec for the
+> UnifiedBar UX, if needed, will be written after the María session validates
+> the slice direction.
+>
+> Content below preserved for historical context only.
+
+---
+
 # OpenClo UI Polish Spec — For UX/UI Design Team
 
 > **Date:** 2026-03-05
