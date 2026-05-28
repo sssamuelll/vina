@@ -56,6 +56,14 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
   const [mode, setMode] = useState<BarMode>('chat');
   const [input, setInput] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
+  // Submit nonce — incremented only when the user actually presses Enter or
+  // clicks Send in chat mode. UnifiedBarChat watches this counter (NOT the
+  // raw `input` prop) to decide when to fire a chat send. Pre-2026-05-28
+  // UnifiedBarChat watched `input` directly, which meant every keystroke
+  // arriving from `setInput(e.target.value)` was interpreted as a submit —
+  // typing "hola" sent four separate messages "h", "o", "l", "a". Switching
+  // to a nonce decouples per-keystroke input updates from submit intent.
+  const [submitNonce, setSubmitNonce] = useState(0);
   const [position, setPosition] = useState(loadPosition);
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +150,10 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
     if (!input.trim()) return;
     if (mode === 'chat') {
       setPanelOpen(true);
+      // Signal the chat panel that THIS specific input value should be sent.
+      // The nonce changes only on intentional submit (Enter / Send button),
+      // never on per-keystroke setInput updates from onChange.
+      setSubmitNonce((n) => n + 1);
     }
   }, [input, mode]);
 
@@ -202,7 +214,7 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
       {/* Expanding panel */}
       {panelOpen && (
         <div className="unified-bar__panel" onClick={e => e.stopPropagation()}>
-          {mode === 'chat' && <UnifiedBarChat input={input} setInput={setInput} />}
+          {mode === 'chat' && <UnifiedBarChat input={input} setInput={setInput} submitNonce={submitNonce} />}
           {mode === 'commands' && (
             <UnifiedBarCommands
               query={input}

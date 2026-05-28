@@ -178,6 +178,11 @@
   color: var(--text-secondary);
   line-height: 1.6;
   max-width: 85%;
+  /* Parent `.unified-bar` sets user-select: none to allow drag from chrome
+     areas. Chat content needs to be selectable so users can copy errors,
+     tool outputs, and agent replies for debugging. */
+  user-select: text;
+  cursor: text;
 }
 .chat-message--user .chat-message__text {
   color: var(--text-primary);
