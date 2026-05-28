@@ -15,11 +15,29 @@ const LAYOUT_DEFAULTS: LayoutState = {
   splitRatio: 0.5,
 };
 
+// shape: LayoutState v1 — opt-in envelope: no
+//
+// LS-only justification (per CLAUDE.md B6-state): layout is pure UI chrome
+// state — primary axis + split ratio. No cross-device sync requirement, no
+// versioned schema needed (a corrupt or unknown shape falls back to defaults
+// without user-visible loss). IDB envelope overhead would dwarf the payload.
+// Pre-MVP-v1 versions of this slice persisted extra fields (copilotOpen /
+// copilotSize / copilotPosition / sidebarTab / bottomPanelOpen / bottomPanelTab)
+// that were dropped in commit fd7691b2 along with the VS Code-style shell.
+// `loadLayoutFromStorage` whitelists the surviving keys so legacy zombie fields
+// from older LS payloads are dropped on first read instead of looping back to
+// disk through `saveLayoutToStorage`.
 function loadLayoutFromStorage(): LayoutState {
   try {
     const stored = safeGetItem(STORAGE_KEY);
     if (stored) {
-      return { ...LAYOUT_DEFAULTS, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored) as Partial<LayoutState> & Record<string, unknown>;
+      return {
+        primaryView: parsed.primaryView === '3d' ? '3d' : LAYOUT_DEFAULTS.primaryView,
+        splitRatio: typeof parsed.splitRatio === 'number'
+          ? Math.max(0.15, Math.min(0.85, parsed.splitRatio))
+          : LAYOUT_DEFAULTS.splitRatio,
+      };
     }
   } catch {
     // Ignore JSON.parse errors

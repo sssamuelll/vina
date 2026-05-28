@@ -53,7 +53,10 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfigSync);
   useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
 
-  // Listen for provider config changes (settings may be saved from CopilotPanel)
+  // Listen for provider config changes (dispatched by UnifiedBar after Save in
+  // settings mode). One-shot invalidation HINT — see contract on the dispatch
+  // site in UnifiedBar.tsx. In-flight `useAgenticLoop.send` calls keep their
+  // captured providerConfig; only subsequent calls see the refreshed value.
   useEffect(() => {
     const handler = () => { loadProviderConfig().then(setProviderConfig); };
     window.addEventListener('openclo:provider-config-changed', handler);

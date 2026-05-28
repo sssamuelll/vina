@@ -1,4 +1,4 @@
-/* AvatarPanel — sidebar that pushes 3D viewport (like ActivityBar sidebar) */
+/* AvatarPanel — sidebar that pushes the 3D viewport horizontally instead of overlaying. */
 .avatar-panel-wrapper {
   flex-shrink: 0;
   overflow: hidden;

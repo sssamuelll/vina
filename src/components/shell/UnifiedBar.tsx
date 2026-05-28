@@ -214,6 +214,17 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
           {mode === 'settings' && (
             <AgentSettings
               onSave={() => {
+                // `openclo:provider-config-changed` is a one-shot invalidation HINT,
+                // not a transactional channel. Contract:
+                //   - Listener (UnifiedBarChat) refreshes providerConfig via
+                //     loadProviderConfig() on receipt. If the panel isn't mounted
+                //     yet (first chat open after save), the listener's mount-effect
+                //     reads provider config from scratch → the hint is redundant
+                //     but not incorrect.
+                //   - In-flight `useAgenticLoop.send` closures capture providerConfig
+                //     at call time. A provider switch mid-stream does NOT cancel or
+                //     reroute the in-flight call. This is intentional in MVP v1 —
+                //     mid-conversation provider switching is out of scope.
                 window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
                 setPanelOpen(false);
               }}

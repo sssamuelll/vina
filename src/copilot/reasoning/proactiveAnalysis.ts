@@ -318,8 +318,9 @@ export function auditNotches(
  * Run all proactive analysis checks on the current project state.
  *
  * This is the main entry point — call this after any state change that
- * modifies pieces or seams. The results are displayed as subtle hints
- * in the CopilotPanel.
+ * modifies pieces or seams. The results surface as agentic chat hints
+ * via the UnifiedBar chat mode (the previous CopilotPanel host was
+ * deleted in commit 1c6e4238).
  *
  * @param pieces - All pattern pieces in the project
  * @param seams - All seam connections in the project

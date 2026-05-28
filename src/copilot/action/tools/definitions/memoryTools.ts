@@ -3,6 +3,17 @@
  * #81 — Copilot Memory tools: rememberThis, recallContext, setPreference, addNote
  * #143/#146 — Design Log tools: writeDesignNote, recallDesignLog
  * #148 — Preference Learning tools: detectFormulaChanges, saveFormulaOverride
+ *
+ * MVP v1 state (dark surface, ratified 2026-05-28 in #827):
+ * These tools remain registered. The agent can WRITE to project memory
+ * (`openclo_memory_<projectId>` localStorage) via `rememberDecision` /
+ * `setUserPreference` / `addNote`, and READ via `getMemory`. There is no
+ * user-reachable UI to inspect or clear this state in MVP v1 — AgentSettings
+ * exposes a Clear-memory button only when its host wires `onClearMemory`, and
+ * UnifiedBar (the canonical shell) does not, per Opt C partial port.
+ * Trade-off accepted: the agent gains cross-session recall in the María slice;
+ * the user must purge via DevTools or by clearing site data. A user-facing
+ * clear surface is queued for M2+ together with the ProjectMemory UI binding.
  */
 
 import type { ToolDefinition } from '../registry';
