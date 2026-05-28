@@ -15,6 +15,7 @@ import {
 } from '../../copilot/providers/types';
 import type { ProviderConfig, ChatMessage as ProviderChatMessage, ProviderToolDef } from '../../copilot/providers/types';
 import { getAllMetaTools } from '../../copilot/reasoning/bridge/meta-tools';
+import { classifyError, getErrorMessage } from '../../copilot/errorRecovery';
 import { newId } from '../../utils/ids';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
@@ -52,7 +53,10 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
   const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfigSync);
   useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
 
-  // Listen for provider config changes (settings may be saved from CopilotPanel)
+  // Listen for provider config changes (dispatched by UnifiedBar after Save in
+  // settings mode). One-shot invalidation HINT — see contract on the dispatch
+  // site in UnifiedBar.tsx. In-flight `useAgenticLoop.send` calls keep their
+  // captured providerConfig; only subsequent calls see the refreshed value.
   useEffect(() => {
     const handler = () => { loadProviderConfig().then(setProviderConfig); };
     window.addEventListener('openclo:provider-config-changed', handler);
@@ -129,10 +133,10 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
         { id: newId(), role: 'assistant', content: response },
       ]);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'An error occurred';
+      const msg = getErrorMessage(classifyError(e), e);
       setMessages(prev => [
         ...prev,
-        { id: newId(), role: 'assistant', content: `Error: ${msg}` },
+        { id: newId(), role: 'assistant', content: msg },
       ]);
     }
   }, [agenticHook, setInput]);
@@ -174,7 +178,7 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
           color: 'var(--text-ghost)',
           fontSize: 'var(--text-ui)',
         }}>
-          {hasProvider ? 'Ask the AI about your design...' : 'Configure AI provider in Copilot settings...'}
+          {hasProvider ? 'Ask the AI about your design...' : 'Add an AI provider in settings to start chatting.'}
         </div>
       )}
 

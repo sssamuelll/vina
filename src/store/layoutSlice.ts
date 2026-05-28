@@ -1,46 +1,43 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { safeGetItem, safeSetItem } from '../utils/safeStorage';
 
-export type BottomTab = 'copilot' | 'problems' | 'output' | 'nesting-preview' | 'timeline' | 'inspector' | 'poms' | 'bom' | 'grading';
-
 export interface LayoutState {
-  /** Where the copilot panel lives */
-  copilotPosition: 'bottom' | 'right' | 'left';
-  /** Whether copilot is open */
-  copilotOpen: boolean;
-  /** Copilot panel size (height for bottom, width for left/right) in px */
-  copilotSize: number;
-  /** Active tab in the sidebar panel */
-  sidebarTab: 'chat' | 'properties';
   /** 2D/3D view order — which is on the left in split mode */
   primaryView: '2d' | '3d';
   /** Split ratio when in split mode */
   splitRatio: number;
-  /** Whether the bottom panel is open */
-  bottomPanelOpen: boolean;
-  /** Active tab in the bottom panel */
-  bottomPanelTab: BottomTab;
 }
 
 const STORAGE_KEY = 'openclo-layout';
 
 const LAYOUT_DEFAULTS: LayoutState = {
-  copilotPosition: 'right',
-  copilotOpen: false,
-  copilotSize: 340,
-  sidebarTab: 'chat',
   primaryView: '2d',
   splitRatio: 0.5,
-  bottomPanelOpen: false,
-  bottomPanelTab: 'problems',
 };
 
-// Load from localStorage, merging with defaults to handle new fields
+// shape: LayoutState v1 — opt-in envelope: no
+//
+// LS-only justification (per CLAUDE.md B6-state): layout is pure UI chrome
+// state — primary axis + split ratio. No cross-device sync requirement, no
+// versioned schema needed (a corrupt or unknown shape falls back to defaults
+// without user-visible loss). IDB envelope overhead would dwarf the payload.
+// Pre-MVP-v1 versions of this slice persisted extra fields (copilotOpen /
+// copilotSize / copilotPosition / sidebarTab / bottomPanelOpen / bottomPanelTab)
+// that were dropped in commit fd7691b2 along with the VS Code-style shell.
+// `loadLayoutFromStorage` whitelists the surviving keys so legacy zombie fields
+// from older LS payloads are dropped on first read instead of looping back to
+// disk through `saveLayoutToStorage`.
 function loadLayoutFromStorage(): LayoutState {
   try {
     const stored = safeGetItem(STORAGE_KEY);
     if (stored) {
-      return { ...LAYOUT_DEFAULTS, ...JSON.parse(stored) };
+      const parsed = JSON.parse(stored) as Partial<LayoutState> & Record<string, unknown>;
+      return {
+        primaryView: parsed.primaryView === '3d' ? '3d' : LAYOUT_DEFAULTS.primaryView,
+        splitRatio: typeof parsed.splitRatio === 'number'
+          ? Math.max(0.15, Math.min(0.85, parsed.splitRatio))
+          : LAYOUT_DEFAULTS.splitRatio,
+      };
     }
   } catch {
     // Ignore JSON.parse errors
@@ -48,7 +45,6 @@ function loadLayoutFromStorage(): LayoutState {
   return { ...LAYOUT_DEFAULTS };
 }
 
-// Save to localStorage
 function saveLayoutToStorage(state: LayoutState) {
   safeSetItem(STORAGE_KEY, JSON.stringify(state));
 }
@@ -59,96 +55,18 @@ const layoutSlice = createSlice({
   name: 'layout',
   initialState,
   reducers: {
-    setCopilotPosition(state, action: PayloadAction<'bottom' | 'right' | 'left'>) {
-      state.copilotPosition = action.payload;
-      // Adjust size based on position
-      if (action.payload === 'bottom') {
-        state.copilotSize = Math.min(state.copilotSize, 300); // Max height for bottom
-      } else {
-        state.copilotSize = Math.max(state.copilotSize, 280); // Min width for sides
-      }
-      saveLayoutToStorage(state);
-    },
-    
-    setCopilotOpen(state, action: PayloadAction<boolean>) {
-      state.copilotOpen = action.payload;
-      saveLayoutToStorage(state);
-    },
-    
-    toggleCopilot(state) {
-      state.copilotOpen = !state.copilotOpen;
-      saveLayoutToStorage(state);
-    },
-    
-    setCopilotSize(state, action: PayloadAction<number>) {
-      const { copilotPosition } = state;
-      
-      if (copilotPosition === 'bottom') {
-        // Height constraints for bottom panel
-        state.copilotSize = Math.max(100, Math.min(action.payload, window.innerHeight * 0.6));
-      } else {
-        // Width constraints for side panels
-        state.copilotSize = Math.max(280, Math.min(action.payload, window.innerWidth * 0.6));
-      }
-      saveLayoutToStorage(state);
-    },
-    
     setPrimaryView(state, action: PayloadAction<'2d' | '3d'>) {
       state.primaryView = action.payload;
       saveLayoutToStorage(state);
     },
-    
+
     swapViews(state) {
       state.primaryView = state.primaryView === '2d' ? '3d' : '2d';
       saveLayoutToStorage(state);
     },
-    
+
     setSplitRatio(state, action: PayloadAction<number>) {
       state.splitRatio = Math.max(0.15, Math.min(0.85, action.payload));
-      saveLayoutToStorage(state);
-    },
-    
-    cycleCopilotPosition(state) {
-      // Cycle: right → bottom → left → right
-      const cycle: Record<string, 'bottom' | 'right' | 'left'> = {
-        right: 'bottom',
-        bottom: 'left',
-        left: 'right',
-      };
-      
-      const newPosition = cycle[state.copilotPosition];
-      state.copilotPosition = newPosition;
-      
-      // Adjust size based on new position
-      if (newPosition === 'bottom') {
-        state.copilotSize = Math.min(state.copilotSize, 300);
-      } else {
-        state.copilotSize = Math.max(state.copilotSize, 280);
-      }
-      
-      saveLayoutToStorage(state);
-    },
-    
-    setSidebarTab(state, action: PayloadAction<'chat' | 'properties'>) {
-      state.sidebarTab = action.payload;
-      saveLayoutToStorage(state);
-    },
-
-    setBottomPanelOpen(state, action: PayloadAction<boolean>) {
-      state.bottomPanelOpen = action.payload;
-      saveLayoutToStorage(state);
-    },
-
-    toggleBottomPanel(state) {
-      state.bottomPanelOpen = !state.bottomPanelOpen;
-      saveLayoutToStorage(state);
-    },
-
-    setBottomPanelTab(state, action: PayloadAction<BottomTab>) {
-      state.bottomPanelTab = action.payload;
-      if (!state.bottomPanelOpen) {
-        state.bottomPanelOpen = true;
-      }
       saveLayoutToStorage(state);
     },
 
@@ -160,18 +78,9 @@ const layoutSlice = createSlice({
 });
 
 export const {
-  setCopilotPosition,
-  setCopilotOpen,
-  toggleCopilot,
-  setCopilotSize,
   setPrimaryView,
   swapViews,
   setSplitRatio,
-  cycleCopilotPosition,
-  setSidebarTab,
-  setBottomPanelOpen,
-  toggleBottomPanel,
-  setBottomPanelTab,
   resetLayout,
 } = layoutSlice.actions;
 

@@ -28,7 +28,7 @@ export const simulateTool: ToolDefinition = {
   icon: SimulateIcon,
   cursor: 'pointer',
   group: '3d-simulation',
-  hidden: true, // Managed via ActivityBar, not Toolbar3D
+  hidden: true, // Hidden from the canvas toolbar; triggered via copilot tool calls / commands mode
   options: [
     {
       id: 'particleDistance',

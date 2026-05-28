@@ -63,3 +63,6 @@ mempalace.yaml
 /webgpu-*.png
 /webgpu-*.log
 /webgpu-*.txt
+
+# Understand-Anything (Lum1104) tool eval — local-only, never commit
+/.understand-anything/
