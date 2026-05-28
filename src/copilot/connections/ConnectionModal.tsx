@@ -54,7 +54,7 @@ const dialogStyle: React.CSSProperties = {
 };
 
 const headerStyle: React.CSSProperties = {
-  padding: '14px 16px',
+  padding: '16px 18px',
   borderBottom: '1px solid var(--border)',
   display: 'flex',
   justifyContent: 'space-between',
@@ -62,25 +62,25 @@ const headerStyle: React.CSSProperties = {
 };
 
 const bodyStyle: React.CSSProperties = {
-  padding: 16,
+  padding: 18,
   overflowY: 'auto',
 };
 
 const footerStyle: React.CSSProperties = {
-  padding: 12,
+  padding: 14,
   borderTop: '1px solid var(--border)',
   display: 'flex',
   justifyContent: 'flex-end',
-  gap: 8,
+  gap: 10,
 };
 
 const btnStyle: React.CSSProperties = {
   background: 'var(--accent)',
   color: 'white',
   border: 'none',
-  padding: '6px 16px',
-  borderRadius: 4,
-  fontSize: 11,
+  padding: '8px 18px',
+  borderRadius: 5,
+  fontSize: 13,
   cursor: 'pointer',
   fontWeight: 600,
 };
@@ -89,9 +89,9 @@ const btnSecondaryStyle: React.CSSProperties = {
   background: 'transparent',
   color: 'var(--text-secondary)',
   border: '1px solid var(--border)',
-  padding: '5px 12px',
-  borderRadius: 4,
-  fontSize: 10,
+  padding: '7px 14px',
+  borderRadius: 5,
+  fontSize: 12,
   cursor: 'pointer',
 };
 
@@ -174,13 +174,13 @@ export default function ConnectionModal(props: Props) {
     >
       <div style={dialogStyle} onMouseDown={(e) => e.stopPropagation()}>
         <div style={headerStyle}>
-          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+          <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>
             {isEdit ? 'Edit connection' : 'Add connection'}
           </h4>
           <button
             type="button"
             onClick={props.onClose}
-            style={{ ...btnSecondaryStyle, padding: '2px 8px' }}
+            style={{ ...btnSecondaryStyle, padding: '4px 10px', fontSize: 13 }}
             aria-label="Close"
           >
             ✕
@@ -189,8 +189,8 @@ export default function ConnectionModal(props: Props) {
         <div style={bodyStyle}>
           {/* Provider picker (Add mode only) */}
           {!isEdit && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-              <label style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
+              <label style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
                 Provider
               </label>
               <select
@@ -198,9 +198,9 @@ export default function ConnectionModal(props: Props) {
                   background: 'var(--bg-primary)',
                   border: '1px solid var(--border)',
                   color: 'var(--text-primary)',
-                  padding: '6px 8px',
-                  borderRadius: 4,
-                  fontSize: 11,
+                  padding: '8px 10px',
+                  borderRadius: 5,
+                  fontSize: 14,
                 }}
                 value={provider}
                 onChange={(e) => setProvider(e.target.value as ProviderId)}

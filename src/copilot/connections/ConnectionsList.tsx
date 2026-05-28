@@ -27,34 +27,36 @@ import ConnectionModal from './ConnectionModal';
 const containerStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: 8,
+  gap: 10,
 };
 
 const headerStyle: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'center',
-  marginBottom: 4,
+  marginBottom: 6,
 };
 
 const addBtnStyle: React.CSSProperties = {
   background: 'var(--accent, #6366f1)',
   color: 'white',
   border: 'none',
-  padding: '5px 10px',
-  borderRadius: 4,
-  fontSize: 10,
+  padding: '7px 14px',
+  borderRadius: 5,
+  fontSize: 13,
   cursor: 'pointer',
   fontWeight: 600,
+  lineHeight: 1.2,
 };
 
 const emptyStyle: React.CSSProperties = {
   textAlign: 'center',
-  padding: '24px 16px',
+  padding: '32px 20px',
   color: 'var(--text-muted)',
-  fontSize: 11,
+  fontSize: 13,
   border: '1px dashed var(--border)',
   borderRadius: 6,
+  lineHeight: 1.5,
 };
 
 interface Props {
@@ -88,7 +90,7 @@ export default function ConnectionsList({ onStateChange }: Props) {
   );
 
   if (!state) {
-    return <div style={{ ...emptyStyle, padding: '16px' }}>Loading connections…</div>;
+    return <div style={{ ...emptyStyle, padding: '20px' }}>Loading connections…</div>;
   }
 
   const handleAdd = () => setModal({ mode: 'add' });
@@ -129,7 +131,7 @@ export default function ConnectionsList({ onStateChange }: Props) {
   return (
     <div style={containerStyle}>
       <div style={headerStyle}>
-        <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>
+        <span style={{ fontSize: 13, color: 'var(--text-secondary)', fontWeight: 600 }}>
           Connections ({state.connections.length})
         </span>
         <button type="button" style={addBtnStyle} onClick={handleAdd}>
@@ -145,9 +147,9 @@ export default function ConnectionsList({ onStateChange }: Props) {
             type="button"
             style={{
               ...addBtnStyle,
-              marginTop: 10,
-              padding: '6px 14px',
-              fontSize: 11,
+              marginTop: 14,
+              padding: '8px 18px',
+              fontSize: 13,
             }}
             onClick={handleAdd}
           >
