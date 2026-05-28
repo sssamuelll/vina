@@ -29,6 +29,14 @@ interface ChatMessage {
 interface Props {
   input: string;
   setInput: (v: string) => void;
+  /**
+   * Counter incremented by `UnifiedBar` ONLY when the user actually submits
+   * (Enter key or Send button click). UnifiedBarChat watches this nonce
+   * (not the raw `input` prop) to decide when to fire a send — decoupling
+   * per-keystroke input updates from submit intent. Pre-2026-05-28 we
+   * watched `input` directly which sent one message per typed character.
+   */
+  submitNonce: number;
 }
 
 // ─── Provider Helper ─────────────────────────────────────────────────────────────
@@ -46,7 +54,7 @@ function getProvider(config: ProviderConfig) {
 
 // ─── Component ───────────────────────────────────────────────────────────────────
 
-export default function UnifiedBarChat({ input, setInput }: Props) {
+export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) {
   const dispatch = useDispatch<AppDispatch>();
 
   // Provider config
@@ -66,9 +74,6 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
   // Chat messages state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Track the last submitted input to detect new submissions from the parent
-  const lastSubmittedRef = useRef<string>('');
 
   // Tool registry
   const registry = useMemo(() => {
@@ -111,11 +116,11 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, agenticHook.toolCalls]);
 
-  // Detect submit from parent: fires when input is non-empty and different from last submitted
+  // Send a chat message. Called from the nonce-watching effect below when
+  // the user actually submits (Enter / Send button in UnifiedBar).
   const handleSend = useCallback(async (text: string) => {
     if (!text.trim() || agenticHook.isRunning) return;
 
-    lastSubmittedRef.current = text;
     setInput('');
 
     // Add user message
@@ -141,23 +146,22 @@ export default function UnifiedBarChat({ input, setInput }: Props) {
     }
   }, [agenticHook, setInput]);
 
-  // Watch for new input submitted by the parent (UnifiedBar presses Enter → sets panelOpen)
-  // We trigger when the input is non-empty and hasn't been submitted yet
-  const prevInputRef = useRef<string>(input);
+  // Watch the submit-nonce from UnifiedBar. It changes ONLY when the user
+  // intentionally submits (Enter key or Send button). Per-keystroke input
+  // updates do not move the nonce. Initial value is captured in the ref so
+  // mount does not auto-fire (`null` sentinel handles the very first run).
+  const lastNonceRef = useRef<number | null>(null);
   useEffect(() => {
-    const prev = prevInputRef.current;
-    prevInputRef.current = input;
+    if (lastNonceRef.current === null) {
+      lastNonceRef.current = submitNonce;
+      return;
+    }
+    if (submitNonce === lastNonceRef.current) return;
+    lastNonceRef.current = submitNonce;
 
-    // Input cleared by us (after submit) — skip
-    if (!input.trim()) return;
-    // Same value as last time — no change
-    if (input === prev) return;
-    // Already submitted this exact string
-    if (input === lastSubmittedRef.current) return;
-
-    // New non-empty input arrived — this means the user pressed Enter in UnifiedBar
+    if (!input.trim() || agenticHook.isRunning) return;
     handleSend(input);
-  }, [input, handleSend]);
+  }, [submitNonce, input, handleSend, agenticHook.isRunning]);
 
   // Running tool indicator
   const runningToolName = agenticHook.toolCalls.find(tc => tc.status === 'running')?.name;
