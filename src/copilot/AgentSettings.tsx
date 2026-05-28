@@ -343,12 +343,19 @@ export default function AgentSettings({
           <input
             type="password"
             style={inputStyle}
-            placeholder={provider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+            placeholder={
+              provider === 'anthropic' ? 'sk-ant-...' :
+              provider === 'vercel-gateway' ? 'vck_...' :
+              'sk-...'
+            }
             value={apiKey}
             onChange={e => setApiKey(e.target.value)}
           />
           <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>
-            {provider === 'anthropic' ? 'console.anthropic.com/settings/keys' : 'platform.openai.com/api-keys'}
+            {provider === 'anthropic' ? 'console.anthropic.com/settings/keys' :
+             provider === 'deepseek' ? 'platform.deepseek.com/api_keys' :
+             provider === 'vercel-gateway' ? 'vercel.com/account/ai/keys' :
+             'platform.openai.com/api-keys'}
           </span>
         </div>
       )}
