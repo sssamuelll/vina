@@ -9,6 +9,7 @@ import { openaiProvider } from '../../copilot/providers/openai';
 import { deepseekProvider } from '../../copilot/providers/deepseek';
 import { ollamaProvider } from '../../copilot/providers/ollama';
 import { claudeBridgeProvider } from '../../copilot/providers/claudeBridge';
+import { vercelGatewayProvider } from '../../copilot/providers/vercelGateway';
 import {
   loadProviderConfig,
   loadProviderConfigSync,
@@ -43,6 +44,7 @@ interface Props {
 
 function getProvider(config: ProviderConfig) {
   switch (config.provider) {
+    case 'vercel-gateway': return vercelGatewayProvider;
     case 'claude-bridge': return claudeBridgeProvider;
     case 'anthropic': return anthropicProvider;
     case 'openai': return openaiProvider;

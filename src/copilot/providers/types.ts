@@ -75,10 +75,18 @@ export interface ProviderResponse {
  */
 export interface ProviderConfig {
   /** Provider type */
-  provider: 'anthropic' | 'openai' | 'deepseek' | 'ollama' | 'claude-bridge';
-  /** API key (empty for Ollama) */
+  provider: 'anthropic' | 'openai' | 'deepseek' | 'ollama' | 'claude-bridge' | 'vercel-gateway';
+  /** API key (empty for Ollama; Vercel AI Gateway key starts with vck_) */
   apiKey: string;
-  /** Model name (e.g. 'claude-sonnet-4-20250514', 'gpt-4o-mini', 'llama3') */
+  /**
+   * Model identifier. Format depends on provider:
+   * - anthropic: bare model ID (`claude-sonnet-4-20250514`)
+   * - openai: bare model ID (`gpt-4o-mini`)
+   * - deepseek: bare model ID (`deepseek-v4-flash`, `deepseek-v4-pro`)
+   * - vercel-gateway: namespaced model ID (`anthropic/claude-sonnet-4.6`,
+   *   `deepseek/deepseek-v4-pro`, `openai/gpt-4o`, etc.) — the gateway
+   *   routes by namespace.
+   */
   model: string;
   /** Optional base URL override */
   baseUrl?: string;
@@ -128,20 +136,46 @@ export interface LLMProvider {
 
 /** Available provider options for the settings UI */
 export const PROVIDER_OPTIONS = [
+  { value: 'vercel-gateway', label: 'Vercel AI Gateway (Multi-Provider)', defaultModel: 'anthropic/claude-sonnet-4.6' },
   { value: 'claude-bridge', label: 'Claude Code (Bridge)', defaultModel: 'claude-code' },
   { value: 'anthropic', label: 'Anthropic (API)', defaultModel: 'claude-sonnet-4-20250514' },
   { value: 'openai', label: 'OpenAI (API)', defaultModel: 'gpt-4o-mini' },
-  { value: 'deepseek', label: 'DeepSeek (API)', defaultModel: 'deepseek-chat' },
+  { value: 'deepseek', label: 'DeepSeek (API)', defaultModel: 'deepseek-v4-flash' },
   { value: 'ollama', label: 'Ollama (Local)', defaultModel: 'llama3' },
 ] as const;
 
-/** Available models per provider */
+/**
+ * Available models per provider.
+ *
+ * Notes:
+ * - `deepseek-chat` and `deepseek-reasoner` are still accepted by the API but
+ *   are scheduled for deprecation 2026-07-24 (they alias `deepseek-v4-flash`
+ *   non-thinking / thinking respectively). New configs should pick the V4
+ *   model IDs directly. Aliases kept in the list until the deprecation date
+ *   so existing saved configs continue to render correctly.
+ * - `vercel-gateway` accepts namespaced IDs from any provider Vercel routes;
+ *   the list below is a curated set of the best chat + tool-calling models
+ *   available today. The dropdown is intentionally finite — paste-a-custom-ID
+ *   support is queued for a follow-up.
+ */
 export const MODEL_OPTIONS: Record<string, string[]> = {
   'claude-bridge': ['claude-code'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-3-5-haiku-20241022'],
   openai: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo'],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner'],
   ollama: ['llama3', 'codellama', 'mistral', 'mixtral'],
+  'vercel-gateway': [
+    'anthropic/claude-sonnet-4.6',
+    'anthropic/claude-sonnet-4.5',
+    'anthropic/claude-opus-4.7',
+    'anthropic/claude-opus-4.6',
+    'deepseek/deepseek-v4-pro',
+    'deepseek/deepseek-v4-flash',
+    'openai/gpt-4o',
+    'openai/gpt-4o-mini',
+    'openai/o4-mini',
+    'meta/llama-3.3-70b',
+  ],
 };
 
 // ─── Provider Config from localStorage ──────────────────────────────────────
