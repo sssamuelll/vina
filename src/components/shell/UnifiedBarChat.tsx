@@ -10,11 +10,9 @@ import { deepseekProvider } from '../../copilot/providers/deepseek';
 import { ollamaProvider } from '../../copilot/providers/ollama';
 import { claudeBridgeProvider } from '../../copilot/providers/claudeBridge';
 import { vercelGatewayProvider } from '../../copilot/providers/vercelGateway';
-import {
-  loadProviderConfig,
-  loadProviderConfigSync,
-} from '../../copilot/providers/types';
 import type { ProviderConfig, ChatMessage as ProviderChatMessage, ProviderToolDef } from '../../copilot/providers/types';
+import { loadConnectionsState, getActiveConnection } from '../../copilot/connections/storage';
+import { connectionToProviderConfig } from '../../copilot/connections/types';
 import { getAllMetaTools } from '../../copilot/reasoning/bridge/meta-tools';
 import { classifyError, getErrorMessage } from '../../copilot/errorRecovery';
 import { newId } from '../../utils/ids';
@@ -59,19 +57,28 @@ function getProvider(config: ProviderConfig) {
 export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) {
   const dispatch = useDispatch<AppDispatch>();
 
-  // Provider config
-  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(loadProviderConfigSync);
-  useEffect(() => { loadProviderConfig().then(setProviderConfig); }, []);
+  // Provider config — derived from the active connection in the new
+  // connections store. Starts null (no sync path; IDB is async-only) and
+  // hydrates from the active connection on mount.
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig | null>(null);
 
-  // Listen for provider config changes (dispatched by UnifiedBar after Save in
-  // settings mode). One-shot invalidation HINT — see contract on the dispatch
-  // site in UnifiedBar.tsx. In-flight `useAgenticLoop.send` calls keep their
-  // captured providerConfig; only subsequent calls see the refreshed value.
-  useEffect(() => {
-    const handler = () => { loadProviderConfig().then(setProviderConfig); };
-    window.addEventListener('openclo:provider-config-changed', handler);
-    return () => window.removeEventListener('openclo:provider-config-changed', handler);
+  const loadFromActiveConnection = useCallback(async () => {
+    const state = await loadConnectionsState();
+    const active = getActiveConnection(state);
+    setProviderConfig(active ? connectionToProviderConfig(active) : null);
   }, []);
+
+  useEffect(() => { loadFromActiveConnection(); }, [loadFromActiveConnection]);
+
+  // Listen for connection mutations from ConnectionsList (add / update / delete /
+  // set-active / toggle-enabled). One-shot invalidation HINT — in-flight
+  // `useAgenticLoop.send` calls keep their captured providerConfig; only
+  // subsequent calls see the refreshed value. Mid-conversation active
+  // connection switching is out of scope for MVP v1.
+  useEffect(() => {
+    window.addEventListener('openclo:provider-config-changed', loadFromActiveConnection);
+    return () => window.removeEventListener('openclo:provider-config-changed', loadFromActiveConnection);
+  }, [loadFromActiveConnection]);
 
   // Chat messages state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
