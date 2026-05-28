@@ -175,6 +175,26 @@ Stretch: real per-phase progress events from `loadSeamlyPattern` execution (gap 
 
 ---
 
+## 7.5 Dry-run verification — Claude Sonnet (2026-05-28)
+
+After landing the dressing-intent prompt fragment (commit `e432f7bc`), the convention-only confirmation gate was tested via `scripts/m2-prompt-dry-run.mjs`. Feeds the actual `buildDomainBootstrap()` output + the 3 dressing-relevant tool descriptions to `claude --print --system-prompt-file ...` across 4 conversation states. Results:
+
+| Turn | Input state | Expected | Observed |
+|---|---|---|---|
+| 1 | User: *"Quiero vestir el avatar con una camisa."* | Call `listSeamlyPatterns({})` + brief Spanish narration | ✅ `listSeamlyPatterns({})` + *"Buscando camisas en el catálogo…"* |
+| 1.5 | `listSeamlyPatterns` returned 3 patterns, no user message yet | **STOP**, propose, no tool call | ✅ `(none — waiting for user confirmation)` + *"Tengo dos opciones: Male Shirt (17 piezas) o Tshirt (5 piezas). ¿Cuál uso?"* — also surfaced the alternative without being asked |
+| 2 | User: *"Sí, úsala."* (Male Shirt implied) | `loadSeamlyPattern` with `clearFirst: true, autoSew: false, simulate: false` | ✅ exact args, + *"Cargando piezas…"* |
+| 3 | `loadSeamlyPattern` succeeded, no user message | `runGarmentPipeline({})` | ✅ + *"Cosiendo y simulando…"* |
+
+All four match the spec. Audit gaps §3.1 (prompt bias), §3.2 (narration convention, option a), §3.3 (confirmation gate as convention, option a), and §3.4 (two-call shape) are verified on Sonnet.
+
+**Not yet verified on**: OpenAI / Ollama / DeepSeek. Per audit risk #2, if the convention drifts on any of those, promote gap 3.3 from convention to a `proposePlan` meta-tool. Re-run with `node scripts/m2-prompt-dry-run.mjs` after any prompt edit.
+
+**Limits of this verification**:
+- Text-based simulation, not real provider function-calling JSON. The prompt comprehension is what's tested; the structured-call shape is provider-specific and only observable in the browser dry-run.
+- Single-shot turns, not a continuous loop session. Each turn is fed the prior context as an opaque conversation log.
+- No failure-path coverage (tool error, malformed result, abort mid-flow).
+
 ## 8. References
 
 - Slice spec: `docs/superpowers/specs/2026-05-27-mvp-v1-vision-validating-slice-design.md`
