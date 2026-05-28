@@ -17,8 +17,22 @@ import { applyMeasMapping, deriveMeasurements } from '../../../../utils/seamly2d
 
 // ─── Lazy-load pattern JSONs via Vite glob ──────────────────────────────────
 
+// Path counts UP from this file's directory:
+//   src/copilot/action/tools/definitions/  (here)
+//   ../                                    src/copilot/action/tools/
+//   ../../                                 src/copilot/action/
+//   ../../../                              src/copilot/
+//   ../../../../                           src/
+//   ../../../../../                        repo root  ← tools/ lives here
+// (TemplateLibrary.tsx uses 3 ups from src/components/TemplateLibrary/ for
+// the same target; this file is two levels deeper so it needs 5.)
+// Pre-MVP-v1 this used 4 ups, which silently resolved to a non-existent
+// src/tools/... path → listSeamlyPatterns always returned [] when invoked
+// from the agentic loop. The bug was masked because the live UI loads
+// patterns via TemplateLibrary, not via this tool. Discovered by the M2
+// dressing-slice integration test on 2026-05-28.
 const patternModules = import.meta.glob(
-  '../../../../tools/seamly2d-converter/output/*.json',
+  '../../../../../tools/seamly2d-converter/output/*.json',
   { eager: false },
 );
 

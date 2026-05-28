@@ -7,7 +7,7 @@
  * @module useAgenticLoop
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import { type AgenticLoopOptions, type AgenticEvent } from '../reasoning/bridge/AgenticLoop';
 import { createDebugAgenticLoop } from '../debug/createDebugBridge';
@@ -29,6 +29,8 @@ export interface UseAgenticLoopReturn {
   response: string | null;
   /** Run a user request through the agentic loop */
   run: (request: string) => Promise<string>;
+  /** Clear the conversation history (project switch / fresh session). */
+  clearHistory: () => void;
 }
 
 /**
@@ -62,12 +64,23 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
   const [isRunning, setIsRunning] = useState(false);
   const [response, setResponse] = useState<string | null>(null);
 
+  // Keep the loop instance stable so its internal conversation history
+  // persists across run() calls — required for the convention-only
+  // confirmation gate (M2 dressing intent: propose + STOP on one turn,
+  // resume on the next). The loop is recreated when `send` changes (i.e.
+  // when the user switches provider), which also clears history naturally.
+  // Mid-conversation provider switch is out of scope per the M2 spec.
+  const loop = useMemo(
+    () => createDebugAgenticLoop(options).loop,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: rebuild
+    // only on send/registry change so history survives between turns
+    [options.send, options.registry],
+  );
+
   const run = useCallback(async (request: string): Promise<string> => {
     setIsRunning(true);
     setToolCalls([]);
     setResponse(null);
-
-    const { loop } = createDebugAgenticLoop(options);
 
     const handleEvent = (event: AgenticEvent) => {
       switch (event.type) {
@@ -92,7 +105,13 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
     } finally {
       setIsRunning(false);
     }
-  }, [options, dispatch]);
+  }, [loop, dispatch]);
 
-  return { toolCalls, isRunning, response, run };
+  const clearHistory = useCallback(() => {
+    loop.clearHistory();
+    setToolCalls([]);
+    setResponse(null);
+  }, [loop]);
+
+  return { toolCalls, isRunning, response, run, clearHistory };
 }
