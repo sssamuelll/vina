@@ -89,7 +89,7 @@ The agent is provider-agnostic, supporting:
 
 1. **Natural Language, Technical Precision**: Speak like a tailor, execute like a CAD engineer.
 2. **Visual Feedback**: Every AI action is immediately reflected in the 2D Editor and 3D Viewport.
-3. **Transparency**: Token tracking, budget warnings, and tool-use logging are visible in the ActivityBar.
+3. **Transparency**: Token tracking, budget warnings, and tool-use logging are visible in the UnifiedBar settings mode (AgentSettings).
 4. **Deterministic Audits**: The agent validates changes before applying them to ensure no unsewable geometry is created.
 
 ## Fashion Terminology & Soul

@@ -22,7 +22,6 @@
 
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 import type { AppDispatch } from './index';
-import { setBottomPanelTab } from './layoutSlice';
 import { NEW_PROJECT } from './actions';
 import type {
   InspectionTarget,
@@ -181,10 +180,13 @@ export const {
   clearInspection,
 } = inspectorSlice.actions;
 
-/** Helper: dispatch both setInspectionTarget + setBottomPanelTab('inspector') */
+/**
+ * Set the inspection target for a piece. The InspectorTab UI lives in
+ * ContextPanel now (AppShell lazy import); user must open it via the
+ * UnifiedBar / TopBar.
+ */
 export function dispatchInspectPiece(dispatch: AppDispatch, pieceId: string) {
   dispatch(setInspectionTarget({ type: 'piece', pieceId }));
-  dispatch(setBottomPanelTab('inspector'));
 }
 
 export default inspectorSlice.reducer;

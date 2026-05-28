@@ -5,7 +5,7 @@
  * to detect common issues: missing seam allowance, missing grainline,
  * dart alignment problems, seam length mismatches, and missing notches.
  *
- * Results are displayed as subtle hints in the CopilotPanel, not blocking alerts.
+ * Results are surfaced via the agentic chat (UnifiedBar) as subtle hints, not blocking alerts.
  *
  * @module proactiveAnalysis
  */

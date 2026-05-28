@@ -52,7 +52,6 @@ import { resetSimulation, setViewMode3D, clearArrangementSnapshot, clearAllPins,
 import { FABRIC_LIBRARY } from '../../utils/cloth/fabricLibrary';
 import { resolveColorway } from '../../utils/colorwayResolver';
 import { setArrangement3D, clearArrangementOverrides, setLayer, setSublayer, cloneToLayer } from '../../store/projectSlice';
-import { setCopilotOpen, setSidebarTab } from '../../store/layoutSlice';
 import { dispatchInspectPiece } from '../../store/inspectorSlice';
 import { useDispatch } from 'react-redux';
 import { toolRegistry } from '../../tools';
@@ -850,8 +849,6 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onResetPose={() => dispatch(resetPose())}
         onShowProperties={(id) => {
           dispatch(selectPiece(id));
-          dispatch(setCopilotOpen(true));
-          dispatch(setSidebarTab('properties'));
         }}
         onResetArrangement={() => {
           dispatch(resetSimulation());

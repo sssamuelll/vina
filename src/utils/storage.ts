@@ -272,7 +272,7 @@ export async function migrateFromLocalStorage<T = unknown>(
  * migrateFromLocalStorage as fallback). All eight migrated sites follow the
  * same shape:
  *
- *   - agent-config           (CopilotPanel)
+ *   - agent-config           (UnifiedBar settings mode / AgentSettings)
  *   - saved-poses            (avatarSlice)
  *   - avatar profiles        (avatarLibrary)
  *   - per-plugin storage     (pluginLoader)

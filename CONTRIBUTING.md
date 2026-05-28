@@ -25,14 +25,13 @@ Open `http://localhost:5180`
 ```
 src/
 ├── components/        # React UI components
-│   ├── ActivityBar/       # VS Code-style navigation strip
-│   ├── CopilotPanel/      # AI assistant chat interface
+│   ├── shell/             # AppShell + UnifiedBar (chat/commands/settings) + TopBar + FloatingToolbar + FloatingControls3D + ContextPanel
 │   ├── DisplayBar2D/      # 2D context toolbar (toggles, render modes)
 │   ├── PatternEditor/     # 2D SVG canvas + tool hooks
 │   ├── Viewport3D/        # R3F 3D viewport, collision bodies, snapshots
 │   ├── Toolbar2D/         # 2D tool buttons
 │   ├── Toolbar3D/         # 3D tool buttons
-│   └── Workspace/         # Synchronized 2D/3D layout
+│   └── BottomPanel/       # Lazy sub-tabs (BOMTab, GradingTab, InspectorTab, NestingTab) loaded into ContextPanel
 ├── copilot/           # AI copilot system
 │   ├── reasoning/bridge/  # AgenticLoop, meta-tools, domain bootstrap
 │   ├── action/skills/     # Skill system (SkillBuilder, marketplace, registry)

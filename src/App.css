@@ -8,10 +8,10 @@
 @import './styles/shared.css';
 
 /* ──────────────────────────────────────────────
-   Legacy CSS variables — backward compatibility
-   Many existing components (Workspace, Sidebar,
-   BottomPanel, CopilotPanel, etc.) still reference
-   these. Kept until Task 10 cleanup migrates them.
+   Legacy CSS variables — backward compatibility.
+   Originally retained for Workspace/Sidebar/BottomPanel/CopilotPanel;
+   those components were deleted in commit 1c6e4238 (MVP v1 P1).
+   Variables kept because other unmigrated components still reference them.
    ────────────────────────────────────────────── */
 :root {
   /* ─── Colors ─── */
