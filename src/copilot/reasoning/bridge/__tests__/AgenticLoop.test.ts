@@ -314,4 +314,84 @@ describe('AgenticLoop', () => {
     const errorEvents = events.filter(e => e.type === 'tool:error');
     expect(errorEvents).toHaveLength(1);
   });
+
+  // ─── Multi-turn conversation history (M2 dressing intent gate) ────────────
+
+  it('persists conversation history across run() calls so turn 2 sees turn 1 context', async () => {
+    // Simulates the M2 dressing-intent confirmation gate:
+    //   Turn 1: user "vestir camisa" → LLM emits proposal text + no tool calls → loop exits
+    //   Turn 2: user "sí, úsala" → loop MUST send turn 1's history so the LLM
+    //           knows what was proposed; otherwise turn 2 starts blind.
+    const responses: ProviderResponse[] = [
+      // Turn 1 final response: propose Male Shirt, no tool calls (gate)
+      { content: 'Tengo Male Shirt (17 piezas). ¿La uso?', toolCalls: [] },
+      // Turn 2 final response: confirm load. In practice the LLM would emit a
+      // loadSeamlyPattern tool call here, but for this history-persistence
+      // test only what matters is the `messages` argument the LLM receives.
+      { content: 'Cargando…', toolCalls: [] },
+    ];
+
+    // Snapshot messages at call time — vitest's mock.calls stores references
+    // and the loop mutates the messages array after send() returns.
+    const captured: Array<Array<{ role: string; content: string }>> = [];
+    const send = vi.fn(async (msgs: Array<{ role: string; content: string }>) => {
+      captured.push(msgs.map((m) => ({ role: m.role, content: m.content })));
+      return responses.shift()!;
+    });
+
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [],
+      actionToolDefs: [],
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+    });
+
+    await loop.run('vestir el avatar con una camisa', () => {});
+    await loop.run('sí, úsala', () => {});
+
+    expect(send).toHaveBeenCalledTimes(2);
+
+    // Turn 2's messages must include turn 1's user message + final assistant
+    // response, otherwise the LLM has no context for "sí, úsala".
+    const turn2Messages = captured[1];
+    const turn2Roles = turn2Messages.map((m) => m.role);
+    expect(turn2Roles).toEqual(['system', 'user', 'assistant', 'user']);
+    expect(turn2Messages[1].content).toBe('vestir el avatar con una camisa');
+    expect(turn2Messages[2].content).toBe('Tengo Male Shirt (17 piezas). ¿La uso?');
+    expect(turn2Messages[3].content).toBe('sí, úsala');
+  });
+
+  it('clearHistory() resets conversation so subsequent runs start blind', async () => {
+    const responses: ProviderResponse[] = [
+      { content: 'First response', toolCalls: [] },
+      { content: 'Second response (fresh)', toolCalls: [] },
+    ];
+    const captured: Array<Array<{ role: string; content: string }>> = [];
+    const send = vi.fn(async (msgs: Array<{ role: string; content: string }>) => {
+      captured.push(msgs.map((m) => ({ role: m.role, content: m.content })));
+      return responses.shift()!;
+    });
+
+    const loop = new AgenticLoop({
+      send,
+      metaTools: [],
+      actionToolDefs: [],
+      getState: () => ({}) as never,
+      dispatch: vi.fn(),
+    });
+
+    await loop.run('first turn', () => {});
+    expect(loop.getConversationHistory()).toHaveLength(2); // user + assistant
+
+    loop.clearHistory();
+    expect(loop.getConversationHistory()).toHaveLength(0);
+
+    await loop.run('second turn', () => {});
+
+    // Turn 2's messages must NOT include turn 1 — just system + the new user
+    const turn2Messages = captured[1];
+    expect(turn2Messages.map((m) => m.role)).toEqual(['system', 'user']);
+    expect(turn2Messages[1].content).toBe('second turn');
+  });
 });

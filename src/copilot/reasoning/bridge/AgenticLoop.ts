@@ -83,6 +83,16 @@ export class AgenticLoop {
   private providerConfig: unknown;
   private lastToolCalls: ToolCallRecord[] = [];
 
+  // Conversation history persists across run() calls so the LLM has context
+  // for multi-turn flows — most importantly the convention-only confirmation
+  // gate used by the M2 dressing intent (system prompt step 3 instructs the
+  // LLM to propose + STOP, then continue on the next user message). Without
+  // history, turn 2 would arrive at the LLM as "[system, 'sí, úsala']" with
+  // no context for what was proposed. Stored without the system message so
+  // a fresh system prompt (with refreshed knowledge retrieval) can be prepended
+  // each turn.
+  private conversationHistory: ChatMessage[] = [];
+
   constructor(options: AgenticLoopOptions) {
     this.send = options.send;
     this.metaTools = new Map(options.metaTools.map((t) => [t.name, t]));
@@ -97,6 +107,23 @@ export class AgenticLoop {
    */
   getLastToolCalls(): ToolCallRecord[] {
     return [...this.lastToolCalls];
+  }
+
+  /**
+   * Clear the conversation history. Call when the user starts a fresh
+   * session (project switch, provider switch, "clear conversation"
+   * action). The system message is not stored — it's rebuilt every run().
+   */
+  clearHistory(): void {
+    this.conversationHistory = [];
+  }
+
+  /**
+   * Read-only view of the current conversation history (for debugging /
+   * tests). Does NOT include the system message.
+   */
+  getConversationHistory(): readonly ChatMessage[] {
+    return this.conversationHistory;
   }
 
   /**
@@ -125,6 +152,7 @@ export class AgenticLoop {
 
     const messages: ChatMessage[] = [
       { role: 'system', content: systemPrompt },
+      ...this.conversationHistory,
       { role: 'user', content: userRequest },
     ];
 
@@ -133,6 +161,13 @@ export class AgenticLoop {
 
       // Text response = work is done
       if (response.toolCalls.length === 0) {
+        const finalAssistant: ChatMessage = { role: 'assistant', content: response.content };
+        messages.push(finalAssistant);
+        // Persist all messages from this run EXCEPT the system message — the
+        // system message is rebuilt next run with potentially refreshed
+        // knowledge chunks. Everything else (user input + assistant tool_calls
+        // + tool results + final assistant text) carries over.
+        this.conversationHistory = messages.slice(1);
         onEvent({ type: 'complete', content: response.content });
         return response.content;
       }
