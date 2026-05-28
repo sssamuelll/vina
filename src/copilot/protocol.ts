@@ -6,15 +6,17 @@
  * 'builtin' templates / 'http' / 'websocket') alongside the wire
  * payload types `CopilotContext` / `CopilotResponse` / `CopilotCommand`
  * exchanged with HTTP/WS agents. `AgentConfig` is consumed at runtime
- * by `src/components/CopilotPanel/CopilotPanel.tsx`.
+ * by `src/copilot/AgentSettings.tsx` (now mounted in UnifiedBar
+ * `settings` mode per commit 30e220a6; the previous CopilotPanel
+ * consumer was deleted in commit 1c6e4238).
  *
  * **NOT redundant with `providers/types.ts:ProviderConfig`.**
  * `AgentConfig` models WHICH dispatch path is active (built-in vs
  * external HTTP/WS). `ProviderConfig` models WHICH LLM provider +
  * model + API key is used (anthropic / openai / deepseek / ollama /
- * claude-bridge). They coexist by design — `CopilotPanel.tsx` holds
- * both states (L89-90) because a built-in agent still picks an LLM
- * provider for its internal calls. See #644 closure for rationale.
+ * claude-bridge). They coexist by design — AgentSettings holds both
+ * states because a built-in agent still picks an LLM provider for
+ * its internal calls. See #644 closure for rationale.
  *
  * Canonical dispatcher: `src/copilot/reasoning/bridge/AgenticLoop.ts`.
  * The deprecated `agentConnector.ts` shim was removed in #644.

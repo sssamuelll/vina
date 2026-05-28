@@ -1,16 +1,19 @@
 /**
  * Agent Settings Panel — dedicated configuration UI for the AI copilot.
  *
- * Accessible from the CopilotPanel gear icon. Provides controls for:
+ * Host-agnostic. Mounted today by UnifiedBar `settings` mode (the previous
+ * CopilotPanel host was deleted in commit 1c6e4238). The Budget + Token-Usage
+ * sub-section is conditional on `onBudgetChange` being provided — UnifiedBar
+ * does not wire CostManager in MVP v1, so the section is hidden there to avoid
+ * a "$0.00" surface that looks broken. Provides controls for:
  * - Provider selection (Anthropic / OpenAI / Ollama / None)
  * - API key management (masked input, localStorage)
  * - Model selection per provider
  * - Teaching mode toggle
  * - Language preference
- * - Budget limit
- * - Token usage display
+ * - Budget limit + token usage display (only when host wires CostManager)
  * - Ollama connection status
- * - Reset / Clear actions
+ * - Reset / Clear actions (only when host wires the clear callbacks)
  *
  * @module AgentSettings
  */
@@ -75,10 +78,10 @@ interface AgentSettingsProps {
   onSave: (config: ProviderConfig | null) => void;
   /** Called to close the settings panel */
   onClose: () => void;
-  /** Called to clear conversation */
-  onClearConversation: () => void;
-  /** Called to clear memory */
-  onClearMemory: () => void;
+  /** Called to clear conversation (optional — actions section hides if neither clear callback is provided) */
+  onClearConversation?: () => void;
+  /** Called to clear memory (optional — actions section hides if neither clear callback is provided) */
+  onClearMemory?: () => void;
   /** Current session cost summary */
   sessionCost?: CostSummary;
   /** Current project cost summary */
@@ -441,57 +444,70 @@ export default function AgentSettings({
         </select>
       </div>
 
-      {/* Budget */}
-      <div style={{ ...sectionStyle }}>
-        <div style={fieldStyle}>
-          <label style={labelStyle}>Monthly Budget (USD)</label>
-          <input
-            type="number"
-            style={inputStyle}
-            value={budgetValue}
-            onChange={e => setBudgetValue(parseFloat(e.target.value) || 0)}
-            min={0}
-            step={1}
-          />
-        </div>
-      </div>
+      {/* Budget + Token Usage — only rendered when the host wires a CostManager
+         (signaled by `onBudgetChange`). UnifiedBar does not in MVP v1; hiding
+         avoids a "$0.00 / Budget edits drop silently" surface. */}
+      {onBudgetChange && (
+        <>
+          {/* Budget */}
+          <div style={{ ...sectionStyle }}>
+            <div style={fieldStyle}>
+              <label style={labelStyle}>Monthly Budget (USD)</label>
+              <input
+                type="number"
+                style={inputStyle}
+                value={budgetValue}
+                onChange={e => setBudgetValue(parseFloat(e.target.value) || 0)}
+                min={0}
+                step={1}
+              />
+            </div>
+          </div>
 
-      {/* Token Usage Display */}
-      <div style={{ ...sectionStyle }}>
-        <label style={{ ...labelStyle, marginBottom: 6, display: 'block' }}>Token Usage</label>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: 8,
-          fontSize: 10,
-        }}>
-          <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCost(sessionCost)}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>This session</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>{formatTokens(sessionCost)} tokens</div>
+          {/* Token Usage Display */}
+          <div style={{ ...sectionStyle }}>
+            <label style={{ ...labelStyle, marginBottom: 6, display: 'block' }}>Token Usage</label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: 8,
+              fontSize: 10,
+            }}>
+              <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCost(sessionCost)}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>This session</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>{formatTokens(sessionCost)} tokens</div>
+              </div>
+              <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCost(projectCost)}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>This project</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>{formatTokens(projectCost)} tokens</div>
+              </div>
+              <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>${budgetValue.toFixed(2)}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Budget</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>per month</div>
+              </div>
+            </div>
           </div>
-          <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{formatCost(projectCost)}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>This project</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>{formatTokens(projectCost)} tokens</div>
-          </div>
-          <div style={{ background: 'var(--bg-primary)', padding: 8, borderRadius: 4, textAlign: 'center' }}>
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>${budgetValue.toFixed(2)}</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 9 }}>Budget</div>
-            <div style={{ color: 'var(--text-muted)', fontSize: 8 }}>per month</div>
-          </div>
-        </div>
-      </div>
+        </>
+      )}
 
-        {/* Actions */}
-        <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button style={btnSecondaryStyle} onClick={onClearConversation}>
-            🗑 Clear conversation
-          </button>
-          <button style={btnSecondaryStyle} onClick={onClearMemory}>
-            🧹 Clear memory
-          </button>
-        </div>
+        {/* Actions (hidden when neither clear callback is provided) */}
+        {(onClearConversation || onClearMemory) && (
+          <div style={{ ...sectionStyle, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {onClearConversation && (
+              <button style={btnSecondaryStyle} onClick={onClearConversation}>
+                🗑 Clear conversation
+              </button>
+            )}
+            {onClearMemory && (
+              <button style={btnSecondaryStyle} onClick={onClearMemory}>
+                🧹 Clear memory
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Save/Cancel - sticky at bottom */}

@@ -126,6 +126,46 @@ describe('detectBodyRegion', () => {
     expect(detectBodyRegion(makePiece('Комір'))).toBe('collar');
   });
 
+  it('classifies Finnish piece names (gent_jacket_with_tummy regression for #506 follow-up)', () => {
+    // Sample of gent_jacket_with_tummy.json — Finnish tailoring vocab.
+    // Roots: taka=back, etu=front, hiha=sleeve, kaulus=collar, tasku=pocket,
+    // rinta=chest, sivu=side. Most are compound words (e.g. "Alakaulus" =
+    // "low-collar", "Rintatasku" = "chest-pocket").
+    expect(detectBodyRegion(makePiece('Takakappale'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Takakappalevuori'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Takapalahalkio'))).toBe('back-torso');
+    expect(detectBodyRegion(makePiece('Etukappale'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Etuvuori'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Etukappaletuki'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Rintaliina'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Rintaliinatuki'))).toBe('front-torso');
+    // tasku wins over rinta — POCKET_RE runs before FRONT_RE
+    expect(detectBodyRegion(makePiece('Rintatasku'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Taskupussi'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Taskunauha'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Hihayläosa'))).toMatch(/sleeve/);
+    expect(detectBodyRegion(makePiece('Hiha-alaosa'))).toMatch(/sleeve/);
+    expect(detectBodyRegion(makePiece('Hihaylävuori'))).toMatch(/sleeve/);
+    expect(detectBodyRegion(makePiece('Alakaulus'))).toBe('collar');
+    expect(detectBodyRegion(makePiece('Yläkaulus'))).toBe('collar');
+    expect(detectBodyRegion(makePiece('Yläkaulustuki'))).toBe('collar');
+    // sivu (side panel) defaults to front-torso — side panels wrap the
+    // torso; LEFT_RE / RIGHT_RE would refine if the name carried L/R hints.
+    expect(detectBodyRegion(makePiece('Sivupala'))).toBe('front-torso');
+    expect(detectBodyRegion(makePiece('Sivupalavuori'))).toBe('front-torso');
+  });
+
+  it('handles WaistBand camelCase after splitCamelCase split (regression for #820 follow-up)', () => {
+    // Pre-fix: splitCamelCase("WaistBand1") → "Waist Band 1" but
+    // WAISTBAND_RE only matched the single token "waistband" — so trousers.json
+    // "WaistBand1" silently fell through to 'unknown' and the circle fallback.
+    expect(detectBodyRegion(makePiece('WaistBand1'))).toBe('waistband');
+    expect(detectBodyRegion(makePiece('WaistBand'))).toBe('waistband');
+    expect(detectBodyRegion(makePiece('Waistband'))).toBe('waistband'); // single token still works
+    expect(detectBodyRegion(makePiece('Waist Band'))).toBe('waistband'); // explicit space
+    expect(detectBodyRegion(makePiece('waist-band'))).toBe('waistband'); // hyphen form
+  });
+
   it('covers additional Cyrillic terms for forward compatibility', () => {
     // Russian
     expect(detectBodyRegion(makePiece('Воротник'))).toBe('collar');

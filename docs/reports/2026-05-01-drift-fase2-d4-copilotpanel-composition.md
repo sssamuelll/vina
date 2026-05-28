@@ -1,3 +1,19 @@
+> **SUPERSEDED — 2026-05-28.** This RFC ratified the CopilotPanel composition
+> (11 useState + dual `messages`/`memoryRef` + `recordMessage` helper). The
+> CopilotPanel component is being deleted per the MVP v1 housekeeping P1.
+> AgentSettings was partially ported to UnifiedBar's `settings` mode in
+> commit `30e220a6` via Opt C; the D4 dual-representation pattern
+> (ProjectMemory persistence + `recordMessage` dual-write + CostManager) was
+> **not** ported — accepted loss per Opt C scope (single 30-min María test
+> session does not need cross-session LLM context). See
+> `docs/superpowers/specs/2026-05-27-mvp-v1-vision-validating-slice-design.md`.
+>
+> Content below preserved for historical context of the original ratification
+> decision and the patterns it documented (Pattern 2.5 hybrid lite,
+> dual-representation with surgical bridge helper).
+
+---
+
 # Drift Fase 2 — D4: CopilotPanel composition (11 useState)
 
 **Fecha:** 2026-05-01

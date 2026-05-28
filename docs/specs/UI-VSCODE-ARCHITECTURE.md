@@ -1,3 +1,14 @@
+> **SUPERSEDED — 2026-05-28.** This document describes the VS Code-style UI
+> (ActivityBar + Sidebar + BottomPanel + CopilotPanel) that was the canonical
+> shell prior to MVP v1. That UI is being deleted per the MVP v1 housekeeping
+> P1. The new canonical shell is **UnifiedBar** (chat / commands / settings
+> modes) per `docs/specs/UX-VISION.md` and the slice spec at
+> `docs/superpowers/specs/2026-05-27-mvp-v1-vision-validating-slice-design.md`.
+>
+> Content below preserved for historical context only.
+
+---
+
 # OpenClo.ai — Professional UI Architecture (Fashion IDE) (v0.7)
 
 ## 1. Overview

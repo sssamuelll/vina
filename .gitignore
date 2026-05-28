@@ -33,7 +33,6 @@ bom-e2e-test.png
 test-*.png
 pr*.png
 docs/specs/APPLICATION-AUDIT-*.md
-docs/superpowers/
 
 # CLAUDE/ — local-only context routing layer (per-developer).
 # Project canonical lives in CLAUDE.md + docs/reports/.
@@ -64,3 +63,6 @@ mempalace.yaml
 /webgpu-*.png
 /webgpu-*.log
 /webgpu-*.txt
+
+# Understand-Anything (Lum1104) tool eval — local-only, never commit
+/.understand-anything/

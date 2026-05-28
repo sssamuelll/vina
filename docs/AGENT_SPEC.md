@@ -56,7 +56,7 @@ Redux state mutates → Canvas re-renders
     ↓
 Agent reads updated context → confirms/adjusts
     ↓
-Streamed response to CopilotPanel
+Streamed response to UnifiedBar chat panel
 ```
 
 ### 1.2 State Access
@@ -103,7 +103,7 @@ OpenClo already has the bones:
 | Protocol | `src/copilot/protocol.ts` | ✅ Exists — `CopilotContext`, `CopilotCommand`, `CopilotResponse` |
 | Connector | `src/copilot/agentConnector.ts` | ✅ Exists — HTTP, WebSocket, built-in |
 | Executor | `src/copilot/commandExecutor.ts` | ✅ Exists — dispatches to Redux |
-| Chat UI | `src/components/CopilotPanel/` | ✅ Exists — message list, settings, input |
+| Chat UI | `src/components/shell/UnifiedBarChat.tsx` + `src/copilot/AgentSettings.tsx` | ✅ Exists — chat in UnifiedBar `chat` mode, settings in `settings` mode (CopilotPanel deleted in 1c6e4238) |
 | Templates | `src/utils/patternTemplates.ts` | ✅ Exists — bodice, sleeve, skirt, pants, collar |
 | Grading | `src/utils/grading/` | ✅ Exists — grade tables, scale outlines |
 | Nesting | `src/utils/nesting/` | ✅ Exists — skyline bin packing |
@@ -1386,7 +1386,7 @@ async function executeTool(name: string, params: any, store: Store): Promise<any
 Use Server-Sent Events (SSE) for real-time streaming:
 
 ```typescript
-// CopilotPanel.tsx — replace current batch response with streaming
+// UnifiedBarChat.tsx — replace current batch response with streaming
 const handleSend = async () => {
   const context = buildAgentContext(project, editor, simulation, memory, text, messages);
   
@@ -1737,7 +1737,7 @@ function getRelevantSkills(message: string): SkillContext[] {
 - [ ] Create `/server` directory with Express API
 - [ ] Implement tool registry (all 30+ tools with JSON Schema)
 - [ ] Implement tool executor (dispatches to existing engines)
-- [ ] Connect CopilotPanel to server API (replace builtin connector)
+- [ ] Connect UnifiedBarChat to server API (replace builtin connector)
 - [ ] Add streaming SSE support
 - [ ] Write PATRONAJE_SOUL.md
 - [ ] Per-project memory in localStorage

@@ -2,7 +2,12 @@
  * #81 — Copilot Memory: Project Context Persistence
  *
  * Class-based API (ProjectMemory) for session-level message history + decisions.
- * Stored in localStorage for synchronous access from CopilotPanel.
+ * Stored in localStorage for synchronous access.
+ *
+ * Note: this class is currently NOT mounted in the UnifiedBar shell (deferred
+ * per MVP v1 Opt C partial port — see RFC D4 superseded). It remains exported
+ * because `memoryTools.ts` registers copilot tools (`getMemory` etc.) that
+ * still reference it; future re-introduction in the agentic chat is possible.
  *
  * Functional API (loadMemory/saveMemory) for IndexedDB-backed long-term memory
  * with preferences, notes, and cross-session recall via copilot tools.

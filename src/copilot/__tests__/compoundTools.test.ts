@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 231 + 1 dressAvatar
-      expect(registry.size).toBe(232);
+      // 230 + 1 dressAvatar (was 232, decremented by 1 after removing setFabric tool — see commit message of fix(copilot)! consolidation into assignFabric)
+      expect(registry.size).toBe(231);
     });
   });
 });

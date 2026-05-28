@@ -2,7 +2,10 @@
  * PluginManager — UI panel for managing OpenClo plugins.
  *
  * Lists installed plugins, allows enabling/disabling, installing from URL,
- * and removing plugins. Accessible from the ActivityBar (puzzle piece icon).
+ * and removing plugins. (Pre-MVP-v1 this mounted via the ActivityBar puzzle
+ * icon; ActivityBar was deleted in commit 1c6e4238. The panel is currently
+ * unmounted in the UnifiedBar shell — re-introduction via the commands mode
+ * is queued for M2+.)
  *
  * @module components/PluginManager/PluginManager
  */

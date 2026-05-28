@@ -1,14 +1,18 @@
 /**
- * Simulation Tools — fabric assignment and cloth simulation control.
- * Herramientas de Simulación — asignación de tela y control de simulación de tela.
+ * Simulation Tools — cloth simulation control (start/pause, fit maps, snapshots, arrangements).
+ * Herramientas de Simulación — control de simulación de tela.
+ *
+ * Note: fabric assignment lives in `fabricTools.ts` (`assignFabric`).
+ * The legacy `setFabric` tool was removed because it dispatched a transient
+ * cache write (`simulationSlice.setFabric`) instead of the persistent
+ * `project.setPieceFabric` action — violating B10-state ratification. See
+ * `docs/reports/2026-04-30-drift-fase2-b10state-par1-fabric-write-surfaces.md`.
  *
  * @module simulationTools
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
 import {
-  setFabric as setFabricAction,
-  setDefaultFabric,
   startSimulation as startSimAction,
   pauseSimulation as pauseSimAction,
   resetSimulation,
@@ -28,56 +32,6 @@ import type { InterfacingType } from '../../../../types/types';
 import { FABRIC_LIBRARY } from '../../../../utils/cloth/fabricLibrary';
 import { computeStiffnessMultiplier } from '../../../../utils/cloth/interfacing';
 import { newId } from '../../../../utils/ids';
-
-// ─── setFabric ──────────────────────────────────────────────────────────────
-
-const setFabricTool: ToolDefinition = {
-  name: 'setFabric',
-  description:
-    'Assign a fabric material to a piece or set the default fabric for all pieces. ' +
-    '/ Asignar un material de tela a una pieza o establecer la tela predeterminada para todas las piezas.',
-  parameters: {
-    type: 'object',
-    properties: {
-      pieceId: { type: 'string', description: "Piece ID, or 'default' for all new pieces / ID de la pieza, o 'default' para nuevas piezas" },
-      fabricId: {
-        type: 'string',
-        enum: ['cotton-poplin', 'denim', 'silk-charmeuse', 'wool-crepe', 'jersey-knit', 'organza', 'linen', 'neoprene', 'chiffon', 'canvas'],
-        description: 'Built-in fabric ID / ID de tela incorporada',
-      },
-    },
-    required: ['pieceId', 'fabricId'],
-  },
-  execute: async (params, dispatch): Promise<ToolResult> => {
-    const pieceId = params.pieceId as string;
-    const fabricId = params.fabricId as string;
-
-    const fabric = FABRIC_LIBRARY[fabricId];
-    if (!fabric) {
-      return { success: false, error: `Fabric "${fabricId}" not found` };
-    }
-
-    if (pieceId === 'default') {
-      dispatch(setDefaultFabric(fabricId));
-    } else {
-      dispatch(setFabricAction({ pieceId, fabricId }));
-    }
-
-    return {
-      success: true,
-      data: {
-        fabricName: fabric.name,
-        properties: {
-          weight: fabric.weight,
-          stretchStiffness: fabric.stretchStiffness,
-          bendStiffness: fabric.bendStiffness,
-          friction: fabric.friction,
-          thickness: fabric.thickness,
-        },
-      },
-    };
-  },
-};
 
 // ─── listFabrics ────────────────────────────────────────────────────────────
 
@@ -612,7 +566,6 @@ const reset3DArrangementTool: ToolDefinition = {
 };
 
 export const tools: ToolDefinition[] = [
-  setFabricTool,
   listFabricsTool,
   startSimulationTool,
   pauseSimulationTool,
