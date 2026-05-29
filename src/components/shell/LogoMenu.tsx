@@ -29,6 +29,7 @@ const FILE_MENU: MenuItem[] = [
   { label: 'New Project', shortcut: '⌘N', action: () => { if (confirm('Create new project? Unsaved changes will be lost.')) window.location.reload(); } },
   { separator: true, label: '' },
   { label: 'Import Seamly2D Pattern...', action: () => {} }, // wired via callback
+  { label: 'Import DXF...', action: () => {} }, // wired via callback (opens file picker)
   { label: 'Import Reference Image...', action: () => {} },
   { separator: true, label: '' },
   { label: 'Export DXF', action: () => {} },
@@ -126,9 +127,10 @@ const TOP_LEVEL: TopLevelItem[] = [
 interface LogoMenuProps {
   onOpenTemplates?: () => void;
   onOpenPanel?: (name: string) => void;
+  onImportDXF?: () => void;
 }
 
-export default function LogoMenu({ onOpenTemplates, onOpenPanel }: LogoMenuProps) {
+export default function LogoMenu({ onOpenTemplates, onOpenPanel, onImportDXF }: LogoMenuProps) {
   const [open, setOpen] = useState(false);
   const [hoveredTop, setHoveredTop] = useState<string | null>(null);
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
@@ -162,6 +164,8 @@ export default function LogoMenu({ onOpenTemplates, onOpenPanel }: LogoMenuProps
 
     if (item.label === 'Import Seamly2D Pattern...') {
       onOpenTemplates?.();
+    } else if (item.label === 'Import DXF...') {
+      onImportDXF?.();
     } else if (item.label.includes('Settings...') || item.label === 'Fabric Library...') {
       onOpenPanel?.(item.label.replace('...', '').trim());
     } else if (item.label === 'AI Provider...') {
@@ -174,7 +178,7 @@ export default function LogoMenu({ onOpenTemplates, onOpenPanel }: LogoMenuProps
 
     setOpen(false);
     setHoveredTop(null);
-  }, [dispatch, state, onOpenTemplates, onOpenPanel]);
+  }, [dispatch, state, onOpenTemplates, onOpenPanel, onImportDXF]);
 
   const renderMenuItem = (item: MenuItem, index: number) => {
     if (item.separator) {

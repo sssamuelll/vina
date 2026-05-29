@@ -7,3 +7,5 @@ export { generateDXFAAMA, downloadDXFAAMA, generateMultiSizeDXF, downloadMultiSi
 export type { GradedSizeSet } from './exportAAMA';
 export { detectDXFFormat } from './formatDetector';
 export { FORMAT_PROFILES, getProfile } from './formatProfiles';
+export { importDXFContent, DXFParseError, readAndParseDXFFile, DXFFileError, DXF_MAX_BYTES } from './importPipeline';
+export type { DXFImportOptions as DXFImportPipelineOptions, DXFImportResult, DXFParseErrorCode, DXFFileErrorCode } from './importPipeline';

@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search, MessageSquare, Settings, ArrowUp } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
+import { showErrorToast } from '../../store/copilotUISlice';
+import { readAndParseDXFFile } from '../../utils/dxf';
+import { dxfErrorMessage, type PendingDXFAttachment } from './dxfImport';
 import UnifiedBarChat from './UnifiedBarChat';
 import UnifiedBarCommands from './UnifiedBarCommands';
 import AgentSettings from '../../copilot/AgentSettings';
@@ -71,6 +74,52 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
   const dragOffset = useRef({ x: 0, y: 0 });
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
+  const dispatch = useDispatch();
+
+  // ─── DXF chat attachment (Claude-style: drop → attach → send with text) ──
+  const [pendingDXF, setPendingDXF] = useState<PendingDXFAttachment | null>(null);
+  const [dxfDragActive, setDxfDragActive] = useState(false);
+  const dxfDragCounter = useRef(0);
+
+  // Parse on attach (validates + counts pieces, surfaces bad files early).
+  // Does NOT import — pieces land in Redux only when the message is sent.
+  const attachDXF = useCallback(async (file: File) => {
+    try {
+      const { name, result } = await readAndParseDXFFile(file, { unit: 'auto', autoDetect: true });
+      setPendingDXF({ name, pieces: result.pieces });
+      setMode('chat');
+      setPanelOpen(true);
+    } catch (err) {
+      dispatch(showErrorToast(dxfErrorMessage(err)));
+    }
+  }, [dispatch]);
+
+  const handleDxfDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dxfDragCounter.current += 1;
+    setDxfDragActive(true);
+  }, []);
+  const handleDxfDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+  }, []);
+  const handleDxfDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    dxfDragCounter.current -= 1;
+    if (dxfDragCounter.current <= 0) {
+      dxfDragCounter.current = 0;
+      setDxfDragActive(false);
+    }
+  }, []);
+  const handleDxfDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dxfDragCounter.current = 0;
+    setDxfDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void attachDXF(file);
+  }, [attachDXF]);
 
   // Recalculate position on window resize
   useEffect(() => {
@@ -147,7 +196,8 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
   }, [mode]);
 
   const handleSubmit = useCallback(() => {
-    if (!input.trim()) return;
+    // An attached DXF can be sent on its own (no text required).
+    if (!input.trim() && !pendingDXF) return;
     if (mode === 'chat') {
       setPanelOpen(true);
       // Signal the chat panel that THIS specific input value should be sent.
@@ -155,7 +205,7 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
       // never on per-keystroke setInput updates from onChange.
       setSubmitNonce((n) => n + 1);
     }
-  }, [input, mode]);
+  }, [input, mode, pendingDXF]);
 
   // Suppress unused vars — pieces/seams kept for future metadata display
   void pieces; void seams;
@@ -172,7 +222,33 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
       className={barClasses}
       style={{ left: position.x, top: position.y }}
       onMouseDown={handleMouseDown}
+      onDragEnter={handleDxfDragEnter}
+      onDragOver={handleDxfDragOver}
+      onDragLeave={handleDxfDragLeave}
+      onDrop={handleDxfDrop}
     >
+      {/* DXF drag overlay — appears while dragging a file over the bar/panel */}
+      {dxfDragActive && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 10,
+            pointerEvents: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'rgba(99, 102, 241, 0.14)',
+            border: '2px dashed var(--accent, #6366f1)',
+            borderRadius: 12,
+          }}
+        >
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+            Suelta tu .dxf para adjuntarlo
+          </span>
+        </div>
+      )}
+
       {/* Mode toggle */}
       <div className="unified-bar__modes">
         {(Object.keys(MODE_ICONS) as BarMode[]).map(m => {
@@ -206,7 +282,7 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
 
       {/* Send button (chat mode) */}
       {mode === 'chat' && (
-        <button className="unified-bar__send" onClick={handleSubmit} disabled={!input.trim()}>
+        <button className="unified-bar__send" onClick={handleSubmit} disabled={!input.trim() && !pendingDXF}>
           <ArrowUp size={18} />
         </button>
       )}
@@ -214,7 +290,15 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
       {/* Expanding panel */}
       {panelOpen && (
         <div className="unified-bar__panel" onClick={e => e.stopPropagation()}>
-          {mode === 'chat' && <UnifiedBarChat input={input} setInput={setInput} submitNonce={submitNonce} />}
+          {mode === 'chat' && (
+            <UnifiedBarChat
+              input={input}
+              setInput={setInput}
+              submitNonce={submitNonce}
+              pendingDXF={pendingDXF}
+              clearAttachment={() => setPendingDXF(null)}
+            />
+          )}
           {mode === 'commands' && (
             <UnifiedBarCommands
               query={input}

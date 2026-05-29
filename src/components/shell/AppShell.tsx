@@ -2,6 +2,11 @@ import { useState, useRef, useCallback, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setSplitRatio } from '../../store/layoutSlice';
+import { addPiece } from '../../store/projectSlice';
+import { selectPiece } from '../../store/editorSlice';
+import { showSuccessToast, showErrorToast } from '../../store/copilotUISlice';
+import { readAndParseDXFFile } from '../../utils/dxf';
+import { dxfErrorMessage, piecesLabel } from './dxfImport';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
@@ -62,10 +67,70 @@ export default function AppShell() {
   const [contextPanel, setContextPanel] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
+  const [dxfDragActive, setDxfDragActive] = useState(false);
+  const dxfDragCounter = useRef(0);
+  const dxfInputRef = useRef<HTMLInputElement>(null);
 
   // Register all keyboard shortcut handlers (file/edit/tools/sim/etc).
   // Without this, every shortcut in src/shortcuts/defaults.ts is a no-op.
   useKeyboardShortcuts();
+
+  // ─── DXF drop-zone (M3) ─────────────────────────────────────────────
+  // Dropping a .dxf anywhere on the canvas imports it immediately. This
+  // is the ONLY file-entry surface — the browser sandbox forbids the AI
+  // agent from reading files, so import is always a user gesture. The
+  // agent operates downstream on the loaded pieces (sew / dress / sim).
+  // See docs/superpowers/specs/2026-05-29-m3-dxf-agentic-load-design.md.
+  const importDXFFile = useCallback(async (file: File) => {
+    try {
+      const { result } = await readAndParseDXFFile(file, { unit: 'auto', autoDetect: true });
+      for (const piece of result.pieces) dispatch(addPiece(piece));
+      dispatch(selectPiece(result.pieces[0].id));
+      dispatch(showSuccessToast(`Cargué tu patrón: ${piecesLabel(result.pieces.length)}`));
+    } catch (err) {
+      dispatch(showErrorToast(dxfErrorMessage(err)));
+    }
+  }, [dispatch]);
+
+  // Counter pattern: dragenter/dragleave bubble from children, so a
+  // single boolean flickers. Balancing a counter is the known-correct fix.
+  const handleDxfDragEnter = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dxfDragCounter.current += 1;
+    setDxfDragActive(true);
+  }, []);
+
+  const handleDxfDragOver = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault(); // required so the drop event fires
+  }, []);
+
+  const handleDxfDragLeave = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    dxfDragCounter.current -= 1;
+    if (dxfDragCounter.current <= 0) {
+      dxfDragCounter.current = 0;
+      setDxfDragActive(false);
+    }
+  }, []);
+
+  const handleDxfDrop = useCallback((e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return;
+    e.preventDefault();
+    dxfDragCounter.current = 0;
+    setDxfDragActive(false);
+    const file = e.dataTransfer.files[0];
+    if (file) void importDXFFile(file);
+  }, [importDXFFile]);
+
+  // File-picker fallback (File ▸ Import DXF…) for keyboard/touch users who
+  // cannot drag-drop. Resets value so re-selecting the same file re-fires.
+  const handleDxfFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) void importDXFFile(file);
+    e.target.value = '';
+  }, [importDXFFile]);
 
   // ─── Divider drag ───────────────────────────────────────────────────
   const handleDividerMouseDown = useCallback((e: React.MouseEvent) => {
@@ -111,8 +176,53 @@ export default function AppShell() {
       <TopBar
         onOpenTemplates={() => setShowTemplates(true)}
         onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
+        onImportDXF={() => dxfInputRef.current?.click()}
       />
-      <div ref={canvasRef} className="canvas-area">
+      <input
+        ref={dxfInputRef}
+        type="file"
+        accept=".dxf"
+        onChange={handleDxfFileInput}
+        style={{ display: 'none' }}
+      />
+      <div
+        ref={canvasRef}
+        className="canvas-area"
+        onDragEnter={handleDxfDragEnter}
+        onDragOver={handleDxfDragOver}
+        onDragLeave={handleDxfDragLeave}
+        onDrop={handleDxfDrop}
+      >
+        {dxfDragActive && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              zIndex: 50,
+              pointerEvents: 'none', // let the drop event pass through to canvas-area
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(99, 102, 241, 0.12)',
+              border: '2px dashed var(--accent, #6366f1)',
+              borderRadius: 8,
+            }}
+          >
+            <div
+              style={{
+                background: 'var(--bg-elevated, #1e1e1e)',
+                color: 'var(--text-primary, #fff)',
+                padding: '14px 22px',
+                borderRadius: 8,
+                fontSize: 15,
+                fontWeight: 600,
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              }}
+            >
+              Suelta tu archivo .dxf para importarlo
+            </div>
+          </div>
+        )}
         <div
           className="canvas-area__2d"
           style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}

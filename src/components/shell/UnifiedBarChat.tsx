@@ -1,8 +1,13 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import { useDispatch } from 'react-redux';
+import { Paperclip, X } from 'lucide-react';
 import { store } from '../../store';
 import type { AppDispatch } from '../../store';
-import { useAgenticLoop } from '../../copilot/hooks/useAgenticLoop';
+import { addPiece } from '../../store/projectSlice';
+import { selectPiece } from '../../store/editorSlice';
+import { showSuccessToast } from '../../store/copilotUISlice';
+import { piecesLabel, type PendingDXFAttachment } from './dxfImport';
+import { useAgenticLoop, type ToolCallProgress } from '../../copilot/hooks/useAgenticLoop';
 import { getDefaultRegistry } from '../../copilot/action/tools/registry';
 import { anthropicProvider } from '../../copilot/providers/anthropic';
 import { openaiProvider } from '../../copilot/providers/openai';
@@ -23,6 +28,10 @@ interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  /** Tool calls the agent made on this turn — the auditable decision trail.
+   *  Persisted on the message because the hook's live `toolCalls` resets on
+   *  the next run. Only set on assistant messages that ran the loop. */
+  toolCalls?: ToolCallProgress[];
 }
 
 interface Props {
@@ -36,6 +45,12 @@ interface Props {
    * watched `input` directly which sent one message per typed character.
    */
   submitNonce: number;
+  /** DXF attached to the input but not yet sent. Imported into the project
+   *  (atomically) when the message is sent; the agent then operates on the
+   *  loaded pieces. Null when nothing is attached. */
+  pendingDXF: PendingDXFAttachment | null;
+  /** Clear the attachment (× on the chip, or after it is consumed by send). */
+  clearAttachment: () => void;
 }
 
 // ─── Provider Helper ─────────────────────────────────────────────────────────────
@@ -54,7 +69,7 @@ function getProvider(config: ProviderConfig) {
 
 // ─── Component ───────────────────────────────────────────────────────────────────
 
-export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) {
+export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDXF, clearAttachment }: Props) {
   const dispatch = useDispatch<AppDispatch>();
 
   // Provider config — derived from the active connection in the new
@@ -128,23 +143,54 @@ export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) 
   // Send a chat message. Called from the nonce-watching effect below when
   // the user actually submits (Enter / Send button in UnifiedBar).
   const handleSend = useCallback(async (text: string) => {
-    if (!text.trim() || agenticHook.isRunning) return;
+    const attachment = pendingDXF;
+    if ((!text.trim() && !attachment) || agenticHook.isRunning) return;
 
     setInput('');
 
-    // Add user message
-    const userMsg: ChatMessage = {
-      id: newId(),
-      role: 'user',
-      content: text,
-    };
+    // Consume the attachment: import its pieces into the project (atomic,
+    // single point) and clear the chip. The agent then operates on real
+    // loaded state — it never receives raw file bytes (sandbox-safe).
+    let agentText = text;
+    let displayContent = text;
+    if (attachment) {
+      for (const piece of attachment.pieces) dispatch(addPiece(piece));
+      dispatch(selectPiece(attachment.pieces[0].id));
+      clearAttachment();
+      const label = `${attachment.name} · ${piecesLabel(attachment.pieces.length)}`;
+      displayContent = text.trim() ? `📎 ${label}\n${text}` : `📎 ${label}`;
+      const note = `[Contexto: el usuario adjuntó y cargó un patrón DXF "${attachment.name}" con ${attachment.pieces.length} piezas, ya presentes en el proyecto.]`;
+      agentText = text.trim()
+        ? `${note}\n\n${text}`
+        : `${note}\n\nAcabo de cargar este patrón. ¿Qué puedes hacer con él?`;
+    }
+
+    // Add user message (shows the attachment chip inline if present).
+    const userMsg: ChatMessage = { id: newId(), role: 'user', content: displayContent };
     setMessages(prev => [...prev, userMsg]);
 
+    // No provider configured: the pieces are already imported (María sees
+    // her pattern); confirm instead of running the agent against a no-op send.
+    const providerReady = providerConfig !== null && (
+      providerConfig.provider === 'ollama' ||
+      providerConfig.provider === 'claude-bridge' ||
+      providerConfig.apiKey.length > 0
+    );
+    if (attachment && !providerReady) {
+      dispatch(showSuccessToast(`Cargué tu patrón: ${piecesLabel(attachment.pieces.length)}`));
+      setMessages(prev => [...prev, {
+        id: newId(),
+        role: 'assistant',
+        content: `Cargué tu patrón (${piecesLabel(attachment.pieces.length)}). Configura un proveedor de AI en ajustes para que pueda ayudarte con él.`,
+      }]);
+      return;
+    }
+
     try {
-      const response = await agenticHook.run(text);
+      const { response, toolCalls } = await agenticHook.run(agentText);
       setMessages(prev => [
         ...prev,
-        { id: newId(), role: 'assistant', content: response },
+        { id: newId(), role: 'assistant', content: response, toolCalls },
       ]);
     } catch (e: unknown) {
       const msg = getErrorMessage(classifyError(e), e);
@@ -153,7 +199,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) 
         { id: newId(), role: 'assistant', content: msg },
       ]);
     }
-  }, [agenticHook, setInput]);
+  }, [agenticHook, setInput, pendingDXF, clearAttachment, dispatch, providerConfig]);
 
   // Watch the submit-nonce from UnifiedBar. It changes ONLY when the user
   // intentionally submits (Enter key or Send button). Per-keystroke input
@@ -168,9 +214,9 @@ export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) 
     if (submitNonce === lastNonceRef.current) return;
     lastNonceRef.current = submitNonce;
 
-    if (!input.trim() || agenticHook.isRunning) return;
+    if ((!input.trim() && !pendingDXF) || agenticHook.isRunning) return;
     handleSend(input);
-  }, [submitNonce, input, handleSend, agenticHook.isRunning]);
+  }, [submitNonce, input, pendingDXF, handleSend, agenticHook.isRunning]);
 
   // Running tool indicator
   const runningToolName = agenticHook.toolCalls.find(tc => tc.status === 'running')?.name;
@@ -197,10 +243,47 @@ export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) 
 
       {/* Message list */}
       {messages.map(m => (
-        <div key={m.id} className={`chat-message ${m.role === 'user' ? 'chat-message--user' : ''}`}>
-          {m.role === 'assistant' && <div className="chat-message__avatar">AI</div>}
-          <div className="chat-message__text">{m.content}</div>
-        </div>
+        <Fragment key={m.id}>
+          <div className={`chat-message ${m.role === 'user' ? 'chat-message--user' : ''}`}>
+            {m.role === 'assistant' && <div className="chat-message__avatar">AI</div>}
+            <div className="chat-message__text">{m.content}</div>
+          </div>
+          {/* Persistent decision trail — the agent's tools for THIS turn, kept
+              visible after completion so the process is auditable. */}
+          {m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0 && (
+            <div
+              style={{
+                marginLeft: 'var(--sp-6)',
+                marginTop: -2,
+                marginBottom: 'var(--sp-1)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                fontSize: 'var(--text-xs)',
+                borderLeft: '2px solid var(--border)',
+                paddingLeft: 'var(--sp-2)',
+              }}
+            >
+              {m.toolCalls.map((tc, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'baseline',
+                    gap: 'var(--sp-1)',
+                    color: tc.status === 'error' ? 'var(--color-error, #f87171)' : 'var(--text-ghost)',
+                  }}
+                >
+                  <span style={{ flexShrink: 0 }}>
+                    {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
+                  </span>
+                  <span style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{tc.name}</span>
+                  {tc.error && <span style={{ opacity: 0.85 }}>— {tc.error}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </Fragment>
       ))}
 
       {/* In-progress tool calls */}
@@ -235,6 +318,36 @@ export default function UnifiedBarChat({ input, setInput, submitNonce }: Props) 
               <span>{tc.name}</span>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pending DXF attachment chip — sits just above the input until sent */}
+      {pendingDXF && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 'var(--sp-2)',
+            padding: 'var(--sp-2) var(--sp-3)',
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            fontSize: 'var(--text-sm)',
+          }}
+        >
+          <Paperclip size={14} style={{ flexShrink: 0, color: 'var(--text-secondary)' }} />
+          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>
+            {pendingDXF.name} · {piecesLabel(pendingDXF.pieces.length)}
+          </span>
+          <button
+            type="button"
+            onClick={clearAttachment}
+            aria-label="Quitar adjunto"
+            title="Quitar"
+            style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', flexShrink: 0, padding: 2 }}
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 

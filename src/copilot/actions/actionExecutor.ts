@@ -30,11 +30,8 @@ import {
   unlinkPieces,
   setPieceFabric,
 } from '../../store/projectSlice';
-import { parseDXF } from '../../utils/dxf/parser';
-import { dxfToPatternPieces } from '../../utils/dxf/converter';
-import { detectDXFFormat } from '../../utils/dxf/formatDetector';
-import { getProfile } from '../../utils/dxf/formatProfiles';
-import type { FormatProfile, FormatId } from '../../utils/dxf/types';
+import { importDXFContent } from '../../utils/dxf/importPipeline';
+import type { FormatId } from '../../utils/dxf/types';
 import {
   selectPiece,
   clearSelection,
@@ -919,20 +916,14 @@ export class CopilotActionExecutor {
           autoDetect?: boolean;
           format?: string;
         };
-        const doc = parseDXF(importAction.fileContent);
-
-        let formatProfile: FormatProfile | undefined;
-        if (importAction.format) {
-          formatProfile = getProfile(importAction.format as FormatId);
-        } else if (importAction.autoDetect !== false) {
-          const results = detectDXFFormat(doc);
-          if (results.length > 0) formatProfile = getProfile(results[0].profileId);
-        }
-
-        const importedPieces = dxfToPatternPieces(doc, {
+        // Shared core (also used by the browser DXF drop-zone). Throws
+        // DXFParseError on empty/parse/no-pieces → caught by execute()'s
+        // outer try/catch and surfaced as a failed ActionResult.
+        const { pieces: importedPieces } = importDXFContent(importAction.fileContent, {
           unit: importAction.unit,
           scale: importAction.scale,
-          formatProfile,
+          autoDetect: importAction.autoDetect,
+          format: importAction.format as FormatId | undefined,
         });
 
         if (importAction.loadType === 'open') {

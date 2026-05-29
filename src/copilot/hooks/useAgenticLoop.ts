@@ -27,8 +27,13 @@ export interface UseAgenticLoopReturn {
   isRunning: boolean;
   /** Final text response from the LLM */
   response: string | null;
-  /** Run a user request through the agentic loop */
-  run: (request: string) => Promise<string>;
+  /**
+   * Run a user request through the agentic loop. Returns the final text
+   * response AND the tool calls made during THIS run, so the caller can
+   * persist the decision trail on the message (live `toolCalls` state is
+   * reset on the next run — it cannot be the audit record).
+   */
+  run: (request: string) => Promise<{ response: string; toolCalls: ToolCallProgress[] }>;
   /** Clear the conversation history (project switch / fresh session). */
   clearHistory: () => void;
 }
@@ -77,17 +82,24 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
     [options.send, options.registry],
   );
 
-  const run = useCallback(async (request: string): Promise<string> => {
+  const run = useCallback(async (request: string): Promise<{ response: string; toolCalls: ToolCallProgress[] }> => {
     setIsRunning(true);
     setToolCalls([]);
     setResponse(null);
+
+    // Accumulate this run's tool calls in a local (not React state) so the
+    // authoritative per-run list is available synchronously when run()
+    // resolves — `toolCalls` state is reset on the next run and would be a
+    // stale closure here. `setToolCalls(runToolCalls)` mirrors it live.
+    let runToolCalls: ToolCallProgress[] = [];
 
     const handleEvent = (event: AgenticEvent) => {
       switch (event.type) {
         case 'tool:start':
         case 'tool:complete':
         case 'tool:error':
-          setToolCalls((prev) => reduceToolCalls(prev, event));
+          runToolCalls = reduceToolCalls(runToolCalls, event);
+          setToolCalls(runToolCalls);
           break;
         case 'complete':
           setResponse(event.content);
@@ -101,7 +113,7 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
 
     try {
       const result = await loop.run(request, handleEvent);
-      return result;
+      return { response: result, toolCalls: runToolCalls };
     } finally {
       setIsRunning(false);
     }
