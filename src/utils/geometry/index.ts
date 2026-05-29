@@ -3,7 +3,7 @@ export { lerp, lerp2D, evalCubic, evalQuadratic, distToBezier } from './bezier';
 export { screenToPattern, screenToPatternLength } from './coords';
 export { cmToM, mToCm, mmToM, mToMm, cmToMm, mmToCm } from './units';
 export { metresToImporter, importerToMetres } from './boundaries';
-export { getEdgeEndpoints, getEdgeLength, computeOffsetPath, computeSegmentOffsetPath } from './path';
+export { getEdgeEndpoints, getEdgeLength, getEdgeArcLength, computeOffsetPath, computeSegmentOffsetPath } from './path';
 export { hitTestPieceBBox, findNearestPiece } from './hitTest';
 export {
   computeBoundingBox, computeHandlePositions, scaleOutline, rotateOutline,

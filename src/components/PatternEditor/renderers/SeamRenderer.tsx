@@ -9,7 +9,7 @@
  */
 
 import { PatternPiece, Seam } from '../../../types/types';
-import { getEdgeEndpoints, getEdgeLength, getEdgePathD } from '../../../utils/geometry/path';
+import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -89,9 +89,12 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
           y: (epB.start.y + epB.end.y) / 2 + offB.y,
         };
 
-        // Length validation
-        const lenA = getEdgeLength(pieceA.outline, segIdxA);
-        const lenB = getEdgeLength(pieceB.outline, segIdxB);
+        // Length validation. Use ARC length (samples curves), not the chord:
+        // autoSew pairs edges by arc length, so a chord-based mismatch wildly
+        // over-reports curved seams (armholes, caps, necklines) — a correctly
+        // matched curved seam would otherwise show a huge false mismatch.
+        const lenA = getEdgeArcLength(pieceA.outline, segIdxA);
+        const lenB = getEdgeArcLength(pieceB.outline, segIdxB);
         const maxLen = Math.max(lenA, lenB, 0.01);
         const mismatch = Math.abs(lenA - lenB) / maxLen;
         const hasMismatch = mismatch > 0.05; // >5% difference
