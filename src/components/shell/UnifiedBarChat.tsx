@@ -228,7 +228,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', padding: 'var(--sp-3)', gap: 'var(--sp-2)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', padding: 'var(--sp-3)', gap: 'var(--sp-2)', userSelect: 'text', cursor: 'text' }}>
       {/* Empty state */}
       {messages.length === 0 && !agenticHook.isRunning && (
         <div style={{
