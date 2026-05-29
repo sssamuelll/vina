@@ -115,6 +115,22 @@ describe('detectSemanticEdges', () => {
     expect(neck!.matchHint).toMatch(/neckline/);
   });
 
+  it('detects waistband edges with a waistline matchHint (waistband had no branch before)', () => {
+    const waistbandOutline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [820, 0] },   // fold (top)
+      { type: 'L', values: [820, 60] },  // end (right)
+      { type: 'L', values: [0, 60] },    // waistband edge (bottom) — sews to waistline
+      { type: 'Z', values: [] },
+    ];
+    const piece = makePiece('PATRONES PARA SAMUEL-2', waistbandOutline);
+    piece.category = 'waistband';
+    const edges = detectSemanticEdges(piece);
+    const band = edges.find(e => e.name.includes('waistbandEdge'));
+    expect(band).toBeDefined();
+    expect(band!.matchHint).toMatch(/waistline/);
+  });
+
   it('labels a centered curved top as neckline (not armhole), with a collar matchHint', () => {
     const outline: PathCommand[] = [
       { type: 'M', values: [0, 0] },

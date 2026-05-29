@@ -239,21 +239,32 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
       }
     } else if (category === 'skirt') {
       if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
-        name = 'waistline'; edgeType = 'seam'; matchHint = 'pairs with waistband';
+        name = 'waistline'; edgeType = 'seam'; matchHint = 'pairs with waistbandEdge';
       } else if (group.zone === 'bottom') {
         name = 'hemline'; edgeType = 'hem';
       } else if (isNearlyVertical(avgAngle)) {
-        name = 'sideSeam'; edgeType = 'seam';
+        name = 'sideSeam'; edgeType = 'seam'; matchHint = 'pairs with sideSeam';
       }
     } else if (category === 'trouser') {
       if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
-        name = 'waistline'; edgeType = 'seam';
+        name = 'waistline'; edgeType = 'seam'; matchHint = 'pairs with waistbandEdge';
       } else if (group.zone === 'bottom') {
         name = 'hemline'; edgeType = 'hem';
       } else if (hasCurve) {
-        name = 'crotchCurve'; edgeType = 'seam';
+        name = 'crotchCurve'; edgeType = 'seam'; matchHint = 'pairs with crotchCurve';
       } else if (isNearlyVertical(avgAngle)) {
-        name = 'sideSeam'; edgeType = 'seam';
+        name = 'sideSeam'; edgeType = 'seam'; matchHint = 'pairs with sideSeam';
+      }
+    } else if (category === 'waistband') {
+      // A waistband is a long strip: one long edge sews to the waistline,
+      // the other is the top/fold edge, the short ends close the band.
+      // (Previously waistband had no branch → generic edges, unsewable.)
+      if (group.zone === 'bottom' && isNearlyHorizontal(avgAngle)) {
+        name = 'waistbandEdge'; edgeType = 'seam'; matchHint = 'pairs with waistline';
+      } else if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
+        name = 'waistbandFold'; edgeType = 'fold';
+      } else {
+        name = 'waistbandEnd'; edgeType = 'seam';
       }
     } else {
       // Generic: assign by zone
