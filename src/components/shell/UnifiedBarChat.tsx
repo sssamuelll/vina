@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import { useDispatch } from 'react-redux';
 import { Paperclip, X } from 'lucide-react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { store } from '../../store';
 import type { AppDispatch } from '../../store';
 import { addPiece } from '../../store/projectSlice';
@@ -246,7 +248,15 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
         <Fragment key={m.id}>
           <div className={`chat-message ${m.role === 'user' ? 'chat-message--user' : ''}`}>
             {m.role === 'assistant' && <div className="chat-message__avatar">AI</div>}
-            <div className="chat-message__text">{m.content}</div>
+            <div className="chat-message__text">
+              {m.role === 'assistant' ? (
+                <div className="chat-markdown">
+                  <Markdown remarkPlugins={[remarkGfm]}>{m.content}</Markdown>
+                </div>
+              ) : (
+                m.content
+              )}
+            </div>
           </div>
           {/* Persistent decision trail — the agent's tools for THIS turn, kept
               visible after completion so the process is auditable. */}
