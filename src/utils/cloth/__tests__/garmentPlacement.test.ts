@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
-import { detectBodyRegion, computePlacement, placeGarmentPieces } from '../garmentPlacement';
-import type { PatternPiece, BodyMeasurements } from '../../../types/types';
+import { detectBodyRegion, computePlacement, placeGarmentPieces, isPieceUpsideDown } from '../garmentPlacement';
+import type { PatternPiece, BodyMeasurements, SemanticEdge } from '../../../types/types';
 
 const MEAS: BodyMeasurements = {
   height: 168, chest: 88, waist: 72, hips: 96,
@@ -26,6 +26,46 @@ function makePiece(name: string, category?: string, side?: string): PatternPiece
     layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
+
+describe('isPieceUpsideDown', () => {
+  // Rectangle in pattern (Y-down) space: top edge at y=0, bottom edge at y=300.
+  // outlineToLocal3D maps local-z = -patternY (centered), so the small-pattern-Y
+  // (top-of-pattern) edge renders HIGHER on the avatar.
+  const outline: PatternPiece['outline'] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [200, 0] },   // edge 1: top of pattern (y≈0)
+    { type: 'L', values: [200, 300] }, // edge 2: right
+    { type: 'L', values: [0, 300] },   // edge 3: bottom of pattern (y≈300)
+    { type: 'Z', values: [] },
+  ];
+  function pieceWithEdges(edges: SemanticEdge[]): PatternPiece {
+    return { ...makePiece('p', 'bodice', 'front'), outline, edges };
+  }
+  const e = (name: string, range: [number, number]): SemanticEdge =>
+    ({ id: name, name, segmentRange: range, edgeType: 'seam' } as SemanticEdge);
+
+  it('is false when neckline (top) is at the pattern top and hemline at the bottom', () => {
+    const piece = pieceWithEdges([e('neckline', [0, 1]), e('hemline', [2, 3])]);
+    expect(isPieceUpsideDown(piece)).toBe(false);
+  });
+
+  it('is true when neckline sits BELOW the hemline (piece laid out head-down)', () => {
+    const piece = pieceWithEdges([e('neckline', [2, 3]), e('hemline', [0, 1])]);
+    expect(isPieceUpsideDown(piece)).toBe(true);
+  });
+
+  it('is false when there is no top/bottom pair to compare', () => {
+    expect(isPieceUpsideDown(pieceWithEdges([e('sideSeam', [1, 2])]))).toBe(false);
+    expect(isPieceUpsideDown({ ...makePiece('p', 'bodice', 'front'), outline })).toBe(false);
+  });
+
+  it('flips the stand-up rotation for an upside-down classified piece', () => {
+    const piece = pieceWithEdges([e('neckline', [2, 3]), e('hemline', [0, 1])]);
+    const [placement] = placeGarmentPieces([piece], MEAS);
+    // front-torso base rotation is [-π/2, 0, 0]; corrected to [+π/2, 0, 0].
+    expect(placement.rotation[0]).toBeCloseTo(Math.PI / 2, 6);
+  });
+});
 
 describe('detectBodyRegion', () => {
   it('uses category when available', () => {

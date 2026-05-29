@@ -12,6 +12,7 @@
 import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 import { mmToM, cmToM } from '../geometry';
+import { edgeMidpointLocal3D } from '../3d/edgePicker';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -333,6 +334,57 @@ export function computePlacement(
  * falls back to name-based regex. Piece geometry (bounding box) is used
  * to adjust vertical positioning (skirts hang from waist, sleeves from shoulder).
  */
+// ── Vertical orientation correction ───────────────────────────────────────────
+// The DXF lays each piece out in an arbitrary orientation, so a piece can arrive
+// "head-down" — its neckline/shoulder at the bottom of the pattern. A generic
+// stand-up rotation then renders it upside down on the avatar. We detect this
+// from the semantic edges (which the agent's classify+detectEdges produced) and
+// correct the orientation per piece.
+
+/** Semantic edge roles that belong at the TOP of a piece on the body. */
+const TOP_EDGE_ROLES = new Set([
+  'neckline', 'shoulder', 'armhole', 'sleeveCap',
+  'collarNeckEdge', 'collarOuterEdge', 'waistline', 'waistbandEdge', 'waistbandFold',
+]);
+/** Semantic edge roles that belong at the BOTTOM of a piece. */
+const BOTTOM_EDGE_ROLES = new Set(['hemline', 'cuffEdge']);
+
+/**
+ * Detect whether a piece is upside down: its semantic TOP edges (neckline,
+ * shoulder, …) sit LOWER than its BOTTOM edges (hemline, …) in the local
+ * height axis (local-z, which the stand-up rotation maps to 3D-up). Returns
+ * false when the piece lacks both a top and a bottom edge to compare — we
+ * cannot tell, so we leave it as placed.
+ */
+export function isPieceUpsideDown(piece: PatternPiece): boolean {
+  const edges = piece.edges;
+  if (!edges || edges.length === 0) return false;
+  let topZ = 0, topN = 0, botZ = 0, botN = 0;
+  for (const e of edges) {
+    const role = e.name.replace(/-\d+$/, '');
+    const mid = edgeMidpointLocal3D(piece.outline, e);
+    if (!mid) continue;
+    if (TOP_EDGE_ROLES.has(role)) { topZ += mid.z; topN++; }
+    else if (BOTTOM_EDGE_ROLES.has(role)) { botZ += mid.z; botN++; }
+  }
+  if (topN === 0 || botN === 0) return false;
+  // Higher local-z renders higher on the avatar. Right-side-up ⇒ top edges
+  // higher than bottom edges; if they're lower, the piece is flipped.
+  return (topZ / topN) < (botZ / botN);
+}
+
+/**
+ * If the piece is upside down, invert the stand-up rotation so its semantic top
+ * points up. (A pure rotation flips the facing too; the wrong-side-of-fabric is
+ * a separate concern that flipNormal3D toggles. Vertical orientation is what
+ * this fixes — the "boca abajo" bug.)
+ */
+function applyVerticalOrientation(piece: PatternPiece, placement: PlacementResult): PlacementResult {
+  if (!isPieceUpsideDown(piece)) return placement;
+  const [rx, ry, rz] = placement.rotation;
+  return { position: placement.position, rotation: [-rx, ry, rz] };
+}
+
 export function placeGarmentPieces(
   pieces: PatternPiece[],
   measurements: BodyMeasurements,
@@ -420,9 +472,11 @@ export function placeGarmentPieces(
       };
     }
 
-    return computePlacement(region, measurements, {
+    const placement = computePlacement(region, measurements, {
       widthMm: geo.width,
       heightMm: geo.height,
     });
+    // Correct per-piece vertical orientation (e.g. a DXF front laid out head-down).
+    return applyVerticalOrientation(piece, placement);
   });
 }
