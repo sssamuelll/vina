@@ -265,21 +265,36 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
               }}
             >
               {m.toolCalls.map((tc, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'baseline',
-                    gap: 'var(--sp-1)',
-                    color: tc.status === 'error' ? 'var(--color-error, #f87171)' : 'var(--text-ghost)',
-                  }}
-                >
-                  <span style={{ flexShrink: 0 }}>
-                    {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
-                  </span>
-                  <span style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{tc.name}</span>
-                  {tc.error && <span style={{ opacity: 0.85 }}>— {tc.error}</span>}
-                </div>
+                <Fragment key={i}>
+                  {/* The agent's rationale for this batch — its WHY, shown
+                      above the action(s) it explains. */}
+                  {tc.reason && (
+                    <div
+                      style={{
+                        marginTop: i === 0 ? 0 : 4,
+                        color: 'var(--text-muted)',
+                        fontStyle: 'italic',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      {tc.reason}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: 'var(--sp-1)',
+                      color: tc.status === 'error' ? 'var(--color-error, #f87171)' : 'var(--text-ghost)',
+                    }}
+                  >
+                    <span style={{ flexShrink: 0 }}>
+                      {tc.status === 'done' ? '✓' : tc.status === 'error' ? '✗' : '·'}
+                    </span>
+                    <span style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}>{tc.name}</span>
+                    {tc.error && <span style={{ opacity: 0.85 }}>— {tc.error}</span>}
+                  </div>
+                </Fragment>
               ))}
             </div>
           )}

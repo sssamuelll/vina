@@ -18,6 +18,10 @@ export interface ToolCallProgress {
   status: 'running' | 'done' | 'error';
   result?: unknown;
   error?: string;
+  /** The agent's one-line rationale for the round this tool belongs to —
+   *  captured from the LLM's narration emitted before the tool batch. Shown
+   *  in the decision trail so each action explains its WHY (auditability). */
+  reason?: string;
 }
 
 export interface UseAgenticLoopReturn {
@@ -92,10 +96,28 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
     // resolves — `toolCalls` state is reset on the next run and would be a
     // stale closure here. `setToolCalls(runToolCalls)` mirrors it live.
     let runToolCalls: ToolCallProgress[] = [];
+    // The agent narrates a one-line rationale (text) before each batch of
+    // tool calls; we hold it here and attach it to the first tool of that
+    // batch so the trail shows WHY each action happened.
+    let pendingReason: string | undefined;
 
     const handleEvent = (event: AgenticEvent) => {
       switch (event.type) {
-        case 'tool:start':
+        case 'text:delta':
+          pendingReason = event.content?.trim() || undefined;
+          break;
+        case 'tool:start': {
+          runToolCalls = reduceToolCalls(runToolCalls, event);
+          if (pendingReason && runToolCalls.length > 0) {
+            const last = runToolCalls.length - 1;
+            runToolCalls = runToolCalls.map((tc, i) =>
+              i === last ? { ...tc, reason: pendingReason } : tc,
+            );
+            pendingReason = undefined; // one reason per batch, on its first tool
+          }
+          setToolCalls(runToolCalls);
+          break;
+        }
         case 'tool:complete':
         case 'tool:error':
           runToolCalls = reduceToolCalls(runToolCalls, event);

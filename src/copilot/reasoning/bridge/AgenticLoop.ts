@@ -398,6 +398,14 @@ export class AgenticLoop {
       }
       messages.push(assistantMsg);
 
+      // Surface the agent's narration for THIS batch of tool calls so the UI
+      // decision trail can show the WHY behind each action (auditability).
+      // The loop is non-streaming, so this is the only emission of per-round
+      // content; the final user-facing message arrives via presentToUser.
+      if (response.content && response.content.trim()) {
+        onEvent({ type: 'text:delta', content: response.content.trim() });
+      }
+
       // Execute each tool call and append results
       for (const toolCall of response.toolCalls) {
         let args: Record<string, unknown> = {};
