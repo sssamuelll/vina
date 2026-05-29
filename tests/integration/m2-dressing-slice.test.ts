@@ -101,6 +101,10 @@ describe.skipIf(!shouldRun)('M2 dressing slice — real LLM integration', () => 
       // called loadSeamlyPattern and runGarmentPipeline (in some order).
       expect(turn2ToolStarts).toContain('loadSeamlyPattern');
       expect(turn2ToolStarts).toContain('runGarmentPipeline');
+      // Honesty gate (added with verifyGarment, 2026-05-29): the agent must
+      // verify garment health before claiming success in its done message,
+      // instead of conflating pipeline-success with dressing-success.
+      expect(turn2ToolStarts).toContain('verifyGarment');
 
       const final = store.getState();
       console.log('[FINAL STATE]:', {
