@@ -97,28 +97,29 @@ describe.skipIf(!shouldRun)('M2 dressing slice — real LLM integration', () => 
         .map((e) => (e as { name: string }).name);
       console.log('[TURN 2 tools called]:', turn2ToolStarts);
 
-      // After turn 2: pattern loaded + pipeline run. The agent should have
-      // called loadSeamlyPattern and runGarmentPipeline (in some order).
+      // After turn 2 (CLO3D flow, 2026-05-29): the agent loads, ARRANGES in
+      // 3D, and verifies — it does NOT auto-simulate. The human presses
+      // Simulate. So we expect loadSeamlyPattern + arrangeGarment + verifyGarment,
+      // and the simulation must NOT be running.
       expect(turn2ToolStarts).toContain('loadSeamlyPattern');
-      expect(turn2ToolStarts).toContain('runGarmentPipeline');
-      // Honesty gate (added with verifyGarment, 2026-05-29): the agent must
-      // verify garment health before claiming success in its done message,
-      // instead of conflating pipeline-success with dressing-success.
+      expect(turn2ToolStarts).toContain('arrangeGarment');
+      // Honesty gate: verify garment health before claiming anything.
       expect(turn2ToolStarts).toContain('verifyGarment');
 
       const final = store.getState();
       console.log('[FINAL STATE]:', {
         pieces: final.project.pieces.length,
         seams: final.project.seams.length,
+        viewMode3D: final.simulation.viewMode3D,
         simulation: final.simulation.simulationState,
       });
 
       // Pattern loaded → at least one piece in store
       expect(final.project.pieces.length).toBeGreaterThan(0);
-      // Pipeline applied seams → at least one seam
-      expect(final.project.seams.length).toBeGreaterThan(0);
-      // Simulation started by runGarmentPipeline
-      expect(final.simulation.simulationState).toBe('running');
+      // The agent must NOT have started the drape — arrange mode, idle solver.
+      // (The human triggers Simulate; the agent never auto-simulates.)
+      expect(final.simulation.simulationState).not.toBe('running');
+      expect(final.simulation.viewMode3D).toBe('arrange');
     },
     600_000, // 10-minute budget — 5 LLM calls × ~15 s each + tool exec
   );

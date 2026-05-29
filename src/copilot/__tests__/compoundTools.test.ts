@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 230 + 1 dressAvatar (was 232, decremented by 1 after removing setFabric tool — see commit message of fix(copilot)! consolidation into assignFabric)
-      expect(registry.size).toBe(231);
+      // 231 + 1 arrangeGarment (CLO3D arrange-only flow, 2026-05-29)
+      expect(registry.size).toBe(232);
     });
   });
 });
