@@ -85,6 +85,55 @@ describe('detectSemanticEdges', () => {
     }
   });
 
+  it('uses explicit piece.category for DXF pieces whose names carry no role', () => {
+    // María's DXF: CAD block names like "PATRONES PARA SAMUEL-1". The name
+    // alone → generic edges; the agent's explicit classification must drive
+    // bodice edge detection instead.
+    const piece = makePiece('PATRONES PARA SAMUEL-1', bodiceFrontOutline);
+    piece.category = 'bodice';
+    piece.side = 'front';
+    const edges = detectSemanticEdges(piece);
+    const names = edges.map(e => e.name);
+    expect(names.some(n => /armhole|shoulder|sideSeam|neckline|centerFront|hemline/.test(n))).toBe(true);
+    // Must NOT fall back to the inert generic positional names.
+    expect(names.some(n => /topEdge|rightEdge|leftEdge|bottomEdge/.test(n))).toBe(false);
+  });
+
+  it('detects collar edges with a neckline matchHint (collar had no branch before)', () => {
+    const collarOutline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [456, 0] },   // outer (top)
+      { type: 'L', values: [456, 41] },  // end (right)
+      { type: 'L', values: [0, 41] },    // neck edge (bottom) — sews to neckline
+      { type: 'Z', values: [] },
+    ];
+    const piece = makePiece('PATRONES PARA SAMUEL-2', collarOutline);
+    piece.category = 'collar';
+    const edges = detectSemanticEdges(piece);
+    const neck = edges.find(e => e.name.includes('collarNeckEdge'));
+    expect(neck).toBeDefined();
+    expect(neck!.matchHint).toMatch(/neckline/);
+  });
+
+  it('labels a centered curved top as neckline (not armhole), with a collar matchHint', () => {
+    const outline: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },                   // left shoulder
+      { type: 'C', values: [130, 60, 270, 60, 300, 0] }, // neckline — centered, curved
+      { type: 'L', values: [400, 0] },                   // right shoulder
+      { type: 'L', values: [400, 600] },                 // right side
+      { type: 'L', values: [0, 600] },                   // hem
+      { type: 'Z', values: [] },
+    ];
+    const piece = makePiece('Front', outline);
+    piece.category = 'bodice';
+    piece.side = 'front';
+    const edges = detectSemanticEdges(piece);
+    const neck = edges.find(e => e.name === 'neckline');
+    expect(neck).toBeDefined();
+    expect(neck!.matchHint).toMatch(/collar/);
+  });
+
   it('returns empty for degenerate piece', () => {
     const piece = makePiece('Tiny', [
       { type: 'M', values: [0, 0] },
