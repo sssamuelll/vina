@@ -501,9 +501,9 @@ export const tools: ToolDefinition[] = [
   {
     name: 'dressAvatar',
     description:
-      'One-click dress avatar: auto-arrange all pattern pieces around the avatar and start simulation. ' +
-      'Pieces are positioned based on their category (bodice, sleeve, skirt, etc.) and the avatar measurements. ' +
-      '/ Vestir avatar: auto-acomodar piezas alrededor del avatar e iniciar simulación.',
+      'Auto-arrange all pattern pieces around the avatar in 3D (arrange mode), by category. ' +
+      'Does NOT start the simulation — the human presses Simulate after verifying the seams. Alias of arrangeGarment (the auto-simulate tail was removed for the CLO3D flow). ' +
+      '/ Acomodar piezas alrededor del avatar en 3D (arrange). NO inicia simulación — el humano presiona Simular.',
     parameters: {
       type: 'object',
       properties: {},
@@ -533,16 +533,17 @@ export const tools: ToolDefinition[] = [
       });
       dispatch(saveArrangementSnapshot(snapshot));
 
-      // Simulate
-      dispatch(setViewMode3D('simulate'));
-      dispatch(startSimulation());
+      // Arrange only — the auto-simulate tail was removed (CLO3D flow):
+      // dressAvatar no longer drapes. The human presses Simulate after
+      // verifying the seams. This is now an alias of arrangeGarment.
+      dispatch(setViewMode3D('arrange'));
 
       return {
         success: true,
         data: {
           piecesArranged: pieces.length,
           seamsActive: state.project.seams.filter(s => s.active).length,
-          message: `Dressing avatar with ${pieces.length} pieces and ${state.project.seams.filter(s => s.active).length} seams.`,
+          message: `Arranged ${pieces.length} pieces in 3D (arrange mode). Verify the seams, then press Simulate.`,
         },
       };
     },
