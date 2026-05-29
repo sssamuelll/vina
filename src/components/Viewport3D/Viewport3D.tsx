@@ -35,6 +35,7 @@ import AvatarTapes from './AvatarTapes';
 import CollisionBodyMesh from './CollisionBodyMesh';
 import CollisionBodyPanel from './CollisionBodyPanel';
 import Sew3DTool from './Sew3DTool';
+import SeamRenderer3D from './SeamRenderer3D';
 import { WindGizmo } from './WindGizmo';
 import RenderSettingsPanel from './RenderSettingsPanel';
 import EnvironmentSetup from './EnvironmentSetup';
@@ -155,6 +156,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   const defaultFabricId = useSelector((s: RootState) => s.simulation.defaultFabricId);
   const viewMode3D = useSelector((s: RootState) => s.simulation.viewMode3D);
   const showGarment = useSelector((s: RootState) => s.simulation.showGarment);
+  const showSeamlines3D = useSelector((s: RootState) => s.simulation.showSeamlines3D);
   const hiddenPieceIds = useSelector((s: RootState) => s.simulation.hiddenPieceIds);
   const flippedPieceIds = useSelector((s: RootState) => s.simulation.flippedPieceIds);
   const collisionBodies = useSelector((s: RootState) => s.collisionBody.bodies);
@@ -723,6 +725,19 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         {/* 3D Sew Tool — click two edges to create a seam */}
         {activeTool3D === 'sew3d' && !useClothSim && (
           <Sew3DTool
+            pieces={pieces}
+            placements={garmentPlacements}
+            arrangementOverrides={arrangementOverrides}
+            flippedPieceIds={flippedPieceIds}
+          />
+        )}
+
+        {/* Seam preview — draw existing seams as 3D lines before simulation,
+            so the user can verify the sewing (CLO3D-style). Reads the
+            showSeamlines3D toggle that DisplayBar3D already exposes. */}
+        {showGarment && !useClothSim && showSeamlines3D && seams.length > 0 && (
+          <SeamRenderer3D
+            seams={seams}
             pieces={pieces}
             placements={garmentPlacements}
             arrangementOverrides={arrangementOverrides}

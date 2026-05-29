@@ -128,6 +128,48 @@ export function outlineToLocal3D(outline: PathCommand[]): Local3DPoint[] {
 }
 
 /**
+ * Yaw rotation for a piece's 3D placement, matching PieceMesh / PiecePickMesh /
+ * EdgeHighlight. Shared by Sew3DTool and SeamRenderer3D so seam lines land
+ * exactly on the edges (the floating-line risk if the transforms drift).
+ *
+ * @param pieceRotationDeg piece.rotation in degrees (optional)
+ * @param rot the placement's base [x,y,z] rotation (optional)
+ */
+export function pieceHighlightRotation(
+  pieceRotationDeg: number | undefined,
+  rot?: [number, number, number],
+): [number, number, number] {
+  const yaw = -(pieceRotationDeg ?? 0) * (Math.PI / 180);
+  if (rot) return [rot[0], rot[1] + yaw, rot[2]];
+  return [0, yaw, 0];
+}
+
+/**
+ * Local-space 3D midpoint of a semantic edge (meters, centered, Y plane).
+ * Uses the SAME outline→local transform and segmentRange clamping as
+ * EdgeHighlight, so a seam endpoint sits on the edge it represents.
+ */
+export function edgeMidpointLocal3D(
+  outline: PathCommand[],
+  edge: SemanticEdge,
+): { x: number; z: number } | null {
+  const local3D = outlineToLocal3D(outline);
+  if (local3D.length === 0) return null;
+  const [start, end] = edge.segmentRange;
+  const clampedStart = Math.max(0, Math.min(start, local3D.length - 1));
+  const clampedEnd = Math.max(clampedStart + 1, Math.min(end + 1, local3D.length));
+  const pts = local3D.slice(clampedStart, clampedEnd);
+  if (pts.length === 0) return null;
+  let sx = 0;
+  let sz = 0;
+  for (const p of pts) {
+    sx += p.x;
+    sz += p.z;
+  }
+  return { x: sx / pts.length, z: sz / pts.length };
+}
+
+/**
  * Find the closest SemanticEdge to a 3D hit point in piece local space.
  *
  * @param localHitX  Hit point X in local space (meters)
