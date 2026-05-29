@@ -480,6 +480,16 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // Ctrl+W — Clear all pins (#134)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Don't steal keystrokes while the user is typing in an input/textarea/
+      // contenteditable (e.g. the AI chat box). Without this, single-key 3D
+      // shortcuts (F=focus, W=pin, I=IK, Shift+A/F) preventDefault the key and
+      // it never reaches the field — typing "front" silently dropped the "f".
+      const el = document.activeElement as HTMLElement | null;
+      if (el) {
+        const tag = el.tagName.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable) return;
+      }
+
       if (e.shiftKey && (e.key === 'A' || e.key === 'a')) {
         e.preventDefault();
         setAvatarHidden(h => !h);
