@@ -12,7 +12,6 @@
 import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 import { mmToM, cmToM } from '../geometry';
-import { edgeMidpointLocal3D } from '../3d/edgePicker';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -252,16 +251,26 @@ export function computePlacement(
   //
   // To stand up a piece: rotate -π/2 around X (Z becomes Y, -Y becomes Z)
 
+  // FORWARD CONVENTION: the avatar's front faces +Z (AvatarModel declares
+  // "Z=forward") and the default camera sits at +Z looking toward it. So a
+  // FRONT piece lands on the +Z side (toward camera) and a BACK piece on -Z.
+  //
+  // FACING vs UP are decoupled. A front piece uses [-π/2, 0, 0]: stand up
+  // (pattern-up → world-up) and face +Z. A back piece must face the OTHER way
+  // while staying upright. We get that with a π about Z (rotation in the
+  // piece's own plane — a reflection-equivalent that preserves pattern-up →
+  // world-up), NOT a π about Y. A π about Y flips facing AND inverts the up
+  // axis, which is the "boca abajo" bug that made back pieces render head-down.
   switch (region) {
     case 'front-torso':
       return {
-        position: [0, midTorso, -(d.chestRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (-Z)
+        position: [0, midTorso, d.chestRadius + GAP],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
       };
     case 'back-torso':
       return {
-        position: [0, midTorso, d.chestRadius + GAP],
-        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward (+Z)
+        position: [0, midTorso, -(d.chestRadius + GAP)],
+        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face backward (-Z)
       };
     case 'left-sleeve':
       return {
@@ -276,31 +285,31 @@ export function computePlacement(
       };
     case 'front-skirt':
       return {
-        position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face front
+        position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face front (+Z)
       };
     case 'back-skirt':
       return {
-        position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
-        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face back
+        position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
+        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face back (-Z)
       };
     case 'collar':
       return {
         // Collar in front of neck, standing vertical like front-torso
-        position: [0, d.neckHeight, -(d.chestRadius * 0.5 + GAP)],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward
+        position: [0, d.neckHeight, d.chestRadius * 0.5 + GAP],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
       };
     case 'waistband':
       return {
         // Waistband in front of waist, standing vertical
-        position: [0, d.waistHeight, -(d.hipRadius * 0.5 + GAP)],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward
+        position: [0, d.waistHeight, d.hipRadius * 0.5 + GAP],
+        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
       };
     case 'hood':
       return {
-        // Behind head, standing vertical facing backward
-        position: [0, d.neckHeight + 0.05, d.chestRadius + GAP],
-        rotation: [-Math.PI / 2, Math.PI, 0], // stand up, face backward
+        // Behind head, standing vertical facing backward (-Z)
+        position: [0, d.neckHeight + 0.05, -(d.chestRadius + GAP)],
+        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face backward (-Z)
       };
     case 'cuff-left':
       return {
@@ -315,10 +324,11 @@ export function computePlacement(
       };
     case 'unknown':
     default: {
-      // Fallback: arrange in a circle around the torso, standing up
+      // Fallback: arrange in a circle around the torso, standing up.
+      // Place toward camera (+Z) so a lone unclassified piece is visible.
       const radius = Math.max(d.chestRadius, d.hipRadius) + 0.12;
       return {
-        position: [0, midTorso, -radius],
+        position: [0, midTorso, radius],
         rotation: [-Math.PI / 2, 0, 0], // stand up
       };
     }
@@ -334,56 +344,14 @@ export function computePlacement(
  * falls back to name-based regex. Piece geometry (bounding box) is used
  * to adjust vertical positioning (skirts hang from waist, sleeves from shoulder).
  */
-// ── Vertical orientation correction ───────────────────────────────────────────
-// The DXF lays each piece out in an arbitrary orientation, so a piece can arrive
-// "head-down" — its neckline/shoulder at the bottom of the pattern. A generic
-// stand-up rotation then renders it upside down on the avatar. We detect this
-// from the semantic edges (which the agent's classify+detectEdges produced) and
-// correct the orientation per piece.
-
-/** Semantic edge roles that belong at the TOP of a piece on the body. */
-const TOP_EDGE_ROLES = new Set([
-  'neckline', 'shoulder', 'armhole', 'sleeveCap',
-  'collarNeckEdge', 'collarOuterEdge', 'waistline', 'waistbandEdge', 'waistbandFold',
-]);
-/** Semantic edge roles that belong at the BOTTOM of a piece. */
-const BOTTOM_EDGE_ROLES = new Set(['hemline', 'cuffEdge']);
-
-/**
- * Detect whether a piece is upside down: its semantic TOP edges (neckline,
- * shoulder, …) sit LOWER than its BOTTOM edges (hemline, …) in the local
- * height axis (local-z, which the stand-up rotation maps to 3D-up). Returns
- * false when the piece lacks both a top and a bottom edge to compare — we
- * cannot tell, so we leave it as placed.
- */
-export function isPieceUpsideDown(piece: PatternPiece): boolean {
-  const edges = piece.edges;
-  if (!edges || edges.length === 0) return false;
-  let topZ = 0, topN = 0, botZ = 0, botN = 0;
-  for (const e of edges) {
-    const role = e.name.replace(/-\d+$/, '');
-    const mid = edgeMidpointLocal3D(piece.outline, e);
-    if (!mid) continue;
-    if (TOP_EDGE_ROLES.has(role)) { topZ += mid.z; topN++; }
-    else if (BOTTOM_EDGE_ROLES.has(role)) { botZ += mid.z; botN++; }
-  }
-  if (topN === 0 || botN === 0) return false;
-  // Higher local-z renders higher on the avatar. Right-side-up ⇒ top edges
-  // higher than bottom edges; if they're lower, the piece is flipped.
-  return (topZ / topN) < (botZ / botN);
-}
-
-/**
- * If the piece is upside down, invert the stand-up rotation so its semantic top
- * points up. (A pure rotation flips the facing too; the wrong-side-of-fabric is
- * a separate concern that flipNormal3D toggles. Vertical orientation is what
- * this fixes — the "boca abajo" bug.)
- */
-function applyVerticalOrientation(piece: PatternPiece, placement: PlacementResult): PlacementResult {
-  if (!isPieceUpsideDown(piece)) return placement;
-  const [rx, ry, rz] = placement.rotation;
-  return { position: placement.position, rotation: [-rx, ry, rz] };
-}
+// NOTE: per-piece "boca abajo" correction used to live here as
+// isPieceUpsideDown + applyVerticalOrientation. It was removed 2026-05-30: it
+// keyed off semantic edge-role names that DXF imports never carry (their edges
+// are geometric — topEdge/bottomEdge/…), so it never fired on the actual input,
+// and the real cause of upside-down pieces was a forward-axis convention bug in
+// computePlacement (front/back used opposite up-axes), now fixed above. If a
+// genuine per-piece flip is ever needed, the renderer already exposes a true
+// reflection via `flippedPieceIds` (DraggablePiece scale-z) the human can drive.
 
 export function placeGarmentPieces(
   pieces: PatternPiece[],
@@ -472,11 +440,9 @@ export function placeGarmentPieces(
       };
     }
 
-    const placement = computePlacement(region, measurements, {
+    return computePlacement(region, measurements, {
       widthMm: geo.width,
       heightMm: geo.height,
     });
-    // Correct per-piece vertical orientation (e.g. a DXF front laid out head-down).
-    return applyVerticalOrientation(piece, placement);
   });
 }

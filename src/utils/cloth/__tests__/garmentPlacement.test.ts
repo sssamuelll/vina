@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
-import { detectBodyRegion, computePlacement, placeGarmentPieces, isPieceUpsideDown } from '../garmentPlacement';
-import type { PatternPiece, BodyMeasurements, SemanticEdge } from '../../../types/types';
+import { detectBodyRegion, computePlacement, placeGarmentPieces } from '../garmentPlacement';
+import type { PatternPiece, BodyMeasurements } from '../../../types/types';
 
 const MEAS: BodyMeasurements = {
   height: 168, chest: 88, waist: 72, hips: 96,
@@ -26,46 +26,6 @@ function makePiece(name: string, category?: string, side?: string): PatternPiece
     layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now(),
   };
 }
-
-describe('isPieceUpsideDown', () => {
-  // Rectangle in pattern (Y-down) space: top edge at y=0, bottom edge at y=300.
-  // outlineToLocal3D maps local-z = -patternY (centered), so the small-pattern-Y
-  // (top-of-pattern) edge renders HIGHER on the avatar.
-  const outline: PatternPiece['outline'] = [
-    { type: 'M', values: [0, 0] },
-    { type: 'L', values: [200, 0] },   // edge 1: top of pattern (y≈0)
-    { type: 'L', values: [200, 300] }, // edge 2: right
-    { type: 'L', values: [0, 300] },   // edge 3: bottom of pattern (y≈300)
-    { type: 'Z', values: [] },
-  ];
-  function pieceWithEdges(edges: SemanticEdge[]): PatternPiece {
-    return { ...makePiece('p', 'bodice', 'front'), outline, edges };
-  }
-  const e = (name: string, range: [number, number]): SemanticEdge =>
-    ({ id: name, name, segmentRange: range, edgeType: 'seam' } as SemanticEdge);
-
-  it('is false when neckline (top) is at the pattern top and hemline at the bottom', () => {
-    const piece = pieceWithEdges([e('neckline', [0, 1]), e('hemline', [2, 3])]);
-    expect(isPieceUpsideDown(piece)).toBe(false);
-  });
-
-  it('is true when neckline sits BELOW the hemline (piece laid out head-down)', () => {
-    const piece = pieceWithEdges([e('neckline', [2, 3]), e('hemline', [0, 1])]);
-    expect(isPieceUpsideDown(piece)).toBe(true);
-  });
-
-  it('is false when there is no top/bottom pair to compare', () => {
-    expect(isPieceUpsideDown(pieceWithEdges([e('sideSeam', [1, 2])]))).toBe(false);
-    expect(isPieceUpsideDown({ ...makePiece('p', 'bodice', 'front'), outline })).toBe(false);
-  });
-
-  it('flips the stand-up rotation for an upside-down classified piece', () => {
-    const piece = pieceWithEdges([e('neckline', [2, 3]), e('hemline', [0, 1])]);
-    const [placement] = placeGarmentPieces([piece], MEAS);
-    // front-torso base rotation is [-π/2, 0, 0]; corrected to [+π/2, 0, 0].
-    expect(placement.rotation[0]).toBeCloseTo(Math.PI / 2, 6);
-  });
-});
 
 describe('detectBodyRegion', () => {
   it('uses category when available', () => {
@@ -224,14 +184,36 @@ describe('detectBodyRegion', () => {
 });
 
 describe('computePlacement', () => {
-  it('front-torso is in front of body (negative Z)', () => {
+  // CONVENTION: the avatar's front faces +Z (AvatarModel: "Z=forward") and the
+  // default camera sits at +Z looking toward the avatar. So a front piece must
+  // land on the +Z side (toward camera) and a back piece on the -Z side.
+  // The pre-2026-05-30 code had this mirrored (front at -Z), which made the
+  // front render behind the avatar and the back in front.
+  it('front-torso is in front of body (positive Z, toward camera)', () => {
     const p = computePlacement('front-torso', MEAS, { widthMm: 200, heightMm: 300 });
-    expect(p.position[2]).toBeLessThan(0); // front = -Z
+    expect(p.position[2]).toBeGreaterThan(0); // front = +Z
   });
 
-  it('back-torso is behind body (positive Z)', () => {
+  it('back-torso is behind body (negative Z)', () => {
     const p = computePlacement('back-torso', MEAS, { widthMm: 200, heightMm: 300 });
-    expect(p.position[2]).toBeGreaterThan(0);
+    expect(p.position[2]).toBeLessThan(0);
+  });
+
+  // Up-axis decoupled from facing: BOTH front and back stand upright. The back's
+  // outward face is achieved with a π about Z (a reflection-equivalent that keeps
+  // pattern-up → world-up), NOT a π about Y (which also inverts up → "boca abajo").
+  it('front-torso stands upright facing forward', () => {
+    const p = computePlacement('front-torso', MEAS, { widthMm: 200, heightMm: 300 });
+    expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 6);
+    expect(p.rotation[1]).toBeCloseTo(0, 6);
+    expect(p.rotation[2]).toBeCloseTo(0, 6);
+  });
+
+  it('back-torso stands upright (no π about Y that would flip it boca abajo)', () => {
+    const p = computePlacement('back-torso', MEAS, { widthMm: 200, heightMm: 300 });
+    expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 6);
+    expect(p.rotation[1]).toBeCloseTo(0, 6); // NOT π
+    expect(p.rotation[2]).toBeCloseTo(Math.PI, 6);
   });
 
   it('sleeves are to the sides (X offset)', () => {
@@ -262,9 +244,9 @@ describe('placeGarmentPieces', () => {
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
     expect(placements.length).toBe(3);
-    // Front in front, back behind
-    expect(placements[0].position[2]).toBeLessThan(0);
-    expect(placements[1].position[2]).toBeGreaterThan(0);
+    // Front in front (+Z, toward camera), back behind (-Z)
+    expect(placements[0].position[2]).toBeGreaterThan(0);
+    expect(placements[1].position[2]).toBeLessThan(0);
   });
 
   it('all-unknown patterns: alternates front/back torso with X stagger (#556 fix)', () => {
@@ -286,10 +268,10 @@ describe('placeGarmentPieces', () => {
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
 
-    // Even-indexed pieces go front (Z < 0), odd go back (Z > 0).
-    expect(placements[0].position[2]).toBeLessThan(0);
-    expect(placements[1].position[2]).toBeGreaterThan(0);
-    expect(placements[2].position[2]).toBeLessThan(0);
+    // Even-indexed pieces go front (Z > 0, toward camera), odd go back (Z < 0).
+    expect(placements[0].position[2]).toBeGreaterThan(0);
+    expect(placements[1].position[2]).toBeLessThan(0);
+    expect(placements[2].position[2]).toBeGreaterThan(0);
 
     // All positions must be distinct — stacked pieces produce collinear
     // vertices that crash the cloth solver with NaN constraints.
@@ -318,8 +300,8 @@ describe('placeGarmentPieces', () => {
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
 
-    // Classified piece on torso front.
-    expect(placements[0].position[2]).toBeLessThan(0);
+    // Classified piece on torso front (+Z, toward camera).
+    expect(placements[0].position[2]).toBeGreaterThan(0);
 
     // Unknown sits on a circle around the avatar at midTorso height.
     // Just sanity-check it's far enough from origin to be "in the circle"
