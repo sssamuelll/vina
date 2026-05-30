@@ -150,6 +150,7 @@ const createSeamTool: ToolDefinition = {
       active: true,
       taped: false,
       tapeWidth: 10,
+      createdBy: 'ai', // agent-created seam — review me
     };
 
     dispatch(addSeam(seam));

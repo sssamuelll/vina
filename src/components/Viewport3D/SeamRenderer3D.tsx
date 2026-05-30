@@ -32,7 +32,16 @@ interface SeamRenderer3DProps {
   flippedPieceIds: string[];
 }
 
-const SEAM_COLOR = '#6366f1'; // accent; provenance-based coloring arrives in a later phase
+// Provenance coloring: AI-proposed seams are amber ("review me"), human-sewn
+// seams are green ("confirmed"). Undefined provenance (legacy seams) is treated
+// as human. Amber is deliberately calm, not a red alarm — an AI seam is a
+// suggestion awaiting the human's confirmation, not an error.
+const SEAM_COLOR_AI = '#f59e0b';    // amber
+const SEAM_COLOR_HUMAN = '#3fb950'; // green
+
+export function seamColor(createdBy: Seam['createdBy']): string {
+  return createdBy === 'ai' ? SEAM_COLOR_AI : SEAM_COLOR_HUMAN;
+}
 
 function edgeWorldMidpoint(
   piece: PatternPiece,
@@ -86,7 +95,7 @@ export default function SeamRenderer3D({
 
       const geo = new THREE.BufferGeometry().setFromPoints([ma, mb]);
       const mat = new THREE.LineDashedMaterial({
-        color: SEAM_COLOR,
+        color: seamColor(seam.createdBy),
         dashSize: 0.018,
         gapSize: 0.012,
         linewidth: 1,

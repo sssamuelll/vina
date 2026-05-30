@@ -17,17 +17,6 @@ export default function FloatingControls3D() {
     <>
       <div className="floating-3d floating-3d--top-right">
         <button
-          className={`floating-3d__pill ${simActive ? 'floating-3d__pill--primary' : 'floating-3d__pill--default'}`}
-          onClick={() => {
-            if (!simActive) {
-              dispatch(setViewMode3D('simulate'));
-              dispatch(startSimulation());
-            }
-          }}
-        >
-          Dress
-        </button>
-        <button
           className="floating-3d__pill floating-3d__pill--default"
           onClick={() => dispatch(setViewMode3D('arrange'))}
         >
