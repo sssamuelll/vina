@@ -45,6 +45,11 @@
   --fold-valley-2d: oklch(0.50 0.11 255);   /* valley-fold direction — blue, kept clear of the selection accent (248) */
   --topstitch-2d: #333333;                  /* topstitch default when the thread has no color set */
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
+  /* Seam overlay (SeamRenderer) on the paper ground. State colors borrow the
+     piece selection/error language (--accent-2d / --piece-error-2d / --ink-on-light-3);
+     tension labels are muted warm (gather) / cool (ease). */
+  --seam-tension-gather-2d: oklch(0.58 0.11 50);  /* gather (<100%) — muted warm */
+  --seam-tension-ease-2d: oklch(0.56 0.10 235);   /* ease (>100%) — muted cool */
 
   /* Typography — scales with viewport for large screens.
      clamp(min, preferred, max) ensures readability at any resolution.
