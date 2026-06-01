@@ -28,10 +28,20 @@
   --grid-2d-major: #d8d3c2;
   --ink-on-light: #2b2d33;     /* cut line, primary labels */
   --ink-on-light-2: #6f7480;   /* seam line, grainline, meta labels */
-  --ink-on-light-3: #646b78;   /* construction / reference lines */
+  --ink-on-light-3: #a0a5b0;   /* construction / reference lines — lighter so they recede behind the seam line */
   --accent-2d: oklch(0.66 0.16 248);   /* selection + seams only */
   --ai-2d: oklch(0.72 0.13 295);       /* AI-authored annotations */
   --font-mono-2d: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  /* Piece-state colors — named so a working piece (folds, locks, errors,
+     topstitch, annotations) stays on-system instead of a parade of inline hex.
+     Hues preserved from the pre-token values; centralization is the point. */
+  --piece-fill-2d: #ffffff;    /* piece interior: paper white, sits above the canvas */
+  --piece-error-2d: #ef4444;   /* unresolved / invalid geometry */
+  --piece-locked-2d: #ff9800;  /* locked-piece marker */
+  --fold-mountain-2d: #9c27b0; /* mountain-fold direction marker (convention) */
+  --fold-valley-2d: #3f51b5;   /* valley-fold direction marker (convention) */
+  --topstitch-2d: #333333;     /* topstitch default when the thread has no color set */
+  --annotation-2d: #808080;    /* annotation fallback when its category has no color */
 
   /* Typography — scales with viewport for large screens.
      clamp(min, preferred, max) ensures readability at any resolution.

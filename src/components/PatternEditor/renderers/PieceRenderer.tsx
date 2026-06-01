@@ -142,9 +142,9 @@ const SinglePiece = memo(function SinglePiece({
   const interiorFill =
     renderMode2D === 'wireframe' ? 'none'
     : colorwayColor ? (isSelected ? colorwayColor + '40' : colorwayColor + '25')
-    : isSelected ? 'color-mix(in oklab, var(--accent-2d) 14%, #fff)'
+    : isSelected ? 'color-mix(in oklab, var(--accent-2d) 14%, var(--piece-fill-2d))'
     : renderMode2D === 'translucent' ? 'rgba(255,255,255,0.45)'
-    : '#fff';
+    : 'var(--piece-fill-2d)';
 
   // Compute bounding box for layer color indicator
   const bounds = piece.outline?.length ? getOutlineBounds(piece.outline) : null;
@@ -245,7 +245,7 @@ const SinglePiece = memo(function SinglePiece({
         <path
           d={pathToSVG(piece.outline)}
           fill="none"
-          stroke="#ef4444"
+          style={{ stroke: 'var(--piece-error-2d)' }}
           strokeWidth={2 / zoom2D}
           strokeDasharray={`${6 / zoom2D} ${4 / zoom2D}`}
           pointerEvents="none"
@@ -261,7 +261,7 @@ const SinglePiece = memo(function SinglePiece({
         // the light paper; accent reserved for selection; thread color for topstitch.
         const lineColor =
           isLineSelected ? 'var(--accent-2d)' :
-          line.type === 'topstitch' ? (line.topstitchOptions?.threadColor ?? '#333') :
+          line.type === 'topstitch' ? (line.topstitchOptions?.threadColor ?? 'var(--topstitch-2d)') :
           line.type === 'notch' ? 'var(--ink-on-light)' :
           (line.type === 'reference' || line.type === 'pleat') ? 'var(--ink-on-light-3)' :
           'var(--ink-on-light-2)'; // grainline, dart, fold, default
@@ -280,7 +280,7 @@ const SinglePiece = memo(function SinglePiece({
             const lineLen = Math.sqrt(dx * dx + dy * dy);
             if (lineLen > 0) {
               const isMountain = line.foldOptions.direction === 'mountain';
-              const markerColor = isMountain ? '#9c27b0' : '#3F51B5';
+              const markerColor = isMountain ? 'var(--fold-mountain-2d)' : 'var(--fold-valley-2d)';
               const interval = 20 / zoom2D;
               const triSize = 3 / zoom2D;
               const tx = dx / lineLen, ty = dy / lineLen;   // unit tangent
@@ -301,7 +301,7 @@ const SinglePiece = memo(function SinglePiece({
                   <polygon
                     key={`fm-${i}`}
                     points={`${apex.x},${apex.y} ${base1.x},${base1.y} ${base2.x},${base2.y}`}
-                    fill={markerColor}
+                    style={{ fill: markerColor }}
                     opacity={0.8}
                     pointerEvents="none"
                   />
@@ -483,12 +483,11 @@ const SinglePiece = memo(function SinglePiece({
           x={cx}
           y={cy + (12 + i * 10) / zoom2D}
           fontSize={8 / zoom2D}
-          fill={ANNOTATION_CATEGORY_COLORS[ann.category] || '#808080'}
           textAnchor="middle"
           dominantBaseline="middle"
           pointerEvents="none"
           opacity={0.85}
-          style={{ fontFamily: 'var(--font-mono-2d)' }}
+          style={{ fontFamily: 'var(--font-mono-2d)', fill: ANNOTATION_CATEGORY_COLORS[ann.category] || 'var(--annotation-2d)' }}
         >
           {ann.text}
         </text>
@@ -501,11 +500,10 @@ const SinglePiece = memo(function SinglePiece({
             x={cx}
             y={cy + 14 / zoom2D}
             fontSize={10 / zoom2D}
-            fill="#ff9800"
             textAnchor="middle"
             dominantBaseline="middle"
             pointerEvents="none"
-            style={{ fontFamily: 'var(--font-mono-2d)' }}
+            style={{ fontFamily: 'var(--font-mono-2d)', fill: 'var(--piece-locked-2d)' }}
           >
             locked
           </text>
