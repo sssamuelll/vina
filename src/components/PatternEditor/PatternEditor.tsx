@@ -35,6 +35,7 @@ import { useEditorInteractions } from './useEditorInteractions';
 import { useElasticTool } from '../../hooks/useElasticTool';
 import PolyPenToolOverlay from './renderers/overlays/PolyPenToolOverlay';
 import GridLayer from './renderers/GridLayer';
+import RulerLayer from './renderers/RulerLayer';
 import PieceRenderer from './renderers/PieceRenderer';
 import SeamRenderer from './renderers/SeamRenderer';
 import ElasticRenderer from './renderers/ElasticRenderer';
@@ -81,7 +82,7 @@ export default function PatternEditor() {
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
   const editor = useSelector(selectEditor);
-  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, renderMode2D, gridSize, units } = editor;
+  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, renderMode2D, gridSize, units, fitViewToken } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
   const groups = useSelector((s: RootState) => s.project.groups);
@@ -125,6 +126,9 @@ export default function PatternEditor() {
 
   // State for inline piece name editing
   const [editingPieceNameId, setEditingPieceNameId] = useState<string | null>(null);
+
+  // Viewport size (px) for the screen-space ruler layer.
+  const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<ContextMenuState>({
@@ -466,6 +470,18 @@ export default function PatternEditor() {
       pen, rectTool, lineTool, seamTool, notchTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
     });
 
+  // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(entries => {
+      const r = entries[0]?.contentRect;
+      if (r) setSvgSize({ width: r.width, height: r.height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [svgRef]);
+
   const handleZoomToFit = useCallback(() => {
     const svgEl = svgRef.current;
     if (!svgEl || pieces.length === 0) return;
@@ -476,6 +492,19 @@ export default function PatternEditor() {
       dispatch(setPan2D(fit.pan));
     }
   }, [pieces, dispatch, svgRef]);
+
+  // Auto fit-to-content: an import bumps fitViewToken; frame the pattern once
+  // the viewport size and pieces are both available. The early return leaves
+  // lastFitTokenRef untouched until a real fit happens, so a token that arrives
+  // before the SVG is measured still fits on the next dependency change. The
+  // token guard ensures we fit once per request — never on subsequent edits.
+  const lastFitTokenRef = useRef(0);
+  useEffect(() => {
+    if (fitViewToken === lastFitTokenRef.current) return;
+    if (pieces.length === 0 || svgSize.width === 0) return; // not ready — retry on next render
+    lastFitTokenRef.current = fitViewToken;
+    handleZoomToFit();
+  }, [fitViewToken, pieces.length, svgSize.width, svgSize.height, handleZoomToFit]);
 
   // ─── Reference image import ───────────────────────────────────────────────
   const handleImageImport = useCallback(async (file: File) => {
@@ -762,6 +791,15 @@ export default function PatternEditor() {
           segmentSewingPhase={segmentSewingTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
+        />
+
+        <RulerLayer
+          zoom2D={zoom2D}
+          pan2D={pan2D}
+          gridSize={gridSize}
+          units={units}
+          width={svgSize.width}
+          height={svgSize.height}
         />
       </svg>
       <ContextMenu

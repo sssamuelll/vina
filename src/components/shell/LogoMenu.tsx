@@ -4,7 +4,7 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, togglePieceNames, toggleSewingLines,
-  clearSelection, setZoom2D,
+  clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
 import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
@@ -70,6 +70,10 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Grainlines', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piece Names', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Sewing Lines', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
+  { separator: true, label: '' },
+  { label: 'Ruler: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
+  { label: 'Ruler: inches', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
+  { label: 'Ruler: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
 ];
 
 const PATTERN_MENU: MenuItem[] = [

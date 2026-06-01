@@ -99,6 +99,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       selectedInternalLine: null,
       zoom2D: 1,
       pan2D: { x: 0, y: 0 },
+      fitViewToken: 0,
       showSeamAllowance: true,
       defaultSeamAllowanceWidth: 10,
       showGrainlines: true,

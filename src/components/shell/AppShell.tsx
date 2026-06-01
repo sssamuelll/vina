@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setSplitRatio } from '../../store/layoutSlice';
 import { addPiece } from '../../store/projectSlice';
-import { selectPiece } from '../../store/editorSlice';
+import { selectPiece, requestFitView } from '../../store/editorSlice';
 import { showSuccessToast, showErrorToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, piecesLabel } from './dxfImport';
@@ -86,6 +86,7 @@ export default function AppShell() {
       const { result } = await readAndParseDXFFile(file, { unit: 'auto', autoDetect: true });
       for (const piece of result.pieces) dispatch(addPiece(piece));
       dispatch(selectPiece(result.pieces[0].id));
+      dispatch(requestFitView()); // frame the freshly imported pattern (no more blank/tiny canvas)
       dispatch(showSuccessToast(`Cargué tu patrón: ${piecesLabel(result.pieces.length)}`));
     } catch (err) {
       dispatch(showErrorToast(dxfErrorMessage(err)));

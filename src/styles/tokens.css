@@ -19,6 +19,20 @@
   --destructive: #ef4444;
   --warning: #f59e0b;
 
+  /* ── 2D pattern canvas (design surface 5 — light "paper" CAD surface) ──
+     Namespaced so the dark app chrome (--accent above) is untouched; these are
+     consumed only by the 2D pattern editor renderers. Reference: design-team
+     handoff DESIGN-NOTES.md §3. The accent is reserved for selection + seams. */
+  --canvas-2d: #f1efe8;
+  --grid-2d: #e3dfd2;
+  --grid-2d-major: #d8d3c2;
+  --ink-on-light: #2b2d33;     /* cut line, primary labels */
+  --ink-on-light-2: #6f7480;   /* seam line, grainline, meta labels */
+  --ink-on-light-3: #646b78;   /* construction / reference lines */
+  --accent-2d: oklch(0.66 0.16 248);   /* selection + seams only */
+  --ai-2d: oklch(0.72 0.13 295);       /* AI-authored annotations */
+  --font-mono-2d: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+
   /* Typography — scales with viewport for large screens.
      clamp(min, preferred, max) ensures readability at any resolution.
      Base: 13px on small screens, scales to ~16px at 2560px+. */

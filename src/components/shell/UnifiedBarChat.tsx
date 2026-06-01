@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { store } from '../../store';
 import type { AppDispatch } from '../../store';
 import { addPiece } from '../../store/projectSlice';
-import { selectPiece } from '../../store/editorSlice';
+import { selectPiece, requestFitView } from '../../store/editorSlice';
 import { showSuccessToast } from '../../store/copilotUISlice';
 import { piecesLabel, type PendingDXFAttachment } from './dxfImport';
 import { useAgenticLoop, type ToolCallProgress } from '../../copilot/hooks/useAgenticLoop';
@@ -158,6 +158,7 @@ export default function UnifiedBarChat({ input, setInput, submitNonce, pendingDX
     if (attachment) {
       for (const piece of attachment.pieces) dispatch(addPiece(piece));
       dispatch(selectPiece(attachment.pieces[0].id));
+      dispatch(requestFitView()); // frame the imported pattern in the 2D canvas
       clearAttachment();
       const label = `${attachment.name} · ${piecesLabel(attachment.pieces.length)}`;
       displayContent = text.trim() ? `📎 ${label}\n${text}` : `📎 ${label}`;

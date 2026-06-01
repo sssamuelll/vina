@@ -15,6 +15,7 @@ const initialState: EditorState = {
   selectedInternalLine: null,
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
+  fitViewToken: 0,
   showSeamAllowance: true,
   defaultSeamAllowanceWidth: DEFAULT_SEAM_ALLOWANCE,
   showGrainlines: true,
@@ -103,6 +104,12 @@ const editorSlice = createSlice({
     setPan2D(state, action: PayloadAction<Point2D>) {
       state.pan2D = action.payload;
     },
+    /** Request a fit-to-content of the 2D viewport. Dispatched after a pattern
+     *  is imported; the PatternEditor performs the actual fit (it owns the
+     *  viewport size). Monotonic so each request is observed exactly once. */
+    requestFitView(state) {
+      state.fitViewToken += 1;
+    },
     toggleSeamAllowance(state) {
       state.showSeamAllowance = !state.showSeamAllowance;
     },
@@ -179,7 +186,9 @@ const editorSlice = createSlice({
     redo() {},
   },
   extraReducers: (builder) => {
-    builder.addCase(NEW_PROJECT, () => initialState);
+    // Reset the editor on a new project, but keep fitViewToken monotonic so a
+    // DXF imported right after File ▸ New still triggers a fresh fit-to-content.
+    builder.addCase(NEW_PROJECT, (state) => ({ ...initialState, fitViewToken: state.fitViewToken }));
     builder.addCase(removeReferenceImage, (state, action) => {
       if (state.selectedReferenceImageId === action.payload) {
         state.selectedReferenceImageId = null;
@@ -201,7 +210,7 @@ const editorSlice = createSlice({
 export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine,
-  setZoom2D, setPan2D,
+  setZoom2D, setPan2D, requestFitView,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,

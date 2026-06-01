@@ -8,12 +8,17 @@ import {
   toggleSeamAllowance, toggleGrainlines,
   togglePieceNames, toggleLineLengths, toggleSewingLines,
   toggleReferenceImages,
-  setRenderMode2D,
+  setRenderMode2D, setUnits,
 } from '../../store/editorSlice';
+import type { UnitSystem } from '../../types/types';
 import ToolTooltip from '../Toolbar3D/ToolTooltip';
 import './DisplayBar2D.css';
 
 type RenderMode = 'textured' | 'translucent' | 'wireframe';
+
+// Ruler unit cycle: the patternmaker's natural unit (cm) first, then inches, then mm.
+const UNIT_CYCLE: UnitSystem[] = ['cm', 'inches', 'mm'];
+const UNIT_LABEL: Record<UnitSystem, string> = { cm: 'cm', inches: 'in', mm: 'mm' };
 
 interface ToggleItem {
   icon: React.ReactNode;
@@ -47,6 +52,11 @@ export default function DisplayBar2D() {
     { icon: <Box size={18} />, label: 'Wireframe', mode: 'wireframe' },
   ];
 
+  const cycleUnits = () => {
+    const idx = UNIT_CYCLE.indexOf(editor.units);
+    dispatch(setUnits(UNIT_CYCLE[(idx + 1) % UNIT_CYCLE.length]));
+  };
+
   return (
     <div className="display-bar-2d">
       {toggles.map(t => (
@@ -59,6 +69,16 @@ export default function DisplayBar2D() {
           </button>
         </ToolTooltip>
       ))}
+
+      <ToolTooltip name="Ruler Units" position="left">
+        <button
+          className="db-btn"
+          onClick={cycleUnits}
+          style={{ fontFamily: 'var(--font-mono-2d)', fontSize: 11, fontWeight: 600 }}
+        >
+          {UNIT_LABEL[editor.units]}
+        </button>
+      </ToolTooltip>
 
       <div className="db-separator" />
 

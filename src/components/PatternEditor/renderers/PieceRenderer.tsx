@@ -9,8 +9,9 @@ import { generateSeamAllowanceWithCorners } from '../../../utils/seam/cornerType
 import { extractNodes } from '../nodeEditorUtils';
 import { getOutlineColor } from '../../../utils/layerColors';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
-import { getFabricCodeColor } from '../../../utils/fabricCodes';
 import { resolveColorway } from '../../../utils/colorwayResolver';
+import { formatPieceLabel } from '../../../utils/pieceLabel';
+import { dartApexPoint } from './internalLineStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
 
 /** Compute bounding box extents of a path outline. */
@@ -79,6 +80,8 @@ interface SinglePieceProps {
   isInternalLineSelected: boolean;
   selectedLineId?: string;
   isEditingName: boolean;
+  /** Stable 0-based piece index, used to derive the displayed number (`· 01`). */
+  pieceNumber: number;
   /** Group color for visual indicator (first group the piece belongs to) */
   groupColor?: string;
   /** Layer outline color for left-border indicator */
@@ -106,6 +109,7 @@ const SinglePiece = memo(function SinglePiece({
   isInternalLineSelected,
   selectedLineId,
   isEditingName,
+  pieceNumber,
   groupColor,
   layerColor,
   isLayerLocked,
@@ -115,10 +119,32 @@ const SinglePiece = memo(function SinglePiece({
   onPieceNameSave,
   onPieceNameCancel,
 }: SinglePieceProps) {
-  const strokeColor = piece.linkedPieceId
-    ? piece.linkMode === 'symmetry' ? '#64b5f6' : '#aed581'
-    : '#4a9eff';
   const { cx, cy } = piece.outline?.length ? getOutlineCenter(piece.outline) : { cx: 0, cy: 0 };
+
+  // ── Seam-allowance double-line (design surface 5, P0.1) ──
+  // The piece OUTLINE is the stitch/seam line (interior); the outward-offset SA
+  // contour is the CUT line (exterior). Same geometry the export pipeline uses —
+  // only the styling is the redesign. When SA is hidden, the outline is itself
+  // the cut line. The accent is reserved for selection; the band is a faint shade
+  // between the two contours.
+  const saWidth = piece.seamAllowance || defaultSeamAllowanceWidth;
+  const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
+    || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
+  const saPath = (showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)
+    ? (hasCustomCorners
+        ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {})
+        : generateSeamAllowance(piece.outline, saWidth))
+    : [];
+  const hasSA = saPath.length > 0;
+  const outlineD = piece.outline?.length ? pathToSVG(piece.outline) : '';
+  const saD = hasSA ? pathToSVG(saPath) : '';
+  const cutStroke = isSelected ? 'var(--accent-2d)' : 'var(--ink-on-light)';
+  const interiorFill =
+    renderMode2D === 'wireframe' ? 'none'
+    : colorwayColor ? (isSelected ? colorwayColor + '40' : colorwayColor + '25')
+    : isSelected ? 'color-mix(in oklab, var(--accent-2d) 14%, #fff)'
+    : renderMode2D === 'translucent' ? 'rgba(255,255,255,0.45)'
+    : '#fff';
 
   // Compute bounding box for layer color indicator
   const bounds = piece.outline?.length ? getOutlineBounds(piece.outline) : null;
@@ -151,38 +177,57 @@ const SinglePiece = memo(function SinglePiece({
           rx={1.5 / zoom2D}
         />
       )}
+      {/* Interior fill — no color on the piece body (ink/accent only, per spec) */}
       <path
-        d={pathToSVG(piece.outline)}
-        fill={
-          renderMode2D === 'wireframe' ? 'none'
-          : colorwayColor
-          ? (isSelected ? colorwayColor + '40' : colorwayColor + '25') // hex alpha: 25% / 15%
-          : renderMode2D === 'translucent'
-          ? (isSelected ? 'rgba(255, 215, 0, 0.08)' : 'rgba(74, 158, 255, 0.03)')
-          : (isSelected ? 'rgba(255, 215, 0, 0.18)' : 'rgba(74, 158, 255, 0.08)')
-        }
-        stroke={strokeColor}
-        strokeWidth={1.5 / zoom2D}
-        strokeLinejoin="round"
+        className="piece-fill"
+        d={outlineD}
+        style={{ fill: interiorFill }}
+        stroke="none"
       />
 
-      {showSeamAllowance && (piece.seamAllowance > 0 || defaultSeamAllowanceWidth > 0) && (() => {
-        const saWidth = piece.seamAllowance || defaultSeamAllowanceWidth;
-        const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
-          || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
-        const saPath = hasCustomCorners
-          ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {})
-          : generateSeamAllowance(piece.outline, saWidth);
-        return saPath.length > 0 ? (
-          <path
-            d={pathToSVG(saPath)}
-            fill="none"
-            stroke="rgba(74, 158, 255, 0.4)"
-            strokeWidth={0.8 / zoom2D}
-            strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
-          />
-        ) : null;
-      })()}
+      {/* Hover highlight overlay — opacity toggled via CSS :hover (no transition,
+          per DESIGN-NOTES §8: animated opacity on re-rendering SVG nodes sticks). */}
+      <path
+        className="piece-hover-fill"
+        d={outlineD}
+        style={{ fill: 'var(--accent-2d)' }}
+        stroke="none"
+        pointerEvents="none"
+      />
+
+      {/* Seam-allowance band: faint shade between cut and seam contours */}
+      {hasSA && (
+        <path
+          d={`${saD} ${outlineD}`}
+          fillRule="evenodd"
+          style={{ fill: 'var(--ink-on-light)' }}
+          opacity={0.06}
+          stroke="none"
+          pointerEvents="none"
+        />
+      )}
+
+      {/* Cut line (solid, exterior). With SA it's the offset contour; else the outline. */}
+      <path
+        d={hasSA ? saD : outlineD}
+        fill="none"
+        style={{ stroke: cutStroke }}
+        strokeWidth={1.4 / zoom2D}
+        strokeLinejoin="round"
+        pointerEvents="none"
+      />
+
+      {/* Seam line (dashed, interior) — only when SA is shown */}
+      {hasSA && (
+        <path
+          d={outlineD}
+          fill="none"
+          style={{ stroke: 'var(--ink-on-light-2)' }}
+          strokeWidth={0.8 / zoom2D}
+          strokeDasharray={`${3 / zoom2D} ${3 / zoom2D}`}
+          pointerEvents="none"
+        />
+      )}
 
       {groupColor && (
         <path
@@ -211,6 +256,16 @@ const SinglePiece = memo(function SinglePiece({
         const isNotch = line.type === 'notch';
         const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
         const isLineSelected = isInternalLineSelected && selectedLineId === line.id;
+
+        // Tokenized internal-line colors (design surface 5, P0.3): ink tones on
+        // the light paper; accent reserved for selection; thread color for topstitch.
+        const lineColor =
+          isLineSelected ? 'var(--accent-2d)' :
+          line.type === 'topstitch' ? (line.topstitchOptions?.threadColor ?? '#333') :
+          line.type === 'notch' ? 'var(--ink-on-light)' :
+          (line.type === 'reference' || line.type === 'pleat') ? 'var(--ink-on-light-3)' :
+          'var(--ink-on-light-2)'; // grainline, dart, fold, default
+        const dartApex = line.type === 'dart' ? dartApexPoint(line.path) : null;
 
         // Compute fold direction markers for fold lines with foldOptions
         const foldMarkers: React.ReactElement[] = [];
@@ -260,26 +315,23 @@ const SinglePiece = memo(function SinglePiece({
           <g key={line.id}>
             <path
               d={pathToSVG(line.path)}
-              fill={hasFill ? 'rgba(255, 152, 0, 0.3)' : 'none'}
-              stroke={
-                isLineSelected ? '#ffd700' :
-                line.type === 'grainline' ? '#6bff6b' :
-                line.type === 'dart' ? '#ff9800' :
-                line.type === 'notch' ? '#ff9800' :
-                line.type === 'fold' ? '#9c27b0' :
-                line.type === 'topstitch' ? (line.topstitchOptions?.threadColor ?? '#333') :
-                line.type === 'reference' ? '#999' :
-                '#888'
-              }
+              style={{ stroke: lineColor, fill: hasFill ? 'var(--ink-on-light)' : 'none' }}
               strokeWidth={isLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
               strokeDasharray={
-                line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D}` :
+                line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D} ${0.5 / zoom2D} ${3 / zoom2D}` :
                 line.type === 'topstitch' ? `${(line.topstitchOptions?.stitchLength ?? 3) / zoom2D} ${1.5 / zoom2D}` :
                 line.type === 'reference' ? `${4 / zoom2D} ${4 / zoom2D}` :
                 'none'
               }
-              opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.7}
+              opacity={line.type === 'grainline' && !showGrainlines ? 0 : line.type === 'reference' ? 0.6 : isLineSelected ? 1 : 0.8}
             />
+            {/* Dart apex point marker (P0.3) */}
+            {dartApex && (
+              <circle
+                cx={dartApex.x} cy={dartApex.y} r={2.2 / zoom2D}
+                style={{ fill: lineColor }} stroke="none" pointerEvents="none"
+              />
+            )}
             {foldMarkers.length > 0 && <g className="fold-direction-markers">{foldMarkers}</g>}
             {isLineSelected && (() => {
               const first = line.path[0];
@@ -303,10 +355,9 @@ const SinglePiece = memo(function SinglePiece({
                       cx={pt.x}
                       cy={pt.y}
                       r={3.5 / zoom2D}
-                      fill="rgba(255, 215, 0, 0.7)"
-                      stroke="#ffd700"
+                      fillOpacity={0.7}
                       strokeWidth={1 / zoom2D}
-                      style={{ cursor: 'move' }}
+                      style={{ cursor: 'move', fill: 'var(--accent-2d)', stroke: 'var(--accent-2d)' }}
                       pointerEvents="none"
                     />
                   ))}
@@ -350,8 +401,9 @@ const SinglePiece = memo(function SinglePiece({
                   border: 'none',
                   outline: 'none',
                   fontSize: `${11 / zoom2D}px`,
-                  fontFamily: 'Inter, sans-serif',
-                  color: '#555',
+                  fontFamily: 'var(--font-mono-2d)',
+                  fontWeight: 600,
+                  color: 'var(--ink-on-light)',
                   textAlign: 'center',
                   padding: 0,
                   margin: 0,
@@ -376,34 +428,50 @@ const SinglePiece = memo(function SinglePiece({
             </foreignObject>
           );
         } else {
+          // Label block (design surface 5, P0.2): headline name·num + monospace
+          // meta lines (CUT ×N / size / fabric / mirror). Derived, no model change.
+          const fabricName = PHYSICAL_FABRIC_LIBRARY.find(f => f.id === piece.fabricId)?.name;
+          const { name, meta } = formatPieceLabel(piece, pieceNumber, fabricName);
+          // Name outranks meta by 13:9 (1.44×), clearing the 1.25× contrast
+          // threshold so the headline reads as a headline, not decoration.
+          const nameSize = 13 / zoom2D;
+          const metaSize = 9 / zoom2D;
+          const lineGap = 14 / zoom2D;
+          const startY = cy - ((meta.length) * lineGap) / 2;
           return (
-            <g transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`}>
-              <circle
-                cx={cx}
-                cy={cy - 10 / zoom2D}
-                r={3.5 / zoom2D}
-                fill={getFabricCodeColor(piece.fabricCode)}
-                stroke="none"
-                opacity={0.9}
-                pointerEvents="none"
-              />
+            <g transform={`rotate(${-piece.rotation}, ${cx}, ${cy})`} className="piece-label-block">
               <text
                 x={cx}
-                y={cy}
-                fontSize={11 / zoom2D}
-                fill="#555"
+                y={startY}
+                fontSize={nameSize}
+                fontWeight={600}
+                letterSpacing={0.08 * nameSize}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 pointerEvents="auto"
-                fontFamily="Inter, sans-serif"
+                style={{ fill: 'var(--ink-on-light)', fontFamily: 'var(--font-mono-2d)', cursor: 'pointer' }}
                 onDoubleClick={(e) => {
                   e.stopPropagation();
                   onPieceNameDoubleClick?.(piece.id);
                 }}
-                style={{ cursor: 'pointer' }}
               >
-                {piece.name}
+                {name}
               </text>
+              {meta.map((m, i) => (
+                <text
+                  key={i}
+                  x={cx}
+                  y={startY + (i + 1) * lineGap}
+                  fontSize={metaSize}
+                  letterSpacing={0.08 * metaSize}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  pointerEvents="none"
+                  style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
+                >
+                  {m}
+                </text>
+              ))}
             </g>
           );
         }
@@ -419,8 +487,8 @@ const SinglePiece = memo(function SinglePiece({
           textAnchor="middle"
           dominantBaseline="middle"
           pointerEvents="none"
-          fontFamily="Inter, sans-serif"
           opacity={0.85}
+          style={{ fontFamily: 'var(--font-mono-2d)' }}
         >
           {ann.text}
         </text>
@@ -437,7 +505,7 @@ const SinglePiece = memo(function SinglePiece({
             textAnchor="middle"
             dominantBaseline="middle"
             pointerEvents="none"
-            fontFamily="Inter, sans-serif"
+            style={{ fontFamily: 'var(--font-mono-2d)' }}
           >
             locked
           </text>
@@ -454,8 +522,8 @@ const SinglePiece = memo(function SinglePiece({
                 cx={node.position.x}
                 cy={node.position.y}
                 r={3 / zoom2D}
-                fill="rgba(74, 158, 255, 0.6)"
-                stroke="#4a9eff"
+                style={{ fill: 'var(--accent-2d)', stroke: 'var(--accent-2d)' }}
+                fillOpacity={0.55}
                 strokeWidth={1 / zoom2D}
                 pointerEvents="none"
               />
@@ -543,6 +611,14 @@ export default function PieceRenderer({
     [pieces, hiddenLayerIds],
   );
 
+  // Stable label numbers from the original piece order (not z-sorted), so a
+  // piece keeps its number regardless of stacking.
+  const pieceNumberById = useMemo(() => {
+    const m: Record<string, number> = {};
+    pieces.forEach((p, i) => { m[p.id] = i; });
+    return m;
+  }, [pieces]);
+
   return (
     <>
       {sortedPieces.map(piece => (
@@ -568,6 +644,7 @@ export default function PieceRenderer({
           isInternalLineSelected={selectedInternalLine?.pieceId === piece.id}
           selectedLineId={selectedInternalLine?.lineId}
           isEditingName={editingPieceNameId === piece.id}
+          pieceNumber={pieceNumberById[piece.id] ?? 0}
           onPieceNameDoubleClick={onPieceNameDoubleClick}
           onPieceNameSave={onPieceNameSave}
           onPieceNameCancel={onPieceNameCancel}
