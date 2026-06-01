@@ -5,7 +5,12 @@
   z-index: 100;
   width: 560px;
   height: 58px;
-  background: rgba(8, 8, 15, 0.92);
+  /* Idle (resting): the agentic bar is the instrument, not the subject. On the
+     light paper canvas it must not be the loudest object, so at rest it recedes
+     — a softer, more translucent dark capsule that lets the pattern win the
+     hierarchy. It comes forward the moment you reach for it (see below). On the
+     dark 3D view this is benign: dark-on-dark either way. */
+  background: rgba(8, 8, 15, 0.78);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(99, 102, 241, 0.15);
@@ -14,10 +19,21 @@
   align-items: center;
   padding: 0 10px 0 12px;
   gap: 10px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  transition: border-radius 0.15s ease;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
+  opacity: 0.92;
+  transition: border-radius 0.15s ease, background 0.18s ease,
+    box-shadow 0.18s ease, opacity 0.18s ease;
   /* User-select none on non-input areas for drag */
   user-select: none;
+}
+/* Come forward when in use — hovered, focused, or with the panel open. Full
+   presence restored so typing/reading the agent is never dim. */
+.unified-bar:hover,
+.unified-bar:focus-within,
+.unified-bar--panel-open {
+  background: rgba(8, 8, 15, 0.92);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  opacity: 1;
 }
 /* When panel is open, flatten the top edge for seamless connection */
 .unified-bar--panel-open {
