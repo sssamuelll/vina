@@ -15,6 +15,7 @@
   --accent-hover: #818cf8;
   --accent-subtle: rgba(99, 102, 241, 0.13);
   --accent-border: rgba(99, 102, 241, 0.27);
+  --dock-auto: #a78bfa;   /* AI-suggested dock tools (violet), distinct from the indigo --accent */
   --success: #22c55e;
   --destructive: #ef4444;
   --warning: #f59e0b;

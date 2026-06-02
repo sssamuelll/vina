@@ -56,3 +56,21 @@
   background: var(--accent-subtle);
   color: var(--accent);
 }
+
+.dock__sep {
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+  margin: 3px 0;
+}
+
+.dock__auto-label {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-ghost);
+}
+
+.dock__tool--auto { color: var(--dock-auto); }
+.dock__tool--auto:hover { color: var(--dock-auto); background: var(--bg-elevated); }

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import DockShell from './DockShell';
 import type { DockToolDef } from './dock2dTools';
 import './Dock.css';
@@ -9,6 +10,8 @@ interface DockProps {
   /** The currently active tool id (the engine truth). */
   activeToolId: string;
   onSelectTool: (id: string) => void;
+  /** Optional auto-suggest (✦) zone rendered below the pinned tools. */
+  autoZone?: ReactNode;
 }
 
 /**
@@ -16,7 +19,7 @@ interface DockProps {
  * inside the shared DockShell. Presentational only — the container supplies
  * tools + active id and handles activation.
  */
-export default function Dock({ domainLabel, tools, activeToolId, onSelectTool }: DockProps) {
+export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, autoZone }: DockProps) {
   return (
     <DockShell side="left" domainLabel={domainLabel}>
       {tools.map(tool => {
@@ -36,6 +39,7 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool }:
           </button>
         );
       })}
+      {autoZone}
     </DockShell>
   );
 }
