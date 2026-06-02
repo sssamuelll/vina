@@ -228,7 +228,7 @@ export default function AppShell() {
           className="canvas-area__2d"
           style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <LeftDock />
+          <LeftDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
           <PatternEditor onImportDXF={() => dxfInputRef.current?.click()} />
         </div>
         {viewMode === 'split' && (

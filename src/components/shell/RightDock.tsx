@@ -1,9 +1,12 @@
 import { useSelector, useDispatch } from 'react-redux';
 import { Shirt, Spline, Play, Pause, PersonStanding } from 'lucide-react';
 import type { RootState } from '../../store';
-import { startSimulation, pauseSimulation, setViewMode3D, resetSimulation } from '../../store/simulationSlice';
+import { startSimulation, pauseSimulation, setViewMode3D, resetSimulation, setFitMapMode } from '../../store/simulationSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
+import { selectWorkflowStage } from '../../store/selectors';
 import DockShell from './DockShell';
+import DockAutoZone from './DockAutoZone';
+import { getDockSuggestions } from './dockSuggestions';
 
 interface RightDockProps {
   onOpenPanel: (name: string) => void;
@@ -21,6 +24,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   const simState = useSelector((s: RootState) => s.simulation.simulationState);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const frameTime = useSelector((s: RootState) => s.simulation.frameTimeMs);
+  const stage = useSelector(selectWorkflowStage);
 
   if (viewMode === '2d') return null;
 
@@ -39,6 +43,11 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   };
 
   const SimIcon = simActive ? Pause : Play;
+
+  const runSuggestion = (id: string) => {
+    if (id === 'fitmap') dispatch(setFitMapMode('fit'));
+    else if (id === 'bom') onOpenPanel('BOM');
+  };
 
   return (
     <>
@@ -81,6 +90,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
         >
           <PersonStanding size={16} />
         </button>
+        <DockAutoZone suggestions={getDockSuggestions(stage, 'right')} onRun={runSuggestion} />
       </DockShell>
 
       {simActive && (

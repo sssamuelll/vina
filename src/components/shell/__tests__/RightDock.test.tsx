@@ -6,19 +6,20 @@
  * unreachable).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer, { setViewMode } from '../../../store/editorSlice';
-import simulationReducer from '../../../store/simulationSlice';
+import simulationReducer, { startSimulation, pauseSimulation } from '../../../store/simulationSlice';
 import toolsReducer from '../../../store/toolSlice';
+import projectReducer, { addPiece } from '../../../store/projectSlice';
 import RightDock from '../RightDock';
 
 afterEach(cleanup);
 
 function renderRightDock(onOpenPanel = vi.fn()) {
   const store = configureStore({
-    reducer: { editor: editorReducer, simulation: simulationReducer, tools: toolsReducer },
+    reducer: { editor: editorReducer, simulation: simulationReducer, tools: toolsReducer, project: projectReducer },
   });
   render(<Provider store={store}><RightDock onOpenPanel={onOpenPanel} /></Provider>);
   return { store, onOpenPanel };
@@ -57,10 +58,22 @@ describe('RightDock (3D dock)', () => {
 
   it('is hidden in 2D-only view', () => {
     const store = configureStore({
-      reducer: { editor: editorReducer, simulation: simulationReducer, tools: toolsReducer },
+      reducer: { editor: editorReducer, simulation: simulationReducer, tools: toolsReducer, project: projectReducer },
     });
     store.dispatch(setViewMode('2d'));
     render(<Provider store={store}><RightDock onOpenPanel={vi.fn()} /></Provider>);
     expect(screen.queryByText('3D')).toBeNull();
+  });
+
+  it('shows a BOM ✦ suggestion at the simulated stage and runs it', () => {
+    const { store, onOpenPanel } = renderRightDock();
+    act(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
+      store.dispatch(startSimulation());
+      store.dispatch(pauseSimulation()); // → simulationState 'paused' → stage 'simulated'
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'BOM' }));
+    expect(onOpenPanel).toHaveBeenCalledWith('BOM');
   });
 });

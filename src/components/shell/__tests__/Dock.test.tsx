@@ -2,13 +2,15 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import Dock from '../Dock';
 import { MousePointer2, Pen } from 'lucide-react';
 import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
+import projectReducer, { addPiece } from '../../../store/projectSlice';
+import simulationReducer from '../../../store/simulationSlice';
 import LeftDock from '../LeftDock';
 
 afterEach(cleanup);
@@ -40,24 +42,36 @@ describe('Dock (presentational)', () => {
   });
 });
 
-function renderLeftDock() {
-  const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer } });
-  render(<Provider store={store}><LeftDock /></Provider>);
-  return store;
+function renderLeftDock(onOpenPanel = vi.fn()) {
+  const store = configureStore({
+    reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer },
+  });
+  render(<Provider store={store}><LeftDock onOpenPanel={onOpenPanel} /></Provider>);
+  return { store, onOpenPanel };
 }
 
 describe('LeftDock (container)', () => {
   it('activates a tool in BOTH slices on click (convergence guard)', () => {
-    const store = renderLeftDock();
+    const { store } = renderLeftDock();
     fireEvent.click(screen.getByRole('button', { name: /sew · b/i }));
     expect(store.getState().editor.activeTool).toBe('seam');
     expect(store.getState().tools.activeTool2D).toBe('seam');
   });
 
   it('is hidden in 3D-only view', () => {
-    const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer } });
+    const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer } });
     store.dispatch(setViewMode('3d'));
-    render(<Provider store={store}><LeftDock /></Provider>);
+    render(<Provider store={store}><LeftDock onOpenPanel={vi.fn()} /></Provider>);
     expect(screen.queryByText('2D')).toBeNull();
+  });
+
+  it('shows a grade ✦ suggestion once pieces exist and runs it', () => {
+    const { store, onOpenPanel } = renderLeftDock();
+    act(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Grade' }));
+    expect(onOpenPanel).toHaveBeenCalledWith('Grading');
   });
 });
