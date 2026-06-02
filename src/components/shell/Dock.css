@@ -3,7 +3,6 @@
 .dock {
   position: absolute;
   top: 50%;
-  left: 14px;
   transform: translateY(-50%);
   z-index: 5;
   display: flex;
@@ -16,6 +15,9 @@
   border-radius: var(--radius-xl);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
+
+.dock--left { left: 14px; }
+.dock--right { right: 14px; }
 
 .dock__label {
   font-family: var(--font-mono);

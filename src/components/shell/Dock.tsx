@@ -1,3 +1,4 @@
+import DockShell from './DockShell';
 import type { DockToolDef } from './dock2dTools';
 import './Dock.css';
 
@@ -11,15 +12,13 @@ interface DockProps {
 }
 
 /**
- * A vertical single-select tool column (the redesign's side dock, left/2D use).
- * Presentational only — no store. The container supplies tools + active id and
- * handles activation. (Not generalized for the 3D side, whose affordances are
- * toggles + sim transport, not single-select — see the spec.)
+ * A vertical single-select tool column (the redesign's left/2D dock), rendered
+ * inside the shared DockShell. Presentational only — the container supplies
+ * tools + active id and handles activation.
  */
 export default function Dock({ domainLabel, tools, activeToolId, onSelectTool }: DockProps) {
   return (
-    <div className="dock">
-      <div className="dock__label">{domainLabel}</div>
+    <DockShell side="left" domainLabel={domainLabel}>
       {tools.map(tool => {
         const Icon = tool.icon;
         const active = tool.id === activeToolId;
@@ -37,6 +36,6 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool }:
           </button>
         );
       })}
-    </div>
+    </DockShell>
   );
 }
