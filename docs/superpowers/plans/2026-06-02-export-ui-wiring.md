@@ -87,11 +87,12 @@ function bboxOf(pieces: { outline: PatternPiece['outline'] }[]) {
 }
 
 describe('DXF export round-trips through the importer (the spine)', () => {
-  it('preserves piece count and overall geometry within tolerance', () => {
+  it('preserves piece count and per-piece geometry (modulo seam allowance)', () => {
+    const SA = 10;
     const pieces = [
-      makePiece({ id: 'p1', name: 'Front' }),
+      makePiece({ id: 'p1', name: 'Front', seamAllowance: SA }),
       makePiece({
-        id: 'p2', name: 'Back',
+        id: 'p2', name: 'Back', seamAllowance: SA,
         outline: [
           { type: 'M', values: [0, 0] },
           { type: 'L', values: [120, 0] },
@@ -110,11 +111,21 @@ describe('DXF export round-trips through the importer (the spine)', () => {
     for (const p of reimported) {
       expect(p.outline.length).toBeGreaterThan(0);
     }
-    // AAMA export may re-segment; assert overall geometry survives, not bytes.
-    const before = bboxOf(pieces);
-    const after = bboxOf(reimported);
-    expect(Math.abs(after.w - before.w)).toBeLessThan(1); // mm
-    expect(Math.abs(after.h - before.h)).toBeLessThan(1);
+    // Compare PER PIECE — a piece's own bbox width/height is invariant to the
+    // DXF layout offset (the exporter spreads pieces via INSERT translations,
+    // which the importer correctly applies). AAMA writes the CUT line, so a
+    // re-imported piece is the net piece grown by at most ~2×SA per axis.
+    const SA_TOL = 2 * SA + 1;
+    const dims = (arr: { outline: PatternPiece['outline'] }[]) =>
+      arr.map((p) => bboxOf([p])).sort((a, b) => a.w - b.w);
+    const before = dims(pieces);
+    const after = dims(reimported);
+    for (let i = 0; i < before.length; i++) {
+      expect(after[i].w).toBeGreaterThan(0);
+      expect(after[i].h).toBeGreaterThan(0);
+      expect(Math.abs(after[i].w - before[i].w)).toBeLessThanOrEqual(SA_TOL);
+      expect(Math.abs(after[i].h - before[i].h)).toBeLessThanOrEqual(SA_TOL);
+    }
     // AAMA CUT layer present (layer "1").
     expect(dxf).toContain('8\n1\n');
   });
