@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { getDockSuggestions } from '../dockSuggestions';
+import type { WorkflowStage } from '../../../store/selectors';
 
-const ids = (stage: any, side: any) => getDockSuggestions(stage, side).map(s => s.id);
+const ids = (stage: WorkflowStage, side: 'left' | 'right') => getDockSuggestions(stage, side).map(s => s.id);
 
 describe('getDockSuggestions (wired-only map)', () => {
   it('empty → nothing on either side', () => {
