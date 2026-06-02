@@ -11,6 +11,7 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
+import dockReducer from '../../../store/dockSlice';
 import LeftDock from '../LeftDock';
 
 afterEach(cleanup);
@@ -44,7 +45,7 @@ describe('Dock (presentational)', () => {
 
 function renderLeftDock(onOpenPanel = vi.fn()) {
   const store = configureStore({
-    reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer },
+    reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer },
   });
   render(<Provider store={store}><LeftDock onOpenPanel={onOpenPanel} /></Provider>);
   return { store, onOpenPanel };
@@ -59,7 +60,7 @@ describe('LeftDock (container)', () => {
   });
 
   it('is hidden in 3D-only view', () => {
-    const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer } });
+    const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer, project: projectReducer, simulation: simulationReducer, dock: dockReducer } });
     store.dispatch(setViewMode('3d'));
     render(<Provider store={store}><LeftDock onOpenPanel={vi.fn()} /></Provider>);
     expect(screen.queryByText('2D')).toBeNull();
@@ -73,5 +74,17 @@ describe('LeftDock (container)', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Grade' }));
     expect(onOpenPanel).toHaveBeenCalledWith('Grading');
+  });
+
+  it('keeps a grade suggestion (✦→📌) and records it in the dock slice', () => {
+    const { store } = renderLeftDock();
+    act(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Keep Grade' }));
+    expect(store.getState().dock.pinnedExtra.left).toEqual(['grade']);
+    expect(screen.getByRole('button', { name: 'Unpin Grade' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Keep Grade' })).toBeNull();
   });
 });

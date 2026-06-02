@@ -323,6 +323,9 @@ function mockState(overrides?: Partial<RootState>): RootState {
       stale: false,
       lastGradedAt: null,
     },
+    dock: {
+      pinnedExtra: { left: [], right: [] },
+    },
   };
 
   if (overrides) {

@@ -17,6 +17,7 @@ import collisionBodyReducer from './collisionBodySlice';
 import renderSettingsReducer from './renderSettingsSlice';
 import animationReducer from './animationSlice';
 import workflowReducer, { loadWorkflow, rehydrateWorkflow } from './workflowSlice';
+import dockReducer, { loadDocks, rehydrateDocks, persistDocks } from './dockSlice';
 import inspectorReducer from './inspectorSlice';
 import bomReducer from './bomSlice';
 import nestingReducer from './nestingSlice';
@@ -48,6 +49,7 @@ export const store = configureStore({
     renderSettings: renderSettingsReducer,
     animation: animationReducer,
     workflow: workflowReducer,
+    dock: dockReducer,
     inspector: inspectorReducer,
     bom: bomReducer,
     nesting: nestingReducer,
@@ -82,6 +84,22 @@ const savedWorkflow = loadWorkflow();
 if (savedWorkflow) {
   store.dispatch(rehydrateWorkflow(savedWorkflow));
 }
+
+const savedDocks = loadDocks();
+if (savedDocks) {
+  store.dispatch(rehydrateDocks(savedDocks));
+}
+
+// Persist the kept-dock set whenever it changes (focused subscribe; isolated
+// from the cascade-middleware chain and the workflowSlice envelope).
+let prevDock = store.getState().dock;
+store.subscribe(() => {
+  const dock = store.getState().dock;
+  if (dock !== prevDock) {
+    prevDock = dock;
+    persistDocks(dock);
+  }
+});
 
 // Expose store for debugging (remove in production)
 (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ = store;

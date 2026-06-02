@@ -3,10 +3,11 @@ import { store, type RootState } from '../../store';
 import { activate2DTool } from '../../store/toolActivation';
 import { selectWorkflowStage } from '../../store/selectors';
 import { runUiExport } from '../../utils/export/uiExport';
+import { pinAuto, unpinAuto } from '../../store/dockSlice';
 import Dock from './Dock';
 import DockAutoZone from './DockAutoZone';
 import { DOCK_2D_TOOLS } from './dock2dTools';
-import { getDockSuggestions } from './dockSuggestions';
+import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
 
 interface LeftDockProps {
   onOpenPanel: (name: string) => void;
@@ -18,6 +19,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
   const activeTool = useSelector((s: RootState) => s.editor.activeTool);
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const stage = useSelector(selectWorkflowStage);
+  const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
 
   if (viewMode === '3d') return null;
 
@@ -32,7 +34,20 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
       tools={DOCK_2D_TOOLS}
       activeToolId={activeTool}
       onSelectTool={(id) => activate2DTool(dispatch, id)}
-      autoZone={<DockAutoZone suggestions={getDockSuggestions(stage, 'left')} onRun={runSuggestion} />}
+      autoZone={(() => {
+        const keptIds = pinnedExtra.left;
+        const kept = keptIds.map(getAutoItemById).filter((x): x is DockSuggestion => x !== undefined);
+        const suggested = getDockSuggestions(stage, 'left').filter((s) => !keptIds.includes(s.id));
+        return (
+          <DockAutoZone
+            kept={kept}
+            suggested={suggested}
+            onRun={runSuggestion}
+            onPin={(id) => dispatch(pinAuto({ side: 'left', id }))}
+            onUnpin={(id) => dispatch(unpinAuto({ side: 'left', id }))}
+          />
+        );
+      })()}
     />
   );
 }

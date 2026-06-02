@@ -4,9 +4,10 @@ import type { RootState } from '../../store';
 import { startSimulation, pauseSimulation, setViewMode3D, resetSimulation, setFitMapMode } from '../../store/simulationSlice';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { selectWorkflowStage } from '../../store/selectors';
+import { pinAuto, unpinAuto } from '../../store/dockSlice';
 import DockShell from './DockShell';
 import DockAutoZone from './DockAutoZone';
-import { getDockSuggestions } from './dockSuggestions';
+import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
 
 interface RightDockProps {
   onOpenPanel: (name: string) => void;
@@ -25,6 +26,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const frameTime = useSelector((s: RootState) => s.simulation.frameTimeMs);
   const stage = useSelector(selectWorkflowStage);
+  const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
 
   if (viewMode === '2d') return null;
 
@@ -90,7 +92,20 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
         >
           <PersonStanding size={16} />
         </button>
-        <DockAutoZone suggestions={getDockSuggestions(stage, 'right')} onRun={runSuggestion} />
+        {(() => {
+          const keptIds = pinnedExtra.right;
+          const kept = keptIds.map(getAutoItemById).filter((x): x is DockSuggestion => x !== undefined);
+          const suggested = getDockSuggestions(stage, 'right').filter((s) => !keptIds.includes(s.id));
+          return (
+            <DockAutoZone
+              kept={kept}
+              suggested={suggested}
+              onRun={runSuggestion}
+              onPin={(id) => dispatch(pinAuto({ side: 'right', id }))}
+              onUnpin={(id) => dispatch(unpinAuto({ side: 'right', id }))}
+            />
+          );
+        })()}
       </DockShell>
 
       {simActive && (

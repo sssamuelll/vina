@@ -76,7 +76,7 @@ const dockSlice = createSlice({
       state.pinnedExtra = action.payload.pinnedExtra;
     },
   },
-  // No NEW_PROJECT handler: the kept set is a user preference and persists across projects.
+  // No new-project handler: the kept set is a user preference and persists across projects.
 });
 
 export const { pinAuto, unpinAuto, rehydrateDocks } = dockSlice.actions;
