@@ -9,6 +9,7 @@ import {
 import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
+import { runUiExport } from '../../utils/export/uiExport';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -32,8 +33,8 @@ const FILE_MENU: MenuItem[] = [
   { label: 'Import DXF...', action: () => {} }, // wired via callback (opens file picker)
   { label: 'Import Reference Image...', action: () => {} },
   { separator: true, label: '' },
-  { label: 'Export DXF', action: () => {} },
-  { label: 'Export PDF (1:1)', action: () => {} },
+  { label: 'Export DXF', action: (d) => runUiExport('dxf', store.getState().project, d) },
+  { label: 'Export PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
   { label: 'Export Tech Pack', action: () => {} },
   { label: 'Export 3D Model', submenu: [
     { label: 'OBJ', action: () => {} },
@@ -41,7 +42,7 @@ const FILE_MENU: MenuItem[] = [
     { label: 'FBX', action: () => {} },
     { label: 'USDZ', action: () => {} },
   ]},
-  { label: 'Export BOM (CSV)', action: () => {} },
+  { label: 'Export BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
   { separator: true, label: '' },
   { label: 'Project Settings...', action: () => {} },
 ];
