@@ -74,3 +74,29 @@
 
 .dock__tool--auto { color: var(--dock-auto); }
 .dock__tool--auto:hover { color: var(--dock-auto); background: var(--bg-elevated); }
+
+.dock__tool-wrap {
+  position: relative;
+  display: flex;
+}
+
+.dock__badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 15px;
+  height: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.dock__badge:hover { transform: scale(1.22); }
+.dock__badge--pin { color: var(--accent); }
+.dock__badge--auto { color: var(--dock-auto); }
