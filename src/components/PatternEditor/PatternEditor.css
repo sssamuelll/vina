@@ -3,6 +3,7 @@
   height: 100%;
   overflow: hidden;
   cursor: crosshair;
+  position: relative; /* anchor for the EmptyState2D overlay */
 }
 
 .pattern-svg {

@@ -229,7 +229,7 @@ export default function AppShell() {
           style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
         >
           <FloatingToolbar />
-          <PatternEditor />
+          <PatternEditor onImportDXF={() => dxfInputRef.current?.click()} />
         </div>
         {viewMode === 'split' && (
           <div className="canvas-area__divider" onMouseDown={handleDividerMouseDown} />

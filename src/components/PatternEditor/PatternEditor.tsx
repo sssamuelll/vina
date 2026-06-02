@@ -42,6 +42,7 @@ import ElasticRenderer from './renderers/ElasticRenderer';
 import TrimRenderer from './renderers/TrimRenderer';
 import ToolOverlay from './renderers/ToolOverlay';
 import HintText from './renderers/HintText';
+import EmptyState2D, { shouldShowEmptyState } from './EmptyState2D';
 import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
@@ -77,7 +78,12 @@ function findNearestVertex(
   return best;
 }
 
-export default function PatternEditor() {
+interface PatternEditorProps {
+  /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
+  onImportDXF?: () => void;
+}
+
+export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
   const dispatch = useDispatch();
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
@@ -802,6 +808,9 @@ export default function PatternEditor() {
           height={svgSize.height}
         />
       </svg>
+      {shouldShowEmptyState(pieces.length, activeTool) && (
+        <EmptyState2D onImportDXF={onImportDXF} />
+      )}
       <ContextMenu
         menu={ctxMenu}
         onClose={() => setCtxMenu(m => ({ ...m, visible: false }))}
