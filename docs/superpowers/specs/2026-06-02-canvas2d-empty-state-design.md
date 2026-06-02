@@ -91,7 +91,7 @@ The overlay container uses `pointer-events: none`; only the interactive controls
 | Element | Token / value |
 |---|---|
 | Ground | transparent over `--canvas-2d` (`#f1efe8`) |
-| Heading | Schibsted Grotesk, `--ink-on-light` (`#2b2d33`), ~15px |
+| Heading | Schibsted Grotesk via a new `--font-ui-2d` token (the font is loaded in `index.html` but had no token), `--ink-on-light` (`#2b2d33`), ~15px |
 | Primary button label / "(P)" | `--font-mono-2d` (JetBrains Mono) |
 | Primary button | ink outline (`--ink-on-light`), transparent fill; hover/focus → border `--accent-2d`, +0.6px (matches DESIGN-NOTES §3 "Borde en hover") |
 | Drop hint | `--ink-on-light-3` (`#a0a5b0`), small |
@@ -129,7 +129,7 @@ Constraints from solace-wren: no emoji, no exclamation marks, no title case for 
 - `Draw from scratch` click dispatches `setActiveTool('pen')`;
 - Import DXF disabled when `onImportDXF` is undefined.
 
-`PatternEditor` gating (light): empty-state present with zero pieces + Select tool; absent with ≥1 piece; absent with a non-Select tool (Pen/Rectangle). (Mock the store/selectors per existing PatternEditor test patterns.)
+Gating logic is extracted into a pure predicate `shouldShowEmptyState(pieceCount, activeTool)` (exported from the `EmptyState2D` module) and unit-tested directly — `select` + 0 → true; `select` + ≥1 → false; `pen`/`rect` + 0 → false. This avoids a heavy full-`PatternEditor` RTL render (the editor mounts ~25 tool hooks); `PatternEditor` just consumes the predicate, with correctness backstopped by `tsc -b` + the predicate test.
 
 Full gate run before commit: `npx tsc -b --noEmit && npm run test && npm run lint`.
 

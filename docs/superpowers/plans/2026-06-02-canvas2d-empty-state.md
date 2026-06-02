@@ -25,7 +25,7 @@
 | `src/components/PatternEditor/renderers/HintText.tsx` | Remove the now-superseded no-pieces branch | Modify |
 | `src/components/shell/AppShell.tsx` | Pass `onImportDXF` to `<PatternEditor>` | Modify |
 
-Working copy is Spanish (decided in brainstorming; María-facing first surface). Task 3 finalizes all five strings through the `solace-wren` skill per the global CLAUDE.md microcopy mandate.
+Copy is Spanish (María-facing first surface), finalized through `solace-wren` up front (see Task 3) and shipped in Task 1 — no churn commit.
 
 ---
 
@@ -92,9 +92,9 @@ describe('shouldShowEmptyState', () => {
 describe('EmptyState2D', () => {
   it('renders the heading and all four affordances', () => {
     renderWithStore({ onImportDXF: () => {} });
-    expect(screen.getByText('Importa tu patrón')).toBeTruthy();
+    expect(screen.getByText('Trae tu patrón')).toBeTruthy();
     expect(screen.getByRole('button', { name: /importar dxf/i })).toBeTruthy();
-    expect(screen.getByText(/arrastra un \.dxf/i)).toBeTruthy();
+    expect(screen.getByText(/suelta tu \.dxf/i)).toBeTruthy();
     expect(screen.getByRole('button', { name: /dibujar desde cero/i })).toBeTruthy();
     expect(screen.getByText(/descríbelo a la/i)).toBeTruthy();
   });
@@ -156,7 +156,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
   return (
     <div className="empty-state-2d" data-testid="empty-state-2d">
       <div className="empty-state-2d__inner">
-        <h2 className="empty-state-2d__heading">Importa tu patrón</h2>
+        <h2 className="empty-state-2d__heading">Trae tu patrón</h2>
 
         <button
           type="button"
@@ -174,7 +174,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
           Importar DXF
         </button>
 
-        <p className="empty-state-2d__drop-hint">o arrastra un .dxf al lienzo</p>
+        <p className="empty-state-2d__drop-hint">o suelta tu .dxf aquí</p>
 
         <button
           type="button"
@@ -191,7 +191,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
         </button>
 
         <p className="empty-state-2d__ai-hint">
-          …o descríbelo a la <span className="empty-state-2d__ai-word">IA</span> abajo
+          o descríbelo a la <span className="empty-state-2d__ai-word">IA</span>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none"
             stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
             strokeLinejoin="round" aria-hidden="true">
@@ -446,39 +446,21 @@ git commit -m "feat(canvas-2d): wire EmptyState2D into the editor, retire the lo
 
 ---
 
-## Task 3: Finalize microcopy via solace-wren
+## Task 3: Finalize microcopy via solace-wren — DONE (folded into Task 1)
 
-Microcopy is a `solace-wren` trigger (global CLAUDE.md). The strings shipped in Task 1 are working copy; this task locks them.
+The `solace-wren` pass ran before implementation, so Task 1 ships the FINAL copy (no churn commit). The five locked strings — already in the Task 1 code and tests above:
 
-**Files:**
-- Modify: `src/components/PatternEditor/EmptyState2D.tsx` (final strings)
-- Modify: `src/components/PatternEditor/__tests__/EmptyState2D.test.tsx` (match final strings)
+| Element | Final string |
+|---|---|
+| Heading | `Trae tu patrón` |
+| Primary button | `Importar DXF` |
+| Drop hint | `o suelta tu .dxf aquí` |
+| Secondary | `Dibujar desde cero` + `(P)` |
+| AI pointer | `o descríbelo a la IA` (+ ↓ icon) |
 
-- [ ] **Step 1: Run the copy through solace-wren**
+solace-wren audit notes: killed the Importa/Importar root echo (heading → "Trae"); aligned the drop hint verb with the existing active-drag overlay ("Suelta tu archivo .dxf"); cut the decorative leading ellipsis and "abajo" on the AI pointer (the arrow icon carries "below"). No Tier-1 words, no emoji, no exclamation, sentence case.
 
-Invoke the `solace-wren` skill on the five strings, with constraints: Spanish (Venezuelan register), no emoji, no exclamation marks, no title case for body, no hype words; the leading ellipsis on the AI hint is up for revision.
-
-- Heading: `Importa tu patrón`
-- Primary button: `Importar DXF`
-- Drop hint: `o arrastra un .dxf al lienzo`
-- Secondary: `Dibujar desde cero` + `(P)`
-- AI pointer: `…o descríbelo a la IA abajo`
-
-- [ ] **Step 2: Apply the finalized strings**
-
-Update the literals in `EmptyState2D.tsx` and the matching `screen.getByText` / `getByRole({ name })` queries in the test to whatever solace-wren returns. Keep `aria-hidden="true"` on the icons so each button's accessible name is its text only.
-
-- [ ] **Step 3: Run tests + typecheck + lint**
-
-Run: `npm run test -- src/components/PatternEditor/__tests__/EmptyState2D.test.tsx && npx tsc -b --noEmit && npm run lint`
-Expected: all pass.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add src/components/PatternEditor/EmptyState2D.tsx src/components/PatternEditor/__tests__/EmptyState2D.test.tsx
-git commit -m "feat(canvas-2d): finalize empty-state microcopy (solace-wren)"
-```
+Nothing to do in this task — proceed to Task 4.
 
 ---
 
