@@ -25,7 +25,7 @@ Open `http://localhost:5180`
 ```
 src/
 ├── components/        # React UI components
-│   ├── shell/             # AppShell + UnifiedBar (chat/commands/settings) + TopBar + FloatingToolbar + FloatingControls3D + ContextPanel
+│   ├── shell/             # AppShell + UnifiedBar (chat/commands/settings) + TopBar + LeftDock/RightDock (DockShell — 2D & 3D side docks) + ContextPanel
 │   ├── DisplayBar2D/      # 2D context toolbar (toggles, render modes)
 │   ├── PatternEditor/     # 2D SVG canvas + tool hooks
 │   ├── Viewport3D/        # R3F 3D viewport, collision bodies, snapshots
