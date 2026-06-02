@@ -10,7 +10,7 @@ import { dxfErrorMessage, piecesLabel } from './dxfImport';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
-import FloatingToolbar from './FloatingToolbar';
+import LeftDock from './LeftDock';
 import FloatingControls3D from './FloatingControls3D';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
@@ -228,7 +228,7 @@ export default function AppShell() {
           className="canvas-area__2d"
           style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <FloatingToolbar />
+          <LeftDock />
           <PatternEditor onImportDXF={() => dxfInputRef.current?.click()} />
         </div>
         {viewMode === 'split' && (
