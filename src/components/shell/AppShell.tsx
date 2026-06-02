@@ -11,7 +11,7 @@ import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import LeftDock from './LeftDock';
-import FloatingControls3D from './FloatingControls3D';
+import RightDock from './RightDock';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
@@ -238,7 +238,7 @@ export default function AppShell() {
           className="canvas-area__3d"
           style={{ width: get3dWidth(), display: viewMode === '2d' ? 'none' : undefined }}
         >
-          <FloatingControls3D />
+          <RightDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>

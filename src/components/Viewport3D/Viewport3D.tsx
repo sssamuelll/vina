@@ -143,7 +143,7 @@ function AnimationDriver() {
 interface Viewport3DProps {
   activeTool3D?: Tool3D;
   /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons, sim-status)
-   *  because the new AppShell provides FloatingControls3D instead. */
+   *  because the new AppShell provides RightDock instead. */
   hideChrome?: boolean;
 }
 
