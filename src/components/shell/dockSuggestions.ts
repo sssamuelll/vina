@@ -24,3 +24,10 @@ const RIGHT: Record<WorkflowStage, DockSuggestion[]> = {
 export function getDockSuggestions(stage: WorkflowStage, side: 'left' | 'right'): DockSuggestion[] {
   return (side === 'left' ? LEFT : RIGHT)[stage];
 }
+
+const ALL_AUTO_ITEMS: Record<string, DockSuggestion> = { grade: GRADE, export: EXPORT, fitmap: FITMAP, bom: BOM };
+
+/** Look up an auto item by id (so a kept id renders regardless of stage). */
+export function getAutoItemById(id: string): DockSuggestion | undefined {
+  return ALL_AUTO_ITEMS[id];
+}

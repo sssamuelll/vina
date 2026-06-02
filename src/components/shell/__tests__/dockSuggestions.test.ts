@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getDockSuggestions } from '../dockSuggestions';
+import { getAutoItemById } from '../dockSuggestions';
 import type { WorkflowStage } from '../../../store/selectors';
 
 const ids = (stage: WorkflowStage, side: 'left' | 'right') => getDockSuggestions(stage, side).map(s => s.id);
@@ -24,5 +25,15 @@ describe('getDockSuggestions (wired-only map)', () => {
   it('simulated → export left, bom right', () => {
     expect(ids('simulated', 'left')).toEqual(['export']);
     expect(ids('simulated', 'right')).toEqual(['bom']);
+  });
+});
+
+describe('getAutoItemById', () => {
+  it('returns the item for a known id', () => {
+    expect(getAutoItemById('grade')?.id).toBe('grade');
+    expect(getAutoItemById('bom')?.label).toBe('BOM');
+  });
+  it('returns undefined for an unknown id', () => {
+    expect(getAutoItemById('nope')).toBeUndefined();
   });
 });
