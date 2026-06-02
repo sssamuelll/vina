@@ -1,5 +1,5 @@
 import { useDispatch } from 'react-redux';
-import { setActiveTool } from '../../store/editorSlice';
+import { activate2DTool } from '../../store/toolActivation';
 import type { Tool2D } from '../../types/types';
 import './EmptyState2D.css';
 
@@ -46,7 +46,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
         <button
           type="button"
           className="empty-state-2d__secondary"
-          onClick={() => dispatch(setActiveTool('pen'))}
+          onClick={() => activate2DTool(dispatch, 'pen')}
         >
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none"
             stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"

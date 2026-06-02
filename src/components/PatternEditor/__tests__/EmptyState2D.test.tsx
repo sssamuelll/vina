@@ -10,12 +10,13 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer from '../../../store/editorSlice';
+import toolsReducer from '../../../store/toolSlice';
 import EmptyState2D, { shouldShowEmptyState } from '../EmptyState2D';
 
 afterEach(cleanup);
 
 function renderWithStore(props: { onImportDXF?: () => void } = {}) {
-  const store = configureStore({ reducer: { editor: editorReducer } });
+  const store = configureStore({ reducer: { editor: editorReducer, tools: toolsReducer } });
   render(
     <Provider store={store}>
       <EmptyState2D {...props} />
@@ -54,11 +55,12 @@ describe('EmptyState2D', () => {
     expect(onImportDXF).toHaveBeenCalledTimes(1);
   });
 
-  it('activates the Pen tool when Draw from scratch is clicked', () => {
+  it('activates the Pen tool in both slices when Draw from scratch is clicked', () => {
     const store = renderWithStore({ onImportDXF: () => {} });
     expect(store.getState().editor.activeTool).toBe('select');
     fireEvent.click(screen.getByRole('button', { name: /dibujar desde cero/i }));
     expect(store.getState().editor.activeTool).toBe('pen');
+    expect(store.getState().tools.activeTool2D).toBe('pen');
   });
 
   it('disables the Import DXF button when no handler is provided', () => {

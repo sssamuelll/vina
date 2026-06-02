@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * useKeyboardShortcuts — CLO3D-compatible global keyboard shortcut system.
  *
@@ -13,7 +12,6 @@ import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import {
-  setActiveTool,
   clearSelection,
   selectAllVisiblePieces,
   toggleSeamAllowance,
@@ -22,7 +20,8 @@ import {
   copyPieces,
   createPastedPieces,
 } from '../store/editorSlice';
-import { setActiveTool2D, setActiveTool3D } from '../store/toolSlice';
+import { setActiveTool3D } from '../store/toolSlice';
+import { activate2DTool } from '../store/toolActivation';
 import { removePieces, removeSeam, reverseSeam, addPiece, duplicatePiece, flipPieceH } from '../store/projectSlice';
 import {
   startSimulation,
@@ -178,42 +177,42 @@ export function useKeyboardShortcuts() {
       ['view.layersPanel', () => window.dispatchEvent(new CustomEvent('openclo:toggleLayersPanel'))],
       ['view.xrayMode', () => dispatch(setXrayMode({ enabled: !xrayMode }))],
 
-      // 2D Tools (CLO3D mapping)
-      ['tool.transform', () => { dispatch(setActiveTool('transform' as any)); dispatch(setActiveTool2D('transform')); }],
-      ['tool.select', () => { dispatch(setActiveTool('select' as any)); dispatch(setActiveTool2D('select')); }],
-      ['tool.editCurve', () => { dispatch(setActiveTool('editCurve' as any)); dispatch(setActiveTool2D('editCurve')); }],
-      ['tool.editConstrain', () => { dispatch(setActiveTool('editConstrain' as any)); dispatch(setActiveTool2D('editConstrain')); }],
-      ['tool.pen', () => { dispatch(setActiveTool('pen' as any)); dispatch(setActiveTool2D('pen')); }],
-      ['tool.rectangle', () => { dispatch(setActiveTool('rectangle' as any)); dispatch(setActiveTool2D('rectangle')); }],
-      ['tool.circle', () => { dispatch(setActiveTool('circle' as any)); dispatch(setActiveTool2D('circle')); }],
-      ['tool.internalShape', () => { dispatch(setActiveTool('internalShape' as any)); dispatch(setActiveTool2D('internalShape')); }],
-      ['tool.trace', () => { dispatch(setActiveTool('trace' as any)); dispatch(setActiveTool2D('trace')); }],
-      ['tool.dart', () => { dispatch(setActiveTool('dart' as any)); dispatch(setActiveTool2D('dart')); }],
-      ['tool.scissors', () => { dispatch(setActiveTool('scissors' as any)); dispatch(setActiveTool2D('scissors')); }],
-      ['tool.pin', () => { dispatch(setActiveTool('pin' as any)); dispatch(setActiveTool2D('pin')); }],
-      ['tool.measure', () => { dispatch(setActiveTool('measure' as any)); dispatch(setActiveTool2D('measure')); }],
-      ['tool.walkSeam', () => { dispatch(setActiveTool('walkSeam' as any)); dispatch(setActiveTool2D('walkSeam')); }],
-      ['tool.merge', () => { dispatch(setActiveTool('merge' as any)); dispatch(setActiveTool2D('merge')); }],
-      ['tool.topstitchEdit', () => { dispatch(setActiveTool('topstitchEdit' as any)); dispatch(setActiveTool2D('topstitchEdit')); }],
-      ['tool.topstitchSegment', () => { dispatch(setActiveTool('topstitchSegment' as any)); dispatch(setActiveTool2D('topstitchSegment')); }],
-      ['tool.topstitchFree', () => { dispatch(setActiveTool('topstitchFree' as any)); dispatch(setActiveTool2D('topstitchFree')); }],
-      ['tool.topstitchSeamline', () => { dispatch(setActiveTool('topstitchSeamline' as any)); dispatch(setActiveTool2D('topstitchSeamline')); }],
+      // 2D Tools (CLO3D mapping) — all route through the single writer
+      ['tool.transform', () => activate2DTool(dispatch, 'transform')],
+      ['tool.select', () => activate2DTool(dispatch, 'select')],
+      ['tool.editCurve', () => activate2DTool(dispatch, 'editCurve')],
+      ['tool.editConstrain', () => activate2DTool(dispatch, 'editConstrain')],
+      ['tool.pen', () => activate2DTool(dispatch, 'pen')],
+      ['tool.rectangle', () => activate2DTool(dispatch, 'rectangle')],
+      ['tool.circle', () => activate2DTool(dispatch, 'circle')],
+      ['tool.internalShape', () => activate2DTool(dispatch, 'internalShape')],
+      ['tool.trace', () => activate2DTool(dispatch, 'trace')],
+      ['tool.dart', () => activate2DTool(dispatch, 'dart')],
+      ['tool.scissors', () => activate2DTool(dispatch, 'scissors')],
+      ['tool.pin', () => activate2DTool(dispatch, 'pin')],
+      ['tool.measure', () => activate2DTool(dispatch, 'measure')],
+      ['tool.walkSeam', () => activate2DTool(dispatch, 'walkSeam')],
+      ['tool.merge', () => activate2DTool(dispatch, 'merge')],
+      ['tool.topstitchEdit', () => activate2DTool(dispatch, 'topstitchEdit')],
+      ['tool.topstitchSegment', () => activate2DTool(dispatch, 'topstitchSegment')],
+      ['tool.topstitchFree', () => activate2DTool(dispatch, 'topstitchFree')],
+      ['tool.topstitchSeamline', () => activate2DTool(dispatch, 'topstitchSeamline')],
 
-      ['tool.pomMeasure', () => { dispatch(setActiveTool('pomMeasure' as any)); dispatch(setActiveTool2D('pomMeasure')); }],
-      ['tool.offsetOutline', () => { dispatch(setActiveTool('offsetOutline' as any)); dispatch(setActiveTool2D('offsetOutline')); }],
-      ['tool.extendTrim', () => { dispatch(setActiveTool('extendTrim' as any)); dispatch(setActiveTool2D('extendTrim')); }],
-      ['tool.polyPen', () => { dispatch(setActiveTool('polyPen' as any)); dispatch(setActiveTool2D('polyPen')); }],
+      ['tool.pomMeasure', () => activate2DTool(dispatch, 'pomMeasure')],
+      ['tool.offsetOutline', () => activate2DTool(dispatch, 'offsetOutline')],
+      ['tool.extendTrim', () => activate2DTool(dispatch, 'extendTrim')],
+      ['tool.polyPen', () => activate2DTool(dispatch, 'polyPen')],
 
       // Sewing
-      ['tool.seam', () => { dispatch(setActiveTool('seam' as any)); dispatch(setActiveTool2D('seam')); }],
-      ['tool.freeSewing', () => { dispatch(setActiveTool('freesewing' as any)); dispatch(setActiveTool2D('freesewing')); }],
-      ['tool.segmentSewing', () => { dispatch(setActiveTool('segmentSewing' as any)); dispatch(setActiveTool2D('segmentSewing')); }],
+      ['tool.seam', () => activate2DTool(dispatch, 'seam')],
+      ['tool.freeSewing', () => activate2DTool(dispatch, 'freesewing')],
+      ['tool.segmentSewing', () => activate2DTool(dispatch, 'segmentSewing')],
 
       // Shift+Key tools
-      ['tool.grainline', () => { dispatch(setActiveTool('grainline' as any)); dispatch(setActiveTool2D('grainline')); }],
-      ['tool.freeSewingAlt', () => { dispatch(setActiveTool('freesewing' as any)); dispatch(setActiveTool2D('freesewing')); }],
-      ['tool.notch', () => { dispatch(setActiveTool('notch' as any)); dispatch(setActiveTool2D('notch')); }],
-      ['tool.line', () => { dispatch(setActiveTool('line' as any)); dispatch(setActiveTool2D('line')); }],
+      ['tool.grainline', () => activate2DTool(dispatch, 'grainline')],
+      ['tool.freeSewingAlt', () => activate2DTool(dispatch, 'freesewing')],
+      ['tool.notch', () => activate2DTool(dispatch, 'notch')],
+      ['tool.line', () => activate2DTool(dispatch, 'line')],
 
       // 3D Tools
       ['tool3d.steamBrush', () => dispatch(setActiveTool3D('steamBrush'))],

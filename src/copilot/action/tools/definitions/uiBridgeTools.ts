@@ -7,7 +7,8 @@
 import type { ToolDefinition } from '../registry';
 import { duplicatePiece } from '../../../../store/projectSlice';
 import { addInternalLine } from '../../../../store/projectSlice';
-import { setActiveTool, setViewMode, selectPiece, clearSelection } from '../../../../store/editorSlice';
+import { setViewMode, selectPiece, clearSelection } from '../../../../store/editorSlice';
+import { activate2DTool } from '../../../../store/toolActivation';
 import { newId } from '../../../../utils/ids';
 import type { InternalLine } from '../../../../types/types';
 import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
@@ -114,7 +115,7 @@ export const tools: ToolDefinition[] = [
       required: ['tool'],
     },
     execute: async (params, dispatch) => {
-      dispatch(setActiveTool(params.tool as any));
+      activate2DTool(dispatch, params.tool as string);
       return { success: true, activeTool: params.tool };
     },
   },
