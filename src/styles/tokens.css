@@ -32,6 +32,7 @@
   --accent-2d: oklch(0.66 0.16 248);   /* selection + seams only */
   --ai-2d: oklch(0.72 0.13 295);       /* AI-authored annotations */
   --font-mono-2d: 'JetBrains Mono', 'SF Mono', 'Fira Code', ui-monospace, monospace;
+  --font-ui-2d: 'Schibsted Grotesk', var(--font-sans);   /* UI support text on the paper canvas */
   /* Piece-state colors — named so a working piece (folds, locks, errors,
      topstitch, annotations) stays on-system instead of a parade of inline hex.
      Hues preserved from the pre-token values; centralization is the point. */
