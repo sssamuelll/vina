@@ -16,6 +16,7 @@ import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import ContextPanel from './ContextPanel';
+import { getPanelSide } from './panelSide';
 import type { Tool3D } from '../Toolbar3D/Toolbar3D';
 
 // Lazy-load panel content
@@ -244,7 +245,7 @@ export default function AppShell() {
           </Viewport3DErrorBoundary>
         </div>
         {contextPanel && (
-          <ContextPanel title={contextPanel} onClose={() => setContextPanel(null)}>
+          <ContextPanel title={contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
             {renderPanelContent(contextPanel, () => setContextPanel(null))}
           </ContextPanel>
         )}
