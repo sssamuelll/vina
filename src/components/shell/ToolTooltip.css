@@ -71,6 +71,8 @@
   white-space: normal;
   font-family: 'Inter', 'Helvetica Neue', sans-serif;
 }
+.tool-tooltip-desc--pin { color: var(--accent); }
+.tool-tooltip-desc--auto { color: var(--dock-auto); }
 
 .tool-tooltip-hint {
   font-size: 10.5px;

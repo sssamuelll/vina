@@ -11,7 +11,7 @@ import {
   setRenderMode2D, setUnits,
 } from '../../store/editorSlice';
 import type { UnitSystem } from '../../types/types';
-import ToolTooltip from '../Toolbar3D/ToolTooltip';
+import ToolTooltip from '../shell/ToolTooltip';
 import './DisplayBar2D.css';
 
 type RenderMode = 'textured' | 'translucent' | 'wireframe';

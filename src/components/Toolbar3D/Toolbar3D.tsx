@@ -4,7 +4,7 @@ import type { RootState } from '../../store';
 import { setActiveTool3D } from '../../store/toolSlice';
 import { toolRegistry } from '../../tools';
 import type { ToolDefinition } from '../../tools/types';
-import ToolTooltip from './ToolTooltip';
+import ToolTooltip from '../shell/ToolTooltip';
 import './Toolbar3D.css';
 import { safeGetItem, safeSetItem } from '../../utils/safeStorage';
 

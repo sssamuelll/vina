@@ -12,7 +12,7 @@ import {
 } from '../../store/simulationSlice';
 import type { SurfaceMode3D } from '../../store/simulationSlice';
 import type { FitMapMode } from '../../utils/cloth/fitMaps';
-import ToolTooltip from '../Toolbar3D/ToolTooltip';
+import ToolTooltip from '../shell/ToolTooltip';
 import './DisplayBar3D.css';
 
 interface ToggleItem {
