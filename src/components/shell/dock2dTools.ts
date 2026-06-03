@@ -36,6 +36,3 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
 export function getDockToolById(id: string): DockToolDef | undefined {
   return DOCK_2D_CATALOG.find((t) => t.id === id);
 }
-
-/** @deprecated Task-3 transitional: LeftDock switches to DOCK_2D_CATALOG + store membership. */
-export const DOCK_2D_TOOLS: DockToolDef[] = DOCK_2D_CATALOG.slice(0, 7);

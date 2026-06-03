@@ -11,7 +11,7 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
-import dockReducer, { toggleDockSignaling, pinAuto } from '../../../store/dockSlice';
+import dockReducer, { toggleDockSignaling, pinAuto, addDockTool, removeDockTool } from '../../../store/dockSlice';
 import LeftDock from '../LeftDock';
 
 afterEach(cleanup);
@@ -123,5 +123,29 @@ describe('LeftDock (container)', () => {
     });
     expect(screen.getByRole('button', { name: 'Grade' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Unpin Grade' })).toBeNull();
+  });
+
+  it('adds a catalog tool to the dock when dispatched', () => {
+    const { store } = renderLeftDock();
+    expect(screen.queryByRole('button', { name: /notch/i })).toBeNull();
+    act(() => { store.dispatch(addDockTool('notch')); });
+    expect(screen.getByRole('button', { name: /notch/i })).toBeTruthy();
+  });
+
+  it('removes a default tool from the dock when dispatched', () => {
+    const { store } = renderLeftDock();
+    expect(screen.getByRole('button', { name: /pen · h/i })).toBeTruthy();
+    act(() => { store.dispatch(removeDockTool('pen')); });
+    expect(screen.queryByRole('button', { name: /pen · h/i })).toBeNull();
+  });
+
+  it('the ＋ button toggles the picker and Escape closes it', () => {
+    renderLeftDock();
+    const add = screen.getByRole('button', { name: 'Customize dock tools' });
+    expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
+    fireEvent.click(add);
+    expect(screen.getByRole('group', { name: 'Customize dock tools' })).toBeTruthy();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
   });
 });

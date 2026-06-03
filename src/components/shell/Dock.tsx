@@ -13,6 +13,8 @@ interface DockProps {
   onSelectTool: (id: string) => void;
   /** Optional auto-suggest (✦) zone rendered below the pinned tools. */
   autoZone?: ReactNode;
+  /** Optional footer (e.g. the ＋ customize editor) rendered at the very bottom. */
+  footer?: ReactNode;
 }
 
 /**
@@ -20,7 +22,7 @@ interface DockProps {
  * inside the shared DockShell. Presentational only — the container supplies
  * tools + active id and handles activation.
  */
-export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, autoZone }: DockProps) {
+export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, autoZone, footer }: DockProps) {
   return (
     <DockShell side="left" domainLabel={domainLabel}>
       {tools.map(tool => {
@@ -32,7 +34,7 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, a
               type="button"
               className={`dock__tool ${active ? 'dock__tool--active' : ''}`}
               onClick={() => onSelectTool(tool.id)}
-              aria-label={`${tool.label} · ${tool.shortcut}`}
+              aria-label={tool.shortcut ? `${tool.label} · ${tool.shortcut}` : tool.label}
               aria-pressed={active}
             >
               <Icon size={16} />
@@ -41,6 +43,7 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, a
         );
       })}
       {autoZone}
+      {footer}
     </DockShell>
   );
 }
