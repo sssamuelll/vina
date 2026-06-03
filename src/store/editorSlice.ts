@@ -254,7 +254,7 @@ export function createPastedPieces(clipboard: { pieces: PatternPiece[] }, mirror
  * Returns null if no pieces or all pieces have no outline data.
  */
 export function computeFitView(
-  pieces: { position: Point2D; outline: { values: number[] }[] }[],
+  pieces: { position: Point2D; rotation?: number; outline: { values: number[] }[] }[],
   viewportWidth: number,
   viewportHeight: number,
   padding = 1.2,
@@ -265,10 +265,27 @@ export function computeFitView(
   let hasPoints = false;
 
   for (const piece of pieces) {
+    const rot = ((piece.rotation ?? 0) * Math.PI) / 180;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    // Piece-local outline bbox center = the renderer's rotation pivot.
+    let lminX = Infinity, lminY = Infinity, lmaxX = -Infinity, lmaxY = -Infinity;
     for (const cmd of piece.outline) {
       for (let i = 0; i < cmd.values.length - 1; i += 2) {
-        const px = cmd.values[i] + piece.position.x;
-        const py = cmd.values[i + 1] + piece.position.y;
+        lminX = Math.min(lminX, cmd.values[i]);
+        lmaxX = Math.max(lmaxX, cmd.values[i]);
+        lminY = Math.min(lminY, cmd.values[i + 1]);
+        lmaxY = Math.max(lmaxY, cmd.values[i + 1]);
+      }
+    }
+    const cx = (lminX + lmaxX) / 2;
+    const cy = (lminY + lmaxY) / 2;
+    for (const cmd of piece.outline) {
+      for (let i = 0; i < cmd.values.length - 1; i += 2) {
+        const lx = cmd.values[i] - cx;
+        const ly = cmd.values[i + 1] - cy;
+        const px = lx * cos - ly * sin + cx + piece.position.x;
+        const py = lx * sin + ly * cos + cy + piece.position.y;
         minX = Math.min(minX, px);
         minY = Math.min(minY, py);
         maxX = Math.max(maxX, px);

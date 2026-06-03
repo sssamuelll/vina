@@ -81,4 +81,14 @@ describe('computeFitView', () => {
     expect(fit!.pan.x + 200 * fit!.zoom).toBeCloseTo(400, 5);
     expect(fit!.pan.y + 50 * fit!.zoom).toBeCloseTo(300, 5);
   });
+
+  it('accounts for piece rotation when framing (rotated content needs a smaller zoom)', () => {
+    const sq = { position: { x: 0, y: 0 }, outline: [{ values: [0, 0, 100, 0, 100, 100, 0, 100] }] };
+    const flat = computeFitView([{ ...sq, rotation: 0 }], 800, 600);
+    const rotated = computeFitView([{ ...sq, rotation: 45 }], 800, 600);
+    expect(flat).not.toBeNull();
+    expect(rotated).not.toBeNull();
+    // The 45°-rotated square's bbox is the ~141px diagonal, so it must zoom out further.
+    expect(rotated!.zoom).toBeLessThan(flat!.zoom);
+  });
 });
