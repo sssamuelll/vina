@@ -10,6 +10,9 @@ export interface DockState {
   /** Auto-signaling preference. 'off' mutes ✦ suggestions + badges + the "auto"
    *  label; kept items still render as plain buttons. Default 'subtle'. */
   signaling: 'subtle' | 'off';
+  /** The left (2D) dock's tool membership — ids drawn from DOCK_2D_CATALOG.
+   *  Rendered in catalog order. Default DEFAULT_DOCK_2D_IDS. Min 1 (never empty). */
+  tools2d: string[];
 }
 
 const STORAGE_KEY = 'openclo-docks';
@@ -17,6 +20,10 @@ const STORAGE_VERSION = 1;
 const MAX_PINNED = 16;
 const MAX_ID_LEN = 80;
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/** The 7 default left-dock 2D tool ids, in render order. Lives here (store layer)
+ *  so the slice owns its default without importing the component-layer catalog. */
+export const DEFAULT_DOCK_2D_IDS = ['select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam'];
 
 const idString = z
   .string()
@@ -27,10 +34,13 @@ const sideArray = z.array(idString).max(MAX_PINNED);
 
 const signalingSchema = z.enum(['subtle', 'off']).default('subtle');
 
+const tools2dSchema = z.array(idString).max(MAX_PINNED).default([...DEFAULT_DOCK_2D_IDS]);
+
 const DockStateSchema = z
   .object({
     pinnedExtra: z.object({ left: sideArray, right: sideArray }).strict(),
     signaling: signalingSchema,
+    tools2d: tools2dSchema,
   })
   .strict();
 
@@ -38,7 +48,7 @@ const PersistedEnvelopeSchema = z
   .object({ version: z.literal(STORAGE_VERSION), data: DockStateSchema })
   .strict();
 
-const initialState: DockState = { pinnedExtra: { left: [], right: [] }, signaling: 'subtle' };
+const initialState: DockState = { pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: [...DEFAULT_DOCK_2D_IDS] };
 
 /** Persist the kept-dock set to its own LS key (small per-user UI preference;
  *  LS-only, co-located in spirit with workflowSlice prefs — not project data). */
@@ -86,10 +96,21 @@ const dockSlice = createSlice({
     rehydrateDocks(state, action: PayloadAction<DockState>) {
       state.pinnedExtra = action.payload.pinnedExtra;
       state.signaling = action.payload.signaling;
+      state.tools2d = action.payload.tools2d;
+    },
+    addDockTool(state, action: PayloadAction<string>) {
+      if (!state.tools2d.includes(action.payload)) state.tools2d.push(action.payload);
+    },
+    removeDockTool(state, action: PayloadAction<string>) {
+      if (state.tools2d.length <= 1) return; // never empty the dock
+      state.tools2d = state.tools2d.filter((id) => id !== action.payload);
+    },
+    resetDockTools(state) {
+      state.tools2d = [...DEFAULT_DOCK_2D_IDS];
     },
   },
   // No new-project handler: the kept set is a user preference and persists across projects.
 });
 
-export const { pinAuto, unpinAuto, rehydrateDocks, toggleDockSignaling } = dockSlice.actions;
+export const { pinAuto, unpinAuto, rehydrateDocks, toggleDockSignaling, addDockTool, removeDockTool, resetDockTools } = dockSlice.actions;
 export default dockSlice.reducer;
