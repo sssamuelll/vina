@@ -24,7 +24,7 @@ Out of scope: panel-routing-by-side (its own slice), tooltips on non-dock contro
 
 ## 3. The shared tooltip component
 
-`ToolTooltip` already implements everything needed: a 500 ms hover delay, portal rendering (escapes the dock's `overflow`), `position: 'left' | 'right'`, and a `name` + `shortcut` (`<kbd>`, via `formatShortcut`) header plus an optional `description` line. Today it lives at `src/components/Toolbar3D/ToolTooltip.tsx` and is imported **only** by the orphaned (unmounted) `Toolbar3D.tsx`.
+`ToolTooltip` already implements everything needed: a 500 ms hover delay, portal rendering (escapes the dock's `overflow`), `position: 'left' | 'right'`, and a `name` + `shortcut` (`<kbd>`, via `formatShortcut`) header plus an optional `description` line. Today it lives at `src/components/Toolbar3D/ToolTooltip.tsx`. (Correction, post-implementation: it is imported by three components — `Toolbar3D.tsx`, `DisplayBar2D.tsx`, and `DisplayBar3D.tsx` — not Toolbar3D alone; all three imports get repointed in the move.)
 
 **Relocate it to a shared home:** move `ToolTooltip.tsx` and its `ToolTooltip.css` from `src/components/Toolbar3D/` to `src/components/shell/` (the docks' home). Update the single import in the orphaned `Toolbar3D.tsx` to the new path so the project still type-checks (do not delete Toolbar3D — that is a separate orphan-cleanup decision). No behavior change to the relocated component beyond the one extension below.
 
