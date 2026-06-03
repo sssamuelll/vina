@@ -11,7 +11,8 @@ export interface DockState {
    *  label; kept items still render as plain buttons. Default 'subtle'. */
   signaling: 'subtle' | 'off';
   /** The left (2D) dock's tool membership — ids drawn from DOCK_2D_CATALOG.
-   *  Rendered in catalog order. Default DEFAULT_DOCK_2D_IDS. Min 1 (never empty). */
+   *  Rendered in this array's order (user-reorderable via drag, slice 4b).
+   *  Default DEFAULT_DOCK_2D_IDS. Min 1 (never empty). */
   tools2d: string[];
 }
 
