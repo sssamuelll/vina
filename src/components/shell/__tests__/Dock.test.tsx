@@ -11,7 +11,7 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
 import simulationReducer from '../../../store/simulationSlice';
-import dockReducer from '../../../store/dockSlice';
+import dockReducer, { toggleDockSignaling, pinAuto } from '../../../store/dockSlice';
 import LeftDock from '../LeftDock';
 
 afterEach(cleanup);
@@ -86,5 +86,29 @@ describe('LeftDock (container)', () => {
     expect(store.getState().dock.pinnedExtra.left).toEqual(['grade']);
     expect(screen.getByRole('button', { name: 'Unpin Grade' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Keep Grade' })).toBeNull();
+  });
+
+  it('signaling=off mutes the auto layer but shows no suggestion', () => {
+    const { store } = renderLeftDock();
+    act(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
+      store.dispatch(toggleDockSignaling()); // → 'off'
+    });
+    expect(screen.queryByText('auto')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Keep Grade' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Grade' })).toBeNull();
+  });
+
+  it('off: a kept tool still renders (plain, no Unpin badge)', () => {
+    const { store } = renderLeftDock();
+    act(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
+      store.dispatch(pinAuto({ side: 'left', id: 'grade' }));
+      store.dispatch(toggleDockSignaling()); // → 'off'
+    });
+    expect(screen.getByRole('button', { name: 'Grade' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Unpin Grade' })).toBeNull();
   });
 });

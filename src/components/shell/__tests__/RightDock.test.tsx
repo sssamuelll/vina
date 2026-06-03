@@ -13,7 +13,7 @@ import editorReducer, { setViewMode } from '../../../store/editorSlice';
 import simulationReducer, { startSimulation, pauseSimulation } from '../../../store/simulationSlice';
 import toolsReducer from '../../../store/toolSlice';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
-import dockReducer from '../../../store/dockSlice';
+import dockReducer, { toggleDockSignaling } from '../../../store/dockSlice';
 import RightDock from '../RightDock';
 
 afterEach(cleanup);
@@ -89,5 +89,18 @@ describe('RightDock (3D dock)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Keep BOM' }));
     expect(store.getState().dock.pinnedExtra.right).toEqual(['bom']);
     expect(screen.getByRole('button', { name: 'Unpin BOM' })).toBeTruthy();
+  });
+
+  it('signaling=off mutes the auto layer at the simulated stage', () => {
+    const { store } = renderRightDock();
+    act(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      store.dispatch(addPiece({ id: 'p1', name: 'P', outline: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, internals: [], createdAt: 0, updatedAt: 0, active: false } as any));
+      store.dispatch(startSimulation());
+      store.dispatch(pauseSimulation()); // → simulationState 'paused' → stage 'simulated'
+      store.dispatch(toggleDockSignaling()); // → 'off'
+    });
+    expect(screen.queryByText('auto')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'BOM' })).toBeNull();
   });
 });

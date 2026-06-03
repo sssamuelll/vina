@@ -20,6 +20,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const stage = useSelector(selectWorkflowStage);
   const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
+  const signaling = useSelector((s: RootState) => s.dock.signaling);
 
   if (viewMode === '3d') return null;
 
@@ -42,6 +43,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
           <DockAutoZone
             kept={kept}
             suggested={suggested}
+            signaling={signaling}
             onRun={runSuggestion}
             onPin={(id) => dispatch(pinAuto({ side: 'left', id }))}
             onUnpin={(id) => dispatch(unpinAuto({ side: 'left', id }))}

@@ -27,6 +27,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   const frameTime = useSelector((s: RootState) => s.simulation.frameTimeMs);
   const stage = useSelector(selectWorkflowStage);
   const pinnedExtra = useSelector((s: RootState) => s.dock.pinnedExtra);
+  const signaling = useSelector((s: RootState) => s.dock.signaling);
 
   if (viewMode === '2d') return null;
 
@@ -100,6 +101,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
             <DockAutoZone
               kept={kept}
               suggested={suggested}
+              signaling={signaling}
               onRun={runSuggestion}
               onPin={(id) => dispatch(pinAuto({ side: 'right', id }))}
               onUnpin={(id) => dispatch(unpinAuto({ side: 'right', id }))}
