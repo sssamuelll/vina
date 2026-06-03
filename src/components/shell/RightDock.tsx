@@ -7,6 +7,7 @@ import { selectWorkflowStage } from '../../store/selectors';
 import { pinAuto, unpinAuto } from '../../store/dockSlice';
 import DockShell from './DockShell';
 import DockAutoZone from './DockAutoZone';
+import ToolTooltip from './ToolTooltip';
 import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
 
 interface RightDockProps {
@@ -55,44 +56,48 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
   return (
     <>
       <DockShell side="right" domainLabel="3D">
-        <button
-          type="button"
-          className="dock__tool"
-          onClick={() => dispatch(setViewMode3D('arrange'))}
-          title="Arrange"
-          aria-label="Arrange"
-        >
-          <Shirt size={16} />
-        </button>
-        <button
-          type="button"
-          className={`dock__tool ${sewActive ? 'dock__tool--active' : ''}`}
-          onClick={toggleSew}
-          title={sewActive ? 'Sewing… · click to exit' : 'Sew · click two 3D edges'}
-          aria-label="Sew"
-          aria-pressed={sewActive}
-        >
-          <Spline size={16} />
-        </button>
-        <button
-          type="button"
-          className={`dock__tool ${simActive ? 'dock__tool--active' : ''}`}
-          onClick={() => { if (simActive) dispatch(pauseSimulation()); else dispatch(startSimulation()); }}
-          title={simActive ? 'Pause · Space' : 'Simulate · Space'}
-          aria-label="Simulate"
-          aria-pressed={simActive}
-        >
-          <SimIcon size={16} />
-        </button>
-        <button
-          type="button"
-          className="dock__tool"
-          onClick={() => onOpenPanel('Avatar')}
-          title="Avatar"
-          aria-label="Avatar"
-        >
-          <PersonStanding size={16} />
-        </button>
+        <ToolTooltip name="Arrange" position="left">
+          <button
+            type="button"
+            className="dock__tool"
+            onClick={() => dispatch(setViewMode3D('arrange'))}
+            aria-label="Arrange"
+          >
+            <Shirt size={16} />
+          </button>
+        </ToolTooltip>
+        <ToolTooltip name="Sew" position="left">
+          <button
+            type="button"
+            className={`dock__tool ${sewActive ? 'dock__tool--active' : ''}`}
+            onClick={toggleSew}
+            aria-label="Sew"
+            aria-pressed={sewActive}
+          >
+            <Spline size={16} />
+          </button>
+        </ToolTooltip>
+        <ToolTooltip name="Simulate" shortcut="space" position="left">
+          <button
+            type="button"
+            className={`dock__tool ${simActive ? 'dock__tool--active' : ''}`}
+            onClick={() => { if (simActive) dispatch(pauseSimulation()); else dispatch(startSimulation()); }}
+            aria-label="Simulate"
+            aria-pressed={simActive}
+          >
+            <SimIcon size={16} />
+          </button>
+        </ToolTooltip>
+        <ToolTooltip name="Avatar" position="left">
+          <button
+            type="button"
+            className="dock__tool"
+            onClick={() => onOpenPanel('Avatar')}
+            aria-label="Avatar"
+          >
+            <PersonStanding size={16} />
+          </button>
+        </ToolTooltip>
         {(() => {
           const keptIds = pinnedExtra.right;
           const kept = keptIds.map(getAutoItemById).filter((x): x is DockSuggestion => x !== undefined);
@@ -102,6 +107,7 @@ export default function RightDock({ onOpenPanel }: RightDockProps) {
               kept={kept}
               suggested={suggested}
               signaling={signaling}
+              side="right"
               onRun={runSuggestion}
               onPin={(id) => dispatch(pinAuto({ side: 'right', id }))}
               onUnpin={(id) => dispatch(unpinAuto({ side: 'right', id }))}

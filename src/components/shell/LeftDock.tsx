@@ -44,6 +44,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
             kept={kept}
             suggested={suggested}
             signaling={signaling}
+            side="left"
             onRun={runSuggestion}
             onPin={(id) => dispatch(pinAuto({ side: 'left', id }))}
             onUnpin={(id) => dispatch(unpinAuto({ side: 'left', id }))}

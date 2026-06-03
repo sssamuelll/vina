@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import DockShell from './DockShell';
+import ToolTooltip from './ToolTooltip';
 import type { DockToolDef } from './dock2dTools';
 import './Dock.css';
 
@@ -26,17 +27,17 @@ export default function Dock({ domainLabel, tools, activeToolId, onSelectTool, a
         const Icon = tool.icon;
         const active = tool.id === activeToolId;
         return (
-          <button
-            key={tool.id}
-            type="button"
-            className={`dock__tool ${active ? 'dock__tool--active' : ''}`}
-            onClick={() => onSelectTool(tool.id)}
-            title={`${tool.label} · ${tool.shortcut}`}
-            aria-label={`${tool.label} · ${tool.shortcut}`}
-            aria-pressed={active}
-          >
-            <Icon size={16} />
-          </button>
+          <ToolTooltip key={tool.id} name={tool.label} shortcut={tool.shortcut} position="right">
+            <button
+              type="button"
+              className={`dock__tool ${active ? 'dock__tool--active' : ''}`}
+              onClick={() => onSelectTool(tool.id)}
+              aria-label={`${tool.label} · ${tool.shortcut}`}
+              aria-pressed={active}
+            >
+              <Icon size={16} />
+            </button>
+          </ToolTooltip>
         );
       })}
       {autoZone}

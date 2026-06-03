@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import DockAutoZone from '../DockAutoZone';
 import { Scaling, Package } from 'lucide-react';
 
@@ -14,7 +14,7 @@ const BOM = { id: 'bom', icon: Package, label: 'BOM' };
 function setup(props: Partial<Parameters<typeof DockAutoZone>[0]> = {}) {
   const onRun = vi.fn(), onPin = vi.fn(), onUnpin = vi.fn();
   const { container } = render(
-    <DockAutoZone kept={[]} suggested={[]} signaling="subtle" onRun={onRun} onPin={onPin} onUnpin={onUnpin} {...props} />,
+    <DockAutoZone kept={[]} suggested={[]} signaling="subtle" side="left" onRun={onRun} onPin={onPin} onUnpin={onUnpin} {...props} />,
   );
   return { onRun, onPin, onUnpin, container };
 }
@@ -82,5 +82,29 @@ describe('DockAutoZone', () => {
   it('off + no kept renders nothing', () => {
     const { container } = setup({ kept: [], suggested: [GRADE], signaling: 'off' });
     expect(container.querySelector('.dock__tool-wrap')).toBeNull();
+  });
+
+  it('kept item tooltip shows the pinned why-here line in the pin tone', () => {
+    vi.useFakeTimers();
+    const { container } = setup({ kept: [BOM], side: 'left' });
+    fireEvent.mouseEnter(container.querySelector('.tool-tooltip-wrapper')!);
+    act(() => { vi.advanceTimersByTime(500); });
+    const desc = document.querySelector('.tool-tooltip-desc')!;
+    expect(desc.textContent).toBe('you pinned this');
+    expect(desc.classList.contains('tool-tooltip-desc--pin')).toBe(true);
+    expect(document.querySelector('.tool-tooltip')!.classList.contains('tooltip-right')).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('auto item tooltip shows the stage why-here line in the auto tone, left-positioned on the right dock', () => {
+    vi.useFakeTimers();
+    const { container } = setup({ suggested: [GRADE], side: 'right' });
+    fireEvent.mouseEnter(container.querySelector('.tool-tooltip-wrapper')!);
+    act(() => { vi.advanceTimersByTime(500); });
+    const desc = document.querySelector('.tool-tooltip-desc')!;
+    expect(desc.textContent).toBe('suggested for this stage · click ✦ to keep');
+    expect(desc.classList.contains('tool-tooltip-desc--auto')).toBe(true);
+    expect(document.querySelector('.tool-tooltip')!.classList.contains('tooltip-left')).toBe(true);
+    vi.useRealTimers();
   });
 });

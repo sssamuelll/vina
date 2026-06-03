@@ -41,6 +41,19 @@ describe('Dock (presentational)', () => {
     const penBtn = screen.getByRole('button', { name: /pen · h/i });
     expect(penBtn.className).toContain('dock__tool--active');
   });
+
+  it('keeps the accessible name and shows a right-positioned tooltip on hover', () => {
+    vi.useFakeTimers();
+    const { container } = render(<Dock domainLabel="2D" tools={TOOLS} activeToolId="select" onSelectTool={() => {}} />);
+    expect(screen.getByRole('button', { name: /select · z/i })).toBeTruthy();
+    fireEvent.mouseEnter(container.querySelectorAll('.tool-tooltip-wrapper')[0]);
+    act(() => { vi.advanceTimersByTime(500); });
+    const tip = document.querySelector('.tool-tooltip');
+    expect(tip).toBeTruthy();
+    expect(tip!.classList.contains('tooltip-right')).toBe(true);
+    expect(tip!.querySelector('.tool-tooltip-name')!.textContent).toBe('Select');
+    vi.useRealTimers();
+  });
 });
 
 function renderLeftDock(onOpenPanel = vi.fn()) {
