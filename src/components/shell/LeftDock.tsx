@@ -5,11 +5,11 @@ import { store, type RootState } from '../../store';
 import { activate2DTool } from '../../store/toolActivation';
 import { selectWorkflowStage } from '../../store/selectors';
 import { runUiExport } from '../../utils/export/uiExport';
-import { pinAuto, unpinAuto, addDockTool, removeDockTool, resetDockTools } from '../../store/dockSlice';
+import { pinAuto, unpinAuto, addDockTool, removeDockTool, resetDockTools, reorderDockTool } from '../../store/dockSlice';
 import Dock from './Dock';
 import DockAutoZone from './DockAutoZone';
 import DockToolPicker from './DockToolPicker';
-import { DOCK_2D_CATALOG } from './dock2dTools';
+import { DOCK_2D_CATALOG, getDockToolById, type DockToolDef } from './dock2dTools';
 import { getDockSuggestions, getAutoItemById, type DockSuggestion } from './dockSuggestions';
 
 interface LeftDockProps {
@@ -42,7 +42,9 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
 
   if (viewMode === '3d') return null;
 
-  const tools = DOCK_2D_CATALOG.filter((t) => tools2d.includes(t.id));
+  const tools = tools2d
+    .map(getDockToolById)
+    .filter((t): t is DockToolDef => t !== undefined);
 
   const runSuggestion = (id: string) => {
     if (id === 'grade') onOpenPanel('Grading');
@@ -59,6 +61,7 @@ export default function LeftDock({ onOpenPanel }: LeftDockProps) {
       tools={tools}
       activeToolId={activeTool}
       onSelectTool={(id) => activate2DTool(dispatch, id)}
+      onReorderTool={(fromId, toId) => dispatch(reorderDockTool({ fromId, toId }))}
       autoZone={
         <DockAutoZone
           kept={kept}
