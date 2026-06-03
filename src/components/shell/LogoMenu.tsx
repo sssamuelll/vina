@@ -7,6 +7,7 @@ import {
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
 import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
+import { toggleDockSignaling } from '../../store/dockSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
@@ -71,6 +72,8 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Grainlines', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piece Names', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Sewing Lines', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
+  { separator: true, label: '' },
+  { label: 'Dock Suggestions', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
   { separator: true, label: '' },
   { label: 'Ruler: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
   { label: 'Ruler: inches', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
