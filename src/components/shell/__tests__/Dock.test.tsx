@@ -191,6 +191,16 @@ describe('LeftDock (container)', () => {
     expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
   });
 
+  it('the ＋ picker closes on a click outside the dock editor', () => {
+    renderLeftDock();
+    fireEvent.click(screen.getByRole('button', { name: 'Customize dock tools' }));
+    expect(screen.getByRole('group', { name: 'Customize dock tools' })).toBeTruthy();
+    // mousedown outside the editorRef wrapper closes the picker (the trigger is
+    // inside the ref, so opening it never self-closes — this guards that seam).
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole('group', { name: 'Customize dock tools' })).toBeNull();
+  });
+
   it('renders tools in tools2d order; reordering moves the tool in the DOM', () => {
     const { store } = renderLeftDock();
     const select1 = screen.getByRole('button', { name: /select · z/i });
