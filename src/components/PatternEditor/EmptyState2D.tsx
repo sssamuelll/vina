@@ -8,6 +8,7 @@ import './EmptyState2D.css';
  * the idle Select tool with no pieces — picking any drawing tool (pen / rect /
  * polyPen / …) clears the canvas for that tool instead of keeping the overlay.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function shouldShowEmptyState(pieceCount: number, activeTool: Tool2D): boolean {
   return pieceCount === 0 && activeTool === 'select';
 }
@@ -57,7 +58,12 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
           Dibujar desde cero <span className="empty-state-2d__kbd">(P)</span>
         </button>
 
-        <p className="empty-state-2d__ai-hint">
+        <button
+          type="button"
+          className="empty-state-2d__ai-hint"
+          onClick={() => window.dispatchEvent(new CustomEvent('openclo:focusChat'))}
+          aria-label="Describe tu patrón a la IA"
+        >
           o descríbelo a la <span className="empty-state-2d__ai-word">IA</span>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none"
             stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"
@@ -65,7 +71,7 @@ export default function EmptyState2D({ onImportDXF }: EmptyState2DProps) {
             <line x1="12" y1="5" x2="12" y2="19" />
             <polyline points="19 12 12 19 5 12" />
           </svg>
-        </p>
+        </button>
       </div>
     </div>
   );

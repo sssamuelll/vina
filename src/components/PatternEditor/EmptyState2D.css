@@ -94,13 +94,27 @@
 }
 
 .empty-state-2d__ai-hint {
+  pointer-events: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
   margin: 6px 0 0;
+  padding: 0;
   font-family: var(--font-mono-2d);
   font-size: 11px;
   color: var(--ink-on-light-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.empty-state-2d__ai-hint:hover {
+  color: var(--ai-2d);
+}
+
+.empty-state-2d__ai-hint:focus-visible {
+  outline: 2px solid var(--accent-2d);
+  outline-offset: 2px;
 }
 
 .empty-state-2d__ai-word {

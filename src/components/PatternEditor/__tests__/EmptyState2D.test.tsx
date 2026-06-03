@@ -68,4 +68,13 @@ describe('EmptyState2D', () => {
     const btn = screen.getByRole('button', { name: /importar dxf/i }) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
   });
+
+  it('dispatches openclo:focusChat when the AI hint is clicked', () => {
+    const spy = vi.fn();
+    window.addEventListener('openclo:focusChat', spy);
+    renderWithStore({ onImportDXF: () => {} });
+    fireEvent.click(screen.getByRole('button', { name: /describe tu patrón a la ia/i }));
+    expect(spy).toHaveBeenCalledTimes(1);
+    window.removeEventListener('openclo:focusChat', spy);
+  });
 });
