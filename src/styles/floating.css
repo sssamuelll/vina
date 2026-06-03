@@ -27,6 +27,12 @@
   z-index: 25;
   animation: slide-down var(--transition-normal) ease-out;
 }
+/* Right-routed panels (default, e.g. Avatar/BOM). Explicit so the base rule's
+   anchor can be refactored without silently breaking right placement. */
+.context-panel--right {
+  right: var(--sp-3);
+  left: auto;
+}
 /* Left-routed panels (2D-domain, e.g. Grading) anchor past the left 2D dock. */
 .context-panel--left {
   left: calc(14px + 52px + 12px); /* dock at left:14px, ~52px wide, + 12px gap */
