@@ -325,6 +325,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
     },
     dock: {
       pinnedExtra: { left: [], right: [] },
+      signaling: 'subtle' as const,
     },
   };
 

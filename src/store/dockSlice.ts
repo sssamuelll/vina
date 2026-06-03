@@ -7,6 +7,9 @@ type DockSide = 'left' | 'right';
 export interface DockState {
   /** Auto-suggestion ids the user kept (shown always, with a 📌 badge). */
   pinnedExtra: { left: string[]; right: string[] };
+  /** Auto-signaling preference. 'off' mutes ✦ suggestions + badges + the "auto"
+   *  label; kept items still render as plain buttons. Default 'subtle'. */
+  signaling: 'subtle' | 'off';
 }
 
 const STORAGE_KEY = 'openclo-docks';
@@ -22,15 +25,20 @@ const idString = z
   .refine((s) => !s.includes('\0'), { message: 'contains null byte' });
 const sideArray = z.array(idString).max(MAX_PINNED);
 
+const signalingSchema = z.enum(['subtle', 'off']).default('subtle');
+
 const DockStateSchema = z
-  .object({ pinnedExtra: z.object({ left: sideArray, right: sideArray }).strict() })
+  .object({
+    pinnedExtra: z.object({ left: sideArray, right: sideArray }).strict(),
+    signaling: signalingSchema,
+  })
   .strict();
 
 const PersistedEnvelopeSchema = z
   .object({ version: z.literal(STORAGE_VERSION), data: DockStateSchema })
   .strict();
 
-const initialState: DockState = { pinnedExtra: { left: [], right: [] } };
+const initialState: DockState = { pinnedExtra: { left: [], right: [] }, signaling: 'subtle' };
 
 /** Persist the kept-dock set to its own LS key (small per-user UI preference;
  *  LS-only, co-located in spirit with workflowSlice prefs — not project data). */
@@ -72,12 +80,16 @@ const dockSlice = createSlice({
       const { side, id } = action.payload;
       state.pinnedExtra[side] = state.pinnedExtra[side].filter((x) => x !== id);
     },
+    toggleDockSignaling(state) {
+      state.signaling = state.signaling === 'subtle' ? 'off' : 'subtle';
+    },
     rehydrateDocks(state, action: PayloadAction<DockState>) {
       state.pinnedExtra = action.payload.pinnedExtra;
+      state.signaling = action.payload.signaling;
     },
   },
   // No new-project handler: the kept set is a user preference and persists across projects.
 });
 
-export const { pinAuto, unpinAuto, rehydrateDocks } = dockSlice.actions;
+export const { pinAuto, unpinAuto, rehydrateDocks, toggleDockSignaling } = dockSlice.actions;
 export default dockSlice.reducer;
