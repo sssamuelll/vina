@@ -13,8 +13,10 @@ const BOM = { id: 'bom', icon: Package, label: 'BOM' };
 
 function setup(props: Partial<Parameters<typeof DockAutoZone>[0]> = {}) {
   const onRun = vi.fn(), onPin = vi.fn(), onUnpin = vi.fn();
-  render(<DockAutoZone kept={[]} suggested={[]} onRun={onRun} onPin={onPin} onUnpin={onUnpin} {...props} />);
-  return { onRun, onPin, onUnpin };
+  const { container } = render(
+    <DockAutoZone kept={[]} suggested={[]} signaling="subtle" onRun={onRun} onPin={onPin} onUnpin={onUnpin} {...props} />,
+  );
+  return { onRun, onPin, onUnpin, container };
 }
 
 describe('DockAutoZone', () => {
@@ -55,5 +57,30 @@ describe('DockAutoZone', () => {
     const { onRun } = setup({ suggested: [GRADE] });
     fireEvent.click(screen.getByRole('button', { name: 'Grade' }));
     expect(onRun).toHaveBeenCalledWith('grade');
+  });
+
+  it('off: kept items render as plain buttons with no badge', () => {
+    const { container } = setup({ kept: [BOM], signaling: 'off' });
+    expect(screen.getByRole('button', { name: 'BOM' })).toBeTruthy();
+    expect(container.querySelector('.dock__badge')).toBeNull();
+    expect(screen.queryByText('auto')).toBeNull();
+  });
+
+  it('off: the kept icon still calls onRun', () => {
+    const { onRun } = setup({ kept: [BOM], signaling: 'off' });
+    fireEvent.click(screen.getByRole('button', { name: 'BOM' }));
+    expect(onRun).toHaveBeenCalledWith('bom');
+  });
+
+  it('off: no suggestions rise even when suggested is non-empty', () => {
+    const { container } = setup({ suggested: [GRADE], signaling: 'off' });
+    expect(screen.queryByText('auto')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Grade' })).toBeNull();
+    expect(container.querySelector('.dock__tool')).toBeNull();
+  });
+
+  it('off + no kept renders nothing', () => {
+    const { container } = setup({ kept: [], suggested: [GRADE], signaling: 'off' });
+    expect(container.querySelector('.dock__tool-wrap')).toBeNull();
   });
 });

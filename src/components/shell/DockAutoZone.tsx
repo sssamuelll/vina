@@ -2,10 +2,12 @@ import { Pin, Sparkles } from 'lucide-react';
 import type { DockSuggestion } from './dockSuggestions';
 
 interface DockAutoZoneProps {
-  /** Kept items — shown always, with an unpin (📌) badge. */
+  /** Kept items — shown always. With a 📌 unpin badge in 'subtle'; plain in 'off'. */
   kept: DockSuggestion[];
-  /** Stage suggestions (minus the kept), with a keep (✦) badge. */
+  /** Stage suggestions (minus the kept), with a keep (✦) badge. Hidden in 'off'. */
   suggested: DockSuggestion[];
+  /** Auto-signaling preference. 'off' mutes badges + the "auto" label + suggestions. */
+  signaling: 'subtle' | 'off';
   onRun: (id: string) => void;
   onPin: (id: string) => void;
   onUnpin: (id: string) => void;
@@ -16,12 +18,15 @@ interface DockAutoZoneProps {
  * joined the pinned area), then — if any — a separator + "auto" label + the
  * stage suggestions (✦). Each item is an icon button (runs the action) plus a
  * corner badge sub-button (keeps/drops; stopPropagation so it never runs the
- * action). Renders nothing when both lists are empty.
+ * action). When signaling is 'off' the layer is muted: kept items render as
+ * plain icon buttons (no badge) and no suggestions rise. Renders nothing when
+ * there is nothing to show.
  */
-export default function DockAutoZone({ kept, suggested, onRun, onPin, onUnpin }: DockAutoZoneProps) {
-  if (kept.length === 0 && suggested.length === 0) return null;
+export default function DockAutoZone({ kept, suggested, signaling, onRun, onPin, onUnpin }: DockAutoZoneProps) {
+  const off = signaling === 'off';
+  if (kept.length === 0 && (off || suggested.length === 0)) return null;
 
-  const renderItem = (s: DockSuggestion, variant: 'kept' | 'suggested') => {
+  const renderItem = (s: DockSuggestion, variant: 'kept' | 'suggested', withBadge: boolean) => {
     const Icon = s.icon;
     const BadgeIcon = variant === 'kept' ? Pin : Sparkles;
     return (
@@ -35,26 +40,28 @@ export default function DockAutoZone({ kept, suggested, onRun, onPin, onUnpin }:
         >
           <Icon size={16} />
         </button>
-        <button
-          type="button"
-          className={`dock__badge ${variant === 'kept' ? 'dock__badge--pin' : 'dock__badge--auto'}`}
-          onClick={(e) => { e.stopPropagation(); (variant === 'kept' ? onUnpin : onPin)(s.id); }}
-          aria-label={`${variant === 'kept' ? 'Unpin' : 'Keep'} ${s.label}`}
-        >
-          <BadgeIcon size={9} />
-        </button>
+        {withBadge && (
+          <button
+            type="button"
+            className={`dock__badge ${variant === 'kept' ? 'dock__badge--pin' : 'dock__badge--auto'}`}
+            onClick={(e) => { e.stopPropagation(); (variant === 'kept' ? onUnpin : onPin)(s.id); }}
+            aria-label={`${variant === 'kept' ? 'Unpin' : 'Keep'} ${s.label}`}
+          >
+            <BadgeIcon size={9} />
+          </button>
+        )}
       </div>
     );
   };
 
   return (
     <>
-      {kept.map((s) => renderItem(s, 'kept'))}
-      {suggested.length > 0 && (
+      {kept.map((s) => renderItem(s, 'kept', !off))}
+      {!off && suggested.length > 0 && (
         <>
           <div className="dock__sep" />
           <div className="dock__auto-label">auto</div>
-          {suggested.map((s) => renderItem(s, 'suggested'))}
+          {suggested.map((s) => renderItem(s, 'suggested', true))}
         </>
       )}
     </>
