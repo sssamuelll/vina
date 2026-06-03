@@ -108,9 +108,19 @@ const dockSlice = createSlice({
     resetDockTools(state) {
       state.tools2d = [...DEFAULT_DOCK_2D_IDS];
     },
+    reorderDockTool(state, action: PayloadAction<{ fromId: string; toId: string }>) {
+      const { fromId, toId } = action.payload;
+      if (fromId === toId) return;
+      const from = state.tools2d.indexOf(fromId);
+      const to = state.tools2d.indexOf(toId);
+      if (from === -1 || to === -1) return; // unknown id → no-op
+      state.tools2d.splice(from, 1);
+      const insertAt = state.tools2d.indexOf(toId); // recompute after removal
+      state.tools2d.splice(insertAt, 0, fromId);
+    },
   },
   // No new-project handler: the kept set is a user preference and persists across projects.
 });
 
-export const { pinAuto, unpinAuto, rehydrateDocks, toggleDockSignaling, addDockTool, removeDockTool, resetDockTools } = dockSlice.actions;
+export const { pinAuto, unpinAuto, rehydrateDocks, toggleDockSignaling, addDockTool, removeDockTool, resetDockTools, reorderDockTool } = dockSlice.actions;
 export default dockSlice.reducer;

@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import dockReducer, { pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling, rehydrateDocks, addDockTool, removeDockTool, resetDockTools, DEFAULT_DOCK_2D_IDS } from '../dockSlice';
+import dockReducer, { pinAuto, unpinAuto, persistDocks, loadDocks, toggleDockSignaling, rehydrateDocks, addDockTool, removeDockTool, resetDockTools, reorderDockTool, DEFAULT_DOCK_2D_IDS } from '../dockSlice';
 
 const initial = () => dockReducer(undefined, { type: '@@INIT' });
 
@@ -134,5 +134,34 @@ describe('dockSlice tools2d', () => {
     const added = dockReducer(initial(), addDockTool('notch'));
     const after = dockReducer(added, { type: 'global/newProject' });
     expect(after.tools2d).toContain('notch');
+  });
+});
+
+describe('dockSlice reorderDockTool', () => {
+  const seed = (ids: string[]) => dockReducer(initial(), rehydrateDocks({ pinnedExtra: { left: [], right: [] }, signaling: 'subtle', tools2d: ids }));
+
+  it('up-move: dragging a lower tool onto a higher one lands it before the target', () => {
+    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'line', toId: 'select' }));
+    expect(s.tools2d).toEqual(['line', 'select', 'pen']);
+  });
+
+  it('down-move: dragging a higher tool onto a lower one lands it immediately before the target', () => {
+    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'select', toId: 'line' }));
+    expect(s.tools2d).toEqual(['pen', 'select', 'line']);
+  });
+
+  it('fromId === toId is a no-op', () => {
+    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'pen', toId: 'pen' }));
+    expect(s.tools2d).toEqual(['select', 'pen', 'line']);
+  });
+
+  it('an absent id is a no-op', () => {
+    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'zzz', toId: 'select' }));
+    expect(s.tools2d).toEqual(['select', 'pen', 'line']);
+  });
+
+  it('preserves length', () => {
+    const s = dockReducer(seed(['select', 'pen', 'line']), reorderDockTool({ fromId: 'pen', toId: 'select' }));
+    expect(s.tools2d).toHaveLength(3);
   });
 });
