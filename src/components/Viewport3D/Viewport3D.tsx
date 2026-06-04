@@ -32,6 +32,7 @@ import { downloadGLTF } from '../../utils/export/gltfExporter';
 import { downloadUSDZ } from '../../utils/export/usdzExporter';
 import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
+import PanCrosshair from './PanCrosshair';
 import SimModeToggle from './SimModeToggle';
 import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
@@ -221,6 +222,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // pan that kept the target locked on the avatar; decision 2026-06-04).
   const panState = useRef<{ active: boolean; lastX: number; lastY: number; drag: number }>({ active: false, lastX: 0, lastY: 0, drag: 0 });
   const lastPanClickRef = useRef<PanClick | null>(null);
+  const crosshairRef = useRef<HTMLDivElement>(null);
 
   const onPanPointerDown = useCallback((e: React.PointerEvent) => {
     if (!isPanGesture(e)) return;
@@ -242,6 +244,8 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
     e.currentTarget.setPointerCapture(e.pointerId);
     panState.current = { active: true, lastX: e.clientX, lastY: e.clientY, drag: 0 };
+    // Show the focus crosshair while the pan button is held (target = viewport center)
+    if (crosshairRef.current) crosshairRef.current.style.display = 'block';
   }, [playbackState]);
 
   const onPanPointerMove = useCallback((e: React.PointerEvent) => {
@@ -278,6 +282,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     if (!panState.current.active || !isPanRelease(e.button)) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     panState.current.active = false;
+    if (crosshairRef.current) crosshairRef.current.style.display = 'none';
   }, []);
 
   // Disable OrbitControls during animation playback
@@ -727,6 +732,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
       }} />
+      <PanCrosshair ref={crosshairRef} />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
         shadows={!nodeMaterialActive}
