@@ -4,6 +4,7 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, togglePieceNames, toggleSewingLines,
+  toggleReferenceImages, toggleLineLengths, setRenderMode2D,
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
 import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
@@ -72,6 +73,12 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Grainlines', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piece Names', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Sewing Lines', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
+  { label: 'Reference Images', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
+  { label: 'Line Lengths', action: (d) => d(toggleLineLengths()), checked: (s) => s.editor.showLineLengths },
+  { separator: true, label: '' },
+  { label: 'Render: Textured', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },
+  { label: 'Render: Translucent', action: (d) => d(setRenderMode2D('translucent')), checked: (s) => s.editor.renderMode2D === 'translucent' },
+  { label: 'Render: Wireframe', action: (d) => d(setRenderMode2D('wireframe')), checked: (s) => s.editor.renderMode2D === 'wireframe' },
   { separator: true, label: '' },
   { label: 'Dock Suggestions', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
   { separator: true, label: '' },
