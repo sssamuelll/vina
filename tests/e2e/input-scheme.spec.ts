@@ -108,7 +108,8 @@ test.describe('input scheme', () => {
 
     const before = await page.evaluate(() => {
       const store = (window as unknown as { __OPENCLO_STORE__?: StoreLike }).__OPENCLO_STORE__;
-      return store?.getState().editor.zoom2D;
+      if (!store) throw new Error('store not ready: zoom2D missing');
+      return store.getState().editor.zoom2D;
     });
 
     const svg = page.locator('svg.pattern-svg');
@@ -125,7 +126,7 @@ test.describe('input scheme', () => {
         });
       },
       { timeout: 5000 },
-    ).toBeGreaterThan(before ?? 0);
+    ).toBeGreaterThan(before);
   });
 
   test('explicit user choice survives reload (IDB persistence)', async ({ page }) => {
