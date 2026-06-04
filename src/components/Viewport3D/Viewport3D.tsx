@@ -19,6 +19,7 @@ import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
+import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
@@ -850,6 +851,9 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         open={collisionPanelOpen}
         onClose={() => setCollisionPanelOpen(false)}
       />
+
+      {/* Surface mode picker (spec 2026-06-04 display-toggles-resurface) */}
+      {!hideChrome && <SurfaceModePill />}
 
       {/* Status indicators */}
       {!hideChrome && (

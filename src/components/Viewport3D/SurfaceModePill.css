@@ -1,0 +1,65 @@
+.surface-pill {
+  position: absolute;
+  top: 8px;
+  right: 116px;
+  z-index: 25;
+}
+
+.surface-pill__trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #ccc;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: Inter, sans-serif;
+}
+
+.surface-pill__trigger--open {
+  background: rgba(74, 158, 255, 0.2);
+  color: #4a9eff;
+}
+
+.surface-pill__flyout {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  width: 264px;
+  background: rgba(30, 30, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 6px;
+  z-index: 30;
+}
+
+.surface-pill__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #ccc;
+  padding: 8px 4px;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: Inter, sans-serif;
+  text-align: center;
+}
+
+.surface-pill__option:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.surface-pill__option--active {
+  border-color: #4a9eff;
+  color: #4a9eff;
+}
