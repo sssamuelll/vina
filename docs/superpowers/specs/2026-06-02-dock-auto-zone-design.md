@@ -29,11 +29,10 @@ pieces.length === 0                         → 'empty'
 else simulation.simulationState === 'running' → 'simulating'
 else simulation.simulationState === 'paused'  → 'simulated'
 else seams.length > 0                        → 'sewn'
-else simulation.viewMode3D === 'arrange'      → 'arranged'
 else                                         → 'drafted'
 ```
 
-Signals: `s.project.pieces`, `s.project.seams`, `s.simulation.simulationState`, `s.simulation.viewMode3D` — all confirmed present. The exact precedence among drafted/arranged/sewn/simulating is forgiving because `grade` is suggested across all of them.
+Signals: `s.project.pieces`, `s.project.seams`, `s.simulation.simulationState` — all confirmed present. **`'arranged'` is kept in the `WorkflowStage` vocabulary (handoff term, for later slices) but is NOT derived in 3a**: `simulation.viewMode3D` defaults to `'arrange'`, so it is not a meaningful "user arranged" signal (it would make every pieces-present idle pattern read as `arranged` and `drafted` nearly unreachable). 3a derives five stages; the drafted/sewn/simulating distinction is forgiving because `grade` is suggested across all three.
 
 ## 4. The suggestion map (wired-only)
 
@@ -43,10 +42,10 @@ Signals: `s.project.pieces`, `s.project.seams`, `s.simulation.simulationState`, 
 |---|---|---|
 | empty | — | — |
 | drafted | `grade` | — |
-| arranged | `grade` | — |
 | sewn | `grade` | `fitmap` |
 | simulating | `grade` | — |
-| simulated | `grade`, `export` | `bom` |
+| simulated | `export` | `bom` |
+| arranged (not derived in 3a) | `grade` | — |
 
 Wired actions (run by the container, which holds the deps):
 
@@ -75,9 +74,9 @@ The auto ✦ buttons reuse `.dock__tool` (sizing/hover) with the `--auto` violet
 
 ## 6. Acceptance criteria
 
-1. `selectWorkflowStage` returns the correct stage for each signal combination (the 6-case precedence in §3).
-2. `getDockSuggestions(stage, side)` returns the wired-only map in §4 (e.g. `('sewn','right') === [fitmap]`, `('empty','left') === []`).
-3. The left dock shows a violet ✦ `grade` button in drafted/arranged/sewn/simulating, and `grade`+`export` in simulated; the right dock shows `fitmap` in sewn and `bom` in simulated.
+1. `selectWorkflowStage` returns the correct stage for each signal combination (the 5-case precedence in §3; `arranged` is not derived in 3a).
+2. `getDockSuggestions(stage, side)` returns the wired-only map in §4 (e.g. `('sewn','right') === [fitmap]`, `('empty','left') === []`, `('simulated','left') === [export]`).
+3. The left dock shows a violet ✦ `grade` button in drafted/sewn/simulating and `export` in simulated; the right dock shows `fitmap` in sewn and `bom` in simulated.
 4. Clicking ✦ `grade`/`bom` opens the respective panel; ✦ `export` downloads a DXF; ✦ `fitmap` sets the fit-map mode.
 5. When a stage/side has no suggestions, the auto zone (separator + label) does not render.
 6. ✦ buttons are visually distinct (violet `--dock-auto`) from the blue/ink pinned tools; `aria-label` present; no emoji.
