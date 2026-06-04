@@ -8,6 +8,7 @@ import { showSuccessToast, showErrorToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, piecesLabel } from './dxfImport';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useSchemeHeuristic } from '../../input/useSchemeHeuristic';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
 import LeftDock from './LeftDock';
@@ -72,6 +73,9 @@ export default function AppShell() {
   const [dxfDragActive, setDxfDragActive] = useState(false);
   const dxfDragCounter = useRef(0);
   const dxfInputRef = useRef<HTMLInputElement>(null);
+
+  // One-shot passive trackpad heuristic (ctrlKey+wheel → auto-detects trackpad).
+  useSchemeHeuristic();
 
   // Register all keyboard shortcut handlers (file/edit/tools/sim/etc).
   // Without this, every shortcut in src/shortcuts/defaults.ts is a no-op.
