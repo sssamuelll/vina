@@ -21,6 +21,7 @@ import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
 import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
+import { isPanGesture, isPanRelease, cameraViewFromKeyEvent } from './inputBindings';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
@@ -203,12 +204,13 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     }
   }, []);
 
-  // Custom pan: middle-click drag translates camera only, keeping orbit target
-  // locked on the avatar so right-click orbit always rotates around the avatar.
+  // Custom pan: middle-click drag (mouse) or Alt/Option+left-drag (trackpad —
+  // MacBooks have no middle button) translates camera only, keeping orbit
+  // target locked on the avatar so right-click orbit always rotates around it.
   const panState = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
 
   const onPanPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 1) return; // middle click only
+    if (!isPanGesture(e)) return;
     if (playbackState === 'playing') return;
     e.currentTarget.setPointerCapture(e.pointerId);
     panState.current = { active: true, lastX: e.clientX, lastY: e.clientY };
@@ -240,7 +242,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   }, []);
 
   const onPanPointerUp = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 1) return;
+    if (!panState.current.active || !isPanRelease(e.button)) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     panState.current.active = false;
   }, []);
@@ -518,15 +520,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         console.log('[Pin Tool] Cleared all pins');
       }
 
-      // ─── Numpad Camera Presets (CLO3D-standard) ───
-      if (e.code === 'Numpad2') { e.preventDefault(); cameraPresets.setCameraView('front'); }
-      if (e.code === 'Numpad8') { e.preventDefault(); cameraPresets.setCameraView('back'); }
-      if (e.code === 'Numpad4') { e.preventDefault(); cameraPresets.setCameraView('right'); }
-      if (e.code === 'Numpad6') { e.preventDefault(); cameraPresets.setCameraView('left'); }
-      if (e.code === 'Numpad5') { e.preventDefault(); cameraPresets.setCameraView('top'); }
-      if (e.code === 'Numpad0') { e.preventDefault(); cameraPresets.setCameraView('bottom'); }
-      if (e.code === 'Numpad1') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterRight'); }
-      if (e.code === 'Numpad3') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterLeft'); }
+      // ─── Camera Presets (CLO3D-standard) — numpad or top-row digits ───
+      // Top-row support: MacBooks have no numpad (the ShortcutRegistry
+      // defaults already declared '2'/'8'/… — this makes them real).
+      const presetView = cameraViewFromKeyEvent(e);
+      if (presetView) { e.preventDefault(); cameraPresets.setCameraView(presetView); }
 
       // I — Toggle IK mode (when pose editor is open)
       if ((e.key === 'I' || e.key === 'i') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -866,7 +864,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       )}
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — middle-click to orbit
+          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — right-drag orbit · middle/⌥-drag pan
         </div>
       )}
 
