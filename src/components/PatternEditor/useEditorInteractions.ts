@@ -4,6 +4,8 @@ import { RootState } from '../../store';
 import { selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectInternalLine, setZoom2D, setPan2D } from '../../store/editorSlice';
 import { movePiece, updateInternalLine, removeInternalLine } from '../../store/projectSlice';
 import { PatternPiece, Point2D, Tool2D, PathCommand, InternalLine } from '../../types/types';
+import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
+import { zoomAtPoint } from '../../input/zoom2d';
 
 /** Compute bounding box center (duplicated from PieceRenderer for drag transform). */
 function getOutlineCenterForDrag(outline: PathCommand[]): { cx: number; cy: number } {
@@ -314,37 +316,72 @@ export function useEditorInteractions(
     return () => window.removeEventListener('keydown', handler);
   }, [activeTool, pen.handleKeyDown, lineTool.handleKeyDown, seamTool.handleKeyDown, measureTool.handleKeyDown, transformTool.handleKeyDown, nodeEditor.isEditing, nodeEditor.handleKeyDown, editPattern.handleKeyDown, scissorsTool.handleKeyDown, slashAndSpreadTool.handleKeyDown, mergeTool.handleKeyDown, segmentSewingTool.handleKeyDown, topstitchTool.handleKeyDown, walkSeamTool.handleKeyDown, selectedInternalLine, handleInternalLineKeyDown, freeSewingTool.handleKeyDown, offsetTool.handleKeyDown, extendTrimTool.handleKeyDown, polyPenTool.handleKeyDown]);
 
-  // Register wheel handler with { passive: false } to allow preventDefault
-  // React's onWheel uses passive listeners by default in Chrome, causing
-  // "Unable to preventDefault inside passive event listener" warnings.
-  useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const handler = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? 0.9 : 1.1;
-      const currentZoom = zoomRef.current;
-      const currentPan = panRef2.current;
-      const newZoom = Math.max(0.1, Math.min(10, currentZoom * delta));
-      const rect = svg.getBoundingClientRect();
-      const cx = e.clientX - rect.left;
-      const cy = e.clientY - rect.top;
-      const scale = newZoom / currentZoom;
-      dispatch(setPan2D({
-        x: cx - scale * (cx - currentPan.x),
-        y: cy - scale * (cy - currentPan.y),
-      }));
-      dispatch(setZoom2D(newZoom));
-    };
-    svg.addEventListener('wheel', handler, { passive: false });
-    return () => svg.removeEventListener('wheel', handler);
-  }, [dispatch]);
-
   // Refs to avoid stale closures in the wheel handler
   const zoomRef = useRef(zoom2D);
   zoomRef.current = zoom2D;
   const panRef2 = useRef(pan2D);
   panRef2.current = pan2D;
+
+  const inputScheme = useSelector((s: RootState) => s.inputScheme.scheme);
+  const inputSchemeRef = useRef<InputSchemeId>(inputScheme);
+  inputSchemeRef.current = inputScheme;
+
+  // Register wheel handler with { passive: false } to allow preventDefault
+  // React's onWheel uses passive listeners by default in Chrome, causing
+  // "Unable to preventDefault inside passive event listener" warnings.
+  //
+  // rAF-coalesced (spec 2026-06-04 § Momentum): trackpad momentum emits
+  // dozens of events/s with no terminator; accumulate per frame and dispatch
+  // at most once per frame instead of per event (Halberg constraint 4).
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    let panAcc = { dx: 0, dy: 0 };
+    let zoomAcc = { factor: 1, cx: 0, cy: 0 };
+    let rafId = 0;
+
+    const flush = () => {
+      rafId = 0;
+      if (zoomAcc.factor !== 1) {
+        const next = zoomAtPoint(
+          { zoom: zoomRef.current, pan: panRef2.current },
+          zoomAcc.factor, zoomAcc.cx, zoomAcc.cy,
+        );
+        dispatch(setPan2D(next.pan));
+        dispatch(setZoom2D(next.zoom));
+        zoomAcc = { factor: 1, cx: 0, cy: 0 };
+      }
+      if (panAcc.dx !== 0 || panAcc.dy !== 0) {
+        const p = panRef2.current;
+        // natural-scroll convention: content follows fingers (deltaY>0 → view down)
+        dispatch(setPan2D({ x: p.x - panAcc.dx, y: p.y - panAcc.dy }));
+        panAcc = { dx: 0, dy: 0 };
+      }
+    };
+
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const intent = wheelIntent(e, inputSchemeRef.current, '2d');
+      if (!intent) return;
+      if (intent.kind === 'pan') {
+        panAcc.dx += intent.dx;
+        panAcc.dy += intent.dy;
+      } else if (intent.kind === 'zoom') {
+        zoomAcc.factor *= zoomFactor(intent.delta);
+        const rect = svg.getBoundingClientRect();
+        zoomAcc.cx = e.clientX - rect.left;
+        zoomAcc.cy = e.clientY - rect.top;
+      }
+      if (!rafId) rafId = requestAnimationFrame(flush);
+    };
+
+    svg.addEventListener('wheel', handler, { passive: false });
+    return () => {
+      svg.removeEventListener('wheel', handler);
+      if (rafId) cancelAnimationFrame(rafId);
+      flush(); // commit any pending deltas on unmount (spec § error handling)
+    };
+  }, [dispatch]);
 
   // Keep handleWheel as a no-op for the return signature (SVG onWheel removed)
   const handleWheel = useCallback((_e: React.WheelEvent) => { /* handled by native listener */ }, []);
