@@ -15,6 +15,11 @@ describe('wheelIntent — matrix scheme × surface × modifiers', () => {
       .toEqual({ kind: 'orbit', dx: 10, dy: -4 });
   });
 
+  it('trackpad + 3d + both axes clamped at ±10', () => {
+    expect(wheelIntent({ deltaX: 30, deltaY: 50, ...plain }, 'trackpad', '3d'))
+      .toEqual({ kind: 'orbit', dx: 10, dy: 10 });
+  });
+
   it('pinch (ctrlKey) = zoom on BOTH schemes and BOTH surfaces', () => {
     for (const scheme of ['mouse', 'trackpad'] as const) {
       for (const surface of ['2d', '3d'] as const) {

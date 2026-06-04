@@ -47,5 +47,5 @@ export function wheelIntent(
     if (surface === '3d') return { kind: 'orbit', dx: clamp(rawX, GESTURE_CLAMP), dy: clamp(rawY, GESTURE_CLAMP) };
     return { kind: 'pan', dx: clamp(rawX, PAN_CLAMP), dy: clamp(rawY, PAN_CLAMP) };
   }
-  return { kind: 'zoom', delta: clamp(rawY, GESTURE_CLAMP) };
+  return { kind: 'zoom', delta: clamp(rawY, GESTURE_CLAMP) }; // scalar delta, clamped ±10 (spec sketch used dx/dy; intentionally scalar here)
 }
