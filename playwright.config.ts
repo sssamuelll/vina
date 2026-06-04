@@ -2,9 +2,12 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 30000,
+  // CI runners (SwiftShader software GL, 2 workers) run 3-6× slower than a dev
+  // machine — basic interactions (goto, mouse.move) blow a 30s budget under
+  // contention. Sim-heavy specs already set test.setTimeout(120s) themselves.
+  timeout: process.env.CI ? 120_000 : 30_000,
   expect: {
-    timeout: 5000,
+    timeout: process.env.CI ? 15_000 : 5_000,
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.01,
     },

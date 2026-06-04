@@ -15,6 +15,7 @@ const initialState: EditorState = {
   selectedInternalLine: null,
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
+  fitViewToken: 0,
   showSeamAllowance: true,
   defaultSeamAllowanceWidth: DEFAULT_SEAM_ALLOWANCE,
   showGrainlines: true,
@@ -103,6 +104,12 @@ const editorSlice = createSlice({
     setPan2D(state, action: PayloadAction<Point2D>) {
       state.pan2D = action.payload;
     },
+    /** Request a fit-to-content of the 2D viewport. Dispatched after a pattern
+     *  is imported; the PatternEditor performs the actual fit (it owns the
+     *  viewport size). Monotonic so each request is observed exactly once. */
+    requestFitView(state) {
+      state.fitViewToken += 1;
+    },
     toggleSeamAllowance(state) {
       state.showSeamAllowance = !state.showSeamAllowance;
     },
@@ -179,7 +186,9 @@ const editorSlice = createSlice({
     redo() {},
   },
   extraReducers: (builder) => {
-    builder.addCase(NEW_PROJECT, () => initialState);
+    // Reset the editor on a new project, but keep fitViewToken monotonic so a
+    // DXF imported right after File ▸ New still triggers a fresh fit-to-content.
+    builder.addCase(NEW_PROJECT, (state) => ({ ...initialState, fitViewToken: state.fitViewToken }));
     builder.addCase(removeReferenceImage, (state, action) => {
       if (state.selectedReferenceImageId === action.payload) {
         state.selectedReferenceImageId = null;
@@ -201,7 +210,7 @@ const editorSlice = createSlice({
 export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine,
-  setZoom2D, setPan2D,
+  setZoom2D, setPan2D, requestFitView,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
@@ -245,7 +254,7 @@ export function createPastedPieces(clipboard: { pieces: PatternPiece[] }, mirror
  * Returns null if no pieces or all pieces have no outline data.
  */
 export function computeFitView(
-  pieces: { position: Point2D; outline: { values: number[] }[] }[],
+  pieces: { position: Point2D; rotation?: number; outline: { values: number[] }[] }[],
   viewportWidth: number,
   viewportHeight: number,
   padding = 1.2,
@@ -256,10 +265,27 @@ export function computeFitView(
   let hasPoints = false;
 
   for (const piece of pieces) {
+    const rot = ((piece.rotation ?? 0) * Math.PI) / 180;
+    const cos = Math.cos(rot);
+    const sin = Math.sin(rot);
+    // Piece-local outline bbox center = the renderer's rotation pivot.
+    let lminX = Infinity, lminY = Infinity, lmaxX = -Infinity, lmaxY = -Infinity;
     for (const cmd of piece.outline) {
       for (let i = 0; i < cmd.values.length - 1; i += 2) {
-        const px = cmd.values[i] + piece.position.x;
-        const py = cmd.values[i + 1] + piece.position.y;
+        lminX = Math.min(lminX, cmd.values[i]);
+        lmaxX = Math.max(lmaxX, cmd.values[i]);
+        lminY = Math.min(lminY, cmd.values[i + 1]);
+        lmaxY = Math.max(lmaxY, cmd.values[i + 1]);
+      }
+    }
+    const cx = (lminX + lmaxX) / 2;
+    const cy = (lminY + lmaxY) / 2;
+    for (const cmd of piece.outline) {
+      for (let i = 0; i < cmd.values.length - 1; i += 2) {
+        const lx = cmd.values[i] - cx;
+        const ly = cmd.values[i + 1] - cy;
+        const px = lx * cos - ly * sin + cx + piece.position.x;
+        const py = lx * sin + ly * cos + cy + piece.position.y;
         minX = Math.min(minX, px);
         minY = Math.min(minY, py);
         maxX = Math.max(maxX, px);

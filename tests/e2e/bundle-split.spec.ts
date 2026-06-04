@@ -3,12 +3,26 @@ import { test, expect, Page } from '@playwright/test';
 /**
  * E2E tests verifying dynamic imports work after the Three.js bundle split.
  * Each test triggers a code path that loads from the deferred `three-addons` chunk.
+ *
+ * Setup retargeted (2026-06-04):
+ *  - The GLTF-export test was DELETED. The 3D export is only reachable through
+ *    the Render panel's "Export 3D" button, which is gated behind `hideChrome`
+ *    in the current shell (AppShell mounts Viewport3D with hideChrome). The
+ *    LogoMenu ▸ File ▸ "Export 3D Model" submenu items (OBJ/glTF/FBX/USDZ) are
+ *    all `() => {}` stubs, and `onExport3D` is not exposed to the page — so the
+ *    GLTFExporter chunk has no user-reachable trigger. Re-add this test when an
+ *    export affordance is surfaced (product backlog).
+ *  - The IK-chunk test now opens the Avatar panel via the RightDock
+ *    `[aria-label="Avatar"]` affordance (the old `[data-tool-id="avatar"]`
+ *    Toolbar3D button was deleted) and toggles `.ik-toggle-btn`.
+ *  - The store handle is `__OPENCLO_STORE__` (RectAreaLight test dispatches
+ *    `renderSettings/addLight`, which still exists).
  */
 
 async function waitForApp(page: Page) {
   await page.goto('/');
-  await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
-  await page.waitForTimeout(1000);
+  await page.waitForFunction(() => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__), { timeout: 15000 });
+  await expect(page.locator('[aria-label="Simulate"]').first()).toBeVisible({ timeout: 15000 });
 }
 
 async function open3DView(page: Page) {
@@ -19,85 +33,32 @@ async function open3DView(page: Page) {
 test.describe('Bundle Split — Dynamic Imports', () => {
   test.setTimeout(120_000);
 
-  test('GLTF export triggers addon chunk load without errors', async ({ page }) => {
+  test('IK solver loads CCDIKSolver from addon chunk without errors', async ({ page }) => {
     const errors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
-    });
+    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
 
     await waitForApp(page);
     await open3DView(page);
 
-    // Open render settings panel
-    const renderBtn = page.locator('button:has-text("Render")');
-    await renderBtn.click({ force: true });
+    // Open the Avatar panel via the RightDock affordance.
+    await page.locator('button[aria-label="Avatar"]').click({ force: true });
     await page.waitForTimeout(500);
+    await expect(page.locator('h3:has-text("Avatar & Pose")')).toBeVisible({ timeout: 5000 });
 
-    // Wait for Export section to be visible, expand if needed
-    const exportSection = page.locator('button:has-text("Export")');
-    if (await exportSection.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await exportSection.click({ force: true });
-      await page.waitForTimeout(300);
-    }
-
-    // Click "Export 3D" button — this triggers dynamic import of GLTFExporter
-    const export3DBtn = page.locator('button:has-text("Export 3D")');
-    if (await export3DBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      // Set up download handling (we don't need the actual file, just verify no crash)
-      const downloadPromise = page.waitForEvent('download', { timeout: 10000 }).catch(() => null);
-      await export3DBtn.click({ force: true });
-
-      // Wait a bit for dynamic import to resolve
-      await page.waitForTimeout(3000);
-
-      // Cancel/dismiss any download
-      const download = await downloadPromise;
-      if (download) await download.cancel().catch(() => {});
-    }
-
-    // No import errors should occur
-    const importErrors = errors.filter(e =>
-      e.includes('Failed to fetch dynamically imported module') ||
-      e.includes('Loading chunk') ||
-      e.includes('GLTFExporter')
-    );
-    expect(importErrors).toHaveLength(0);
-  });
-
-  test('IK solver loads CCDIKSolver from addon chunk without errors', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
-    });
-
-    await waitForApp(page);
-
-    // Switch to 3D view
-    await page.click('button:has-text("3D")');
-    await page.waitForTimeout(2000);
-
-    // Open avatar panel
-    const avatarBtn = page.locator('button[data-tool-id="avatar"]');
-    await avatarBtn.click({ force: true });
-    await page.waitForTimeout(500);
-
-    // Expand Pose section if collapsed
+    // Expand Pose section if collapsed.
     const poseHeader = page.locator('.avatar-panel button:has-text("Pose")');
     if (await poseHeader.isVisible({ timeout: 3000 }).catch(() => false)) {
       await poseHeader.click({ force: true });
       await page.waitForTimeout(300);
     }
 
-    // Enable IK mode — triggers dynamic import of CCDIKSolver
+    // Enable IK mode — triggers dynamic import of CCDIKSolver.
     const ikToggle = page.locator('.ik-toggle-btn');
     await expect(ikToggle).toBeVisible({ timeout: 5000 });
     await ikToggle.click({ force: true });
     await page.waitForTimeout(2000);
-
-    // Verify IK mode is active
     await expect(ikToggle).toHaveText('IK Mode');
 
-    // No dynamic import errors
     const importErrors = errors.filter(e =>
       e.includes('Failed to fetch dynamically imported module') ||
       e.includes('Loading chunk') ||
@@ -108,28 +69,20 @@ test.describe('Bundle Split — Dynamic Imports', () => {
 
   test('RectAreaLight renders after dynamic import of UniformsLib', async ({ page }) => {
     const errors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
-    });
+    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
 
     await waitForApp(page);
     await open3DView(page);
 
-    // Add a light via Redux store — this triggers RectLight component which
-    // dynamically imports RectAreaLightUniformsLib
+    // Add a light via the store — triggers RectLight which dynamically imports
+    // RectAreaLightUniformsLib.
     await page.evaluate(() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const store = (window as any).__OPENCLO_STORE__;
-      if (!store) return;
-      store.dispatch({
-        type: 'renderSettings/addLight',
-      });
+      const store = (window as unknown as { __OPENCLO_STORE__?: { dispatch: (a: unknown) => void } }).__OPENCLO_STORE__;
+      store?.dispatch({ type: 'renderSettings/addLight' });
     });
 
-    // Wait for dynamic import to resolve and light to render
     await page.waitForTimeout(3000);
 
-    // No errors from dynamic import or RectAreaLight rendering
     const importErrors = errors.filter(e =>
       e.includes('Failed to fetch dynamically imported module') ||
       e.includes('Loading chunk') ||
@@ -141,20 +94,14 @@ test.describe('Bundle Split — Dynamic Imports', () => {
 
   test('avatar model loads via GLTFLoader from core chunk', async ({ page }) => {
     const errors: string[] = [];
-    page.on('console', msg => {
-      if (msg.type() === 'error') errors.push(msg.text());
-    });
+    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
 
     await waitForApp(page);
     await open3DView(page);
-
-    // Wait for avatar to load (GLTFLoader is in three-core, loads immediately)
     await page.waitForTimeout(3000);
 
-    // Canvas should be visible and rendering
-    await expect(page.locator('canvas')).toBeVisible();
+    await expect(page.locator('canvas').first()).toBeVisible();
 
-    // No loading/import errors
     const importErrors = errors.filter(e =>
       e.includes('Failed to fetch dynamically imported module') ||
       e.includes('Loading chunk') ||

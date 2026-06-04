@@ -22,3 +22,26 @@ export const selectToolOptions = createSelector(
   (s: RootState) => s.tools,
   t => t.toolOptions,
 );
+
+// ─── Workflow stage ────────────────────────────────────────────────────────
+
+export type WorkflowStage = 'empty' | 'drafted' | 'arranged' | 'sewn' | 'simulating' | 'simulated';
+
+/**
+ * Derived workflow stage from existing signals (no stored stage field).
+ * `arranged` is in the vocabulary for later slices but is NOT derived here:
+ * simulation.viewMode3D defaults to 'arrange', so it is not a meaningful
+ * "user arranged" signal. 3a derives five stages.
+ */
+export const selectWorkflowStage = createSelector(
+  (s: RootState) => s.project.pieces.length,
+  (s: RootState) => s.project.seams.length,
+  (s: RootState) => s.simulation.simulationState,
+  (pieceCount, seamCount, simState): WorkflowStage => {
+    if (pieceCount === 0) return 'empty';
+    if (simState === 'running') return 'simulating';
+    if (simState === 'paused') return 'simulated';
+    if (seamCount > 0) return 'sewn';
+    return 'drafted';
+  },
+);

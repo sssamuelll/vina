@@ -4,11 +4,17 @@ import type { RootState, AppDispatch } from '../../store';
 import {
   setViewMode, undo, redo, toggleSnapToGrid, toggleSeamAllowance,
   toggleGrainlines, togglePieceNames, toggleSewingLines,
-  clearSelection, setZoom2D,
+  toggleReferenceImages, toggleLineLengths, setRenderMode2D,
+  clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
-import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
+import {
+  startSimulation, pauseSimulation, resetSimulation, setViewMode3D,
+  toggleGarment, toggleSeamlines3D, toggleInternalLines3D,
+} from '../../store/simulationSlice';
+import { toggleDockSignaling } from '../../store/dockSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
+import { runUiExport } from '../../utils/export/uiExport';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -32,8 +38,8 @@ const FILE_MENU: MenuItem[] = [
   { label: 'Import DXF...', action: () => {} }, // wired via callback (opens file picker)
   { label: 'Import Reference Image...', action: () => {} },
   { separator: true, label: '' },
-  { label: 'Export DXF', action: () => {} },
-  { label: 'Export PDF (1:1)', action: () => {} },
+  { label: 'Export DXF', action: (d) => runUiExport('dxf', store.getState().project, d) },
+  { label: 'Export PDF (1:1)', action: (d) => runUiExport('pdf', store.getState().project, d) },
   { label: 'Export Tech Pack', action: () => {} },
   { label: 'Export 3D Model', submenu: [
     { label: 'OBJ', action: () => {} },
@@ -41,7 +47,7 @@ const FILE_MENU: MenuItem[] = [
     { label: 'FBX', action: () => {} },
     { label: 'USDZ', action: () => {} },
   ]},
-  { label: 'Export BOM (CSV)', action: () => {} },
+  { label: 'Export BOM (CSV)', action: (d) => runUiExport('bom', store.getState().project, d) },
   { separator: true, label: '' },
   { label: 'Project Settings...', action: () => {} },
 ];
@@ -70,6 +76,22 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Grainlines', action: (d) => d(toggleGrainlines()), checked: (s) => s.editor.showGrainlines },
   { label: 'Piece Names', action: (d) => d(togglePieceNames()), checked: (s) => s.editor.showPieceNames },
   { label: 'Sewing Lines', action: (d) => d(toggleSewingLines()), checked: (s) => s.editor.showSewingLines },
+  { label: 'Reference Images', action: (d) => d(toggleReferenceImages()), checked: (s) => s.editor.showReferenceImages },
+  { label: 'Line Lengths', action: (d) => d(toggleLineLengths()), checked: (s) => s.editor.showLineLengths },
+  { separator: true, label: '' },
+  { label: 'Render: Textured', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },
+  { label: 'Render: Translucent', action: (d) => d(setRenderMode2D('translucent')), checked: (s) => s.editor.renderMode2D === 'translucent' },
+  { label: 'Render: Wireframe', action: (d) => d(setRenderMode2D('wireframe')), checked: (s) => s.editor.renderMode2D === 'wireframe' },
+  { separator: true, label: '' },
+  { label: '3D: Garment', action: (d) => d(toggleGarment()), checked: (s) => s.simulation.showGarment },
+  { label: '3D: Seamlines', action: (d) => d(toggleSeamlines3D()), checked: (s) => s.simulation.showSeamlines3D },
+  { label: '3D: Internal Lines', action: (d) => d(toggleInternalLines3D()), checked: (s) => s.simulation.showInternalLines3D },
+  { separator: true, label: '' },
+  { label: 'Dock Suggestions', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
+  { separator: true, label: '' },
+  { label: 'Ruler: cm', action: (d) => d(setUnits('cm')), checked: (s) => s.editor.units === 'cm' },
+  { label: 'Ruler: inches', action: (d) => d(setUnits('inches')), checked: (s) => s.editor.units === 'inches' },
+  { label: 'Ruler: mm', action: (d) => d(setUnits('mm')), checked: (s) => s.editor.units === 'mm' },
 ];
 
 const PATTERN_MENU: MenuItem[] = [

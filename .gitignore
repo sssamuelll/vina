@@ -26,7 +26,8 @@ OpenClo_Review_*.docx
 .github/*
 !.github/workflows/
 !.github/workflows/**
-.husky/
+# .husky/_ is auto-generated (self-ignored via .husky/_/.gitignore); user hooks like
+# .husky/pre-commit must stay tracked so the gate is shared. Do NOT re-ignore .husky/.
 scripts/deploy.sh
 tiny-piece.patch
 bom-e2e-test.png

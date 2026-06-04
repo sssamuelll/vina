@@ -1,0 +1,122 @@
+/* Onboarding empty-state overlay for the 2D canvas (DESIGN-NOTES P2.11).
+   Container is click-through so canvas pan / DXF drop still reach the SVG and
+   canvas-area; only the controls re-enable pointer events. */
+.empty-state-2d {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.empty-state-2d__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 320px;
+  text-align: center;
+}
+
+.empty-state-2d__heading {
+  margin: 0;
+  font-family: var(--font-ui-2d);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  color: var(--ink-on-light);
+}
+
+.empty-state-2d__primary {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-family: var(--font-mono-2d);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-on-light);
+  background: transparent;
+  border: 1.4px solid var(--ink-on-light);
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+/* Hover/focus: accent border + the +0.6px weight from DESIGN-NOTES, via an
+   inset shadow so the box does not reflow. */
+.empty-state-2d__primary:hover:not(:disabled),
+.empty-state-2d__primary:focus-visible {
+  border-color: var(--accent-2d);
+  box-shadow: inset 0 0 0 0.6px var(--accent-2d);
+  color: var(--accent-2d);
+  outline: none;
+}
+
+.empty-state-2d__primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.empty-state-2d__drop-hint {
+  margin: 0;
+  font-family: var(--font-mono-2d);
+  font-size: 11px;
+  color: var(--ink-on-light-3);
+}
+
+.empty-state-2d__secondary {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 4px 6px;
+  font-family: var(--font-mono-2d);
+  font-size: 12px;
+  color: var(--ink-on-light-2);
+  background: none;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.empty-state-2d__secondary:hover,
+.empty-state-2d__secondary:focus-visible {
+  color: var(--ink-on-light);
+  outline: none;
+}
+
+.empty-state-2d__kbd {
+  color: var(--ink-on-light-3);
+}
+
+.empty-state-2d__ai-hint {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0;
+  padding: 0;
+  font-family: var(--font-mono-2d);
+  font-size: 11px;
+  color: var(--ink-on-light-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.empty-state-2d__ai-hint:hover {
+  color: var(--ai-2d);
+}
+
+.empty-state-2d__ai-hint:focus-visible {
+  outline: 2px solid var(--accent-2d);
+  outline-offset: 2px;
+}
+
+.empty-state-2d__ai-word {
+  color: var(--ai-2d);
+}

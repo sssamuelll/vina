@@ -60,6 +60,31 @@ function computeAngle(line: InternalLine): number {
   return angle;
 }
 
+/**
+ * The `piece.rotation` (degrees, SVG `rotate()` convention) that makes the
+ * piece's grainline vertical — i.e. grain-aligns the piece. Returns 0 when the
+ * piece has no usable grainline (nothing to align to). A grainline is an
+ * undirected line, so the result is the minimal turn in (-90, 90].
+ *
+ * SVG `rotate(R)` maps a vector (x, y) → (x·cosR − y·sinR, …); zeroing the
+ * grainline's x-component gives R = atan2(dx, dy). Non-destructive: callers set
+ * `piece.rotation`, which the renderer/export/nesting/3D already honor.
+ */
+export function grainAlignmentRotation(piece: Pick<PatternPiece, 'internals'>): number {
+  const gl = piece.internals.find(l => l.type === 'grainline');
+  if (!gl) return 0;
+  const pts = samplePath(gl.path);
+  if (pts.length < 2) return 0;
+  const dx = pts[pts.length - 1].x - pts[0].x;
+  const dy = pts[pts.length - 1].y - pts[0].y;
+  if (dx === 0 && dy === 0) return 0;
+  let deg = Math.atan2(dx, dy) * 180 / Math.PI;
+  // Fold into (-90, 90] — up and down are the same grain line.
+  while (deg > 90) deg -= 180;
+  while (deg <= -90) deg += 180;
+  return Math.round(deg * 100) / 100;
+}
+
 function samplePath(path: PathCommand[]): { x: number; y: number }[] {
   const pts: { x: number; y: number }[] = [];
   let cx = 0, cy = 0;

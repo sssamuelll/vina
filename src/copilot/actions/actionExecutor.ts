@@ -37,6 +37,7 @@ import {
   clearSelection,
   setViewMode,
   selectAllPieces,
+  requestFitView,
 } from '../../store/editorSlice';
 import {
   startSimulation,
@@ -955,6 +956,7 @@ export class CopilotActionExecutor {
             this.dispatch(addPiece(piece));
           }
         }
+        this.dispatch(requestFitView()); // frame the imported pattern in the 2D canvas
 
         const names = importedPieces.map(p => p.name);
         return {

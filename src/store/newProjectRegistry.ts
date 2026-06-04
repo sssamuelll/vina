@@ -44,6 +44,7 @@ export const SLICES_THAT_SURVIVE: readonly { slice: string; reason: string }[] =
   { slice: 'layoutSlice', reason: 'UI layout preferences are user-level (panel positions, sizes)' },
   { slice: 'pluginSlice', reason: 'Installed/enabled plugins are global, not per-project' },
   { slice: 'renderSettingsSlice', reason: 'Render/lighting/export preferences are user-level defaults (HDRI preset, tone mapping, exposure, format). Custom lights are user setups, not project-derived.' },
+  { slice: 'dockSlice', reason: 'Kept auto-suggestion ids are a user UI preference, not project data — intentionally persists across projects.' },
 ];
 
 /** All registered slice names (for completeness checking). */

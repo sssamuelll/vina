@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useDispatch } from 'react-redux';
 import type { AppDispatch } from '../../store';
+import { store } from '../../store';
+import { runUiExport } from '../../utils/export/uiExport';
 import { setViewMode, toggleSnapToGrid, toggleSeamAllowance, toggleGrainlines, togglePieceNames, undo, redo } from '../../store/editorSlice';
 import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import {
@@ -45,7 +47,7 @@ const COMMANDS: CommandDef[] = [
 
   // ─── Export ───
   { id: 'export-techpack', name: 'Export Tech Pack', description: 'Generate PDF tech pack with BOM', icon: Download, action: (_d, cb) => cb.onOpenPanel('Export') },
-  { id: 'export-dxf', name: 'Export DXF', description: 'Export patterns as DXF files', icon: FileText, action: (_d, cb) => cb.onOpenPanel('Export') },
+  { id: 'export-dxf', name: 'Export DXF', description: 'Export patterns as DXF files', icon: FileText, action: (d) => runUiExport('dxf', store.getState().project, d) },
 
   // ─── View ───
   { id: 'view-2d', name: 'View: 2D Only', description: 'Switch to 2D pattern view', icon: Eye, action: (d) => d(setViewMode('2d')) },

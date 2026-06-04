@@ -189,6 +189,18 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
+  // The 2D empty-state's "describe it to the AI" hint dispatches this; switch to
+  // chat mode and focus the prompt input.
+  useEffect(() => {
+    const handler = () => {
+      setMode('chat');
+      setPanelOpen(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    };
+    window.addEventListener('openclo:focusChat', handler);
+    return () => window.removeEventListener('openclo:focusChat', handler);
+  }, []);
+
   const handleInputFocus = useCallback(() => {
     if (mode === 'commands' || mode === 'settings') {
       setPanelOpen(true);

@@ -1,0 +1,3 @@
+# Husky hooks are run via `sh`; CRLF line endings break the shebang/parser on
+# checkout under Windows autocrlf. Force LF so the gate runs everywhere.
+.husky/pre-commit text eol=lf

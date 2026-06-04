@@ -41,9 +41,12 @@ function directionArrow(
   return `M${tip.x},${tip.y} L${left.x},${left.y} L${right.x},${right.y} Z`;
 }
 
+// Categorical palette for distinguishing seam groups — muted for the cream
+// paper ground (was a neon set built for a dark canvas). Mid-tone, lower
+// chroma, still mutually distinguishable.
 const SEAM_PALETTE = [
-  '#4a9eff', '#ff6b9d', '#6bffa6', '#ffa64a', '#9d6bff',
-  '#ff4a4a', '#4affc8', '#ffd54a', '#c84aff', '#4affe5',
+  '#4a7fb5', '#b56d8a', '#5a9e72', '#c08a4a', '#8a6db5',
+  '#b55a4a', '#4a9e8f', '#b59a4a', '#a45ab5', '#4a9eae',
 ];
 
 export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: SeamRendererProps) {
@@ -102,7 +105,16 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const isSelected = selectedSeamId === seam.id;
         const isInactive = seam.active === false;
         const paletteColor = SEAM_PALETTE[seamIndex % SEAM_PALETTE.length];
-        const baseColor = isInactive ? '#666' : isSelected ? '#44ff88' : hasMismatch ? '#ff9944' : paletteColor;
+        // State colors borrow the piece selection/error language; otherwise the
+        // muted seam-group palette. var() tokens must be applied via `style`
+        // (SVG presentation attrs can't read CSS variables).
+        const baseColor = isInactive
+          ? 'var(--ink-on-light-3)'
+          : isSelected
+            ? 'var(--accent-2d)'
+            : hasMismatch
+              ? 'var(--piece-error-2d)'
+              : paletteColor;
         // Type-specific line styles (CLO3D parity)
         const z = zoom2D;
         let edgeDash: string | undefined;
@@ -126,17 +138,17 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
           <g key={seam.id} className="seam-connection" opacity={isInactive ? 0.5 : 1}>
             {/* Selection glow (wider semi-transparent behind main stroke) */}
             {isSelected && pathDA && (
-              <path d={pathDA} fill="none" stroke="#44ff88" strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
+              <path d={pathDA} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
             )}
             {isSelected && pathDB && (
-              <path d={pathDB} fill="none" stroke="#44ff88" strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
+              <path d={pathDB} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
             )}
             {/* Edge A highlight (follows curves) */}
             {pathDA ? (
               <path
                 d={pathDA}
                 fill="none"
-                stroke={baseColor}
+                style={{ stroke: baseColor }}
                 strokeWidth={edgeWidth}
                 strokeLinecap="round"
                 strokeDasharray={edgeDash}
@@ -145,7 +157,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
               <line
                 x1={epA.start.x + offA.x} y1={epA.start.y + offA.y}
                 x2={epA.end.x + offA.x} y2={epA.end.y + offA.y}
-                stroke={baseColor} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
+                style={{ stroke: baseColor }} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
               />
             )}
             {/* Edge B highlight (follows curves) */}
@@ -153,7 +165,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
               <path
                 d={pathDB}
                 fill="none"
-                stroke={baseColor}
+                style={{ stroke: baseColor }}
                 strokeWidth={edgeWidth}
                 strokeLinecap="round"
                 strokeDasharray={edgeDash}
@@ -162,25 +174,25 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
               <line
                 x1={epB.start.x + offB.x} y1={epB.start.y + offB.y}
                 x2={epB.end.x + offB.x} y2={epB.end.y + offB.y}
-                stroke={baseColor} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
+                style={{ stroke: baseColor }} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
               />
             )}
             {/* Connection line (dotted) */}
             <line
               x1={midA.x} y1={midA.y}
               x2={midB.x} y2={midB.y}
-              stroke={baseColor}
+              style={{ stroke: baseColor }}
               strokeWidth={1 / zoom2D}
               strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
               opacity={0.6}
             />
             {/* Midpoint dots */}
-            <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} fill={baseColor} />
-            <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} fill={baseColor} />
+            <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} style={{ fill: baseColor }} />
+            <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} style={{ fill: baseColor }} />
 
             {/* Directional arrows */}
-            {arrowA && <path d={arrowA} fill={baseColor} opacity={0.8} />}
-            {arrowB && <path d={arrowB} fill={baseColor} opacity={0.8} />}
+            {arrowA && <path d={arrowA} style={{ fill: baseColor }} opacity={0.8} />}
+            {arrowB && <path d={arrowB} style={{ fill: baseColor }} opacity={0.8} />}
 
             {/* Length mismatch warning */}
             {hasMismatch && (
@@ -188,10 +200,9 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 x={(midA.x + midB.x) / 2}
                 y={(midA.y + midB.y) / 2 - 8 / zoom2D}
                 fontSize={9 / zoom2D}
-                fill="#ff9944"
                 textAnchor="middle"
-                fontFamily="Inter, sans-serif"
                 fontWeight={600}
+                style={{ fill: 'var(--piece-error-2d)', fontFamily: 'var(--font-mono-2d)' }}
               >
                 ⚠ {Math.round(mismatch * 100)}% mismatch
               </text>
@@ -203,10 +214,9 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 x={(midA.x + midB.x) / 2}
                 y={(midA.y + midB.y) / 2 + (hasMismatch ? 14 : -8) / zoom2D}
                 fontSize={8 / zoom2D}
-                fill={seam.tension < 100 ? '#e67e22' : '#3498db'}
                 textAnchor="middle"
-                fontFamily="Inter, sans-serif"
                 fontWeight={600}
+                style={{ fill: seam.tension < 100 ? 'var(--seam-tension-gather-2d)' : 'var(--seam-tension-ease-2d)', fontFamily: 'var(--font-mono-2d)' }}
               >
                 {seam.tension}%{seam.tension < 100 ? ' gather' : ' ease'}
               </text>
@@ -217,15 +227,15 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
               <>
                 <text
                   x={midA.x} y={midA.y - 8 / zoom2D}
-                  fontSize={8 / zoom2D} fill="#ccc" textAnchor="middle"
-                  fontFamily="Inter, sans-serif"
+                  fontSize={8 / zoom2D} textAnchor="middle"
+                  style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
                 >
                   {lenA.toFixed(1)}mm
                 </text>
                 <text
                   x={midB.x} y={midB.y - 8 / zoom2D}
-                  fontSize={8 / zoom2D} fill="#ccc" textAnchor="middle"
-                  fontFamily="Inter, sans-serif"
+                  fontSize={8 / zoom2D} textAnchor="middle"
+                  style={{ fill: 'var(--ink-on-light-2)', fontFamily: 'var(--font-mono-2d)' }}
                 >
                   {lenB.toFixed(1)}mm
                 </text>

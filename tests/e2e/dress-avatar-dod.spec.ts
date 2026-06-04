@@ -1,18 +1,24 @@
 /**
  * E2E: Dress Avatar — Definition of Done for epic #506 (Sewing Pipeline)
  *
- * This test is INTENTIONALLY RED today. It encodes the binary success criterion
- * for closing the sewing pipeline epic and is expected to fail until the
- * downstream bugs (#527 piece-local coords, #518 generic auto-seams,
- * #556 placement→circle on unknown category, #531 dress falls as panels)
- * are resolved.
+ * STATUS (2026-06-03): now GREEN for all four cases below. It was written as
+ * an intentionally-red DoD while the downstream bugs (#527 piece-local coords,
+ * #518 generic auto-seams, #556 placement→circle on unknown category, #531
+ * dress falls as panels) were open; those now appear resolved — every case
+ * drapes as a single connected component within the geometry bounds. The
+ * selectors were also retargeted this commit after FloatingControls3D was
+ * deleted in the canvas-2d / side-docks redesign (the old ".floating-3d__pill"
+ * Dress button is gone; the action now lives in LogoMenu ▸ Simulation ▸
+ * "Dress Avatar"). Male Shirt (17 pieces) can need a retry: its only flake is
+ * the post-load template-overlay close, which is slow under heavy meshing.
  *
- * Once #506 is closed, this test should flip to green and stay green. At
- * that point a follow-up commit will:
+ * To promote this to a required gate (note: .github/workflows/ci.yml was
+ * removed in b69a745a, so the CI wiring below must be recreated first):
  *   1. Add a baseline screenshot assertion (Playwright's toHaveScreenshot
  *      with the existing 1% maxDiffPixelRatio).
- *   2. Flip the CI job's `continue-on-error: false` in .github/workflows/ci.yml.
- *   3. Add `e2e` to `ci-success.needs` to promote it to a required gate.
+ *   2. Restore a CI workflow that runs `npm run test:e2e` without
+ *      `continue-on-error`.
+ *   3. Add the e2e job to the CI success gate's `needs`.
  *
  * ## DoD encoded here
  *
@@ -101,8 +107,8 @@ declare global {
  *     setShowTemplates(true) in AppShell, which renders the overlay.
  */
 async function openTemplateLibrary(page: Page) {
-  // The beforeEach already waited for FloatingControls3D to mount, which
-  // implies UnifiedBar (sibling in the shell) also mounted, so the ⌘K
+  // The beforeEach already waited for RightDock's Simulate button to mount,
+  // which implies UnifiedBar (sibling in the shell) also mounted, so the ⌘K
   // listener should be registered. Even so, give the palette opening real
   // breathing room: cold-start can have GPU/WASM init contending with the
   // main thread for several hundred ms.
@@ -153,11 +159,21 @@ async function pickTemplate(page: Page, name: string) {
 }
 
 async function clickDressButton(page: Page) {
-  // FloatingControls3D renders the pill as a `<button>` with text "Dress"
-  // inside the top-right floating control group.
-  const dress = page.locator('.floating-3d__pill', { hasText: /^\s*dress\s*$/i });
-  await expect(dress.first()).toBeVisible({ timeout: 5_000 });
-  await dress.first().click();
+  // FloatingControls3D (the old "Dress" pill) was deleted in the canvas-2d /
+  // side-docks redesign. The same action — setViewMode3D('simulate') +
+  // startSimulation() — now lives in LogoMenu ▸ Simulation ▸ "Dress Avatar"
+  // (LogoMenu.tsx). Open the logo menu, hover the Simulation top-level item to
+  // fly out its submenu, then click "Dress Avatar".
+  await page.locator('.logo-menu__trigger').click();
+  await page.locator('.logo-menu__item', { hasText: 'Simulation' }).first().hover();
+  const dress = page.locator('.logo-menu__submenu .logo-menu__item', { hasText: 'Dress Avatar' }).first();
+  await expect(
+    dress,
+    'LogoMenu ▸ Simulation ▸ "Dress Avatar" not found. Check LogoMenu.tsx still ' +
+      'has a SIMULATION_MENU item labeled "Dress Avatar" dispatching ' +
+      "setViewMode3D('simulate') + startSimulation().",
+  ).toBeVisible({ timeout: 5_000 });
+  await dress.click();
 }
 
 /**
@@ -207,10 +223,10 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
 
     // Two-stage hydration wait. The store is set at module load time (early);
     // the UnifiedBar keydown listener (⌘K → command palette) is only
-    // registered after React commits FloatingControls3D. The original v1.2
-    // race went: ⌘K pressed before listener registered → no palette → test
-    // fails on its first run but passes on retry. Waiting for both observables
-    // makes the test order-independent.
+    // registered after React commits the shell. The original v1.2 race went:
+    // ⌘K pressed before listener registered → no palette → test fails on its
+    // first run but passes on retry. Waiting for both observables makes the
+    // test order-independent.
 
     await page
       .waitForFunction(() => Boolean(window.__OPENCLO_STORE__), { timeout: 10_000 })
@@ -222,14 +238,20 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
         );
       });
 
-    // The "Dress" floating pill is part of FloatingControls3D in the shell.
-    // If it's visible, the shell mounted, which means UnifiedBar mounted,
-    // which means the ⌘K listener is registered.
+    // RightDock's "Simulate" button is part of the shell and renders in the
+    // default 'split' view (RightDock is hidden only in 2D-only view). If it's
+    // visible, the shell mounted (so UnifiedBar mounted and the ⌘K listener is
+    // registered) AND the 3D viewport is present (so GarmentSimulation can
+    // mount and expose __OPENCLO_CLOTH_MESH__). This replaces the deleted
+    // FloatingControls3D ".floating-3d__pill" sentinel with an equivalent
+    // guarantee.
     await expect(
-      page.locator('.floating-3d__pill').first(),
-      'shell did not finish hydrating within 10s (no .floating-3d__pill visible). ' +
+      page.locator('[aria-label="Simulate"]').first(),
+      'shell did not finish hydrating within 10s (no RightDock Simulate button visible). ' +
         'The ⌘K listener is registered in a UnifiedBar useEffect that runs after ' +
-        'first React commit, so pressing ⌘K before this point is racy.',
+        'first React commit, so pressing ⌘K before this point is racy. (RightDock ' +
+        'renders in the default split view; if the default viewMode changed to 2d, ' +
+        'this sentinel needs revisiting.)',
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -278,7 +300,11 @@ test.describe('#506 DoD — Dress Avatar produces a draped garment', () => {
       await openTemplateLibrary(page);
       await pickTemplate(page, c.template);
 
-      await expect(page.locator('.template-overlay.open')).toBeHidden({ timeout: 10_000 });
+      // Overlay close is gated on the template's pieces loading into state;
+      // heavy templates (Male Shirt, 17 pieces) can exceed 10s under CPU-side
+      // meshing on slow runners, which was the lone Male Shirt flake. 25s gives
+      // headroom without masking a genuine "overlay never closed" hang.
+      await expect(page.locator('.template-overlay.open')).toBeHidden({ timeout: 25_000 });
       const piecesCount = await page.evaluate(
         () => window.__OPENCLO_STORE__?.getState().project?.pieces?.length ?? 0,
       );

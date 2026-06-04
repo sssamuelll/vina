@@ -639,6 +639,9 @@ export type Tool2D =
   | 'hand'         // pan
   | 'zoom';
 
+/** 3D viewport tools (re-homed from the deleted Toolbar3D component, 2026-06-04). */
+export type Tool3D = 'camera' | 'edit' | 'sew3d' | 'pose' | 'avatar' | 'arrangement' | 'pin' | 'meshSelectBox' | 'meshSelectLasso';
+
 export type UnitSystem = 'mm' | 'cm' | 'inches';
 
 export interface EditorState {
@@ -651,6 +654,11 @@ export interface EditorState {
   selectedInternalLine: { pieceId: string; lineId: string } | null;
   zoom2D: number;
   pan2D: Point2D;
+  /** Monotonic counter: bumped to request a fit-to-content of the 2D viewport
+   *  (e.g. right after a pattern is imported). The PatternEditor watches it and
+   *  fits once per change, using the live viewport size. Preserved across
+   *  NEW_PROJECT so a fresh import after File ▸ New still triggers a fit. */
+  fitViewToken: number;
   showSeamAllowance: boolean;
   defaultSeamAllowanceWidth: number;  // mm fallback when piece has no SA set
   showGrainlines: boolean;

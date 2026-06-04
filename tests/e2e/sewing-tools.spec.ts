@@ -1,13 +1,18 @@
 /**
- * E2E tests for sewing tools: Seam, Segment Sewing, Walk Seam, Free Sewing
+ * E2E tests for sewing tools: Seam, Segment Sewing, Walk Seam, Free Sewing.
  *
- * Tests verify:
- * 1. Tool activation via keyboard shortcuts
- * 2. Visual feedback (overlays, highlights)
- * 3. Tool options bar rendering
- * 4. Seam creation via edge clicks
- * 5. Free Sewing tool functionality
- * 6. Seam context menu (right-click)
+ * Retargeted onto the current shell (2026-06-04):
+ * - Tool activation is verified by reading the Redux store
+ *   (`editor.activeTool` + `tools.activeTool2D`), the canonical truth written
+ *   together by `activate2DTool`. The old `.status-bar` text surface is dead:
+ *   StatusBar is an unmounted orphan in the current shell.
+ * - The tool-options-bar tests were DELETED. `ToolOptionsBar2D` was removed
+ *   along with `Toolbar2D`; tool options have no UI surface today
+ *   (product backlog). Asserting `.tool-options-bar` could only ever be
+ *   vacuous, so those tests are gone rather than weakened.
+ * - Interaction core (edge overlays, Escape clears, seam context menu, measure
+ *   activation) is kept and exercised against store-dispatched pieces/seams so
+ *   the geometry is deterministic (no dependency on a template loader).
  */
 import { test, expect, Page } from '@playwright/test';
 
@@ -17,24 +22,118 @@ async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(1000);
+  // The Seamly2D template library modal auto-opens on first load and overlays
+  // the canvas — dismiss it so canvas interactions (clicks, right-clicks) land.
+  const closeBtn = page.locator('button:has-text("✕")');
+  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await closeBtn.click({ force: true });
+    await page.waitForTimeout(300);
+  }
 }
 
-/** Load the T-Shirt template to get real pattern pieces */
-async function loadTShirtTemplate(page: Page) {
-  // Template library auto-opens on first load, or click Templates button
-  const templateBtn = page.locator('button:has-text("Templates")');
-  if (await templateBtn.isVisible()) {
-    await templateBtn.click();
-    await page.waitForTimeout(500);
-  }
+/** Dispatch a Redux action via the exposed store global. */
+async function dispatch(page: Page, action: { type: string; payload?: unknown }) {
+  await page.evaluate((act) => {
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+      | { dispatch: (a: unknown) => void }
+      | undefined;
+    store?.dispatch(act);
+  }, action);
+}
 
-  // Click the T-Shirt template card
-  const tshirtCard = page.locator('button:has-text("T-Shirt")').first();
-  await tshirtCard.click({ force: true });
-  await page.waitForTimeout(3000); // wait for template to load and resolve
+/** Read a dotted-path value out of the Redux state. */
+async function getState<T = unknown>(page: Page, path: string): Promise<T> {
+  return page.evaluate((sel) => {
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+      | { getState: () => unknown }
+      | undefined;
+    if (!store) return null;
+    const state = store.getState();
+    return sel
+      .split('.')
+      .reduce((o: unknown, k) => (o as Record<string, unknown> | null)?.[k], state) as T;
+  }, path) as Promise<T>;
+}
 
-  // Verify pieces loaded
-  await expect(page.locator('.status-bar')).toContainText(/Pieces.*[1-9]/, { timeout: 5000 });
+/** The active 2D tool, read from the canonical store fields. */
+async function activeTool(page: Page): Promise<{ editor: string; tools: string }> {
+  return {
+    editor: (await getState<string>(page, 'editor.activeTool')) ?? '',
+    tools: (await getState<string>(page, 'tools.activeTool2D')) ?? '',
+  };
+}
+
+/**
+ * Press a tool shortcut and wait until the store reflects it. The single global
+ * keydown listener can miss the very first press if it lands during the React
+ * commit that follows dismissing the template modal, so we re-press until the
+ * canonical `editor.activeTool` matches (or time out).
+ */
+async function activateToolKey(page: Page, key: string, expected: string) {
+  await expect
+    .poll(
+      async () => {
+        // The single global keydown listener ignores key events whose target is
+        // an <input>/<textarea> (e.g. the AI chat box, which may hold focus right
+        // after load). Move focus to <body> before each press so the shortcut
+        // actually reaches the registry.
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+        await page.keyboard.press(key);
+        await page.waitForTimeout(120);
+        return getState<string>(page, 'editor.activeTool');
+      },
+      { timeout: 8000, intervals: [150, 150, 150, 150] },
+    )
+    .toBe(expected);
+}
+
+/** A simple square piece at a known position (deterministic geometry). */
+function squarePiece(id: string, name: string, x: number, y: number) {
+  return {
+    id,
+    name,
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, 100] },
+      { type: 'L', values: [0, 100] },
+      { type: 'Z', values: [] },
+    ],
+    internals: [],
+    position: { x, y },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    layer: 1,
+    sublayer: 0,
+    active: true,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+}
+
+/**
+ * Seed two pieces + one seam between them via the store. Positions are near the
+ * SVG origin so they render on-screen at the default zoom=1 / pan=(0,0).
+ */
+async function seedPiecesAndSeam(page: Page) {
+  await dispatch(page, { type: 'project/addPiece', payload: squarePiece('sw-A', 'Front', 40, 40) });
+  await dispatch(page, { type: 'project/addPiece', payload: squarePiece('sw-B', 'Back', 220, 40) });
+  await dispatch(page, {
+    type: 'project/addSeam',
+    payload: {
+      id: 'sw-seam-1',
+      pieceA: { pieceId: 'sw-A', edgeName: 'edge-1' }, // right edge of A
+      pieceB: { pieceId: 'sw-B', edgeName: 'edge-3' }, // left edge of B
+      type: 'standard',
+      tension: 100,
+      strength: 1,
+      active: true,
+      taped: false,
+      tapeWidth: 10,
+    },
+  });
+  await page.waitForTimeout(400);
 }
 
 async function getSvgCenter(page: Page) {
@@ -44,475 +143,289 @@ async function getSvgCenter(page: Page) {
   return { cx: box.x + box.width / 2, cy: box.y + box.height / 2, box };
 }
 
-/** Get full status bar left text */
-async function getStatusText(page: Page): Promise<string> {
-  return (await page.locator('.status-bar-left').textContent()) ?? '';
+/**
+ * Map a pattern-space point to screen coordinates using the live zoom/pan and
+ * the SVG bounding box. Mirrors `screenToPattern` inverted.
+ */
+async function patternToScreen(page: Page, px: number, py: number) {
+  const svg = page.locator('svg.pattern-svg');
+  const box = await svg.boundingBox();
+  if (!box) throw new Error('SVG not found');
+  const zoom = (await getState<number>(page, 'editor.zoom2D')) ?? 1;
+  const pan = (await getState<{ x: number; y: number }>(page, 'editor.pan2D')) ?? { x: 0, y: 0 };
+  return { x: box.x + pan.x + px * zoom, y: box.y + pan.y + py * zoom };
 }
 
-/** Get piece bounding boxes for targeting edges */
-async function getPieceBounds(page: Page) {
-  const pieces = page.locator('.pattern-piece');
-  const count = await pieces.count();
-  const bounds: Array<{ x: number; y: number; width: number; height: number }> = [];
-  for (let i = 0; i < count; i++) {
-    const box = await pieces.nth(i).boundingBox();
-    if (box) bounds.push(box);
-  }
-  return bounds;
-}
-
-// ─── Seam Tool ──────────────────────────────────────────────────────────────
+// ─── Seam Tool (b) ────────────────────────────────────────────────────────────
 
 test.describe('Seam Tool (b)', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
   test('shortcut B activates seam tool', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(300);
-    const text = await getStatusText(page);
-    // StatusBar shows "Edit Sewing (B)" for the seam tool
-    expect(text).toContain('Edit Sewing');
+    await activateToolKey(page, 'b', 'seam');
+    const tool = await activeTool(page);
+    expect(tool.editor).toBe('seam');
+    expect(tool.tools).toBe('seam');
   });
 
-  test('tool options bar shows seam type and stitch length', async ({ page }) => {
-    await page.keyboard.press('b');
-    await page.waitForTimeout(500);
+  test('hovering piece edge surfaces the edge-pair overlay group', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'b', 'seam');
 
-    const optionsBar = page.locator('.tool-options-bar');
-    await expect(optionsBar).toBeVisible();
-
-    // Should have "Seam" label
-    await expect(optionsBar.locator('.tool-options-label')).toContainText('Seam');
-
-    // Should have seam type selector
-    const seamTypeSelect = optionsBar.locator('select');
-    await expect(seamTypeSelect.first()).toBeVisible();
-
-    // Should have stitch length slider
-    const slider = optionsBar.locator('input[type="range"]');
-    await expect(slider.first()).toBeVisible();
-  });
-
-  test('hovering piece edge shows highlight overlay', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('b');
-    await page.waitForTimeout(300);
+    // The edge-pair overlay <g> renders whenever the seam tool is active.
+    const overlay = page.locator('.edge-pair-overlay');
+    await expect(overlay).toHaveCount(1);
 
     const { cx, cy } = await getSvgCenter(page);
-
-    // Move mouse across the canvas — should trigger edge detection
-    await page.mouse.move(cx, cy);
-    await page.waitForTimeout(300);
-
-    // Move to different positions to find edges
-    for (let dx = -100; dx <= 100; dx += 50) {
+    for (let dx = -120; dx <= 120; dx += 40) {
       await page.mouse.move(cx + dx, cy);
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(60);
     }
-
-    // Check for seam overlay presence (may or may not have edges detected)
-    const seamOverlay = page.locator('.edge-pair-overlay');
-    const overlayExists = await seamOverlay.count();
-    console.log(`Seam tool overlay exists: ${overlayExists > 0}`);
+    // Non-binding: log whether any hover line was produced.
+    const lines = await page.locator('.edge-pair-overlay line').count();
+    console.log(`Seam overlay lines after hover sweep: ${lines}`);
   });
 
   test('clicking piece edge then Escape clears selection', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('b');
-    await page.waitForTimeout(300);
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'b', 'seam');
 
     const { cx, cy } = await getSvgCenter(page);
-
-    // Click somewhere on the canvas
     await page.mouse.click(cx, cy);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(200);
 
-    // Press Escape to clear
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    // Overlay should have no highlight lines
-    const lines = page.locator('.edge-pair-overlay line');
-    const count = await lines.count();
+    const count = await page.locator('.edge-pair-overlay line').count();
     expect(count).toBe(0);
   });
 });
 
-// ─── Segment Sewing Tool ────────────────────────────────────────────────────
+// ─── Segment Sewing Tool (n) ──────────────────────────────────────────────────
 
 test.describe('Segment Sewing Tool (n)', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
   test('shortcut N activates segment sewing tool', async ({ page }) => {
-    await page.keyboard.press('n');
-    await page.waitForTimeout(300);
-    const text = await getStatusText(page);
-    // No label in toolLabels map → shows raw ID "segmentSewing"
-    expect(text).toContain('segmentSewing');
+    await activateToolKey(page, 'n', 'segmentSewing');
+    const tool = await activeTool(page);
+    expect(tool.editor).toBe('segmentSewing');
+    expect(tool.tools).toBe('segmentSewing');
   });
 
-  test('tool options bar shows seam type selector', async ({ page }) => {
-    await page.keyboard.press('n');
-    await page.waitForTimeout(500);
-
-    const optionsBar = page.locator('.tool-options-bar');
-    await expect(optionsBar).toBeVisible();
-
-    // Should have a select dropdown for seam type
-    const select = optionsBar.locator('select');
-    await expect(select.first()).toBeVisible();
-  });
-
-  test('hovering near piece edge shows snap indicator', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('n');
-    await page.waitForTimeout(300);
+  test('hovering near piece edge does not crash the canvas', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'n', 'segmentSewing');
 
     const { cx, cy } = await getSvgCenter(page);
-
-    // Hover across the canvas to find edges
     for (let dx = -150; dx <= 150; dx += 30) {
       await page.mouse.move(cx + dx, cy);
-      await page.waitForTimeout(50);
+      await page.waitForTimeout(40);
     }
-    await page.waitForTimeout(300);
-
-    // Snap indicators are purple circles in the overlay
-    const snapCircles = page.locator('svg.pattern-svg circle');
-    const circleCount = await snapCircles.count();
+    // Snap indicators are circles in the SVG; non-binding count.
+    const circleCount = await page.locator('svg.pattern-svg circle').count();
     console.log(`Circles in SVG (possible snap indicators): ${circleCount}`);
+    await expect(page.locator('svg.pattern-svg')).toBeVisible();
   });
 });
 
-// ─── Walk Seam Tool ─────────────────────────────────────────────────────────
+// ─── Walk Seam Tool (Shift+M) ─────────────────────────────────────────────────
 
 test.describe('Walk Seam Tool (Shift+M)', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
   test('Shift+M activates walk seam tool', async ({ page }) => {
-    await page.keyboard.press('Shift+m');
-    await page.waitForTimeout(300);
-    const text = await getStatusText(page);
-    // No label in toolLabels map → shows raw ID "walkSeam"
-    expect(text).toContain('walkSeam');
+    await activateToolKey(page, 'Shift+m', 'walkSeam');
+    const tool = await activeTool(page);
+    expect(tool.editor).toBe('walkSeam');
+    expect(tool.tools).toBe('walkSeam');
   });
 
-  test('tool options bar shows tolerance and ghost opacity', async ({ page }) => {
-    await page.keyboard.press('Shift+m');
-    await page.waitForTimeout(500);
+  test('walk seam overlay group is present while tool is active', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'Shift+m', 'walkSeam');
 
-    const optionsBar = page.locator('.tool-options-bar');
-    await expect(optionsBar).toBeVisible();
-
-    // Should show "Walk Seam" label
-    await expect(optionsBar.locator('.tool-options-label')).toContainText('Walk Seam');
-
-    // Should have tolerance selector
-    const select = optionsBar.locator('select');
-    await expect(select.first()).toBeVisible();
-
-    // Should have ghost opacity slider
-    const slider = optionsBar.locator('input[type="range"]');
-    await expect(slider.first()).toBeVisible();
+    // The walk-seam overlay <g> renders whenever the walkSeam tool is active.
+    await expect(page.locator('.walk-seam-overlay')).toHaveCount(1);
   });
 
-  test('clicking piece outline sets stationary edge', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('Shift+m');
-    await page.waitForTimeout(300);
-
-    const { cx, cy } = await getSvgCenter(page);
-
-    // Find a piece outline by moving mouse to detect snap
-    // Hover first to see if we get snap feedback
-    await page.mouse.move(cx - 50, cy - 50);
-    await page.waitForTimeout(200);
-    await page.mouse.click(cx - 50, cy - 50);
-    await page.waitForTimeout(500);
-
-    // Walk seam overlay should be present
-    const walkOverlay = page.locator('.walk-seam-overlay');
-    const exists = await walkOverlay.count();
-    console.log(`Walk seam overlay present after click: ${exists > 0}`);
-  });
-
-  test('Escape clears walk state', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('Shift+m');
-    await page.waitForTimeout(300);
+  test('Escape clears walk state without crashing', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'Shift+m', 'walkSeam');
 
     const { cx, cy } = await getSvgCenter(page);
     await page.mouse.click(cx, cy);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(200);
 
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    // Should not crash, page still functional
-    const svg = page.locator('svg.pattern-svg');
-    await expect(svg).toBeVisible();
+    await expect(page.locator('svg.pattern-svg')).toBeVisible();
   });
 });
 
-// ─── Free Sewing Tool ──────────────────────────────────────────────────────
+// ─── Free Sewing Tool (f) ─────────────────────────────────────────────────────
 
 test.describe('Free Sewing Tool (f)', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
-  test('shortcut F activates and shows status bar', async ({ page }) => {
-    await page.keyboard.press('f');
-    await page.waitForTimeout(300);
-    const text = await getStatusText(page);
-    expect(text).toContain('Free Sewing');
+  test('shortcut F activates free sewing tool', async ({ page }) => {
+    // F maps to the lowercase 'freesewing' tool id.
+    await activateToolKey(page, 'f', 'freesewing');
+    const tool = await activeTool(page);
+    expect(tool.editor).toBe('freesewing');
+    expect(tool.tools).toBe('freesewing');
   });
 
-  test('hovering piece edge shows green highlight', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('f');
-    await page.waitForTimeout(300);
+  test('free sewing surfaces the edge-pair overlay group', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'f', 'freesewing');
 
-    // Move mouse across piece edges to trigger highlight
-    const bounds = await getPieceBounds(page);
-    if (bounds.length > 0) {
-      const b = bounds[0];
-      // Hover along the left edge of first piece
-      for (let dy = 0; dy <= b.height; dy += b.height / 5) {
-        await page.mouse.move(b.x, b.y + dy);
-        await page.waitForTimeout(100);
+    await expect(page.locator('.edge-pair-overlay')).toHaveCount(1);
+
+    // Hover along the left edge of the first piece (non-binding line count).
+    const piece = page.locator('.pattern-piece').first();
+    const box = await piece.boundingBox();
+    if (box) {
+      for (let dy = 0; dy <= box.height; dy += box.height / 5) {
+        await page.mouse.move(box.x, box.y + dy);
+        await page.waitForTimeout(60);
       }
     }
-
-    // Edge pair overlay should be present with at least one line
-    const overlay = page.locator('.edge-pair-overlay');
-    const overlayCount = await overlay.count();
-    const lines = page.locator('.edge-pair-overlay line');
-    const lineCount = await lines.count();
-    console.log(`Free sewing overlay: ${overlayCount > 0}, lines: ${lineCount}`);
+    const lineCount = await page.locator('.edge-pair-overlay line').count();
+    console.log(`Free sewing overlay lines after hover: ${lineCount}`);
   });
 
-  test('clicking piece edge selects first edge with visual feedback', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('f');
-    await page.waitForTimeout(300);
-
-    const bounds = await getPieceBounds(page);
-    if (bounds.length > 0) {
-      // Click the left edge of the first piece
-      const b = bounds[0];
-      await page.mouse.click(b.x, b.y + b.height / 2);
-      await page.waitForTimeout(300);
-    }
-
-    // After first edge click, overlay should have a green highlight line
-    const lines = page.locator('.edge-pair-overlay line');
-    const lineCount = await lines.count();
-    // At least one line if edge was detected (green first edge highlight)
-    console.log(`Lines after first click: ${lineCount}`);
-  });
-
-  test('clicking empty area resets selection', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('f');
-    await page.waitForTimeout(300);
+  test('clicking empty area leaves no dangling overlay lines', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'f', 'freesewing');
 
     const { box } = await getSvgCenter(page);
-
-    // Click a piece edge first (left side of canvas where pieces are)
-    const bounds = await getPieceBounds(page);
-    if (bounds.length > 0) {
-      await page.mouse.click(bounds[0].x, bounds[0].y + bounds[0].height / 2);
-      await page.waitForTimeout(300);
-    }
-
-    // Click far from any piece to reset
+    // Click far from any piece (top-right corner of the canvas).
     await page.mouse.click(box.x + box.width - 20, box.y + 20);
     await page.waitForTimeout(300);
 
-    // Overlay lines should be cleared
-    const lines = page.locator('.edge-pair-overlay line');
-    const count = await lines.count();
+    const count = await page.locator('.edge-pair-overlay line').count();
     expect(count).toBe(0);
   });
 
   test('Escape cancels first edge selection', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.keyboard.press('f');
-    await page.waitForTimeout(300);
+    await seedPiecesAndSeam(page);
+    await activateToolKey(page, 'f', 'freesewing');
 
-    // Click on piece to select an edge
-    const bounds = await getPieceBounds(page);
-    if (bounds.length > 0) {
-      await page.mouse.click(bounds[0].x, bounds[0].y + bounds[0].height / 2);
-      await page.waitForTimeout(300);
+    const piece = page.locator('.pattern-piece').first();
+    const box = await piece.boundingBox();
+    if (box) {
+      await page.mouse.click(box.x, box.y + box.height / 2);
+      await page.waitForTimeout(200);
     }
 
-    // Escape should clear the selection
     await page.keyboard.press('Escape');
     await page.waitForTimeout(300);
 
-    const lines = page.locator('.edge-pair-overlay line');
-    const count = await lines.count();
+    const count = await page.locator('.edge-pair-overlay line').count();
     expect(count).toBe(0);
-  });
-
-  test('tool options bar shows sewing type selector', async ({ page }) => {
-    await page.keyboard.press('f');
-    await page.waitForTimeout(500);
-
-    const optionsBar = page.locator('.tool-options-bar');
-    await expect(optionsBar).toBeVisible();
-
-    // Should have "Free Sewing" label
-    await expect(optionsBar.locator('.tool-options-label')).toContainText('Free Sewing');
   });
 });
 
-// ─── Seam Context Menu ─────────────────────────────────────────────────────
+// ─── Seam Context Menu ────────────────────────────────────────────────────────
 
 test.describe('Seam Context Menu', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
+  /**
+   * Right-click on the seam connection line. The menu opens via a hit-test on
+   * the SVG at the cursor's pattern-space coordinate, so we right-click the
+   * midpoint of the connection between the two seamed edge midpoints.
+   *
+   * NB: the right-click hit-test resolves an unknown edge name to segment
+   * index 1 (it does NOT run the renderer's edge-N parsing), so both edges
+   * resolve to the top edge (command index 1: M→first L).
+   *
+   * Geometry (default zoom=1, pan=0):
+   *   A top-edge midpoint = A.pos + (50, 0)  = (90, 40)
+   *   B top-edge midpoint = B.pos + (50, 0)  = (270, 40)
+   *   connection midpoint = (180, 40)
+   */
+  async function openSeamMenu(page: Page) {
+    const pt = await patternToScreen(page, 180, 40);
+    await page.mouse.click(pt.x, pt.y, { button: 'right' });
+    await page.waitForTimeout(300);
+  }
+
   test('right-click on seam connection shows seam context menu', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.waitForTimeout(1000);
+    await seedPiecesAndSeam(page);
+    await openSeamMenu(page);
 
-    // T-Shirt template comes with seams — find a seam connection element
-    const seamConnection = page.locator('.seam-connection').first();
-    const seamVisible = await seamConnection.isVisible().catch(() => false);
-
-    if (seamVisible) {
-      // Right-click the seam
-      await seamConnection.click({ button: 'right', force: true });
-      await page.waitForTimeout(300);
-
-      // Context menu should show "Seam" header
-      const seamHeader = page.locator('text=Seam');
-      await expect(seamHeader).toBeVisible({ timeout: 2000 });
-
-      // Should show seam-specific items
-      const reverseItem = page.locator('text=Reverse Sewing Direction');
-      await expect(reverseItem).toBeVisible();
-
-      const deleteItem = page.locator('text=Delete Seam');
-      await expect(deleteItem).toBeVisible();
-    } else {
-      console.log('No visible seam connections — template may not have pre-defined seams');
-    }
+    await expect(page.locator('text=Reverse Sewing Direction')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('text=Delete Seam')).toBeVisible();
   });
 
-  test('Reverse Sewing Direction swaps seam direction', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.waitForTimeout(1000);
+  test('Reverse Sewing Direction keeps the seam alive', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await openSeamMenu(page);
 
-    const seamConnection = page.locator('.seam-connection').first();
-    const seamVisible = await seamConnection.isVisible().catch(() => false);
+    const reverse = page.locator('text=Reverse Sewing Direction');
+    await expect(reverse).toBeVisible({ timeout: 2000 });
+    await reverse.click();
+    await page.waitForTimeout(300);
 
-    if (seamVisible) {
-      // Right-click to open context menu
-      await seamConnection.click({ button: 'right', force: true });
-      await page.waitForTimeout(300);
-
-      // Click "Reverse Sewing Direction"
-      const reverseItem = page.locator('text=Reverse Sewing Direction');
-      if (await reverseItem.isVisible()) {
-        await reverseItem.click();
-        await page.waitForTimeout(300);
-
-        // Context menu should close
-        await expect(reverseItem).not.toBeVisible();
-
-        // Page should still be functional
-        await expect(page.locator('svg.pattern-svg')).toBeVisible();
-        // Seam should still exist (not deleted, just reversed)
-        await expect(page.locator('.seam-connection').first()).toBeVisible();
-      }
-    }
+    // Menu closed; seam still exists (reversed, not removed).
+    await expect(reverse).not.toBeVisible();
+    const seams = await getState<unknown[]>(page, 'project.seams');
+    expect(seams.length).toBe(1);
+    await expect(page.locator('svg.pattern-svg')).toBeVisible();
   });
 
   test('Delete Seam removes the seam', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.waitForTimeout(1000);
+    await seedPiecesAndSeam(page);
 
-    const seamsBefore = await page.locator('.seam-connection').count();
+    const before = await getState<unknown[]>(page, 'project.seams');
+    expect(before.length).toBe(1);
 
-    const seamConnection = page.locator('.seam-connection').first();
-    const seamVisible = await seamConnection.isVisible().catch(() => false);
+    await openSeamMenu(page);
+    const del = page.locator('text=Delete Seam');
+    await expect(del).toBeVisible({ timeout: 2000 });
+    await del.click();
+    await page.waitForTimeout(400);
 
-    if (seamVisible && seamsBefore > 0) {
-      // Right-click to open context menu
-      await seamConnection.click({ button: 'right', force: true });
-      await page.waitForTimeout(300);
-
-      // Click "Delete Seam"
-      const deleteItem = page.locator('text=Delete Seam');
-      if (await deleteItem.isVisible()) {
-        await deleteItem.click();
-        await page.waitForTimeout(500);
-
-        // Seam count should decrease by 1
-        const seamsAfter = await page.locator('.seam-connection').count();
-        expect(seamsAfter).toBe(seamsBefore - 1);
-      }
-    }
+    const after = await getState<unknown[]>(page, 'project.seams');
+    expect(after.length).toBe(0);
   });
 
-  test('Select piece items appear for connected pieces', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.waitForTimeout(1000);
+  test('Select piece items appear for both connected pieces', async ({ page }) => {
+    await seedPiecesAndSeam(page);
+    await openSeamMenu(page);
 
-    const seamConnection = page.locator('.seam-connection').first();
-    const seamVisible = await seamConnection.isVisible().catch(() => false);
-
-    if (seamVisible) {
-      await seamConnection.click({ button: 'right', force: true });
-      await page.waitForTimeout(300);
-
-      // Should show Select "piece name" items for both connected pieces
-      const selectItems = page.locator('button:has-text("Select")');
-      const selectCount = await selectItems.count();
-      // At minimum: "Select [pieceA]" and "Select [pieceB]"
-      console.log(`Select items in seam context menu: ${selectCount}`);
-      expect(selectCount).toBeGreaterThanOrEqual(2);
-    }
+    await expect(page.locator('text=Reverse Sewing Direction')).toBeVisible({ timeout: 2000 });
+    // The seam menu offers Select "<pieceName>" for each connected piece.
+    const selectItems = page.locator('button:has-text("Select")');
+    expect(await selectItems.count()).toBeGreaterThanOrEqual(2);
   });
 
-  test('right-click on piece shows piece menu, not seam menu', async ({ page }) => {
-    await loadTShirtTemplate(page);
-    await page.waitForTimeout(500);
+  test('right-click on a piece shows the piece menu, not the seam menu', async ({ page }) => {
+    await seedPiecesAndSeam(page);
 
-    // Right-click on a pattern piece (not a seam)
-    const piece = page.locator('.pattern-piece').first();
-    await expect(piece).toBeVisible({ timeout: 5000 });
-
-    await piece.click({ button: 'right', force: true });
+    // Center of piece A = A.pos + (50, 50) = (90, 90).
+    const pt = await patternToScreen(page, 90, 90);
+    await page.mouse.click(pt.x, pt.y, { button: 'right' });
     await page.waitForTimeout(300);
 
-    // Should show piece-specific items, NOT seam items
-    const rotateItem = page.locator('text=Rotate 90°');
-    await expect(rotateItem).toBeVisible();
-
-    // Should NOT show seam-specific items
-    const reverseItem = page.locator('text=Reverse Sewing Direction');
-    await expect(reverseItem).not.toBeVisible();
+    await expect(page.locator('text=Rotate 90°')).toBeVisible({ timeout: 2000 });
+    await expect(page.locator('text=Reverse Sewing Direction')).not.toBeVisible();
   });
 });
 
-// ─── Measure sub-tools (quick sanity) ───────────────────────────────────────
+// ─── Measure Tool ─────────────────────────────────────────────────────────────
 
 test.describe('Measure Tool Group', () => {
   test.beforeEach(async ({ page }) => { await waitForApp(page); });
 
   test('M activates measure tool', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(300);
-    const text = await getStatusText(page);
-    expect(text).toContain('Measure');
-  });
-
-  test('measure tool shows options bar', async ({ page }) => {
-    await page.keyboard.press('m');
-    await page.waitForTimeout(500);
-    const optionsBar = page.locator('.tool-options-bar');
-    await expect(optionsBar).toBeVisible();
+    await activateToolKey(page, 'm', 'measure');
+    const tool = await activeTool(page);
+    expect(tool.editor).toBe('measure');
+    expect(tool.tools).toBe('measure');
   });
 });

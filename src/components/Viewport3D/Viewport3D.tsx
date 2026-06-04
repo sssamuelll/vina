@@ -19,6 +19,7 @@ import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
 import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
+import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
@@ -26,7 +27,7 @@ import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import { collectExportScene } from '../../utils/export/sceneCollector';
 import { downloadGLTF } from '../../utils/export/gltfExporter';
 import { downloadUSDZ } from '../../utils/export/usdzExporter';
-import type { Tool3D } from '../Toolbar3D/Toolbar3D';
+import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
 import SnapshotBar from './SnapshotBar';
@@ -143,7 +144,7 @@ function AnimationDriver() {
 interface Viewport3DProps {
   activeTool3D?: Tool3D;
   /** When true, hides legacy chrome (SimModeToggle, Render/CB buttons, sim-status)
-   *  because the new AppShell provides FloatingControls3D instead. */
+   *  because the new AppShell provides RightDock instead. */
   hideChrome?: boolean;
 }
 
@@ -850,6 +851,12 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         open={collisionPanelOpen}
         onClose={() => setCollisionPanelOpen(false)}
       />
+
+      {/* Surface mode picker (spec 2026-06-04 display-toggles-resurface).
+          NOT gated on hideChrome: AppShell mounts Viewport3D with hideChrome
+          (legacy chrome hidden in the redesign shell), but the pill is
+          redesign-era UI — gating it would make it a dark surface. */}
+      <SurfaceModePill />
 
       {/* Status indicators */}
       {!hideChrome && (

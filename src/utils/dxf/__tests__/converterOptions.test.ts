@@ -50,6 +50,28 @@ function makeDocWithInternals(): DXFDocument {
   return { header: new Map(), layers: [], blocks: new Map(), entities };
 }
 
+/** Rectangle outline + a clearly TILTED grainline (for grain-alignment). */
+function makeDocWithTiltedGrainline(): DXFDocument {
+  const entities: DXFEntity[] = [
+    {
+      type: 'LWPOLYLINE',
+      layer: '1',
+      data: {
+        closed: true,
+        vertices: [
+          { x: 0, y: 0, bulge: 0 },
+          { x: 100, y: 0, bulge: 0 },
+          { x: 100, y: 200, bulge: 0 },
+          { x: 0, y: 200, bulge: 0 },
+        ],
+      },
+    },
+    // Grainline (layer 7) tilted off vertical
+    { type: 'LINE', layer: '7', data: { x1: 20, y1: 40, x2: 80, y2: 160 } },
+  ];
+  return { header: new Map(), layers: [], blocks: new Map(), entities };
+}
+
 describe('dxfToPatternPieces with DXFImportOptions', () => {
   // ─── Backwards compatibility ───
 
@@ -238,6 +260,38 @@ describe('dxfToPatternPieces with DXFImportOptions', () => {
         importInternalLines: false,
       });
       expect(pieces[0].internals).toHaveLength(0);
+    });
+  });
+
+  // ─── Grain alignment ───
+
+  describe('grain alignment (alignToGrainline, default on)', () => {
+    it('rotates a tilted grainline to vertical (applying piece.rotation zeroes its x-component)', () => {
+      const p = dxfToPatternPieces(makeDocWithTiltedGrainline())[0];
+      expect(p.rotation).not.toBe(0); // a tilted grainline must produce a rotation
+      const gl = p.internals.find(i => i.type === 'grainline')!;
+      const dx = gl.path[gl.path.length - 1].values[0] - gl.path[0].values[0];
+      const dy = gl.path[gl.path.length - 1].values[1] - gl.path[0].values[1];
+      const R = (p.rotation * Math.PI) / 180;
+      const dxRot = dx * Math.cos(R) - dy * Math.sin(R); // SVG rotate(R) applied to the grainline vector
+      // Vertical means the x-component is ~0 relative to the line's length
+      // (the rotation is rounded to 2 decimals, so check the unit direction).
+      expect(dxRot / Math.hypot(dx, dy)).toBeCloseTo(0, 3); // grainline ends up vertical
+    });
+
+    it('leaves a vertical grainline unrotated', () => {
+      const p = dxfToPatternPieces(makeDocWithInternals())[0]; // grainline is x=50 (vertical)
+      expect(Math.abs(p.rotation)).toBeLessThan(0.01);
+    });
+
+    it('does not rotate when alignToGrainline is false', () => {
+      const p = dxfToPatternPieces(makeDocWithTiltedGrainline(), { alignToGrainline: false })[0];
+      expect(p.rotation).toBe(0);
+    });
+
+    it('is a no-op for a piece with no grainline', () => {
+      const p = dxfToPatternPieces(makeRectDoc())[0];
+      expect(p.rotation).toBe(0);
     });
   });
 });

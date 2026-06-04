@@ -3,6 +3,7 @@
   height: 100%;
   overflow: hidden;
   cursor: crosshair;
+  position: relative; /* anchor for the EmptyState2D overlay */
 }
 
 .pattern-svg {
@@ -11,14 +12,18 @@
 
 .pattern-piece {
   cursor: pointer;
-  transition: opacity 0.15s;
 }
 
-.pattern-piece:hover path:first-child {
-  fill: rgba(74, 158, 255, 0.2);
+/* Hover highlight (design surface 5, P1.5). A dedicated overlay path whose
+   opacity toggles on :hover — NO CSS transition: per DESIGN-NOTES §8, animating
+   opacity on frequently-re-rendered SVG nodes leaves them stuck on a stale frame. */
+.pattern-piece .piece-hover-fill {
+  opacity: 0;
 }
 
-.pattern-piece.selected path:first-child {
-  stroke: var(--selected);
-  stroke-width: 2;
+.pattern-piece:hover .piece-hover-fill {
+  opacity: 0.1;
 }
+
+/* Selection is drawn in the renderer (accent cut line + anchor handles); the
+   piece body fill stays neutral. */

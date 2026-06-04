@@ -29,16 +29,6 @@ export default function HintText({
         </text>
       )}
 
-      {!hasPieces && activeTool !== 'pen' && (
-        <text
-          x="50%" y="50%"
-          textAnchor="middle" dominantBaseline="middle"
-          fill="rgba(0,0,0,0.2)" fontSize="15" fontFamily="Inter, sans-serif"
-        >
-          Select the Pen tool (P) to draw pattern pieces
-        </text>
-      )}
-
       {!hasPieces && activeTool === 'pen' && penNodesLength === 0 && (
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
           fill="rgba(0,0,0,0.2)" fontSize="13" fontFamily="Inter, sans-serif">

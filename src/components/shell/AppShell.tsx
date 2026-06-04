@@ -3,20 +3,22 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setSplitRatio } from '../../store/layoutSlice';
 import { addPiece } from '../../store/projectSlice';
-import { selectPiece } from '../../store/editorSlice';
+import { selectPiece, requestFitView } from '../../store/editorSlice';
 import { showSuccessToast, showErrorToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, piecesLabel } from './dxfImport';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import TopBar from './TopBar';
 import UnifiedBar from './UnifiedBar';
-import FloatingToolbar from './FloatingToolbar';
-import FloatingControls3D from './FloatingControls3D';
+import LeftDock from './LeftDock';
+import RightDock from './RightDock';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import ContextPanel from './ContextPanel';
-import type { Tool3D } from '../Toolbar3D/Toolbar3D';
+import ToastContainer from './ToastContainer';
+import { getPanelSide } from './panelSide';
+import type { Tool3D } from '../../types/types';
 
 // Lazy-load panel content
 const AvatarPanel = lazy(() => import('../Viewport3D/AvatarPanel'));
@@ -86,6 +88,7 @@ export default function AppShell() {
       const { result } = await readAndParseDXFFile(file, { unit: 'auto', autoDetect: true });
       for (const piece of result.pieces) dispatch(addPiece(piece));
       dispatch(selectPiece(result.pieces[0].id));
+      dispatch(requestFitView()); // frame the freshly imported pattern (no more blank/tiny canvas)
       dispatch(showSuccessToast(`Cargué tu patrón: ${piecesLabel(result.pieces.length)}`));
     } catch (err) {
       dispatch(showErrorToast(dxfErrorMessage(err)));
@@ -227,23 +230,24 @@ export default function AppShell() {
           className="canvas-area__2d"
           style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
         >
-          <FloatingToolbar />
-          <PatternEditor />
+          <LeftDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
+          <PatternEditor onImportDXF={() => dxfInputRef.current?.click()} />
         </div>
         {viewMode === 'split' && (
           <div className="canvas-area__divider" onMouseDown={handleDividerMouseDown} />
         )}
         <div
           className="canvas-area__3d"
+          data-shortcut-context="3d"
           style={{ width: get3dWidth(), display: viewMode === '2d' ? 'none' : undefined }}
         >
-          <FloatingControls3D />
+          <RightDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
           <Viewport3DErrorBoundary>
             <Viewport3D activeTool3D={activeTool3D as Tool3D} hideChrome />
           </Viewport3DErrorBoundary>
         </div>
         {contextPanel && (
-          <ContextPanel title={contextPanel} onClose={() => setContextPanel(null)}>
+          <ContextPanel title={contextPanel} side={getPanelSide(contextPanel)} onClose={() => setContextPanel(null)}>
             {renderPanelContent(contextPanel, () => setContextPanel(null))}
           </ContextPanel>
         )}
@@ -253,6 +257,7 @@ export default function AppShell() {
         onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
       />
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
+      <ToastContainer />
     </div>
   );
 }

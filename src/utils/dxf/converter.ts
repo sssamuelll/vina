@@ -8,6 +8,7 @@ import {
   DXFArcData, DXFCircleData, DXFTextData, layerRole,
 } from './types';
 import type { FormatProfile, LayerRole } from './types';
+import { grainAlignmentRotation } from '../grainLine';
 
 // ─── Entity → PathCommand[] conversion ───
 
@@ -223,6 +224,10 @@ export interface DXFImportOptions {
   importNotches?: boolean;
   importGrainlines?: boolean;
   importInternalLines?: boolean;
+  /** Rotate each piece so its grainline is vertical on import (default true).
+   *  The canonical orientation a patronista reads. No-op for pieces without a
+   *  grainline. */
+  alignToGrainline?: boolean;
   formatProfile?: FormatProfile;
 }
 
@@ -302,6 +307,17 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
           values: cmd.values.map(v => v * scaleFactor),
         })),
       }));
+    }
+  }
+
+  // Grain-align (default on): rotate each piece so its grainline is vertical —
+  // the canonical orientation a patronista reads. Non-destructive (sets
+  // piece.rotation, honored by render/export/nesting/3D); no-op without a
+  // grainline. Computed before the grainline filter below so it still aligns
+  // when grainlines are imported-but-hidden.
+  if (!options || options.alignToGrainline !== false) {
+    for (const piece of pieces) {
+      piece.rotation = grainAlignmentRotation(piece);
     }
   }
 

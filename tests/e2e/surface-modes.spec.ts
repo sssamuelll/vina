@@ -163,64 +163,27 @@ test.describe('Surface Modes — WebGPU/TSL path', () => {
     expect(state?.surfaceMode3D).toBe('shaded');
   });
 
-  test('surface mode buttons in DisplayBar3D toggle modes', async ({ page }) => {
+  test('SurfaceModePill picks surface modes', async ({ page }) => {
+    // Retargeted 2026-06-04: DisplayBar3D (the old .db-btn strip) was deleted;
+    // the user-facing surface-mode picker is now the SurfaceModePill flyout.
+    // Strict (no if-visible guard): the pill renders unconditionally in 3D.
     await waitForApp(page);
     await open3DView(page);
 
-    // Click the Flat button
-    const flatBtn = page.locator('.db-btn').filter({ hasText: 'Flat' });
-    if (await flatBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await flatBtn.click({ force: true });
-      await page.waitForTimeout(500);
+    const getMode = () => page.evaluate(() =>
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).__OPENCLO_STORE__?.getState().simulation.surfaceMode3D ?? '');
 
-      const mode = await page.evaluate(() => {
-        const root = document.getElementById('root');
-        if (!root) return '';
-        const key = Object.keys(root).find(k => k.startsWith('__reactContainer'));
-        if (!key) return '';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const queue = [(root as any)[key]];
-        while (queue.length > 0) {
-          const node = queue.shift();
-          if (!node) continue;
-          if (node.memoizedProps?.store?.getState) {
-            return node.memoizedProps.store.getState().simulation.surfaceMode3D;
-          }
-          if (node.child) queue.push(node.child);
-          if (node.sibling) queue.push(node.sibling);
-        }
-        return '';
-      });
+    // Flat
+    await page.locator('.surface-pill__trigger').click();
+    await page.locator('.surface-pill__option', { hasText: 'Flat' }).first().click();
+    await page.waitForTimeout(300);
+    expect(await getMode()).toBe('flat');
 
-      expect(mode).toBe('flat');
-    }
-
-    // Click X-Ray button
-    const xrayBtn = page.locator('.db-btn').filter({ hasText: 'X-Ray' });
-    if (await xrayBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await xrayBtn.click({ force: true });
-      await page.waitForTimeout(500);
-
-      const mode = await page.evaluate(() => {
-        const root = document.getElementById('root');
-        if (!root) return '';
-        const key = Object.keys(root).find(k => k.startsWith('__reactContainer'));
-        if (!key) return '';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const queue = [(root as any)[key]];
-        while (queue.length > 0) {
-          const node = queue.shift();
-          if (!node) continue;
-          if (node.memoizedProps?.store?.getState) {
-            return node.memoizedProps.store.getState().simulation.surfaceMode3D;
-          }
-          if (node.child) queue.push(node.child);
-          if (node.sibling) queue.push(node.sibling);
-        }
-        return '';
-      });
-
-      expect(mode).toBe('xray');
-    }
+    // X-Ray (the flyout closes after each pick — reopen)
+    await page.locator('.surface-pill__trigger').click();
+    await page.locator('.surface-pill__option', { hasText: 'X-Ray' }).first().click();
+    await page.waitForTimeout(300);
+    expect(await getMode()).toBe('xray');
   });
 });
