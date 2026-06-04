@@ -1,5 +1,25 @@
 import { describe, it, expect } from 'vitest';
-import { isPanGesture, isPanRelease, cameraViewFromKeyEvent } from '../inputBindings';
+import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick } from '../inputBindings';
+
+describe('isDoublePanClick', () => {
+  const at = (time: number, x: number, y: number) => ({ time, x, y });
+
+  it('accepts two pan-clicks within the time and distance windows', () => {
+    expect(isDoublePanClick(at(1000, 200, 300), at(1300, 202, 298))).toBe(true);
+  });
+
+  it('rejects when too slow', () => {
+    expect(isDoublePanClick(at(1000, 200, 300), at(1500, 200, 300))).toBe(false);
+  });
+
+  it('rejects when the pointer moved too far between clicks', () => {
+    expect(isDoublePanClick(at(1000, 200, 300), at(1200, 240, 300))).toBe(false);
+  });
+
+  it('rejects when there is no previous click', () => {
+    expect(isDoublePanClick(null, at(1000, 200, 300))).toBe(false);
+  });
+});
 
 describe('isPanGesture', () => {
   it('accepts middle-click (mouse pan, CLO3D-style)', () => {

@@ -19,6 +19,26 @@ export function isPanRelease(button: number): boolean {
   return button === 0 || button === 1;
 }
 
+export interface PanClick {
+  time: number;
+  x: number;
+  y: number;
+}
+
+const DOUBLE_CLICK_MS = 400;
+const DOUBLE_CLICK_PX = 6;
+
+/**
+ * Double pan-click detection (no native dblclick for the middle button).
+ * Two pan-gesture downs within 400ms and 6px = double click → re-center
+ * the orbit target on the avatar.
+ */
+export function isDoublePanClick(prev: PanClick | null, next: PanClick): boolean {
+  if (!prev) return false;
+  if (next.time - prev.time > DOUBLE_CLICK_MS) return false;
+  return Math.hypot(next.x - prev.x, next.y - prev.y) <= DOUBLE_CLICK_PX;
+}
+
 // CLO3D-standard view mapping. Numpad for full keyboards, top-row digits for
 // laptops without one (the ShortcutRegistry defaults already declare '2'/'8'/…).
 const VIEW_BY_DIGIT: Record<string, ViewPreset> = {

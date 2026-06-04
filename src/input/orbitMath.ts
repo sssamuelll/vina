@@ -62,6 +62,22 @@ export function dollyTowardTarget(
 const _panDelta = new THREE.Vector3();
 
 /**
+ * Move the orbit target to `newTarget`, translating the camera by the same
+ * delta so the viewing angle and distance are preserved (mutates both).
+ * Inverse of panViewpoint — used by double pan-click to re-center the
+ * focus on the avatar after wandering off (decision Samuel 2026-06-04).
+ */
+export function recenterTarget(
+  position: THREE.Vector3,
+  target: THREE.Vector3,
+  newTarget: THREE.Vector3,
+): void {
+  _panDelta.copy(newTarget).sub(target);
+  position.add(_panDelta);
+  target.copy(newTarget);
+}
+
+/**
  * CLO3D-style pan: translate camera position AND orbit target by the same
  * screen-space delta (mutates both). Moving the target means subsequent
  * orbit/dolly pivot around wherever the user panned to (e.g. a sleeve's

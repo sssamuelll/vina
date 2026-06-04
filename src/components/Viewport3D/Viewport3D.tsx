@@ -21,9 +21,9 @@ import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
 import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
-import { isPanGesture, isPanRelease, cameraViewFromKeyEvent } from './inputBindings';
+import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, type PanClick } from './inputBindings';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
-import { orbitAroundTarget, dollyTowardTarget, panViewpoint } from '../../input/orbitMath';
+import { orbitAroundTarget, dollyTowardTarget, panViewpoint, recenterTarget } from '../../input/orbitMath';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
@@ -89,6 +89,7 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 // Scratch vectors for custom pan — avoids allocations in pointermove hot path
 const _panRight = new THREE.Vector3();
 const _panUp = new THREE.Vector3();
+const _homeTarget = new THREE.Vector3();
 
 /**
  * Create a WebGPURenderer (with WebGL2 fallback when WebGPU is unavailable).
@@ -218,13 +219,29 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   // MacBooks have no middle button) moves the camera AND the orbit target
   // together (CLO3D-style focus-point pan — supersedes the C7 camera-only
   // pan that kept the target locked on the avatar; decision 2026-06-04).
-  const panState = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
+  const panState = useRef<{ active: boolean; lastX: number; lastY: number; drag: number }>({ active: false, lastX: 0, lastY: 0, drag: 0 });
+  const lastPanClickRef = useRef<PanClick | null>(null);
 
   const onPanPointerDown = useCallback((e: React.PointerEvent) => {
     if (!isPanGesture(e)) return;
     if (playbackState === 'playing') return;
+
+    // Double pan-click → re-center the focus on the avatar, keeping the
+    // current angle/distance (inverse of the CLO3D-style pan above).
+    const click: PanClick = { time: e.timeStamp, x: e.clientX, y: e.clientY };
+    if (isDoublePanClick(lastPanClickRef.current, click)) {
+      lastPanClickRef.current = null; // consume — a triple click doesn't re-fire
+      const controls = orbitRef.current;
+      if (controls) {
+        recenterTarget(controls.object.position, controls.target, _homeTarget.set(...DEFAULT_TARGET));
+        controls.update();
+      }
+    } else {
+      lastPanClickRef.current = click;
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId);
-    panState.current = { active: true, lastX: e.clientX, lastY: e.clientY };
+    panState.current = { active: true, lastX: e.clientX, lastY: e.clientY, drag: 0 };
   }, [playbackState]);
 
   const onPanPointerMove = useCallback((e: React.PointerEvent) => {
@@ -237,6 +254,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     const dy = e.clientY - panState.current.lastY;
     panState.current.lastX = e.clientX;
     panState.current.lastY = e.clientY;
+
+    // A real drag is a pan, not a click — disarm the pending double-click.
+    panState.current.drag += Math.abs(dx) + Math.abs(dy);
+    if (panState.current.drag > 6) lastPanClickRef.current = null;
 
     // Scale pan speed based on camera distance to target
     const distance = camera.position.distanceTo(controls.target);

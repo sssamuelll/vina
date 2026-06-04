@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { orbitAroundTarget, dollyTowardTarget, panViewpoint } from '../orbitMath';
+import { orbitAroundTarget, dollyTowardTarget, panViewpoint, recenterTarget } from '../orbitMath';
 
 const target = new THREE.Vector3(0, 0.75, 0);
 
@@ -59,6 +59,27 @@ describe('dollyTowardTarget', () => {
     dollyTowardTarget(pos, target, 0.9, 0.6, 5);
     expect(pos.distanceTo(target)).toBeCloseTo(0.6, 10);
     expect(Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)).toBe(true);
+  });
+});
+
+describe('recenterTarget — double-click pan button returns focus to the avatar', () => {
+  it('moves the target to the new focus and translates the camera by the same delta (angle preserved)', () => {
+    const pos = new THREE.Vector3(1.2, 1.4, 2.0);
+    const tgt = new THREE.Vector3(0.4, 1.1, -0.3); // wandered off after panning
+    const home = new THREE.Vector3(0, 0.75, 0);
+    const offsetBefore = pos.clone().sub(tgt);
+    recenterTarget(pos, tgt, home);
+    expect(tgt.distanceTo(home)).toBeCloseTo(0, 10);
+    expect(pos.clone().sub(tgt).distanceTo(offsetBefore)).toBeCloseTo(0, 10);
+  });
+
+  it('is a no-op when already centered', () => {
+    const pos = new THREE.Vector3(0, 0.85, 3.0);
+    const tgt = new THREE.Vector3(0, 0.75, 0);
+    recenterTarget(pos, tgt, new THREE.Vector3(0, 0.75, 0));
+    expect(pos.x).toBeCloseTo(0, 10);
+    expect(pos.y).toBeCloseTo(0.85, 10);
+    expect(pos.z).toBeCloseTo(3.0, 10);
   });
 });
 
