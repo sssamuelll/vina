@@ -27,6 +27,14 @@ describe('orbitAroundTarget', () => {
     expect(phi).toBeGreaterThanOrEqual(0.05 - 1e-9);
     expect(phi).toBeLessThanOrEqual(Math.PI - 0.05 + 1e-9);
   });
+
+  it('positive dy decreases phi (camera moves toward the north pole)', () => {
+    const pos = new THREE.Vector3(0, 0.85, 3.0);
+    const before = new THREE.Spherical().setFromVector3(pos.clone().sub(target)).phi;
+    orbitAroundTarget(pos, target, 0, 10);
+    const after = new THREE.Spherical().setFromVector3(pos.clone().sub(target)).phi;
+    expect(after).toBeLessThan(before);
+  });
 });
 
 describe('dollyTowardTarget', () => {
@@ -44,5 +52,12 @@ describe('dollyTowardTarget', () => {
     const far = new THREE.Vector3(0, 0.75, 4.9);
     dollyTowardTarget(far, target, 100, 0.6, 5);
     expect(far.distanceTo(target)).toBeCloseTo(5, 10);
+  });
+
+  it('escapes cleanly when camera is exactly at target (zero offset)', () => {
+    const pos = new THREE.Vector3(0, 0.75, 0); // AT target
+    dollyTowardTarget(pos, target, 0.9, 0.6, 5);
+    expect(pos.distanceTo(target)).toBeCloseTo(0.6, 10);
+    expect(Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)).toBe(true);
   });
 });

@@ -47,7 +47,14 @@ export function dollyTowardTarget(
   maxDistance: number,
 ): THREE.Vector3 {
   _offset.copy(position).sub(target);
-  const dist = Math.max(minDistance, Math.min(maxDistance, _offset.length() * factor));
+  const currentDist = _offset.length();
+  if (currentDist === 0) {
+    // Camera exactly at the target — setLength on a zero vector is a no-op
+    // and would lock the camera there forever. Escape along world +Z.
+    _offset.set(0, 0, minDistance);
+    return position.copy(target).add(_offset);
+  }
+  const dist = Math.max(minDistance, Math.min(maxDistance, currentDist * factor));
   _offset.setLength(dist);
   return position.copy(target).add(_offset);
 }
