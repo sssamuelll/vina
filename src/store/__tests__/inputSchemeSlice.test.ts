@@ -16,7 +16,7 @@ const initial: InputSchemeState = { scheme: 'mouse', source: 'default' };
 
 describe('inputSchemeSlice reducers', () => {
   it('starts as mouse/default', () => {
-    expect(reducer(undefined, { type: '@@init' })).toEqual(initial);
+    expect(reducer(undefined, { type: '@@INIT' })).toEqual(initial);
   });
 
   it('setUserScheme always wins and marks source user', () => {
@@ -43,12 +43,17 @@ describe('hydrateInputScheme (zod envelope, silent-degradable per E-async-states
   beforeEach(() => vi.mocked(storageGet).mockReset());
 
   it('returns parsed state for a valid v1 envelope', async () => {
-    vi.mocked(storageGet).mockResolvedValue({ version: 1, scheme: 'trackpad', source: 'user' });
+    vi.mocked(storageGet).mockResolvedValue({ version: 1, data: { scheme: 'trackpad', source: 'user' } });
     expect(await hydrateInputScheme()).toEqual({ scheme: 'trackpad', source: 'user' });
   });
 
   it('returns null when nothing persisted', async () => {
     vi.mocked(storageGet).mockResolvedValue(undefined);
+    expect(await hydrateInputScheme()).toBeNull();
+  });
+
+  it('returns null when stored value is null (not undefined)', async () => {
+    vi.mocked(storageGet).mockResolvedValue(null);
     expect(await hydrateInputScheme()).toBeNull();
   });
 
@@ -62,6 +67,6 @@ describe('persistInputScheme', () => {
   it('writes the v1 envelope to settings/input-scheme', () => {
     persistInputScheme({ scheme: 'trackpad', source: 'auto' });
     expect(storageSet).toHaveBeenCalledWith('settings', 'input-scheme',
-      { version: 1, scheme: 'trackpad', source: 'auto' });
+      { version: 1, data: { scheme: 'trackpad', source: 'auto' } });
   });
 });

@@ -18,8 +18,12 @@ const STORAGE_KEY = 'input-scheme';
 const PersistedSchema = z
   .object({
     version: z.literal(1),
-    scheme: z.enum(['mouse', 'trackpad']),
-    source: z.enum(['default', 'auto', 'user']),
+    data: z
+      .object({
+        scheme: z.enum(['mouse', 'trackpad']),
+        source: z.enum(['default', 'auto', 'user']),
+      })
+      .strict(),
   })
   .strict();
 
@@ -27,18 +31,19 @@ const PersistedSchema = z
  *  silent-degradable storage per E-async-states). */
 export async function hydrateInputScheme(): Promise<InputSchemeState | null> {
   const raw = await storageGet('settings', STORAGE_KEY);
-  if (raw === undefined) return null;
+  if (raw == null) return null;
   const parsed = PersistedSchema.safeParse(raw);
   if (!parsed.success) return null;
-  return { scheme: parsed.data.scheme, source: parsed.data.source };
+  return { scheme: parsed.data.data.scheme, source: parsed.data.data.source };
 }
 
 export function persistInputScheme(state: InputSchemeState): void {
   // shape: InputSchemePersisted v1 — opt-in envelope: yes
+  // `source` is persisted deliberately: a stored 'auto'/'user' keeps the
+  // one-shot heuristic from re-firing on the next session.
   void storageSet('settings', STORAGE_KEY, {
     version: 1,
-    scheme: state.scheme,
-    source: state.source,
+    data: { scheme: state.scheme, source: state.source },
   });
 }
 
