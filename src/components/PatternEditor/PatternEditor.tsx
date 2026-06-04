@@ -47,7 +47,7 @@ import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
-import ReferenceImageSettings from '../DisplayBar2D/ReferenceImageSettings';
+import ReferenceImageSettings from './ReferenceImageSettings';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
 import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';

@@ -24,7 +24,7 @@ interface ModeDef {
   icon: LucideIcon;
 }
 
-// Same inventory + icons the orphaned DisplayBar3D exposed.
+// Same inventory + icons the legacy DisplayBar3D exposed (deleted 2026-06-04).
 const MODES: ModeDef[] = [
   { mode: 'textured', label: 'Textured', icon: Image },
   { mode: 'translucent', label: 'Translucent', icon: Droplets },

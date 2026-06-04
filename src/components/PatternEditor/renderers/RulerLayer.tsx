@@ -20,7 +20,7 @@ const UNIT_SUFFIX: Record<UnitSystem, string> = { mm: 'mm', cm: 'cm', inches: 'i
  * Screen-space (outside the scaled content group), like GridLayer, so ticks and
  * labels stay crisp at any zoom. Ticks come from the pure generateRulerTicks()
  * helper (major every 10cm, minor every 1cm, minors dropped when crowded).
- * Purely visual — pointerEvents disabled; the cm/inch toggle lives in DisplayBar2D.
+ * Purely visual — pointerEvents disabled; the unit toggle lives in LogoMenu ▸ View (Ruler radios).
  */
 export default function RulerLayer({ zoom2D, pan2D, gridSize, units, width, height }: RulerLayerProps) {
   if (width <= 0 || height <= 0) return null;
