@@ -60,7 +60,10 @@ const inputSchemeSlice = createSlice({
       state.scheme = 'trackpad';
       state.source = 'auto';
     },
-    rehydrateInputScheme(_state, action: PayloadAction<InputSchemeState>) {
+    rehydrateInputScheme(state, action: PayloadAction<InputSchemeState>) {
+      // Async IDB hydrate may land AFTER the user or the heuristic already
+      // acted this session — never clobber a non-default source.
+      if (state.source !== 'default') return;
       return action.payload;
     },
   },

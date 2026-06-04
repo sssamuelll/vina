@@ -37,6 +37,13 @@ describe('inputSchemeSlice reducers', () => {
     expect(reducer(initial, rehydrateInputScheme({ scheme: 'trackpad', source: 'user' })))
       .toEqual({ scheme: 'trackpad', source: 'user' });
   });
+
+  it('rehydrateInputScheme never clobbers a session where user/heuristic already acted', () => {
+    expect(reducer({ scheme: 'trackpad', source: 'auto' }, rehydrateInputScheme({ scheme: 'mouse', source: 'user' })))
+      .toEqual({ scheme: 'trackpad', source: 'auto' });
+    expect(reducer({ scheme: 'mouse', source: 'user' }, rehydrateInputScheme({ scheme: 'trackpad', source: 'auto' })))
+      .toEqual({ scheme: 'mouse', source: 'user' });
+  });
 });
 
 describe('hydrateInputScheme (zod envelope, silent-degradable per E-async-states)', () => {
