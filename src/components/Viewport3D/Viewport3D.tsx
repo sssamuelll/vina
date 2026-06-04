@@ -22,6 +22,8 @@ import FitMapToggle from './FitMapToggle';
 import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
 import { isPanGesture, isPanRelease, cameraViewFromKeyEvent } from './inputBindings';
+import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
+import { orbitAroundTarget, dollyTowardTarget } from '../../input/orbitMath';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
@@ -149,6 +151,10 @@ interface Viewport3DProps {
   hideChrome?: boolean;
 }
 
+// Safari signals trackpad pinch via proprietary GestureEvent; everywhere else
+// the browser synthesizes ctrlKey on the wheel event. XOR — never handle both.
+const SAFARI_GESTURES = typeof window !== 'undefined' && 'ongesturestart' in window;
+
 export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false }: Viewport3DProps) {
   const dispatch = useDispatch();
   const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
@@ -203,6 +209,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       };
     }
   }, []);
+
+  const inputScheme = useSelector((s: RootState) => s.inputScheme.scheme);
+  const inputSchemeRef = useRef<InputSchemeId>(inputScheme);
+  inputSchemeRef.current = inputScheme;
 
   // Custom pan: middle-click drag (mouse) or Alt/Option+left-drag (trackpad —
   // MacBooks have no middle button) translates camera only, keeping orbit
@@ -264,6 +274,61 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
   // Force Canvas to resize continuously during CSS transitions
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // ─── Single 3D wheel owner (spec 2026-06-04 § Halberg constraint 1) ───
+  // OrbitControls enableZoom is OFF permanently; this handler routes wheel
+  // per scheme via the pure intent layer. Early-returns when controls are
+  // disabled (TransformControls / poseDrag own the pointer then).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const controls = orbitRef.current;
+      if (!controls || !controls.enabled) return;
+      // Safari XOR (constraint 3): pinch arrives as GestureEvent there.
+      if (SAFARI_GESTURES && (e.ctrlKey || e.metaKey)) return;
+      const intent = wheelIntent(e, inputSchemeRef.current, '3d');
+      if (!intent) return;
+      e.preventDefault();
+      const camera = controls.object;
+      if (intent.kind === 'orbit') {
+        orbitAroundTarget(camera.position, controls.target, intent.dx, intent.dy);
+      } else if (intent.kind === 'zoom') {
+        // zoomFactor>1 = zoom in = distance shrinks → invert for dolly
+        dollyTowardTarget(camera.position, controls.target, 1 / zoomFactor(intent.delta), 0.6, 5);
+      }
+      controls.update();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Safari trackpad pinch → GestureEvent zoom (the global main.tsx preventDefault
+  // does NOT stop propagation — we still receive these; verified fase 1).
+  useEffect(() => {
+    if (!SAFARI_GESTURES) return;
+    const el = containerRef.current;
+    if (!el) return;
+    let prevScale = 1;
+    const onStart = (e: Event) => { prevScale = 1; e.preventDefault(); };
+    const onChange = (e: Event) => {
+      e.preventDefault();
+      const scale = (e as Event & { scale?: number }).scale;
+      const controls = orbitRef.current;
+      if (!controls || !controls.enabled || typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) return;
+      // fingers apart (scale grows) → zoom in → distance shrinks
+      dollyTowardTarget(controls.object.position, controls.target, prevScale / scale, 0.6, 5);
+      prevScale = scale;
+      controls.update();
+    };
+    el.addEventListener('gesturestart', onStart);
+    el.addEventListener('gesturechange', onChange);
+    return () => {
+      el.removeEventListener('gesturestart', onStart);
+      el.removeEventListener('gesturechange', onChange);
+    };
+  }, []);
+
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
@@ -768,6 +833,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           maxDistance={5}
           target={[0, 0.75, 0]}
           enablePan={false}
+          enableZoom={false}
           mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: -1 as unknown as THREE.MOUSE, RIGHT: THREE.MOUSE.ROTATE }}
           onChange={patchMouseButtons}
         />
@@ -864,7 +930,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       )}
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — right-drag orbit · middle/⌥-drag pan
+          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — {inputScheme === 'trackpad' ? 'two-finger orbit · pinch zoom · ⌥-drag pan' : 'right-drag orbit · middle/⌥-drag pan'}
         </div>
       )}
 
