@@ -81,10 +81,13 @@ is reachable from any view mode.
 **Files:** `src/components/Viewport3D/SurfaceModePill.tsx` + `SurfaceModePill.css`.
 
 - Floating pill in the 3D viewport top chrome row: `position: absolute; top: 8px;
-  right: 116px` — left of the "Render" button cluster (Render at `right: 52`,
-  CB at `right: 8`), gated on `!hideChrome` like its siblings. Rendered from
-  `Viewport3D.tsx` next to the Render/CB buttons. (Exact offset may be nudged during
-  live verification if it collides with the Render button's open-panel positions.)
+  right: 116px`. Rendered from `Viewport3D.tsx` next to the legacy Render/CB buttons.
+  **NOT gated on `!hideChrome`** (deviation found in live verification): AppShell
+  mounts `<Viewport3D hideChrome />`, so the legacy chrome row (Render, CB,
+  SimModeToggle) is invisible in the real app — gating the pill there would have
+  made it a dark surface. The pill is redesign-era UI and renders unconditionally;
+  in the live shell it sits alone top-right, clearing the RightDock (verified,
+  `design-handoff/ui-screenshots/verify-surface-pill-3d.png`).
 - Collapsed: one button showing the **current mode's icon + short label** (e.g. icon +
   "Textured"). `aria-label="Surface mode: <label>"`.
 - Click → flyout **3×3 grid** of the 9 modes (icon + label each), current mode

@@ -852,8 +852,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         onClose={() => setCollisionPanelOpen(false)}
       />
 
-      {/* Surface mode picker (spec 2026-06-04 display-toggles-resurface) */}
-      {!hideChrome && <SurfaceModePill />}
+      {/* Surface mode picker (spec 2026-06-04 display-toggles-resurface).
+          NOT gated on hideChrome: AppShell mounts Viewport3D with hideChrome
+          (legacy chrome hidden in the redesign shell), but the pill is
+          redesign-era UI — gating it would make it a dark surface. */}
+      <SurfaceModePill />
 
       {/* Status indicators */}
       {!hideChrome && (
