@@ -49,6 +49,7 @@
     "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
     "react-zoom-pan-pinch": "^3.7.0",
+    "remark-gfm": "^4.0.1",
     "three": "^0.183.2",
     "three-mesh-bvh": "^0.9.9",
     "ws": "^8.19.0",

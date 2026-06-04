@@ -184,14 +184,36 @@ describe('detectBodyRegion', () => {
 });
 
 describe('computePlacement', () => {
-  it('front-torso is in front of body (negative Z)', () => {
+  // CONVENTION: the avatar's front faces +Z (AvatarModel: "Z=forward") and the
+  // default camera sits at +Z looking toward the avatar. So a front piece must
+  // land on the +Z side (toward camera) and a back piece on the -Z side.
+  // The pre-2026-05-30 code had this mirrored (front at -Z), which made the
+  // front render behind the avatar and the back in front.
+  it('front-torso is in front of body (positive Z, toward camera)', () => {
     const p = computePlacement('front-torso', MEAS, { widthMm: 200, heightMm: 300 });
-    expect(p.position[2]).toBeLessThan(0); // front = -Z
+    expect(p.position[2]).toBeGreaterThan(0); // front = +Z
   });
 
-  it('back-torso is behind body (positive Z)', () => {
+  it('back-torso is behind body (negative Z)', () => {
     const p = computePlacement('back-torso', MEAS, { widthMm: 200, heightMm: 300 });
-    expect(p.position[2]).toBeGreaterThan(0);
+    expect(p.position[2]).toBeLessThan(0);
+  });
+
+  // Up-axis decoupled from facing: BOTH front and back stand upright. The back's
+  // outward face is achieved with a π about Z (a reflection-equivalent that keeps
+  // pattern-up → world-up), NOT a π about Y (which also inverts up → "boca abajo").
+  it('front-torso stands upright facing forward', () => {
+    const p = computePlacement('front-torso', MEAS, { widthMm: 200, heightMm: 300 });
+    expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 6);
+    expect(p.rotation[1]).toBeCloseTo(0, 6);
+    expect(p.rotation[2]).toBeCloseTo(0, 6);
+  });
+
+  it('back-torso stands upright (no π about Y that would flip it boca abajo)', () => {
+    const p = computePlacement('back-torso', MEAS, { widthMm: 200, heightMm: 300 });
+    expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 6);
+    expect(p.rotation[1]).toBeCloseTo(0, 6); // NOT π
+    expect(p.rotation[2]).toBeCloseTo(Math.PI, 6);
   });
 
   it('sleeves are to the sides (X offset)', () => {
@@ -222,9 +244,9 @@ describe('placeGarmentPieces', () => {
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
     expect(placements.length).toBe(3);
-    // Front in front, back behind
-    expect(placements[0].position[2]).toBeLessThan(0);
-    expect(placements[1].position[2]).toBeGreaterThan(0);
+    // Front in front (+Z, toward camera), back behind (-Z)
+    expect(placements[0].position[2]).toBeGreaterThan(0);
+    expect(placements[1].position[2]).toBeLessThan(0);
   });
 
   it('all-unknown patterns: alternates front/back torso with X stagger (#556 fix)', () => {
@@ -246,10 +268,10 @@ describe('placeGarmentPieces', () => {
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
 
-    // Even-indexed pieces go front (Z < 0), odd go back (Z > 0).
-    expect(placements[0].position[2]).toBeLessThan(0);
-    expect(placements[1].position[2]).toBeGreaterThan(0);
-    expect(placements[2].position[2]).toBeLessThan(0);
+    // Even-indexed pieces go front (Z > 0, toward camera), odd go back (Z < 0).
+    expect(placements[0].position[2]).toBeGreaterThan(0);
+    expect(placements[1].position[2]).toBeLessThan(0);
+    expect(placements[2].position[2]).toBeGreaterThan(0);
 
     // All positions must be distinct — stacked pieces produce collinear
     // vertices that crash the cloth solver with NaN constraints.
@@ -278,8 +300,8 @@ describe('placeGarmentPieces', () => {
     ];
     const placements = placeGarmentPieces(pieces, MEAS);
 
-    // Classified piece on torso front.
-    expect(placements[0].position[2]).toBeLessThan(0);
+    // Classified piece on torso front (+Z, toward camera).
+    expect(placements[0].position[2]).toBeGreaterThan(0);
 
     // Unknown sits on a circle around the avatar at midTorso height.
     // Just sanity-check it's far enough from origin to be "in the circle"

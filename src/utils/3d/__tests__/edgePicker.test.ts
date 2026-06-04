@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { PathCommand, SemanticEdge } from '../../../types/types';
-import { pickEdge, outlineToLocal3D } from '../edgePicker';
+import { pickEdge, outlineToLocal3D, pieceHighlightRotation, edgeMidpointLocal3D } from '../edgePicker';
 
 // ─── Test Fixtures ──────────────────────────────────────────────────────────
 
@@ -27,6 +27,48 @@ const edges: SemanticEdge[] = [
 //   pt0 (−0.05, 0.1), pt1 (0.05, 0.1), pt2 (0.05, −0.1), pt3 (−0.05, −0.1), pt4 (−0.05, 0.1)
 
 // ─── outlineToLocal3D ───────────────────────────────────────────────────────
+
+describe('pieceHighlightRotation', () => {
+  it('returns yaw-only rotation when no base rotation is given', () => {
+    const r0 = pieceHighlightRotation(0);
+    expect(r0[0]).toBeCloseTo(0, 6);
+    expect(r0[1]).toBeCloseTo(0, 6); // -0 is fine
+    expect(r0[2]).toBeCloseTo(0, 6);
+    const r = pieceHighlightRotation(90);
+    expect(r[0]).toBeCloseTo(0, 6);
+    expect(r[1]).toBeCloseTo(-Math.PI / 2, 6);
+    expect(r[2]).toBeCloseTo(0, 6);
+  });
+  it('adds the piece yaw onto a base rotation', () => {
+    const r = pieceHighlightRotation(90, [0.1, 0.2, 0.3]);
+    expect(r[0]).toBeCloseTo(0.1, 6);
+    expect(r[1]).toBeCloseTo(0.2 - Math.PI / 2, 6);
+    expect(r[2]).toBeCloseTo(0.3, 6);
+  });
+  it('treats undefined rotation as 0', () => {
+    const r = pieceHighlightRotation(undefined);
+    expect(r[1]).toBeCloseTo(0, 6);
+  });
+});
+
+describe('edgeMidpointLocal3D', () => {
+  // Rectangle local points (after centering): see comment above.
+  it('computes the midpoint of the top edge', () => {
+    const mid = edgeMidpointLocal3D(outline, edges[0]); // top: pts 0,1 → (-0.05,0.1),(0.05,0.1)
+    expect(mid).not.toBeNull();
+    expect(mid!.x).toBeCloseTo(0, 6);
+    expect(mid!.z).toBeCloseTo(0.1, 6);
+  });
+  it('computes the midpoint of the right edge', () => {
+    const mid = edgeMidpointLocal3D(outline, edges[1]); // right: pts 1,2 → (0.05,0.1),(0.05,-0.1)
+    expect(mid).not.toBeNull();
+    expect(mid!.x).toBeCloseTo(0.05, 6);
+    expect(mid!.z).toBeCloseTo(0, 6);
+  });
+  it('returns null for an empty outline', () => {
+    expect(edgeMidpointLocal3D([], edges[0])).toBeNull();
+  });
+});
 
 describe('outlineToLocal3D', () => {
   it('converts outline to centered local 3D points', () => {

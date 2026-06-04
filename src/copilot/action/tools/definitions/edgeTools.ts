@@ -8,11 +8,26 @@ import type { AppDispatch, RootState } from '../../../../store';
 export const tools: ToolDefinition[] = [
   {
     name: 'classifyPiece',
-    description: 'Classify a piece by category (bodice/sleeve/collar/skirt/trouser/etc.) and side (front/back/left/right)',
+    description:
+      'Set a piece\'s category (bodice/sleeve/collar/skirt/trouser/waistband/facing/lining/pocket/cuff/hood/yoke) and side (front/back/left/right/center/both). ' +
+      'Category drives 3D placement: trouser/skirt → lower body (legs/hips), bodice → torso, sleeve → arms, waistband → waist. ' +
+      'Pass explicit `category`/`side` to set them directly — REQUIRED for DXF-imported pieces, whose names are ambiguous (e.g. "Delantero" auto-classifies as bodice/torso even when it is a trouser front, which would place pants at the chest and make them fall). ' +
+      'Omit `category`/`side` to auto-classify by name (only safe when names contain the garment type). ' +
+      '/ Clasifica una pieza; usa category explícito para piezas DXF (un "Delantero" de pantalón se autoclasifica como torso y caería en el pecho).',
     parameters: {
       type: 'object',
       properties: {
-        pieceId: { type: 'string', description: 'Piece ID (omit for all pieces)' },
+        pieceId: { type: 'string', description: 'Piece ID (omit for all pieces — only meaningful for auto-classify)' },
+        category: {
+          type: 'string',
+          enum: ['bodice', 'sleeve', 'collar', 'skirt', 'trouser', 'waistband', 'facing', 'lining', 'pocket', 'cuff', 'hood', 'yoke', 'other'],
+          description: 'Explicit category override. Omit to auto-classify by name.',
+        },
+        side: {
+          type: 'string',
+          enum: ['front', 'back', 'left', 'right', 'center', 'both'],
+          description: 'Explicit side override. Omit to auto-classify by name.',
+        },
       },
     },
     execute: async (
@@ -25,15 +40,39 @@ export const tools: ToolDefinition[] = [
       const state = getState();
       const pieces = state.project.pieces;
       const targetId = params.pieceId as string | undefined;
+      const explicitCategory = params.category as string | undefined;
+      const explicitSide = params.side as string | undefined;
+      const hasExplicit = explicitCategory !== undefined || explicitSide !== undefined;
+
+      // An explicit override targets exactly one piece — applying a single
+      // category to "all pieces" is never what the caller means.
+      if (hasExplicit && !targetId) {
+        return { success: false, error: 'pieceId is required when setting an explicit category/side.' };
+      }
 
       const results: Record<string, unknown>[] = [];
       for (const piece of pieces) {
         if (targetId && piece.id !== targetId) continue;
-        const { category, side } = classifyPiece(piece);
+        let category = piece.category;
+        let side = piece.side;
+        if (hasExplicit) {
+          // Explicit override wins; auto-classify only the field left unset.
+          const auto = classifyPiece(piece);
+          category = (explicitCategory as typeof category) ?? piece.category ?? auto.category;
+          side = (explicitSide as typeof side) ?? piece.side ?? auto.side;
+        } else {
+          const auto = classifyPiece(piece);
+          category = auto.category;
+          side = auto.side;
+        }
         if (category !== piece.category || side !== piece.side) {
           dispatch(updatePiece({ ...piece, category, side }));
         }
         results.push({ id: piece.id, name: piece.name, category, side });
+      }
+
+      if (targetId && results.length === 0) {
+        return { success: false, error: `Piece "${targetId}" not found` };
       }
 
       return { success: true, data: { pieces: results } };

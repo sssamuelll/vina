@@ -217,6 +217,7 @@ export function autoSew(
       active: true,
       taped: false,
       tapeWidth: 10,
+      createdBy: 'ai' as const, // auto-sew proposal — review me
     },
     confidence: candidate.confidence,
     reason: candidate.breakdown.reason,

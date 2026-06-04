@@ -321,6 +321,13 @@ export interface Seam {
   taped: boolean;
   /** Width of tape in mm (default 10) */
   tapeWidth: number;
+  /**
+   * Provenance: who created the seam. 'ai' = agent / auto-sew proposal (a
+   * "review me" seam the human has not yet confirmed); 'human' = manual
+   * sewing. Undefined is treated as 'human' (legacy seams predate the field).
+   * Drives provenance coloring in SeamRenderer3D (amber AI / green human).
+   */
+  createdBy?: 'ai' | 'human';
 }
 
 // ─── Elastics (edge-based elastic/gathering) ───

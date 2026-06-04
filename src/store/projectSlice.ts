@@ -644,6 +644,10 @@ const projectSlice = createSlice({
         active: s.active ?? true,
         taped: s.taped ?? false,
         tapeWidth: s.tapeWidth ?? 10,
+        // Provenance defaults to 'human': anything dispatched without an
+        // explicit origin is treated as manual sewing. AI surfaces (agent
+        // createSeam, auto-sew proposer) pass createdBy: 'ai' themselves.
+        createdBy: s.createdBy ?? 'human',
       };
       state.seams.push(seam);
       state.isDirty = true;

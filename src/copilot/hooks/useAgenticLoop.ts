@@ -18,6 +18,10 @@ export interface ToolCallProgress {
   status: 'running' | 'done' | 'error';
   result?: unknown;
   error?: string;
+  /** The agent's one-line rationale for the round this tool belongs to —
+   *  captured from the LLM's narration emitted before the tool batch. Shown
+   *  in the decision trail so each action explains its WHY (auditability). */
+  reason?: string;
 }
 
 export interface UseAgenticLoopReturn {
@@ -27,8 +31,13 @@ export interface UseAgenticLoopReturn {
   isRunning: boolean;
   /** Final text response from the LLM */
   response: string | null;
-  /** Run a user request through the agentic loop */
-  run: (request: string) => Promise<string>;
+  /**
+   * Run a user request through the agentic loop. Returns the final text
+   * response AND the tool calls made during THIS run, so the caller can
+   * persist the decision trail on the message (live `toolCalls` state is
+   * reset on the next run — it cannot be the audit record).
+   */
+  run: (request: string) => Promise<{ response: string; toolCalls: ToolCallProgress[] }>;
   /** Clear the conversation history (project switch / fresh session). */
   clearHistory: () => void;
 }
@@ -77,17 +86,42 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
     [options.send, options.registry],
   );
 
-  const run = useCallback(async (request: string): Promise<string> => {
+  const run = useCallback(async (request: string): Promise<{ response: string; toolCalls: ToolCallProgress[] }> => {
     setIsRunning(true);
     setToolCalls([]);
     setResponse(null);
 
+    // Accumulate this run's tool calls in a local (not React state) so the
+    // authoritative per-run list is available synchronously when run()
+    // resolves — `toolCalls` state is reset on the next run and would be a
+    // stale closure here. `setToolCalls(runToolCalls)` mirrors it live.
+    let runToolCalls: ToolCallProgress[] = [];
+    // The agent narrates a one-line rationale (text) before each batch of
+    // tool calls; we hold it here and attach it to the first tool of that
+    // batch so the trail shows WHY each action happened.
+    let pendingReason: string | undefined;
+
     const handleEvent = (event: AgenticEvent) => {
       switch (event.type) {
-        case 'tool:start':
+        case 'text:delta':
+          pendingReason = event.content?.trim() || undefined;
+          break;
+        case 'tool:start': {
+          runToolCalls = reduceToolCalls(runToolCalls, event);
+          if (pendingReason && runToolCalls.length > 0) {
+            const last = runToolCalls.length - 1;
+            runToolCalls = runToolCalls.map((tc, i) =>
+              i === last ? { ...tc, reason: pendingReason } : tc,
+            );
+            pendingReason = undefined; // one reason per batch, on its first tool
+          }
+          setToolCalls(runToolCalls);
+          break;
+        }
         case 'tool:complete':
         case 'tool:error':
-          setToolCalls((prev) => reduceToolCalls(prev, event));
+          runToolCalls = reduceToolCalls(runToolCalls, event);
+          setToolCalls(runToolCalls);
           break;
         case 'complete':
           setResponse(event.content);
@@ -101,7 +135,7 @@ export function useAgenticLoop(options: AgenticLoopOptions): UseAgenticLoopRetur
 
     try {
       const result = await loop.run(request, handleEvent);
-      return result;
+      return { response: result, toolCalls: runToolCalls };
     } finally {
       setIsRunning(false);
     }

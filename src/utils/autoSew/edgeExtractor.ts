@@ -39,6 +39,10 @@ export interface Edge {
   points: Point2D[];
   /** Semantic edge name (e.g. "armhole", "sideSeam") */
   name: string;
+  /** Semantic pairing hint (e.g. "pairs with sleeveCap"), if the detected
+   *  semantic edge carried one. Lets the scorer reward edges whose roles are
+   *  known seam partners — the signal DXF pieces otherwise lack. */
+  matchHint?: string;
 }
 
 // ─── Geometry helpers ───────────────────────────────────────────────────────
@@ -260,6 +264,7 @@ function assignSemanticNames(edges: Edge[], piece: PatternPiece): void {
       se.segmentRange[0] <= edge.segStart && se.segmentRange[1] >= edge.segEnd
     );
     edge.name = match?.name ?? `edge-${edge.edgeIndex}`;
+    edge.matchHint = match?.matchHint;
   }
 }
 

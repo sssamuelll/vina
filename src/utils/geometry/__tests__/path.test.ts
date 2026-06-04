@@ -1,6 +1,6 @@
 // src/utils/geometry/__tests__/path.test.ts
 import { describe, it, expect } from 'vitest';
-import { getEdgeEndpoints, getEdgeLength, computeOffsetPath, computeSegmentOffsetPath } from '../path';
+import { getEdgeEndpoints, getEdgeLength, getEdgeArcLength, computeOffsetPath, computeSegmentOffsetPath } from '../path';
 import type { PathCommand } from '../../../types/types';
 
 const triangle: PathCommand[] = [
@@ -31,6 +31,32 @@ describe('getEdgeLength', () => {
   });
   it('returns 0 for invalid index', () => {
     expect(getEdgeLength(triangle, 0)).toBe(0);
+  });
+});
+
+describe('getEdgeArcLength', () => {
+  it('equals the chord for straight edges', () => {
+    // Horizontal L edge: arc length == straight length.
+    expect(getEdgeArcLength(triangle, 1)).toBeCloseTo(10, 5);
+  });
+
+  it('returns 0 for invalid index', () => {
+    expect(getEdgeArcLength(triangle, 0)).toBe(0);
+  });
+
+  it('measures a curved (C) edge by arc length, not the chord — the seam-mismatch fix', () => {
+    // A cubic that bulges far above the straight chord from (0,0) to (100,0).
+    const curved: PathCommand[] = [
+      { type: 'M', values: [0, 0] },
+      { type: 'C', values: [0, 80, 100, 80, 100, 0] },
+    ];
+    const chord = getEdgeLength(curved, 1); // straight endpoint distance = 100
+    const arc = getEdgeArcLength(curved, 1); // sampled curve length > chord
+    expect(chord).toBeCloseTo(100, 5);
+    expect(arc).toBeGreaterThan(chord);
+    // The bulge makes the arc materially longer — this gap is exactly what a
+    // chord-based mismatch was over-reporting on curved seams.
+    expect(arc).toBeGreaterThan(140);
   });
 });
 

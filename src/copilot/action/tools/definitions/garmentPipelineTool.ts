@@ -17,23 +17,24 @@ import { startSimulation } from '../../../../store/simulationSlice';
 const runGarmentPipelineTool: ToolDefinition = {
   name: 'runGarmentPipeline',
   description:
-    'Run the full garment pipeline on currently loaded pieces: auto-detect seams → apply high-confidence seams → start 3D simulation. ' +
-    'Call this AFTER loading a pattern (loadSeamlyPattern or blueprint). ' +
-    '/ Ejecutar pipeline completo: auto-detectar costuras → aplicar → iniciar simulación 3D.',
+    'DEPRECATED for dressing. Geometric auto-sew pairs the wrong edges on DXF pieces (collar↔sleeve) and the auto-simulate drops the garment on the floor — do NOT use it to dress. ' +
+    'Prefer: arrangeGarment (position in 3D) → createSeam (explicit, from construction knowledge) → let the HUMAN press Simulate. ' +
+    'By default this tool now does NOTHING (no auto-sew, no simulation); both are opt-in via autoSew:true / simulate:true, kept only for non-dressing/legacy callers. ' +
+    '/ OBSOLETO para vestir: el auto-sew geométrico empareja mal y el auto-simulate tira la prenda al piso. Usa arrangeGarment + createSeam + que el humano simule.',
   parameters: {
     type: 'object',
     properties: {
       minConfidence: {
         type: 'number',
-        description: 'Minimum seam confidence to auto-apply (default 0.6) / Confianza mínima para aplicar costuras',
+        description: 'Minimum seam confidence to auto-apply (default 0.6) — only used when autoSew:true',
       },
-      skipSimulation: {
+      autoSew: {
         type: 'boolean',
-        description: 'If true, only detect seams but don\'t start simulation / Solo detectar costuras sin simular',
+        description: 'Opt-in: run geometric auto-sew (default false — discouraged, pairs wrong edges on DXF)',
       },
-      skipAutoSew: {
+      simulate: {
         type: 'boolean',
-        description: 'If true, skip auto-sew (use existing seams) / Saltar auto-sew',
+        description: 'Opt-in: start the 3D drape simulation (default false — the human should press Simulate)',
       },
     },
   },
@@ -64,8 +65,11 @@ const runGarmentPipelineTool: ToolDefinition = {
       unmatchedEdges: 0,
     };
 
-    // ─── Step 1: Auto-sew ───────────────────────────────────────────────
-    if (!params.skipAutoSew) {
+    // ─── Step 1: Auto-sew (opt-in only — default OFF) ───────────────────
+    // Geometric auto-sew mispairs DXF edges; the dressing flow uses
+    // arrangeGarment + explicit createSeam instead. Kept behind an explicit
+    // flag so neither the agent nor a stray call can flail with it.
+    if (params.autoSew === true) {
       const minConf = (params.minConfidence as number) ?? 0.6;
 
       if (pieces.length >= 2) {
@@ -91,8 +95,9 @@ const runGarmentPipelineTool: ToolDefinition = {
       }
     }
 
-    // ─── Step 2: Start simulation ───────────────────────────────────────
-    if (!params.skipSimulation) {
+    // ─── Step 2: Start simulation (opt-in only — default OFF) ───────────
+    // The human presses Simulate; the agent never auto-starts the drape.
+    if (params.simulate === true) {
       dispatch(startSimulation());
       result.simulationStarted = true;
     }

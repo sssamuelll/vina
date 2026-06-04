@@ -1,5 +1,6 @@
 // src/utils/geometry/path.ts
 import type { PathCommand, Point2D } from '../../types/types';
+import { gaussLegendreCubicBezierLength } from './arcLength';
 
 /** Get the start and end points of an edge at edgeIndex in a PathCommand array. */
 export function getEdgeEndpoints(
@@ -86,11 +87,54 @@ export function getEdgePathD(
   }
 }
 
-/** Compute the straight-line length of an edge. */
+/** Compute the straight-line length of an edge (chord between endpoints). */
 export function getEdgeLength(commands: PathCommand[], edgeIndex: number): number {
   const ep = getEdgeEndpoints(commands, edgeIndex);
   if (!ep) return 0;
   return Math.sqrt((ep.end.x - ep.start.x) ** 2 + (ep.end.y - ep.start.y) ** 2);
+}
+
+/** Sample a quadratic Bézier into `steps` segments and sum their lengths. */
+function quadraticArcLength(p0: Point2D, p1: Point2D, p2: Point2D, steps = 24): number {
+  let len = 0;
+  let px = p0.x, py = p0.y;
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const u = 1 - t;
+    const x = u * u * p0.x + 2 * u * t * p1.x + t * t * p2.x;
+    const y = u * u * p0.y + 2 * u * t * p1.y + t * t * p2.y;
+    len += Math.hypot(x - px, y - py);
+    px = x; py = y;
+  }
+  return len;
+}
+
+/**
+ * Compute the ARC length of an edge — samples curve commands (C/Q) so curved
+ * edges (armholes, sleeve caps, necklines) report their true traversed length,
+ * not the straight-line chord between endpoints. Straight edges (L/H/V/Z)
+ * return the chord, which equals their arc length.
+ *
+ * Use this — NOT getEdgeLength — for seam length comparison: autoSew pairs
+ * edges by sampled arc length, so a chord-based mismatch over-reports curved
+ * seams (a half-circle armhole's chord is ~64% of its arc, reading as a huge
+ * false mismatch even when the seam is correctly matched).
+ */
+export function getEdgeArcLength(commands: PathCommand[], edgeIndex: number): number {
+  const ep = getEdgeEndpoints(commands, edgeIndex);
+  if (!ep) return 0;
+  const cmd = commands[edgeIndex];
+  const v = cmd.values;
+  switch (cmd.type) {
+    case 'C':
+      // Reuse the precise Gauss-Legendre cubic length (< 0.1mm error).
+      return gaussLegendreCubicBezierLength(ep.start, { x: v[0], y: v[1] }, { x: v[2], y: v[3] }, { x: v[4], y: v[5] });
+    case 'Q':
+      return quadraticArcLength(ep.start, { x: v[0], y: v[1] }, { x: v[2], y: v[3] });
+    default:
+      // L / H / V / Z are straight — chord IS the arc length.
+      return Math.hypot(ep.end.x - ep.start.x, ep.end.y - ep.start.y);
+  }
 }
 
 /** Compute a perpendicular offset path from a line segment. */

@@ -55,6 +55,18 @@ function makeSeamGroup(id: string, overrides: Partial<SeamGroup> = {}): SeamGrou
   };
 }
 
+describe('projectSlice — addSeam provenance', () => {
+  it('defaults createdBy to "human" when origin is omitted', () => {
+    const next = reducer(baseState(), addSeam(makeSeam('s1')));
+    expect(next.seams[0].createdBy).toBe('human');
+  });
+
+  it('preserves an explicit "ai" origin (agent / auto-sew)', () => {
+    const next = reducer(baseState(), addSeam(makeSeam('s2', { createdBy: 'ai' })));
+    expect(next.seams[0].createdBy).toBe('ai');
+  });
+});
+
 describe('projectSlice — updateSeam', () => {
   it('replaces the seam with matching id', () => {
     const state = baseState({ seams: [makeSeam('s1'), makeSeam('s2')] });

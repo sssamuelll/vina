@@ -21,7 +21,7 @@ import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { RootState, AppDispatch } from '../../store';
 import { addSeam } from '../../store/projectSlice';
-import { pickEdge } from '../../utils/3d/edgePicker';
+import { pickEdge, pieceHighlightRotation } from '../../utils/3d/edgePicker';
 import type { PatternPiece, PathCommand } from '../../types/types';
 import EdgeHighlight from './EdgeHighlight';
 import { newId } from '../../utils/ids';
@@ -247,16 +247,12 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
     return { piece, pos, rot, flipped };
   }, [pieces, placements, arrangementOverrides, flippedPieceIds]);
 
-  // Build highlight rotation for a piece (matches PieceMesh/PiecePickMesh)
+  // Build highlight rotation for a piece (shared with SeamRenderer3D via
+  // edgePicker.pieceHighlightRotation so the transforms can't drift apart).
   const getHighlightRotation = useCallback((
     piece: PatternPiece,
     rot?: [number, number, number],
-  ): [number, number, number] => {
-    if (rot) {
-      return [rot[0], rot[1] - (piece.rotation ?? 0) * Math.PI / 180, rot[2]];
-    }
-    return [0, -(piece.rotation ?? 0) * Math.PI / 180, 0];
-  }, []);
+  ): [number, number, number] => pieceHighlightRotation(piece.rotation, rot), []);
 
   // Memoize active pieces with edges for pick mesh rendering
   const activePiecesWithEdges = useMemo(() =>

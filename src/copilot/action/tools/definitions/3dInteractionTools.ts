@@ -501,9 +501,9 @@ export const tools: ToolDefinition[] = [
   {
     name: 'dressAvatar',
     description:
-      'One-click dress avatar: auto-arrange all pattern pieces around the avatar and start simulation. ' +
-      'Pieces are positioned based on their category (bodice, sleeve, skirt, etc.) and the avatar measurements. ' +
-      '/ Vestir avatar: auto-acomodar piezas alrededor del avatar e iniciar simulación.',
+      'Auto-arrange all pattern pieces around the avatar in 3D (arrange mode), by category. ' +
+      'Does NOT start the simulation — the human presses Simulate after verifying the seams. Alias of arrangeGarment (the auto-simulate tail was removed for the CLO3D flow). ' +
+      '/ Acomodar piezas alrededor del avatar en 3D (arrange). NO inicia simulación — el humano presiona Simular.',
     parameters: {
       type: 'object',
       properties: {},
@@ -533,16 +533,60 @@ export const tools: ToolDefinition[] = [
       });
       dispatch(saveArrangementSnapshot(snapshot));
 
-      // Simulate
-      dispatch(setViewMode3D('simulate'));
-      dispatch(startSimulation());
+      // Arrange only — the auto-simulate tail was removed (CLO3D flow):
+      // dressAvatar no longer drapes. The human presses Simulate after
+      // verifying the seams. This is now an alias of arrangeGarment.
+      dispatch(setViewMode3D('arrange'));
 
       return {
         success: true,
         data: {
           piecesArranged: pieces.length,
           seamsActive: state.project.seams.filter(s => s.active).length,
-          message: `Dressing avatar with ${pieces.length} pieces and ${state.project.seams.filter(s => s.active).length} seams.`,
+          message: `Arranged ${pieces.length} pieces in 3D (arrange mode). Verify the seams, then press Simulate.`,
+        },
+      };
+    },
+  },
+  {
+    name: 'arrangeGarment',
+    description:
+      'Position the loaded pieces in 3D around the avatar in ARRANGE mode, WITHOUT starting the drape simulation. ' +
+      'Pieces are placed by category (bodice→torso, sleeve→arms, trouser/skirt→lower body, collar→neck, waistband→waist). ' +
+      'Use this after classifying pieces: it sets up the 3D view so the user can verify placement and the seams (drawn as lines) before pressing Simulate. Does NOT auto-sew and does NOT simulate. ' +
+      '/ Acomodar las piezas en 3D alrededor del avatar (modo arrange) SIN simular. No auto-cose, no simula.',
+    parameters: { type: 'object', properties: {}, required: [] },
+    execute: async (_params, dispatch, getState) => {
+      const state = getState();
+      const pieces = state.project.pieces.filter(p => p.active);
+      if (pieces.length === 0) {
+        return { success: false, error: 'No active pattern pieces to arrange.' };
+      }
+
+      const { placeGarmentPieces } = await import('../../../../utils/cloth/garmentPlacement');
+      const { clearArrangementOverrides } = await import('../../../../store/projectSlice');
+      const { saveArrangementSnapshot, clearArrangementSnapshot } = await import('../../../../store/simulationSlice');
+
+      dispatch(resetSimulation());
+      dispatch(clearArrangementOverrides());
+      dispatch(clearArrangementSnapshot());
+
+      const placements = placeGarmentPieces(pieces, state.project.avatar.measurements);
+      const snapshot: Record<string, [number, number, number]> = {};
+      pieces.forEach((p, i) => {
+        snapshot[p.id] = [placements[i].position[0], placements[i].position[1], placements[i].position[2]];
+      });
+      dispatch(saveArrangementSnapshot(snapshot));
+
+      // Arrange only — stay in arrange mode; the human triggers Simulate.
+      dispatch(setViewMode3D('arrange'));
+
+      return {
+        success: true,
+        data: {
+          piecesArranged: pieces.length,
+          seamsActive: state.project.seams.filter(s => s.active).length,
+          message: `Arranged ${pieces.length} pieces in 3D (arrange mode). Verify placement and seams, then press Simulate when ready.`,
         },
       };
     },

@@ -131,6 +131,27 @@ function guessPieceCategory(name: string): PieceCategory {
   return 'unknown';
 }
 
+/**
+ * Resolve the edge-detection category, PREFERRING the piece's explicit
+ * `category`/`side` (set by the agent's classifyPiece or the user) over
+ * guessing from the name. This is what lets edge detection work for DXF
+ * pieces: their CAD block names carry no garment role, but once the agent
+ * classifies them (e.g. bodice/front, collar) we map that to the internal
+ * category and emit role-bearing edges (armhole, neckline, collarNeckEdge)
+ * instead of inert positional ones. Name-guessing remains the fallback.
+ */
+function resolveCategory(piece: PatternPiece): PieceCategory {
+  switch (piece.category) {
+    case 'bodice': return piece.side === 'back' ? 'bodice-back' : 'bodice-front';
+    case 'sleeve': return 'sleeve';
+    case 'collar': return 'collar';
+    case 'skirt': return 'skirt';
+    case 'trouser': return 'trouser';
+    case 'waistband': return 'waistband';
+    default: return guessPieceCategory(piece.name);
+  }
+}
+
 // ─── Main Detection ───────────────────────────────────────────────────────────
 
 /**
@@ -142,7 +163,7 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
   if (segments.length < 3) return [];
 
   const bbox = computeBBox(segments);
-  const category = guessPieceCategory(piece.name);
+  const category = resolveCategory(piece);
   const edges: SemanticEdge[] = [];
 
   // Group consecutive segments by zone
@@ -165,17 +186,26 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
     const totalLength = group.segments.reduce((sum, s) => sum + s.length, 0);
     const hasCurve = group.segments.some(s => isCurved(piece.outline, s.index));
     const avgAngle = group.segments.reduce((sum, s) => sum + s.angle, 0) / group.segments.length;
+    const avgMidX = group.segments.reduce((sum, s) => sum + s.midX, 0) / group.segments.length;
+    const relX = bbox.width > 0 ? (avgMidX - bbox.minX) / bbox.width : 0.5;
+    const isCenterX = relX > 0.3 && relX < 0.7;
 
     let name = 'edge';
     let edgeType: SemanticEdgeType = 'unknown';
     let matchHint: string | undefined;
 
     if (category === 'bodice-front' || category === 'bodice-back') {
-      const side = category === 'bodice-front' ? 'front' : 'back';
-      if (group.zone === 'top' && hasCurve) {
-        name = 'armhole'; edgeType = 'seam'; matchHint = `pairs with ${side}-sleeve-cap`;
+      const opp = category === 'bodice-front' ? 'back' : 'front';
+      if (group.zone === 'top' && hasCurve && isCenterX) {
+        // Curved AND centered → neckline. Without the relX check, a curved
+        // neckline falls into the curved-top rule below and is mislabeled
+        // 'armhole' (the failure mode behind "el cuello detectó bordes
+        // incorrectos").
+        name = 'neckline'; edgeType = 'opening'; matchHint = 'pairs with collarNeckEdge';
+      } else if (group.zone === 'top' && hasCurve) {
+        name = 'armhole'; edgeType = 'seam'; matchHint = 'pairs with sleeveCap';
       } else if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
-        name = 'shoulder'; edgeType = 'seam'; matchHint = `pairs with ${side === 'front' ? 'back' : 'front'}-shoulder`;
+        name = 'shoulder'; edgeType = 'seam'; matchHint = `pairs with ${opp}-shoulder`;
       } else if (group.zone === 'bottom' && isNearlyHorizontal(avgAngle)) {
         name = 'hemline'; edgeType = 'hem';
       } else if (group.zone === 'left' && isNearlyVertical(avgAngle)) {
@@ -183,9 +213,9 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
         edgeType = 'fold';
       } else if (group.zone === 'right' && isNearlyVertical(avgAngle)) {
         name = 'sideSeam'; edgeType = 'seam';
-        matchHint = `pairs with ${side === 'front' ? 'back' : 'front'}-sideSeam`;
+        matchHint = `pairs with ${opp}-sideSeam`;
       } else if (group.zone === 'top') {
-        name = 'neckline'; edgeType = 'opening';
+        name = 'neckline'; edgeType = 'opening'; matchHint = 'pairs with collarNeckEdge';
       }
     } else if (category === 'sleeve') {
       if (group.zone === 'top' && hasCurve) {
@@ -195,23 +225,46 @@ export function detectSemanticEdges(piece: PatternPiece): SemanticEdge[] {
       } else if (isNearlyVertical(avgAngle)) {
         name = 'underarmSeam'; edgeType = 'seam'; matchHint = 'self-close';
       }
+    } else if (category === 'collar') {
+      // A collar is a long strip: the bottom long edge sews to the neckline,
+      // the top is the free outer edge, the short ends are collar points.
+      // Previously collar had NO branch and fell to the generic case → inert
+      // positional edges with no matchHint → autoSew mispaired the collar.
+      if (group.zone === 'bottom' && isNearlyHorizontal(avgAngle)) {
+        name = 'collarNeckEdge'; edgeType = 'seam'; matchHint = 'pairs with neckline';
+      } else if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
+        name = 'collarOuterEdge'; edgeType = 'hem';
+      } else {
+        name = 'collarEnd'; edgeType = 'seam';
+      }
     } else if (category === 'skirt') {
       if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
-        name = 'waistline'; edgeType = 'seam'; matchHint = 'pairs with waistband';
+        name = 'waistline'; edgeType = 'seam'; matchHint = 'pairs with waistbandEdge';
       } else if (group.zone === 'bottom') {
         name = 'hemline'; edgeType = 'hem';
       } else if (isNearlyVertical(avgAngle)) {
-        name = 'sideSeam'; edgeType = 'seam';
+        name = 'sideSeam'; edgeType = 'seam'; matchHint = 'pairs with sideSeam';
       }
     } else if (category === 'trouser') {
       if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
-        name = 'waistline'; edgeType = 'seam';
+        name = 'waistline'; edgeType = 'seam'; matchHint = 'pairs with waistbandEdge';
       } else if (group.zone === 'bottom') {
         name = 'hemline'; edgeType = 'hem';
       } else if (hasCurve) {
-        name = 'crotchCurve'; edgeType = 'seam';
+        name = 'crotchCurve'; edgeType = 'seam'; matchHint = 'pairs with crotchCurve';
       } else if (isNearlyVertical(avgAngle)) {
-        name = 'sideSeam'; edgeType = 'seam';
+        name = 'sideSeam'; edgeType = 'seam'; matchHint = 'pairs with sideSeam';
+      }
+    } else if (category === 'waistband') {
+      // A waistband is a long strip: one long edge sews to the waistline,
+      // the other is the top/fold edge, the short ends close the band.
+      // (Previously waistband had no branch → generic edges, unsewable.)
+      if (group.zone === 'bottom' && isNearlyHorizontal(avgAngle)) {
+        name = 'waistbandEdge'; edgeType = 'seam'; matchHint = 'pairs with waistline';
+      } else if (group.zone === 'top' && isNearlyHorizontal(avgAngle)) {
+        name = 'waistbandFold'; edgeType = 'fold';
+      } else {
+        name = 'waistbandEnd'; edgeType = 'seam';
       }
     } else {
       // Generic: assign by zone

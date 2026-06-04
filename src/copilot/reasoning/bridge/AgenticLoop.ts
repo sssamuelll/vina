@@ -303,7 +303,7 @@ export class AgenticLoop {
 
           if (!actionsInScope && !actionsThisRun) {
             const errorMsg = lastConfirmIdx >= 0
-              ? 'presentToUser({awaiting: "done"}) was rejected. The user confirmed your previous proposal, but you have not yet called any action tool to actually execute that proposal. The Redux store has not changed since the confirmation. Call the action tools the user just approved (e.g. loadSeamlyPattern, runGarmentPipeline for a dressing flow) and then try presentToUser({awaiting: "done"}) again with REAL numbers from the tool results — never fabricated.'
+              ? 'presentToUser({awaiting: "done"}) was rejected. The user confirmed your previous proposal, but you have not yet called any action tool to actually execute that proposal. The Redux store has not changed since the confirmation. Call the action tools the user just approved (e.g. loadSeamlyPattern, arrangeGarment, createSeam for a dressing flow) and then try presentToUser again with REAL numbers from the tool results — never fabricated.'
               : 'presentToUser({awaiting: "done"}) was rejected. No action tool has been called in this conversation. Call the relevant action tools required by the user\'s request first, then try presentToUser again.';
 
             // Record the rejected attempt in messages so the LLM sees its
@@ -397,6 +397,14 @@ export class AgenticLoop {
         assistantMsg.reasoning_content = response.reasoningContent;
       }
       messages.push(assistantMsg);
+
+      // Surface the agent's narration for THIS batch of tool calls so the UI
+      // decision trail can show the WHY behind each action (auditability).
+      // The loop is non-streaming, so this is the only emission of per-round
+      // content; the final user-facing message arrives via presentToUser.
+      if (response.content && response.content.trim()) {
+        onEvent({ type: 'text:delta', content: response.content.trim() });
+      }
 
       // Execute each tool call and append results
       for (const toolCall of response.toolCalls) {

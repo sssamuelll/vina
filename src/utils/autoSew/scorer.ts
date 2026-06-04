@@ -29,6 +29,10 @@ export interface ScoreBreakdown {
   proximity: number;
   /** Edge position alignment score (0-1) */
   edgePosition: number;
+  /** Semantic role correspondence (0 or 1): a known seam-partner pair
+   *  (armhole↔sleeveCap, sideSeam↔sideSeam, neckline↔collarNeckEdge, …),
+   *  applied only when the pair is geometrically plausible. */
+  semanticMatch: number;
   /** Reason from naming rules */
   reason: string;
 }
@@ -89,6 +93,31 @@ function edgePositionScore(edgeA: Edge, edgeB: Edge, hints: EdgeHint[]): number 
   return normalScore;
 }
 
+/**
+ * Score semantic role correspondence between two edges. Returns 1 when one
+ * edge's matchHint references the other's role name (e.g. an armhole's
+ * "pairs with sleeveCap" and an edge named "sleeveCap"), else 0.
+ *
+ * This is the signal DXF pieces lack: with no layout proximity and
+ * similar-length edges everywhere, geometry alone pairs coincidentally.
+ * Once pieces are classified, edges carry roles (armhole / neckline /
+ * collarNeckEdge / sideSeam …) and known garment seams become explicit.
+ */
+function semanticMatchScore(edgeA: Edge, edgeB: Edge): number {
+  const nameA = edgeA.name?.toLowerCase().replace(/-\d+$/, '') ?? '';
+  const nameB = edgeB.name?.toLowerCase().replace(/-\d+$/, '') ?? '';
+  // Unnamed / fallback edges carry no role signal.
+  if (!nameA || !nameB || nameA.startsWith('edge-') || nameB.startsWith('edge-')) return 0;
+  const hintA = edgeA.matchHint?.toLowerCase() ?? '';
+  const hintB = edgeB.matchHint?.toLowerCase() ?? '';
+  if (hintA && hintA.includes(nameB)) return 1;
+  if (hintB && hintB.includes(nameA)) return 1;
+  return 0;
+}
+
+/** How far a confirmed semantic match lifts confidence toward 1. */
+const SEMANTIC_LIFT = 0.55;
+
 // ─── Composite scoring ─────────────────────────────────────────────────────
 
 /**
@@ -127,7 +156,19 @@ export function scoreEdgePair(
     totalWeight = weights.naming + weights.length + weights.proximity + weights.edgePosition;
   }
 
-  const confidence = totalWeight > 0 ? weightedSum / totalWeight : 0;
+  const base = totalWeight > 0 ? weightedSum / totalWeight : 0;
+
+  // Semantic role lift — but ONLY among geometrically plausible pairs. A
+  // confirmed role match (armhole↔sleeveCap, …) lifts confidence toward 1,
+  // letting a correct seam beat a coincidental similar-length one. The
+  // plausibility gate (edges within ~2× length of each other) prevents a
+  // mislabeled edge from forcing a confidently-wrong seam on bad geometry —
+  // semantics disambiguate among plausible matches, they never override it.
+  const maxLen = Math.max(edgeA.arcLength, edgeB.arcLength, 1e-6);
+  const lenRatio = Math.min(edgeA.arcLength, edgeB.arcLength) / maxLen;
+  const geometricallyPlausible = lenRatio >= 0.5;
+  const semanticMatch = geometricallyPlausible ? semanticMatchScore(edgeA, edgeB) : 0;
+  const confidence = semanticMatch > 0 ? base + SEMANTIC_LIFT * (1 - base) : base;
 
   return {
     edgeA,
@@ -138,6 +179,7 @@ export function scoreEdgePair(
       lengthSimilarity: lenSim,
       proximity: proxScore,
       edgePosition: posScore,
+      semanticMatch,
       reason: namingResult?.reason ?? 'No naming heuristic matched',
     },
   };
