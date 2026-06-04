@@ -238,6 +238,7 @@ export default function AppShell() {
         )}
         <div
           className="canvas-area__3d"
+          data-shortcut-context="3d"
           style={{ width: get3dWidth(), display: viewMode === '2d' ? 'none' : undefined }}
         >
           <RightDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
