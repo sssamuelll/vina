@@ -7,7 +7,10 @@ import {
   toggleReferenceImages, toggleLineLengths, setRenderMode2D,
   clearSelection, setZoom2D, setUnits,
 } from '../../store/editorSlice';
-import { startSimulation, pauseSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
+import {
+  startSimulation, pauseSimulation, resetSimulation, setViewMode3D,
+  toggleGarment, toggleSeamlines3D, toggleInternalLines3D,
+} from '../../store/simulationSlice';
 import { toggleDockSignaling } from '../../store/dockSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
@@ -79,6 +82,10 @@ const VIEW_MENU: MenuItem[] = [
   { label: 'Render: Textured', action: (d) => d(setRenderMode2D('textured')), checked: (s) => s.editor.renderMode2D === 'textured' },
   { label: 'Render: Translucent', action: (d) => d(setRenderMode2D('translucent')), checked: (s) => s.editor.renderMode2D === 'translucent' },
   { label: 'Render: Wireframe', action: (d) => d(setRenderMode2D('wireframe')), checked: (s) => s.editor.renderMode2D === 'wireframe' },
+  { separator: true, label: '' },
+  { label: '3D: Garment', action: (d) => d(toggleGarment()), checked: (s) => s.simulation.showGarment },
+  { label: '3D: Seamlines', action: (d) => d(toggleSeamlines3D()), checked: (s) => s.simulation.showSeamlines3D },
+  { label: '3D: Internal Lines', action: (d) => d(toggleInternalLines3D()), checked: (s) => s.simulation.showInternalLines3D },
   { separator: true, label: '' },
   { label: 'Dock Suggestions', action: (d) => d(toggleDockSignaling()), checked: (s) => s.dock.signaling === 'subtle' },
   { separator: true, label: '' },

@@ -45,7 +45,7 @@ function openViewMenu() {
 
 function isChecked(label: string): boolean {
   const item = screen.getByText(label).closest('.logo-menu__item')!;
-  return item.querySelector('.logo-menu__check')!.textContent === '✓';
+  return item.querySelector('.logo-menu__check')!.textContent!.trim() !== '';
 }
 
 describe('LogoMenu ▸ View — 2D display toggles', () => {
@@ -60,11 +60,11 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
 
   it('toggles Line Lengths', () => {
     const store = renderMenu();
-    expect(store.getState().editor.showLineLengths).toBe(false);
+    const before = store.getState().editor.showLineLengths;
     openViewMenu();
-    expect(isChecked('Line Lengths')).toBe(false);
+    expect(isChecked('Line Lengths')).toBe(before);
     fireEvent.click(screen.getByText('Line Lengths'));
-    expect(store.getState().editor.showLineLengths).toBe(true);
+    expect(store.getState().editor.showLineLengths).toBe(!before);
   });
 
   it('Render trio is a radio group: selecting Wireframe unchecks Textured', () => {
@@ -79,5 +79,20 @@ describe('LogoMenu ▸ View — 2D display toggles', () => {
     openViewMenu();
     expect(isChecked('Render: Wireframe')).toBe(true);
     expect(isChecked('Render: Textured')).toBe(false);
+  });
+});
+
+describe('LogoMenu ▸ View — 3D display toggles', () => {
+  it.each([
+    ['3D: Garment', 'showGarment'],
+    ['3D: Seamlines', 'showSeamlines3D'],
+    ['3D: Internal Lines', 'showInternalLines3D'],
+  ] as const)('%s toggles simulation.%s and reflects checked state', (label, field) => {
+    const store = renderMenu();
+    const before = store.getState().simulation[field];
+    openViewMenu();
+    expect(isChecked(label)).toBe(before);
+    fireEvent.click(screen.getByText(label));
+    expect(store.getState().simulation[field]).toBe(!before);
   });
 });
