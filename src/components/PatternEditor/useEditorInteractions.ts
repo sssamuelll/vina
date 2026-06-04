@@ -342,19 +342,23 @@ export function useEditorInteractions(
 
     const flush = () => {
       rafId = 0;
+      let basePan = panRef2.current;
       if (zoomAcc.factor !== 1) {
         const next = zoomAtPoint(
-          { zoom: zoomRef.current, pan: panRef2.current },
+          { zoom: zoomRef.current, pan: basePan },
           zoomAcc.factor, zoomAcc.cx, zoomAcc.cy,
         );
         dispatch(setPan2D(next.pan));
         dispatch(setZoom2D(next.zoom));
+        basePan = next.pan;
         zoomAcc = { factor: 1, cx: 0, cy: 0 };
       }
       if (panAcc.dx !== 0 || panAcc.dy !== 0) {
-        const p = panRef2.current;
+        // Note: basePan is the last Redux-committed pan (or this frame's zoom
+        // adjustment). If a middle-click drag is active, the live DOM transform
+        // differs — simultaneous wheel+drag is not a realistic gesture; tolerated.
         // natural-scroll convention: content follows fingers (deltaY>0 → view down)
-        dispatch(setPan2D({ x: p.x - panAcc.dx, y: p.y - panAcc.dy }));
+        dispatch(setPan2D({ x: basePan.x - panAcc.dx, y: basePan.y - panAcc.dy }));
         panAcc = { dx: 0, dy: 0 };
       }
     };
