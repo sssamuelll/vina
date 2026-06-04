@@ -21,56 +21,96 @@ async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(1000);
+  // Dismiss the auto-opened template library modal.
+  const closeBtn = page.locator('button:has-text("✕")');
+  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+    await closeBtn.click({ force: true });
+    await page.waitForTimeout(300);
+  }
 }
 
-async function drawRect(page: Page) {
-  const svg = page.locator('svg.pattern-svg');
-  await svg.click(); // Focus the 2D canvas
-  await page.waitForTimeout(200);
+async function dispatch(page: Page, action: { type: string; payload?: unknown }) {
+  await page.evaluate((act) => {
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+      | { dispatch: (a: unknown) => void }
+      | undefined;
+    store?.dispatch(act);
+  }, action);
+}
 
-  // 's' = Rectangle tool
-  await page.keyboard.press('s');
-  await page.waitForTimeout(200);
+async function getState<T = unknown>(page: Page, path: string): Promise<T> {
+  return page.evaluate((sel) => {
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+      | { getState: () => unknown }
+      | undefined;
+    if (!store) return null;
+    const state = store.getState();
+    return sel
+      .split('.')
+      .reduce((o: unknown, k) => (o as Record<string, unknown> | null)?.[k], state) as T;
+  }, path) as Promise<T>;
+}
 
-  const box = await svg.boundingBox();
-  if (!box) throw new Error('Pattern SVG not found');
-
-  const cx = box.x + box.width / 2;
-  const cy = box.y + box.height / 2;
-  await page.mouse.move(cx - 80, cy - 80);
-  await page.mouse.down();
-  await page.mouse.move(cx + 80, cy + 80, { steps: 10 });
-  await page.mouse.up();
-  await page.waitForTimeout(1000);
-
-  // Verify piece was created
-  const piecesIndicator = page.locator('text=/Pieces:\\s*[1-9]/');
-  await expect(piecesIndicator).toBeVisible({ timeout: 5000 });
+/** Seed one rectangle piece via the store (deterministic, no canvas drawing). */
+async function addPiece(page: Page) {
+  await dispatch(page, {
+    type: 'project/addPiece',
+    payload: {
+      id: 'fitmap-piece-1',
+      name: 'Panel',
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [200, 0] },
+        { type: 'L', values: [200, 300] },
+        { type: 'L', values: [0, 300] },
+        { type: 'L', values: [0, 0] },
+      ],
+      internals: [],
+      position: { x: 60, y: 40 },
+      rotation: 0,
+      mirrored: false,
+      seamAllowance: 10,
+      layer: 1,
+      sublayer: 0,
+      active: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  });
+  await page.waitForTimeout(300);
+  const pieces = await getState<unknown[]>(page, 'project.pieces');
+  expect(pieces.length).toBeGreaterThanOrEqual(1);
 }
 
 async function startSimulation(page: Page) {
-  // Open simulation panel via activity bar
-  await page.click('.activity-bar-item[aria-label="Simulation"]');
-  await page.waitForTimeout(500);
+  // Switch to the 3D view so Viewport3D (which hosts FitMapToggle) is mounted.
+  await page.click('button:has-text("3D")');
+  await page.waitForTimeout(2000);
 
-  // Try the sidebar "▶ Simulate" button first, fall back to "Start Simulation"
-  const simBtn = page.locator('button:has-text("▶ Simulate"), button:has-text("Start Simulation")').first();
-  await expect(simBtn).toBeEnabled({ timeout: 5000 });
-  await simBtn.click();
+  // Drive the simulation lifecycle through the store: arrange snapshot is not
+  // required for the fit-map UI, only simulationState !== 'idle'.
+  await dispatch(page, { type: 'simulation/setViewMode3D', payload: 'simulate' });
+  await dispatch(page, { type: 'simulation/startSimulation' });
 
-  // Wait for simulation to initialize (Wasm/Worker loading + mesh setup)
-  await expect(page.locator('.sim-status.running')).toBeVisible({ timeout: 15000 });
-  // Let physics settle a bit so stats can be computed
+  // Poll the canonical truth: the toggle bar renders once state leaves 'idle'.
+  await expect.poll(
+    async () => getState<string>(page, 'simulation.simulationState'),
+    { timeout: 15000 },
+  ).toBe('running');
+
+  // The toggle bar should now be visible in the 3D viewport.
+  await expect(page.locator('button[title="Stress Map (Alt+6)"]')).toBeVisible({ timeout: 5000 });
+  // Let physics settle a bit so stats can be computed.
   await page.waitForTimeout(2000);
 }
 
 /**
- * Full setup: load app, draw a piece, start simulation.
+ * Full setup: load app, seed a piece, start simulation.
  * After this, the FitMapToggle bar should be visible in the 3D viewport.
  */
 async function setupSimulation(page: Page) {
   await waitForApp(page);
-  await drawRect(page);
+  await addPiece(page);
   await startSimulation(page);
 }
 
@@ -90,15 +130,16 @@ test.describe('Fit Map UI', () => {
     const stressBtn = page.locator('button[title="Stress Map (Alt+6)"]');
     await expect(stressBtn).toBeVisible({ timeout: 5000 });
 
-    // Click to activate stress map
-    await stressBtn.click();
+    // Click to activate stress map (force: surface-mode pill overlaps the bar)
+    await stressBtn.click({ force: true });
     await page.waitForTimeout(500);
 
-    // Legend should show "kPa" label in the vertical scale bar
-    await expect(page.locator('text=/kPa/')).toBeVisible({ timeout: 3000 });
+    // Legend should show "kPa" label(s) in the vertical scale bar.
+    // (Stress mode renders several kPa labels: range ends + live max/avg.)
+    await expect(page.locator('text=/kPa/').first()).toBeVisible({ timeout: 3000 });
 
     // Toggle off by clicking again
-    await stressBtn.click();
+    await stressBtn.click({ force: true });
     await page.waitForTimeout(500);
 
     // Legend should disappear — kPa text should no longer be visible
@@ -126,7 +167,8 @@ test.describe('Fit Map UI', () => {
     for (const { title } of modes) {
       const btn = page.locator(`button[title="${title}"]`);
       await expect(btn).toBeVisible({ timeout: 3000 });
-      await btn.click();
+      // force: the surface-mode pill overlaps the toggle bar's top-right corner.
+      await btn.click({ force: true });
       await page.waitForTimeout(500);
 
       // Canvas should still be visible (no crash / blank screen)
@@ -135,13 +177,16 @@ test.describe('Fit Map UI', () => {
 
     // Deactivate by clicking the last mode again (pressure)
     const pressureBtn = page.locator('button[title="Pressure Points (Alt+9)"]');
-    await pressureBtn.click();
+    await pressureBtn.click({ force: true });
     await page.waitForTimeout(300);
 
-    // Verify canvas is still alive
+    // Verify canvas is still alive and the simulation is still running (the
+    // `.sim-status` chrome is hidden in the redesign shell, so assert the
+    // canonical store truth instead).
     await expect(page.locator('canvas')).toBeVisible();
-    // Verify the sim-status indicator is still present (app didn't crash)
-    await expect(page.locator('.sim-status')).toBeVisible();
+    expect(await getState<string>(page, 'simulation.simulationState')).toBe('running');
+    // Toggle bar still mounted (FitMapToggle renders while non-idle).
+    await expect(page.locator('button[title="Stress Map (Alt+6)"]')).toBeVisible();
   });
 
   // ── Test 3: Legend shows live stats (not NaN) ──────────────────────────
@@ -149,7 +194,7 @@ test.describe('Fit Map UI', () => {
   test('legend shows live stats via window global', async ({ page }) => {
     // Activate strain map so stats are generated
     const strainBtn = page.locator('button[title="Strain Map (Alt+7)"]');
-    await strainBtn.click();
+    await strainBtn.click({ force: true });
 
     // Give the simulation a moment to compute fit map stats
     await page.waitForTimeout(3000);
@@ -195,13 +240,13 @@ test.describe('Fit Map UI', () => {
   test('config popover opens and has inputs', async ({ page }) => {
     // First activate stress map so there is context for the config
     const stressBtn = page.locator('button[title="Stress Map (Alt+6)"]');
-    await stressBtn.click();
+    await stressBtn.click({ force: true });
     await page.waitForTimeout(300);
 
     // Click the config/gear button
     const configBtn = page.locator('button[title="Fit Map Config"]');
     await expect(configBtn).toBeVisible({ timeout: 3000 });
-    await configBtn.click();
+    await configBtn.click({ force: true });
     await page.waitForTimeout(300);
 
     // The config popover should appear with the heading
@@ -223,7 +268,7 @@ test.describe('Fit Map UI', () => {
     await expect(page.locator('button:has-text("Reset to Defaults")')).toBeVisible();
 
     // Close the popover by clicking the config button again
-    await configBtn.click();
+    await configBtn.click({ force: true });
     await page.waitForTimeout(300);
 
     // The "Stress Range" text inside the popover should be gone
@@ -254,19 +299,20 @@ test.describe('Fit Map UI', () => {
     await page.keyboard.press('Alt+6');
     await page.waitForTimeout(500);
 
-    // Legend should show "kPa" in the scale bar
-    const kpaVisible = await page.locator('text=/kPa/').isVisible().catch(() => false);
+    // Legend should show "kPa" label(s) in the scale bar. Stress mode renders
+    // several kPa labels, so scope to the first and gate on the count.
+    const kpaVisible = (await page.locator('text=/kPa/').count()) > 0;
 
     if (kpaVisible) {
-      await expect(page.locator('text=/kPa/')).toBeVisible();
+      await expect(page.locator('text=/kPa/').first()).toBeVisible();
 
       // Press Alt+0 to turn off all fit maps
       await page.keyboard.press('Alt+0');
       await page.waitForTimeout(500);
 
-      // kPa should disappear
-      await expect(page.locator('text=/kPa/')).not.toBeVisible({ timeout: 3000 }).catch(() => {
-        // The scale bar may still exist but be hidden — acceptable
+      // kPa labels should disappear (scale bar unmounts when mode is none).
+      await expect(page.locator('text=/kPa/')).toHaveCount(0, { timeout: 3000 }).catch(() => {
+        // The scale bar may still exist but be hidden — acceptable.
         console.log('kPa text may still exist in DOM but should be hidden');
       });
     } else {
@@ -279,9 +325,9 @@ test.describe('Fit Map UI', () => {
 
       // Verify the button-based approach works as a fallback
       const stressBtn = page.locator('button[title="Stress Map (Alt+6)"]');
-      await stressBtn.click();
+      await stressBtn.click({ force: true });
       await page.waitForTimeout(500);
-      await expect(page.locator('text=/kPa/')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('text=/kPa/').first()).toBeVisible({ timeout: 3000 });
     }
   });
 
@@ -290,7 +336,7 @@ test.describe('Fit Map UI', () => {
   test('fit map survives simulation reset and restart', async ({ page }) => {
     // Activate fit map mode
     const fitBtn = page.locator('button[title="Fit Map (Alt+8)"]');
-    await fitBtn.click();
+    await fitBtn.click({ force: true });
     await page.waitForTimeout(500);
 
     // Verify fit map table is present (or at least the button is active)
@@ -298,36 +344,27 @@ test.describe('Fit Map UI', () => {
     const fitTableVisible = await page.locator('text=Fit Map').first().isVisible().catch(() => false);
     console.log('Fit map table visible before reset:', fitTableVisible);
 
-    // Reset the simulation
-    const resetBtn = page.locator('button:has-text("Reset"), button:has-text("⏹ Reset")').first();
-    if (await resetBtn.isVisible().catch(() => false)) {
-      await resetBtn.click();
-      await page.waitForTimeout(1000);
+    // Reset the simulation through the store (no StatusBar / sidebar in the
+    // current shell). This returns simulationState to 'idle'.
+    await dispatch(page, { type: 'simulation/resetSimulation' });
+    await page.waitForTimeout(800);
 
-      // After reset, the app should still be alive (no crash)
-      await expect(page.locator('canvas')).toBeVisible();
-      await expect(page.locator('.status-bar')).toBeVisible();
+    // After reset, the app should still be alive (no crash). The toggle bar
+    // hides while idle (FitMapToggle returns null), but the canvas persists.
+    await expect(page.locator('canvas')).toBeVisible();
+    expect(await getState<string>(page, 'simulation.simulationState')).toBe('idle');
 
-      // Restart simulation
-      // Re-open sim panel if needed
-      const simActivity = page.locator('.activity-bar-item[aria-label="Simulation"]');
-      if (await simActivity.isVisible().catch(() => false)) {
-        await simActivity.click();
-        await page.waitForTimeout(300);
-      }
+    // Restart simulation through the store.
+    await dispatch(page, { type: 'simulation/setViewMode3D', payload: 'simulate' });
+    await dispatch(page, { type: 'simulation/startSimulation' });
+    await expect.poll(
+      async () => getState<string>(page, 'simulation.simulationState'),
+      { timeout: 10000 },
+    ).toBe('running');
+    await page.waitForTimeout(1000);
 
-      const startBtn = page.locator('button:has-text("▶ Simulate"), button:has-text("Start Simulation")').first();
-      if (await startBtn.isVisible().catch(() => false) && await startBtn.isEnabled().catch(() => false)) {
-        await startBtn.click();
-        await page.waitForTimeout(3000);
-      }
-
-      // Canvas should still be rendering (no crash after reset + restart)
-      await expect(page.locator('canvas')).toBeVisible();
-    } else {
-      console.warn('Reset button not visible — simulation may have already stopped');
-      // Still verify app is alive
-      await expect(page.locator('canvas')).toBeVisible();
-    }
+    // The toggle bar should reappear and the canvas should still render.
+    await expect(page.locator('button[title="Fit Map (Alt+8)"]')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('canvas')).toBeVisible();
   });
 });

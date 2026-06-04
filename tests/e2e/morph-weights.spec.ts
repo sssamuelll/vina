@@ -11,8 +11,10 @@ async function openAvatarPanel(page: Page) {
   await page.click('button:has-text("3D")');
   await page.waitForTimeout(2000);
 
-  // Click the avatar tool button to open the AvatarPanel
-  const avatarBtn = page.locator('button[data-tool-id="avatar"]');
+  // Click the Avatar affordance in the RightDock to open the AvatarPanel.
+  // (Toolbar3D, which owned the old data-tool-id button, was deleted 2026-06-04;
+  // the 3D-side dock now hosts Arrange/Sew/Simulate/Avatar.)
+  const avatarBtn = page.locator('button[aria-label="Avatar"]');
   await avatarBtn.click({ force: true });
   await page.waitForTimeout(500);
 
