@@ -16,6 +16,7 @@ import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import ContextPanel from './ContextPanel';
+import ToastContainer from './ToastContainer';
 import { getPanelSide } from './panelSide';
 import type { Tool3D } from '../../types/types';
 
@@ -255,6 +256,7 @@ export default function AppShell() {
         onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
       />
       <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
+      <ToastContainer />
     </div>
   );
 }
