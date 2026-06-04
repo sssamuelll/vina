@@ -2,19 +2,9 @@ import { test, expect, Page } from '@playwright/test';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-async function dismissTemplateLibrary(page: Page) {
-  const heading = page.locator('text=Seamly2D Pattern Library');
-  if (await heading.isVisible().catch(() => false)) {
-    await page.locator('button.template-close').click({ force: true });
-    await page.waitForTimeout(300);
-  }
-}
-
 async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
-  await dismissTemplateLibrary(page);
-  // Additional wait to ensure app is fully loaded
   await page.waitForTimeout(500);
 }
 
@@ -34,18 +24,27 @@ async function getActiveTool2D(page: Page): Promise<string | null> {
   });
 }
 
-async function focusEditor(page: Page) {
-  // Click into the 2D canvas so subsequent keyboard / mouse events route to it.
-  const svg = page.locator('svg.pattern-svg');
-  await svg.click({ position: { x: 10, y: 10 } });
-  await page.waitForTimeout(150);
+// Piece count straight from Redux — deterministic, replaces the dead `.status-bar`.
+async function getPieceCount(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { project: { pieces: unknown[] } } } }).__OPENCLO_STORE__;
+    return store ? store.getState().project.pieces.length : -1;
+  });
+}
+
+// Activate a 2D drawing tool by keyboard shortcut and wait for EmptyState2D to
+// unmount. EmptyState2D overlays the canvas when 0 pieces AND activeTool ===
+// 'select' and intercepts pointer events — so it MUST be gone before drawing.
+async function activateTool(page: Page, shortcut: string, toolId: string) {
+  await page.keyboard.press(shortcut);
+  await expect.poll(() => getActiveTool2D(page), { timeout: 2000 }).toBe(toolId);
+  // Wait for the empty-state overlay to disappear (only present at 0 pieces).
+  await page.locator('[data-testid="empty-state-2d"]').waitFor({ state: 'detached', timeout: 2000 }).catch(() => {});
+  await page.waitForTimeout(100);
 }
 
 async function drawRect(page: Page) {
-  await focusEditor(page);
-  // 's' = Rectangle tool
-  await page.keyboard.press('s');
-  await page.waitForTimeout(150);
+  await activateTool(page, 's', 'rectangle');
   const { cx, cy } = await getSvgCenter(page);
   await page.mouse.move(cx - 80, cy - 60);
   await page.mouse.down();
@@ -56,10 +55,7 @@ async function drawRect(page: Page) {
 }
 
 async function drawPenShape(page: Page) {
-  await focusEditor(page);
-  // 'h' = Pen tool
-  await page.keyboard.press('h');
-  await page.waitForTimeout(150);
+  await activateTool(page, 'h', 'pen');
   const { cx, cy } = await getSvgCenter(page);
   // Draw a triangle
   await page.mouse.click(cx - 60, cy - 40);
@@ -78,7 +74,7 @@ test.describe('Rectangle Tool', () => {
 
   test('draws a piece via drag', async ({ page }) => {
     await drawRect(page);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
   });
 
   test('keyboard shortcut S activates rectangle tool', async ({ page }) => {
@@ -88,29 +84,18 @@ test.describe('Rectangle Tool', () => {
 
   test('drawing multiple rectangles increments piece count', async ({ page }) => {
     await drawRect(page);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
 
     // Draw second rectangle further offset to avoid overlap
     await page.keyboard.press('s');
     const { cx, cy } = await getSvgCenter(page);
-    // Move to a more distinctly different area
     await page.mouse.move(cx + 150, cy + 80);
     await page.mouse.down();
     await page.mouse.move(cx + 280, cy + 180, { steps: 15 });
     await page.mouse.up();
-    await page.waitForTimeout(1000); // Longer wait for UI to update
+    await page.waitForTimeout(500);
 
-    // Check if piece count incremented (allow for different formatting)
-    try {
-      await expect(page.locator('.status-bar')).toContainText(/Pieces.*2/, { timeout: 3000 });
-    } catch {
-      // If exact count fails, at least verify we have more than 1 piece
-      // This is a looser assertion for flaky mouse interactions
-      const statusText = await page.locator('.status-bar').textContent();
-      console.log('Status bar content:', statusText);
-      // Pass if we can find any indication of multiple pieces
-      await expect(page.locator('.status-bar')).toContainText(/Pieces/, { timeout: 1000 });
-    }
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(2);
   });
 });
 
@@ -126,7 +111,7 @@ test.describe('Pen Tool', () => {
 
   test('draws a closed shape', async ({ page }) => {
     await drawPenShape(page);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
   });
 });
 
@@ -147,12 +132,16 @@ test.describe('Select Tool', () => {
     await page.keyboard.press('z');
     await page.mouse.click(cx, cy);
     await page.waitForTimeout(500);
-    // Check for selection indicators - piece groups might have selection classes or attributes
-    const selectedElements = page.locator('svg.pattern-svg .selected, svg.pattern-svg [data-selected="true"], svg.pattern-svg .piece-group.selected');
-    await expect(selectedElements.first()).toBeVisible({ timeout: 2000 }).catch(async () => {
-      // Fallback: Check if status bar shows selected state or piece remains visible
-      await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 1000 });
+    // Selection lives in Redux (editor.selectedPieceIds). The piece survives.
+    const selectedCount = await page.evaluate(() => {
+      const store = (window as unknown as { __OPENCLO_STORE__?: { getState: () => { editor: { selectedPieceIds?: unknown[]; selectedIds?: unknown[] } } } }).__OPENCLO_STORE__;
+      if (!store) return -1;
+      const ed = store.getState().editor;
+      const ids = ed.selectedPieceIds ?? ed.selectedIds ?? [];
+      return ids.length;
     });
+    expect(selectedCount).toBeGreaterThanOrEqual(1);
+    expect(await getPieceCount(page)).toBe(1);
   });
 });
 
@@ -190,27 +179,25 @@ test.describe('Undo / Redo', () => {
 
   test('undo removes drawn piece', async ({ page }) => {
     await drawRect(page);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
 
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(300);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*0/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(0);
   });
 
   test('redo restores undone piece', async ({ page }) => {
     await drawRect(page);
     await page.keyboard.press('Control+z');
-    await page.waitForTimeout(300);
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(0);
     await page.keyboard.press('Control+Shift+z');
-    await page.waitForTimeout(300);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*1/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
   });
 
   test('undo button in toolbar works', async ({ page }) => {
     await drawRect(page);
-    // TopBar (`src/components/shell/TopBar.tsx`) exposes `aria-label="Undo"`
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(1);
+    // TopBar (`src/components/shell/TopBar.tsx`) exposes `aria-label="Undo"`.
     await page.click('button[aria-label="Undo"]');
-    await page.waitForTimeout(300);
-    await expect(page.locator('.status-bar')).toContainText(/Pieces.*0/, { timeout: 3000 });
+    await expect.poll(() => getPieceCount(page), { timeout: 3000 }).toBe(0);
   });
 });

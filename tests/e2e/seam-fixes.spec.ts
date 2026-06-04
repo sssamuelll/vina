@@ -122,23 +122,28 @@ test.describe('Seam P0+P1 Fixes', () => {
 
     await page.waitForTimeout(500);
 
-    // Check that seam connection SVG elements exist with different stroke colors
-    const seamLines = page.locator('.seam-connection line');
-    const count = await seamLines.count();
-    // Each seam renders 3 lines (edgeA, edgeB, connection) = 6 total for 2 seams
-    expect(count).toBeGreaterThanOrEqual(4);
-
-    // Get stroke colors from the first line of each seam group
-    const colors = new Set<string>();
+    // Each seam renders as a `.seam-connection` <g>. Straight outlines resolve to
+    // <path> edge highlights (getEdgePathD returns a path for L segments), so the
+    // group is path-heavy rather than line-heavy. Stroke color is applied via the
+    // inline `style` attribute (SVG presentation attrs can't read CSS vars), NOT
+    // the `stroke` attribute — so read `element.style.stroke`.
     const seamGroups = page.locator('.seam-connection');
     const groupCount = await seamGroups.count();
+    // Two seams were added → two groups.
+    expect(groupCount).toBeGreaterThanOrEqual(2);
+
+    // Collect the stroke color of the first stroked shape (path or line) in each
+    // group. Distinct seams draw from SEAM_PALETTE[seamIndex % len] → distinct.
+    const colors = new Set<string>();
     for (let i = 0; i < groupCount; i++) {
-      const firstLine = seamGroups.nth(i).locator('line').first();
-      const stroke = await firstLine.getAttribute('stroke');
+      const stroke = await seamGroups.nth(i).evaluate((g) => {
+        const el = g.querySelector('path, line') as SVGElement | null;
+        return el ? el.style.stroke : '';
+      });
       if (stroke) colors.add(stroke);
     }
 
-    // Should have at least 2 distinct colors (one per seam)
+    // Should have at least 2 distinct colors (one per seam).
     expect(colors.size).toBeGreaterThanOrEqual(2);
   });
 

@@ -77,17 +77,20 @@ test('shows warning toast and app works when localStorage is blocked', async ({ 
 
   await waitForApp(page);
 
-  // Verify the toast warning appeared
-  const toast = page.getByText('Local storage is unavailable', { exact: false });
+  // Verify the toast warning appeared. App dispatches showToast({type:'error'})
+  // for the storage-blocked path → renders as `.toast.toast--error` via the now-
+  // mounted ToastContainer.
+  const toast = page.locator('.toast--error', { hasText: 'Local storage is unavailable' });
   await expect(toast.first()).toBeVisible({ timeout: 10000 });
 
   // Verify the app is still functional — pattern editor loaded
   const svg = page.locator('svg.pattern-svg');
   await expect(svg).toBeVisible();
 
-  // Verify the workspace rendered (not crashed)
-  const workspace = page.locator('.workspace');
-  await expect(workspace).toBeVisible();
+  // Verify the shell rendered (not crashed). `.workspace` no longer exists;
+  // the current top-level shell root is `.app-shell`.
+  const shell = page.locator('.app-shell');
+  await expect(shell).toBeVisible();
 
   await context.close();
 });
