@@ -8,8 +8,9 @@ import { startSimulation, resetSimulation, setViewMode3D } from '../../store/sim
 import {
   FileText, Scissors, Ruler, Shirt, Download, Grid3x3, Eye,
   LayoutTemplate, Layers, ScanLine, Undo2, Redo2, User, Package,
-  Search, ClipboardList, Wind, Palette, PenLine, Tag, type LucideIcon,
+  Search, ClipboardList, Wind, Palette, PenLine, Tag, Hand, MousePointer2, type LucideIcon,
 } from 'lucide-react';
+import { setUserScheme } from '../../store/inputSchemeSlice';
 
 interface CommandDef {
   id: string;
@@ -53,6 +54,8 @@ const COMMANDS: CommandDef[] = [
   { id: 'view-2d', name: 'View: 2D Only', description: 'Switch to 2D pattern view', icon: Eye, action: (d) => d(setViewMode('2d')) },
   { id: 'view-3d', name: 'View: 3D Only', description: 'Switch to 3D simulation view', icon: Eye, action: (d) => d(setViewMode('3d')) },
   { id: 'view-split', name: 'View: Split', description: 'Side-by-side 2D + 3D', icon: Layers, action: (d) => d(setViewMode('split')) },
+  { id: 'input-trackpad', name: 'Use Trackpad Controls', description: 'Two-finger orbit/pan, pinch zoom, ⌥-drag pan', icon: Hand, action: (d) => d(setUserScheme('trackpad')) },
+  { id: 'input-mouse', name: 'Use Mouse Controls', description: 'CLO3D-style: right-drag orbit, wheel zoom', icon: MousePointer2, action: (d) => d(setUserScheme('mouse')) },
 
   // ─── Toggles ───
   { id: 'toggle-grid', name: 'Toggle Grid', description: 'Show/hide canvas grid', icon: Grid3x3, shortcut: 'G', action: (d) => d(toggleSnapToGrid()) },

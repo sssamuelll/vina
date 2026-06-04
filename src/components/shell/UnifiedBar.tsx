@@ -8,6 +8,7 @@ import { dxfErrorMessage, type PendingDXFAttachment } from './dxfImport';
 import UnifiedBarChat from './UnifiedBarChat';
 import UnifiedBarCommands from './UnifiedBarCommands';
 import AgentSettings from '../../copilot/AgentSettings';
+import InputSchemeSection from './InputSchemeSection';
 
 export type BarMode = 'chat' | 'commands' | 'settings';
 
@@ -320,16 +321,19 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
             />
           )}
           {mode === 'settings' && (
-            <AgentSettings
-              onClose={() => setPanelOpen(false)}
-              onSave={() => {
-                // `openclo:provider-config-changed` is fired by `ConnectionsList`
-                // on every connection mutation directly — this onSave callback
-                // is here only for preference changes (teaching mode, language,
-                // budget) and panel close after Save preferences.
-                window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
-              }}
-            />
+            <>
+              <InputSchemeSection />
+              <AgentSettings
+                onClose={() => setPanelOpen(false)}
+                onSave={() => {
+                  // `openclo:provider-config-changed` is fired by `ConnectionsList`
+                  // on every connection mutation directly — this onSave callback
+                  // is here only for preference changes (teaching mode, language,
+                  // budget) and panel close after Save preferences.
+                  window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
+                }}
+              />
+            </>
           )}
         </div>
       )}
