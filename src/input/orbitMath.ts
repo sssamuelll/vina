@@ -58,3 +58,32 @@ export function dollyTowardTarget(
   _offset.setLength(dist);
   return position.copy(target).add(_offset);
 }
+
+const _panDelta = new THREE.Vector3();
+
+/**
+ * CLO3D-style pan: translate camera position AND orbit target by the same
+ * screen-space delta (mutates both). Moving the target means subsequent
+ * orbit/dolly pivot around wherever the user panned to (e.g. a sleeve's
+ * armpit) — this supersedes the C7-era camera-only pan, whose fixed target
+ * made panning read as a slow angle drift (decision Samuel 2026-06-04).
+ *
+ * `right`/`up` are the camera-local axes (matrix columns 0 and 1);
+ * `panSpeed` is typically distance-to-target scaled by the caller.
+ */
+export function panViewpoint(
+  position: THREE.Vector3,
+  target: THREE.Vector3,
+  right: THREE.Vector3,
+  up: THREE.Vector3,
+  dx: number,
+  dy: number,
+  panSpeed: number,
+): void {
+  _panDelta
+    .copy(right)
+    .multiplyScalar(-dx * panSpeed)
+    .addScaledVector(up, dy * panSpeed);
+  position.add(_panDelta);
+  target.add(_panDelta);
+}

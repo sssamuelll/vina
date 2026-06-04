@@ -23,7 +23,7 @@ import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
 import { isPanGesture, isPanRelease, cameraViewFromKeyEvent } from './inputBindings';
 import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
-import { orbitAroundTarget, dollyTowardTarget } from '../../input/orbitMath';
+import { orbitAroundTarget, dollyTowardTarget, panViewpoint } from '../../input/orbitMath';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
@@ -215,8 +215,9 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
   inputSchemeRef.current = inputScheme;
 
   // Custom pan: middle-click drag (mouse) or Alt/Option+left-drag (trackpad —
-  // MacBooks have no middle button) translates camera only, keeping orbit
-  // target locked on the avatar so right-click orbit always rotates around it.
+  // MacBooks have no middle button) moves the camera AND the orbit target
+  // together (CLO3D-style focus-point pan — supersedes the C7 camera-only
+  // pan that kept the target locked on the avatar; decision 2026-06-04).
   const panState = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
 
   const onPanPointerDown = useCallback((e: React.PointerEvent) => {
@@ -245,9 +246,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     _panRight.setFromMatrixColumn(camera.matrix, 0); // camera X axis
     _panUp.setFromMatrixColumn(camera.matrix, 1);     // camera Y axis
 
-    // Move camera only — target stays fixed on avatar
-    camera.position.addScaledVector(_panRight, -dx * panSpeed);
-    camera.position.addScaledVector(_panUp, dy * panSpeed);
+    // CLO3D-style: camera AND orbit target move together, so subsequent
+    // orbit/zoom pivot around wherever the user panned to (e.g. an armpit).
+    // Camera presets / reset restore the default target if you get lost.
+    panViewpoint(camera.position, controls.target, _panRight, _panUp, dx, dy, panSpeed);
     controls.update();
   }, []);
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
-import { orbitAroundTarget, dollyTowardTarget } from '../orbitMath';
+import { orbitAroundTarget, dollyTowardTarget, panViewpoint } from '../orbitMath';
 
 const target = new THREE.Vector3(0, 0.75, 0);
 
@@ -59,5 +59,37 @@ describe('dollyTowardTarget', () => {
     dollyTowardTarget(pos, target, 0.9, 0.6, 5);
     expect(pos.distanceTo(target)).toBeCloseTo(0.6, 10);
     expect(Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z)).toBe(true);
+  });
+});
+
+describe('panViewpoint — CLO3D-style pan moves camera AND focus point together', () => {
+  const right = new THREE.Vector3(1, 0, 0);
+  const up = new THREE.Vector3(0, 1, 0);
+
+  it('preserves the camera→target offset (no slow angle drift while panning)', () => {
+    const pos = new THREE.Vector3(0, 0.85, 3.0);
+    const tgt = target.clone();
+    const offsetBefore = pos.clone().sub(tgt);
+    panViewpoint(pos, tgt, right, up, 40, -25, 0.002);
+    const offsetAfter = pos.clone().sub(tgt);
+    expect(offsetAfter.distanceTo(offsetBefore)).toBeCloseTo(0, 10);
+  });
+
+  it('moves the focus point — subsequent orbit pivots around the new spot', () => {
+    const pos = new THREE.Vector3(0, 0.85, 3.0);
+    const tgt = target.clone();
+    panViewpoint(pos, tgt, right, up, 100, 0, 0.002);
+    expect(tgt.x).toBeCloseTo(-0.2, 10); // -dx * speed along camera-right
+    expect(tgt.y).toBeCloseTo(0.75, 10);
+  });
+
+  it('applies screen-space convention: drag right moves view left, drag down moves view up', () => {
+    const pos = new THREE.Vector3(0, 0.85, 3.0);
+    const tgt = target.clone();
+    panViewpoint(pos, tgt, right, up, 10, 10, 0.001);
+    expect(tgt.x).toBeCloseTo(-0.01, 10); // -dx along right
+    expect(tgt.y).toBeCloseTo(0.75 + 0.01, 10); // +dy along up
+    expect(pos.x).toBeCloseTo(-0.01, 10);
+    expect(pos.y).toBeCloseTo(0.85 + 0.01, 10);
   });
 });
