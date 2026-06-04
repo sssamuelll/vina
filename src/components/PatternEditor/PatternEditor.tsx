@@ -88,7 +88,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
   const editor = useSelector(selectEditor);
-  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, renderMode2D, gridSize, units, fitViewToken } = editor;
+  const { activeTool, zoom2D, pan2D, showSeamAllowance, showGrainlines, showPieceNames, showSewingLines, showLineLengths, renderMode2D, gridSize, units, fitViewToken } = editor;
   const selectedPieceIds = editor.selectedPieceIds;
   const toolOptions = useSelector(selectToolOptions);
   const groups = useSelector((s: RootState) => s.project.groups);
@@ -649,6 +649,8 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
             showGrainlines={showGrainlines}
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
+            showLineLengths={showLineLengths}
+            units={units}
             groupColors={groupColors}
             selectedInternalLine={editor.selectedInternalLine}
             editingPieceNameId={editingPieceNameId}

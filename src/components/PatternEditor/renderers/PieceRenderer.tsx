@@ -2,7 +2,8 @@
 import React, { memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
-import { PatternPiece, PathCommand } from '../../../types/types';
+import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
+import LineLengthLabels from './LineLengthLabels';
 import { pathToSVG } from '../utils';
 import { generateSeamAllowance } from '../../../utils/seam';
 import { generateSeamAllowanceWithCorners } from '../../../utils/seam/cornerTypes';
@@ -77,6 +78,8 @@ interface SinglePieceProps {
   showGrainlines: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
+  showLineLengths: boolean;
+  units: UnitSystem;
   isInternalLineSelected: boolean;
   selectedLineId?: string;
   isEditingName: boolean;
@@ -106,6 +109,8 @@ const SinglePiece = memo(function SinglePiece({
   showGrainlines,
   showPieceNames,
   renderMode2D,
+  showLineLengths,
+  units,
   isInternalLineSelected,
   selectedLineId,
   isEditingName,
@@ -477,6 +482,10 @@ const SinglePiece = memo(function SinglePiece({
         }
       })()}
 
+      {showLineLengths && (
+        <LineLengthLabels piece={piece} zoom2D={zoom2D} units={units} />
+      )}
+
       {(piece.annotations || []).map((ann, i) => (
         <text
           key={ann.id}
@@ -542,6 +551,8 @@ interface PieceRendererProps {
   showGrainlines: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
+  showLineLengths: boolean;
+  units: UnitSystem;
   /** Map of piece ID to group color for visual indicators */
   groupColors?: Record<string, string>;
   selectedInternalLine?: { pieceId: string; lineId: string } | null;
@@ -560,6 +571,8 @@ export default function PieceRenderer({
   showGrainlines,
   showPieceNames,
   renderMode2D,
+  showLineLengths,
+  units,
   groupColors,
   selectedInternalLine,
   editingPieceNameId,
@@ -630,6 +643,8 @@ export default function PieceRenderer({
           showGrainlines={showGrainlines}
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}
+          showLineLengths={showLineLengths}
+          units={units}
           groupColor={groupColors?.[piece.id]}
           layerColor={getOutlineColor(piece.layer ?? 1, layerOutlineColors)}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
