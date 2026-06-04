@@ -27,7 +27,7 @@ import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
 import { collectExportScene } from '../../utils/export/sceneCollector';
 import { downloadGLTF } from '../../utils/export/gltfExporter';
 import { downloadUSDZ } from '../../utils/export/usdzExporter';
-import type { Tool3D } from '../Toolbar3D/Toolbar3D';
+import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
 import SimModeToggle from './SimModeToggle';
 import SnapshotBar from './SnapshotBar';

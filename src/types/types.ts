@@ -639,6 +639,9 @@ export type Tool2D =
   | 'hand'         // pan
   | 'zoom';
 
+/** 3D viewport tools (re-homed from the deleted Toolbar3D component, 2026-06-04). */
+export type Tool3D = 'camera' | 'edit' | 'sew3d' | 'pose' | 'avatar' | 'arrangement' | 'pin' | 'meshSelectBox' | 'meshSelectLasso';
+
 export type UnitSystem = 'mm' | 'cm' | 'inches';
 
 export interface EditorState {

@@ -17,7 +17,7 @@ import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
 import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import ContextPanel from './ContextPanel';
 import { getPanelSide } from './panelSide';
-import type { Tool3D } from '../Toolbar3D/Toolbar3D';
+import type { Tool3D } from '../../types/types';
 
 // Lazy-load panel content
 const AvatarPanel = lazy(() => import('../Viewport3D/AvatarPanel'));
