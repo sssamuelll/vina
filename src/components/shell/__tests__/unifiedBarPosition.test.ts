@@ -41,12 +41,37 @@ describe('loadPosition — restoring a persisted bar position', () => {
   });
 });
 
-describe('clampPosition', () => {
-  it('keeps the bar inside the bottom drag zone', () => {
+describe('clampPosition — bar movable everywhere except over the top-bar', () => {
+  it('allows the whole viewport below the top-bar', () => {
     setViewport(1600, 900);
-    const p = clampPosition(5000, -200);
-    expect(p.x).toBeLessThanOrEqual(1600 - 560 - 16);
-    expect(p.y).toBeGreaterThanOrEqual(900 * 0.8);
-    expect(p.y).toBeLessThanOrEqual(900 - 58 - 16);
+    const mid = clampPosition(700, 400); // middle of the screen — now legal
+    expect(mid).toEqual({ x: 700, y: 400 });
+  });
+
+  it('never overlaps the top-bar (measured from the live .top-bar element)', () => {
+    setViewport(1600, 900);
+    const topBar = document.createElement('div');
+    topBar.className = 'top-bar';
+    topBar.getBoundingClientRect = () => ({ bottom: 44, top: 0, left: 0, right: 1600, width: 1600, height: 44, x: 0, y: 0, toJSON: () => ({}) });
+    document.body.appendChild(topBar);
+    try {
+      const p = clampPosition(700, -200);
+      expect(p.y).toBe(44 + 8); // top-bar bottom + margin
+    } finally {
+      topBar.remove();
+    }
+  });
+
+  it('falls back to the token max (48px) when no top-bar is mounted', () => {
+    setViewport(1600, 900);
+    const p = clampPosition(700, -200);
+    expect(p.y).toBe(48 + 8);
+  });
+
+  it('still clamps right/bottom edges', () => {
+    setViewport(1600, 900);
+    const p = clampPosition(5000, 5000);
+    expect(p.x).toBe(1600 - 560 - 16);
+    expect(p.y).toBe(900 - 58 - 16);
   });
 });

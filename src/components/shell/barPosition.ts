@@ -9,10 +9,22 @@ const STORAGE_KEY = 'openclo-bar-position';
 export const BAR_WIDTH = 560;
 export const BAR_HEIGHT = 58;
 
+// Token max of --top-bar-h: clamp(36px, 2.5vw, 48px) — used when no .top-bar
+// is mounted (e.g. hideChrome shells, tests).
+const TOP_BAR_FALLBACK = 48;
+const TOP_BAR_MARGIN = 8;
+
+/** Bottom edge of the live top-bar, so the bar can roam the whole viewport
+ *  except over it (decision 2026-06-04; previously confined to bottom 20%). */
+function topBarBottom(): number {
+  const el = document.querySelector('.top-bar');
+  return (el ? el.getBoundingClientRect().bottom : TOP_BAR_FALLBACK) + TOP_BAR_MARGIN;
+}
+
 export function clampPosition(x: number, y: number): { x: number; y: number } {
   const minX = 16;
   const maxX = window.innerWidth - BAR_WIDTH - 16;
-  const minY = window.innerHeight * 0.8; // top of drag zone (bottom 20%)
+  const minY = topBarBottom();
   const maxY = window.innerHeight - BAR_HEIGHT - 16;
   return {
     x: Math.max(minX, Math.min(maxX, x)),
