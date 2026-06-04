@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import type { RootState } from '../store';
+import type { RootState, AppDispatch } from '../store';
 import { autoDetectTrackpad } from '../store/inputSchemeSlice';
 import { showInfoToast } from '../store/copilotUISlice';
 
@@ -18,12 +18,15 @@ import { showInfoToast } from '../store/copilotUISlice';
  * return → listeners removed. Mounted once in AppShell.
  */
 export function useSchemeHeuristic(): void {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const source = useSelector((s: RootState) => s.inputScheme.source);
 
   useEffect(() => {
     if (source !== 'default') return;
+    let fired = false; // sync one-shot: many wheel events can land before React re-runs this effect
     const fire = () => {
+      if (fired) return;
+      fired = true;
       dispatch(autoDetectTrackpad());
       dispatch(showInfoToast('Trackpad mode enabled — change it anytime in Settings ▸ Input'));
     };

@@ -64,4 +64,14 @@ describe('useSchemeHeuristic', () => {
     });
     expect(store.getState().copilotUI.toasts).toHaveLength(1);
   });
+
+  it('fires at most once even when two events arrive before re-render (same act)', () => {
+    const store = makeStore();
+    renderHook(() => useSchemeHeuristic(), { wrapper: wrapperFor(store) });
+    act(() => {
+      window.dispatchEvent(new WheelEvent('wheel', { ctrlKey: true, deltaY: -3 }));
+      window.dispatchEvent(new WheelEvent('wheel', { ctrlKey: true, deltaY: -3 }));
+    });
+    expect(store.getState().copilotUI.toasts).toHaveLength(1);
+  });
 });
