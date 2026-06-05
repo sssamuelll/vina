@@ -32,7 +32,8 @@ export type DXFEntityType =
   | 'TEXT'
   | 'MTEXT'
   | 'INSERT'
-  | 'SEQEND';
+  | 'SEQEND'
+  | 'POINT';
 
 export interface DXFEntity {
   type: DXFEntityType;
@@ -45,6 +46,11 @@ export interface DXFEntity {
 export interface DXFLineData {
   x1: number; y1: number;
   x2: number; y2: number;
+}
+
+/** POINT entity — used by CLO/AAMA exports for notch & drill-hole markers. */
+export interface DXFPointData {
+  x: number; y: number;
 }
 
 export interface DXFLWPolylineData {
@@ -92,6 +98,7 @@ export interface DXFInsertData {
 
 export type DXFEntityData =
   | DXFLineData
+  | DXFPointData
   | DXFLWPolylineData
   | DXFPolylineData
   | DXFSplineData

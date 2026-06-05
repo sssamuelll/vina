@@ -5,7 +5,7 @@ import { RootState } from '../../../store';
 import { PatternPiece, PathCommand, UnitSystem } from '../../../types/types';
 import LineLengthLabels from './LineLengthLabels';
 import { pathToSVG } from '../utils';
-import { generateSeamAllowance } from '../../../utils/seam';
+import { generateSeamAllowance, effectiveSeamAllowanceWidth } from '../../../utils/seam';
 import { generateSeamAllowanceWithCorners } from '../../../utils/seam/cornerTypes';
 import { extractNodes } from '../nodeEditorUtils';
 import { getOutlineColor } from '../../../utils/layerColors';
@@ -132,7 +132,9 @@ const SinglePiece = memo(function SinglePiece({
   // only the styling is the redesign. When SA is hidden, the outline is itself
   // the cut line. The accent is reserved for selection; the band is a faint shade
   // between the two contours.
-  const saWidth = piece.seamAllowance || defaultSeamAllowanceWidth;
+  // M3.5: pieces carrying their REAL seam line (a 'seam' internal, e.g. DXF AAMA
+  // layer 84) suppress the synthetic default — their outline IS the cut line.
+  const saWidth = effectiveSeamAllowanceWidth(piece, defaultSeamAllowanceWidth);
   const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
     || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
   const saPath = (showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)

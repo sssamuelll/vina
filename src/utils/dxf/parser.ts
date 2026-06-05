@@ -6,6 +6,7 @@ import {
   DXFDocument, DXFEntity, DXFEntityType, DXFLayer, DXFBlock,
   DXFLineData, DXFLWPolylineData, DXFSplineData, DXFArcData,
   DXFCircleData, DXFTextData, DXFInsertData, DXFPolylineData,
+  DXFPointData,
 } from './types';
 
 let lastParsedDoc: DXFDocument | null = null;
@@ -252,6 +253,14 @@ function parseEntityList(pairs: GroupPair[]): DXFEntity[] {
           rotation: numOr(entityPairs, 50, 0),
         };
         entities.push({ type: 'INSERT', layer, data: d });
+        break;
+      }
+      case 'POINT': {
+        // CLO/AAMA exports use POINT for notch & drill-hole markers (layers 2/3/4).
+        const d: DXFPointData = {
+          x: num(entityPairs, 10), y: num(entityPairs, 20),
+        };
+        entities.push({ type: 'POINT', layer, data: d });
         break;
       }
     }

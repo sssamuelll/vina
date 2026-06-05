@@ -197,12 +197,14 @@ export interface GrainLine {
  * domain view is the `Dart` entity (`src/types/types.ts:148`). See bridge
  * module `src/utils/dartEntity.ts` for conversion. Other variants like
  * `'grainline'` have their own rich types (e.g., `GrainLine` interface);
- * the rest (`'notch'`, `'fold'`, `'pleat'`, `'topstitch'`, `'reference'`)
- * are storage-only by design.
+ * the rest (`'notch'`, `'fold'`, `'pleat'`, `'topstitch'`, `'reference'`,
+ * `'seam'`) are storage-only by design. `'seam'` is the imported sew/seam
+ * line (DXF AAMA layer 84 / ASTM "SEW LINE" / Lectra "COUTURE") — display
+ * fidelity for the patternmaker, distinct from `Seam` (the 3D sewing entity).
  *
  * Cross-ref: `docs/reports/2026-04-30-drift-fase2-d1real-dart-internalline.md`.
  */
-export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch' | 'reference';
+export type InternalLineType = 'dart' | 'grainline' | 'notch' | 'fold' | 'pleat' | 'topstitch' | 'reference' | 'seam';
 
 export type NotchShape = 'slit' | 't-notch' | 'v-internal' | 'v-external' | 'u-notch' | 'castle' | 'diamond';
 export type NotchSubType = 'straightforward' | 'bisector' | 'intersection';
