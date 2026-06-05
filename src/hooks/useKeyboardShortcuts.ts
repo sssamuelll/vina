@@ -35,7 +35,8 @@ import {
   setXrayMode,
 } from '../store/simulationSlice';
 import { placeGarmentPieces } from '../utils/cloth/garmentPlacement';
-import { saveToLocalStorage } from '../utils/projectIO';
+import { saveToStorage } from '../utils/projectIO';
+import { showSuccessToast } from '../store/copilotUISlice';
 import { useShortcutRegistry } from '../shortcuts/useShortcut';
 
 // Re-export ShortcutEntry type for backwards compatibility
@@ -83,8 +84,13 @@ export function useKeyboardShortcuts() {
     // ─── Define all handlers ────────────────────────────────────────────
 
     const handlers: Array<[string, () => void]> = [
-      // File
-      ['file.save', wrapHandler(() => saveToLocalStorage(projectState))],
+      // File — manual save through the modern async path (autosave also runs;
+      // explicit Ctrl+S deserves explicit feedback).
+      ['file.save', wrapHandler(() => {
+        void saveToStorage(projectState)
+          .then(() => dispatch(showSuccessToast('Proyecto guardado')))
+          .catch(() => {});
+      })],
 
       // Edit
       ['edit.undo', wrapHandler(() => dispatch(undo()))],

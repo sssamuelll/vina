@@ -23,6 +23,7 @@ import bomReducer from './bomSlice';
 import nestingReducer from './nestingSlice';
 import gradingReducer from './gradingSlice';
 import inputSchemeReducer, { hydrateInputScheme, rehydrateInputScheme, persistInputScheme } from './inputSchemeSlice';
+import { initProjectPersistence } from './projectAutosave';
 import { confirmationMiddleware } from './confirmationMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
@@ -116,6 +117,12 @@ store.subscribe(() => {
     persistInputScheme(inputScheme);
   }
 });
+
+// Project autosave: async IDB hydrate (restore + toast), THEN a focused
+// debounced persist subscriber — hydrate-then-subscribe so an early dispatch
+// can never clobber the autosave with the boot-empty project. The user's
+// actual work must survive a reload (browsers are volatile).
+void initProjectPersistence(store);
 
 // Expose store for debugging (remove in production)
 (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ = store;

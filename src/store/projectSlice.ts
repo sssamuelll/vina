@@ -238,6 +238,97 @@ const initialState: ProjectState = {
   activeColorwayId: null,
 };
 
+/**
+ * Shared load/restore body: validate + repair + backfill a project payload
+ * into the slice draft. `generative` gates the IMPORT-only enrichment
+ * (auto-rename duplicates, auto-sew) — a faithful RESTORE (boot autosave)
+ * must return exactly what the user had saved, never invent seams or names.
+ */
+function applyProjectPayload(state: ProjectState, payload: OpenCloProject, generative: boolean): void {
+  const { project: validated, diagnostics, quarantine } = validateAndRepairProject(payload);
+  state.loadDiagnostics = diagnostics;
+  state.loadQuarantine = quarantine;
+
+  const p = validated;
+  state.id = p.id;
+  state.name = p.name;
+  state.pieces = p.pieces;
+  state.seams = p.seams;
+  state.fabrics = p.fabrics;
+  state.avatar = p.avatar;
+  state.groups = p.groups ?? [];
+  state.poms = p.poms ?? [];
+  state.seamGroups = (p as any).seamGroups ?? [];
+  state.isDirty = false;
+  // Backfill layer/sublayer for pieces loaded from older project files
+  for (const piece of state.pieces) {
+    if ((piece as any).layer === undefined) {
+      piece.layer = autoDetectLayer(piece.category);
+    }
+    if ((piece as any).sublayer === undefined) {
+      piece.sublayer = 0;
+    }
+    if ((piece as any).active === undefined) {
+      piece.active = true;
+    }
+    if ((piece as any).interfacingType === undefined) piece.interfacingType = 'none';
+    if ((piece as any).solidifyFactor === undefined) piece.solidifyFactor = 0;
+  }
+  // Auto-detect semantic edges on pieces that lack them
+  for (const piece of state.pieces) {
+    if ((!piece.edges || piece.edges.length === 0) && piece.outline?.length >= 3) {
+      piece.edges = detectSemanticEdges(piece);
+    }
+  }
+
+  if (generative) {
+    // Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D)
+    autoRenameDuplicatePieces(state.pieces);
+
+    // Re-detect edges on pieces that were renamed (category/side now set)
+    for (const piece of state.pieces) {
+      if (piece.category && piece.category !== 'other') {
+        piece.edges = detectSemanticEdges(piece);
+      }
+    }
+
+    // Auto-detect seams if none exist and pieces have edges
+    if (state.seams.length === 0 && state.pieces.some(p => p.edges && p.edges.length > 0)) {
+      // Adaptive confidence: lower threshold when pieces have duplicate names
+      // (naming score will be 0, so only length + proximity + position contribute)
+      const uniqueNames = new Set(state.pieces.map(p => p.name));
+      const namingDiversity = uniqueNames.size / state.pieces.length;
+      const adaptiveConfidence = namingDiversity < 0.5 ? 0.3 : 0.6;
+      const result = autoSew(state.pieces, { minConfidence: adaptiveConfidence });
+      if (result.seams.length > 0) {
+        for (const proposed of result.seams) {
+          state.seams.push(proposed.seam);
+        }
+        state.loadDiagnostics.push({
+          severity: 'info',
+          code: 'AUTO_SEAMS_DETECTED',
+          message: `Auto-detected ${result.seams.length} seam(s). Review in the 2D editor. Undo with Ctrl+Z if incorrect.`,
+        });
+      }
+    }
+  }
+
+  // Backfill sewing enhancement fields for seams from older projects
+  for (const seam of state.seams) {
+    if ((seam as any).tension === undefined) seam.tension = 100;
+    if ((seam as any).strength === undefined) seam.strength = 1.0;
+    if ((seam as any).active === undefined) seam.active = true;
+    if ((seam as any).taped === undefined) seam.taped = false;
+    if ((seam as any).tapeWidth === undefined) seam.tapeWidth = 10;
+  }
+  // Backfill layer metadata from older projects
+  state.layerNames = (p as any).layerNames ?? {};
+  state.layerLocked = (p as any).layerLocked ?? {};
+  // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
+  state.referenceImages = (p as any).referenceImages ?? [];
+  state.trims = (p as any).trims ?? [];
+}
+
 const projectSlice = createSlice({
   name: 'project',
   initialState,
@@ -246,85 +337,15 @@ const projectSlice = createSlice({
       return action.payload;
     },
     loadProject(state, action: PayloadAction<OpenCloProject>) {
-      const { project: validated, diagnostics, quarantine } = validateAndRepairProject(action.payload);
-      state.loadDiagnostics = diagnostics;
-      state.loadQuarantine = quarantine;
-
-      const p = validated;
-      state.id = p.id;
-      state.name = p.name;
-      state.pieces = p.pieces;
-      state.seams = p.seams;
-      state.fabrics = p.fabrics;
-      state.avatar = p.avatar;
-      state.groups = p.groups ?? [];
-      state.poms = p.poms ?? [];
-      state.seamGroups = (p as any).seamGroups ?? [];
-      state.isDirty = false;
-      // Backfill layer/sublayer for pieces loaded from older project files
-      for (const piece of state.pieces) {
-        if ((piece as any).layer === undefined) {
-          piece.layer = autoDetectLayer(piece.category);
-        }
-        if ((piece as any).sublayer === undefined) {
-          piece.sublayer = 0;
-        }
-        if ((piece as any).active === undefined) {
-          piece.active = true;
-        }
-        if ((piece as any).interfacingType === undefined) piece.interfacingType = 'none';
-        if ((piece as any).solidifyFactor === undefined) piece.solidifyFactor = 0;
-      }
-      // Auto-detect semantic edges on pieces that lack them
-      for (const piece of state.pieces) {
-        if ((!piece.edges || piece.edges.length === 0) && piece.outline?.length >= 3) {
-          piece.edges = detectSemanticEdges(piece);
-        }
-      }
-
-      // Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D)
-      autoRenameDuplicatePieces(state.pieces);
-
-      // Re-detect edges on pieces that were renamed (category/side now set)
-      for (const piece of state.pieces) {
-        if (piece.category && piece.category !== 'other') {
-          piece.edges = detectSemanticEdges(piece);
-        }
-      }
-
-      // Auto-detect seams if none exist and pieces have edges
-      if (state.seams.length === 0 && state.pieces.some(p => p.edges && p.edges.length > 0)) {
-        // Adaptive confidence: lower threshold when pieces have duplicate names
-        // (naming score will be 0, so only length + proximity + position contribute)
-        const uniqueNames = new Set(state.pieces.map(p => p.name));
-        const namingDiversity = uniqueNames.size / state.pieces.length;
-        const adaptiveConfidence = namingDiversity < 0.5 ? 0.3 : 0.6;
-        const result = autoSew(state.pieces, { minConfidence: adaptiveConfidence });
-        if (result.seams.length > 0) {
-          for (const proposed of result.seams) {
-            state.seams.push(proposed.seam);
-          }
-          state.loadDiagnostics.push({
-            severity: 'info',
-            code: 'AUTO_SEAMS_DETECTED',
-            message: `Auto-detected ${result.seams.length} seam(s). Review in the 2D editor. Undo with Ctrl+Z if incorrect.`,
-          });
-        }
-      }
-      // Backfill sewing enhancement fields for seams from older projects
-      for (const seam of state.seams) {
-        if ((seam as any).tension === undefined) seam.tension = 100;
-        if ((seam as any).strength === undefined) seam.strength = 1.0;
-        if ((seam as any).active === undefined) seam.active = true;
-        if ((seam as any).taped === undefined) seam.taped = false;
-        if ((seam as any).tapeWidth === undefined) seam.tapeWidth = 10;
-      }
-      // Backfill layer metadata from older projects
-      state.layerNames = (p as any).layerNames ?? {};
-      state.layerLocked = (p as any).layerLocked ?? {};
-      // Load reference image metadata (without objectUrl — blob restoration is async, done outside this reducer)
-      state.referenceImages = (p as any).referenceImages ?? [];
-      state.trims = (p as any).trims ?? [];
+      applyProjectPayload(state, action.payload, true);
+    },
+    /**
+     * Faithful restore (boot autosave / projectAutosave): validation +
+     * backfill only — no auto-rename, no auto-sew. What was saved is what
+     * comes back.
+     */
+    restoreProject(state, action: PayloadAction<OpenCloProject>) {
+      applyProjectPayload(state, action.payload, false);
     },
     clearLoadDiagnostics(state) {
       state.loadDiagnostics = [];
@@ -1390,7 +1411,7 @@ const projectSlice = createSlice({
 });
 
 export const {
-  restoreState, loadProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
+  restoreState, loadProject, restoreProject, clearLoadDiagnostics, setProjectName, setGarmentInfo, setGarmentInfoBulk,
   addPiece, updatePiece, removePiece, removePieces, movePiece, rotatePiece, duplicatePiece, flipPieceH, flipPieceV, setArrangement3D, clearArrangementOverrides,
   addInternalLine, updateInternalLine, removeInternalLine, setInternalLine,
   addAnnotation, removeAnnotation, updateAnnotation,

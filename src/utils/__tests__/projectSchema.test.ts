@@ -99,6 +99,27 @@ describe('parseOpenCloProject — happy path', () => {
     );
     expect(r.ok).toBe(true);
   });
+
+  it('accepts every InternalLineType — including the M3.5 "seam" sew-line (DXF AAMA 84)', () => {
+    // Regression: the autosave of a DXF-imported project (whose pieces carry
+    // 'seam' internals) was quarantined on reload because the zod enum lagged
+    // behind the TS union. The boundary must accept what the importer writes.
+    const types = ['dart', 'grainline', 'notch', 'fold', 'pleat', 'topstitch', 'reference', 'seam'] as const;
+    const piece = {
+      ...makePiece(),
+      internals: types.map((type, i) => ({
+        id: `il-${i}`,
+        type,
+        path: [
+          { type: 'M' as const, values: [0, 0] },
+          { type: 'L' as const, values: [5, 5] },
+        ],
+      })),
+    };
+    const r = parseOpenCloProject(makeProject({ pieces: [piece] }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.project.pieces[0].internals).toHaveLength(types.length);
+  });
 });
 
 describe('parseOpenCloProject — required field absent', () => {

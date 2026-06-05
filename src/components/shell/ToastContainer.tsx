@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import type { UnknownAction } from '@reduxjs/toolkit';
 import type { RootState } from '../../store';
 import { dismissToast, cleanupExpiredToasts } from '../../store/copilotUISlice';
 import './ToastContainer.css';
@@ -9,9 +10,10 @@ import './ToastContainer.css';
  *
  * Before this component existed, every `showSuccessToast` / `showErrorToast`
  * dispatch (export feedback, DXF import, storage warnings, copilot pipeline)
- * was silently swallowed: the renderer died with the old shell. This is the
- * minimal v1 surface — message + dismiss. Undo/action buttons are YAGNI
- * until `showUndoToast` has live callers.
+ * was silently swallowed: the renderer died with the old shell. Surface:
+ * message + dismiss, plus an optional action button when the toast carries
+ * `actionLabel` + `actionPayload` (a serializable Redux action dispatched on
+ * click — first live caller: the project-restore toast's "Empezar de cero").
  *
  * Position: fixed bottom-right, above the Solver pill (bottom: 56px),
  * column-reverse so the newest toast sits closest to the bottom edge.
@@ -40,6 +42,17 @@ export default function ToastContainer() {
       {toasts.map((toast) => (
         <div key={toast.id} className={`toast toast--${toast.type}`} role="status">
           <span className="toast__message">{toast.message}</span>
+          {toast.actionLabel && toast.actionPayload != null && (
+            <button
+              className="toast__action"
+              onClick={() => {
+                dispatch(toast.actionPayload as UnknownAction);
+                dispatch(dismissToast(toast.id));
+              }}
+            >
+              {toast.actionLabel}
+            </button>
+          )}
           <button
             className="toast__dismiss"
             aria-label="Dismiss notification"

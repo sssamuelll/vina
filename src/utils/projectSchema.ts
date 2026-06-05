@@ -15,7 +15,7 @@
  * @module projectSchema
  */
 import { z } from 'zod';
-import type { OpenCloProject } from '../types/types';
+import type { OpenCloProject, InternalLineType } from '../types/types';
 
 // ─── DoS bounds ──────────────────────────────────────────────────────────────
 // Real patterns: <500 pieces, <1000 outline cmds. Margins are 10–20×.
@@ -86,15 +86,21 @@ const pathCommandSchema = z.object({
 });
 
 // ─── Internal lines ──────────────────────────────────────────────────────────
-const internalLineTypes = [
-  'dart',
-  'grainline',
-  'notch',
-  'fold',
-  'pleat',
-  'topstitch',
-  'reference',
-] as const;
+// Record<InternalLineType, true> keeps this enum in COMPILE-TIME lockstep with
+// the TS union (src/types/types.ts): a member added to InternalLineType but
+// missing here is a tsc error, not a runtime quarantine of the user's autosave
+// (found the hard way with M3.5's 'seam').
+const internalLineTypeMap: Record<InternalLineType, true> = {
+  dart: true,
+  grainline: true,
+  notch: true,
+  fold: true,
+  pleat: true,
+  topstitch: true,
+  reference: true,
+  seam: true,
+};
+const internalLineTypes = Object.keys(internalLineTypeMap) as [InternalLineType, ...InternalLineType[]];
 
 const internalLineSchema = z
   .object({

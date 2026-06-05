@@ -5,16 +5,23 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import type { UnknownAction } from '@reduxjs/toolkit';
 import copilotUIReducer, {
   showToast,
   cleanupExpiredToasts,
 } from '../../../store/copilotUISlice';
+import { NEW_PROJECT } from '../../../store/actions';
 import ToastContainer from '../ToastContainer';
 
 afterEach(cleanup);
 
+// Probe reducer: records whether the toast's actionPayload was dispatched.
+function probeReducer(state = { newProjectFired: false }, action: UnknownAction) {
+  return action.type === NEW_PROJECT.type ? { newProjectFired: true } : state;
+}
+
 function makeStore() {
-  return configureStore({ reducer: { copilotUI: copilotUIReducer } });
+  return configureStore({ reducer: { copilotUI: copilotUIReducer, probe: probeReducer } });
 }
 
 function renderWithStore(store: ReturnType<typeof makeStore>) {
@@ -69,6 +76,50 @@ describe('ToastContainer', () => {
     expect(dismiss).toBeTruthy();
     fireEvent.click(dismiss!);
     expect(store.getState().copilotUI.toasts.length).toBe(0);
+  });
+
+  it('renders an action button when actionLabel + actionPayload are present', () => {
+    const store = makeStore();
+    act(() => {
+      store.dispatch(showToast({
+        type: 'info',
+        message: 'Restauré tu proyecto: 5 piezas',
+        actionLabel: 'Empezar de cero',
+        actionPayload: NEW_PROJECT(),
+        duration: 8000,
+      }));
+    });
+    const container = renderWithStore(store);
+    const action = container.querySelector('.toast__action');
+    expect(action).toBeTruthy();
+    expect(action!.textContent).toBe('Empezar de cero');
+  });
+
+  it('clicking the action dispatches the actionPayload and dismisses the toast', () => {
+    const store = makeStore();
+    act(() => {
+      store.dispatch(showToast({
+        type: 'info',
+        message: 'Restauré tu proyecto: 5 piezas',
+        actionLabel: 'Empezar de cero',
+        actionPayload: NEW_PROJECT(),
+        duration: 8000,
+      }));
+    });
+    const container = renderWithStore(store);
+    fireEvent.click(container.querySelector('.toast__action')!);
+
+    expect((store.getState() as { probe: { newProjectFired: boolean } }).probe.newProjectFired).toBe(true);
+    expect(store.getState().copilotUI.toasts.length).toBe(0);
+  });
+
+  it('toasts without actionLabel render no action button', () => {
+    const store = makeStore();
+    act(() => {
+      store.dispatch(showToast({ type: 'success', message: 'Plain', duration: 3000 }));
+    });
+    const container = renderWithStore(store);
+    expect(container.querySelector('.toast__action')).toBeNull();
   });
 
   it('expired toasts are cleaned up by the interval; duration:0 survives', () => {

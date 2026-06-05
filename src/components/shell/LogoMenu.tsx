@@ -15,6 +15,7 @@ import { toggleDockSignaling } from '../../store/dockSlice';
 import { canUndo, canRedo } from '../../store/undoMiddleware';
 import { store } from '../../store';
 import { runUiExport } from '../../utils/export/uiExport';
+import { clearStorageProject } from '../../utils/projectIO';
 import { ChevronRight, ChevronDown } from 'lucide-react';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -32,7 +33,13 @@ interface MenuItem {
 // ─── Submenu Definitions ─────────────────────────────────────────────────────
 
 const FILE_MENU: MenuItem[] = [
-  { label: 'New Project', shortcut: '⌘N', action: () => { if (confirm('Create new project? Unsaved changes will be lost.')) window.location.reload(); } },
+  // New Project must clear the IDB autosave BEFORE reloading — otherwise boot
+  // hydration (projectAutosave) restores the project the user just abandoned.
+  { label: 'New Project', shortcut: '⌘N', action: () => {
+    if (confirm('Create new project? Unsaved changes will be lost.')) {
+      void clearStorageProject().finally(() => window.location.reload());
+    }
+  } },
   { separator: true, label: '' },
   { label: 'Import Seamly2D Pattern...', action: () => {} }, // wired via callback
   { label: 'Import DXF...', action: () => {} }, // wired via callback (opens file picker)
