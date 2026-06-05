@@ -97,7 +97,7 @@ describe('detectBodyRegion', () => {
   });
 
   it('classifies all 17 pieces of male_shirt.json (regression for baseline #506)', () => {
-    // Exact piece names from tools/seamly2d-converter/output/male_shirt.json.
+    // Exact piece names from tests/fixtures/garments/male_shirt.dxf (frozen 2026-06-05).
     // Pre-fix: 7 returned 'unknown' (Yoke, Pocket×4, Placket×2).
     // Post-fix: 0 return 'unknown' — all route to a real body region.
     const names = [
@@ -113,7 +113,7 @@ describe('detectBodyRegion', () => {
   });
 
   it('classifies Cyrillic piece names (jacket1_52-176 regression for #506 follow-up)', () => {
-    // Exact piece names from tools/seamly2d-converter/output/jacket1_52-176.json.
+    // Exact piece names from tests/fixtures/garments/jacket1_52-176.dxf (frozen 2026-06-05).
     // Mix of Russian (Спинка/Полочка/Подборт/Рукав) and Ukrainian (Комір).
     // Pre-fix: all 5 returned 'unknown' → placement fallback put them at
     // midTorso (~40cm below shoulder) → DoD spec REACHES_UP gate failed with

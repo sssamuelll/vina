@@ -22,13 +22,6 @@ async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(1000);
-  // The Seamly2D template library modal auto-opens on first load and overlays
-  // the canvas — dismiss it so canvas interactions (clicks, right-clicks) land.
-  const closeBtn = page.locator('button:has-text("✕")');
-  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await closeBtn.click({ force: true });
-    await page.waitForTimeout(300);
-  }
 }
 
 /** Dispatch a Redux action via the exposed store global. */
@@ -65,9 +58,9 @@ async function activeTool(page: Page): Promise<{ editor: string; tools: string }
 
 /**
  * Press a tool shortcut and wait until the store reflects it. The single global
- * keydown listener can miss the very first press if it lands during the React
- * commit that follows dismissing the template modal, so we re-press until the
- * canonical `editor.activeTool` matches (or time out).
+ * keydown listener can miss the very first press if it lands during a React
+ * commit right after load, so we re-press until the canonical
+ * `editor.activeTool` matches (or time out).
  */
 async function activateToolKey(page: Page, key: string, expected: string) {
   await expect

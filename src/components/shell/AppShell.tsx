@@ -15,7 +15,6 @@ import LeftDock from './LeftDock';
 import RightDock from './RightDock';
 import PatternEditor from '../PatternEditor/PatternEditor';
 import Viewport3D, { Viewport3DErrorBoundary } from '../Viewport3D/Viewport3D';
-import TemplateLibrary from '../TemplateLibrary/TemplateLibrary';
 import ContextPanel from './ContextPanel';
 import ToastContainer from './ToastContainer';
 import { getPanelSide } from './panelSide';
@@ -66,7 +65,6 @@ export default function AppShell() {
   const viewMode = useSelector((s: RootState) => s.editor.viewMode);
   const splitRatio = useSelector((s: RootState) => s.layout.splitRatio);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
-  const [showTemplates, setShowTemplates] = useState(false);
   const [contextPanel, setContextPanel] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
@@ -181,7 +179,6 @@ export default function AppShell() {
   return (
     <div className="app-shell">
       <TopBar
-        onOpenTemplates={() => setShowTemplates(true)}
         onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
         onImportDXF={() => dxfInputRef.current?.click()}
       />
@@ -257,10 +254,8 @@ export default function AppShell() {
         )}
       </div>
       <UnifiedBar
-        onOpenTemplates={() => setShowTemplates(true)}
         onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)}
       />
-      <TemplateLibrary isOpen={showTemplates} onClose={() => setShowTemplates(false)} />
       <ToastContainer />
     </div>
   );

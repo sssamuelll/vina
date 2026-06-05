@@ -10,12 +10,6 @@ async function waitForApp(page: Page) {
   await page.goto('/');
   await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
   await page.waitForTimeout(1000);
-  // Dismiss template dialog if visible
-  const closeBtn = page.locator('button:has-text("✕")');
-  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await closeBtn.click({ force: true });
-    await page.waitForTimeout(300);
-  }
 }
 
 async function open3DView(page: Page) {
