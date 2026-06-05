@@ -7,7 +7,7 @@ import { setViewMode, toggleSnapToGrid, toggleSeamAllowance, toggleGrainlines, t
 import { startSimulation, resetSimulation, setViewMode3D } from '../../store/simulationSlice';
 import {
   FileText, Scissors, Ruler, Shirt, Download, Grid3x3, Eye,
-  LayoutTemplate, Layers, ScanLine, Undo2, Redo2, User, Package,
+  Layers, ScanLine, Undo2, Redo2, User, Package,
   Search, ClipboardList, Wind, Palette, PenLine, Tag, Hand, MousePointer2, type LucideIcon,
 } from 'lucide-react';
 import { setUserScheme } from '../../store/inputSchemeSlice';
@@ -22,13 +22,11 @@ interface CommandDef {
 }
 
 interface CommandCallbacks {
-  onOpenTemplates: () => void;
   onOpenPanel: (name: string) => void;
 }
 
 const COMMANDS: CommandDef[] = [
-  // ─── Templates & Patterns ───
-  { id: 'load-template', name: 'Load Template', description: 'Open Seamly2D pattern library', icon: LayoutTemplate, action: (_d, cb) => cb.onOpenTemplates() },
+  // ─── Patterns ───
   { id: 'auto-sew', name: 'Auto-Sew Pieces', description: 'Detect and create seams automatically', icon: Scissors, action: (_d, cb) => cb.onOpenPanel('Auto-Sew') },
 
   // ─── Simulation ───
@@ -81,11 +79,10 @@ function fuzzyMatch(query: string, text: string): boolean {
 interface Props {
   query: string;
   onExecute: () => void;
-  onOpenTemplates: () => void;
   onOpenPanel: (name: string) => void;
 }
 
-export default function UnifiedBarCommands({ query, onExecute, onOpenTemplates, onOpenPanel }: Props) {
+export default function UnifiedBarCommands({ query, onExecute, onOpenPanel }: Props) {
   const dispatch = useDispatch<AppDispatch>();
 
   const filtered = useMemo(() => {
@@ -107,7 +104,7 @@ export default function UnifiedBarCommands({ query, onExecute, onOpenTemplates, 
             }}
             onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-subtle)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            onClick={() => { cmd.action(dispatch, { onOpenTemplates, onOpenPanel }); onExecute(); }}
+            onClick={() => { cmd.action(dispatch, { onOpenPanel }); onExecute(); }}
           >
             <Icon size={15} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <span style={{ fontSize: '14px', color: 'var(--text-primary)' }}>{cmd.name}</span>

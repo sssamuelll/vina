@@ -14,7 +14,6 @@ import { loadPosition, clampPosition, savePosition } from './barPosition';
 export type BarMode = 'chat' | 'commands' | 'settings';
 
 interface UnifiedBarProps {
-  onOpenTemplates?: () => void;
   onOpenPanel?: (name: string) => void;
 }
 
@@ -30,7 +29,7 @@ const MODE_PLACEHOLDERS: Record<BarMode, string> = {
   settings: 'Search settings...',
 };
 
-export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarProps = {}) {
+export default function UnifiedBar({ onOpenPanel }: UnifiedBarProps = {}) {
   const [mode, setMode] = useState<BarMode>('chat');
   const [input, setInput] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
@@ -290,7 +289,6 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
             <UnifiedBarCommands
               query={input}
               onExecute={() => { setPanelOpen(false); setInput(''); }}
-              onOpenTemplates={onOpenTemplates ?? (() => {})}
               onOpenPanel={onOpenPanel ?? (() => {})}
             />
           )}

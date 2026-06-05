@@ -41,7 +41,6 @@ const FILE_MENU: MenuItem[] = [
     }
   } },
   { separator: true, label: '' },
-  { label: 'Import Seamly2D Pattern...', action: () => {} }, // wired via callback
   { label: 'Import DXF...', action: () => {} }, // wired via callback (opens file picker)
   { label: 'Import Reference Image...', action: () => {} },
   { separator: true, label: '' },
@@ -154,12 +153,11 @@ const TOP_LEVEL: TopLevelItem[] = [
 // ─── Component ───────────────────────────────────────────────────────────────
 
 interface LogoMenuProps {
-  onOpenTemplates?: () => void;
   onOpenPanel?: (name: string) => void;
   onImportDXF?: () => void;
 }
 
-export default function LogoMenu({ onOpenTemplates, onOpenPanel, onImportDXF }: LogoMenuProps) {
+export default function LogoMenu({ onOpenPanel, onImportDXF }: LogoMenuProps) {
   const [open, setOpen] = useState(false);
   const [hoveredTop, setHoveredTop] = useState<string | null>(null);
   const [hoveredSub, setHoveredSub] = useState<string | null>(null);
@@ -191,9 +189,7 @@ export default function LogoMenu({ onOpenTemplates, onOpenPanel, onImportDXF }: 
     if (item.separator || item.submenu) return;
     if (item.disabled?.(state)) return;
 
-    if (item.label === 'Import Seamly2D Pattern...') {
-      onOpenTemplates?.();
-    } else if (item.label === 'Import DXF...') {
+    if (item.label === 'Import DXF...') {
       onImportDXF?.();
     } else if (item.label.includes('Settings...') || item.label === 'Fabric Library...') {
       onOpenPanel?.(item.label.replace('...', '').trim());
@@ -207,7 +203,7 @@ export default function LogoMenu({ onOpenTemplates, onOpenPanel, onImportDXF }: 
 
     setOpen(false);
     setHoveredTop(null);
-  }, [dispatch, state, onOpenTemplates, onOpenPanel, onImportDXF]);
+  }, [dispatch, state, onOpenPanel, onImportDXF]);
 
   const renderMenuItem = (item: MenuItem, index: number) => {
     if (item.separator) {

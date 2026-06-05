@@ -30,11 +30,6 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      # #631 (flaky tests under concurrent run) addressed via vitest.config.ts
-      # `projects` API: tshirtMeshing + cubicBezier now run in a dedicated
-      # `seamly-heavy` fork pool with singleFork:true, isolated from the
-      # default thread pool. The previous `--exclude` workaround was removed
-      # in the same change. See vitest.config.ts header for verification steps.
       - name: Run tests with coverage
         run: npx vitest run --coverage
 
