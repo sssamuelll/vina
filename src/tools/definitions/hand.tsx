@@ -28,7 +28,7 @@ export const handTool: ToolDefinition = {
   cursor: 'grab',
   group: 'navigation',
   copilot: {
-    description: 'Pan the 2D canvas view by clicking and dragging. Does not modify any pattern pieces. Hold spacebar with any tool to temporarily activate hand mode. Useful for navigating large patterns or repositioning the view without changing zoom level.',
+    description: 'Pan the 2D canvas view by clicking and dragging. Does not modify any pattern pieces. Middle-click drag also pans while any other tool is active. Useful for navigating large patterns or repositioning the view without changing zoom level.',
     examples: [
       'Pan to the left side',
       'Move the view to see the sleeves',

@@ -21,6 +21,9 @@ import IKEndEffectorGizmos from './IKEndEffectorGizmos';
 import FitMapToggle from './FitMapToggle';
 import SurfaceModePill from './SurfaceModePill';
 import { usePoseDrag } from './usePoseDrag';
+import { isPanGesture, isPanRelease, cameraViewFromKeyEvent, isDoublePanClick, type PanClick } from './inputBindings';
+import { wheelIntent, zoomFactor, type InputSchemeId } from '../../input/wheelIntents';
+import { orbitAroundTarget, dollyTowardTarget, panViewpoint, recenterTarget } from '../../input/orbitMath';
 import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
 import { renderTurntable, downloadBlob } from '../../utils/export/turntableRenderer';
 import { exportStill, exportAllViews } from '../../utils/export/stillExporter';
@@ -29,6 +32,7 @@ import { downloadGLTF } from '../../utils/export/gltfExporter';
 import { downloadUSDZ } from '../../utils/export/usdzExporter';
 import type { Tool3D } from '../../types/types';
 import ContextMenu3D, { type ContextMenu3DState } from './ContextMenu3D';
+import PanCrosshair from './PanCrosshair';
 import SimModeToggle from './SimModeToggle';
 import SnapshotBar from './SnapshotBar';
 import AnchorPoints from './AnchorPoints';
@@ -86,6 +90,7 @@ const PIECE_COLORS = ['#e8e4df', '#d4cfc8', '#c8c0b5', '#f0ece6', '#e0d8cc'];
 // Scratch vectors for custom pan — avoids allocations in pointermove hot path
 const _panRight = new THREE.Vector3();
 const _panUp = new THREE.Vector3();
+const _homeTarget = new THREE.Vector3();
 
 /**
  * Create a WebGPURenderer (with WebGL2 fallback when WebGPU is unavailable).
@@ -148,6 +153,10 @@ interface Viewport3DProps {
   hideChrome?: boolean;
 }
 
+// Safari signals trackpad pinch via proprietary GestureEvent; everywhere else
+// the browser synthesizes ctrlKey on the wheel event. XOR — never handle both.
+const SAFARI_GESTURES = typeof window !== 'undefined' && 'ongesturestart' in window;
+
 export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false }: Viewport3DProps) {
   const dispatch = useDispatch();
   const { pieces, seams, avatarMode, avatarModelUrl, avatar, arrangementOverrides } = useSelector((s: RootState) => s.project);
@@ -203,15 +212,40 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     }
   }, []);
 
-  // Custom pan: middle-click drag translates camera only, keeping orbit target
-  // locked on the avatar so right-click orbit always rotates around the avatar.
-  const panState = useRef<{ active: boolean; lastX: number; lastY: number }>({ active: false, lastX: 0, lastY: 0 });
+  const inputScheme = useSelector((s: RootState) => s.inputScheme.scheme);
+  const inputSchemeRef = useRef<InputSchemeId>(inputScheme);
+  inputSchemeRef.current = inputScheme;
+
+  // Custom pan: middle-click drag (mouse) or Alt/Option+left-drag (trackpad —
+  // MacBooks have no middle button) moves the camera AND the orbit target
+  // together (CLO3D-style focus-point pan — supersedes the C7 camera-only
+  // pan that kept the target locked on the avatar; decision 2026-06-04).
+  const panState = useRef<{ active: boolean; lastX: number; lastY: number; drag: number }>({ active: false, lastX: 0, lastY: 0, drag: 0 });
+  const lastPanClickRef = useRef<PanClick | null>(null);
+  const crosshairRef = useRef<HTMLDivElement>(null);
 
   const onPanPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 1) return; // middle click only
+    if (!isPanGesture(e)) return;
     if (playbackState === 'playing') return;
+
+    // Double pan-click → re-center the focus on the avatar, keeping the
+    // current angle/distance (inverse of the CLO3D-style pan above).
+    const click: PanClick = { time: e.timeStamp, x: e.clientX, y: e.clientY };
+    if (isDoublePanClick(lastPanClickRef.current, click)) {
+      lastPanClickRef.current = null; // consume — a triple click doesn't re-fire
+      const controls = orbitRef.current;
+      if (controls) {
+        recenterTarget(controls.object.position, controls.target, _homeTarget.set(...DEFAULT_TARGET));
+        controls.update();
+      }
+    } else {
+      lastPanClickRef.current = click;
+    }
+
     e.currentTarget.setPointerCapture(e.pointerId);
-    panState.current = { active: true, lastX: e.clientX, lastY: e.clientY };
+    panState.current = { active: true, lastX: e.clientX, lastY: e.clientY, drag: 0 };
+    // Show the focus crosshair while the pan button is held (target = viewport center)
+    if (crosshairRef.current) crosshairRef.current.style.display = 'block';
   }, [playbackState]);
 
   const onPanPointerMove = useCallback((e: React.PointerEvent) => {
@@ -225,6 +259,10 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     panState.current.lastX = e.clientX;
     panState.current.lastY = e.clientY;
 
+    // A real drag is a pan, not a click — disarm the pending double-click.
+    panState.current.drag += Math.abs(dx) + Math.abs(dy);
+    if (panState.current.drag > 6) lastPanClickRef.current = null;
+
     // Scale pan speed based on camera distance to target
     const distance = camera.position.distanceTo(controls.target);
     const panSpeed = distance * 0.001;
@@ -233,16 +271,18 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
     _panRight.setFromMatrixColumn(camera.matrix, 0); // camera X axis
     _panUp.setFromMatrixColumn(camera.matrix, 1);     // camera Y axis
 
-    // Move camera only — target stays fixed on avatar
-    camera.position.addScaledVector(_panRight, -dx * panSpeed);
-    camera.position.addScaledVector(_panUp, dy * panSpeed);
+    // CLO3D-style: camera AND orbit target move together, so subsequent
+    // orbit/zoom pivot around wherever the user panned to (e.g. an armpit).
+    // Camera presets / reset restore the default target if you get lost.
+    panViewpoint(camera.position, controls.target, _panRight, _panUp, dx, dy, panSpeed);
     controls.update();
   }, []);
 
   const onPanPointerUp = useCallback((e: React.PointerEvent) => {
-    if (e.button !== 1) return;
+    if (!panState.current.active || !isPanRelease(e.button)) return;
     e.currentTarget.releasePointerCapture(e.pointerId);
     panState.current.active = false;
+    if (crosshairRef.current) crosshairRef.current.style.display = 'none';
   }, []);
 
   // Disable OrbitControls during animation playback
@@ -262,6 +302,61 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
 
   // Force Canvas to resize continuously during CSS transitions
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // ─── Single 3D wheel owner (spec 2026-06-04 § Halberg constraint 1) ───
+  // OrbitControls enableZoom is OFF permanently; this handler routes wheel
+  // per scheme via the pure intent layer. Early-returns when controls are
+  // disabled (TransformControls / poseDrag own the pointer then).
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      const controls = orbitRef.current;
+      if (!controls || !controls.enabled) return;
+      // Safari XOR (constraint 3): pinch arrives as GestureEvent there.
+      if (SAFARI_GESTURES && (e.ctrlKey || e.metaKey)) return;
+      const intent = wheelIntent(e, inputSchemeRef.current, '3d');
+      if (!intent) return;
+      e.preventDefault();
+      const camera = controls.object;
+      if (intent.kind === 'orbit') {
+        orbitAroundTarget(camera.position, controls.target, intent.dx, intent.dy);
+      } else if (intent.kind === 'zoom') {
+        // zoomFactor>1 = zoom in = distance shrinks → invert for dolly
+        dollyTowardTarget(camera.position, controls.target, 1 / zoomFactor(intent.delta), 0.6, 5);
+      }
+      controls.update();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
+
+  // Safari trackpad pinch → GestureEvent zoom (the global main.tsx preventDefault
+  // does NOT stop propagation — we still receive these; verified fase 1).
+  useEffect(() => {
+    if (!SAFARI_GESTURES) return;
+    const el = containerRef.current;
+    if (!el) return;
+    let prevScale = 1;
+    const onStart = (e: Event) => { prevScale = 1; e.preventDefault(); };
+    const onChange = (e: Event) => {
+      e.preventDefault();
+      const scale = (e as Event & { scale?: number }).scale;
+      const controls = orbitRef.current;
+      if (!controls || !controls.enabled || typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0) return;
+      // fingers apart (scale grows) → zoom in → distance shrinks
+      dollyTowardTarget(controls.object.position, controls.target, prevScale / scale, 0.6, 5);
+      prevScale = scale;
+      controls.update();
+    };
+    el.addEventListener('gesturestart', onStart);
+    el.addEventListener('gesturechange', onChange);
+    return () => {
+      el.removeEventListener('gesturestart', onStart);
+      el.removeEventListener('gesturechange', onChange);
+    };
+  }, []);
+
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [fitMapStats, setFitMapStats] = useState<import('../../utils/cloth/fitMaps').FitMapStats | null>(null);
   const [inspectedValue, setInspectedValue] = useState<number | null>(null);
@@ -518,15 +613,11 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         console.log('[Pin Tool] Cleared all pins');
       }
 
-      // ─── Numpad Camera Presets (CLO3D-standard) ───
-      if (e.code === 'Numpad2') { e.preventDefault(); cameraPresets.setCameraView('front'); }
-      if (e.code === 'Numpad8') { e.preventDefault(); cameraPresets.setCameraView('back'); }
-      if (e.code === 'Numpad4') { e.preventDefault(); cameraPresets.setCameraView('right'); }
-      if (e.code === 'Numpad6') { e.preventDefault(); cameraPresets.setCameraView('left'); }
-      if (e.code === 'Numpad5') { e.preventDefault(); cameraPresets.setCameraView('top'); }
-      if (e.code === 'Numpad0') { e.preventDefault(); cameraPresets.setCameraView('bottom'); }
-      if (e.code === 'Numpad1') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterRight'); }
-      if (e.code === 'Numpad3') { e.preventDefault(); cameraPresets.setCameraView('threeQuarterLeft'); }
+      // ─── Camera Presets (CLO3D-standard) — numpad or top-row digits ───
+      // Top-row support: MacBooks have no numpad (the ShortcutRegistry
+      // defaults already declared '2'/'8'/… — this makes them real).
+      const presetView = cameraViewFromKeyEvent(e);
+      if (presetView) { e.preventDefault(); cameraPresets.setCameraView(presetView); }
 
       // I — Toggle IK mode (when pose editor is open)
       if ((e.key === 'I' || e.key === 'i') && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
@@ -641,6 +732,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
       }} />
+      <PanCrosshair ref={crosshairRef} />
       <Canvas
         camera={{ position: [0, 0.85, 3.0], fov: 50 }}
         shadows={!nodeMaterialActive}
@@ -770,6 +862,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
           maxDistance={5}
           target={[0, 0.75, 0]}
           enablePan={false}
+          enableZoom={false}
           mouseButtons={{ LEFT: -1 as unknown as THREE.MOUSE, MIDDLE: -1 as unknown as THREE.MOUSE, RIGHT: THREE.MOUSE.ROTATE }}
           onChange={patchMouseButtons}
         />
@@ -866,7 +959,7 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       )}
       {!cameraMode && (
         <div className="sim-status" style={{ left: 12, right: 'auto', color: '#4488ff', opacity: 0.9, pointerEvents: 'none' }}>
-          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — middle-click to orbit
+          {poseEditorOpen ? '● POSE MODE' : activeTool3D === 'arrangement' ? '⊕ ARRANGE MODE' : '✏️ EDIT MODE'} — {inputScheme === 'trackpad' ? 'two-finger orbit · pinch zoom · ⌥-drag pan' : 'right-drag orbit · middle/⌥-drag pan'}
         </div>
       )}
 

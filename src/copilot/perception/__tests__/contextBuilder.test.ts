@@ -328,6 +328,10 @@ function mockState(overrides?: Partial<RootState>): RootState {
       signaling: 'subtle' as const,
       tools2d: ['select', 'pen', 'line', 'rectangle', 'scissors', 'measure', 'seam'],
     },
+    inputScheme: {
+      scheme: 'mouse' as const,
+      source: 'default' as const,
+    },
   };
 
   if (overrides) {

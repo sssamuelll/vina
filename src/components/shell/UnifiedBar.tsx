@@ -8,6 +8,8 @@ import { dxfErrorMessage, type PendingDXFAttachment } from './dxfImport';
 import UnifiedBarChat from './UnifiedBarChat';
 import UnifiedBarCommands from './UnifiedBarCommands';
 import AgentSettings from '../../copilot/AgentSettings';
+import InputSchemeSection from './InputSchemeSection';
+import { loadPosition, clampPosition, savePosition } from './barPosition';
 
 export type BarMode = 'chat' | 'commands' | 'settings';
 
@@ -27,33 +29,6 @@ const MODE_PLACEHOLDERS: Record<BarMode, string> = {
   commands: 'Type a command...',
   settings: 'Search settings...',
 };
-
-const STORAGE_KEY = 'openclo-bar-position';
-const BAR_WIDTH = 560;
-const BAR_HEIGHT = 58;
-
-/** Load saved position or default to bottom-center */
-function loadPosition(): { x: number; y: number } {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch { /* ignore */ }
-  return {
-    x: Math.round((window.innerWidth - BAR_WIDTH) / 2),
-    y: window.innerHeight - BAR_HEIGHT - 24,
-  };
-}
-
-function clampPosition(x: number, y: number): { x: number; y: number } {
-  const minX = 16;
-  const maxX = window.innerWidth - BAR_WIDTH - 16;
-  const minY = window.innerHeight * 0.8; // top of drag zone (bottom 20%)
-  const maxY = window.innerHeight - BAR_HEIGHT - 16;
-  return {
-    x: Math.max(minX, Math.min(maxX, x)),
-    y: Math.max(minY, Math.min(maxY, y)),
-  };
-}
 
 export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarProps = {}) {
   const [mode, setMode] = useState<BarMode>('chat');
@@ -159,7 +134,7 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
     const handleUp = () => {
       setIsDragging(false);
       setPosition(prev => {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(prev)); } catch { /* ignore */ }
+        savePosition(prev);
         return prev;
       });
     };
@@ -320,16 +295,19 @@ export default function UnifiedBar({ onOpenTemplates, onOpenPanel }: UnifiedBarP
             />
           )}
           {mode === 'settings' && (
-            <AgentSettings
-              onClose={() => setPanelOpen(false)}
-              onSave={() => {
-                // `openclo:provider-config-changed` is fired by `ConnectionsList`
-                // on every connection mutation directly — this onSave callback
-                // is here only for preference changes (teaching mode, language,
-                // budget) and panel close after Save preferences.
-                window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
-              }}
-            />
+            <>
+              <InputSchemeSection />
+              <AgentSettings
+                onClose={() => setPanelOpen(false)}
+                onSave={() => {
+                  // `openclo:provider-config-changed` is fired by `ConnectionsList`
+                  // on every connection mutation directly — this onSave callback
+                  // is here only for preference changes (teaching mode, language,
+                  // budget) and panel close after Save preferences.
+                  window.dispatchEvent(new CustomEvent('openclo:provider-config-changed'));
+                }}
+              />
+            </>
           )}
         </div>
       )}

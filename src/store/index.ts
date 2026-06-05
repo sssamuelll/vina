@@ -22,6 +22,7 @@ import inspectorReducer from './inspectorSlice';
 import bomReducer from './bomSlice';
 import nestingReducer from './nestingSlice';
 import gradingReducer from './gradingSlice';
+import inputSchemeReducer, { hydrateInputScheme, rehydrateInputScheme, persistInputScheme } from './inputSchemeSlice';
 import { confirmationMiddleware } from './confirmationMiddleware';
 import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
@@ -54,6 +55,7 @@ export const store = configureStore({
     bom: bomReducer,
     nesting: nestingReducer,
     grading: gradingReducer,
+    inputScheme: inputSchemeReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
@@ -98,6 +100,20 @@ store.subscribe(() => {
   if (dock !== prevDock) {
     prevDock = dock;
     persistDocks(dock);
+  }
+});
+
+// Input scheme: async IDB hydrate (fire-and-forget; default Mouse until it lands)
+// + focused persist subscribe — same isolation rationale as persistDocks above.
+void hydrateInputScheme().then((saved) => {
+  if (saved) store.dispatch(rehydrateInputScheme(saved));
+});
+let prevInputScheme = store.getState().inputScheme;
+store.subscribe(() => {
+  const inputScheme = store.getState().inputScheme;
+  if (inputScheme !== prevInputScheme) {
+    prevInputScheme = inputScheme;
+    persistInputScheme(inputScheme);
   }
 });
 
