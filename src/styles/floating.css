@@ -168,3 +168,75 @@
   min-width: 220px;
   z-index: 210;
 }
+
+/* ─── Canvas context menu (right-click, 2D editor) ───
+   Same glass language as the logo menu — it used to be a flat VSCode-dark
+   one-off (#1e1e1e) that clashed with every other floating surface. */
+.context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  background: rgba(8, 8, 15, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99, 102, 241, 0.15);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  user-select: none;
+}
+.context-menu__header {
+  padding: 6px 12px 4px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.08);
+  margin-bottom: 2px;
+}
+.context-menu__header--seam {
+  color: var(--destructive);
+}
+.context-menu__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  text-align: left;
+  gap: 8px;
+  border-radius: 8px;
+  transition: background 0.08s ease;
+}
+.context-menu__item:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+.context-menu__item--danger {
+  color: var(--destructive);
+}
+.context-menu__icon {
+  width: 20px;
+  text-align: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.context-menu__label {
+  flex: 1;
+}
+.context-menu__shortcut {
+  font-size: var(--text-xs);
+  color: var(--text-ghost);
+  margin-left: 12px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.context-menu__separator {
+  height: 1px;
+  background: rgba(99, 102, 241, 0.08);
+  margin: 4px 10px;
+}
