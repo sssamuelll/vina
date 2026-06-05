@@ -45,50 +45,46 @@ describe('Seam Allowance Rendering', () => {
     });
   });
 
-  describe('Default width fallback', () => {
-    it('uses piece.seamAllowance when set', () => {
-      const piece: Pick<PatternPiece, 'seamAllowance'> = { seamAllowance: 15 };
-      const defaultWidth = 10;
-      const saWidth = piece.seamAllowance || defaultWidth;
-      expect(saWidth).toBe(15);
-    });
-
-    it('falls back to defaultWidth when piece SA is 0', () => {
-      const piece: Pick<PatternPiece, 'seamAllowance'> = { seamAllowance: 0 };
-      const defaultWidth = 10;
-      const saWidth = piece.seamAllowance || defaultWidth;
-      expect(saWidth).toBe(10);
-    });
-  });
-
-  describe('effectiveSeamAllowanceWidth — real seam line suppresses the synthetic default (M3.5)', () => {
+  describe('effectiveSeamAllowanceWidth — explicit-only (hallazgo #2: pieces are NET)', () => {
+    // Seam allowance is an explicit finishing step, never a default. The
+    // editor-wide 10mm fallback is gone: a piece renders a margin ONLY when
+    // its own seamAllowance was explicitly set. This unifies M3.5 (sew-line
+    // suppression) and junta F1 (import provenance) — both are now just
+    // "no explicit SA → no margin".
     const seamInternal: InternalLine = {
       id: 'seam-1',
       type: 'seam',
       path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }],
     };
-    const mk = (seamAllowance: number, internals: InternalLine[]): Pick<PatternPiece, 'seamAllowance' | 'internals'> =>
-      ({ seamAllowance, internals });
+    const mk = (
+      seamAllowance: number,
+      internals: InternalLine[] = [],
+      outlineIsCutLine?: boolean,
+    ): Pick<PatternPiece, 'seamAllowance' | 'internals' | 'outlineIsCutLine'> =>
+      ({ seamAllowance, internals, outlineIsCutLine });
 
-    it('piece WITH a real seam internal and no explicit SA → 0 (no synthetic contour)', () => {
-      expect(effectiveSeamAllowanceWidth(mk(0, [seamInternal]), 10)).toBe(0);
+    it('explicit per-piece SA → user value wins', () => {
+      expect(effectiveSeamAllowanceWidth(mk(15))).toBe(15);
+    });
+
+    it('SA 0 → 0, no editor fallback (drafted pieces are born net)', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0))).toBe(0);
+    });
+
+    it('piece WITH a real seam internal and no explicit SA → 0 (M3.5 preserved)', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0, [seamInternal]))).toBe(0);
     });
 
     it('piece WITH a real seam internal but explicit SA → user value wins', () => {
-      expect(effectiveSeamAllowanceWidth(mk(15, [seamInternal]), 10)).toBe(15);
+      expect(effectiveSeamAllowanceWidth(mk(15, [seamInternal]))).toBe(15);
     });
 
-    it('piece WITHOUT seam internal and SA 0 → default (P0.1 behavior preserved)', () => {
-      expect(effectiveSeamAllowanceWidth(mk(0, []), 10)).toBe(10);
+    it('imported piece (outlineIsCutLine) → 0 (junta F1 preserved)', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0, [], true))).toBe(0);
     });
 
-    it('piece WITHOUT seam internal and explicit SA → explicit value', () => {
-      expect(effectiveSeamAllowanceWidth(mk(15, []), 10)).toBe(15);
-    });
-
-    it('non-seam internals do not suppress the default', () => {
-      const grain: InternalLine = { id: 'g', type: 'grainline', path: seamInternal.path };
-      expect(effectiveSeamAllowanceWidth(mk(0, [grain]), 10)).toBe(10);
+    it('imported piece with EXPLICIT per-piece SA → user value still wins', () => {
+      expect(effectiveSeamAllowanceWidth(mk(15, [], true))).toBe(15);
     });
   });
 

@@ -19,13 +19,10 @@ function generateSuggestions(data: InspectionData, diagnostics: Diagnostic[]): A
         }
         break;
       case 'seam-allowance':
-        if (data.piece.seamAllowance === 0) {
-          suggestions.push({
-            description: 'Set seam allowance to 10mm',
-            impact: 'Standard seam allowance for most garments',
-            toolCall: { name: 'setSeamAllowance', params: { pieceId: data.piece.id, width: 10 } },
-          });
-        }
+        // SA = 0 is the normal NET state (hallazgo #2) — never suggest
+        // adding an allowance the patternmaker didn't ask for. The only
+        // remaining seam-allowance diagnostic is the explicit-too-small
+        // warning, which needs the user's intent, not an auto-fix.
         break;
       case 'internals':
         if (d.message.includes('grainline')) {

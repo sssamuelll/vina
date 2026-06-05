@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Point2D, PathCommand, PatternPiece, InternalLineType } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
+import { draftedPieceDefaults } from '../../utils/defaults';
 
 export interface PolyPenNode {
   point: Point2D;
@@ -65,10 +66,7 @@ export function usePolyPenTool(
       onCompletePiece({
         name: 'Poly Pen Piece',
         outline: cmds,
-        internals: [],
-        position: { x: 0, y: 0 },
-        rotation: 0, mirrored: false,
-        seamAllowance: 10, layer: 1, sublayer: 0, active: true,
+        ...draftedPieceDefaults(),
       });
     } else {
       onCompleteInternalLine(cmds, lineType);

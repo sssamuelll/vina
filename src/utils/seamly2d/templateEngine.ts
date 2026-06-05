@@ -127,7 +127,7 @@ export class PatternTemplateEngine {
           position: { x: 0, y: 0 },
           rotation: 0,
           mirrored: false,
-          seamAllowance: piece.seamAllowance ?? 10,
+          seamAllowance: piece.seamAllowance ?? 0, // born net (hallazgo #2)
           layer: 1,
           sublayer: 0,
           active: true,

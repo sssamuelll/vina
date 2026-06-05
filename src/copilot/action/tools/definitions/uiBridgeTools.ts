@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * #82 — Tool-UI Bridge: Missing copilot equivalents for UI tools
  * duplicatePiece, addAnnotation, quickRectangle, selectTool, setViewMode
@@ -11,7 +11,6 @@ import { setViewMode, selectPiece, clearSelection } from '../../../../store/edit
 import { activate2DTool } from '../../../../store/toolActivation';
 import { newId } from '../../../../utils/ids';
 import type { InternalLine } from '../../../../types/types';
-import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
 
 export const tools: ToolDefinition[] = [
   {
@@ -99,7 +98,7 @@ export const tools: ToolDefinition[] = [
         internals: [],
         position: { x, y },
         rotation: 0,
-        seamAllowance: DEFAULT_SEAM_ALLOWANCE,
+        seamAllowance: 0, // born net (hallazgo #2)
       } as any));
       return { success: true, pieceId: id, name: params.name, width: w, height: h };
     },

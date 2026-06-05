@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Point2D, PathCommand, InternalLine } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
+import { draftedPieceDefaults } from '../../utils/defaults';
 
 interface RectState {
   start: Point2D | null;
@@ -80,14 +81,7 @@ export function useRectangleTool(
       onComplete({
         name: `Rect ${Date.now().toString(36)}`,
         outline,
-        internals: [],
-        position: { x: 0, y: 0 },
-        rotation: 0,
-        mirrored: false,
-        seamAllowance: 10,
-        layer: 1,
-        sublayer: 0,
-        active: true,
+        ...draftedPieceDefaults(),
       });
     }
 

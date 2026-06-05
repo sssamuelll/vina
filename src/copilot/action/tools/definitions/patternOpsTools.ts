@@ -740,7 +740,7 @@ export const tools: ToolDefinition[] = [
 
       const mode = (params.mode as string) || 'piece';
       if (mode === 'piece') {
-        const newPiece = { id: uid('piece'), name: 'Poly Pen Piece', outline: cmds, internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now() };
+        const newPiece = { id: uid('piece'), name: 'Poly Pen Piece', outline: cmds, internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false, seamAllowance: 0 /* born net (hallazgo #2) */, layer: 1, sublayer: 0, active: true, createdAt: Date.now(), updatedAt: Date.now() };
         dispatch(addPiece(newPiece));
         return { success: true, data: { pieceId: newPiece.id }, rollback: () => dispatch({ type: 'project/removePiece', payload: newPiece.id, meta: { skipConfirmation: true } }) };
       } else {

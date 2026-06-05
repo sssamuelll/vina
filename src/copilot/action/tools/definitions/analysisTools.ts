@@ -186,10 +186,7 @@ const analyzeProjectTool: ToolDefinition = {
         issues.push(`${piece.name} has no grainline / no tiene línea de hilo`);
       }
 
-      // Check for missing seam allowance
-      if (piece.seamAllowance === 0) {
-        issues.push(`${piece.name} has no seam allowance / no tiene margen de costura`);
-      }
+      // SA = 0 is the normal NET state (hallazgo #2) — not an issue to report.
     }
 
     return {

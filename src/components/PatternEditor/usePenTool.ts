@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { Point2D, PathCommand, PatternPiece } from '../../types/types';
 import { screenToPattern } from '../../utils/geometry';
+import { draftedPieceDefaults } from '../../utils/defaults';
 
 /** 
  * A node in the pen path. Each node has an anchor point and optional
@@ -130,14 +131,7 @@ export function usePenTool(
         onComplete({
           name: `Piece ${Date.now().toString(36)}`,
           outline: commands,
-          internals: [],
-          position: { x: 0, y: 0 },
-          rotation: 0,
-          mirrored: false,
-          seamAllowance: 10,
-          layer: 1,
-          sublayer: 0,
-          active: true,
+          ...draftedPieceDefaults(),
         });
         setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
         return;
@@ -192,14 +186,7 @@ export function usePenTool(
       onComplete({
         name: `Piece ${Date.now().toString(36)}`,
         outline: commands,
-        internals: [],
-        position: { x: 0, y: 0 },
-        rotation: 0,
-        mirrored: false,
-        seamAllowance: 10,
-        layer: 1,
-        sublayer: 0,
-        active: true,
+        ...draftedPieceDefaults(),
       });
       setState({ nodes: [], isDragging: false, cursorPos: null, isClosed: false });
     }

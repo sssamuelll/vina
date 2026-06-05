@@ -117,10 +117,12 @@ describe('evaluateRules', () => {
 
   // ── Seam allowance rules ──────────────────────────────────────────────────
 
-  it('fires seam-allowance:zero error when SA = 0', () => {
+  it('SA = 0 is the normal NET state — no diagnostic (hallazgo #2)', () => {
+    // Patternmakers work net; allowance is an explicit finishing step. SA 0
+    // must not be flagged — the sim never consumes SA (display/export only).
     const data = makeData({ piece: { ...makeData().piece, seamAllowance: 0 } });
     const diags = evaluateRules(data);
-    expect(diags.some(d => d.category === 'seam-allowance' && d.severity === 'error')).toBe(true);
+    expect(diags.some(d => d.category === 'seam-allowance')).toBe(false);
   });
 
   it('fires seam-allowance:too-small warning when SA < 3mm', () => {

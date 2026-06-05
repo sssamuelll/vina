@@ -74,7 +74,6 @@ interface SinglePieceProps {
   isSelected: boolean;
   zoom2D: number;
   showSeamAllowance: boolean;
-  defaultSeamAllowanceWidth: number;
   showGrainlines: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
@@ -105,7 +104,6 @@ const SinglePiece = memo(function SinglePiece({
   isSelected,
   zoom2D,
   showSeamAllowance,
-  defaultSeamAllowanceWidth,
   showGrainlines,
   showPieceNames,
   renderMode2D,
@@ -132,9 +130,9 @@ const SinglePiece = memo(function SinglePiece({
   // only the styling is the redesign. When SA is hidden, the outline is itself
   // the cut line. The accent is reserved for selection; the band is a faint shade
   // between the two contours.
-  // M3.5: pieces carrying their REAL seam line (a 'seam' internal, e.g. DXF AAMA
-  // layer 84) suppress the synthetic default — their outline IS the cut line.
-  const saWidth = effectiveSeamAllowanceWidth(piece, defaultSeamAllowanceWidth);
+  // Hallazgo #2: pieces are NET — the margin renders ONLY when the piece's own
+  // seamAllowance was explicitly set. No editor-wide default fallback.
+  const saWidth = effectiveSeamAllowanceWidth(piece);
   const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
     || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
   const saPath = (showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)
@@ -549,7 +547,6 @@ interface PieceRendererProps {
   selectedPieceIds: string[];
   zoom2D: number;
   showSeamAllowance: boolean;
-  defaultSeamAllowanceWidth: number;
   showGrainlines: boolean;
   showPieceNames: boolean;
   renderMode2D: 'textured' | 'translucent' | 'wireframe';
@@ -569,7 +566,6 @@ export default function PieceRenderer({
   selectedPieceIds,
   zoom2D,
   showSeamAllowance,
-  defaultSeamAllowanceWidth,
   showGrainlines,
   showPieceNames,
   renderMode2D,
@@ -641,7 +637,6 @@ export default function PieceRenderer({
           isSelected={selectedPieceIds.includes(piece.id)}
           zoom2D={zoom2D}
           showSeamAllowance={showSeamAllowance}
-          defaultSeamAllowanceWidth={defaultSeamAllowanceWidth}
           showGrainlines={showGrainlines}
           showPieceNames={showPieceNames}
           renderMode2D={renderMode2D}

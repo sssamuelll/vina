@@ -206,7 +206,7 @@ export function executeBlueprint(
                 connection: (step.curves?.[i] && step.curves[i] !== null) ? 'curve' as const : 'line' as const,
                 curveId: step.curves?.[i] ?? undefined,
               })),
-              seamAllowance: step.seamAllowance ?? 10,
+              seamAllowance: step.seamAllowance ?? 0, // born net (hallazgo #2)
             }),
             description: step.comment || `Build piece "${step.name}" from ${step.points.length} points`,
             descriptionEs: step.commentEs,

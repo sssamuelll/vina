@@ -27,3 +27,17 @@
 
 /* Selection is drawn in the renderer (accent cut line + anchor handles); the
    piece body fill stays neutral. */
+
+/* Seam detail markers (connection line, midpoint dots, direction arrows) —
+   hover/selection only (Iris cut 3). The colored edge highlights stay as the
+   ambient signal; the geometric markers appear on demand. Same no-transition
+   rationale as .piece-hover-fill (DESIGN-NOTES §8). */
+.seam-connection .seam-detail {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.seam-connection:hover .seam-detail,
+.seam-connection--selected .seam-detail {
+  opacity: 1;
+}

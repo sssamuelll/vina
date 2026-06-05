@@ -512,42 +512,16 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
   return (
     <div
       ref={ref}
-      style={{
-        position: 'fixed',
-        left: menu.x,
-        top: menu.y,
-        zIndex: 1000,
-        minWidth: 180,
-        background: '#1e1e1e',
-        border: '1px solid #3a3a3a',
-        borderRadius: 6,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-        padding: '4px 0',
-        fontFamily: "'Inter', 'Helvetica Neue', sans-serif",
-        fontSize: 13,
-        color: '#e0e0e0',
-        userSelect: 'none',
-      }}
+      className="context-menu"
+      style={{ left: menu.x, top: menu.y }}
     >
       {menu.seamId && (
-        <div style={{
-          padding: '6px 12px 4px',
-          fontSize: 11,
-          color: '#e74c3c',
-          borderBottom: '1px solid #333',
-          marginBottom: 2,
-        }}>
+        <div className="context-menu__header context-menu__header--seam">
           Seam
         </div>
       )}
       {menu.pieceId && !menu.seamId && (
-        <div style={{
-          padding: '6px 12px 4px',
-          fontSize: 11,
-          color: '#888',
-          borderBottom: '1px solid #333',
-          marginBottom: 2,
-        }}>
+        <div className="context-menu__header">
           {menu.pieceName || menu.pieceId}
         </div>
       )}
@@ -558,31 +532,17 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
           ) : (
             <button
               onClick={item.action}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                width: '100%',
-                padding: '6px 12px',
-                border: 'none',
-                background: 'transparent',
-                color: item.danger ? '#ff6b6b' : '#e0e0e0',
-                cursor: 'pointer',
-                fontSize: 13,
-                textAlign: 'left',
-                gap: 8,
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#2d2d2d')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              className={`context-menu__item${item.danger ? ' context-menu__item--danger' : ''}`}
             >
-              <span style={{ width: 20, textAlign: 'center', fontSize: 14 }}>{item.icon}</span>
-              <span style={{ flex: 1 }}>{item.label}</span>
+              <span className="context-menu__icon">{item.icon}</span>
+              <span className="context-menu__label">{item.label}</span>
               {item.shortcut && (
-                <span style={{ fontSize: 11, color: '#666', marginLeft: 12 }}>{item.shortcut}</span>
+                <span className="context-menu__shortcut">{item.shortcut}</span>
               )}
             </button>
           )}
           {item.separator && (
-            <div style={{ height: 1, background: '#333', margin: '2px 8px' }} />
+            <div className="context-menu__separator" />
           )}
         </div>
       ))}

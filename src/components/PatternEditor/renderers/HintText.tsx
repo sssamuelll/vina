@@ -8,11 +8,14 @@ interface HintTextProps {
   segmentSewingPhase?: string;
   topstitchMode?: string;
   walkSeamPhase?: string;
+  /** Whether the seam/freesewing tool already holds its first edge */
+  seamHasFirstEdge?: boolean;
 }
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, segmentSewingPhase, topstitchMode, walkSeamPhase,
+  seamHasFirstEdge,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -33,6 +36,15 @@ export default function HintText({
         <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
           fill="rgba(0,0,0,0.2)" fontSize="13" fontFamily="Inter, sans-serif">
           Click to add points · Drag to curve · Click first point to close · Enter to finish open · Esc to cancel
+        </text>
+      )}
+
+      {(activeTool === 'seam' || activeTool === 'freesewing') && (
+        <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
+          fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+          {seamHasFirstEdge
+            ? 'Click an edge on a different piece to sew · Esc to cancel'
+            : 'Click an edge on the first piece to start a seam'}
         </text>
       )}
 

@@ -645,7 +645,6 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
             selectedPieceIds={selectedPieceIds}
             zoom2D={zoom2D}
             showSeamAllowance={showSeamAllowance}
-            defaultSeamAllowanceWidth={editor.defaultSeamAllowanceWidth}
             showGrainlines={showGrainlines}
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}
@@ -799,6 +798,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
           segmentSewingPhase={segmentSewingTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
+          seamHasFirstEdge={activeTool === 'seam' ? !!seamTool.firstEdge : !!freeSewingTool.firstEdge}
         />
 
         <RulerLayer
