@@ -645,7 +645,6 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
             selectedPieceIds={selectedPieceIds}
             zoom2D={zoom2D}
             showSeamAllowance={showSeamAllowance}
-            defaultSeamAllowanceWidth={editor.defaultSeamAllowanceWidth}
             showGrainlines={showGrainlines}
             showPieceNames={showPieceNames}
             renderMode2D={renderMode2D}

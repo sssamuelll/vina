@@ -11,7 +11,6 @@ import { addPiece, updatePiece, removePiece, movePiece, rotatePiece } from '../.
 import { selectPiece } from '../../../../store/editorSlice';
 import type { PatternPiece, PathCommand } from '../../../../types/types';
 import { uid } from '../../../../utils/pathHelpers';
-import { DEFAULT_SEAM_ALLOWANCE } from '../../../../utils/defaults';
 
 /** Compute bounding box from outline */
 function computeBounds(outline: PathCommand[]): { width: number; height: number } {
@@ -59,7 +58,7 @@ const createPieceTool: ToolDefinition = {
           y: { type: 'number' },
         },
       },
-      seamAllowance: { type: 'number', description: 'Seam allowance in mm (default 10) / Margen de costura en mm (defecto 10)' },
+      seamAllowance: { type: 'number', description: 'Seam allowance in mm. Pieces are born NET (0) — only set when the user explicitly asks for an allowance / Margen de costura en mm. Las piezas nacen en NETO (0) — solo asignar si el usuario lo pide explícitamente' },
       mirrored: { type: 'boolean', description: 'Whether piece is mirrored / Si la pieza está espejada' },
     },
     required: ['name'],
@@ -79,7 +78,7 @@ const createPieceTool: ToolDefinition = {
           position: (params.position as { x: number; y: number }) || { x: 50, y: 50 },
           rotation: 0,
           mirrored: (params.mirrored as boolean) || false,
-          seamAllowance: (params.seamAllowance as number) ?? DEFAULT_SEAM_ALLOWANCE,
+          seamAllowance: (params.seamAllowance as number) ?? 0, // born net (hallazgo #2)
           layer: 1,
           sublayer: 0,
           active: true,

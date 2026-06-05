@@ -294,7 +294,7 @@ export class CopilotActionExecutor {
           name: action.params.name || 'New Piece',
           outline,
           internals: [],
-          seamAllowance: 10,
+          seamAllowance: 0, // born net (hallazgo #2)
           position: action.params.position || { x: 0, y: 0 },
           rotation: 0,
           mirrored: false,

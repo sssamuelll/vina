@@ -270,7 +270,7 @@ const constructionSlice = createSlice({
         id: cid('cp'),
         name,
         nodes,
-        seamAllowance: seamAllowance ?? 10,
+        seamAllowance: seamAllowance ?? 0, // born net (hallazgo #2)
         closed: true,
         blockId,
       });

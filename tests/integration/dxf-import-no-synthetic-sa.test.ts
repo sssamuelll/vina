@@ -19,7 +19,6 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { importDXFContent } from '../../src/utils/dxf';
 import { effectiveSeamAllowanceWidth } from '../../src/utils/seam';
-import { DEFAULT_SEAM_ALLOWANCE } from '../../src/utils/defaults';
 
 const FIXTURES = [
   'jacket1_52-176.dxf',
@@ -41,7 +40,7 @@ describe('DXF import — no synthetic seam allowance on imported pieces', () => 
       for (const piece of pieces) {
         expect(piece.outlineIsCutLine, `${piece.name} provenance flag`).toBe(true);
         expect(
-          effectiveSeamAllowanceWidth(piece, DEFAULT_SEAM_ALLOWANCE),
+          effectiveSeamAllowanceWidth(piece),
           `${piece.name} synthetic SA width`,
         ).toBe(0);
       }

@@ -83,26 +83,22 @@ export function flattenPath(commands: PathCommand[], resolution: number = CURVE_
 }
 
 /**
- * Width of the SYNTHETIC seam-allowance double-line (P0.1) for a piece.
+ * Width of the seam-allowance double-line for a piece — EXPLICIT-ONLY.
  *
- * A piece that carries its REAL seam line (a `'seam'` internal, e.g. imported
- * from DXF AAMA layer 84) must not get the default synthetic contour drawn on
- * top of it — its outline IS the cut line and the internal IS the stitch line.
- * Same for any piece whose provenance marks the outline as the cut line
- * (`outlineIsCutLine`, set by the DXF converter): the system must never
- * invent a margin the file does not carry, even without a sew-line layer.
- * Offsetting the sparse imported cut polyline also produces visible arc/step
- * artifacts (M3.5). An EXPLICIT per-piece seamAllowance still wins: the user
- * asked for it.
+ * Pieces are NET (hallazgo #2, María): patternmakers draft without seam
+ * allowance — SA is an explicit finishing step, never a default. A piece
+ * renders a margin ONLY when its own `seamAllowance` was explicitly set
+ * (the user asked for it). There is no editor-wide fallback anymore.
+ *
+ * This subsumes the earlier suppression rules: pieces carrying a real sew
+ * line (`'seam'` internal, M3.5) or import provenance (`outlineIsCutLine`,
+ * junta F1) are born with `seamAllowance: 0` and thus render no margin —
+ * the system never invents geometry the file/user did not provide.
  */
 export function effectiveSeamAllowanceWidth(
-  piece: Pick<PatternPiece, 'seamAllowance' | 'internals' | 'outlineIsCutLine'>,
-  defaultWidth: number,
+  piece: Pick<PatternPiece, 'seamAllowance'>,
 ): number {
-  if (piece.seamAllowance) return piece.seamAllowance;
-  if (piece.outlineIsCutLine) return 0;
-  const hasRealSeamLine = piece.internals?.some(i => i.type === 'seam') ?? false;
-  return hasRealSeamLine ? 0 : defaultWidth;
+  return piece.seamAllowance || 0;
 }
 
 // Clipper2 scale: integer coords at 100x for 0.01mm precision

@@ -10,9 +10,33 @@
 
 // ─── Seam Defaults ──────────────────────────────────────────────────────────
 
+/** Width an EXPLICIT apply-seam-allowance action offers — NOT a birth value. */
 export const DEFAULT_SEAM_ALLOWANCE = 10; // mm
 export const DEFAULT_SEAM_TENSION = 100; // 0-200, 100 = normal
 export const DEFAULT_SEAM_STRENGTH = 1.0; // 0-1
+
+// ─── Drafted-piece Defaults ─────────────────────────────────────────────────
+
+/**
+ * Shared birth fields for pieces drafted in the 2D editor (pen, polyPen,
+ * rectangle) or created by the copilot.
+ *
+ * Pieces are born NET (hallazgo #2, María): patternmakers draft without
+ * seam allowance — SA is an explicit finishing step applied per piece
+ * (width + corner geometry), never an automatic default at creation.
+ */
+export function draftedPieceDefaults() {
+  return {
+    internals: [] as import('../types/types').InternalLine[],
+    position: { x: 0, y: 0 },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 0, // born net
+    layer: 1,
+    sublayer: 0,
+    active: true,
+  };
+}
 
 // ─── Annotation Defaults ────────────────────────────────────────────────────
 
