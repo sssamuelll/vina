@@ -74,8 +74,8 @@ describe('Tools E2E', () => {
   // ─── Registry health ───────────────────────────────────────────────
 
   describe('Registry', () => {
-    it('has 232 tools registered', () => {
-      expect(registry.size).toBe(232); // 231 + 1 arrangeGarment (CLO3D arrange-only flow)
+    it('has 230 tools registered', () => {
+      expect(registry.size).toBe(230); // 232 - 2 seamly tools (Seamly removal 2026-06-05)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(232); // 231 + 1 arrangeGarment (CLO3D arrange-only flow)
+      expect(names.length).toBe(230); // 232 - 2 seamly tools (Seamly removal 2026-06-05)
 
       // Key tools from every category
       const expected = [
@@ -422,7 +422,6 @@ describe('Tools E2E', () => {
         'setMeasurements',
         'autoDetectSeams',
         'searchFabrics', 'getFabricDetails', 'compareFabrics',
-        'listSeamlyPatterns', 'loadSeamlyPattern',
         'adjustFit', 'adjustLength', 'adjustSleeve', 'adjustProportions',
         'runGarmentPipeline',
         'modifyDimension',

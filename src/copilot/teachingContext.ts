@@ -244,22 +244,6 @@ const TEACHING_DB: Record<string, TeachingEntry> = {
     },
   },
 
-  generateFromTemplate: {
-    es: {
-      title: 'Generación desde plantilla Seamly2D',
-      explanation:
-        'Se genera el patrón desde una plantilla validada de Seamly2D con geometría de construcción real. ' +
-        'Las piezas se calculan paramétricamente según las medidas corporales o talla estándar.',
-      tip: 'Usa searchTemplates para encontrar la plantilla correcta antes de generar.',
-    },
-    en: {
-      title: 'Generation from Seamly2D Template',
-      explanation:
-        'The pattern is generated from a validated Seamly2D template with real construction geometry. ' +
-        'Pieces are parametrically calculated from body measurements or standard size.',
-      tip: 'Use searchTemplates to find the right template before generating.',
-    },
-  },
 };
 
 /**

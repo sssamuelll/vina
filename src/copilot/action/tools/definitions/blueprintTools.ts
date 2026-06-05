@@ -1,9 +1,9 @@
 /**
  * Blueprint Tools — user blueprint management only.
- * 
+ *
  * searchBlueprints and executeBlueprint removed — no AI-generated blueprints.
- * Real patterns come from Seamly2D (seamlyTools.ts).
- * Users can save their own constructions as blueprints for reuse.
+ * Real patterns come from the user's imported DXF (file entry is always a
+ * user gesture). Users can save their own constructions as blueprints.
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
@@ -133,7 +133,7 @@ const saveUserBlueprintTool: ToolDefinition = {
 
 const listBlueprintsTool: ToolDefinition = {
   name: 'listBlueprints',
-  description: 'List user-saved blueprints. For real patterns, use listSeamlyPatterns instead. / Listar planos guardados por el usuario.',
+  description: 'List user-saved blueprints. Real patterns come from the user importing their DXF. / Listar planos guardados por el usuario.',
   parameters: { type: 'object', properties: {} },
   execute: async (_params, _dispatch, getState): Promise<ToolResult> => {
     const blueprints = getState().blueprints.blueprints;
@@ -148,7 +148,7 @@ const listBlueprintsTool: ToolDefinition = {
         })),
         total: blueprints.length,
         hint: blueprints.length === 0
-          ? 'No user blueprints saved. Use listSeamlyPatterns for real patterns.'
+          ? 'No user blueprints saved. Real patterns come from the user importing their DXF.'
           : undefined,
       },
     };

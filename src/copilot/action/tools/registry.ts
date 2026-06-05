@@ -23,12 +23,10 @@ import { tools as editorToolDefs } from './definitions/editorTools';
 import { tools as analysisToolDefs } from './definitions/analysisTools';
 import { tools as compoundToolDefs } from './definitions/compoundTools';
 import { tools as autoSewToolDefs } from './definitions/autoSewTools';
-import { tools as templateToolDefs } from './definitions/templateTools';
 import { tools as fabricToolDefs } from './definitions/fabricTools';
 import { tools as semanticToolDefs } from './definitions/semanticTools';
 import { tools as constructionToolDefs } from './definitions/constructionTools';
 import { tools as blueprintToolDefs } from './definitions/blueprintTools';
-import { tools as seamlyToolDefs } from './definitions/seamlyTools';
 import { tools as garmentPipelineToolDefs } from './definitions/garmentPipelineTool';
 import { tools as edgeToolDefs } from './definitions/edgeTools';
 import { tools as dartToolDefs } from './definitions/dartTools';
@@ -357,12 +355,10 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   analysisToolDefs,
   compoundToolDefs,
   autoSewToolDefs,
-  templateToolDefs,
   fabricToolDefs,
   semanticToolDefs,
   constructionToolDefs,
   blueprintToolDefs,
-  seamlyToolDefs,
   garmentPipelineToolDefs,
   edgeToolDefs,
   dartToolDefs,

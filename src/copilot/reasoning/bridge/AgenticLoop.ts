@@ -222,7 +222,7 @@ export class AgenticLoop {
             'presentToUser was rejected. You cannot speak to the user without first grounding ' +
             'your response in at least one real tool call. The conversation has no tool calls yet, ' +
             'and your current response contains no tool calls other than presentToUser. ' +
-            'You must call the relevant tools (e.g. listSeamlyPatterns to read the catalog for a ' +
+            'You must call the relevant tools (e.g. getGarmentState to read the loaded pieces for a ' +
             'dressing intent) BEFORE you propose anything to the user. Whatever you would have ' +
             'said in the message is unsupported by real state — call the tools first, then propose.';
 
@@ -257,7 +257,7 @@ export class AgenticLoop {
         // current presentToUser({awaiting: "done"}) call. This enforces
         // the slice semantic propose → confirm → ACT → done. Without this
         // temporal gate, the LLM exploits prior action tool calls from
-        // earlier in the conversation (e.g. listSeamlyPatterns from
+        // earlier in the conversation (e.g. getGarmentState from
         // turn 1) as evidence that "work was done" — even though the
         // user-facing post-confirmation work has not actually run.
         // If no prior confirmation exists, fall back to a simpler "any
@@ -303,7 +303,7 @@ export class AgenticLoop {
 
           if (!actionsInScope && !actionsThisRun) {
             const errorMsg = lastConfirmIdx >= 0
-              ? 'presentToUser({awaiting: "done"}) was rejected. The user confirmed your previous proposal, but you have not yet called any action tool to actually execute that proposal. The Redux store has not changed since the confirmation. Call the action tools the user just approved (e.g. loadSeamlyPattern, arrangeGarment, createSeam for a dressing flow) and then try presentToUser again with REAL numbers from the tool results — never fabricated.'
+              ? 'presentToUser({awaiting: "done"}) was rejected. The user confirmed your previous proposal, but you have not yet called any action tool to actually execute that proposal. The Redux store has not changed since the confirmation. Call the action tools the user just approved (e.g. arrangeGarment, createSeam for a dressing flow) and then try presentToUser again with REAL numbers from the tool results — never fabricated.'
               : 'presentToUser({awaiting: "done"}) was rejected. No action tool has been called in this conversation. Call the relevant action tools required by the user\'s request first, then try presentToUser again.';
 
             // Record the rejected attempt in messages so the LLM sees its

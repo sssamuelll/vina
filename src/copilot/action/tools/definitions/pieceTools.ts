@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Piece Operations — tools for creating, modifying, and transforming pattern pieces.
  * Operaciones de Pieza — herramientas para crear, modificar y transformar piezas de patrón.
@@ -35,9 +34,9 @@ const createPieceTool: ToolDefinition = {
   name: 'createPiece',
   description:
     'Create a new pattern piece from an SVG outline on the canvas. ' +
-    'For standard garments, use generateFromTemplate (Seamly2D patterns) instead. ' +
+    'For real garments, the user imports their own DXF pattern instead. ' +
     '/ Crear una nueva pieza de patrón desde un contorno SVG. ' +
-    'Para prendas estándar, usar generateFromTemplate (patrones Seamly2D).',
+    'Para prendas reales, el usuario importa su propio patrón DXF.',
   parameters: {
     type: 'object',
     properties: {
