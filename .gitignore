@@ -67,3 +67,15 @@ mempalace.yaml
 
 # Understand-Anything (Lum1104) tool eval — local-only, never commit
 /.understand-anything/
+
+# Ad-hoc UI verification harnesses (Playwright) + their screenshot evidence.
+# Convention per docs/superpowers/plans/2026-06-02..04: created untracked, "do NOT
+# commit" — the script source lives inline in each plan doc, so they are regenerable.
+# CI's WASM smoke test is the tracked exception (negated below); if a future verify
+# script must be committed, add its own negation here.
+scripts/verify-*.mjs
+!scripts/verify-wasm-smoke.mjs
+scripts/capture-*.mjs
+scripts/walk-*.mjs
+design-handoff/ui-screenshots/verify-*.png
+design-handoff/ui-screenshots/walk-*.png
