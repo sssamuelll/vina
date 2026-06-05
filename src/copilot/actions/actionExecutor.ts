@@ -25,7 +25,7 @@ import {
   removeSeam,
   reverseSeam,
   addInternalLine,
-  loadProject,
+  restoreProject,
   linkPieces,
   unlinkPieces,
   setPieceFabric,
@@ -928,7 +928,10 @@ export class CopilotActionExecutor {
         });
 
         if (importAction.loadType === 'open') {
-          this.dispatch(loadProject({
+          // Faithful import: restoreProject skips the generative pipeline
+          // (auto-rename + auto-sew). The pivot rule is "the AI NEVER
+          // auto-sews" — sewing is a separate, explicit downstream step.
+          this.dispatch(restoreProject({
             id: uid(),
             name: 'DXF Import',
             pieces: importedPieces,
