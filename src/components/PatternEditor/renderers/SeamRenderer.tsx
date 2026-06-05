@@ -42,12 +42,10 @@ function directionArrow(
 }
 
 // Categorical palette for distinguishing seam groups — muted for the cream
-// paper ground (was a neon set built for a dark canvas). Mid-tone, lower
-// chroma, still mutually distinguishable.
-const SEAM_PALETTE = [
-  '#4a7fb5', '#b56d8a', '#5a9e72', '#c08a4a', '#8a6db5',
-  '#b55a4a', '#4a9e8f', '#b59a4a', '#a45ab5', '#4a9eae',
-];
+// paper ground. Three hues (Iris cut 3): beyond three, adjacent seams read
+// as a parade of color rather than groups; cycling three keeps neighbors
+// distinct without competing with the selection/error language.
+const SEAM_PALETTE = ['#4a7fb5', '#b56d8a', '#5a9e72'];
 
 export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: SeamRendererProps) {
   return (
@@ -135,7 +133,11 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         const arrowB = directionArrow(epB.start, epB.end, offB, zoom2D);
 
         return (
-          <g key={seam.id} className="seam-connection" opacity={isInactive ? 0.5 : 1}>
+          <g
+            key={seam.id}
+            className={`seam-connection${isSelected ? ' seam-connection--selected' : ''}`}
+            opacity={isInactive ? 0.5 : 1}
+          >
             {/* Selection glow (wider semi-transparent behind main stroke) */}
             {isSelected && pathDA && (
               <path d={pathDA} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
@@ -177,22 +179,28 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 style={{ stroke: baseColor }} strokeWidth={edgeWidth} strokeLinecap="round" strokeDasharray={edgeDash}
               />
             )}
-            {/* Connection line (dotted) */}
-            <line
-              x1={midA.x} y1={midA.y}
-              x2={midB.x} y2={midB.y}
-              style={{ stroke: baseColor }}
-              strokeWidth={1 / zoom2D}
-              strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
-              opacity={0.6}
-            />
-            {/* Midpoint dots */}
-            <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} style={{ fill: baseColor }} />
-            <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} style={{ fill: baseColor }} />
+            {/* Detail markers (connection, dots, arrows) — hover/selection only
+                (Iris cut 3): with several seams the always-on markers turned
+                the canvas into noise. The edge highlights remain the ambient
+                signal; details appear on demand via CSS (.seam-detail). */}
+            <g className="seam-detail">
+              {/* Connection line (dotted) */}
+              <line
+                x1={midA.x} y1={midA.y}
+                x2={midB.x} y2={midB.y}
+                style={{ stroke: baseColor }}
+                strokeWidth={1 / zoom2D}
+                strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
+                opacity={0.6}
+              />
+              {/* Midpoint dots */}
+              <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} style={{ fill: baseColor }} />
+              <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} style={{ fill: baseColor }} />
 
-            {/* Directional arrows */}
-            {arrowA && <path d={arrowA} style={{ fill: baseColor }} opacity={0.8} />}
-            {arrowB && <path d={arrowB} style={{ fill: baseColor }} opacity={0.8} />}
+              {/* Directional arrows */}
+              {arrowA && <path d={arrowA} style={{ fill: baseColor }} opacity={0.8} />}
+              {arrowB && <path d={arrowB} style={{ fill: baseColor }} opacity={0.8} />}
+            </g>
 
             {/* Length mismatch warning */}
             {hasMismatch && (

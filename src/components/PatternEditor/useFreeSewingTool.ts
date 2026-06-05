@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
 import type { PatternPiece, Point2D, Seam } from '../../types/types';
 import {
   screenToPattern,
@@ -26,6 +28,12 @@ export function useFreeSewingTool(
     firstEdge: null,
     hoveredEdge: null,
   });
+
+  // Seam construction type — shared option surface for the seam tool family
+  // (toolOptions.seam.seamType), mirroring useSegmentSewingTool's convention.
+  const seamType = useSelector(
+    (s: RootState) => (s.tools.toolOptions?.seam?.seamType as Seam['type']) ?? 'standard',
+  );
 
   const toPattern = useCallback((screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
     screenToPattern(screenX, screenY, svgRect, zoom, pan),
@@ -56,7 +64,7 @@ export function useFreeSewingTool(
       onComplete({
         pieceA: { pieceId: state.firstEdge.pieceId, edgeName: edgeAName },
         pieceB: { pieceId: edge.pieceId, edgeName: edgeBName },
-        type: 'standard',
+        type: seamType,
         tension: 100,
         strength: 1.0,
         active: true,
@@ -65,7 +73,7 @@ export function useFreeSewingTool(
       });
       setState({ firstEdge: null, hoveredEdge: null });
     }
-  }, [toPattern, pieces, zoom, mode, state.firstEdge, onComplete]);
+  }, [toPattern, pieces, zoom, mode, state.firstEdge, onComplete, seamType]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;

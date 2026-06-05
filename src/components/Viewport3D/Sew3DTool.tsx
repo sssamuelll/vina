@@ -15,14 +15,15 @@
  *   - Red: blocked (same piece or already seamed)
  */
 
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useDisposable } from './hooks/useDisposable';
 import type { ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { RootState, AppDispatch } from '../../store';
 import { addSeam } from '../../store/projectSlice';
 import { pickEdge, pieceHighlightRotation } from '../../utils/3d/edgePicker';
-import type { PatternPiece, PathCommand } from '../../types/types';
+import type { PatternPiece, PathCommand, Seam } from '../../types/types';
 import EdgeHighlight from './EdgeHighlight';
 import { newId } from '../../utils/ids';
 
@@ -74,12 +75,9 @@ interface PiecePickMeshProps {
 }
 
 function PiecePickMesh({ piece, position, rotation, flipped, onPointerMove, onClick }: PiecePickMeshProps) {
-  const prevGeoRef = useRef<THREE.BufferGeometry | null>(null);
   const geometry = useMemo(() => {
-    // Dispose previous geometry to avoid GPU memory leak
-    if (prevGeoRef.current) prevGeoRef.current.dispose();
     const shape = commandsToShape(piece.outline);
-    if (!shape) { prevGeoRef.current = null; return null; }
+    if (!shape) return null;
     const geo = new THREE.ShapeGeometry(shape, 32);
     geo.rotateX(Math.PI / 2);
     geo.computeBoundingBox();
@@ -88,14 +86,11 @@ function PiecePickMesh({ piece, position, rotation, flipped, onPointerMove, onCl
       geo.boundingBox.getCenter(center);
       geo.translate(-center.x, -center.y, -center.z);
     }
-    prevGeoRef.current = geo;
     return geo;
   }, [piece.outline]);
-
-  // Dispose on unmount
-  useEffect(() => {
-    return () => { if (prevGeoRef.current) prevGeoRef.current.dispose(); };
-  }, []);
+  // C1 lifecycle: disposes the previous geometry on recompute and on unmount
+  // (replaces the manual prevGeoRef pattern).
+  useDisposable(geometry);
 
   const finalRotation = useMemo((): [number, number, number] => {
     if (rotation) {
@@ -132,6 +127,11 @@ interface Sew3DToolProps {
 export default function Sew3DTool({ pieces, placements, arrangementOverrides, flippedPieceIds }: Sew3DToolProps) {
   const dispatch = useDispatch<AppDispatch>();
   const seams = useSelector((s: RootState) => s.project.seams);
+  // Seam construction type — shared option surface for the seam tool family
+  // (toolOptions.seam.seamType), same as the 2D seam/freesewing tools.
+  const seamType = useSelector(
+    (s: RootState) => (s.tools.toolOptions?.seam?.seamType as Seam['type']) ?? 'standard',
+  );
 
   // State machine
   const [firstEdge, setFirstEdge] = useState<{ pieceId: string; edgeName: string } | null>(null);
@@ -222,7 +222,7 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
         id: newId(),
         pieceA: { pieceId: firstEdge.pieceId, edgeName: firstEdge.edgeName, tStart: 0, tEnd: 1 },
         pieceB: { pieceId: clicked.pieceId, edgeName: clicked.edgeName, tStart: 0, tEnd: 1 },
-        type: 'standard',
+        type: seamType,
         tension: 100,
         strength: 1.0,
         active: true,
@@ -234,7 +234,7 @@ export default function Sew3DTool({ pieces, placements, arrangementOverrides, fl
       setFirstEdge(null);
       setHoveredEdge(null);
     }
-  }, [firstEdge, getCompatibility, dispatch]);
+  }, [firstEdge, getCompatibility, dispatch, seamType]);
 
   // Get piece + placement for a given pieceId
   const getPiecePlacement = useCallback((pieceId: string) => {

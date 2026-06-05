@@ -798,6 +798,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
           segmentSewingPhase={segmentSewingTool.phase}
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
+          seamHasFirstEdge={activeTool === 'seam' ? !!seamTool.firstEdge : !!freeSewingTool.firstEdge}
         />
 
         <RulerLayer
