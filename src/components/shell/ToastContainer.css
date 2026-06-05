@@ -58,6 +58,29 @@
   word-break: break-word;
 }
 
+/* ─── Action button (e.g. restore-toast "Empezar de cero") ─── */
+
+.toast__action {
+  flex-shrink: 0;
+  align-self: center;
+  padding: 3px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-primary, #f0f0f0);
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.4;
+  white-space: nowrap;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.toast__action:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
 /* ─── Dismiss button ─── */
 
 .toast__dismiss {
