@@ -53,8 +53,8 @@ const setSeamAllowanceTool: ToolDefinition = {
 const auditSeamAllowancesTool: ToolDefinition = {
   name: 'auditSeamAllowances',
   description:
-    'Check all pieces for seam allowance consistency. Reports missing SA, mismatched SA between connected pieces, and non-standard values. ' +
-    '/ Revisar todas las piezas para consistencia de margen de costura. Reporta SA faltante, discrepancias entre piezas conectadas y valores no estándar.',
+    'Check pieces with an EXPLICIT seam allowance for consistency. Reports mismatched SA between connected pieces and non-standard values. SA 0 (net pattern) is the normal working state, never an issue. ' +
+    '/ Revisar consistencia de las piezas con margen de costura EXPLÍCITO. Reporta discrepancias entre piezas conectadas y valores no estándar. SA 0 (patrón en neto) es el estado normal de trabajo, nunca un issue.',
   parameters: {
     type: 'object',
     properties: {},
@@ -64,14 +64,9 @@ const auditSeamAllowancesTool: ToolDefinition = {
     const issues: Array<{ pieceId: string; pieceName: string; issue: string; detail: string }> = [];
 
     for (const piece of state.project.pieces) {
-      if (piece.seamAllowance === 0) {
-        issues.push({
-          pieceId: piece.id,
-          pieceName: piece.name,
-          issue: 'missing',
-          detail: 'No seam allowance set (0mm)',
-        });
-      } else if (piece.seamAllowance !== 10 && piece.seamAllowance !== 15) {
+      // SA = 0 is the normal NET state (hallazgo #2) — not an issue.
+      // Only explicitly-set values get audited for standard widths.
+      if (piece.seamAllowance > 0 && piece.seamAllowance !== 10 && piece.seamAllowance !== 15) {
         issues.push({
           pieceId: piece.id,
           pieceName: piece.name,

@@ -55,20 +55,10 @@ const ruleFabricHeavyWeight: Rule = (data) => {
 };
 
 // ─── Seam allowance rules ─────────────────────────────────────────────────────
-
-const ruleSeamAllowanceZero: Rule = (data) => {
-  if (data.piece.seamAllowance === 0) {
-    return [
-      {
-        severity: 'error',
-        category: 'seam-allowance',
-        message: 'Seam allowance is 0 mm',
-        detail: 'A seam allowance of 0 mm will cause seams to fail during construction.',
-      },
-    ];
-  }
-  return [];
-};
+// NOTE: SA = 0 is the normal NET working state (hallazgo #2) — patternmakers
+// draft without allowance; it is an explicit finishing step. There is
+// deliberately NO rule flagging SA 0 (the sim never consumes SA; it is a
+// display/export concern only). Only an explicitly tiny allowance warns.
 
 const ruleSeamAllowanceTooSmall: Rule = (data) => {
   const sa = data.piece.seamAllowance;
@@ -369,7 +359,6 @@ const RULES: Rule[] = [
   ruleNoFabric,
   ruleFabricHeavyWeight,
   // seam allowance
-  ruleSeamAllowanceZero,
   ruleSeamAllowanceTooSmall,
   // seam
   ruleNoSeamConnections,
