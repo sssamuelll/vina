@@ -14,13 +14,22 @@ export type KnowledgeCategory =
   | 'production-standard'   // industry standards, tolerances
   | 'size-table';           // size system measurements
 
-/** Source of the knowledge */
+/**
+ * Source of the knowledge.
+ *
+ * 'seamly2d' is retained as a DEAD union member after the Seamly removal
+ * (2026-06-05): the index is a plain static asset with no zod boundary, so
+ * keeping the literal costs nothing and lets any stale/cached index from a
+ * previous deploy type-check on read instead of widening to `string`. No new
+ * chunks may use it (knowledgeIndexContent.test.ts enforces 0 in the built
+ * index).
+ */
 export type KnowledgeSource = 'textbook' | 'seamly2d' | 'house-rules' | 'user' | 'community';
 
 /** Metadata attached to each knowledge chunk */
 export interface ChunkMetadata {
   source: KnowledgeSource;
-  sourceRef: string;          // "Aldrich p.47" or "skill:bodice" or "seamly2d:mens-shirt"
+  sourceRef: string;          // "Aldrich p.47" or "skill:bodice"
   category: KnowledgeCategory;
   tags: string[];
   garmentTypes?: string[];    // ['bodice', 'sleeve', 'skirt', etc.]

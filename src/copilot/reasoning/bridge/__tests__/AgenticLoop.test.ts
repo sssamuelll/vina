@@ -325,9 +325,9 @@ describe('AgenticLoop', () => {
     const responses: ProviderResponse[] = [
       // Turn 1 final response: propose Male Shirt, no tool calls (gate)
       { content: 'Tengo Male Shirt (17 piezas). ¿La uso?', toolCalls: [] },
-      // Turn 2 final response: confirm load. In practice the LLM would emit a
-      // loadSeamlyPattern tool call here, but for this history-persistence
-      // test only what matters is the `messages` argument the LLM receives.
+      // Turn 2 final response: confirm. In practice the LLM would emit real
+      // action tool calls here (arrangeGarment etc.), but for this
+      // history-persistence test only the `messages` argument matters.
       { content: 'Cargando…', toolCalls: [] },
     ];
 

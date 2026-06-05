@@ -1,8 +1,6 @@
 /**
- * Garment Pipeline Tool — end-to-end: load pattern → auto-sew → simulate.
- *
- * Orchestrates the full flow from Seamly2D pattern to 3D draping.
- * This is the "one click" experience for OpenClo.
+ * Garment Pipeline Tool — legacy auto-sew + simulate orchestrator over the
+ * already-loaded pieces (the user imports their pattern via DXF).
  *
  * @module garmentPipelineTool
  */
@@ -45,7 +43,7 @@ const runGarmentPipelineTool: ToolDefinition = {
     if (pieces.length === 0) {
       return {
         success: false,
-        error: 'No pieces loaded. Use loadSeamlyPattern or a blueprint first. / No hay piezas cargadas.',
+        error: 'No pieces loaded. Ask the user to import their DXF pattern first (drag-drop or File > Import DXF). / No hay piezas cargadas; pide al usuario importar su DXF.',
       };
     }
 

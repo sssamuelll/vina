@@ -1,3 +1,7 @@
 # Husky hooks are run via `sh`; CRLF line endings break the shebang/parser on
 # checkout under Windows autocrlf. Force LF so the gate runs everywhere.
 .husky/pre-commit text eol=lf
+
+# Frozen DXF garment fixtures: keep bytes identical across platforms (the
+# parser tolerates CRLF, but byte-stable fixtures keep hashes/diffs honest).
+tests/fixtures/garments/*.dxf text eol=lf

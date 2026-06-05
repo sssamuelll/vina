@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 231 + 1 arrangeGarment (CLO3D arrange-only flow, 2026-05-29)
-      expect(registry.size).toBe(232);
+      // 232 - 2 seamly tools (Seamly removal 2026-06-05)
+      expect(registry.size).toBe(230);
     });
   });
 });

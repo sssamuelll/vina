@@ -102,8 +102,9 @@ describe('DEFAULT_SYSTEM_PROMPT', () => {
     expect(DEFAULT_SYSTEM_PROMPT).toContain('1 unit = 1mm');
   });
 
-  it('prioritizes Seamly2D patterns', () => {
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('Seamly2D');
-    expect(DEFAULT_SYSTEM_PROMPT).toContain('loadSeamlyPattern');
+  it('routes pattern entry through the user-imported DXF (no catalog, no agentic load)', () => {
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('imported DXF');
+    expect(DEFAULT_SYSTEM_PROMPT).not.toContain('Seamly');
+    expect(DEFAULT_SYSTEM_PROMPT).not.toContain('loadSeamlyPattern');
   });
 });
