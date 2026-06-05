@@ -117,6 +117,30 @@ describe('seam-line routing', () => {
   });
 });
 
+// ─── 1b. Outline provenance (junta F1) ───
+
+describe('imported outline provenance — the boundary IS the cut line', () => {
+  // The DXF boundary layer is the contour the patternmaker cuts. Every
+  // imported piece must carry `outlineIsCutLine: true` so the renderer never
+  // offsets a synthetic seam allowance over it — even when the file brings
+  // no sew-line layer (the raw-DXF case the fixtures cover).
+  it('marks pieces from a profile-mapped DXF', () => {
+    const doc = parseDXF(buildDXF([{ kind: 'rect', layer: '1' }]));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outlineIsCutLine).toBe(true);
+  });
+
+  it('marks pieces from a profile-less DXF (unknown-layer fallback outline)', () => {
+    const doc = parseDXF(buildDXF([{ kind: 'rect', layer: 'WHATEVER' }]));
+    const pieces = dxfToPatternPieces(doc);
+
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outlineIsCutLine).toBe(true);
+  });
+});
+
 // ─── 2. POINT notches ───
 
 describe('POINT entities as notch markers', () => {

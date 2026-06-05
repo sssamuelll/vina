@@ -92,6 +92,29 @@ describe('Seam Allowance Rendering', () => {
     });
   });
 
+  describe('effectiveSeamAllowanceWidth — imported cut outline suppresses the synthetic default (junta F1)', () => {
+    // A DXF boundary layer IS the cut line. Offsetting it invents geometry
+    // the file does not carry — the bug María hit. Provenance, not the
+    // presence of a sew internal, is what must gate the synthetic default.
+    const mk = (
+      seamAllowance: number,
+      outlineIsCutLine: boolean | undefined,
+    ): Pick<PatternPiece, 'seamAllowance' | 'internals' | 'outlineIsCutLine'> =>
+      ({ seamAllowance, internals: [], outlineIsCutLine });
+
+    it('imported piece (outlineIsCutLine) without sew internal → 0, no invented margin', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0, true), 10)).toBe(0);
+    });
+
+    it('imported piece with EXPLICIT per-piece SA → user value still wins', () => {
+      expect(effectiveSeamAllowanceWidth(mk(15, true), 10)).toBe(15);
+    });
+
+    it('drafted piece (no provenance flag) keeps the P0.1 default', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0, undefined), 10)).toBe(10);
+    });
+  });
+
   describe('Visibility toggle (Redux)', () => {
     it('toggles showSeamAllowance', () => {
       const initial = editorReducer(undefined, { type: '@@INIT' });

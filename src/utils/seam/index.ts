@@ -88,15 +88,19 @@ export function flattenPath(commands: PathCommand[], resolution: number = CURVE_
  * A piece that carries its REAL seam line (a `'seam'` internal, e.g. imported
  * from DXF AAMA layer 84) must not get the default synthetic contour drawn on
  * top of it — its outline IS the cut line and the internal IS the stitch line.
+ * Same for any piece whose provenance marks the outline as the cut line
+ * (`outlineIsCutLine`, set by the DXF converter): the system must never
+ * invent a margin the file does not carry, even without a sew-line layer.
  * Offsetting the sparse imported cut polyline also produces visible arc/step
  * artifacts (M3.5). An EXPLICIT per-piece seamAllowance still wins: the user
  * asked for it.
  */
 export function effectiveSeamAllowanceWidth(
-  piece: Pick<PatternPiece, 'seamAllowance' | 'internals'>,
+  piece: Pick<PatternPiece, 'seamAllowance' | 'internals' | 'outlineIsCutLine'>,
   defaultWidth: number,
 ): number {
   if (piece.seamAllowance) return piece.seamAllowance;
+  if (piece.outlineIsCutLine) return 0;
   const hasRealSeamLine = piece.internals?.some(i => i.type === 'seam') ?? false;
   return hasRealSeamLine ? 0 : defaultWidth;
 }

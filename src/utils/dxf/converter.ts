@@ -502,6 +502,10 @@ function entitiesToPiece(
     rotation: 0,
     mirrored: false,
     seamAllowance: 0,
+    // Provenance: a DXF boundary layer IS the cut contour. Suppresses the
+    // synthetic seam-allowance default — never invent a margin the file
+    // does not carry (junta F1).
+    outlineIsCutLine: true,
     layer: 1,
     sublayer: 0,
     active: true,

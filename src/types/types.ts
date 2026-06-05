@@ -36,6 +36,14 @@ export interface PatternPiece {
   mirrored: boolean;
   /** Seam allowance in mm (0 = none) */
   seamAllowance: number;
+  /**
+   * Provenance: when true, the outline IS the cut line (e.g., DXF import —
+   * the boundary layer is the contour the patternmaker cuts). Suppresses the
+   * synthetic default seam-allowance offset: the system must never invent
+   * geometry the file does not carry. An explicit per-piece seamAllowance
+   * still wins (the user asked for it).
+   */
+  outlineIsCutLine?: boolean;
   /** Default corner type for all vertices. Default 'mitered'. */
   defaultCornerType?: CornerType;
   /** Per-vertex corner type overrides. Key = outline command index. */

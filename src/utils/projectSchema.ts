@@ -140,6 +140,7 @@ const patternPieceSchema = z
     rotation: finiteNumber,
     mirrored: z.boolean(),
     seamAllowance: finiteNumber,
+    outlineIsCutLine: z.boolean().optional(),
     edges: z.array(semanticEdgeSchema).max(MAX_EDGES_PER_PIECE).optional(),
     fabricId: boundedString(MAX_ID_LEN).optional(),
     fabricCode: boundedString(MAX_ID_LEN).optional(),
