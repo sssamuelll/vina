@@ -139,9 +139,14 @@ test.describe('Seam curved edge highlights', () => {
     const pieceAQuadratics = pathDs.filter((d) => d === 'M200,100 Q250,70,300,100');
     expect(pieceAQuadratics).toHaveLength(2);
 
-    // No fallback straight <line> edge highlights should be needed for these valid curve cases
-    const seamLines = page.locator('g.seam-connection > line');
-    await expect(seamLines).toHaveCount(2); // only the dotted connection line per seam
+    // No fallback straight <line> edge highlights should be needed for these
+    // valid curve cases. The dotted connection line lives inside the
+    // .seam-detail group (hover/selection-gated since Iris cut 3) — direct
+    // <line> children of the seam group would mean a fallback edge highlight.
+    const fallbackLines = page.locator('g.seam-connection > line');
+    await expect(fallbackLines).toHaveCount(0);
+    const seamLines = page.locator('g.seam-connection .seam-detail > line');
+    await expect(seamLines).toHaveCount(2); // one dotted connection line per seam
   });
 
   test('renders cubic seam highlights as SVG path C commands', async ({ page }) => {
