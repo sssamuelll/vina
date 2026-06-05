@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateSeamAllowance, flattenPath } from '../../../utils/seam';
-import type { PathCommand, PatternPiece } from '../../../types/types';
+import { generateSeamAllowance, flattenPath, effectiveSeamAllowanceWidth } from '../../../utils/seam';
+import type { InternalLine, PathCommand, PatternPiece } from '../../../types/types';
 import editorReducer, { toggleSeamAllowance, setDefaultSAWidth } from '../../../store/editorSlice';
 
 // Simple square outline: 0,0 → 100,0 → 100,100 → 0,100 → close
@@ -58,6 +58,37 @@ describe('Seam Allowance Rendering', () => {
       const defaultWidth = 10;
       const saWidth = piece.seamAllowance || defaultWidth;
       expect(saWidth).toBe(10);
+    });
+  });
+
+  describe('effectiveSeamAllowanceWidth — real seam line suppresses the synthetic default (M3.5)', () => {
+    const seamInternal: InternalLine = {
+      id: 'seam-1',
+      type: 'seam',
+      path: [{ type: 'M', values: [0, 0] }, { type: 'L', values: [10, 0] }],
+    };
+    const mk = (seamAllowance: number, internals: InternalLine[]): Pick<PatternPiece, 'seamAllowance' | 'internals'> =>
+      ({ seamAllowance, internals });
+
+    it('piece WITH a real seam internal and no explicit SA → 0 (no synthetic contour)', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0, [seamInternal]), 10)).toBe(0);
+    });
+
+    it('piece WITH a real seam internal but explicit SA → user value wins', () => {
+      expect(effectiveSeamAllowanceWidth(mk(15, [seamInternal]), 10)).toBe(15);
+    });
+
+    it('piece WITHOUT seam internal and SA 0 → default (P0.1 behavior preserved)', () => {
+      expect(effectiveSeamAllowanceWidth(mk(0, []), 10)).toBe(10);
+    });
+
+    it('piece WITHOUT seam internal and explicit SA → explicit value', () => {
+      expect(effectiveSeamAllowanceWidth(mk(15, []), 10)).toBe(15);
+    });
+
+    it('non-seam internals do not suppress the default', () => {
+      const grain: InternalLine = { id: 'g', type: 'grainline', path: seamInternal.path };
+      expect(effectiveSeamAllowanceWidth(mk(0, [grain]), 10)).toBe(10);
     });
   });
 

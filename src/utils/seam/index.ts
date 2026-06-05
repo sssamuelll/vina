@@ -1,4 +1,4 @@
-import type { PathCommand, Point2D } from '../../types/types';
+import type { PathCommand, PatternPiece, Point2D } from '../../types/types';
 import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clipper2-js';
 
 const CURVE_RESOLUTION = 12;
@@ -80,6 +80,25 @@ export function flattenPath(commands: PathCommand[], resolution: number = CURVE_
   }
 
   return points;
+}
+
+/**
+ * Width of the SYNTHETIC seam-allowance double-line (P0.1) for a piece.
+ *
+ * A piece that carries its REAL seam line (a `'seam'` internal, e.g. imported
+ * from DXF AAMA layer 84) must not get the default synthetic contour drawn on
+ * top of it — its outline IS the cut line and the internal IS the stitch line.
+ * Offsetting the sparse imported cut polyline also produces visible arc/step
+ * artifacts (M3.5). An EXPLICIT per-piece seamAllowance still wins: the user
+ * asked for it.
+ */
+export function effectiveSeamAllowanceWidth(
+  piece: Pick<PatternPiece, 'seamAllowance' | 'internals'>,
+  defaultWidth: number,
+): number {
+  if (piece.seamAllowance) return piece.seamAllowance;
+  const hasRealSeamLine = piece.internals?.some(i => i.type === 'seam') ?? false;
+  return hasRealSeamLine ? 0 : defaultWidth;
 }
 
 // Clipper2 scale: integer coords at 100x for 0.01mm precision

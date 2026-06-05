@@ -5,7 +5,7 @@ import { PatternPiece, PathCommand, InternalLine } from '../../types/types';
 import {
   DXFDocument, DXFEntity, DXFInsertData, DXFLineData,
   DXFLWPolylineData, DXFPolylineData, DXFSplineData,
-  DXFArcData, DXFCircleData, DXFTextData, layerRole,
+  DXFArcData, DXFCircleData, DXFTextData, DXFPointData, layerRole,
 } from './types';
 import type { FormatProfile, LayerRole } from './types';
 import { grainAlignmentRotation } from '../grainLine';
@@ -29,6 +29,7 @@ export function entityToPath(entity: DXFEntity): PathCommand[] {
     case 'SPLINE': return splineToPath(entity.data as DXFSplineData);
     case 'ARC': return arcToPath(entity.data as DXFArcData);
     case 'CIRCLE': return circleToPath(entity.data as DXFCircleData);
+    case 'POINT': return pointToPath(entity.data as DXFPointData);
     default: return [];
   }
 }
@@ -37,6 +38,19 @@ function lineToPath(d: DXFLineData): PathCommand[] {
   return [
     { type: 'M', values: [d.x1, d.y1] },
     { type: 'L', values: [d.x2, d.y2] },
+  ];
+}
+
+/**
+ * POINT → 6-unit vertical tick centered on the point — the same marker shape
+ * the TEXT-on-notch-layer path produces. CLO/AAMA exports emit notches and
+ * drill holes as POINT entities on layer 4 (consumed only when the layer
+ * role is 'notch'; construction POINTs on layers 2/3 are skipped upstream).
+ */
+function pointToPath(d: DXFPointData): PathCommand[] {
+  return [
+    { type: 'M', values: [d.x, d.y - 3] },
+    { type: 'L', values: [d.x, d.y + 3] },
   ];
 }
 
@@ -354,6 +368,11 @@ function entitiesToPiece(
   profile?: FormatProfile,
 ): PatternPiece | null {
   let outline: PathCommand[] = [];
+  // Unmapped-layer geometry. Only used as the outline when NO cut-role entity
+  // exists (plain DXFs without layer semantics). When a cut outline exists,
+  // unknown layers must never glue onto it — CLO vendor layers (84/85) used to
+  // corrupt the boundary with a second overlapping contour this way.
+  const unknownOutline: PathCommand[] = [];
   const internals: InternalLine[] = [];
   let name = defaultName;
 
@@ -402,6 +421,9 @@ function entitiesToPiece(
   for (const e of entities) {
     if (e.type === 'TEXT' || e.type === 'MTEXT' || e.type === 'INSERT') continue;
     const role = resolveLayerRole(e.layer, profile);
+    // POINTs are markers, not geometry: only notch-layer POINTs become
+    // internals; construction points (CLO layers 2/3: turn/curve-fit) are noise.
+    if (e.type === 'POINT' && role !== 'notch') continue;
     let path = entityToPath(e);
     if (path.length === 0) continue;
 
@@ -411,14 +433,15 @@ function entitiesToPiece(
 
     switch (role) {
       case 'cut':
-      case 'unknown':
-        // Use first cut-layer entity as outline, or accumulate
+        // Use first cut-layer entity as outline, or accumulate segments
         if (outline.length === 0) {
           outline = path;
         } else {
-          // Append additional outline segments
           outline.push(...path);
         }
+        break;
+      case 'unknown':
+        unknownOutline.push(...path);
         break;
       case 'notch': {
         const flipped = flipPathY(path);
@@ -450,9 +473,19 @@ function entitiesToPiece(
         internals.push({ id: crypto.randomUUID(), type: 'dart', path: flipPathY(path) });
         break;
       case 'seam':
+        // Sew/seam line (AAMA 84 / ASTM "SEW LINE" / Lectra "COUTURE") —
+        // display fidelity the patternmaker expects; never part of the outline.
+        internals.push({ id: crypto.randomUUID(), type: 'seam', path: flipPathY(path) });
+        break;
       case 'label':
         break; // skip for now
     }
+  }
+
+  // Fallback: no cut-role geometry at all → assemble the outline from
+  // unmapped layers (pre-existing behavior for plain/profile-less DXFs).
+  if (outline.length === 0 && unknownOutline.length > 0) {
+    outline = unknownOutline;
   }
 
   if (outline.length === 0) return null;
