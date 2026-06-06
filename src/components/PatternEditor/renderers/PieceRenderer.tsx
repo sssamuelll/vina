@@ -8,39 +8,11 @@ import { pathToSVG } from '../utils';
 import { generateSeamAllowance, effectiveSeamAllowanceWidth } from '../../../utils/seam';
 import { generateSeamAllowanceWithCorners } from '../../../utils/seam/cornerTypes';
 import { extractNodes } from '../nodeEditorUtils';
-import { getOutlineColor } from '../../../utils/layerColors';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 import { resolveColorway } from '../../../utils/colorwayResolver';
 import { formatPieceLabel } from '../../../utils/pieceLabel';
 import { dartApexPoint } from './internalLineStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
-
-/** Compute bounding box extents of a path outline. */
-function getOutlineBounds(outline: PathCommand[]): { minX: number; minY: number; maxX: number; maxY: number } {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const cmd of outline) {
-    const v = cmd.values;
-    if (cmd.type === 'M' || cmd.type === 'L') {
-      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
-      if (v[1] < minY) minY = v[1]; if (v[1] > maxY) maxY = v[1];
-    } else if (cmd.type === 'C') {
-      for (let i = 0; i < 6; i += 2) {
-        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
-        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
-      }
-    } else if (cmd.type === 'Q') {
-      for (let i = 0; i < 4; i += 2) {
-        if (v[i] < minX) minX = v[i]; if (v[i] > maxX) maxX = v[i];
-        if (v[i + 1] < minY) minY = v[i + 1]; if (v[i + 1] > maxY) maxY = v[i + 1];
-      }
-    } else if (cmd.type === 'H') {
-      if (v[0] < minX) minX = v[0]; if (v[0] > maxX) maxX = v[0];
-    } else if (cmd.type === 'V') {
-      if (v[0] < minY) minY = v[0]; if (v[0] > maxY) maxY = v[0];
-    }
-  }
-  return { minX, minY, maxX, maxY };
-}
 
 /** Compute bounding box center of a path outline. */
 function getOutlineCenter(outline: PathCommand[]): { cx: number; cy: number } {
@@ -86,8 +58,6 @@ interface SinglePieceProps {
   pieceNumber: number;
   /** Group color for visual indicator (first group the piece belongs to) */
   groupColor?: string;
-  /** Layer outline color for left-border indicator */
-  layerColor?: string;
   /** Whether the piece's layer is locked (reduced opacity + no pointer events) */
   isLayerLocked?: boolean;
   /** Whether the piece has unresolved construction points */
@@ -114,7 +84,6 @@ const SinglePiece = memo(function SinglePiece({
   isEditingName,
   pieceNumber,
   groupColor,
-  layerColor,
   isLayerLocked,
   hasResolutionErrors,
   colorwayColor,
@@ -151,9 +120,6 @@ const SinglePiece = memo(function SinglePiece({
     : renderMode2D === 'translucent' ? 'rgba(255,255,255,0.45)'
     : 'var(--piece-fill-2d)';
 
-  // Compute bounding box for layer color indicator
-  const bounds = piece.outline?.length ? getOutlineBounds(piece.outline) : null;
-
   // Layer-locked: reduce opacity and disable pointer events
   const groupOpacity = piece.active === false ? 0.3 : isLayerLocked ? 0.5 : 1;
   const groupStyle: React.CSSProperties | undefined =
@@ -169,19 +135,9 @@ const SinglePiece = memo(function SinglePiece({
       opacity={groupOpacity}
       style={groupStyle}
     >
-      {/* Layer color left-border indicator */}
-      {layerColor && bounds && (
-        <rect
-          x={bounds.minX - 4 / zoom2D}
-          y={bounds.minY}
-          width={3 / zoom2D}
-          height={bounds.maxY - bounds.minY}
-          fill={layerColor}
-          opacity={0.5}
-          pointerEvents="none"
-          rx={1.5 / zoom2D}
-        />
-      )}
+      {/* Layer membership has no canvas indicator (hallazgo #4, María): the
+          floating left-border rect read as pattern geometry, not UI chrome.
+          Layer color/identity lives in LayerPanel only. */}
       {/* Interior fill — no color on the piece body (ink/accent only, per spec) */}
       <path
         className="piece-fill"
@@ -580,7 +536,6 @@ export default function PieceRenderer({
 }: PieceRendererProps) {
   // Layer visibility selectors
   const hiddenLayerIds = useSelector((s: RootState) => s.simulation.hiddenLayerIds);
-  const layerOutlineColors = useSelector((s: RootState) => s.simulation.layerOutlineColors);
   const layerLocked = useSelector((s: RootState) => s.project.layerLocked);
 
   // Colorway selectors + resolver
@@ -643,7 +598,6 @@ export default function PieceRenderer({
           showLineLengths={showLineLengths}
           units={units}
           groupColor={groupColors?.[piece.id]}
-          layerColor={getOutlineColor(piece.layer ?? 1, layerOutlineColors)}
           isLayerLocked={!!layerLocked[piece.layer ?? 1]}
           hasResolutionErrors={hasResolutionErrors.get(piece.id) ?? false}
           colorwayColor={(() => {
