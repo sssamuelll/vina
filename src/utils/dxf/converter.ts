@@ -9,6 +9,7 @@ import {
 } from './types';
 import type { FormatProfile, LayerRole } from './types';
 import { grainAlignmentRotation } from '../grainLine';
+import { flattenPath } from '../seam';
 
 // ─── Entity → PathCommand[] conversion ───
 
@@ -493,6 +494,15 @@ function entitiesToPiece(
   // Flip Y for outline
   outline = flipPathY(outline);
 
+  // Hallazgo #3 (María): CLO exports the cut boundary as a COARSE polyline
+  // while the sew line (84) carries the SAME curve at ~7x resolution. On a
+  // net pattern both trace one curve — drawing both gives an ugly faceted
+  // double contour. When a denser sew line geometrically coincides with the
+  // cut boundary, it IS the better sample of the outline: promote it and
+  // drop the duplicate internal. An OFFSET sew line (baked seam allowance)
+  // never coincides, so it stays an internal — cut geometry is untouched.
+  outline = promoteDenseSeamOutline(outline, internals);
+
   return {
     id: crypto.randomUUID(),
     name,
@@ -512,4 +522,77 @@ function entitiesToPiece(
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+}
+
+// ─── Dense sew-line outline promotion (hallazgo #3) ───
+
+/**
+ * Coincidence tolerance as a fraction of the outline bbox diagonal —
+ * unit-independent (DXF files arrive in mm, cm, or inches before scaling).
+ * Cut vertices in a CLO export lie ON the sew curve, so their distance to
+ * the dense sew polyline is ≈ its chord sagitta (near zero); a baked seam
+ * allowance offsets the sew line by ≥5mm — orders of magnitude above this.
+ */
+const SEAM_PROMOTION_TOLERANCE_RATIO = 0.002;
+
+function distPointToSegment(
+  p: { x: number; y: number },
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): number {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-12) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** True when EVERY point lies within `tol` of the polyline — early-exits. */
+function everyPointNearPolyline(
+  pts: { x: number; y: number }[],
+  poly: { x: number; y: number }[],
+  tol: number,
+): boolean {
+  outer: for (const p of pts) {
+    for (let i = 0; i < poly.length - 1; i++) {
+      if (distPointToSegment(p, poly[i], poly[i + 1]) <= tol) continue outer;
+    }
+    return false;
+  }
+  return true;
+}
+
+/**
+ * When a `'seam'` internal is a DENSER sample of the SAME curve as the cut
+ * outline (net pattern — sew line and cut line coincide), promote it to be
+ * the outline and remove the duplicate internal. Returns the (possibly
+ * replaced) outline; mutates `internals` on promotion.
+ */
+function promoteDenseSeamOutline(outline: PathCommand[], internals: InternalLine[]): PathCommand[] {
+  const outlinePts = flattenPath(outline);
+  if (outlinePts.length < 3) return outline;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of outlinePts) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const tol = Math.hypot(maxX - minX, maxY - minY) * SEAM_PROMOTION_TOLERANCE_RATIO;
+  if (tol <= 0) return outline;
+
+  for (let i = 0; i < internals.length; i++) {
+    const line = internals[i];
+    if (line.type !== 'seam') continue;
+    const seamPts = flattenPath(line.path);
+    if (seamPts.length <= outlinePts.length) continue; // not a denser sample
+    if (!everyPointNearPolyline(outlinePts, seamPts, tol)) continue; // offset or partial
+    // Promote: the dense sew path becomes the boundary; ensure closure.
+    const promoted = [...line.path];
+    if (promoted[promoted.length - 1]?.type !== 'Z') promoted.push({ type: 'Z', values: [] });
+    internals.splice(i, 1);
+    return promoted;
+  }
+  return outline;
 }

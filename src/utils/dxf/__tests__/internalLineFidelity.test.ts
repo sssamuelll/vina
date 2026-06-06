@@ -141,6 +141,89 @@ describe('imported outline provenance — the boundary IS the cut line', () => {
   });
 });
 
+// ─── 1c. Dense sew line promotes to outline (hallazgo #3) ───
+
+/** Build a flat-entities DXF from explicit closed LWPOLYLINEs. */
+function buildPolyDXF(specs: { layer: string; points: { x: number; y: number }[] }[]): string {
+  const lines: string[] = [
+    '  0', 'SECTION', '  2', 'HEADER', '  0', 'ENDSEC',
+    '  0', 'SECTION', '  2', 'ENTITIES',
+  ];
+  for (const s of specs) {
+    lines.push(
+      '  0', 'LWPOLYLINE',
+      '  8', s.layer,
+      ' 90', String(s.points.length),
+      ' 70', '1', // closed
+    );
+    for (const p of s.points) {
+      lines.push(' 10', p.x.toFixed(4), ' 20', p.y.toFixed(4), ' 42', '0.0');
+    }
+  }
+  lines.push('  0', 'ENDSEC', '  0', 'EOF');
+  return lines.join('\n');
+}
+
+/** Sample a circle as a closed polygon with `n` vertices. */
+function circlePoints(cx: number, cy: number, r: number, n: number): { x: number; y: number }[] {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (2 * Math.PI * i) / n;
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+  });
+}
+
+describe('dense sew line promotes to outline (hallazgo #3)', () => {
+  // CLO exports the cut boundary as a COARSE polyline (29-56 vertices in
+  // María's file) while the sew line (layer 84) carries the SAME curve at
+  // ~7x resolution (192-274 vertices). On a net pattern both trace one
+  // curve — rendering both gives the ugly faceted double line María saw.
+  // When the dense sew line geometrically coincides with the coarse cut
+  // boundary, it IS the better sample of the outline: promote it and drop
+  // the duplicate internal.
+  it('coincident denser sew line replaces the coarse cut outline', () => {
+    const doc = parseDXF(buildPolyDXF([
+      { layer: '1', points: circlePoints(50, 50, 40, 8) },   // coarse cut
+      { layer: '84', points: circlePoints(50, 50, 40, 64) }, // dense sew, same circle
+    ]));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    expect(pieces.length).toBe(1);
+    // Outline is now the dense polyline (M + 63 L + Z), not the octagon.
+    expect(pieces[0].outline.length).toBeGreaterThan(60);
+    // The duplicate seam internal is gone — no double contour.
+    expect(pieces[0].internals.filter(i => i.type === 'seam').length).toBe(0);
+    // Still the cut boundary (net pattern): provenance flag preserved.
+    expect(pieces[0].outlineIsCutLine).toBe(true);
+  });
+
+  it('an OFFSET sew line (baked seam allowance) is NOT promoted', () => {
+    const doc = parseDXF(buildPolyDXF([
+      { layer: '1', points: circlePoints(50, 50, 40, 8) },   // cut contour
+      { layer: '84', points: circlePoints(50, 50, 30, 64) }, // sew inset 10 — real SA
+    ]));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    expect(pieces.length).toBe(1);
+    // Outline stays the cut octagon (M + 8 L + Z = 10 commands).
+    expect(pieces[0].outline.length).toBe(10);
+    // The sew line stays as a seam internal — it carries real information.
+    expect(pieces[0].internals.filter(i => i.type === 'seam').length).toBe(1);
+  });
+
+  it('a sew line covering only PART of the boundary is NOT promoted', () => {
+    const denseArc = circlePoints(50, 50, 40, 64).slice(0, 24); // ~1/3 of the circle
+    const doc = parseDXF(buildPolyDXF([
+      { layer: '1', points: circlePoints(50, 50, 40, 8) },
+      { layer: '84', points: denseArc },
+    ]));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    expect(pieces.length).toBe(1);
+    expect(pieces[0].outline.length).toBe(10);
+    expect(pieces[0].internals.filter(i => i.type === 'seam').length).toBe(1);
+  });
+});
+
 // ─── 2. POINT notches ───
 
 describe('POINT entities as notch markers', () => {
