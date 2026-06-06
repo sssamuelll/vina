@@ -77,12 +77,18 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
       // (POLYLINE@8), 1 sew line (POLYLINE@84 → 'seam').
       expect(byType('grainline'), `${p.name} grainline`).toBe(1);
       expect(byType('dart'), `${p.name} darts`).toBe(2);
-      expect(byType('seam'), `${p.name} seam line`).toBe(1);
-      // The outline must be the cut boundary alone (~30 commands) — before
-      // M3.5 the 200+-vertex sew line (84) and ref axes (85) were glued onto
-      // it, corrupting it to 237-338 commands.
-      expect(p.outline.length, `${p.name} outline (cut-only, not glued)`).toBeLessThan(60);
+      // Hallazgo #3: María's pattern is NET — the dense sew line (192-274
+      // vertices) coincides with the coarse cut boundary (29-56 vertices)
+      // and is PROMOTED to be the outline; the duplicate internal is gone.
+      // (Before: byType('seam') === 1 and outline < 60 cut-only commands —
+      // which drew the faceted double contour she flagged.)
+      expect(byType('seam'), `${p.name} seam promoted, no duplicate`).toBe(0);
     }
+    // Outlines are now the dense sew samples (16/192/200/200/274 vertices,
+    // M + n·L + Z) — not the coarse cut polylines (8-56 vertices) that drew
+    // the faceted contour.
+    expect(pieces.map((p) => p.outline.length).sort((a, b) => a - b))
+      .toEqual([18, 194, 202, 202, 276]);
     // Notch/drill POINTs on layer 4: 2 + 0 + 0 + 2 + 4 across the 5 pieces.
     const totalNotches = pieces.reduce(
       (sum, p) => sum + p.internals.filter((i) => i.type === 'notch').length, 0);
