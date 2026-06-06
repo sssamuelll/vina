@@ -224,6 +224,113 @@ describe('dense sew line promotes to outline (hallazgo #3)', () => {
   });
 });
 
+// ─── 1d. POINT notch marks interpreted as edge-anchored notches (hallazgo #5) ───
+
+/** Build a flat-entities DXF from closed LWPOLYLINEs + POINTs. */
+function buildNotchDXF(
+  polys: { layer: string; points: { x: number; y: number }[] }[],
+  points: { layer: string; x: number; y: number }[],
+): string {
+  const lines: string[] = [
+    '  0', 'SECTION', '  2', 'HEADER', '  0', 'ENDSEC',
+    '  0', 'SECTION', '  2', 'ENTITIES',
+  ];
+  for (const s of polys) {
+    lines.push('  0', 'LWPOLYLINE', '  8', s.layer, ' 90', String(s.points.length), ' 70', '1');
+    for (const p of s.points) {
+      lines.push(' 10', p.x.toFixed(4), ' 20', p.y.toFixed(4), ' 42', '0.0');
+    }
+  }
+  for (const p of points) {
+    lines.push('  0', 'POINT', '  8', p.layer, ' 10', p.x.toFixed(4), ' 20', p.y.toFixed(4));
+  }
+  lines.push('  0', 'ENDSEC', '  0', 'EOF');
+  return lines.join('\n');
+}
+
+const SQUARE = [
+  { x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }, { x: 0, y: 100 },
+];
+
+describe('POINT notch marks interpreted as edge-anchored notches (hallazgo #5)', () => {
+  // CLO/AAMA exports notches as POINT entities on layer 4 — position-only
+  // markers ON the cut boundary. The converter used to synthesize a generic
+  // 6-unit VERTICAL tick at that position (half outside the piece, blind to
+  // the edge direction) — "pone las rayas pero no lo interpreta" (María).
+  // A mark on the boundary is a real notch: project it onto the outline,
+  // point it inward along the edge normal, give it the native notch model
+  // (generateNotchPath + notchOptions) — same as the notch tool produces.
+  it('a POINT on the boundary becomes a perpendicular inward notch', () => {
+    // Mark on the LEFT edge midpoint (0,50). Flipped piece space: (0,-50);
+    // left edge is vertical, inward normal = +x.
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: SQUARE }],
+      [{ layer: '4', x: 0, y: 50 }],
+    ));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    expect(pieces.length).toBe(1);
+    const notches = pieces[0].internals.filter(i => i.type === 'notch');
+    expect(notches.length).toBe(1);
+    const [n] = notches;
+    // Native notch model attached (editable like a tool-made notch).
+    expect(n.notchOptions?.shape).toBe('slit');
+    expect(n.notchOptions?.length).toBe(8);
+    // Slit: M on the edge point, L 8mm inward (+x), not a vertical tick.
+    expect(n.path.length).toBe(2);
+    expect(n.path[0].values[0]).toBeCloseTo(0, 3);
+    expect(n.path[0].values[1]).toBeCloseTo(-50, 3);
+    expect(n.path[1].values[0]).toBeCloseTo(8, 3);
+    expect(n.path[1].values[1]).toBeCloseTo(-50, 3);
+  });
+
+  it('a POINT on the bottom edge points inward too (orientation follows the edge)', () => {
+    // Mark at (50,100): flipped (50,-100) on the y=-100 edge → inward = +y.
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: SQUARE }],
+      [{ layer: '4', x: 50, y: 100 }],
+    ));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    const [n] = pieces[0].internals.filter(i => i.type === 'notch');
+    expect(n.path[0].values[0]).toBeCloseTo(50, 3);
+    expect(n.path[0].values[1]).toBeCloseTo(-100, 3);
+    expect(n.path[1].values[0]).toBeCloseTo(50, 3);
+    expect(n.path[1].values[1]).toBeCloseTo(-92, 3); // 8mm toward the interior
+  });
+
+  it('a POINT far from the boundary (drill hole) keeps the legacy tick', () => {
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: SQUARE }],
+      [{ layer: '4', x: 50, y: 50 }], // dead center — 50 units from every edge
+    ));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    const [n] = pieces[0].internals.filter(i => i.type === 'notch');
+    // Vertical 6-unit tick centered on the mark — we do NOT invent an edge anchor.
+    expect(n.path.length).toBe(2);
+    expect(n.path[0].values[0]).toBeCloseTo(50, 3);
+    expect(n.path[1].values[0]).toBeCloseTo(50, 3);
+    expect(Math.abs(n.path[1].values[1] - n.path[0].values[1])).toBeCloseTo(6, 3);
+  });
+
+  it('notch size compensates the unit factor — 8mm real after cm scaling', () => {
+    // 10×10 cm square; the converter scales ×10 to mm AFTER building the
+    // piece, so the notch must be generated at 0.8 file-units to land at 8mm.
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }] }],
+      [{ layer: '4', x: 0, y: 5 }],
+    ));
+    const pieces = dxfToPatternPieces(doc, { unit: 'cm', formatProfile: getProfile('aama') });
+
+    const [n] = pieces[0].internals.filter(i => i.type === 'notch');
+    expect(n.path[0].values[0]).toBeCloseTo(0, 3);
+    expect(n.path[0].values[1]).toBeCloseTo(-50, 3);
+    expect(n.path[1].values[0]).toBeCloseTo(8, 3); // 8mm inward, post-scale
+    expect(n.notchOptions?.length).toBe(8);
+  });
+});
+
 // ─── 2. POINT notches ───
 
 describe('POINT entities as notch markers', () => {

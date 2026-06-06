@@ -90,8 +90,20 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
     expect(pieces.map((p) => p.outline.length).sort((a, b) => a - b))
       .toEqual([18, 194, 202, 202, 276]);
     // Notch/drill POINTs on layer 4: 2 + 0 + 0 + 2 + 4 across the 5 pieces.
-    const totalNotches = pieces.reduce(
-      (sum, p) => sum + p.internals.filter((i) => i.type === 'notch').length, 0);
-    expect(totalNotches).toBe(8);
+    const allNotches = pieces.flatMap((p) =>
+      p.internals.filter((i) => i.type === 'notch').map((n) => ({ piece: p, n })));
+    expect(allNotches.length).toBe(8);
+
+    // Hallazgo #5: every CLO notch POINT sits ON the boundary → all 8 are
+    // interpreted as edge-anchored notches (native model), not generic ticks.
+    for (const { piece, n } of allNotches) {
+      expect(n.notchOptions?.shape, `${piece.name} notch model`).toBe('slit');
+      expect(n.notchOptions?.length).toBe(8);
+      // Slit path: M on the boundary, L 8mm inward.
+      expect(n.path.length).toBe(2);
+      const [m, l] = n.path;
+      const len = Math.hypot(l.values[0] - m.values[0], l.values[1] - m.values[1]);
+      expect(len, `${piece.name} notch length`).toBeCloseTo(8, 1);
+    }
   });
 });

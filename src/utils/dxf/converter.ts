@@ -10,6 +10,7 @@ import {
 import type { FormatProfile, LayerRole } from './types';
 import { grainAlignmentRotation } from '../grainLine';
 import { flattenPath } from '../seam';
+import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
 
 // ─── Entity → PathCommand[] conversion ───
 
@@ -276,6 +277,11 @@ function resolveUnitFactor(unit: string | undefined, doc: DXFDocument): number {
 export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions): PatternPiece[] {
   const pieces: PatternPiece[] = [];
 
+  // Resolved up front: notch geometry is generated inside `entitiesToPiece`
+  // in FILE units, sized so the scaling below lands it at the default mm.
+  const unitFactor = resolveUnitFactor(options?.unit, doc);
+  const scaleFactor = ((options?.scale ?? 100) / 100) * unitFactor;
+
   if (doc.blocks.size > 0) {
     // Each block (possibly referenced by INSERT) = one piece
     const inserts = doc.entities.filter(e => e.type === 'INSERT');
@@ -286,7 +292,7 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
         ? insert.data as DXFInsertData
         : { blockName, x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
 
-      let piece = entitiesToPiece(block.entities, blockName, insertData, options?.formatProfile);
+      let piece = entitiesToPiece(block.entities, blockName, insertData, options?.formatProfile, scaleFactor);
       if (piece) {
         if (options?.formatProfile?.convertHook) {
           piece = options.formatProfile.convertHook(piece, block.entities);
@@ -296,7 +302,7 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
     }
   } else {
     // No blocks: group by entities, treat as single piece
-    let piece = entitiesToPiece(doc.entities, 'Imported Piece', null, options?.formatProfile);
+    let piece = entitiesToPiece(doc.entities, 'Imported Piece', null, options?.formatProfile, scaleFactor);
     if (piece) {
       if (options?.formatProfile?.convertHook) {
         piece = options.formatProfile.convertHook(piece, doc.entities);
@@ -306,8 +312,6 @@ export function dxfToPatternPieces(doc: DXFDocument, options?: DXFImportOptions)
   }
 
   // Apply scale and unit
-  const unitFactor = resolveUnitFactor(options?.unit, doc);
-  const scaleFactor = ((options?.scale ?? 100) / 100) * unitFactor;
 
   if (scaleFactor !== 1) {
     for (const piece of pieces) {
@@ -362,11 +366,20 @@ function resolveLayerRole(layerName: string, profile?: FormatProfile): LayerRole
   return layerRole(layerName);
 }
 
+/** Apply an INSERT transform (scale → rotate → translate) to a raw point. */
+function applyInsert(x: number, y: number, insert: DXFInsertData): { x: number; y: number } {
+  const rad = (insert.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const sx = x * insert.scaleX, sy = y * insert.scaleY;
+  return { x: sx * cos - sy * sin + insert.x, y: sx * sin + sy * cos + insert.y };
+}
+
 function entitiesToPiece(
   entities: DXFEntity[],
   defaultName: string,
   insertData: DXFInsertData | null,
   profile?: FormatProfile,
+  mmPerUnit: number = 1,
 ): PatternPiece | null {
   let outline: PathCommand[] = [];
   // Unmapped-layer geometry. Only used as the outline when NO cut-role entity
@@ -375,6 +388,10 @@ function entitiesToPiece(
   // corrupt the boundary with a second overlapping contour this way.
   const unknownOutline: PathCommand[] = [];
   const internals: InternalLine[] = [];
+  // Position-only notch markers (POINT / TEXT on the notch layer), in final
+  // (insert-transformed, Y-flipped) coordinates. Interpreted against the
+  // FINISHED outline at the end of this function (hallazgo #5).
+  const notchMarks: { x: number; y: number }[] = [];
   let name = defaultName;
 
   // Find piece name from TEXT entities — prefer "Piece Name: XXX" (AAMA convention)
@@ -397,24 +414,12 @@ function entitiesToPiece(
     }
   }
 
-  // Extract notch points from TEXT entities on notch layer (AAMA layer 4)
+  // Collect notch marks from TEXT entities on notch layer (AAMA layer 4)
   for (const e of entities) {
     if ((e.type === 'TEXT' || e.type === 'MTEXT') && resolveLayerRole(e.layer, profile) === 'notch') {
       const td = e.data as DXFTextData;
-      let nx = td.x, ny = td.y;
-      if (insertData) {
-        const rad = (insertData.rotation * Math.PI) / 180;
-        const cos = Math.cos(rad), sin = Math.sin(rad);
-        const sx = nx * insertData.scaleX, sy = ny * insertData.scaleY;
-        nx = sx * cos - sy * sin + insertData.x;
-        ny = sx * sin + sy * cos + insertData.y;
-      }
-      ny = -ny; // Y-flip
-      const notchPath: PathCommand[] = [
-        { type: 'M', values: [nx, ny - 3] },
-        { type: 'L', values: [nx, ny + 3] },
-      ];
-      internals.push({ id: crypto.randomUUID(), type: 'notch', path: notchPath });
+      const p = insertData ? applyInsert(td.x, td.y, insertData) : { x: td.x, y: td.y };
+      notchMarks.push({ x: p.x, y: -p.y }); // Y-flip
     }
   }
 
@@ -422,9 +427,17 @@ function entitiesToPiece(
   for (const e of entities) {
     if (e.type === 'TEXT' || e.type === 'MTEXT' || e.type === 'INSERT') continue;
     const role = resolveLayerRole(e.layer, profile);
-    // POINTs are markers, not geometry: only notch-layer POINTs become
-    // internals; construction points (CLO layers 2/3: turn/curve-fit) are noise.
-    if (e.type === 'POINT' && role !== 'notch') continue;
+    // POINTs are markers, not geometry: notch-layer POINTs are collected as
+    // notch marks (interpreted against the finished outline below);
+    // construction points (CLO layers 2/3: turn/curve-fit) are noise.
+    if (e.type === 'POINT') {
+      if (role === 'notch') {
+        const pd = e.data as DXFPointData;
+        const p = insertData ? applyInsert(pd.x, pd.y, insertData) : { x: pd.x, y: pd.y };
+        notchMarks.push({ x: p.x, y: -p.y }); // Y-flip
+      }
+      continue;
+    }
     let path = entityToPath(e);
     if (path.length === 0) continue;
 
@@ -503,6 +516,13 @@ function entitiesToPiece(
   // never coincides, so it stays an internal — cut geometry is untouched.
   outline = promoteDenseSeamOutline(outline, internals);
 
+  // Hallazgo #5 (María): a notch POINT on the boundary is a real notch, not
+  // a generic tick — project it onto the finished outline and build it with
+  // the native notch model (perpendicular, inward, notchOptions).
+  for (const mark of notchMarks) {
+    internals.push(interpretNotchMark(mark, outline, mmPerUnit));
+  }
+
   return {
     id: crypto.randomUUID(),
     name,
@@ -560,6 +580,110 @@ function everyPointNearPolyline(
     return false;
   }
   return true;
+}
+
+// ─── Notch-mark interpretation (hallazgo #5) ───
+
+/**
+ * Max distance from a notch mark to the outline (as a fraction of the bbox
+ * diagonal) for it to count as an EDGE notch. CLO marks sit exactly on the
+ * boundary; drill holes / internal markers sit well inside and keep the
+ * legacy position tick instead — we never invent an edge anchor.
+ */
+const NOTCH_EDGE_SNAP_RATIO = 0.01;
+
+/** Closest point on a polyline to `pt`, with the segment's unit tangent. */
+function projectOntoPolyline(
+  pt: { x: number; y: number },
+  poly: { x: number; y: number }[],
+): { point: { x: number; y: number }; tangent: { x: number; y: number }; dist: number } | null {
+  let best: { point: { x: number; y: number }; tangent: { x: number; y: number }; dist: number } | null = null;
+  for (let i = 0; i < poly.length - 1; i++) {
+    const a = poly[i], b = poly[i + 1];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1e-12) continue;
+    const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / lenSq));
+    const px = a.x + t * dx, py = a.y + t * dy;
+    const d = Math.hypot(pt.x - px, pt.y - py);
+    if (!best || d < best.dist) {
+      const len = Math.sqrt(lenSq);
+      best = { point: { x: px, y: py }, tangent: { x: dx / len, y: dy / len }, dist: d };
+    }
+  }
+  return best;
+}
+
+/** Ray-casting point-in-polygon over a flattened outline. */
+function pointInPolygon(pt: { x: number; y: number }, poly: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i], b = poly[j];
+    if ((a.y > pt.y) !== (b.y > pt.y) &&
+        pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/**
+ * Turn a position-only notch mark into a real notch internal. On-boundary
+ * marks get the native notch model: projected onto the outline, oriented
+ * along the INWARD edge normal, sized via DEFAULT_NOTCH_OPTIONS (mm —
+ * divided by `mmPerUnit` so the later unit scaling lands it at exactly the
+ * default size). Off-boundary marks (drill holes) keep the legacy 6-unit
+ * vertical tick.
+ */
+function interpretNotchMark(
+  mark: { x: number; y: number },
+  outline: PathCommand[],
+  mmPerUnit: number,
+): InternalLine {
+  const poly = flattenPath(outline);
+  const proj = poly.length >= 3 ? projectOntoPolyline(mark, poly) : null;
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of poly) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const diag = Math.hypot(maxX - minX, maxY - minY);
+  const tol = diag * NOTCH_EDGE_SNAP_RATIO;
+
+  if (!proj || proj.dist > tol || !(mmPerUnit > 0)) {
+    // Drill hole / internal marker — position tick, exactly as before.
+    return {
+      id: crypto.randomUUID(),
+      type: 'notch',
+      path: [
+        { type: 'M', values: [mark.x, mark.y - 3] },
+        { type: 'L', values: [mark.x, mark.y + 3] },
+      ],
+    };
+  }
+
+  // Inward normal: of the two edge perpendiculars, the one whose probe
+  // point lands inside the outline.
+  const eps = Math.max(tol, 1e-6);
+  let normal = { x: -proj.tangent.y, y: proj.tangent.x };
+  if (!pointInPolygon({ x: proj.point.x + normal.x * eps, y: proj.point.y + normal.y * eps }, poly)) {
+    normal = { x: proj.tangent.y, y: -proj.tangent.x };
+  }
+
+  const opts = DEFAULT_NOTCH_OPTIONS;
+  return {
+    id: crypto.randomUUID(),
+    type: 'notch',
+    path: generateNotchPath(proj.point, normal, {
+      ...opts,
+      length: opts.length / mmPerUnit,
+      width: opts.width / mmPerUnit,
+    }),
+    notchOptions: { ...opts },
+  };
 }
 
 /**
