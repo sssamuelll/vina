@@ -245,12 +245,12 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       {(piece.placementRules || []).map((rule, idx) => (
         <div key={idx} className="panel-field panel-field--between">
           <span className="panel-item-text">
-            {rule.type === 'atFold' ? '📐 At Fold' :
-             rule.type === 'atEdge' ? `📏 At ${rule.edge || 'left'} edge` :
-             rule.type === 'priority' ? `⬆️ Priority ${rule.value || 1}` :
-             rule.type === 'grainTilt' ? `↗️ Tilt ≤${rule.value || 5}°` :
-             rule.type === 'pairWith' ? `🔗 Pair` :
-             rule.type === 'minDistance' ? `↔️ Min ${rule.value || 10}mm` : rule.type}
+            {rule.type === 'atFold' ? 'At Fold' :
+             rule.type === 'atEdge' ? `At ${rule.edge || 'left'} edge` :
+             rule.type === 'priority' ? `Priority ${rule.value || 1}` :
+             rule.type === 'grainTilt' ? `Tilt ≤${rule.value || 5}°` :
+             rule.type === 'pairWith' ? 'Pair' :
+             rule.type === 'minDistance' ? `Min ${rule.value || 10}mm` : rule.type}
           </span>
           <button className="panel-btn-sm" aria-label="Remove placement rule"
             onClick={() => dispatch(removePlacementRule({ pieceId: piece.id, ruleIndex: idx }))}>✕</button>

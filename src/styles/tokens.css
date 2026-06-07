@@ -4,7 +4,9 @@
   --bg-deeper: #08080f;
   --bg-surface: #10101c;
   --bg-elevated: #1a1a2e;
-  --border: #1a1a2e;
+  /* Must stay > --bg-elevated in luminance: a border equal to the surface it
+     outlines is invisible (Iris audit, properties re-home 2026-06-07). */
+  --border: #2a2a42;
   --border-subtle: #12121f;
   --text-primary: #e2e8f0;
   --text-secondary: #a0a0c0;
