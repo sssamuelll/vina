@@ -97,6 +97,7 @@ interface ToolHooks {
   lineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   seamTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void };
   notchTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
+  seamAllowanceTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void };
   trimTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void };
   grainlineTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseUp: () => void };
   measureTool: { handleMouseDown: (e: React.MouseEvent<SVGSVGElement>) => void; handleMouseMove: (e: React.MouseEvent<SVGSVGElement>) => void; handleKeyDown: (e: KeyboardEvent) => void; clear: () => void };
@@ -232,7 +233,7 @@ export function useEditorInteractions(
   const [selectMarquee, setSelectMarquee] = useState<{ start: Point2D; current: Point2D } | null>(null);
   const selectedPieceIds = useSelector((s: RootState) => s.editor.selectedPieceIds);
 
-  const { pen, rectTool, lineTool, seamTool, notchTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool } = tools;
+  const { pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool } = tools;
 
   /** Check if a click is near an anchor point of a piece */
   const findClickedAnchorPoint = useCallback((
@@ -437,6 +438,7 @@ export function useEditorInteractions(
     if (activeTool === 'line') { lineTool.handleMouseDown(e); return; }
     if (activeTool === 'seam') { seamTool.handleMouseDown(e); return; }
     if (activeTool === 'notch') { notchTool.handleMouseDown(e); return; }
+    if (activeTool === 'seamAllowance') { seamAllowanceTool.handleMouseDown(e); return; }
     if (activeTool === 'trimPlace') { trimTool.handleMouseDown(e); return; }
     if (activeTool === 'grainline') { grainlineTool.handleMouseDown(e); return; }
     if (MEASURE_TOOL_IDS.has(activeTool)) { measureTool.handleMouseDown(e); return; }
@@ -568,7 +570,7 @@ export function useEditorInteractions(
         };
       }
     }
-  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool]);
+  }, [activeTool, pan2D, zoom2D, pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, transformTool, editPattern, dispatch, pieces, nodeEditor, findClickedAnchorPoint, selectedInternalLine, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (panRef.current) {
@@ -768,6 +770,7 @@ export function useEditorInteractions(
       case 'editPattern': return editPattern.isEditing ? editPattern.getCursor() : 'default';
       case 'seam': return 'crosshair';
       case 'notch': return 'crosshair';
+      case 'seamAllowance': return 'crosshair';
       case 'trimPlace': return 'crosshair';
       case 'grainline': return 'crosshair';
       case 'measure': case 'measureCurve': case 'compareCurves': return 'crosshair';

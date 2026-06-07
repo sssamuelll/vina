@@ -57,6 +57,9 @@ export const DEFAULT_SHORTCUTS: ShortcutDef[] = [
   { id: 'tool.offsetOutline', key: 'r', label: 'Offset Outline', category: '2D Tools', context: '2d' },
   { id: 'tool.extendTrim', key: 'u', label: 'Extend / Trim', category: '2D Tools', context: '2d' },
   { id: 'tool.polyPen', key: 'y', label: 'Poly Pen', category: '2D Tools', context: '2d' },
+  // Dual-context key (precedent: 'w' = tool.pin 2d + tool3d.pin 3d): plain 'o'
+  // is tool3d.meshGrab when the 3D viewport has focus.
+  { id: 'tool.seamAllowance', key: 'o', label: 'Seam Allowance', category: '2D Tools', context: '2d' },
 
   // ─── Sewing ─────────────────────────────────────────────────────────────────
   { id: 'tool.seam', key: 'b', label: 'Edit Sewing (Seam)', category: 'Sewing', context: '2d' },

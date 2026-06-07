@@ -13,6 +13,7 @@ import { useFreeSewingTool } from './useFreeSewingTool';
 import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
+import { useSeamAllowanceTool } from './useSeamAllowanceTool';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -195,6 +196,17 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
   }, [dispatch]);
 
   const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd, undefined, handleNotchUpdate);
+
+  // Explicit apply-SA command (pieces are born net; this puts allowance back
+  // on purpose). Width comes from editor.defaultSeamAllowanceWidth inside the
+  // hook; per-piece scalar is the ratified model — per-edge is future work.
+  const handleApplySeamAllowance = useCallback((pieceId: string, widthMm: number) => {
+    const piece = pieces.find(p => p.id === pieceId);
+    if (!piece) return;
+    dispatch(updatePiece({ ...piece, seamAllowance: widthMm, updatedAt: Date.now() }));
+  }, [pieces, dispatch]);
+  const seamAllowanceTool = useSeamAllowanceTool(handleApplySeamAllowance);
+
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
   const handleGrainlineSet = useCallback((pieceId: string, grainline: InternalLine) => {
@@ -487,7 +499,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
 
   const { svgRef, handleWheel, handleDoubleClick, handleMouseDown: editorHandleMouseDown, handleMouseMove: editorHandleMouseMove, handleMouseUp, getCursor, selectMarquee } =
     useEditorInteractions(activeTool, zoom2D, pan2D, pieces, {
-      pen, rectTool, lineTool, seamTool, notchTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
+      pen, rectTool, lineTool, seamTool, notchTool, seamAllowanceTool, trimTool, grainlineTool, measureTool, nodeEditor, transformTool, editPattern: editPatternTool, scissorsTool, slashAndSpreadTool, mergeTool, segmentSewingTool, topstitchTool, walkSeamTool, freeSewingTool, offsetTool, extendTrimTool, polyPenTool, pleatTool, elasticTool,
     });
 
   // Track SVG viewport size for the ruler layer (screen-space ticks/labels).
@@ -814,6 +826,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
           topstitchMode={topstitchTool.mode}
           walkSeamPhase={walkSeamTool.mobileEdge ? 'walking' : walkSeamTool.stationaryEdge ? 'stationary' : 'idle'}
           seamHasFirstEdge={activeTool === 'seam' ? !!seamTool.firstEdge : !!freeSewingTool.firstEdge}
+          saDefaultWidthMm={seamAllowanceTool.widthMm}
         />
 
         <RulerLayer
