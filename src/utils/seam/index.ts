@@ -3,6 +3,98 @@ import { ClipperOffset, Path64, Point64, Paths64, JoinType, EndType } from 'clip
 
 const CURVE_RESOLUTION = 12;
 
+/** A flattened point carrying the index of the source command that produced it. */
+export interface SourcedPoint extends Point2D {
+  /** Index into the original `commands` array of the command that emitted this point. */
+  cmd: number;
+}
+
+/**
+ * Flatten PathCommand[] to points, tagging each with its source command index.
+ *
+ * Curve commands (C/Q) expand to `resolution` points that ALL carry the curve
+ * command's index — so a corner override keyed to a straight M/L command index
+ * resolves to the single flattened point that is that command's endpoint, never
+ * to a mid-curve sample. This is the contract the corner edge-walk needs: corner
+ * overrides are stored by command index (findNearestVertex walks the command
+ * array) but consumed against the flattened vertex array.
+ */
+export function flattenPathWithSource(
+  commands: PathCommand[],
+  resolution: number = CURVE_RESOLUTION,
+): SourcedPoint[] {
+  const points: SourcedPoint[] = [];
+  let cx = 0, cy = 0;
+  let startX = 0, startY = 0;
+  let startCmd = 0;
+
+  for (let ci = 0; ci < commands.length; ci++) {
+    const cmd = commands[ci];
+    switch (cmd.type) {
+      case 'M':
+        cx = cmd.values[0]; cy = cmd.values[1];
+        startX = cx; startY = cy; startCmd = ci;
+        points.push({ x: cx, y: cy, cmd: ci });
+        break;
+      case 'L':
+        cx = cmd.values[0]; cy = cmd.values[1];
+        points.push({ x: cx, y: cy, cmd: ci });
+        break;
+      case 'H':
+        cx = cmd.values[0];
+        points.push({ x: cx, y: cy, cmd: ci });
+        break;
+      case 'V':
+        cy = cmd.values[0];
+        points.push({ x: cx, y: cy, cmd: ci });
+        break;
+      case 'C': {
+        const [x1, y1, x2, y2, x3, y3] = cmd.values;
+        for (let i = 1; i <= resolution; i++) {
+          const t = i / resolution;
+          const mt = 1 - t;
+          points.push({
+            x: mt * mt * mt * cx + 3 * mt * mt * t * x1 + 3 * mt * t * t * x2 + t * t * t * x3,
+            y: mt * mt * mt * cy + 3 * mt * mt * t * y1 + 3 * mt * t * t * y2 + t * t * t * y3,
+            cmd: ci,
+          });
+        }
+        cx = x3; cy = y3;
+        break;
+      }
+      case 'Q': {
+        const [qx1, qy1, qx2, qy2] = cmd.values;
+        for (let i = 1; i <= resolution; i++) {
+          const t = i / resolution;
+          const mt = 1 - t;
+          points.push({
+            x: mt * mt * cx + 2 * mt * t * qx1 + t * t * qx2,
+            y: mt * mt * cy + 2 * mt * t * qy1 + t * t * qy2,
+            cmd: ci,
+          });
+        }
+        cx = qx2; cy = qy2;
+        break;
+      }
+      case 'Z':
+        if (Math.abs(cx - startX) > 0.001 || Math.abs(cy - startY) > 0.001) {
+          points.push({ x: startX, y: startY, cmd: startCmd });
+        }
+        cx = startX; cy = startY;
+        break;
+      default:
+        if (cmd.values.length >= 2) {
+          cx = cmd.values[cmd.values.length - 2];
+          cy = cmd.values[cmd.values.length - 1];
+          points.push({ x: cx, y: cy, cmd: ci });
+        }
+        break;
+    }
+  }
+
+  return points;
+}
+
 /**
  * Flatten PathCommand[] (including curves) to Point2D[].
  */
