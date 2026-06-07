@@ -24,12 +24,14 @@ export const notchTool: ToolDefinition = {
   icon: NotchIcon,
   cursor: 'pointer',
   group: 'annotation',
+  // Option ids use the canonical NotchOptions field names (shape/length/count)
+  // so they land in toolOptions.notch with the keys useNotchTool reads (G6).
   options: [
     {
-      id: 'notchShape',
+      id: 'shape',
       label: 'Notch Shape',
       type: 'select',
-      value: 'v-external',
+      value: 'slit',
       choices: [
         { label: 'Slit', value: 'slit' },
         { label: 'T-Notch', value: 't-notch' },
@@ -41,8 +43,8 @@ export const notchTool: ToolDefinition = {
       ],
     },
     {
-      id: 'notchSize',
-      label: 'Size',
+      id: 'length',
+      label: 'Depth (mm)',
       type: 'number',
       value: 8,
       min: 3,
@@ -50,7 +52,7 @@ export const notchTool: ToolDefinition = {
       step: 1,
     },
     {
-      id: 'notchCount',
+      id: 'count',
       label: 'Count',
       type: 'select',
       value: 1,
@@ -86,9 +88,9 @@ export const notchTool: ToolDefinition = {
     undoable: true,
     dangerous: false,
     parameterHints: {
-      notchShape: 'Shape of the notch: slit, T-notch, V-internal, V-external, U-notch, castle, or diamond',
-      notchSize: 'Size of the notch in millimeters',
-      notchCount: 'Number of notches: single, double, or triple for distinguishing seams',
+      shape: 'Shape of the notch: slit, T-notch, V-internal, V-external, U-notch, castle, or diamond',
+      length: 'Notch depth in millimeters (default 8)',
+      count: 'Number of notches: single, double, or triple for distinguishing seams',
     },
   },
 };

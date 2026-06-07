@@ -1,6 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../../store';
 import { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
+import { computeNotchAnchor } from '../../utils/notchAnchor';
 import { screenToPattern } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 
@@ -80,15 +83,23 @@ function closestPointOnOutline(
   return best;
 }
 
-/** Create a notch InternalLine at a point with a normal direction */
-function createNotchLine(point: Point2D, normal: Point2D, piecePos: Point2D, notchOptions?: NotchOptions): InternalLine {
-  const localPt = { x: point.x - piecePos.x, y: point.y - piecePos.y };
+/**
+ * Create a notch InternalLine at a point with a normal direction.
+ * Attaches the parametric anchor (notch-precision F2): arc distance from
+ * the nearest outline corner, so the precision modal can read/edit the
+ * placement numerically. Cornerless outlines yield an anchor-less notch.
+ * Exported for unit tests.
+ */
+export function createNotchLine(point: Point2D, normal: Point2D, piece: PatternPiece, notchOptions?: NotchOptions): InternalLine {
+  const localPt = { x: point.x - piece.position.x, y: point.y - piece.position.y };
   const opts = notchOptions || DEFAULT_NOTCH_OPTIONS;
+  const anchor = computeNotchAnchor(piece.outline, localPt);
   return {
     id: newId(),
     type: 'notch',
     path: generateNotchPath(localPt, normal, opts),
     notchOptions: opts,
+    ...(anchor ? { notchAnchor: anchor } : {}),
   };
 }
 
@@ -100,6 +111,18 @@ export function useNotchTool(
   notchOptions?: NotchOptions,
 ) {
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
+
+  // toolOptions.notch (G6, mirrors the toolOptions.seam convention): canonical
+  // keys = NotchOptions names (shape/length/width/angle/count). Defaults live
+  // here until a proper 2D Settings exists; the explicit param (modal, tests)
+  // overrides the store.
+  const storeNotchOptions = useSelector(
+    (s: RootState) => s.tools.toolOptions?.notch as Partial<NotchOptions> | undefined,
+  );
+  const effectiveOptions: NotchOptions = useMemo(
+    () => ({ ...DEFAULT_NOTCH_OPTIONS, ...storeNotchOptions, ...notchOptions }),
+    [storeNotchOptions, notchOptions],
+  );
 
   const toPattern = useCallback(
     (screenX: number, screenY: number, svgRect: DOMRect): Point2D =>
@@ -116,12 +139,12 @@ export function useNotchTool(
     for (const piece of pieces) {
       const hit = closestPointOnOutline(pt, piece, zoom);
       if (hit) {
-        const notch = createNotchLine(hit.point, hit.normal, piece.position, notchOptions);
+        const notch = createNotchLine(hit.point, hit.normal, piece, effectiveOptions);
         onAddNotch(piece.id, notch);
         return;
       }
     }
-  }, [toPattern, pieces, zoom, onAddNotch, notchOptions]);
+  }, [toPattern, pieces, zoom, onAddNotch, effectiveOptions]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     const svg = e.currentTarget;
