@@ -212,64 +212,50 @@ test.describe('IK Solver', () => {
       });
     }, handWorldPos);
 
-    // Wait for solver to process new target (~several frames)
-    await page.waitForTimeout(1500);
+    // Poll until the solver actually moved an arm bone (condition-based wait).
+    // A fixed timeout here raced the R3F frame loop: the IK solve runs inside
+    // useFrame, and under SwiftShader on a contended CI runner a single frame
+    // can stall for seconds — 1500ms elapsed with ZERO solve frames, so the
+    // quats read back unchanged (the shard-3 flake: 5 occurrences across 4
+    // PRs, reproduced locally with CDP 100x CPU throttle). Waiting for the
+    // observable condition (quat delta > 0.001 vs the initial snapshot)
+    // absorbs arbitrary frame starvation AND late async CCDIKSolver init,
+    // while a genuine solver regression still fails loudly at the 30s budget.
+    await page.waitForFunction(
+      (initial) => {
+        const container = document.querySelector('.viewport3d') as HTMLElement | null;
+        if (!container) return false;
+        const scene = (container as unknown as Record<string, unknown>).__scene as {
+          traverse: (cb: (obj: { isSkinnedMesh?: boolean; skeleton?: { bones: { name: string; quaternion: { x: number; y: number; z: number; w: number } }[] } }) => void) => void;
+        } | undefined;
+        if (!scene) return false;
 
-    // Record arm bone quaternions AFTER IK solve
-    const solvedQuats = await page.evaluate(() => {
-      const container = document.querySelector('.viewport3d') as HTMLElement | null;
-      if (!container) return null;
-      const scene = (container as unknown as Record<string, unknown>).__scene as {
-        traverse: (cb: (obj: { isSkinnedMesh?: boolean; skeleton?: { bones: { name: string; quaternion: { x: number; y: number; z: number; w: number } }[] } }) => void) => void;
-      } | undefined;
-      if (!scene) return null;
+        let skeleton: { bones: { name: string; quaternion: { x: number; y: number; z: number; w: number } }[] } | null = null;
+        scene.traverse((obj) => {
+          if (obj.isSkinnedMesh && !skeleton && obj.skeleton) {
+            skeleton = obj.skeleton;
+          }
+        });
+        if (!skeleton) return false;
 
-      let skeleton: { bones: { name: string; quaternion: { x: number; y: number; z: number; w: number } }[] } | null = null;
-      scene.traverse((obj) => {
-        if (obj.isSkinnedMesh && !skeleton && obj.skeleton) {
-          skeleton = obj.skeleton;
+        for (const bone of (skeleton as { bones: { name: string; quaternion: { x: number; y: number; z: number; w: number } }[] }).bones) {
+          const before = initial![bone.name];
+          if (!before) continue;
+          const q = bone.quaternion;
+          const dist = Math.sqrt(
+            (q.x - before.x) ** 2 + (q.y - before.y) ** 2 + (q.z - before.z) ** 2 + (q.w - before.w) ** 2
+          );
+          if (dist > 0.001) return true;
         }
-      });
-      if (!skeleton) return null;
-
-      const armBones = ['LeftShoulder', 'LeftArm', 'LeftForeArm'];
-      const quats: Record<string, { x: number; y: number; z: number; w: number }> = {};
-      for (const bone of skeleton.bones) {
-        if (armBones.includes(bone.name)) {
-          quats[bone.name] = {
-            x: bone.quaternion.x,
-            y: bone.quaternion.y,
-            z: bone.quaternion.z,
-            w: bone.quaternion.w,
-          };
-        }
-      }
-      return quats;
+        return false;
+      },
+      initialQuats,
+      { timeout: 30_000, polling: 250 },
+    ).catch(() => {
+      throw new Error(
+        'IK solver never moved LeftShoulder/LeftArm/LeftForeArm within 30s of setIKTarget — arm did not follow the IK target'
+      );
     });
-
-    expect(solvedQuats).not.toBeNull();
-
-    // Verify at least one arm bone quaternion changed (arm followed the target)
-    const quatDistance = (
-      a: { x: number; y: number; z: number; w: number },
-      b: { x: number; y: number; z: number; w: number },
-    ) => Math.sqrt(
-      (a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2 + (a.w - b.w) ** 2
-    );
-
-    let anyBoneChanged = false;
-    for (const boneName of ['LeftShoulder', 'LeftArm', 'LeftForeArm']) {
-      const before = initialQuats![boneName];
-      const after = solvedQuats![boneName];
-      if (before && after) {
-        const dist = quatDistance(before, after);
-        if (dist > 0.001) {
-          anyBoneChanged = true;
-        }
-      }
-    }
-
-    expect(anyBoneChanged).toBe(true);
 
     // Verify no solver errors occurred
     const solverErrors = errors.filter(e =>
