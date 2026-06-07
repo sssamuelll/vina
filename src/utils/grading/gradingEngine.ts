@@ -153,10 +153,24 @@ export function gradePiece(
   const center = computeCentroid(piece.outline);
   const scaledOutline = scaleOutline(piece.outline, scaleFactor, center);
 
-  // Scale internals (notches, grainlines, darts) with the same factor
+  // Scale internals (notches, grainlines, darts) with the same factor.
+  // Parametric notch anchors scale too (notch-precision F4): uniform scale
+  // means arc distances scale by the same factor, and the refPoint follows
+  // the same centroid transform as the path — an unscaled anchor would
+  // silently diverge from the geometry it describes.
   const scaledInternals = piece.internals.map(internal => ({
     ...internal,
     path: scaleOutline(internal.path, scaleFactor, center),
+    ...(internal.notchAnchor ? {
+      notchAnchor: {
+        ...internal.notchAnchor,
+        refPoint: {
+          x: center.x + (internal.notchAnchor.refPoint.x - center.x) * scaleFactor,
+          y: center.y + (internal.notchAnchor.refPoint.y - center.y) * scaleFactor,
+        },
+        distanceMm: internal.notchAnchor.distanceMm * scaleFactor,
+      },
+    } : {}),
   }));
 
   return {

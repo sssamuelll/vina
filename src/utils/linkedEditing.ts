@@ -48,11 +48,20 @@ function mirrorPathX(path: PathCommand[], cx: number): PathCommand[] {
 
 /**
  * Mirror internal lines by reflecting X coordinates around a center.
+ *
+ * Drops `notchAnchor` (notch-precision F4): a reflected anchor would
+ * reference the wrong corner/direction on the mirrored partner. The
+ * mirrored path stays correct geometry (D-2: path manda); re-mapping
+ * anchors under reflection is the future "anchor manda" upgrade.
  */
 export function mirrorInternalsX(internals: InternalLine[], centerX: number): InternalLine[] {
-  return internals.map(line => ({
-    ...line,
-    id: crypto.randomUUID(),
-    path: mirrorPathX(line.path, centerX),
-  }));
+  return internals.map(line => {
+    const { notchAnchor: _dropped, ...rest } = line;
+    void _dropped;
+    return {
+      ...rest,
+      id: crypto.randomUUID(),
+      path: mirrorPathX(line.path, centerX),
+    };
+  });
 }
