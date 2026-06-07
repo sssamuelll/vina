@@ -1,4 +1,26 @@
-import type { PathCommand, Point2D } from '../../../types/types';
+import type { InternalLine, PathCommand, Point2D } from '../../../types/types';
+
+/**
+ * Stroke color for an internal line on the 2D paper canvas (design surface 5).
+ *
+ * Ink tones on the light paper; accent reserved for selection; thread color for
+ * topstitch; notches get their own registration-mark hue (`--notch-2d`) so a
+ * piquete never reads as part of the cut line it crosses (requirement María).
+ */
+export function internalLineColor(line: InternalLine, isSelected: boolean): string {
+  if (isSelected) return 'var(--accent-2d)';
+  switch (line.type) {
+    case 'topstitch':
+      return line.topstitchOptions?.threadColor ?? 'var(--topstitch-2d)';
+    case 'notch':
+      return 'var(--notch-2d)';
+    case 'reference':
+    case 'pleat':
+      return 'var(--ink-on-light-3)';
+    default:
+      return 'var(--ink-on-light-2)'; // grainline, dart, fold
+  }
+}
 
 /**
  * Apex of a dart, for drawing the point marker (design surface 5, P0.3).

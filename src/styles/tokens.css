@@ -46,6 +46,7 @@
   --fold-mountain-2d: oklch(0.50 0.13 335); /* mountain-fold direction — plum; extra chroma offsets the 0.8 marker opacity so it stays ≠ valley */
   --fold-valley-2d: oklch(0.50 0.11 255);   /* valley-fold direction — blue, kept clear of the selection accent (248) */
   --topstitch-2d: #333333;                  /* topstitch default when the thread has no color set */
+  --notch-2d: oklch(0.52 0.115 165);        /* notch — montage registration mark; teal-green, the open hue between cool blue (255) and warm (50), so a frequent fine marker reads ≠ cut line and ≠ fold/seam at zoom */
   --annotation-2d: #808080;                 /* annotation fallback when its category has no color */
   /* Seam overlay (SeamRenderer) on the paper ground. State colors borrow the
      piece selection/error language (--accent-2d / --piece-error-2d / --ink-on-light-3);
