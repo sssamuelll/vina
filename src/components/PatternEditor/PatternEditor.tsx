@@ -84,9 +84,11 @@ function findNearestVertex(
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
   onImportDXF?: () => void;
+  /** Opens a named ContextPanel (e.g. 'Properties'); wired by AppShell. */
+  onOpenPanel?: (name: string) => void;
 }
 
-export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
+export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEditorProps) {
   const dispatch = useDispatch();
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
@@ -850,6 +852,10 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
+        onOpenProperties={(pieceId) => {
+          dispatch(selectPiece(pieceId));
+          onOpenPanel?.('Properties');
+        }}
       />
       {cornerMenu && (() => {
         const piece = pieces.find(p => p.id === cornerMenu.pieceId);

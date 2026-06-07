@@ -1,3 +1,14 @@
+/**
+ * PropertiesPanel — piece / seam / material editor, hosted in the ContextPanel
+ * (AppShell renderPanelContent('Properties')). Re-homed 2026-06-07 after two
+ * orphan levels (CopilotSidePanel → CopilotPanel, both deleted with the
+ * VS-Code shell in `1c6e4238`); this is the only seam editor in the codebase.
+ *
+ * Selection model: editorSlice makes piece and seam selection mutually
+ * exclusive (selectSeam clears selectedPieceIds), so the panel renders for
+ * EITHER — gating everything on a selected piece (the old shell's behavior)
+ * made the seam editor unreachable in practice.
+ */
 import { X } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
@@ -15,6 +26,9 @@ export default function PropertiesPanel() {
   const { pieces, seams } = useSelector((s: RootState) => s.project);
   const editor = useSelector((s: RootState) => s.editor);
   const selectedPiece = pieces.find(p => editor.selectedPieceIds.includes(p.id));
+  const selectedSeam = editor.selectedSeamId
+    ? seams.find(s => s.id === editor.selectedSeamId)
+    : undefined;
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     piece: false,
     material: false,
@@ -28,68 +42,67 @@ export default function PropertiesPanel() {
     }));
   }, []);
 
+  const seamsList = seams.length > 0 && (
+    <PropertySection id="seams" title={`SEAMS (${seams.length})`} collapsed={!!collapsedSections.seams} onToggle={toggleSection}>
+      {seams.map(seam => {
+        const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
+        const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
+        const isSelected = editor.selectedSeamId === seam.id;
+        return (
+          <div
+            key={seam.id}
+            className={`seam-item ${isSelected ? 'selected' : ''}`}
+            onClick={() => dispatch(selectSeam(seam.id))}
+          >
+            <span className="seam-label">
+              {pA?.name || '?'} ↔ {pB?.name || '?'}
+            </span>
+            <span className="seam-type">{seam.type}</span>
+            <button
+              className="seam-delete"
+              aria-label="Delete seam"
+              onClick={(e) => { e.stopPropagation(); dispatch(removeSeam(seam.id)); }}
+            >
+              <X size={10} />
+            </button>
+          </div>
+        );
+      })}
+    </PropertySection>
+  );
+
   return (
     <div className="properties-panel">
-      <div className="panel-content">
-        {!selectedPiece ? (
-          <div style={{ padding: 16, color: '#888', fontSize: 12, textAlign: 'center' }}>
-            Select a piece to edit
-          </div>
-        ) : (
-          <>
+      {!selectedPiece && !selectedSeam ? (
+        <>
+          <div className="panel-empty">Select a piece or seam to edit</div>
+          {seamsList}
+        </>
+      ) : (
+        <>
+          {selectedPiece && (
             <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />
+          )}
 
-            {/* Selected seam properties */}
-            {editor.selectedSeamId && (() => {
-              const seam = seams.find(s => s.id === editor.selectedSeamId);
-              if (!seam) return null;
-              const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
-              const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
-              return (
-                <SeamPropertiesPanel
-                  seam={seam}
-                  pieceAName={pA?.name || '?'}
-                  pieceBName={pB?.name || '?'}
-                  collapsed={!!collapsedSections['seam-props']}
-                  onToggle={toggleSection}
-                />
-              );
-            })()}
+          {selectedSeam && (
+            <SeamPropertiesPanel
+              seam={selectedSeam}
+              pieceAName={pieces.find(p => p.id === selectedSeam.pieceA.pieceId)?.name || '?'}
+              pieceBName={pieces.find(p => p.id === selectedSeam.pieceB.pieceId)?.name || '?'}
+              collapsed={!!collapsedSections['seam-props']}
+              onToggle={toggleSection}
+            />
+          )}
 
+          {selectedPiece && (
             <PropertySection id="material" title="MATERIAL" collapsed={!!collapsedSections.material} onToggle={toggleSection}>
               <MaterialTab />
             </PropertySection>
+          )}
 
-            {seams.length > 0 && (
-              <PropertySection id="seams" title={`SEAMS (${seams.length})`} collapsed={!!collapsedSections.seams} onToggle={toggleSection}>
-                {seams.map(seam => {
-                  const pA = pieces.find(p => p.id === seam.pieceA.pieceId);
-                  const pB = pieces.find(p => p.id === seam.pieceB.pieceId);
-                  const isSelected = editor.selectedSeamId === seam.id;
-                  return (
-                    <div
-                      key={seam.id}
-                      className={`seam-item ${isSelected ? 'selected' : ''}`}
-                      onClick={() => dispatch(selectSeam(seam.id))}
-                    >
-                      <span className="seam-label">
-                        {pA?.name || '?'} ↔ {pB?.name || '?'}
-                      </span>
-                      <span className="seam-type">{seam.type}</span>
-                      <button
-                        className="seam-delete"
-                        onClick={(e) => { e.stopPropagation(); dispatch(removeSeam(seam.id)); }}
-                      >
-                        <X size={10} />
-                      </button>
-                    </div>
-                  );
-                })}
-              </PropertySection>
-            )}
-          </>
-        )}
-      </div>
+          {seamsList}
+        </>
+      )}
     </div>
   );
 }

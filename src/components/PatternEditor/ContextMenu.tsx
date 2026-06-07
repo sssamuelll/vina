@@ -75,6 +75,8 @@ interface ContextMenuProps {
   onUnfold?: (pieceId: string, foldLineId: string, outlineOnly?: boolean) => void;
   onOffsetInternalLine?: (pieceId: string, lineId: string) => void;
   onOptimizeCurves?: (pieceId: string, lineId?: string) => void;
+  /** Selects the piece and opens the Properties ContextPanel (re-homed PropertiesPanel). */
+  onOpenProperties?: (pieceId: string) => void;
 }
 
 // ─── Menu Items ─────────────────────────────────────────────────────────────
@@ -92,7 +94,7 @@ interface MenuItem {
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit, onUnfold, onOffsetInternalLine, onOptimizeCurves }: ContextMenuProps) {
+export default function ContextMenu({ menu, onClose, onRename, onConvertSegment, onZoomToFit, onUnfold, onOffsetInternalLine, onOptimizeCurves, onOpenProperties }: ContextMenuProps) {
   const dispatch = useDispatch();
   const pieces = useSelector((s: RootState) => s.project.pieces);
   const seams = useSelector((s: RootState) => s.project.seams);
@@ -464,6 +466,11 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       action: () => act(() => {
         dispatchInspectPiece(dispatch, pid);
       }),
+    });
+    items.push({
+      label: 'Properties…',
+      icon: '🎛',
+      action: () => act(() => onOpenProperties?.(pid)),
       separator: true,
     });
     items.push({

@@ -6,7 +6,7 @@
  *
  * Reclassifying a panel is a one-line edit: add its name to LEFT_PANELS.
  */
-const LEFT_PANELS = new Set<string>(['Grading']);
+const LEFT_PANELS = new Set<string>(['Grading', 'Properties']);
 
 export function getPanelSide(name: string): 'left' | 'right' {
   return LEFT_PANELS.has(name) ? 'left' : 'right';

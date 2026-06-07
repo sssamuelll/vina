@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { updatePiece, removePiece, unlinkPieces, setLayer, setSublayer, addAnnotation, removeAnnotation, setFabricCode, addPlacementRule, removePlacementRule } from '../../store/projectSlice';
+import { setToolOption } from '../../store/toolSlice';
 import { STANDARD_FABRIC_CODES } from '../../utils/fabricCodes';
 import { clearSelection, selectPiece } from '../../store/editorSlice';
 import type { NotchShape, NotchOptions, InterfacingType, PatternPiece, PlacementRule, PlacementRuleType } from '../../types/types';
+import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import { computeStiffnessMultiplier } from '../../utils/cloth/interfacing';
 import { ANNOTATION_TEMPLATES, annotationId, sanitizeAnnotationText } from '../../utils/annotationTemplates';
 import PropertySection from './PropertySection';
@@ -19,9 +21,15 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
   const dispatch = useDispatch();
   const fabrics = useSelector((s: RootState) => s.project.fabrics);
   const pieces = useSelector((s: RootState) => s.project.pieces);
-  const [notchSettings, setNotchSettings] = useState<NotchOptions>({
-    shape: 'slit', subType: 'straightforward', length: 8, width: 3, angle: 0, count: 1,
-  });
+  // Notch defaults live in tools.toolOptions.notch (G6 convention, canonical
+  // keys = NotchOptions names) — the notch tool reads them on every click.
+  // The old panel kept these in local useState, which wrote nowhere.
+  const storeNotchOptions = useSelector(
+    (s: RootState) => s.tools.toolOptions?.notch as Partial<NotchOptions> | undefined,
+  );
+  const notchSettings: NotchOptions = { ...DEFAULT_NOTCH_OPTIONS, ...storeNotchOptions };
+  const setNotchOption = (optionId: keyof NotchOptions, value: NotchOptions[keyof NotchOptions]) =>
+    dispatch(setToolOption({ toolId: 'notch', optionId, value }));
   const [selectedTemplate, setSelectedTemplate] = useState('');
   const [customText, setCustomText] = useState('');
 
@@ -53,8 +61,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
     <>
     <PropertySection id="piece" title="PIECE" collapsed={collapsed} onToggle={onToggle}>
       <div className="panel-field">
-        <label>Name</label>
+        <label htmlFor="prop-piece-name">Name</label>
         <input
+          id="prop-piece-name"
           type="text"
           className="panel-input"
           value={piece.name}
@@ -62,8 +71,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
       </div>
       <div className="panel-field">
-        <label>Seam (mm)</label>
+        <label htmlFor="prop-piece-sa">Seam (mm)</label>
         <input
+          id="prop-piece-sa"
           type="number"
           className="panel-input narrow"
           value={piece.seamAllowance}
@@ -72,14 +82,13 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           onChange={e => dispatch(updatePiece({ ...piece, seamAllowance: Number(e.target.value), updatedAt: Date.now() }))}
         />
       </div>
-      <div className="panel-field" style={{ flexWrap: 'wrap', gap: 4 }}>
+      <div className="panel-field panel-field--wrap">
         <label>SA Presets</label>
-        <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
+        <div className="panel-preset-row">
           {([['Overlock', 8], ['Standard', 10], ['Flat-felled', 12], ['French', 15]] as const).map(([label, width]) => (
             <button
               key={label}
-              className="panel-labeled-btn"
-              style={{ fontSize: 10, padding: '2px 6px' }}
+              className="panel-chip-btn"
               onClick={() => dispatch(updatePiece({ ...piece, seamAllowance: width, updatedAt: Date.now() }))}
               title={`${label}: ${width}mm`}
             >
@@ -89,8 +98,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         </div>
       </div>
       <div className="panel-field">
-        <label>Fabric</label>
+        <label htmlFor="prop-piece-fabric">Fabric</label>
         <select
+          id="prop-piece-fabric"
           className="panel-input"
           value={piece.fabricId || ''}
           onChange={e => dispatch(updatePiece({ ...piece, fabricId: e.target.value || undefined, updatedAt: Date.now() }))}
@@ -102,12 +112,13 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         </select>
       </div>
       <div className="panel-field">
-        <label>Fabric Code</label>
+        <label htmlFor="prop-piece-fabric-code">Fabric Code</label>
         {(() => {
           const current = piece.fabricCode || 'SELF';
           const isCustom = !STANDARD_FABRIC_CODES.includes(current as typeof STANDARD_FABRIC_CODES[number]);
           return isCustom ? (
             <input
+              id="prop-piece-fabric-code"
               className="panel-input"
               value={current}
               onChange={e => dispatch(setFabricCode({ pieceId: piece.id, fabricCode: e.target.value }))}
@@ -115,6 +126,7 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
             />
           ) : (
             <select
+              id="prop-piece-fabric-code"
               className="panel-input"
               value={current}
               onChange={e => {
@@ -134,8 +146,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         })()}
       </div>
       <div className="panel-field">
-        <label>Interfacing</label>
+        <label htmlFor="prop-piece-interfacing">Interfacing</label>
         <select
+          id="prop-piece-interfacing"
           className="panel-input"
           value={piece.interfacingType || 'none'}
           onChange={e => dispatch(updatePiece({ ...piece, interfacingType: e.target.value as InterfacingType, updatedAt: Date.now() }))}
@@ -161,21 +174,22 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       <div className="panel-field">
         <label>Pressure (Pa)</label>
         <input
-          type="range"
+          type="range" className="panel-slider"
           min={0} max={500} step={10}
           value={piece.pressurePa || 0}
           onChange={e => dispatch(updatePiece({ ...piece, pressurePa: Number(e.target.value), updatedAt: Date.now() }))}
         />
-        <span style={{ fontSize: 11, opacity: 0.7, minWidth: 35, textAlign: 'right' }}>{piece.pressurePa || 0}</span>
+        <span className="panel-value">{piece.pressurePa || 0}</span>
       </div>
       {(piece.interfacingType && piece.interfacingType !== 'none' || (piece.solidifyFactor ?? 0) > 0) && (
-        <div style={{ fontSize: 10, color: '#888', padding: '2px 0' }}>
+        <div className="panel-hint">
           Effective stiffness: {computeStiffnessMultiplier(piece.interfacingType, piece.solidifyFactor).toFixed(1)}x
         </div>
       )}
       <div className="panel-field">
-        <label>Mirror</label>
+        <label htmlFor="prop-piece-mirror">Mirror</label>
         <input
+          id="prop-piece-mirror"
           type="checkbox"
           checked={piece.mirrored}
           onChange={() => dispatch(updatePiece({ ...piece, mirrored: !piece.mirrored, updatedAt: Date.now() }))}
@@ -183,55 +197,54 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
       </div>
       {/* Linked Editing */}
       {piece.linkedPieceId && (
-        <div style={{ marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
-          <div style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Linked Editing</div>
-          <div style={{ fontSize: 12, marginBottom: 6 }}>
-            <span style={{ color: piece.linkMode === 'symmetry' ? '#64b5f6' : '#aed581' }}>
+        <div className="panel-subblock">
+          <div className="panel-subtitle">Linked Editing</div>
+          <div className="panel-link-row">
+            <span className={piece.linkMode === 'symmetry' ? 'panel-link-mode--symmetry' : 'panel-link-mode--instance'}>
               {piece.linkMode === 'symmetry' ? 'Symmetry' : 'Instance'}
             </span>
             {' linked to '}
-            <span
-              style={{ color: '#4a9eff', cursor: 'pointer', textDecoration: 'underline' }}
+            <button
+              className="panel-link"
               onClick={() => dispatch(selectPiece(piece.linkedPieceId!))}
             >
               {pieces.find(p => p.id === piece.linkedPieceId)?.name || piece.linkedPieceId}
-            </span>
+            </button>
           </div>
           <button
             className="panel-delete"
             onClick={() => dispatch(unlinkPieces({ pieceId: piece.id }))}
-            style={{ fontSize: 11, background: 'rgba(255,255,255,0.05)' }}
           >
             Remove Linked Editing
           </button>
         </div>
       )}
       {/* Annotations */}
-      <div className="panel-section-title" style={{ marginTop: 12 }}>ANNOTATIONS</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Annotations</div>
       {(piece.annotations || []).map(ann => (
-        <div key={ann.id} className="panel-field" style={{ justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11 }}>{ann.text}</span>
-          <button className="panel-btn-sm" style={{ fontSize: 10, padding: '1px 4px' }}
+        <div key={ann.id} className="panel-field panel-field--between">
+          <span className="panel-item-text">{ann.text}</span>
+          <button className="panel-btn-sm" aria-label={`Remove annotation ${ann.text}`}
             onClick={() => dispatch(removeAnnotation({ pieceId: piece.id, annotationId: ann.id }))}>✕</button>
         </div>
       ))}
-      <div className="panel-field" style={{ gap: 4 }}>
-        <select className="panel-input" style={{ flex: 1 }} value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}>
+      <div className="panel-field panel-field--row">
+        <select className="panel-input panel-input--grow" value={selectedTemplate} onChange={e => setSelectedTemplate(e.target.value)}>
           <option value="">Template...</option>
           {ANNOTATION_TEMPLATES.map((t, i) => <option key={i} value={t.text}>{t.text}</option>)}
         </select>
         <button className="panel-btn-sm" onClick={handleAddTemplate} disabled={!selectedTemplate}>+</button>
       </div>
-      <div className="panel-field" style={{ gap: 4 }}>
-        <input className="panel-input" style={{ flex: 1 }} placeholder="Custom..." value={customText} onChange={e => setCustomText(e.target.value)} />
+      <div className="panel-field panel-field--row">
+        <input className="panel-input panel-input--grow" placeholder="Custom..." value={customText} onChange={e => setCustomText(e.target.value)} />
         <button className="panel-btn-sm" onClick={handleAddCustom} disabled={!customText.trim()}>+</button>
       </div>
 
       {/* Placement Rules */}
-      <div className="panel-section-title" style={{ marginTop: 12 }}>PLACEMENT RULES</div>
+      <div className="panel-subtitle panel-subtitle--spaced">Placement Rules</div>
       {(piece.placementRules || []).map((rule, idx) => (
-        <div key={idx} className="panel-field" style={{ justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 11 }}>
+        <div key={idx} className="panel-field panel-field--between">
+          <span className="panel-item-text">
             {rule.type === 'atFold' ? '📐 At Fold' :
              rule.type === 'atEdge' ? `📏 At ${rule.edge || 'left'} edge` :
              rule.type === 'priority' ? `⬆️ Priority ${rule.value || 1}` :
@@ -239,12 +252,12 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
              rule.type === 'pairWith' ? `🔗 Pair` :
              rule.type === 'minDistance' ? `↔️ Min ${rule.value || 10}mm` : rule.type}
           </span>
-          <button className="panel-btn-sm" style={{ fontSize: 10, padding: '1px 4px' }}
+          <button className="panel-btn-sm" aria-label="Remove placement rule"
             onClick={() => dispatch(removePlacementRule({ pieceId: piece.id, ruleIndex: idx }))}>✕</button>
         </div>
       ))}
-      <div className="panel-field" style={{ gap: 4 }}>
-        <select className="panel-input" style={{ flex: 1 }} value="" onChange={e => {
+      <div className="panel-field panel-field--row">
+        <select className="panel-input panel-input--grow" value="" onChange={e => {
           if (!e.target.value) return;
           const type = e.target.value as PlacementRuleType;
           const rule: PlacementRule = { type };
@@ -269,15 +282,17 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         Delete Piece
       </button>
 
-      {/* Notch Settings */}
-      <div className="notch-settings" style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Notch Settings</div>
+      {/* Notch defaults — written to tools.toolOptions.notch; the notch tool
+          merges them over DEFAULT_NOTCH_OPTIONS on every placement. */}
+      <div className="panel-subblock">
+        <div className="panel-subtitle">Notch Settings</div>
         <div className="panel-field">
-          <label>Shape</label>
+          <label htmlFor="prop-notch-shape">Shape</label>
           <select
+            id="prop-notch-shape"
             className="panel-input"
             value={notchSettings.shape}
-            onChange={e => setNotchSettings(s => ({ ...s, shape: e.target.value as NotchShape }))}
+            onChange={e => setNotchOption('shape', e.target.value as NotchShape)}
           >
             <option value="slit">Slit</option>
             <option value="t-notch">T-Notch</option>
@@ -289,19 +304,19 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
           </select>
         </div>
         <div className="panel-field">
-          <label>Length (mm)</label>
-          <input type="number" className="panel-input narrow" value={notchSettings.length} min={1} max={30}
-            onChange={e => setNotchSettings(s => ({ ...s, length: Number(e.target.value) }))} />
+          <label htmlFor="prop-notch-length">Depth (mm)</label>
+          <input id="prop-notch-length" type="number" className="panel-input narrow" value={notchSettings.length} min={1} max={30}
+            onChange={e => setNotchOption('length', Number(e.target.value))} />
         </div>
         <div className="panel-field">
-          <label>Width (mm)</label>
-          <input type="number" className="panel-input narrow" value={notchSettings.width} min={1} max={20}
-            onChange={e => setNotchSettings(s => ({ ...s, width: Number(e.target.value) }))} />
+          <label htmlFor="prop-notch-width">Width (mm)</label>
+          <input id="prop-notch-width" type="number" className="panel-input narrow" value={notchSettings.width} min={1} max={20}
+            onChange={e => setNotchOption('width', Number(e.target.value))} />
         </div>
         <div className="panel-field">
-          <label>Count</label>
-          <select className="panel-input" value={notchSettings.count}
-            onChange={e => setNotchSettings(s => ({ ...s, count: Number(e.target.value) as 1 | 2 | 3 }))}>
+          <label htmlFor="prop-notch-count">Count</label>
+          <select id="prop-notch-count" className="panel-input" value={notchSettings.count}
+            onChange={e => setNotchOption('count', Number(e.target.value))}>
             <option value={1}>1</option>
             <option value={2}>2</option>
             <option value={3}>3</option>
@@ -312,8 +327,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
 
     <PropertySection id="layer" title="LAYER" collapsed={collapsed} onToggle={onToggle}>
       <div className="panel-field">
-        <label>Layer</label>
+        <label htmlFor="prop-piece-layer">Layer</label>
         <input
+          id="prop-piece-layer"
           type="number"
           className="panel-input narrow"
           value={piece.layer ?? 1}
@@ -323,8 +339,9 @@ export default function PieceProperties({ piece, collapsed, onToggle }: PiecePro
         />
       </div>
       <div className="panel-field">
-        <label>Sublayer</label>
+        <label htmlFor="prop-piece-sublayer">Sublayer</label>
         <input
+          id="prop-piece-sublayer"
           type="number"
           className="panel-input narrow"
           value={piece.sublayer ?? 0}
