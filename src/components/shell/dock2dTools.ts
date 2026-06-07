@@ -1,6 +1,7 @@
 import {
   MousePointer2, PenTool, Minus, Square, Scissors, Ruler, Spline,
   PenLine, Shapes, Triangle, MoveVertical, Scaling, Type, SquarePlus,
+  SquareDashed,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -27,6 +28,7 @@ export const DOCK_2D_CATALOG: DockToolDef[] = [
   { id: 'editPattern', icon: PenLine, label: 'Edit Pattern', shortcut: 'Q' },
   { id: 'internalShape', icon: Shapes, label: 'Internal Shape', shortcut: 'G' },
   { id: 'notch', icon: Triangle, label: 'Notch' },
+  { id: 'seamAllowance', icon: SquareDashed, label: 'Seam Allowance', shortcut: 'O' },
   { id: 'grainline', icon: MoveVertical, label: 'Grainline' },
   { id: 'grading', icon: Scaling, label: 'Grading' },
   { id: 'textAnnotation', icon: Type, label: 'Text' },

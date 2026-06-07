@@ -3,8 +3,15 @@ import { DOCK_2D_CATALOG, getDockToolById } from '../dock2dTools';
 import { DEFAULT_DOCK_2D_IDS } from '../../../store/dockSlice';
 
 describe('dock2dTools catalog', () => {
-  it('has 14 entries', () => {
-    expect(DOCK_2D_CATALOG).toHaveLength(14);
+  it('has 15 entries', () => {
+    expect(DOCK_2D_CATALOG).toHaveLength(15);
+  });
+
+  it('surfaces the seamAllowance tool (reachability — María, hallazgo #2)', () => {
+    const sa = getDockToolById('seamAllowance');
+    expect(sa).toBeTruthy();
+    expect(sa!.label).toBe('Seam Allowance');
+    expect(sa!.shortcut).toBe('O');
   });
 
   it('getDockToolById resolves a member and is undefined for an unknown id', () => {

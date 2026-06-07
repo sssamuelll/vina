@@ -208,6 +208,7 @@ export function useKeyboardShortcuts() {
       ['tool.offsetOutline', () => activate2DTool(dispatch, 'offsetOutline')],
       ['tool.extendTrim', () => activate2DTool(dispatch, 'extendTrim')],
       ['tool.polyPen', () => activate2DTool(dispatch, 'polyPen')],
+      ['tool.seamAllowance', () => activate2DTool(dispatch, 'seamAllowance')],
 
       // Sewing
       ['tool.seam', () => activate2DTool(dispatch, 'seam')],

@@ -10,12 +10,14 @@ interface HintTextProps {
   walkSeamPhase?: string;
   /** Whether the seam/freesewing tool already holds its first edge */
   seamHasFirstEdge?: boolean;
+  /** Width the seamAllowance tool will apply on click (editor.defaultSeamAllowanceWidth) */
+  saDefaultWidthMm?: number;
 }
 
 export default function HintText({
   activeTool, pieces, penNodesLength,
   nodeEditorIsEditing, segmentSewingPhase, topstitchMode, walkSeamPhase,
-  seamHasFirstEdge,
+  seamHasFirstEdge, saDefaultWidthMm,
 }: HintTextProps) {
   const hasPieces = pieces.length > 0;
 
@@ -78,6 +80,13 @@ export default function HintText({
           </text>
         );
       })()}
+
+      {activeTool === 'seamAllowance' && (
+        <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
+          fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
+          {`Click a piece to apply ${saDefaultWidthMm ?? 10}mm seam allowance · Right-click a corner for corner type`}
+        </text>
+      )}
 
       {activeTool === 'walkSeam' && (() => {
         const msgs: Record<string, string> = {
