@@ -77,6 +77,25 @@ export function detectCorners(
   return corners;
 }
 
+/**
+ * Total arc length of an outline's closed ring. The precision modal uses
+ * this as the distance ceiling — a typed distance beyond the perimeter
+ * would otherwise wrap silently (resolveNotchAnchor wraps by design for
+ * programmatic callers like scaled grading anchors).
+ */
+export function outlinePerimeter(outline: PathCommand[]): number {
+  const ring = ringOf(outline);
+  const n = ring.length;
+  if (n < 2) return 0;
+  let acc = 0;
+  for (let i = 0; i < n; i++) {
+    const a = ring[i];
+    const b = ring[(i + 1) % n];
+    acc += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return acc;
+}
+
 /** Arc position of the closest point on the ring to `pt`, plus total perimeter. */
 function arcPositionOf(ring: Point2D[], pt: Point2D): { s: number; dist: number; perimeter: number } {
   const n = ring.length;

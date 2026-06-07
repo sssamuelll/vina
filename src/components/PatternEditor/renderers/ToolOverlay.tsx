@@ -68,6 +68,7 @@ interface ToolOverlayProps {
   seamHoveredEdge: FreeEdgeSelection | null;
   seamMode: 'free' | 'point';
   notchHoveredPoint: NotchHover | null;
+  notchRefineMarker?: import('./overlays/NotchToolOverlay').NotchRefineMarker | null;
   trimHoveredEdge: TrimHover | null;
   grainlineIsDragging: boolean;
   grainlineStartPoint: Point2D | null;
@@ -176,8 +177,12 @@ export default function ToolOverlay(props: ToolOverlayProps) {
         <EdgePairOverlay zoom2D={zoom2D} firstEdge={props.seamFirstEdge} hoveredEdge={props.seamHoveredEdge} mode={props.seamMode} />
       )}
 
-      {activeTool === 'notch' && props.notchHoveredPoint && (
-        <NotchToolOverlay zoom2D={zoom2D} notchHoveredPoint={props.notchHoveredPoint} />
+      {activeTool === 'notch' && (props.notchHoveredPoint || props.notchRefineMarker) && (
+        <NotchToolOverlay
+          zoom2D={zoom2D}
+          notchHoveredPoint={props.notchHoveredPoint}
+          refineMarker={props.notchRefineMarker}
+        />
       )}
 
       {activeTool === 'trimPlace' && props.trimHoveredEdge && (

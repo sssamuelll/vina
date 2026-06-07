@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
@@ -47,6 +47,8 @@ import ConstructionOverlay from './renderers/ConstructionOverlay';
 import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
+import NotchPrecisionModal from './NotchPrecisionModal';
+import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import ReferenceImageSettings from './ReferenceImageSettings';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
@@ -180,7 +182,19 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
     dispatch(addInternalLine({ pieceId, line: notch }));
   }, [dispatch]);
 
-  const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd);
+  // Precision modal confirm (notch-precision F3): re-position the committed
+  // notch at the exact distance/depth — path + anchor + options move together.
+  const handleNotchUpdate = useCallback((
+    pieceId: string,
+    lineId: string,
+    path: InternalLine['path'],
+    notchAnchor: NonNullable<InternalLine['notchAnchor']>,
+    options: NonNullable<InternalLine['notchOptions']>,
+  ) => {
+    dispatch(updateInternalLine({ pieceId, lineId, path, notchAnchor, notchOptions: options }));
+  }, [dispatch]);
+
+  const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd, undefined, handleNotchUpdate);
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
   const handleGrainlineSet = useCallback((pieceId: string, grainline: InternalLine) => {
@@ -686,6 +700,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
+            notchRefineMarker={notchTool.refining ? { refWorld: notchTool.refining.refWorld, notchWorld: notchTool.refining.notchWorld, previewWorld: notchTool.refining.previewWorld } : null}
             grainlineIsDragging={grainlineTool.isDragging}
             grainlineStartPoint={grainlineTool.startPoint}
             grainlineEndPoint={grainlineTool.endPoint}
@@ -841,6 +856,16 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
           pixelDistance={calibrationPixelDist}
           onConfirm={handleCalibrationConfirm}
           onCancel={handleCalibrationCancel}
+        />
+      )}
+      {notchTool.refining?.notch.notchAnchor && (
+        <NotchPrecisionModal
+          initialDistanceMm={notchTool.refining.notch.notchAnchor.distanceMm}
+          initialDepthMm={notchTool.refining.notch.notchOptions?.length ?? DEFAULT_NOTCH_OPTIONS.length}
+          maxDistanceMm={notchTool.refining.maxDistanceMm}
+          onPreview={notchTool.previewRefine}
+          onConfirm={notchTool.confirmRefine}
+          onCancel={notchTool.cancelRefine}
         />
       )}
       <ReferenceImageSettings

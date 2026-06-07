@@ -1,0 +1,94 @@
+/* Floating precision panel — deliberately no scrim/backdrop (review
+   findings #4/#6): the canvas marker and live preview ghost must stay
+   visible and the canvas interactive while the numbers are edited.
+   Colors come from the app-chrome tokens (review finding #7). */
+.notch-precision-modal {
+  position: fixed;
+  top: calc(var(--top-bar-h) + 24px);
+  right: 24px;
+  z-index: 1000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  padding: 20px;
+  width: 320px;
+  color: var(--text-primary);
+  font-size: var(--text-ui);
+}
+
+.notch-precision-modal h3 {
+  margin: 0 0 12px 0;
+  font-size: var(--text-heading);
+  color: var(--text-primary);
+}
+
+.notch-precision-modal p {
+  margin: 0 0 14px 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.notch-precision-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.notch-precision-input-row label {
+  flex-shrink: 0;
+  color: var(--text-secondary);
+}
+
+.notch-precision-input-row input[type='number'] {
+  flex: 1;
+  padding: 4px 8px;
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--text-input);
+  min-width: 0;
+  max-width: 90px;
+}
+
+.notch-precision-input-row input[type='number'].invalid {
+  border-color: var(--destructive);
+}
+
+.notch-precision-hint {
+  color: var(--text-ghost);
+  font-size: var(--text-xs);
+  text-align: right;
+  margin: 0 0 14px 0;
+}
+
+.notch-precision-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.notch-precision-actions button {
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: var(--text-ui);
+}
+
+.notch-precision-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.notch-precision-actions button.primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
