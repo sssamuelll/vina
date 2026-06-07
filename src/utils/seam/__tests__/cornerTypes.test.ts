@@ -16,7 +16,44 @@ import {
   generateSeamAllowanceWithCorners,
 } from '../cornerTypes';
 import type { Line2D } from '../cornerTypes';
+import { flattenPathWithSource } from '../index';
 import type { CornerType, PathCommand } from '../../../types/types';
+
+// ─── flattenPathWithSource (the corner-index fix's core) ─────────────────────
+
+describe('flattenPathWithSource', () => {
+  it('tags straight M/L points with their own command index', () => {
+    const square: PathCommand[] = [
+      { type: 'M', values: [0, 0] },     // cmd 0
+      { type: 'L', values: [10, 0] },    // cmd 1
+      { type: 'L', values: [10, 10] },   // cmd 2
+      { type: 'Z', values: [] },
+    ];
+    const pts = flattenPathWithSource(square);
+    // On a straight piece, flattened index == command index — the historic
+    // coincidence that hid the bug.
+    expect(pts[0].cmd).toBe(0);
+    expect(pts[1].cmd).toBe(1);
+    expect(pts[2].cmd).toBe(2);
+  });
+
+  it('tags the endpoint of a command AFTER a curve with its own command index, not its flattened position', () => {
+    const curved: PathCommand[] = [
+      { type: 'M', values: [0, 0] },                       // cmd 0 → flattened 0
+      { type: 'C', values: [-20, 30, -20, 70, 0, 100] },   // cmd 1 → flattened 1..12
+      { type: 'L', values: [100, 100] },                   // cmd 2 → flattened 13
+      { type: 'L', values: [100, 0] },                      // cmd 3 → flattened 14
+      { type: 'Z', values: [] },
+    ];
+    const pts = flattenPathWithSource(curved);
+    // The 12 curve samples all carry the C command's index (1) — none of them
+    // can receive an L/M corner override.
+    for (let i = 1; i <= 12; i++) expect(pts[i].cmd).toBe(1);
+    // The corner (100,100) is at flattened index 13 but must carry command index 2.
+    expect(pts[13]).toMatchObject({ x: 100, y: 100, cmd: 2 });
+    expect(pts[14]).toMatchObject({ x: 100, y: 0, cmd: 3 });
+  });
+});
 
 // ─── offsetEdge ──────────────────────────────────────────────────────────────
 
@@ -465,6 +502,85 @@ describe('generateSeamAllowanceWithCorners', () => {
     const saSquared = generateSeamAllowanceWithCorners(square, 10, 'squared', {});
     const saMitered = generateSeamAllowanceWithCorners(square, 10, 'mitered', {});
     expect(saSquared.length).toBeGreaterThan(saMitered.length);
+  });
+
+  // ── Curve index-mismatch regression ──────────────────────────────────────
+  // cornerTypes keys are OUTLINE COMMAND indices (findNearestVertex walks the
+  // command array). The edge-walk looks them up against the FLATTENED-vertex
+  // array, where each C/Q explodes into CURVE_RESOLUTION points. On a square
+  // the two indices coincide; on any curved piece they diverge, and a corner
+  // override lands on the wrong vertex (a point mid-curve instead of the real
+  // corner). This was silent on every real garment (armholes, necklines).
+  //
+  // Outline: a curved LEFT edge (command 1) followed by two straight corners.
+  // Command index 2 = the geometric corner (100,100); after a 12-point curve
+  // its flattened index is ~13. The override must land at (100,100), not on
+  // the curve at x<0.
+  const curvedLeft: PathCommand[] = [
+    { type: 'M', values: [0, 0] },                       // cmd 0 → corner (0,0)
+    { type: 'C', values: [-20, 30, -20, 70, 0, 100] },   // cmd 1 → left-edge curve → (0,100)
+    { type: 'L', values: [100, 100] },                   // cmd 2 → corner (100,100)
+    { type: 'L', values: [100, 0] },                      // cmd 3 → corner (100,0)
+    { type: 'Z', values: [] },
+  ];
+
+  /** Flatten an SA PathCommand[] result to its point list. */
+  const ptsOf = (cmds: PathCommand[]) =>
+    cmds.filter(c => c.type === 'M' || c.type === 'L').map(c => ({ x: c.values[0], y: c.values[1] }));
+
+  it('applies a corner override at the correct geometric corner on a curved piece', () => {
+    // Override 'squared' on command-index 2 = the real corner (100,100).
+    const baseline = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', {});
+    const override = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', { 2: 'squared' });
+
+    const basePts = ptsOf(baseline);
+    const ovrPts = ptsOf(override);
+    // Points the override introduced (no nearby baseline point) localize the change.
+    const changed = ovrPts.filter(p => !basePts.some(b => Math.hypot(b.x - p.x, b.y - p.y) < 0.5));
+
+    expect(changed.length).toBeGreaterThan(0);
+    // Every changed point must sit at the (100,100) corner (right side, x>50),
+    // NEVER on the left-edge curve (x<0). With the index bug the override lands
+    // mid-curve and these points appear at x<0 → this assertion fails.
+    for (const p of changed) {
+      expect(p.x).toBeGreaterThan(50);
+    }
+  });
+
+  it('an all-curve outline (no straight corners) produces valid SA with the default corner everywhere', () => {
+    // A rounded blob: every command is a curve, so no flattened vertex carries
+    // a straight M/L command index that could receive an override. Guards
+    // against a future flattenPathWithSource edit diverging from flattenPath.
+    const blob: PathCommand[] = [
+      { type: 'M', values: [50, 0] },
+      { type: 'C', values: [80, 0, 100, 20, 100, 50] },
+      { type: 'C', values: [100, 80, 80, 100, 50, 100] },
+      { type: 'C', values: [20, 100, 0, 80, 0, 50] },
+      { type: 'C', values: [0, 20, 20, 0, 50, 0] },
+      { type: 'Z', values: [] },
+    ];
+    const sa = generateSeamAllowanceWithCorners(blob, 10, 'mitered', {});
+    expect(sa.length).toBeGreaterThan(0);
+    expect(sa[0].type).toBe('M');
+    expect(sa[sa.length - 1].type).toBe('Z');
+  });
+
+  it('a corner override does NOT bleed onto a curved edge that has no override', () => {
+    // Only command-3 (corner (100,0)) is overridden; the curved left edge
+    // (command 1) must remain identical to the all-mitered baseline.
+    const baseline = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', {});
+    const override = generateSeamAllowanceWithCorners(curvedLeft, 10, 'mitered', { 3: 'squared' });
+
+    const basePts = ptsOf(baseline);
+    const ovrPts = ptsOf(override);
+    const changed = ovrPts.filter(p => !basePts.some(b => Math.hypot(b.x - p.x, b.y - p.y) < 0.5));
+
+    expect(changed.length).toBeGreaterThan(0);
+    // The change belongs to corner (100,0): right side, low y. The curve lives
+    // at x<0 — no changed point may appear there.
+    for (const p of changed) {
+      expect(p.x).toBeGreaterThan(0);
+    }
   });
 });
 

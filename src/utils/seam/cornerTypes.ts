@@ -1,7 +1,7 @@
 import type { PathCommand, Point2D } from '../../types/types';
 import type { CornerType } from '../../types/types';
 import { Clipper, Paths64, Path64, Point64 } from 'clipper2-js';
-import { flattenPath } from './index';
+import { flattenPathWithSource } from './index';
 
 // Clipper2 scale: integer coords at 100x for 0.01mm precision (same as index.ts)
 const CLIPPER_SCALE = 100;
@@ -520,21 +520,26 @@ export function generateSeamAllowanceWithCorners(
   if (saWidth <= 0) return [];
 
   // ── Step 1: Flatten curves to line segments, then extract vertices ────────
-  // flattenPath linearizes C/Q/A commands into Point2D[] so the edge-walk
-  // handles curved outlines correctly (armholes, necklines, hems).
-  const vertices: Point2D[] = flattenPath(outline);
+  // flattenPathWithSource linearizes C/Q/A commands into points so the edge-walk
+  // handles curved outlines (armholes, necklines, hems), and tags each point
+  // with its source command index. cornerTypes is keyed by COMMAND index
+  // (findNearestVertex walks the command array); without the source tag a curved
+  // piece would apply an override to the wrong flattened vertex (a mid-curve
+  // sample) instead of the real corner.
+  const sourced = flattenPathWithSource(outline);
 
   // Remove closing duplicate if present
-  if (vertices.length >= 2) {
-    const first = vertices[0];
-    const last = vertices[vertices.length - 1];
+  if (sourced.length >= 2) {
+    const first = sourced[0];
+    const last = sourced[sourced.length - 1];
     if (Math.abs(first.x - last.x) < 1e-6 && Math.abs(first.y - last.y) < 1e-6) {
-      vertices.pop();
+      sourced.pop();
     }
   }
 
-  if (vertices.length < 3) return [];
+  if (sourced.length < 3) return [];
 
+  const vertices: Point2D[] = sourced.map((p) => ({ x: p.x, y: p.y }));
   const n = vertices.length;
 
   // ── Step 2: Build edges (each consecutive pair; polygon wraps) ────────────
@@ -559,8 +564,11 @@ export function generateSeamAllowanceWithCorners(
     const nextOffsetEdge = offsetEdges[i];
     const vertex = vertices[i];
 
-    // Resolve corner type (per-vertex override or default)
-    const type: CornerType = cornerTypes[i] ?? defaultCornerType;
+    // Resolve corner type: cornerTypes is keyed by source command index, so map
+    // this flattened vertex back to the command that produced it. Mid-curve
+    // samples carry the curve command's index (which carries no corner override),
+    // so they correctly fall through to defaultCornerType.
+    const type: CornerType = cornerTypes[sourced[i].cmd] ?? defaultCornerType;
     const cornerFn = getCornerFunction(type);
 
     // Compute interior angle for corner functions that need it
