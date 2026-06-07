@@ -205,8 +205,12 @@ export interface GrainLine {
  * domain view is the `Dart` entity (`src/types/types.ts:148`). See bridge
  * module `src/utils/dartEntity.ts` for conversion. Other variants like
  * `'grainline'` have their own rich types (e.g., `GrainLine` interface);
- * the rest (`'notch'`, `'fold'`, `'pleat'`, `'topstitch'`, `'reference'`,
- * `'seam'`) are storage-only by design. `'seam'` is the imported sew/seam
+ * the rest (`'fold'`, `'pleat'`, `'topstitch'`, `'reference'`, `'seam'`)
+ * are storage-only by design. `'notch'` is storage-PLUS: its `path` is still
+ * the render/export truth, but it may carry a parametric `notchAnchor`
+ * (placement intent — see {@link NotchAnchor} and the notch-precision spec,
+ * partially amending the D1-real "storage-only" framing for this variant).
+ * `'seam'` is the imported sew/seam
  * line (DXF AAMA layer 84 / ASTM "SEW LINE" / Lectra "COUTURE") — display
  * fidelity for the patternmaker, distinct from `Seam` (the 3D sewing entity).
  *
@@ -226,6 +230,25 @@ export interface NotchOptions {
   count: number;     // 1, 2, or 3
 }
 
+/**
+ * Parametric anchor for an edge-anchored notch (notch-precision F1,
+ * `docs/superpowers/specs/2026-06-07-notch-precision-design.md`).
+ *
+ * Records HOW the notch was placed — arc distance along the outline from a
+ * resolved reference point (a detected corner, stored as coordinates so the
+ * data survives detector changes). The frozen `path` remains the source of
+ * truth for render/export (D-2: path manda); the anchor feeds the precision
+ * modal and manual pair-matching. Transforms that change the outline:
+ * uniform grading scales `distanceMm` by the same factor; mirroring drops
+ * the anchor (edge identity flips — re-mapping is the future "anchor manda"
+ * upgrade, not this MVP).
+ */
+export interface NotchAnchor {
+  refPoint: Point2D;       // reference corner/point, piece-local coords
+  direction: 'cw' | 'ccw'; // measuring direction along the outline
+  distanceMm: number;      // arc distance from refPoint, >= 0
+}
+
 export interface TopstitchOptions {
   stitchType: 'straight' | 'zigzag' | 'triple';
   stitchLength: number;
@@ -239,6 +262,8 @@ export interface InternalLine {
   type: InternalLineType;
   path: PathCommand[];
   notchOptions?: NotchOptions;
+  /** Parametric placement data for `'notch'` lines — see {@link NotchAnchor}. */
+  notchAnchor?: NotchAnchor;
   topstitchOptions?: TopstitchOptions;
   foldOptions?: FoldOptions;
   dartOptions?: DartOptions;
