@@ -80,4 +80,27 @@ describe('seamAllowance activation chain (integration)', () => {
     expect(store.getState().editor.activeTool).toBe('seamAllowance');
     expect(store.getState().tools.activeTool2D).toBe('seamAllowance');
   });
+
+  it('does NOT fire while a <select> has focus (Properties panel dropdowns)', () => {
+    // ShortcutProvider skips input/textarea but selects also swallow typed
+    // letters — pressing 'o' while choosing a fabric code must not switch
+    // tools under the user.
+    const store = makeStore();
+    render(
+      <Provider store={store}>
+        <ShortcutProvider>
+          <Hooked />
+          <select aria-label="probe-select"><option>SELF</option></select>
+        </ShortcutProvider>
+      </Provider>,
+    );
+    const select = document.querySelector('select')!;
+    select.focus();
+
+    act(() => {
+      select.dispatchEvent(new KeyboardEvent('keydown', { key: 'o', bubbles: true }));
+    });
+
+    expect(store.getState().editor.activeTool).not.toBe('seamAllowance');
+  });
 });

@@ -50,9 +50,13 @@ export function ShortcutProvider({ children }: ShortcutProviderProps) {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept when typing in inputs (unless Escape)
+      // Don't intercept when typing in form controls (unless Escape).
+      // Selects included: letters typed while a dropdown has focus are
+      // option-search keystrokes, not tool shortcuts.
       if (
-        (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) &&
+        (e.target instanceof HTMLInputElement ||
+          e.target instanceof HTMLTextAreaElement ||
+          e.target instanceof HTMLSelectElement) &&
         e.key !== 'Escape'
       ) {
         return;

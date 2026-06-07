@@ -8,7 +8,7 @@
  * @module ContextMenu
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
@@ -102,6 +102,22 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
   const clipboard = useSelector((s: RootState) => s.editor.clipboard);
   const groups = useSelector((s: RootState) => s.project.groups);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Clamp the menu into the viewport: long piece menus (25+ rows) opened
+  // mid-canvas extend past the fold, leaving the bottom items unreachable
+  // (review finding, properties re-home). Measured post-render, pre-paint.
+  const [pos, setPos] = useState({ x: menu.x, y: menu.y });
+  useLayoutEffect(() => {
+    if (!menu.visible) return;
+    const el = ref.current;
+    if (!el) { setPos({ x: menu.x, y: menu.y }); return; }
+    const pad = 8;
+    const r = el.getBoundingClientRect();
+    setPos({
+      x: Math.min(menu.x, Math.max(pad, window.innerWidth - r.width - pad)),
+      y: Math.min(menu.y, Math.max(pad, window.innerHeight - r.height - pad)),
+    });
+  }, [menu.visible, menu.x, menu.y]);
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -364,6 +380,14 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       icon: '✏️',
       shortcut: 'F2',
       action: () => act(() => onRename?.(pid)),
+    });
+
+    // Properties — high in the menu: it's María's everyday entry point to
+    // SA width / fabric / seam editing, and long menus can scroll.
+    items.push({
+      label: 'Properties…',
+      icon: '🎛',
+      action: () => act(() => onOpenProperties?.(pid)),
       separator: true,
     });
 
@@ -466,11 +490,6 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
       action: () => act(() => {
         dispatchInspectPiece(dispatch, pid);
       }),
-    });
-    items.push({
-      label: 'Properties…',
-      icon: '🎛',
-      action: () => act(() => onOpenProperties?.(pid)),
       separator: true,
     });
     items.push({
@@ -520,7 +539,7 @@ export default function ContextMenu({ menu, onClose, onRename, onConvertSegment,
     <div
       ref={ref}
       className="context-menu"
-      style={{ left: menu.x, top: menu.y }}
+      style={{ left: pos.x, top: pos.y }}
     >
       {menu.seamId && (
         <div className="context-menu__header context-menu__header--seam">

@@ -21,6 +21,7 @@ import toolReducer from '../../../store/toolSlice';
 import PropertiesPanel from '../PropertiesPanel';
 import { getPanelSide } from '../../shell/panelSide';
 import { COMMANDS } from '../../shell/unifiedBarCommandDefs';
+import type { AppDispatch } from '../../../store';
 import type { PatternPiece, Seam } from '../../../types/types';
 
 afterEach(cleanup);
@@ -46,9 +47,9 @@ function makePiece(id = 'p1'): PatternPiece {
       { type: 'L', values: [0, 100] },
       { type: 'Z', values: [] },
     ],
-    position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+    position: { x: 0, y: 0 }, rotation: 0, mirrored: false, active: true,
     seamAllowance: 0, internals: [], createdAt: now, updatedAt: now,
-  } as unknown as PatternPiece;
+  };
 }
 
 function renderPanel(store = makeStore()) {
@@ -68,7 +69,9 @@ describe('opener surfaces', () => {
     const cmd = COMMANDS.find(c => c.id === 'show-properties');
     expect(cmd).toBeTruthy();
     const onOpenPanel = vi.fn();
-    cmd!.action(vi.fn() as never, { onOpenPanel });
+    // Panel commands never touch dispatch; a typed no-op documents that.
+    const noopDispatch: AppDispatch = ((a: unknown) => a) as AppDispatch;
+    cmd!.action(noopDispatch, { onOpenPanel });
     expect(onOpenPanel).toHaveBeenCalledWith('Properties');
   });
 });
