@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
+import type { PatternPiece } from '../../types/types';
 
 /**
  * Seam allowance tool — the explicit apply-SA command (María, hallazgo #2).
@@ -11,9 +12,13 @@ import type { RootState } from '../../store';
  * are a future model (no data shape today). The other half of the tool —
  * right-click a vertex → CornerTypeMenu — is wired in PatternEditor's
  * handleContextMenu and shares the same `activeTool === 'seamAllowance'` gate.
+ *
+ * `onApply` receives the piece's previous width so the caller can surface an
+ * undo toast when a click overwrites a deliberate custom value.
  */
 export function useSeamAllowanceTool(
-  onApply: (pieceId: string, widthMm: number) => void,
+  pieces: PatternPiece[],
+  onApply: (pieceId: string, widthMm: number, prevWidthMm: number) => void,
 ) {
   const widthMm = useSelector((s: RootState) => s.editor.defaultSeamAllowanceWidth);
 
@@ -21,8 +26,10 @@ export function useSeamAllowanceTool(
     if (e.button !== 0) return;
     const target = e.target as SVGElement;
     const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
-    if (pieceId) onApply(pieceId, widthMm);
-  }, [onApply, widthMm]);
+    if (!pieceId) return;
+    const prev = pieces.find(p => p.id === pieceId)?.seamAllowance ?? 0;
+    onApply(pieceId, widthMm, prev);
+  }, [onApply, widthMm, pieces]);
 
   return { handleMouseDown, widthMm };
 }

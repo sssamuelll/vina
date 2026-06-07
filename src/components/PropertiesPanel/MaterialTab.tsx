@@ -28,34 +28,25 @@ function TextureSlot({ slot, pieceId }: { slot: 'diffuse' | 'normal' | 'roughnes
   }, []);
 
   return (
-    <div
-      onDrop={handleDrop}
-      onDragOver={handleDragOver}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        padding: '4px 0',
-        borderBottom: '1px solid #333',
-      }}
-    >
-      <div style={{ width: 28, height: 28, background: '#333', borderRadius: 3, border: '1px dashed #555', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+    <div className="material-texture-slot" onDrop={handleDrop} onDragOver={handleDragOver}>
+      <div className="material-texture-thumb">
         {url ? (
-          <img src={url} alt={slot} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <img src={url} alt={slot} />
         ) : (
-          <span style={{ fontSize: 8, color: '#666' }}>+</span>
+          <span className="material-texture-plus">+</span>
         )}
       </div>
-      <span style={{ fontSize: 10, color: '#aaa', textTransform: 'capitalize', flex: 1 }}>{slot}</span>
+      <span className="material-texture-name">{slot}</span>
       {url && (
         <button
+          className="panel-btn-sm"
+          aria-label={`Clear ${slot} texture`}
           onClick={() => {
             if (url && url.startsWith('blob:')) URL.revokeObjectURL(url);
             dispatch(setPieceTextureOverride({ pieceId, slot, url: null }));
           }}
-          style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 12 }}
         >
-          x
+          ✕
         </button>
       )}
     </div>
@@ -83,7 +74,7 @@ export default function MaterialTab() {
   }, [dispatch, selectedPieceId]);
 
   if (!selectedPieceId) {
-    return <div style={{ padding: 8, color: '#888', fontSize: 11 }}>Select a piece to edit material</div>;
+    return <div className="panel-empty">Select a piece to edit material</div>;
   }
 
   const fabricId = pieceFabrics[selectedPieceId] || defaultFabricId;
@@ -95,61 +86,48 @@ export default function MaterialTab() {
   const currentEmissionIntensity = pieceEmissionIntensity[selectedPieceId] ?? 0;
 
   return (
-    <div style={{ padding: '0 8px' }}>
+    <div className="material-tab">
       {/* Fabric Preset Grid */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>FABRIC PRESET</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+      <div className="material-block">
+        <div className="panel-subtitle">Fabric Preset</div>
+        <div className="material-grid">
           {PHYSICAL_FABRIC_LIBRARY.map(f => (
             <button
               key={f.id}
+              className={`material-swatch ${f.id === fabricId ? 'material-swatch--active' : ''}`}
               onClick={() => handleFabricSelect(f.id)}
               title={`${f.name} — ${f.weight}gsm ${f.weaveType}`}
-              style={{
-                width: '100%',
-                aspectRatio: '1',
-                border: f.id === fabricId ? '2px solid #4a9eff' : '1px solid #444',
-                borderRadius: 4,
-                background: '#333',
-                cursor: 'pointer',
-                padding: 2,
-                fontSize: 8,
-                color: '#ccc',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
             >
               {f.name.split(' ').slice(0, 2).join(' ')}
             </button>
           ))}
         </div>
         {fabric && (
-          <div style={{ fontSize: 10, color: '#aaa', marginTop: 4 }}>
+          <div className="panel-hint">
             {fabric.name} — {fabric.weight}gsm — {fabric.weaveType}
           </div>
         )}
       </div>
 
       {/* Color Tint */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>COLOR TINT</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="material-block">
+        <div className="panel-subtitle">Color Tint</div>
+        <div className="material-row">
           <input
             type="color"
+            className="material-color"
             value={tint}
             onChange={e => dispatch(setPieceTint({ pieceId: selectedPieceId, tint: e.target.value }))}
-            style={{ width: 28, height: 28, border: '1px solid #555', borderRadius: 4, cursor: 'pointer' }}
           />
           <input
             type="text"
+            className="panel-input material-hex"
             value={tint}
             onChange={e => dispatch(setPieceTint({ pieceId: selectedPieceId, tint: e.target.value }))}
-            style={{ width: 70, background: '#333', border: '1px solid #555', borderRadius: 3, color: '#fff', padding: '2px 6px', fontSize: 11 }}
           />
           <button
+            className="panel-chip-btn"
             onClick={() => dispatch(setPieceTint({ pieceId: selectedPieceId, tint: '#ffffff' }))}
-            style={{ background: '#555', border: 'none', borderRadius: 3, color: '#ccc', padding: '3px 8px', cursor: 'pointer', fontSize: 10 }}
           >
             Reset
           </button>
@@ -157,11 +135,11 @@ export default function MaterialTab() {
       </div>
 
       {/* Opacity */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>OPACITY</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="material-block">
+        <div className="panel-subtitle">Opacity</div>
+        <div className="material-row">
           <input
-            type="range"
+            type="range" className="panel-slider"
             min={0}
             max={100}
             value={Math.round(currentOpacity * 100)}
@@ -169,40 +147,38 @@ export default function MaterialTab() {
               const val = Number(e.target.value) / 100;
               dispatch(setPieceOpacity({ pieceId: selectedPieceId, opacity: val }));
             }}
-            style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 10, color: '#aaa', minWidth: 32, textAlign: 'right' }}>{Math.round(currentOpacity * 100)}%</span>
+          <span className="panel-value">{Math.round(currentOpacity * 100)}%</span>
         </div>
       </div>
 
       {/* Emission */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>EMISSION</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="material-block">
+        <div className="panel-subtitle">Emission</div>
+        <div className="material-row">
           <input
             type="color"
+            className="material-color"
             value={currentEmission || '#000000'}
             onChange={e => {
               dispatch(setPieceEmission({ pieceId: selectedPieceId, color: e.target.value, intensity: currentEmissionIntensity || 1 }));
             }}
-            style={{ width: 28, height: 28, border: '1px solid #555', borderRadius: 4, cursor: 'pointer' }}
           />
           {currentEmission && currentEmission !== '#000000' && (
             <>
               <input
-                type="range"
+                type="range" className="panel-slider"
                 min={0}
                 max={500}
                 value={Math.round(currentEmissionIntensity * 100)}
                 onChange={e => {
                   dispatch(setPieceEmission({ pieceId: selectedPieceId, color: currentEmission, intensity: Number(e.target.value) / 100 }));
                 }}
-                style={{ flex: 1 }}
               />
-              <span style={{ fontSize: 10, color: '#aaa', minWidth: 32, textAlign: 'right' }}>{currentEmissionIntensity.toFixed(1)}</span>
+              <span className="panel-value">{currentEmissionIntensity.toFixed(1)}</span>
               <button
+                className="panel-chip-btn"
                 onClick={() => dispatch(clearPieceEmission(selectedPieceId))}
-                style={{ background: '#555', border: 'none', borderRadius: 3, color: '#ccc', padding: '3px 8px', cursor: 'pointer', fontSize: 10 }}
               >
                 Clear
               </button>
@@ -212,19 +188,18 @@ export default function MaterialTab() {
       </div>
 
       {/* UV Transform */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>UV TRANSFORM</div>
+      <div className="material-block">
+        <div className="panel-subtitle">UV Transform</div>
 
         {/* Repeat Presets */}
-        <div className="panel-field" style={{ gap: 4 }}>
+        <div className="panel-field panel-field--row">
           <label>Presets</label>
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div className="panel-preset-row">
             {[1, 2, 4, 8].map(n => (
               <button
                 key={n}
                 className="panel-btn-sm"
                 onClick={() => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: n, repeatY: n }))}
-                style={{ fontSize: 11, padding: '2px 6px' }}
               >
                 {n}x{n}
               </button>
@@ -237,15 +212,15 @@ export default function MaterialTab() {
           <label>
             Repeat X
             <button
+              className="material-lock-btn"
               onClick={() => setLockAspect(!lockAspect)}
               title={lockAspect ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, marginLeft: 4, padding: 0 }}
             >
-              {lockAspect ? '\uD83D\uDD17' : '\uD83D\uDD13'}
+              {lockAspect ? '🔗' : '🔓'}
             </button>
           </label>
           <input
-            type="range"
+            type="range" className="panel-slider"
             min={0.1}
             max={20}
             step={0.5}
@@ -258,16 +233,15 @@ export default function MaterialTab() {
                 dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatX: val }));
               }
             }}
-            style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{uv.repeatX}</span>
+          <span className="panel-value">{uv.repeatX}</span>
         </div>
 
         {/* Repeat Y */}
         <div className="panel-field">
           <label>Repeat Y</label>
           <input
-            type="range"
+            type="range" className="panel-slider"
             min={0.1}
             max={20}
             step={0.5}
@@ -280,60 +254,56 @@ export default function MaterialTab() {
                 dispatch(setPieceUVTransform({ pieceId: selectedPieceId, repeatY: val }));
               }
             }}
-            style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{uv.repeatY}</span>
+          <span className="panel-value">{uv.repeatY}</span>
         </div>
 
         {/* Offset X */}
         <div className="panel-field">
           <label>Offset X</label>
           <input
-            type="range"
+            type="range" className="panel-slider"
             min={0}
             max={1}
             step={0.05}
             value={uv.offsetX ?? 0}
             onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, offsetX: Number(e.target.value) }))}
-            style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{(uv.offsetX ?? 0).toFixed(2)}</span>
+          <span className="panel-value">{(uv.offsetX ?? 0).toFixed(2)}</span>
         </div>
 
         {/* Offset Y */}
         <div className="panel-field">
           <label>Offset Y</label>
           <input
-            type="range"
+            type="range" className="panel-slider"
             min={0}
             max={1}
             step={0.05}
             value={uv.offsetY ?? 0}
             onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, offsetY: Number(e.target.value) }))}
-            style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{(uv.offsetY ?? 0).toFixed(2)}</span>
+          <span className="panel-value">{(uv.offsetY ?? 0).toFixed(2)}</span>
         </div>
 
         {/* Rotation */}
         <div className="panel-field">
           <label>Rotation</label>
           <input
-            type="range"
+            type="range" className="panel-slider"
             min={0}
             max={360}
             step={15}
             value={uv.rotation}
             onChange={e => dispatch(setPieceUVTransform({ pieceId: selectedPieceId, rotation: Number(e.target.value) }))}
-            style={{ flex: 1 }}
           />
-          <span style={{ fontSize: 11, opacity: 0.7, minWidth: 30, textAlign: 'right' }}>{uv.rotation}&deg;</span>
+          <span className="panel-value">{uv.rotation}&deg;</span>
         </div>
       </div>
 
       {/* Texture Map Slots */}
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 10, color: '#888', marginBottom: 4 }}>TEXTURE OVERRIDES</div>
+      <div className="material-block">
+        <div className="panel-subtitle">Texture Overrides</div>
         {(['diffuse', 'normal', 'roughness', 'ao'] as const).map(slot => (
           <TextureSlot
             key={slot}

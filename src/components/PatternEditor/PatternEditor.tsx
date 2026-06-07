@@ -14,6 +14,7 @@ import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
+import { showUndoToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
 import { useGrainlineTool } from './useGrainlineTool';
@@ -84,9 +85,11 @@ function findNearestVertex(
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
   onImportDXF?: () => void;
+  /** Opens a named ContextPanel (e.g. 'Properties'); wired by AppShell. */
+  onOpenPanel?: (name: string) => void;
 }
 
-export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
+export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEditorProps) {
   const dispatch = useDispatch();
   const pieces = useSelector(selectPieces);
   const seams = useSelector(selectSeams);
@@ -200,12 +203,20 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
   // Explicit apply-SA command (pieces are born net; this puts allowance back
   // on purpose). Width comes from editor.defaultSeamAllowanceWidth inside the
   // hook; per-piece scalar is the ratified model — per-edge is future work.
-  const handleApplySeamAllowance = useCallback((pieceId: string, widthMm: number) => {
+  // Overwriting a deliberate custom width gets an undo toast (review finding:
+  // an accidental click in SA mode must not silently reset María's 8mm to 10).
+  const handleApplySeamAllowance = useCallback((pieceId: string, widthMm: number, prevWidthMm: number) => {
     const piece = pieces.find(p => p.id === pieceId);
     if (!piece) return;
     dispatch(updatePiece({ ...piece, seamAllowance: widthMm, updatedAt: Date.now() }));
+    if (prevWidthMm > 0 && prevWidthMm !== widthMm) {
+      dispatch(showUndoToast(
+        `Seam allowance ${prevWidthMm}mm → ${widthMm}mm`,
+        updatePiece({ ...piece, seamAllowance: prevWidthMm, updatedAt: Date.now() }),
+      ));
+    }
   }, [pieces, dispatch]);
-  const seamAllowanceTool = useSeamAllowanceTool(handleApplySeamAllowance);
+  const seamAllowanceTool = useSeamAllowanceTool(pieces, handleApplySeamAllowance);
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
@@ -850,6 +861,10 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
         onUnfold={handleUnfold}
         onOffsetInternalLine={handleOffsetInternalLine}
         onOptimizeCurves={handleOptimizeCurves}
+        onOpenProperties={(pieceId) => {
+          dispatch(selectPiece(pieceId));
+          onOpenPanel?.('Properties');
+        }}
       />
       {cornerMenu && (() => {
         const piece = pieces.find(p => p.id === cornerMenu.pieceId);

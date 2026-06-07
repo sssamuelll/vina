@@ -36,9 +36,9 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, coll
         <label>
           Tension{' '}
           {seam.tension < 100
-            ? <span style={{ color: '#e67e22', fontSize: 10 }}>(Gathering)</span>
+            ? <span className="panel-tension-tag panel-tension-tag--gather">(Gathering)</span>
             : seam.tension > 100
-            ? <span style={{ color: '#3498db', fontSize: 10 }}>(Easing)</span>
+            ? <span className="panel-tension-tag panel-tension-tag--ease">(Easing)</span>
             : null}
         </label>
         <input
@@ -90,24 +90,21 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, coll
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+      <div className="panel-action-row">
         <button
-          className="panel-labeled-btn"
-          style={{ fontSize: 10, padding: '3px 8px', color: seam.active ? '#e74c3c' : '#2ecc71' }}
+          className={`panel-chip-btn ${seam.active ? 'panel-chip-btn--destructive' : 'panel-chip-btn--success'}`}
           onClick={() => dispatch(deactivateSeam({ seamId: seam.id, active: !seam.active }))}
         >
           {seam.active ? 'Deactivate' : 'Activate'}
         </button>
         <button
-          className="panel-labeled-btn"
-          style={{ fontSize: 10, padding: '3px 8px' }}
+          className="panel-chip-btn"
           onClick={() => dispatch(reverseSeam(seam.id))}
         >
           Reverse
         </button>
         <button
-          className="panel-delete"
-          style={{ fontSize: 10, marginTop: 0, padding: '3px 8px' }}
+          className="panel-chip-btn panel-chip-btn--destructive"
           onClick={() => dispatch(removeSeam(seam.id))}
         >
           Delete

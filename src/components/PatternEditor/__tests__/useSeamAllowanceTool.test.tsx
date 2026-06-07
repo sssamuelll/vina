@@ -19,13 +19,16 @@ function makeStore() {
   return configureStore({ reducer: { editor: editorReducer } });
 }
 
-function setup() {
+function setup(pieces: Array<{ id: string; seamAllowance: number }> = [{ id: 'piece-1', seamAllowance: 0 }]) {
   const store = makeStore();
   const onApply = vi.fn();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );
-  const hook = renderHook(() => useSeamAllowanceTool(onApply), { wrapper });
+  const hook = renderHook(
+    () => useSeamAllowanceTool(pieces as never, onApply),
+    { wrapper },
+  );
   return { store, onApply, hook };
 }
 
@@ -51,7 +54,18 @@ describe('useSeamAllowanceTool', () => {
     act(() => {
       hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1')));
     });
-    expect(onApply).toHaveBeenCalledWith('piece-1', 10);
+    expect(onApply).toHaveBeenCalledWith('piece-1', 10, 0);
+  });
+
+  it('reports the previous width so the caller can offer undo on overwrite', () => {
+    // María sets 8mm (Overlock) in Properties, then accidentally clicks the
+    // piece with the SA tool: the apply must carry prev=8 so the caller can
+    // surface an undo toast instead of overwriting silently.
+    const { onApply, hook } = setup([{ id: 'piece-1', seamAllowance: 8 }]);
+    act(() => {
+      hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1')));
+    });
+    expect(onApply).toHaveBeenCalledWith('piece-1', 10, 8);
   });
 
   it('applies the current editor.defaultSeamAllowanceWidth, not a frozen value', () => {
@@ -62,7 +76,7 @@ describe('useSeamAllowanceTool', () => {
     act(() => {
       hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1')));
     });
-    expect(onApply).toHaveBeenCalledWith('piece-1', 25);
+    expect(onApply).toHaveBeenCalledWith('piece-1', 25, 0);
   });
 
   it('clicking empty canvas does nothing', () => {

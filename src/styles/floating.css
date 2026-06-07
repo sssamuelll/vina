@@ -176,6 +176,11 @@
   position: fixed;
   z-index: 1000;
   min-width: 180px;
+  /* Long piece menus (groups + linked editing + …) can outgrow short
+     viewports; without this the bottom items are unreachable (review
+     finding, properties re-home). */
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
   background: rgba(8, 8, 15, 0.92);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);

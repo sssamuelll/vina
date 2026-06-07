@@ -29,6 +29,7 @@ const NestingTab = lazy(() => import('../BottomPanel/NestingTab'));
 // ProblemsContent needs special handling — BottomPanel is a complex component.
 // For now, problems are shown as a placeholder in the context panel.
 const LayerPanel = lazy(() => import('../LayerPanel/LayerPanel'));
+const PropertiesPanel = lazy(() => import('../PropertiesPanel/PropertiesPanel'));
 
 const PanelLoading = () => (
   <div style={{ padding: 'var(--sp-4)', color: 'var(--text-ghost)', fontSize: '13px', textAlign: 'center' }}>
@@ -51,6 +52,8 @@ function renderPanelContent(name: string, onClose: () => void) {
       return <Suspense fallback={fallback}><NestingTab /></Suspense>;
     case 'Layers':
       return <Suspense fallback={fallback}><LayerPanel /></Suspense>;
+    case 'Properties':
+      return <Suspense fallback={fallback}><PropertiesPanel /></Suspense>;
     default:
       return (
         <div style={{ padding: 'var(--sp-4)', color: 'var(--text-muted)', fontSize: '13px' }}>
@@ -232,7 +235,10 @@ export default function AppShell() {
           style={{ width: get2dWidth(), display: viewMode === '3d' ? 'none' : undefined }}
         >
           <LeftDock onOpenPanel={(name) => setContextPanel(prev => prev === name ? null : name)} />
-          <PatternEditor onImportDXF={() => dxfInputRef.current?.click()} />
+          <PatternEditor
+            onImportDXF={() => dxfInputRef.current?.click()}
+            onOpenPanel={(name) => setContextPanel(name)}
+          />
         </div>
         {viewMode === 'split' && (
           <div className="canvas-area__divider" onMouseDown={handleDividerMouseDown} />
