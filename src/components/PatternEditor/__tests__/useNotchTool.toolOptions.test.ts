@@ -13,6 +13,7 @@ import type React from 'react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import toolReducer, { setToolOption } from '../../../store/toolSlice';
+import editorReducer, { setActiveTool } from '../../../store/editorSlice';
 import { useNotchTool } from '../useNotchTool';
 import type { InternalLine, PatternPiece } from '../../../types/types';
 
@@ -52,21 +53,32 @@ const fakeEvent = (x: number, y: number) =>
     },
   }) as unknown as React.MouseEvent<SVGSVGElement>;
 
-function setup(options?: Record<string, unknown>) {
-  const store = configureStore({ reducer: { tools: toolReducer } });
+function setup(options?: Record<string, unknown>, harness?: { withEditor?: boolean }) {
+  const store = configureStore({
+    reducer: { tools: toolReducer, ...(harness?.withEditor ? { editor: editorReducer } : {}) },
+  });
   for (const [optionId, value] of Object.entries(options ?? {})) {
     store.dispatch(setToolOption({ toolId: 'notch', optionId, value }));
   }
+  if (harness?.withEditor) store.dispatch(setActiveTool('notch'));
   const onAddNotch = vi.fn();
   const onUpdateNotch = vi.fn();
   const wrapper = ({ children }: { children: React.ReactNode }) =>
     createElement(Provider, { store, children });
-  const { result } = renderHook(
-    () => useNotchTool(1, { x: 0, y: 0 }, [makeSquare()], onAddNotch, undefined, onUpdateNotch),
-    { wrapper },
+  const { result, rerender } = renderHook(
+    ({ pieces }: { pieces: PatternPiece[] }) =>
+      useNotchTool(1, { x: 0, y: 0 }, pieces, onAddNotch, undefined, onUpdateNotch),
+    { wrapper, initialProps: { pieces: [makeSquare()] } },
   );
   act(() => { result.current.handleMouseDown(fakeEvent(30, 0)); });
-  return { onAddNotch, onUpdateNotch, result };
+  return { onAddNotch, onUpdateNotch, result, rerender, store };
+}
+
+/** Re-render with the committed notch present in the piece (the live Redux shape). */
+function syncCommittedNotch(h: ReturnType<typeof setup>) {
+  const committed: InternalLine = h.onAddNotch.mock.calls[0][1];
+  h.rerender({ pieces: [{ ...makeSquare(), internals: [committed] }] });
+  return committed;
 }
 
 describe('useNotchTool — notch options from toolOptions.notch (G6)', () => {
@@ -95,19 +107,22 @@ describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
     const { onAddNotch, result } = setup();
     expect(onAddNotch).toHaveBeenCalledTimes(1);
     expect(result.current.refining).not.toBeNull();
-    const { notch, refWorld } = result.current.refining!;
+    const { notch, refWorld, maxDistanceMm } = result.current.refining!;
     expect(notch.notchAnchor?.distanceMm).toBeCloseTo(30, 5);
     // Corner (0,0) piece-local + piece position (0,0) = world (0,0)
     expect(refWorld.x).toBeCloseTo(0, 5);
     expect(refWorld.y).toBeCloseTo(0, 5);
+    // Distance ceiling for the modal = outline perimeter (review finding #9)
+    expect(maxDistanceMm).toBeCloseTo(400, 5);
   });
 
   it('confirmRefine re-positions the notch exactly: new distance + new depth', () => {
-    const { onUpdateNotch, result } = setup();
-    act(() => { result.current.confirmRefine(42, 10); });
+    const h = setup();
+    syncCommittedNotch(h);
+    act(() => { h.result.current.confirmRefine(42, 10); });
 
-    expect(onUpdateNotch).toHaveBeenCalledTimes(1);
-    const [pieceId, lineId, path, anchor, opts] = onUpdateNotch.mock.calls[0];
+    expect(h.onUpdateNotch).toHaveBeenCalledTimes(1);
+    const [pieceId, lineId, path, anchor, opts] = h.onUpdateNotch.mock.calls[0];
     expect(pieceId).toBe('p1');
     expect(typeof lineId).toBe('string');
     // 42mm cw from corner (0,0) along the top edge → (42, 0); slit 10mm inward (+y)
@@ -117,7 +132,46 @@ describe('useNotchTool — click-then-refine (notch-precision F3, D-4)', () => {
     expect(path[1].values[1]).toBeCloseTo(10, 5);
     expect(anchor.distanceMm).toBe(42);
     expect(opts.length).toBe(10);
-    expect(result.current.refining).toBeNull();
+    expect(h.result.current.refining).toBeNull();
+  });
+
+  it('confirm after the committed line vanished (undo) RE-CREATES the notch instead of ghost no-op', () => {
+    // Review finding #1 (HIGH): Ctrl+Z while the modal is open deletes the
+    // committed line; confirming then dispatched an update against a dead
+    // lineId — silent no-op, modal closed as if success, no notch existed.
+    // Confirming still owes the user a notch at the refined position.
+    const h = setup(); // pieces never gain the notch — the "line vanished" shape
+    const original: InternalLine = h.onAddNotch.mock.calls[0][1];
+    act(() => { h.result.current.confirmRefine(42, 10); });
+
+    expect(h.onUpdateNotch).not.toHaveBeenCalled();
+    expect(h.onAddNotch).toHaveBeenCalledTimes(2);
+    const [pieceId, recreated] = h.onAddNotch.mock.calls[1];
+    expect(pieceId).toBe('p1');
+    expect(recreated.id).not.toBe(original.id);
+    expect(recreated.notchAnchor?.distanceMm).toBe(42);
+    expect(recreated.path[0].values[0]).toBeCloseTo(42, 5);
+    expect(recreated.path[1].values[1]).toBeCloseTo(10, 5);
+    expect(h.result.current.refining).toBeNull();
+  });
+
+  it('previewRefine exposes the would-be landing point for the live canvas marker', () => {
+    // Review finding #10: while typing a distance the marker should show
+    // where the notch WILL land, not only where the click put it.
+    const h = setup();
+    act(() => { h.result.current.previewRefine(42); });
+    expect(h.result.current.refining?.previewWorld).toBeDefined();
+    expect(h.result.current.refining!.previewWorld!.x).toBeCloseTo(42, 5);
+    expect(h.result.current.refining!.previewWorld!.y).toBeCloseTo(0, 5);
+  });
+
+  it('leaving the notch tool cancels the refine state (no orphaned modal)', () => {
+    // Review finding #2: a tool-switch shortcut while the modal was open left
+    // it mounted while its canvas marker (gated on activeTool) vanished.
+    const h = setup(undefined, { withEditor: true });
+    expect(h.result.current.refining).not.toBeNull();
+    act(() => { h.store.dispatch(setActiveTool('select')); });
+    expect(h.result.current.refining).toBeNull();
   });
 
   it('cancelRefine keeps the clicked placement and closes the refine state', () => {

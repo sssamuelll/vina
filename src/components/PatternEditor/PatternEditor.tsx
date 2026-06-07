@@ -48,6 +48,7 @@ import ReferenceImageLayer from './renderers/ReferenceImageLayer';
 import CalibrationOverlay from './renderers/overlays/CalibrationOverlay';
 import CalibrationModal from './CalibrationModal';
 import NotchPrecisionModal from './NotchPrecisionModal';
+import { DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
 import ReferenceImageSettings from './ReferenceImageSettings';
 import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
@@ -699,7 +700,7 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
             lineCursor={lineTool.cursorPos}
             lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
-            notchRefineMarker={notchTool.refining ? { refWorld: notchTool.refining.refWorld, notchWorld: notchTool.refining.notchWorld } : null}
+            notchRefineMarker={notchTool.refining ? { refWorld: notchTool.refining.refWorld, notchWorld: notchTool.refining.notchWorld, previewWorld: notchTool.refining.previewWorld } : null}
             grainlineIsDragging={grainlineTool.isDragging}
             grainlineStartPoint={grainlineTool.startPoint}
             grainlineEndPoint={grainlineTool.endPoint}
@@ -860,7 +861,9 @@ export default function PatternEditor({ onImportDXF }: PatternEditorProps) {
       {notchTool.refining?.notch.notchAnchor && (
         <NotchPrecisionModal
           initialDistanceMm={notchTool.refining.notch.notchAnchor.distanceMm}
-          initialDepthMm={notchTool.refining.notch.notchOptions?.length ?? 8}
+          initialDepthMm={notchTool.refining.notch.notchOptions?.length ?? DEFAULT_NOTCH_OPTIONS.length}
+          maxDistanceMm={notchTool.refining.maxDistanceMm}
+          onPreview={notchTool.previewRefine}
           onConfirm={notchTool.confirmRefine}
           onCancel={notchTool.cancelRefine}
         />

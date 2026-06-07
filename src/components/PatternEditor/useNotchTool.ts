@@ -1,9 +1,9 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { PatternPiece, Point2D, InternalLine, NotchOptions } from '../../types/types';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../../utils/notches';
-import { computeNotchAnchor, resolveNotchAnchor } from '../../utils/notchAnchor';
+import { computeNotchAnchor, resolveNotchAnchor, outlinePerimeter } from '../../utils/notchAnchor';
 import { screenToPattern } from '../../utils/geometry';
 import { newId } from '../../utils/ids';
 
@@ -32,6 +32,10 @@ export interface NotchRefineState {
   notch: InternalLine;
   refWorld: Point2D;   // reference corner, world coords (canvas marker)
   notchWorld: Point2D; // notch entry point, world coords (canvas marker)
+  /** Outline perimeter — the modal's distance ceiling (a longer distance would wrap). */
+  maxDistanceMm: number;
+  /** Live landing point while the user types a distance (canvas ghost marker). */
+  previewWorld?: Point2D | null;
 }
 
 /** Get closest point on piece outline to a given point */
@@ -133,6 +137,16 @@ export function useNotchTool(
   const [state, setState] = useState<NotchToolState>({ hoveredPoint: null });
   const [refining, setRefining] = useState<NotchRefineState | null>(null);
 
+  // Leaving the notch tool cancels any pending refine — otherwise the modal
+  // lingers orphaned while its canvas marker (gated on activeTool in
+  // ToolOverlay) vanishes. Mirrors the reset-on-tool-change effects in
+  // useEditorInteractions. Optional chain: test stores may omit the editor
+  // slice; an undefined activeTool must not clear anything.
+  const activeTool = useSelector((s: RootState) => s.editor?.activeTool);
+  useEffect(() => {
+    if (refining && activeTool && activeTool !== 'notch') setRefining(null);
+  }, [activeTool, refining]);
+
   // toolOptions.notch (G6, mirrors the toolOptions.seam convention): canonical
   // keys = NotchOptions names (shape/length/width/angle/count). Defaults live
   // here until a proper 2D Settings exists; the explicit param (modal, tests)
@@ -175,6 +189,7 @@ export function useNotchTool(
               y: notch.notchAnchor.refPoint.y + piece.position.y,
             },
             notchWorld: { x: hit.point.x, y: hit.point.y },
+            maxDistanceMm: outlinePerimeter(piece.outline),
           });
         }
         return;
@@ -192,16 +207,45 @@ export function useNotchTool(
     const resolved = resolveNotchAnchor(piece.outline, editedAnchor);
     if (resolved) {
       const opts: NotchOptions = { ...(refining.notch.notchOptions ?? effectiveOptions), length: depthMm };
-      onUpdateNotch?.(
-        refining.pieceId,
-        refining.notch.id,
-        generateNotchPath(resolved.point, resolved.normal, opts),
-        editedAnchor,
-        opts,
-      );
+      const path = generateNotchPath(resolved.point, resolved.normal, opts);
+      const liveLine = piece.internals.find(l => l.id === refining.notch.id);
+      if (liveLine) {
+        onUpdateNotch?.(refining.pieceId, refining.notch.id, path, editedAnchor, opts);
+      } else {
+        // The committed line vanished while the modal was open (undo while
+        // the modal's input was blurred). Dispatching an update against a
+        // dead lineId would silently no-op and close as if success —
+        // confirming still owes the user a notch at the refined position,
+        // so re-add it.
+        onAddNotch(refining.pieceId, {
+          id: newId(),
+          type: 'notch',
+          path,
+          notchOptions: opts,
+          notchAnchor: editedAnchor,
+        });
+      }
     }
     setRefining(null);
-  }, [refining, pieces, effectiveOptions, onUpdateNotch]);
+  }, [refining, pieces, effectiveOptions, onUpdateNotch, onAddNotch]);
+
+  /** Live landing point while typing a distance — feeds the canvas ghost marker. */
+  const previewRefine = useCallback((distanceMm: number) => {
+    setRefining(prev => {
+      if (!prev?.notch.notchAnchor) return prev;
+      const piece = pieces.find(p => p.id === prev.pieceId);
+      if (!piece) return prev;
+      const resolved = resolveNotchAnchor(piece.outline, { ...prev.notch.notchAnchor, distanceMm });
+      if (!resolved) return { ...prev, previewWorld: null };
+      return {
+        ...prev,
+        previewWorld: {
+          x: resolved.point.x + piece.position.x,
+          y: resolved.point.y + piece.position.y,
+        },
+      };
+    });
+  }, [pieces]);
 
   /** Keep the clicked placement; just close the refine state. */
   const cancelRefine = useCallback(() => setRefining(null), []);
@@ -227,6 +271,7 @@ export function useNotchTool(
     handleMouseMove,
     refining,
     confirmRefine,
+    previewRefine,
     cancelRefine,
   };
 }

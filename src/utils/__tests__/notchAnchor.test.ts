@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectCorners, computeNotchAnchor, resolveNotchAnchor } from '../notchAnchor';
+import { detectCorners, computeNotchAnchor, resolveNotchAnchor, outlinePerimeter } from '../notchAnchor';
 import type { PathCommand } from '../../types/types';
 
 /** 100×100 closed square, stored vertex order: (0,0)→(100,0)→(100,100)→(0,100). */
@@ -76,6 +76,16 @@ describe('detectCorners', () => {
     const corners = detectCorners(outline);
     // 4 rectangle corners only; the ±~11° chamfer vertices stay below 30°
     expect(corners).toHaveLength(4);
+  });
+});
+
+describe('outlinePerimeter', () => {
+  it('measures the closed-ring perimeter (modal distance ceiling)', () => {
+    expect(outlinePerimeter(SQUARE)).toBeCloseTo(400, 5);
+  });
+
+  it('returns 0 for degenerate outlines', () => {
+    expect(outlinePerimeter([{ type: 'M', values: [0, 0] }])).toBe(0);
   });
 });
 
