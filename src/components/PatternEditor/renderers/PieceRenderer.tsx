@@ -11,7 +11,7 @@ import { extractNodes } from '../nodeEditorUtils';
 import { ANNOTATION_CATEGORY_COLORS } from '../../../utils/annotationTemplates';
 import { resolveColorway } from '../../../utils/colorwayResolver';
 import { formatPieceLabel } from '../../../utils/pieceLabel';
-import { dartApexPoint } from './internalLineStyle';
+import { dartApexPoint, internalLineColor } from './internalLineStyle';
 import { PHYSICAL_FABRIC_LIBRARY } from '../../../utils/cloth/physicalFabric';
 
 /** Compute bounding box center of a path outline. */
@@ -218,14 +218,8 @@ const SinglePiece = memo(function SinglePiece({
         const hasFill = isNotch && line.notchOptions?.shape === 'diamond';
         const isLineSelected = isInternalLineSelected && selectedLineId === line.id;
 
-        // Tokenized internal-line colors (design surface 5, P0.3): ink tones on
-        // the light paper; accent reserved for selection; thread color for topstitch.
-        const lineColor =
-          isLineSelected ? 'var(--accent-2d)' :
-          line.type === 'topstitch' ? (line.topstitchOptions?.threadColor ?? 'var(--topstitch-2d)') :
-          line.type === 'notch' ? 'var(--ink-on-light)' :
-          (line.type === 'reference' || line.type === 'pleat') ? 'var(--ink-on-light-3)' :
-          'var(--ink-on-light-2)'; // grainline, dart, fold, default
+        // Tokenized internal-line colors (design surface 5, P0.3) — see internalLineColor.
+        const lineColor = internalLineColor(line, isLineSelected);
         const dartApex = line.type === 'dart' ? dartApexPoint(line.path) : null;
 
         // Compute fold direction markers for fold lines with foldOptions
@@ -276,7 +270,7 @@ const SinglePiece = memo(function SinglePiece({
           <g key={line.id}>
             <path
               d={pathToSVG(line.path)}
-              style={{ stroke: lineColor, fill: hasFill ? 'var(--ink-on-light)' : 'none' }}
+              style={{ stroke: lineColor, fill: hasFill ? lineColor : 'none' }}
               strokeWidth={isLineSelected ? 2 / zoom2D : 0.8 / zoom2D}
               strokeDasharray={
                 line.type === 'fold' ? `${5 / zoom2D} ${3 / zoom2D} ${0.5 / zoom2D} ${3 / zoom2D}` :
