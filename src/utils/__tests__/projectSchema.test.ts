@@ -120,6 +120,85 @@ describe('parseOpenCloProject — happy path', () => {
     expect(r.ok).toBe(true);
     if (r.ok) expect(r.project.pieces[0].internals).toHaveLength(types.length);
   });
+
+  it('round-trips a notch with a parametric anchor (notch-precision F1)', () => {
+    // Restore fidelity: the anchor is what the precision modal reads back —
+    // dropping it on reload silently demotes an anchored notch to frozen
+    // geometry (the exact silent-drop the lockstep comment warns about for
+    // enum members, replayed at field level).
+    const piece = {
+      ...makePiece(),
+      internals: [
+        {
+          id: 'n-1',
+          type: 'notch' as const,
+          path: [
+            { type: 'M' as const, values: [0, 50] },
+            { type: 'L' as const, values: [8, 50] },
+          ],
+          notchAnchor: {
+            refPoint: { x: 0, y: 0 },
+            direction: 'cw' as const,
+            distanceMm: 50,
+          },
+        },
+      ],
+    };
+    const r = parseOpenCloProject(makeProject({ pieces: [piece] }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const notch = r.project.pieces[0].internals[0];
+      expect(notch.notchAnchor).toEqual({
+        refPoint: { x: 0, y: 0 },
+        direction: 'cw',
+        distanceMm: 50,
+      });
+    }
+  });
+
+  it('accepts a notch without anchor (legacy / drill-hole notches have none)', () => {
+    const piece = {
+      ...makePiece(),
+      internals: [
+        {
+          id: 'n-1',
+          type: 'notch' as const,
+          path: [
+            { type: 'M' as const, values: [0, 47] },
+            { type: 'L' as const, values: [0, 53] },
+          ],
+        },
+      ],
+    };
+    const r = parseOpenCloProject(makeProject({ pieces: [piece] }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.project.pieces[0].internals[0].notchAnchor).toBeUndefined();
+  });
+
+  it.each([
+    ['NaN distance', { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: NaN }],
+    ['negative distance', { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: -5 }],
+    ['missing refPoint', { direction: 'cw', distanceMm: 50 }],
+    ['bad direction', { refPoint: { x: 0, y: 0 }, direction: 'left', distanceMm: 50 }],
+  ])('rejects a notch anchor with %s', (_name, anchor) => {
+    const piece = {
+      ...makePiece(),
+      internals: [
+        {
+          id: 'n-1',
+          type: 'notch' as const,
+          path: [
+            { type: 'M' as const, values: [0, 50] },
+            { type: 'L' as const, values: [8, 50] },
+          ],
+          notchAnchor: anchor,
+        },
+      ],
+    };
+    const r = parseOpenCloProject(makeProject({ pieces: [piece as unknown as PatternPiece] }));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe('invalid_shape');
+  });
 });
 
 describe('parseOpenCloProject — required field absent', () => {

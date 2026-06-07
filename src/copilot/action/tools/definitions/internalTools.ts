@@ -270,6 +270,13 @@ const addNotchTool: ToolDefinition = {
     }
 
     const notchLen = (params.length as number) || 8;
+
+    // Parametric anchor (notch-precision F2): the tool already receives the
+    // placement as edgePosition — persist it as arc-distance-from-corner so
+    // the precision modal can read/edit agent-created notches too.
+    const { computeNotchAnchor } = await import('../../../../utils/notchAnchor');
+    const anchor = computeNotchAnchor(piece.outline, { x: px, y: py });
+
     const notchLine: InternalLine = {
       id: lineId(),
       type: 'notch',
@@ -282,6 +289,7 @@ const addNotchTool: ToolDefinition = {
         angle: 0,
         count: (params.count as number) || 1,
       },
+      ...(anchor ? { notchAnchor: anchor } : {}),
     };
 
     dispatch(addInternalLine({ pieceId: params.pieceId as string, line: notchLine }));

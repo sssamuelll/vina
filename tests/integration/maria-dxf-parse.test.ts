@@ -104,6 +104,11 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
       const [m, l] = n.path;
       const len = Math.hypot(l.values[0] - m.values[0], l.values[1] - m.values[1]);
       expect(len, `${piece.name} notch length`).toBeCloseTo(8, 1);
+      // Notch-precision F2: interpreted notches are back-filled with a
+      // parametric anchor (her garment blocks all have detectable corners).
+      expect(n.notchAnchor, `${piece.name} notch anchor`).toBeDefined();
+      expect(n.notchAnchor!.distanceMm).toBeGreaterThan(0);
+      expect(['cw', 'ccw']).toContain(n.notchAnchor!.direction);
     }
   });
 });

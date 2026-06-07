@@ -30,6 +30,35 @@ function makePiece(name: string): PatternPiece {
   };
 }
 
+describe('gradePiece — parametric notch anchor under grading (notch-precision F4)', () => {
+  it('scales the anchor with the same factor as the path — refPoint around the centroid, distance linearly', () => {
+    // Uniform scale ⇒ arc distances scale by the same factor; an unscaled
+    // anchor would silently diverge from the path it describes.
+    const piece = makePiece('Front');
+    piece.internals = [{
+      id: 'n1',
+      type: 'notch',
+      path: [{ type: 'M', values: [100, 0] }, { type: 'L', values: [100, 5] }],
+      notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 100 },
+    }];
+    const graded = gradePiece(piece, { chest: 88 }, { chest: 96.8 }); // factor 1.1
+    const notch = graded.internals[0];
+    expect(notch.notchAnchor).toBeDefined();
+    expect(notch.notchAnchor!.distanceMm).toBeCloseTo(110, 5);
+    // Centroid of the 200×300 rect = (100,150); refPoint scales around it:
+    // (0,0) → (100 - 100·1.1, 150 - 150·1.1) = (-10, -15)
+    expect(notch.notchAnchor!.refPoint.x).toBeCloseTo(-10, 5);
+    expect(notch.notchAnchor!.refPoint.y).toBeCloseTo(-15, 5);
+    expect(notch.notchAnchor!.direction).toBe('cw');
+  });
+
+  it('leaves anchor-less internals untouched', () => {
+    const piece = makePiece('Front');
+    const graded = gradePiece(piece, { chest: 88 }, { chest: 96.8 });
+    expect(graded.internals.every(i => i.notchAnchor === undefined)).toBe(true);
+  });
+});
+
 describe('gradeAllSizes', () => {
   const baseMeasurements = { chest: 88, waist: 72, hips: 96 };
 

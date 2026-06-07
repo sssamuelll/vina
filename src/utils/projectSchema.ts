@@ -102,12 +102,24 @@ const internalLineTypeMap: Record<InternalLineType, true> = {
 };
 const internalLineTypes = Object.keys(internalLineTypeMap) as [InternalLineType, ...InternalLineType[]];
 
+// Parametric notch anchor (notch-precision F1, spec 2026-06-07): unlike the
+// style bags below (z.unknown()), the anchor gets a REAL schema — it is the
+// data the precision modal reads back, and a malformed anchor silently
+// breaking re-positioning is exactly the failure class this boundary exists
+// to catch. Optional: legacy notches and off-boundary drill holes have none.
+const notchAnchorSchema = z.object({
+  refPoint: point2DSchema,
+  direction: z.enum(['cw', 'ccw']),
+  distanceMm: finiteNumber.refine((n) => n >= 0, { message: 'must be >= 0' }),
+});
+
 const internalLineSchema = z
   .object({
     id: idString,
     type: z.enum(internalLineTypes),
     path: z.array(pathCommandSchema).max(MAX_OUTLINE_CMDS),
     notchOptions: z.unknown().optional(),
+    notchAnchor: notchAnchorSchema.optional(),
     topstitchOptions: z.unknown().optional(),
     foldOptions: z.unknown().optional(),
     dartOptions: z.unknown().optional(),

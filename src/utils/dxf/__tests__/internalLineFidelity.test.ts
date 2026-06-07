@@ -314,6 +314,50 @@ describe('POINT notch marks interpreted as edge-anchored notches (hallazgo #5)',
     expect(Math.abs(n.path[1].values[1] - n.path[0].values[1])).toBeCloseTo(6, 3);
   });
 
+  it('an interpreted notch is back-filled with a parametric anchor (notch-precision F2)', () => {
+    // Mark at (0,30) → flipped (0,-30), on the left edge 30 units from the
+    // corner (0,0). interpretNotchMark already computes the projection — the
+    // anchor persists it so the precision modal can read the placement back.
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: SQUARE }],
+      [{ layer: '4', x: 0, y: 30 }],
+    ));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    const [n] = pieces[0].internals.filter(i => i.type === 'notch');
+    expect(n.notchAnchor).toBeDefined();
+    expect(n.notchAnchor!.refPoint.x).toBeCloseTo(0, 3);
+    expect(n.notchAnchor!.refPoint.y).toBeCloseTo(0, 3);
+    expect(n.notchAnchor!.distanceMm).toBeCloseTo(30, 3);
+  });
+
+  it('the back-filled anchor is stored in FINAL units (post-scale mm)', () => {
+    // 10×10 cm square, mark 3cm from the corner → anchor must read 30mm,
+    // because the generic scaling loop only scales paths, not data fields.
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }, { x: 0, y: 10 }] }],
+      [{ layer: '4', x: 0, y: 3 }],
+    ));
+    const pieces = dxfToPatternPieces(doc, { unit: 'cm', formatProfile: getProfile('aama') });
+
+    const [n] = pieces[0].internals.filter(i => i.type === 'notch');
+    expect(n.notchAnchor).toBeDefined();
+    expect(n.notchAnchor!.refPoint.x).toBeCloseTo(0, 3);
+    expect(n.notchAnchor!.refPoint.y).toBeCloseTo(0, 3);
+    expect(n.notchAnchor!.distanceMm).toBeCloseTo(30, 3);
+  });
+
+  it('drill holes get no anchor — we never invent an edge reference', () => {
+    const doc = parseDXF(buildNotchDXF(
+      [{ layer: '1', points: SQUARE }],
+      [{ layer: '4', x: 50, y: 50 }],
+    ));
+    const pieces = dxfToPatternPieces(doc, { formatProfile: getProfile('aama') });
+
+    const [n] = pieces[0].internals.filter(i => i.type === 'notch');
+    expect(n.notchAnchor).toBeUndefined();
+  });
+
   it('notch size compensates the unit factor — 8mm real after cm scaling', () => {
     // 10×10 cm square; the converter scales ×10 to mm AFTER building the
     // piece, so the notch must be generated at 0.8 file-units to land at 8mm.

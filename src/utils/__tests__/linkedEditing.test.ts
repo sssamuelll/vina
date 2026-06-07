@@ -51,4 +51,23 @@ describe('mirrorInternalsX', () => {
     // New ID generated (not the same as original)
     expect(mirrored[0].id).not.toBe('n1');
   });
+
+  it('drops the parametric notch anchor — edge identity flips under reflection (notch-precision F4)', () => {
+    // A reflected anchor would reference the WRONG corner/direction on the
+    // mirrored partner. D-2 (path manda): the mirrored path is still correct
+    // geometry; re-mapping anchors is the future "anchor manda" upgrade.
+    const internals: InternalLine[] = [
+      {
+        id: 'n1',
+        type: 'notch',
+        path: [
+          { type: 'M', values: [20, 0] },
+          { type: 'L', values: [20, 10] },
+        ],
+        notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 20 },
+      },
+    ];
+    const mirrored = mirrorInternalsX(internals, 50);
+    expect(mirrored[0].notchAnchor).toBeUndefined();
+  });
 });

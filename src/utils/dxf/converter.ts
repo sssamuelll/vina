@@ -11,6 +11,7 @@ import type { FormatProfile, LayerRole } from './types';
 import { grainAlignmentRotation } from '../grainLine';
 import { flattenPath } from '../seam';
 import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
+import { computeNotchAnchor } from '../notchAnchor';
 
 // ─── Entity → PathCommand[] conversion ───
 
@@ -674,6 +675,14 @@ function interpretNotchMark(
   }
 
   const opts = DEFAULT_NOTCH_OPTIONS;
+
+  // Back-fill the parametric anchor (notch-precision F2): the projection is
+  // already computed right here — persist it so the precision modal can read
+  // the placement back. Stored in FINAL units (× mmPerUnit) because the
+  // generic scaling loop in dxfToPatternPieces scales paths only, never data
+  // fields. Cornerless outlines yield null → the notch stays anchor-less.
+  const anchor = computeNotchAnchor(outline, proj.point);
+
   return {
     id: crypto.randomUUID(),
     type: 'notch',
@@ -683,6 +692,13 @@ function interpretNotchMark(
       width: opts.width / mmPerUnit,
     }),
     notchOptions: { ...opts },
+    ...(anchor ? {
+      notchAnchor: {
+        refPoint: { x: anchor.refPoint.x * mmPerUnit, y: anchor.refPoint.y * mmPerUnit },
+        direction: anchor.direction,
+        distanceMm: anchor.distanceMm * mmPerUnit,
+      },
+    } : {}),
   };
 }
 
