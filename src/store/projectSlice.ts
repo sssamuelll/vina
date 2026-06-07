@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, NotchAnchor, NotchOptions, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
 import type { PieceArtwork } from '../types/artwork';
 import { NEW_PROJECT } from './actions';
@@ -462,12 +462,22 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
-    updateInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string; path: PathCommand[] }>) {
+    updateInternalLine(state, action: PayloadAction<{
+      pieceId: string;
+      lineId: string;
+      path: PathCommand[];
+      // Optional notch fields (notch-precision F3): the precision modal
+      // re-positions a notch, which moves path AND anchor/depth together.
+      notchAnchor?: NotchAnchor;
+      notchOptions?: NotchOptions;
+    }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (piece) {
         const line = piece.internals.find(l => l.id === action.payload.lineId);
         if (line) {
           line.path = action.payload.path;
+          if (action.payload.notchAnchor !== undefined) line.notchAnchor = action.payload.notchAnchor;
+          if (action.payload.notchOptions !== undefined) line.notchOptions = action.payload.notchOptions;
           piece.updatedAt = Date.now();
           state.isDirty = true;
         }

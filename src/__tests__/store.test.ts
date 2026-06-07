@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, {
   addPiece, updatePiece, removePiece, movePiece, rotatePiece,
-  addSeam, addInternalLine, setInternalLine,
+  addSeam, addInternalLine, setInternalLine, updateInternalLine,
   setProjectName, loadProject, updateMeasurements,
   setAvatarMode, setAvatarModelUrl,
   bringToFront, sendToBack, bringForward, sendBackward,
@@ -100,6 +100,49 @@ describe('projectSlice', () => {
     const internals = store.getState().project.pieces[0].internals;
     expect(internals).toHaveLength(1);
     expect(internals[0].id).toBe('gl2');
+  });
+
+  it('updateInternalLine can also update notchAnchor and notchOptions (notch-precision F3)', () => {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('p1')));
+    store.dispatch(addInternalLine({
+      pieceId: 'p1',
+      line: {
+        id: 'n1', type: 'notch',
+        path: [{ type: 'M', values: [30, 0] }, { type: 'L', values: [30, 8] }],
+        notchOptions: { shape: 'slit', subType: 'straightforward', length: 8, width: 3, angle: 0, count: 1 },
+        notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 30 },
+      },
+    }));
+    store.dispatch(updateInternalLine({
+      pieceId: 'p1', lineId: 'n1',
+      path: [{ type: 'M', values: [42, 0] }, { type: 'L', values: [42, 10] }],
+      notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 42 },
+      notchOptions: { shape: 'slit', subType: 'straightforward', length: 10, width: 3, angle: 0, count: 1 },
+    }));
+    const line = store.getState().project.pieces[0].internals[0];
+    expect(line.path[0].values).toEqual([42, 0]);
+    expect(line.notchAnchor?.distanceMm).toBe(42);
+    expect(line.notchOptions?.length).toBe(10);
+  });
+
+  it('updateInternalLine without optional fields leaves anchor/options untouched', () => {
+    const store = createStore();
+    store.dispatch(addPiece(makePiece('p1')));
+    store.dispatch(addInternalLine({
+      pieceId: 'p1',
+      line: {
+        id: 'n1', type: 'notch',
+        path: [{ type: 'M', values: [30, 0] }, { type: 'L', values: [30, 8] }],
+        notchAnchor: { refPoint: { x: 0, y: 0 }, direction: 'cw', distanceMm: 30 },
+      },
+    }));
+    store.dispatch(updateInternalLine({
+      pieceId: 'p1', lineId: 'n1',
+      path: [{ type: 'M', values: [31, 0] }, { type: 'L', values: [31, 8] }],
+    }));
+    const line = store.getState().project.pieces[0].internals[0];
+    expect(line.notchAnchor?.distanceMm).toBe(30);
   });
 
   it('sets project name', () => {
