@@ -133,10 +133,18 @@ export function bisectorDirection(prev: Line2D, next: Line2D): Point2D {
  * A corner function takes the two adjacent offset edges at a vertex and
  * returns the array of geometry points that replace the standard miter.
  *
- * @param prevOffsetEdge - Offset line of the edge BEFORE this vertex
- * @param nextOffsetEdge - Offset line of the edge AFTER this vertex
+ * The two edges may be offset by DIFFERENT widths (per-edge seam allowance:
+ * e.g. a 40mm hem meeting a 10mm armhole). Geometric corner types (mitered,
+ * squared, slant, match) resolve the asymmetry directly from the offset edges;
+ * scalar-factor types (doubleMitered, envelope, trimMirrored) use the mean of
+ * the two widths. When prevWidth === nextWidth the geometry is identical to the
+ * legacy single-width behavior.
+ *
+ * @param prevOffsetEdge - Offset line of the edge BEFORE this vertex (offset by prevWidth)
+ * @param nextOffsetEdge - Offset line of the edge AFTER this vertex (offset by nextWidth)
  * @param vertex         - The piece outline vertex position
- * @param saWidth        - Seam allowance width in mm
+ * @param prevWidth      - Seam allowance width (mm) of the edge before this vertex
+ * @param nextWidth      - Seam allowance width (mm) of the edge after this vertex
  * @param angle          - Interior angle at the vertex (radians)
  * @returns              - Ordered array of Point2D forming the corner geometry
  */
@@ -144,7 +152,8 @@ export type CornerFunction = (
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   angle: number,
 ) => Point2D[];
 
@@ -170,9 +179,12 @@ export function cornerMitered(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   _vertex: Point2D,
-  _saWidth: number,
+  _prevWidth: number,
+  _nextWidth: number,
   _angle: number,
 ): Point2D[] {
+  // Geometric: the intersection of the two offset edges already encodes their
+  // (possibly different) offset distances — no width factor needed.
   const pt = lineIntersection(prevOffsetEdge, nextOffsetEdge);
   if (pt !== null) return [pt];
   // Parallel fallback: endpoint of prevOffsetEdge
@@ -192,9 +204,12 @@ export function cornerDoubleMitered(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   _angle: number,
 ): Point2D[] {
+  // Scalar setback uses the mean of the two widths (identical to legacy when equal).
+  const saWidth = (prevWidth + nextWidth) / 2;
   // Reconstruct the original edges from vertex (approximate — use offset edge
   // directions since they are parallel to the originals).
   const prevDir = lineDir(prevOffsetEdge);
@@ -212,7 +227,7 @@ export function cornerDoubleMitered(
   const bis = bisectorDirection(prevProxy, nextProxy);
 
   // Miter intersection point.
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, 0)[0];
+  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
 
   // Move from miter back toward vertex by saWidth * 0.3.
   // Use the actual direction from miter to vertex so that midPt stays on the
@@ -250,7 +265,8 @@ export function cornerSquared(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   angle: number,
 ): Point2D[] {
   // The "corner" is the right-angle intersection formed by extending
@@ -288,7 +304,7 @@ export function cornerSquared(
   }
 
   // Degenerate fallback: use the standard miter point
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, angle)[0];
+  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle)[0];
   return [{ ...prevOffsetEdge.end }, miter, { ...nextOffsetEdge.start }];
 }
 
@@ -305,10 +321,12 @@ export function cornerSlant(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   _angle: number,
 ): Point2D[] {
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, 0)[0];
+  // Geometric: the slant passes through the (asymmetric) miter; no width factor.
+  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
 
   const prevDir = lineDir(prevOffsetEdge);
   const nextDir = lineDir(nextOffsetEdge);
@@ -352,11 +370,13 @@ export function cornerEnvelope(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   _angle: number,
 ): Point2D[] {
-  const ext = saWidth * 0.75;
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, 0)[0];
+  // Tab extension uses the mean width (identical to legacy when equal).
+  const ext = ((prevWidth + nextWidth) / 2) * 0.75;
+  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
 
   const prevDir = lineDir(prevOffsetEdge);
   const nextDir = lineDir(nextOffsetEdge);
@@ -407,10 +427,11 @@ export function cornerMatch(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   angle: number,
 ): Point2D[] {
-  return cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, angle);
+  return cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle);
 }
 
 // ─── cornerTrimMirrored ───────────────────────────────────────────────────
@@ -426,11 +447,13 @@ export function cornerTrimMirrored(
   prevOffsetEdge: Line2D,
   nextOffsetEdge: Line2D,
   vertex: Point2D,
-  saWidth: number,
+  prevWidth: number,
+  nextWidth: number,
   _angle: number,
 ): Point2D[] {
-  const trimAmount = saWidth * 0.2;
-  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, 0)[0];
+  // Trim amount uses the mean width (identical to legacy when equal).
+  const trimAmount = ((prevWidth + nextWidth) / 2) * 0.2;
+  const miter = cornerMitered(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, 0)[0];
 
   const prevDir = lineDir(prevOffsetEdge);
   const nextDir = lineDir(nextOffsetEdge);
@@ -576,8 +599,10 @@ export function generateSeamAllowanceWithCorners(
     const nextEdge = edges[i];
     const angle = interiorAngle(prevEdge, nextEdge);
 
-    // Get corner geometry points
-    const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, angle);
+    // Get corner geometry points. Both sides use the same width today (one SA
+    // per piece); per-edge widths are wired here in step 3 — the corner
+    // functions already accept (prevWidth, nextWidth) and resolve asymmetry.
+    const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, saWidth, angle);
 
     // Emit the start of the offset edge for the NEXT edge (i.e., nextOffsetEdge.start),
     // then the corner geometry points.

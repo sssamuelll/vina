@@ -206,7 +206,7 @@ const vertex135 = { x: 100, y: 0 };
 
 describe('cornerMitered', () => {
   it('returns 1 point at 90° corner', () => {
-    const pts = cornerMitered(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerMitered(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(1);
     // Intersection of horizontal y=-10 and vertical x=110
     expect(pts[0].x).toBeCloseTo(110);
@@ -214,12 +214,12 @@ describe('cornerMitered', () => {
   });
 
   it('returns 1 point at 45° corner', () => {
-    const pts = cornerMitered(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerMitered(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(1);
   });
 
   it('returns 1 point at 135° corner', () => {
-    const pts = cornerMitered(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerMitered(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(1);
   });
 });
@@ -228,22 +228,22 @@ describe('cornerMitered', () => {
 
 describe('cornerDoubleMitered', () => {
   it('returns 2 points at 90° corner', () => {
-    const pts = cornerDoubleMitered(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerDoubleMitered(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(2);
   });
 
   it('returns 2 points at 45° corner', () => {
-    const pts = cornerDoubleMitered(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerDoubleMitered(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(2);
   });
 
   it('returns 2 points at 135° corner', () => {
-    const pts = cornerDoubleMitered(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerDoubleMitered(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(2);
   });
 
   it('two points are symmetric about the vertex→miter axis at 90° corner', () => {
-    const pts = cornerDoubleMitered(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerDoubleMitered(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     // The outward SA bisector for this corner is vertex→miter = (1,-1)/sqrt(2).
     // The midpoint of the two blunt-cut points should lie on that axis.
     const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
@@ -259,22 +259,22 @@ describe('cornerDoubleMitered', () => {
 
 describe('cornerSquared', () => {
   it('returns 3 points at 90° corner', () => {
-    const pts = cornerSquared(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerSquared(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(3);
   });
 
   it('returns 3 points at 45° corner', () => {
-    const pts = cornerSquared(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerSquared(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(3);
   });
 
   it('returns 3 points at 135° corner', () => {
-    const pts = cornerSquared(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerSquared(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(3);
   });
 
   it('forms right angles at 90° corner', () => {
-    const pts = cornerSquared(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerSquared(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     // pts[0] should be on the extension of prevOffsetEdge (y ≈ -10)
     expect(pts[0].y).toBeCloseTo(-10);
     // pts[2] should be on the extension of nextOffsetEdge (x ≈ 110)
@@ -289,22 +289,22 @@ describe('cornerSquared', () => {
 
 describe('cornerSlant', () => {
   it('returns 2 points at 90° corner', () => {
-    const pts = cornerSlant(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerSlant(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(2);
   });
 
   it('returns 2 points at 45° corner', () => {
-    const pts = cornerSlant(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerSlant(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(2);
   });
 
   it('returns 2 points at 135° corner', () => {
-    const pts = cornerSlant(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerSlant(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(2);
   });
 
   it('slant line is perpendicular to bisector at 90° corner', () => {
-    const pts = cornerSlant(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerSlant(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     // The line from pts[0] to pts[1] should be perpendicular to bisector (1,1)/sqrt(2)
     // i.e., dot product with bisector direction ≈ 0
     const dx = pts[1].x - pts[0].x;
@@ -318,23 +318,23 @@ describe('cornerSlant', () => {
 
 describe('cornerEnvelope', () => {
   it('returns 4 points at 90° corner', () => {
-    const pts = cornerEnvelope(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerEnvelope(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(4);
   });
 
   it('returns 4 points at 45° corner', () => {
-    const pts = cornerEnvelope(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerEnvelope(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(4);
   });
 
   it('returns 4 points at 135° corner', () => {
-    const pts = cornerEnvelope(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerEnvelope(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(4);
   });
 
   it('envelope extends beyond miter point at 90° corner', () => {
-    const miter = cornerMitered(prevOffset90, nextOffset90, vertex90, SA, angle90);
-    const pts = cornerEnvelope(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const miter = cornerMitered(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
+    const pts = cornerEnvelope(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     // At least one of the inner points should be further from vertex than miter
     const miterDist = Math.hypot(miter[0].x - vertex90.x, miter[0].y - vertex90.y);
     const maxDist = Math.max(
@@ -348,23 +348,23 @@ describe('cornerEnvelope', () => {
 
 describe('cornerMatch', () => {
   it('returns 1 point at 90° corner', () => {
-    const pts = cornerMatch(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerMatch(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(1);
   });
 
   it('returns 1 point at 45° corner', () => {
-    const pts = cornerMatch(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerMatch(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(1);
   });
 
   it('returns 1 point at 135° corner', () => {
-    const pts = cornerMatch(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerMatch(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(1);
   });
 
   it('is identical to mitered at 90° corner', () => {
-    const mitered = cornerMitered(prevOffset90, nextOffset90, vertex90, SA, angle90);
-    const match = cornerMatch(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const mitered = cornerMitered(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
+    const match = cornerMatch(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(match[0].x).toBeCloseTo(mitered[0].x);
     expect(match[0].y).toBeCloseTo(mitered[0].y);
   });
@@ -374,22 +374,22 @@ describe('cornerMatch', () => {
 
 describe('cornerTrimMirrored', () => {
   it('returns 2 points at 90° corner', () => {
-    const pts = cornerTrimMirrored(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerTrimMirrored(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     expect(pts).toHaveLength(2);
   });
 
   it('returns 2 points at 45° corner', () => {
-    const pts = cornerTrimMirrored(prevOffset45, nextOffset45, vertex45, SA, angle45);
+    const pts = cornerTrimMirrored(prevOffset45, nextOffset45, vertex45, SA, SA, angle45);
     expect(pts).toHaveLength(2);
   });
 
   it('returns 2 points at 135° corner', () => {
-    const pts = cornerTrimMirrored(prevOffset135, nextOffset135, vertex135, SA, angle135);
+    const pts = cornerTrimMirrored(prevOffset135, nextOffset135, vertex135, SA, SA, angle135);
     expect(pts).toHaveLength(2);
   });
 
   it('two points are symmetric about the vertex→miter axis at 90° corner', () => {
-    const pts = cornerTrimMirrored(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerTrimMirrored(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     // The midpoint is the miter itself; it should lie on the vertex→miter axis = (1,-1)/sqrt(2).
     const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
     const dx = mid.x - vertex90.x;
@@ -400,7 +400,7 @@ describe('cornerTrimMirrored', () => {
   });
 
   it('trim amount is saWidth * 0.2 on each side at 90° corner', () => {
-    const pts = cornerTrimMirrored(prevOffset90, nextOffset90, vertex90, SA, angle90);
+    const pts = cornerTrimMirrored(prevOffset90, nextOffset90, vertex90, SA, SA, angle90);
     const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
     // Total distance between the two points should be 2 * saWidth * 0.2
     expect(dist).toBeCloseTo(2 * SA * 0.2, 5);
