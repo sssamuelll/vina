@@ -84,7 +84,7 @@ export default function HintText({
       {activeTool === 'seamAllowance' && (
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
           fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
-          {`Click a piece to apply ${saDefaultWidthMm ?? 10}mm seam allowance · Right-click a corner for corner type`}
+          {`Click a piece to apply ${saDefaultWidthMm ?? 10}mm · Right-click an edge for its width · a corner for corner type`}
         </text>
       )}
 

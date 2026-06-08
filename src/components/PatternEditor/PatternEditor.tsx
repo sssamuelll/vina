@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, setEdgeSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
@@ -57,6 +57,8 @@ import { importReferenceImage } from '../../utils/import/imageImporter';
 import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
 import CornerTypeMenu from './CornerTypeMenu';
+import EdgeWidthMenu from './EdgeWidthMenu';
+import { pickEdgeForSeamAllowance } from '../../utils/seam/edgeHitTest';
 import './PatternEditor.css';
 
 // Module-level map: imageId → blob URL (outside Redux for non-serializable data)
@@ -152,6 +154,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     position: { x: number; y: number };
     pieceId: string;
     vertexIndex: number;
+  } | null>(null);
+
+  // Per-edge SA width input (seamAllowance tool, right-click near an edge)
+  const [edgeMenu, setEdgeMenu] = useState<{
+    position: { x: number; y: number };
+    pieceId: string;
+    edgeId: string;
   } | null>(null);
 
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -339,6 +348,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             pieceId: piece.id,
             vertexIndex: hit.index,
           });
+          return;
+        }
+      }
+      // Not near a vertex → near an edge? Open the per-edge width input.
+      const edgeSnap = screenToPatternLength(12, zoom2D);
+      for (const piece of pieces) {
+        if (!piece.outline?.length || !piece.edges?.length) continue;
+        const localX = canvasX - (piece.position?.x ?? 0);
+        const localY = canvasY - (piece.position?.y ?? 0);
+        const edge = pickEdgeForSeamAllowance(piece.outline, piece.edges, { x: localX, y: localY }, edgeSnap);
+        if (edge) {
+          setEdgeMenu({ position: { x: e.clientX, y: e.clientY }, pieceId: piece.id, edgeId: edge.id });
           return;
         }
       }
@@ -876,6 +897,30 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             onSelectType={handleCornerTypeSelect}
             onSetAll={handleSetAllCorners}
             onClose={() => setCornerMenu(null)}
+          />
+        );
+      })()}
+      {edgeMenu && (() => {
+        const piece = pieces.find(p => p.id === edgeMenu.pieceId);
+        const edge = piece?.edges?.find(e => e.id === edgeMenu.edgeId);
+        if (!piece || !edge) return null;
+        const pieceDefault = piece.seamAllowance || 0;
+        return (
+          <EdgeWidthMenu
+            position={edgeMenu.position}
+            edgeName={edge.name}
+            currentWidth={edge.seamAllowanceWidth ?? pieceDefault}
+            isOverridden={edge.seamAllowanceWidth != null}
+            pieceDefaultWidth={pieceDefault}
+            onApply={(width) => {
+              dispatch(setEdgeSeamAllowance({ pieceId: edgeMenu.pieceId, edgeId: edgeMenu.edgeId, width }));
+              setEdgeMenu(null);
+            }}
+            onClear={() => {
+              dispatch(setEdgeSeamAllowance({ pieceId: edgeMenu.pieceId, edgeId: edgeMenu.edgeId, width: null }));
+              setEdgeMenu(null);
+            }}
+            onClose={() => setEdgeMenu(null)}
           />
         );
       })()}
