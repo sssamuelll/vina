@@ -3,7 +3,7 @@
 **Fecha:** 2026-05-29
 **Estado:** IMPLEMENTADO. v3 agrega el chat attachment (estilo Claude) sobre la base v2.
 **Continúa:** probe M3 (commit `6251ef9f`) que confirmó que el parser DXF maneja el archivo real de María (5 piezas, AAMA)
-**Slice MVP v1 spec § 1:** "Importar este DXF de Adidas"
+**Slice MVP v1 spec § 1:** "Importar este DXF"
 **Bloquea:** M4 (sesión con María)
 **Fundamentado por:** workflow `m3-dxf-spec-research` (9 agentes, grounding verbatim) + crítica clínica Serrano (3 BLOCKERS en v1 → resueltos en v2) + review adversarial de implementación (13 agentes → 1 defecto, arreglado) + decisión de Samuel (chat attachment, v3)
 
@@ -199,12 +199,12 @@ La raíz: el sandbox (§2) ya fuerza la entrada por gesto del usuario, así que 
 ## 9. Integration test
 
 `tests/integration/m3-dxf-import.test.ts`:
-- Gate: `M3_INTEGRATION === '1'` + archivo existe (reusar `MARIA_DXF` env var, default `C:\Users\simon\Desktop\temp.dxf`).
+- Gate: `M3_INTEGRATION === '1'` + archivo existe (reusar `EXTERNAL_DXF` env var; el archivo vive fuera del repo).
 - **Core path (sin LLM, barato):** leer el DXF de María (en test, `readFileSync` es legítimo — el test simula el resultado del `FileReader`), llamar `importDXFContent`, asertar `result.pieces.length === 5`, dispatch al store real, asertar `store.getState().project.pieces.length === 5`. Esto valida el camino crítico que María dispara.
 - **Agentic downstream (opcional, con LLM, espeja M2):** con piezas ya cargadas, correr el loop con "cose mi patrón y visten el avatar", asertar `tool:start` incluye análisis + `autoSew`/`dressAvatar`, y `seams.length > 0`. Costo ~$0.25-0.50/run.
 - Unit test del error handling (§4.3): contenido vacío / basura / 0-piezas → `DXFParseError` con el `code` correcto, proyecto sin tocar.
 
-Mantener `maria-dxf-parse.test.ts` como está (valida el parser standalone).
+Mantener `external-dxf-parse.test.ts` como está (valida el parser standalone).
 
 ---
 

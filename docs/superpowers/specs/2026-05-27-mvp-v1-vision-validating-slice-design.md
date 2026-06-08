@@ -1,12 +1,12 @@
 # MVP v1 — Vision-Validating Slice Design
 
-> One agentic intent end-to-end. "Vestir el avatar con una camisa" executed via UnifiedBarChat with narration, on-demand tools, and a recorded session with User 1 (María, patronista at Adidas).
+> One agentic intent end-to-end. "Vestir el avatar con una camisa" executed via UnifiedBarChat with narration, on-demand tools, and a recorded session with User 1 (a professional patternmaker).
 > Scope: a single intent slice that validates the agentic-CLO3D-reversion vision before broader UX investment.
 
 **Status:** Approved (Samuel, 2026-05-27)
 **Target session date:** Week of 2026-06-15 (realistic range 2026-06-15 to 2026-06-22)
 **Authors:** Samuel + brainstorming session orchestrated by Halcyon, with inputs from Halcyon (strategic), Lyra Sage (asymmetry), Aurelius Voronov (ontological reframe), and two Explore audits (backend reality + UX layer post-redesign)
-**User 1:** María — patronista at Adidas, professional reference points Lectra/Gerber/Optitex/CLO3D
+**User 1:** a professional patternmaker — industry reference points Lectra/Gerber/Optitex/CLO3D
 **Related epic:** #506 (Sewing Pipeline) — to be frozen on current passing templates as a precondition
 
 ---
@@ -71,7 +71,7 @@ Acceptable paraphrases the agent must tolerate: *"vísteme el avatar con una cam
 ### Variations explicitly deferred to future slices
 
 - *"Cambiar tela a lino"* — iterative agentic post-dress
-- *"Importar este DXF de Adidas"* — tests capability C (DXF import already works in code, needs agentic wire)
+- *"Importar este DXF"* — tests capability C (DXF import already works in code, needs agentic wire)
 - *"Generar tech pack"* — tests export pipeline narrated by agent
 
 Each becomes its own slice spec → brainstorm → plan → execute cycle.
@@ -509,7 +509,7 @@ Sequential by nature.
 - `src/copilot/tools/` — tool registry
 
 ### Background context
-- User 1 profile: María, patronista at Adidas (Samuel's girlfriend), professional reference Lectra/Gerber/Optitex/CLO3D
+- User 1 profile: a professional patternmaker, industry reference Lectra/Gerber/Optitex/CLO3D
 - openclo vision: agentic CLO3D reversion, web, lightweight, fresh UI, agent-driven UX
 - Active redesign: broke things that half-worked; UnifiedBarChat replaces CopilotPanel; ~9,200 LOC orphan UI to delete
 

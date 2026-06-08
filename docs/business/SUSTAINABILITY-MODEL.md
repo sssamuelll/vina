@@ -24,7 +24,7 @@ While OpenClo remains **100% Free and Open Source**, providing a low-latency, ag
 ## 4. The Foundation (Enterprise ESG)
 Big retailers (Inditex, Nike, Adidas) can contribute to the **OpenClo Foundation** as part of their ESG (Environmental, Social, and Governance) goals. By funding the open-source infrastructure, they ensure the industry stays efficient and sustainable.
 
-## 5. Metrics for Maria (Adidas) / Stakeholders
+## 5. Metrics for the Reference Patternmaker / Stakeholders
 - **Physical Prototype Reduction**: % target (e.g., 70%).
 - **Fabric Waste Reduction**: % via Eco-Nesting.
 - **Time-to-Market Acceleration**: Days saved in the design cycle.
