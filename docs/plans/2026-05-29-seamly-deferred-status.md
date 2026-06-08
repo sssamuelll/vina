@@ -29,7 +29,7 @@ La decisión de hoy **no** dice "los patrones Seamly son malos". Dice: **el cost
 
 ## La pieza que cambia la prioridad
 
-**María carga su propio DXF.** El probe M3 (commit `6251ef9f`) ya confirmó que el parser DXF existente maneja su archivo real de Adidas limpio: 5 piezas, cientos de vértices c/u, formato AAMA. No hace falta el catálogo Seamly para el camino real al MVP testeable por María.
+**El usuario carga su propio DXF.** El probe M3 (commit `6251ef9f`) ya confirmó que el parser DXF existente maneja un archivo profesional real (CLO/AAMA) limpio: 5 piezas, cientos de vértices c/u, formato AAMA. No hace falta el catálogo Seamly para el camino real al MVP testeable por el usuario 1.
 
 El camino al MVP no pasa por arreglar Seamly. Pasa por:
 1. Slice agentic funciona ✅ (validado browser-side hoy)

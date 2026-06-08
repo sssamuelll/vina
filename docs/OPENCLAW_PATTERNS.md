@@ -75,7 +75,7 @@ OpenClaw uses two tiers:
 **What to steal:** Per-project persistent memory:
 ```json
 {
-  "projectId": "maria-bodice-2026",
+  "projectId": "bodice-2026",
   "decisions": [
     "Used 1.5cm ease because jersey knit",
     "Client wants shorter bodice (-2cm from standard)",

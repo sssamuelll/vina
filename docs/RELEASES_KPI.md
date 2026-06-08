@@ -49,4 +49,4 @@ This document defines the Key Performance Indicators (KPIs) to measure the succe
 ## Monitoring Strategy
 - **Telemetry**: (Optional) Anonymous performance tracking of WASM cycles and AI success rates.
 - **E2E Testing**: Automated visual regression and geometric validation in CI/CD.
-- **User Research**: Monthly "Fashion Engineering" sessions with patronistas (Maria/Adidas profile) to validate drafting speed and UX polish.
+- **User Research**: Monthly "Fashion Engineering" sessions with patronistas (professional reference profile) to validate drafting speed and UX polish.

@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 /**
  * M3 — DXF import, core path. Simulates what the browser drop-zone does
- * when María drops her file: read the bytes, run the shared
+ * when a user drops their file: read the bytes, run the shared
  * `importDXFContent` pipeline, dispatch the pieces into the REAL Redux
- * store, and assert they land. This is the exact path María triggers —
+ * store, and assert they land. This is the exact path the drop triggers —
  * no LLM, no agentic loop (the agent operates downstream on the loaded
  * pieces; that path is covered by the M2 harness).
  *
@@ -12,10 +12,10 @@
  * the agent never does, per the sandbox constraint in the M3 spec).
  *
  * Opt-in: requires `M3_INTEGRATION=1` AND the DXF file to exist (reuses
- * the `MARIA_DXF` env var from maria-dxf-parse.test.ts). Skipped on CI
- * and default `npm run test`.
+ * the `EXTERNAL_DXF` env var from external-dxf-parse.test.ts). Skipped on
+ * CI and default `npm run test`.
  *
- *   M3_INTEGRATION=1 MARIA_DXF=/path/to/her.dxf npx vitest run tests/integration/m3-dxf-import.test.ts
+ *   M3_INTEGRATION=1 EXTERNAL_DXF=/path/to/export.dxf npx vitest run tests/integration/m3-dxf-import.test.ts
  */
 
 import { describe, it, expect } from 'vitest';
@@ -25,12 +25,12 @@ import { store } from '../../src/store';
 import { addPiece } from '../../src/store/projectSlice';
 import { selectPiece } from '../../src/store/editorSlice';
 
-const MARIA_DXF = process.env.MARIA_DXF ?? 'C:\\Users\\simon\\Desktop\\temp.dxf';
-const shouldRun = process.env.M3_INTEGRATION === '1' && existsSync(MARIA_DXF);
+const EXTERNAL_DXF = process.env.EXTERNAL_DXF ?? './external-cad-export.dxf';
+const shouldRun = process.env.M3_INTEGRATION === '1' && existsSync(EXTERNAL_DXF);
 
 describe.skipIf(!shouldRun)('M3 DXF import — core path (drop-zone simulation)', () => {
-  it("imports María's real DXF into the Redux store via the shared pipeline", () => {
-    const content = readFileSync(MARIA_DXF, 'utf8');
+  it('imports a real DXF into the Redux store via the shared pipeline', () => {
+    const content = readFileSync(EXTERNAL_DXF, 'utf8');
     expect(content.length).toBeGreaterThan(0);
 
     // Stage 1 — shared core (the exact call AppShell's drop handler makes).
@@ -50,7 +50,7 @@ describe.skipIf(!shouldRun)('M3 DXF import — core path (drop-zone simulation)'
     console.log('[m3-import] store pieces:', baseline, '→', after);
     expect(after - baseline).toBe(pieces.length);
 
-    // María's pattern is the AAMA top probed in 6251ef9f (5 pieces).
+    // The reference pattern is the AAMA top probed in 6251ef9f (5 pieces).
     expect(pieces.length).toBeGreaterThanOrEqual(5);
   });
 });

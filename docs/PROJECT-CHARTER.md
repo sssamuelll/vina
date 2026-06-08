@@ -82,6 +82,6 @@ La industria de la moda digital está fragmentada: soluciones propietarias de al
 ## Stakeholders
 
 - **Arquitecto & Lead:** Samuel Dario
-- **Usuario principal:** María (patronista, Adidas) — validación real de workflows profesionales
+- **Usuario principal:** User 1 — patronista profesional (referencias de industria: Lectra/Gerber/Optitex/CLO3D) — validación real de workflows profesionales
 - **Comunidad potencial:** Seamly2D, Blender Foundation, fashion-tech community
 - **Usuarios finales:** Patronistas, diseñadores de moda, artistas 3D, instituciones educativas

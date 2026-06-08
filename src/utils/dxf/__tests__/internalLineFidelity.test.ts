@@ -1,7 +1,7 @@
 /**
  * M3.5 — internal-line fidelity on DXF import.
  *
- * María's real Adidas DXF (CLO export, AAMA @43% confidence) revealed three
+ * A real CLO DXF export (AAMA @43% confidence) revealed three
  * converter leaks:
  *  1. The sew/seam line (vendor layer 84, also ASTM 'SEW LINE' / Lectra
  *     'COUTURE') resolves to a role the switch skips or — worse, for
