@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, setEdgeSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectEdge, selectVertex, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
-import { PatternPiece, Seam, InternalLine, Point2D, PathCommand, CornerType } from '../../types/types';
+import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
 import { usePenTool } from './usePenTool';
 import { useRectangleTool } from './useRectangleTool';
 import { useLineTool } from './useLineTool';
@@ -14,6 +14,7 @@ import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
+import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
 import { showUndoToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
@@ -56,33 +57,10 @@ import { computePixelsPerMm } from '../../utils/geometry/calibration';
 import { importReferenceImage } from '../../utils/import/imageImporter';
 import { storeImageBlob, loadImageBlob } from '../../utils/import/referenceImageStore';
 import ContextMenu, { type ContextMenuState } from './ContextMenu';
-import CornerTypeMenu from './CornerTypeMenu';
-import EdgeWidthMenu from './EdgeWidthMenu';
-import { pickEdgeForSeamAllowance } from '../../utils/seam/edgeHitTest';
 import './PatternEditor.css';
 
 // Module-level map: imageId → blob URL (outside Redux for non-serializable data)
 const objectUrlMap = new Map<string, string>();
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function findNearestVertex(
-  outline: PathCommand[],
-  point: Point2D,
-  snapDist: number,
-): { index: number; dist: number } | null {
-  let best: { index: number; dist: number } | null = null;
-  for (let i = 0; i < outline.length; i++) {
-    const cmd = outline[i];
-    if (cmd.type !== 'M' && cmd.type !== 'L') continue;
-    const vx = cmd.values[0], vy = cmd.values[1];
-    const d = Math.sqrt((vx - point.x) ** 2 + (vy - point.y) ** 2);
-    if (d <= snapDist && (!best || d < best.dist)) {
-      best = { index: i, dist: d };
-    }
-  }
-  return best;
-}
 
 interface PatternEditorProps {
   /** Opens the DXF file picker; wired by AppShell to its hidden <input>. */
@@ -149,20 +127,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     visible: false, x: 0, y: 0, pieceId: null,
   });
 
-  // Corner type menu state (seamAllowance tool + right-click on vertex)
-  const [cornerMenu, setCornerMenu] = useState<{
-    position: { x: number; y: number };
-    pieceId: string;
-    vertexIndex: number;
-  } | null>(null);
-
-  // Per-edge SA width input (seamAllowance tool, right-click near an edge)
-  const [edgeMenu, setEdgeMenu] = useState<{
-    position: { x: number; y: number };
-    pieceId: string;
-    edgeId: string;
-  } | null>(null);
-
   const handlePieceComplete = useCallback((piece: Omit<PatternPiece, 'id' | 'createdAt' | 'updatedAt'>) => {
     const fullPiece: PatternPiece = {
       ...piece,
@@ -225,7 +189,13 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       ));
     }
   }, [pieces, dispatch]);
-  const seamAllowanceTool = useSeamAllowanceTool(pieces, handleApplySeamAllowance);
+  const seamAllowanceTool = useSeamAllowanceTool(pieces, zoom2D, pan2D, {
+    onApply: handleApplySeamAllowance,
+    // Selecting an edge/vertex opens the Properties panel — its docked home for
+    // editing the width / corner type (CLO3D's persistent Property Editor).
+    onSelectEdge: (pieceId, edgeId) => { dispatch(selectEdge({ pieceId, edgeId })); onOpenPanel?.('Properties'); },
+    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectVertex({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
+  });
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
@@ -302,31 +272,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     }
   }, [pieces, dispatch]);
 
-  const handleCornerTypeSelect = useCallback((type: CornerType) => {
-    if (!cornerMenu) return;
-    const piece = pieces.find(p => p.id === cornerMenu.pieceId);
-    if (!piece) return;
-    dispatch(updatePiece({
-      ...piece,
-      cornerTypes: { ...(piece.cornerTypes ?? {}), [cornerMenu.vertexIndex]: type },
-      updatedAt: Date.now(),
-    }));
-    setCornerMenu(null);
-  }, [cornerMenu, pieces, dispatch]);
-
-  const handleSetAllCorners = useCallback((type: CornerType) => {
-    if (!cornerMenu) return;
-    const piece = pieces.find(p => p.id === cornerMenu.pieceId);
-    if (!piece) return;
-    dispatch(updatePiece({
-      ...piece,
-      defaultCornerType: type,
-      cornerTypes: {},
-      updatedAt: Date.now(),
-    }));
-    setCornerMenu(null);
-  }, [cornerMenu, pieces, dispatch]);
-
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     // Determine which piece (if any) is under the cursor
@@ -334,42 +279,9 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     const rect = svg.getBoundingClientRect();
     const { x: canvasX, y: canvasY } = screenToPattern(e.clientX, e.clientY, rect, zoom2D, pan2D);
 
-    // ── SeamAllowance tool: open CornerTypeMenu when near a vertex ──
-    if (activeTool === 'seamAllowance') {
-      const snapDist = screenToPatternLength(10, zoom2D);
-      for (const piece of pieces) {
-        if (!piece.outline?.length) continue;
-        const localX = canvasX - (piece.position?.x ?? 0);
-        const localY = canvasY - (piece.position?.y ?? 0);
-        const hit = findNearestVertex(piece.outline, { x: localX, y: localY }, snapDist);
-        if (hit) {
-          setCornerMenu({
-            position: { x: e.clientX, y: e.clientY },
-            pieceId: piece.id,
-            vertexIndex: hit.index,
-          });
-          return;
-        }
-      }
-      // Not near a vertex → near an edge? Open the per-edge width input.
-      const edgeSnap = screenToPatternLength(12, zoom2D);
-      for (const piece of pieces) {
-        if (!piece.outline?.length || !piece.edges?.length) continue;
-        const localX = canvasX - (piece.position?.x ?? 0);
-        const localY = canvasY - (piece.position?.y ?? 0);
-        const edge = pickEdgeForSeamAllowance(piece.outline, piece.edges, { x: localX, y: localY }, edgeSnap);
-        if (edge) {
-          setEdgeMenu({ position: { x: e.clientX, y: e.clientY }, pieceId: piece.id, edgeId: edge.id });
-          return;
-        }
-      }
-      // SA mode owns right-click: never fall through to the general (destructive)
-      // piece menu. A miss on both a vertex and an edge does nothing — it must
-      // not surface Delete/Flip/Rotate in a precision editing mode. (The
-      // per-edge editing surface moves to left-click selection + panel next;
-      // this gate stops the collision María reported now.)
-      return;
-    }
+    // Per-edge width and corner type are edited via left-click selection + the
+    // Properties panel (Direction A), so right-click is always the general piece
+    // menu — one gesture, one meaning, no proximity guessing.
 
     // Hit-test: find piece whose bounding box contains the point
     let hitPiece: typeof pieces[0] | null = null;
@@ -732,6 +644,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           )}
           <ElasticRenderer zoom2D={zoom2D} />
           <TrimRenderer zoom2D={zoom2D} />
+          {activeTool === 'seamAllowance' && (
+            <SeamAllowanceSelectionOverlay
+              selectedEdge={editor.selectedEdge}
+              selectedVertex={editor.selectedVertex}
+              pieces={pieces}
+              zoom={zoom2D}
+            />
+          )}
           <ToolOverlay
             activeTool={activeTool}
             zoom2D={zoom2D}
@@ -893,43 +813,6 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           onOpenPanel?.('Properties');
         }}
       />
-      {cornerMenu && (() => {
-        const piece = pieces.find(p => p.id === cornerMenu.pieceId);
-        const currentType: CornerType = piece?.cornerTypes?.[cornerMenu.vertexIndex] ?? piece?.defaultCornerType ?? 'mitered';
-        return (
-          <CornerTypeMenu
-            position={cornerMenu.position}
-            currentType={currentType}
-            onSelectType={handleCornerTypeSelect}
-            onSetAll={handleSetAllCorners}
-            onClose={() => setCornerMenu(null)}
-          />
-        );
-      })()}
-      {edgeMenu && (() => {
-        const piece = pieces.find(p => p.id === edgeMenu.pieceId);
-        const edge = piece?.edges?.find(e => e.id === edgeMenu.edgeId);
-        if (!piece || !edge) return null;
-        const pieceDefault = piece.seamAllowance || 0;
-        return (
-          <EdgeWidthMenu
-            position={edgeMenu.position}
-            edgeName={edge.name}
-            currentWidth={edge.seamAllowanceWidth ?? pieceDefault}
-            isOverridden={edge.seamAllowanceWidth != null}
-            pieceDefaultWidth={pieceDefault}
-            onApply={(width) => {
-              dispatch(setEdgeSeamAllowance({ pieceId: edgeMenu.pieceId, edgeId: edgeMenu.edgeId, width }));
-              setEdgeMenu(null);
-            }}
-            onClear={() => {
-              dispatch(setEdgeSeamAllowance({ pieceId: edgeMenu.pieceId, edgeId: edgeMenu.edgeId, width: null }));
-              setEdgeMenu(null);
-            }}
-            onClose={() => setEdgeMenu(null)}
-          />
-        );
-      })()}
       {showCalibrationModal && (
         <CalibrationModal
           pixelDistance={calibrationPixelDist}
