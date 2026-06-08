@@ -1,0 +1,72 @@
+// @vitest-environment jsdom
+import { describe, it, expect, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import projectReducer, { addPiece } from '../../../store/projectSlice';
+import editorReducer from '../../../store/editorSlice';
+import EdgePropertiesSection from '../EdgePropertiesSection';
+import VertexPropertiesSection from '../VertexPropertiesSection';
+import type { PatternPiece, SemanticEdge } from '../../../types/types';
+
+afterEach(cleanup);
+
+const square = [
+  { type: 'M', values: [0, 0] }, { type: 'L', values: [100, 0] },
+  { type: 'L', values: [100, 100] }, { type: 'L', values: [0, 100] }, { type: 'Z', values: [] },
+] as PatternPiece['outline'];
+
+const hem: SemanticEdge = { id: 'p:hem', name: 'hem', segmentRange: [3, 4], edgeType: 'hem' };
+
+function piece(over: Partial<PatternPiece> = {}): PatternPiece {
+  return {
+    id: 'p', name: 'Front', outline: square, position: { x: 0, y: 0 }, rotation: 0,
+    mirrored: false, active: true, seamAllowance: 10, internals: [], edges: [hem], ...over,
+  } as unknown as PatternPiece;
+}
+
+function mount(node: React.ReactElement, p: PatternPiece) {
+  const store = configureStore({ reducer: { project: projectReducer, editor: editorReducer } });
+  store.dispatch(addPiece(p));
+  render(<Provider store={store}>{node}</Provider>);
+  return store;
+}
+
+describe('EdgePropertiesSection', () => {
+  it('shows the edge name and the effective width (inherited)', () => {
+    mount(<EdgePropertiesSection pieceId="p" edgeId="p:hem" />, piece());
+    expect(screen.getByText(/hem/i)).toBeTruthy();
+    expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('10');
+  });
+
+  it('commits a per-edge width on Enter', () => {
+    const store = mount(<EdgePropertiesSection pieceId="p" edgeId="p:hem" />, piece());
+    const input = screen.getByLabelText(/width/i);
+    fireEvent.change(input, { target: { value: '40' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
+    expect(e.seamAllowanceWidth).toBe(40);
+  });
+
+  it('Inherit clears the per-edge override', () => {
+    const store = mount(<EdgePropertiesSection pieceId="p" edgeId="p:hem" />, piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }));
+    fireEvent.click(screen.getByRole('button', { name: /inherit/i }));
+    const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
+    expect(e.seamAllowanceWidth).toBeUndefined();
+  });
+});
+
+describe('VertexPropertiesSection', () => {
+  it('lists corner types and applies the chosen one to the vertex', () => {
+    const store = mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece());
+    fireEvent.click(screen.getByRole('button', { name: /^squared$/i }));
+    expect(store.getState().project.pieces[0].cornerTypes?.[2]).toBe('squared');
+  });
+
+  it('can apply a corner type to all corners (default)', () => {
+    const store = mount(<VertexPropertiesSection pieceId="p" vertexIndex={2} />, piece());
+    fireEvent.click(screen.getByRole('button', { name: /squared/i }));
+    fireEvent.click(screen.getByRole('button', { name: /all corners/i }));
+    expect(store.getState().project.pieces[0].defaultCornerType).toBe('squared');
+  });
+});

@@ -19,6 +19,8 @@ import PropertySection from './PropertySection';
 import PieceProperties from './PieceProperties';
 import SeamPropertiesPanel from './SeamPropertiesPanel';
 import MaterialTab from './MaterialTab';
+import EdgePropertiesSection from './EdgePropertiesSection';
+import VertexPropertiesSection from './VertexPropertiesSection';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -29,6 +31,12 @@ export default function PropertiesPanel() {
   const selectedSeam = editor.selectedSeamId
     ? seams.find(s => s.id === editor.selectedSeamId)
     : undefined;
+  // Per-edge SA selection (seamAllowance tool) — properties for the focused
+  // edge/vertex live here, bound to the typed selection.
+  const selectedEdge = editor.selectedEdge && pieces.some(p => p.id === editor.selectedEdge!.pieceId)
+    ? editor.selectedEdge : null;
+  const selectedVertex = editor.selectedVertex && pieces.some(p => p.id === editor.selectedVertex!.pieceId)
+    ? editor.selectedVertex : null;
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     piece: false,
     material: false,
@@ -73,13 +81,19 @@ export default function PropertiesPanel() {
 
   return (
     <div className="properties-panel">
-      {!selectedPiece && !selectedSeam ? (
+      {!selectedPiece && !selectedSeam && !selectedEdge && !selectedVertex ? (
         <>
-          <div className="panel-empty">Select a piece or seam to edit</div>
+          <div className="panel-empty">Select a piece, seam or edge to edit</div>
           {seamsList}
         </>
       ) : (
         <>
+          {selectedEdge && (
+            <EdgePropertiesSection pieceId={selectedEdge.pieceId} edgeId={selectedEdge.edgeId} />
+          )}
+          {selectedVertex && (
+            <VertexPropertiesSection pieceId={selectedVertex.pieceId} vertexIndex={selectedVertex.vertexIndex} />
+          )}
           {selectedPiece && (
             <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />
           )}
