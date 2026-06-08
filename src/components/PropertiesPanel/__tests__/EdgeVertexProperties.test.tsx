@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
-import editorReducer from '../../../store/editorSlice';
+import editorReducer, { selectEdge } from '../../../store/editorSlice';
 import EdgePropertiesSection from '../EdgePropertiesSection';
 import VertexPropertiesSection from '../VertexPropertiesSection';
+import PropertiesPanel from '../PropertiesPanel';
 import type { PatternPiece, SemanticEdge } from '../../../types/types';
 
 afterEach(cleanup);
@@ -53,6 +54,24 @@ describe('EdgePropertiesSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /inherit/i }));
     const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
     expect(e.seamAllowanceWidth).toBeUndefined();
+  });
+});
+
+describe('PropertiesPanel edge switching', () => {
+  it('the width field reflects the newly selected edge (no stale value)', () => {
+    const store = configureStore({ reducer: { project: projectReducer, editor: editorReducer } });
+    const twoEdges: SemanticEdge[] = [
+      { id: 'p:hem', name: 'hem', segmentRange: [3, 4], edgeType: 'hem', seamAllowanceWidth: 40 },
+      { id: 'p:side', name: 'side', segmentRange: [2, 3], edgeType: 'seam', seamAllowanceWidth: 10 },
+    ];
+    store.dispatch(addPiece(piece({ edges: twoEdges })));
+    render(<Provider store={store}><PropertiesPanel /></Provider>);
+
+    act(() => { store.dispatch(selectEdge({ pieceId: 'p', edgeId: 'p:hem' })); });
+    expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('40');
+
+    act(() => { store.dispatch(selectEdge({ pieceId: 'p', edgeId: 'p:side' })); });
+    expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('10');
   });
 });
 

@@ -18,6 +18,10 @@ coverage/
 .playwright-mcp/
 copyclip_metrics.jsonl
 snapshot-*.md
+# Canonical home for ALL test/probe/evidence screenshots — gitignored wholesale.
+# Evidence runners and ad-hoc Playwright harnesses write here (e.g.
+# screenshots/seam-allowance/). Keep curated DESIGN artifacts in
+# design-handoff/ui-screenshots/ (committed); never mix test evidence there.
 screenshots/
 .claude/
 
@@ -77,5 +81,7 @@ scripts/verify-*.mjs
 !scripts/verify-wasm-smoke.mjs
 scripts/capture-*.mjs
 scripts/walk-*.mjs
+# Legacy: older harnesses wrote evidence into the curated design-handoff folder;
+# guarded here so it never commits. New evidence goes to screenshots/ (above).
 design-handoff/ui-screenshots/verify-*.png
 design-handoff/ui-screenshots/walk-*.png

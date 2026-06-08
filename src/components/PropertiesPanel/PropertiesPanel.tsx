@@ -89,7 +89,9 @@ export default function PropertiesPanel() {
       ) : (
         <>
           {selectedEdge && (
-            <EdgePropertiesSection pieceId={selectedEdge.pieceId} edgeId={selectedEdge.edgeId} />
+            // key per edge: remount so the width field reflects the newly
+            // selected edge's value (its local input state re-initializes).
+            <EdgePropertiesSection key={selectedEdge.edgeId} pieceId={selectedEdge.pieceId} edgeId={selectedEdge.edgeId} />
           )}
           {selectedVertex && (
             <VertexPropertiesSection pieceId={selectedVertex.pieceId} vertexIndex={selectedVertex.vertexIndex} />
