@@ -1041,6 +1041,20 @@ const projectSlice = createSlice({
       }
     },
 
+    /**
+     * Set (or clear) the per-edge seam allowance width on one semantic edge.
+     * `width: null` clears it back to inheriting the piece-level seamAllowance.
+     * Keyed by the stable edge id so it survives outline renumbering.
+     */
+    setEdgeSeamAllowance(state, action: PayloadAction<{ pieceId: string; edgeId: string; width: number | null }>) {
+      const piece = state.pieces.find(p => p.id === action.payload.pieceId);
+      const edge = piece?.edges?.find(e => e.id === action.payload.edgeId);
+      if (!edge) return;
+      edge.seamAllowanceWidth = action.payload.width == null ? undefined : Math.max(0, action.payload.width);
+      piece!.updatedAt = Date.now();
+      state.isDirty = true;
+    },
+
     cloneToLayer(state, action: PayloadAction<{ pieceId: string; direction: 'over' | 'under' }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
       if (!piece) return;
@@ -1439,6 +1453,8 @@ export const {
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,
+  // Per-edge seam allowance
+  setEdgeSeamAllowance,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,
   renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer,

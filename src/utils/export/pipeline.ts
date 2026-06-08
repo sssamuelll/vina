@@ -106,8 +106,11 @@ export function preparePiece(
   if (piece.seamAllowance > 0) {
     const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
       || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
-    seamOutline = hasCustomCorners
-      ? generateSeamAllowanceWithCorners(piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {})
+    // Per-edge SA widths also require the edge-walk generator — and this is the
+    // EXPORT path, so per-edge widths must reach the factory DXF/PDF.
+    const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
+    seamOutline = hasCustomCorners || hasPerEdgeWidths
+      ? generateSeamAllowanceWithCorners(piece.outline, piece.seamAllowance, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges)
       : generateSeamAllowance(piece.outline, piece.seamAllowance, joinType);
     if (seamOutline.length > 0) {
       flatSeamOutline = flattenPath(seamOutline, resolution);

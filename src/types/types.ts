@@ -333,6 +333,13 @@ export interface SemanticEdge {
   matchHint?: string;
   /** Length in mm (computed) */
   length?: number;
+  /**
+   * Per-edge seam allowance width in mm. Undefined → inherit the piece-level
+   * `seamAllowance` (most edges). Set per edge for real garment practice
+   * (e.g. hem 40mm, armhole 10mm on one piece). Keyed by the stable edge id,
+   * so it survives outline mutations that renumber positional indices.
+   */
+  seamAllowanceWidth?: number;
 }
 
 // ─── Seams (connections between pieces) ───

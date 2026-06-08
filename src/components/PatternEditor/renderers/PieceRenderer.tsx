@@ -104,9 +104,12 @@ const SinglePiece = memo(function SinglePiece({
   const saWidth = effectiveSeamAllowanceWidth(piece);
   const hasCustomCorners = (piece.cornerTypes && Object.keys(piece.cornerTypes).length > 0)
     || (piece.defaultCornerType && piece.defaultCornerType !== 'mitered');
+  // Per-edge SA widths also require the edge-walk generator (the uniform Clipper
+  // offset can't vary width per edge).
+  const hasPerEdgeWidths = piece.edges?.some((e) => e.seamAllowanceWidth != null) ?? false;
   const saPath = (showSeamAllowance && saWidth > 0 && (piece.outline?.length ?? 0) >= 2)
-    ? (hasCustomCorners
-        ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {})
+    ? (hasCustomCorners || hasPerEdgeWidths
+        ? generateSeamAllowanceWithCorners(piece.outline, saWidth, piece.defaultCornerType ?? 'mitered', piece.cornerTypes ?? {}, piece.edges)
         : generateSeamAllowance(piece.outline, saWidth))
     : [];
   const hasSA = saPath.length > 0;
