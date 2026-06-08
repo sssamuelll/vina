@@ -138,6 +138,7 @@ const semanticEdgeSchema = z
     edgeType: z.enum(['seam', 'fold', 'hem', 'opening', 'dart-leg', 'unknown']),
     matchHint: boundedString(MAX_NAME_LEN).optional(),
     length: finiteNumber.optional(),
+    seamAllowanceWidth: finiteNumber.refine((n) => n >= 0, { message: 'must be >= 0' }).optional(),
   })
   .loose();
 

@@ -1,4 +1,4 @@
-import type { PathCommand, Point2D } from '../../types/types';
+import type { PathCommand, Point2D, SemanticEdge } from '../../types/types';
 import type { CornerType } from '../../types/types';
 import { Clipper, Paths64, Path64, Point64 } from 'clipper2-js';
 import { flattenPathWithSource } from './index';
@@ -508,6 +508,51 @@ export function shiftCornerTypes(
   return result;
 }
 
+// ─── perEdgeWidths ────────────────────────────────────────────────────────
+
+/**
+ * Resolve the seam-allowance width of each flattened outline edge.
+ *
+ * For flattened edge `i` (from vertices[i] to vertices[(i+1)%n]), the owning
+ * outline command is the source command of its END vertex — `vertexCmds[(i+1)%n]`
+ * (the convention `detectSemanticEdges`/`sampleSegments` use: a segment is keyed
+ * by the command that draws it). The SemanticEdge whose `segmentRange` [start,end)
+ * covers that command supplies the width; everything else inherits `fallbackWidth`.
+ *
+ * When `semanticEdges` is absent or none sets `seamAllowanceWidth`, every edge
+ * gets `fallbackWidth`, so the result is uniform and the generated SA is
+ * byte-identical to the single-width path (zero regression).
+ *
+ * @param vertexCmds    source command index per flattened vertex (from flattenPathWithSource)
+ * @param semanticEdges piece.edges; `segmentRange` is [start,end) in command space
+ * @param fallbackWidth piece-level SA width (mm)
+ */
+export function perEdgeWidths(
+  vertexCmds: number[],
+  semanticEdges: SemanticEdge[] | undefined,
+  fallbackWidth: number,
+): number[] {
+  const n = vertexCmds.length;
+  const widths = new Array<number>(n).fill(fallbackWidth);
+  if (!semanticEdges || semanticEdges.length === 0) return widths;
+
+  // command index → per-edge width, for the edges that explicitly set one.
+  const commandWidth = new Map<number, number>();
+  for (const se of semanticEdges) {
+    if (se.seamAllowanceWidth == null) continue;
+    const [start, end] = se.segmentRange;
+    for (let c = start; c < end; c++) commandWidth.set(c, se.seamAllowanceWidth);
+  }
+  if (commandWidth.size === 0) return widths;
+
+  for (let i = 0; i < n; i++) {
+    const owningCmd = vertexCmds[(i + 1) % n];
+    const w = commandWidth.get(owningCmd);
+    if (w != null) widths[i] = w;
+  }
+  return widths;
+}
+
 // ─── generateSeamAllowanceWithCorners ─────────────────────────────────────
 
 /**
@@ -530,6 +575,8 @@ export function shiftCornerTypes(
  * @param saWidth           Seam allowance width in mm (must be > 0)
  * @param defaultCornerType Corner type used when a vertex has no explicit override
  * @param cornerTypes       Per-vertex overrides (key = vertex index in outline)
+ * @param semanticEdges     Optional piece.edges — supplies per-edge SA widths via
+ *                          `seamAllowanceWidth`; absent → uniform `saWidth`
  * @param seamLookup        Optional seam lookup for 'match' corner resolution (unused at this level)
  */
 export function generateSeamAllowanceWithCorners(
@@ -537,6 +584,7 @@ export function generateSeamAllowanceWithCorners(
   saWidth: number,
   defaultCornerType: CornerType,
   cornerTypes: Record<number, CornerType>,
+  semanticEdges?: SemanticEdge[],
   _seamLookup?: (vertexIndex: number) => { pieceId: string; vertexIndex: number } | null,
 ): PathCommand[] {
   // ── Guard: degenerate inputs ──────────────────────────────────────────────
@@ -574,8 +622,10 @@ export function generateSeamAllowanceWithCorners(
     });
   }
 
-  // ── Step 3: Offset each edge outward by saWidth ────────────────────────────
-  const offsetEdges: Line2D[] = edges.map((e) => offsetEdge(e, saWidth));
+  // ── Step 3: Offset each edge outward by its per-edge width ─────────────────
+  // Each edge offsets by its own SA width (per-edge SA); absent → uniform saWidth.
+  const edgeWidths = perEdgeWidths(sourced.map((p) => p.cmd), semanticEdges, saWidth);
+  const offsetEdges: Line2D[] = edges.map((e, i) => offsetEdge(e, edgeWidths[i]));
 
   // ── Step 4 + 5: Assemble the SA outline ──────────────────────────────────
   // For each vertex i, the corner is between offsetEdges[i-1] (prev) and
@@ -599,10 +649,13 @@ export function generateSeamAllowanceWithCorners(
     const nextEdge = edges[i];
     const angle = interiorAngle(prevEdge, nextEdge);
 
-    // Get corner geometry points. Both sides use the same width today (one SA
-    // per piece); per-edge widths are wired here in step 3 — the corner
-    // functions already accept (prevWidth, nextWidth) and resolve asymmetry.
-    const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, saWidth, saWidth, angle);
+    // Get corner geometry points. The two adjacent edges may carry different
+    // per-edge widths (e.g. a 40mm hem meeting a 10mm armhole); the corner
+    // function resolves the asymmetry. prevWidth = incoming edge (i-1),
+    // nextWidth = outgoing edge (i).
+    const prevWidth = edgeWidths[(i + n - 1) % n];
+    const nextWidth = edgeWidths[i];
+    const cornerPts = cornerFn(prevOffsetEdge, nextOffsetEdge, vertex, prevWidth, nextWidth, angle);
 
     // Emit the start of the offset edge for the NEXT edge (i.e., nextOffsetEdge.start),
     // then the corner geometry points.
