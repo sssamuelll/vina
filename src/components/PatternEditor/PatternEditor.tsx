@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, setEdgeSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectEdge, selectVertex, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, Point2D, PathCommand, CornerType } from '../../types/types';
@@ -14,6 +14,7 @@ import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
+import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
 import { showUndoToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
 import { newId } from '../../utils/ids';
@@ -225,7 +226,11 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       ));
     }
   }, [pieces, dispatch]);
-  const seamAllowanceTool = useSeamAllowanceTool(pieces, handleApplySeamAllowance);
+  const seamAllowanceTool = useSeamAllowanceTool(pieces, zoom2D, pan2D, {
+    onApply: handleApplySeamAllowance,
+    onSelectEdge: (pieceId, edgeId) => dispatch(selectEdge({ pieceId, edgeId })),
+    onSelectVertex: (pieceId, vertexIndex) => dispatch(selectVertex({ pieceId, vertexIndex })),
+  });
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
 
@@ -732,6 +737,14 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           )}
           <ElasticRenderer zoom2D={zoom2D} />
           <TrimRenderer zoom2D={zoom2D} />
+          {activeTool === 'seamAllowance' && (
+            <SeamAllowanceSelectionOverlay
+              selectedEdge={editor.selectedEdge}
+              selectedVertex={editor.selectedVertex}
+              pieces={pieces}
+              zoom={zoom2D}
+            />
+          )}
           <ToolOverlay
             activeTool={activeTool}
             zoom2D={zoom2D}

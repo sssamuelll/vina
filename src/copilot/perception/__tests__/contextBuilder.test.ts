@@ -97,6 +97,8 @@ function mockState(overrides?: Partial<RootState>): RootState {
       selectedPOMId: null,
       selectedElasticId: null,
       selectedInternalLine: null,
+      selectedEdge: null,
+      selectedVertex: null,
       zoom2D: 1,
       pan2D: { x: 0, y: 0 },
       fitViewToken: 0,

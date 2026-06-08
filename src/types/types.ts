@@ -694,6 +694,10 @@ export interface EditorState {
   selectedPOMId: string | null;
   selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
+  /** Focused outline edge for per-edge seam-allowance editing (seamAllowance tool). */
+  selectedEdge: { pieceId: string; edgeId: string } | null;
+  /** Focused outline vertex for corner-type editing (seamAllowance tool). */
+  selectedVertex: { pieceId: string; vertexIndex: number } | null;
   zoom2D: number;
   pan2D: Point2D;
   /** Monotonic counter: bumped to request a fit-to-content of the 2D viewport

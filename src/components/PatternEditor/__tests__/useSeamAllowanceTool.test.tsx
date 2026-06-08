@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 /**
- * useSeamAllowanceTool — the width-apply half of the seamAllowance tool
- * (María, hallazgo #2: explicit apply-SA command). Click a piece → apply
- * editor.defaultSeamAllowanceWidth as the per-piece scalar. The corner-type
- * half (right-click → CornerTypeMenu) was already wired in PatternEditor.
+ * useSeamAllowanceTool — left-click disambiguation. With the seamAllowance tool
+ * active, left-click selects a vertex (corner editing) or an edge (per-edge
+ * width), or applies the editor default to the whole piece on a body click.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import React from 'react';
@@ -12,95 +11,109 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import editorReducer, { setDefaultSAWidth } from '../../../store/editorSlice';
 import { useSeamAllowanceTool } from '../useSeamAllowanceTool';
+import type { PatternPiece, SemanticEdge } from '../../../types/types';
 
 afterEach(cleanup);
+
+const square = [
+  { type: 'M', values: [0, 0] },
+  { type: 'L', values: [200, 0] },
+  { type: 'L', values: [200, 200] },
+  { type: 'L', values: [0, 200] },
+  { type: 'Z', values: [] },
+] as PatternPiece['outline'];
+
+const edges: SemanticEdge[] = [
+  { id: 'p:top', name: 'top', segmentRange: [1, 2], edgeType: 'seam' },
+  { id: 'p:right', name: 'right', segmentRange: [2, 3], edgeType: 'seam' },
+  { id: 'p:bottom', name: 'bottom', segmentRange: [3, 4], edgeType: 'hem' },
+];
+
+function piece(seamAllowance = 0): PatternPiece {
+  return {
+    id: 'p', name: 'Square', outline: square, position: { x: 0, y: 0 },
+    rotation: 0, mirrored: false, active: true, seamAllowance, internals: [], edges,
+  } as unknown as PatternPiece;
+}
 
 function makeStore() {
   return configureStore({ reducer: { editor: editorReducer } });
 }
 
-function setup(pieces: Array<{ id: string; seamAllowance: number }> = [{ id: 'piece-1', seamAllowance: 0 }]) {
+function setup(pieces: PatternPiece[] = [piece()]) {
   const store = makeStore();
   const onApply = vi.fn();
+  const onSelectEdge = vi.fn();
+  const onSelectVertex = vi.fn();
   const wrapper = ({ children }: { children: React.ReactNode }) => (
     <Provider store={store}>{children}</Provider>
   );
   const hook = renderHook(
-    () => useSeamAllowanceTool(pieces as never, onApply),
+    () => useSeamAllowanceTool(pieces, 1, { x: 0, y: 0 }, { onApply, onSelectEdge, onSelectVertex }),
     { wrapper },
   );
-  return { store, onApply, hook };
+  return { store, onApply, onSelectEdge, onSelectVertex, hook };
 }
 
-/** Build a real SVG fragment so `target.closest('[data-piece-id]')` works. */
-function pieceTarget(pieceId?: string): SVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-  if (pieceId) g.setAttribute('data-piece-id', pieceId);
-  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  g.appendChild(rect);
-  svg.appendChild(g);
-  document.body.appendChild(svg);
-  return rect as unknown as SVGElement;
+// zoom=1, pan=0, rect at origin → pattern point === client point.
+function clickAt(x: number, y: number, button = 0) {
+  return {
+    button,
+    clientX: x,
+    clientY: y,
+    currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
+  } as unknown as React.MouseEvent<SVGSVGElement>;
 }
 
-function mouseEvent(target: SVGElement, button = 0) {
-  return { button, target } as unknown as React.MouseEvent<SVGSVGElement>;
-}
-
-describe('useSeamAllowanceTool', () => {
-  it('clicking a piece applies the default SA width (10mm)', () => {
-    const { onApply, hook } = setup();
-    act(() => {
-      hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1')));
-    });
-    expect(onApply).toHaveBeenCalledWith('piece-1', 10, 0);
+describe('useSeamAllowanceTool left-click', () => {
+  it('clicking near a corner selects that vertex', () => {
+    const { onSelectVertex, onApply, hook } = setup();
+    act(() => hook.result.current.handleMouseDown(clickAt(2, 2)));
+    expect(onSelectVertex).toHaveBeenCalledWith('p', 0);
+    expect(onApply).not.toHaveBeenCalled();
   });
 
-  it('reports the previous width so the caller can offer undo on overwrite', () => {
-    // María sets 8mm (Overlock) in Properties, then accidentally clicks the
-    // piece with the SA tool: the apply must carry prev=8 so the caller can
-    // surface an undo toast instead of overwriting silently.
-    const { onApply, hook } = setup([{ id: 'piece-1', seamAllowance: 8 }]);
-    act(() => {
-      hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1')));
-    });
-    expect(onApply).toHaveBeenCalledWith('piece-1', 10, 8);
+  it('clicking near an edge midpoint selects that edge', () => {
+    const { onSelectEdge, onApply, hook } = setup();
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 2)));
+    expect(onSelectEdge).toHaveBeenCalledWith('p', 'p:top');
+    expect(onApply).not.toHaveBeenCalled();
   });
 
-  it('applies the current editor.defaultSeamAllowanceWidth, not a frozen value', () => {
+  it('clicking the piece body applies the default width to the whole piece', () => {
+    const { onApply, onSelectEdge, hook } = setup([piece(8)]);
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
+    expect(onApply).toHaveBeenCalledWith('p', 10, 8); // default 10, prev 8
+    expect(onSelectEdge).not.toHaveBeenCalled();
+  });
+
+  it('applies the current editor default, not a frozen value', () => {
     const { store, onApply, hook } = setup();
-    act(() => {
-      store.dispatch(setDefaultSAWidth(25));
-    });
-    act(() => {
-      hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1')));
-    });
-    expect(onApply).toHaveBeenCalledWith('piece-1', 25, 0);
+    act(() => store.dispatch(setDefaultSAWidth(25)));
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 100)));
+    expect(onApply).toHaveBeenCalledWith('p', 25, 0);
   });
 
   it('clicking empty canvas does nothing', () => {
-    const { onApply, hook } = setup();
-    act(() => {
-      hook.result.current.handleMouseDown(mouseEvent(pieceTarget(undefined)));
-    });
+    const { onApply, onSelectEdge, onSelectVertex, hook } = setup();
+    act(() => hook.result.current.handleMouseDown(clickAt(999, 999)));
     expect(onApply).not.toHaveBeenCalled();
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    expect(onSelectVertex).not.toHaveBeenCalled();
   });
 
   it('ignores non-left buttons', () => {
-    const { onApply, hook } = setup();
-    act(() => {
-      hook.result.current.handleMouseDown(mouseEvent(pieceTarget('piece-1'), 2));
-    });
+    const { onApply, onSelectEdge, onSelectVertex, hook } = setup();
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 100, 2)));
     expect(onApply).not.toHaveBeenCalled();
+    expect(onSelectEdge).not.toHaveBeenCalled();
+    expect(onSelectVertex).not.toHaveBeenCalled();
   });
 
   it('exposes the effective width for the HintText', () => {
     const { store, hook } = setup();
     expect(hook.result.current.widthMm).toBe(10);
-    act(() => {
-      store.dispatch(setDefaultSAWidth(15));
-    });
+    act(() => store.dispatch(setDefaultSAWidth(15)));
     expect(hook.result.current.widthMm).toBe(15);
   });
 });

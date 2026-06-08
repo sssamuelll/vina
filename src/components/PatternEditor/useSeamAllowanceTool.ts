@@ -1,35 +1,53 @@
 import { useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import type { PatternPiece } from '../../types/types';
+import type { PatternPiece, Point2D } from '../../types/types';
+import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
+import { resolveSeamAllowanceClick } from '../../utils/seam/edgeHitTest';
 
 /**
- * Seam allowance tool — the explicit apply-SA command (María, hallazgo #2).
+ * Seam allowance tool — left-click interaction.
  *
- * Pieces are born NET (seamAllowance 0, drafted-pieces-born-net); this tool is
- * the reachable way to put allowance back ON PURPOSE: click a piece → apply
- * `editor.defaultSeamAllowanceWidth` as the per-piece scalar. Per-edge widths
- * are a future model (no data shape today). The other half of the tool —
- * right-click a vertex → CornerTypeMenu — is wired in PatternEditor's
- * handleContextMenu and shares the same `activeTool === 'seamAllowance'` gate.
+ * Left-click disambiguates by what it lands on (CLO3D-style selection):
+ *  - near a VERTEX  → select that vertex (corner-type editing in the panel)
+ *  - near an EDGE   → select that edge (per-edge width editing in the panel)
+ *  - the piece BODY → apply the editor default to the WHOLE piece (the bulk
+ *    seed; its command home, no longer squatting on the selection verb)
  *
- * `onApply` receives the piece's previous width so the caller can surface an
- * undo toast when a click overwrites a deliberate custom value.
+ * Width/corner-type values are edited in the PropertiesPanel, bound to the
+ * selection — properties live in panels, commands live in menus. `onApply`
+ * receives the previous width so the caller can offer an undo toast.
  */
 export function useSeamAllowanceTool(
   pieces: PatternPiece[],
-  onApply: (pieceId: string, widthMm: number, prevWidthMm: number) => void,
+  zoom: number,
+  pan: Point2D,
+  callbacks: {
+    onApply: (pieceId: string, widthMm: number, prevWidthMm: number) => void;
+    onSelectEdge: (pieceId: string, edgeId: string) => void;
+    onSelectVertex: (pieceId: string, vertexIndex: number) => void;
+  },
 ) {
   const widthMm = useSelector((s: RootState) => s.editor.defaultSeamAllowanceWidth);
+  const { onApply, onSelectEdge, onSelectVertex } = callbacks;
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
-    const target = e.target as SVGElement;
-    const pieceId = target.closest('[data-piece-id]')?.getAttribute('data-piece-id');
-    if (!pieceId) return;
-    const prev = pieces.find(p => p.id === pieceId)?.seamAllowance ?? 0;
-    onApply(pieceId, widthMm, prev);
-  }, [onApply, widthMm, pieces]);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pt = screenToPattern(e.clientX, e.clientY, rect, zoom, pan);
+    const vThresh = screenToPatternLength(10, zoom);
+    const eThresh = screenToPatternLength(12, zoom);
+    const target = resolveSeamAllowanceClick(pieces, pt, vThresh, eThresh);
+    if (!target) return;
+    if (target.kind === 'vertex') {
+      onSelectVertex(target.pieceId, target.vertexIndex);
+    } else if (target.kind === 'edge') {
+      onSelectEdge(target.pieceId, target.edgeId);
+    } else {
+      const prev = pieces.find(p => p.id === target.pieceId)?.seamAllowance ?? 0;
+      onApply(target.pieceId, widthMm, prev);
+    }
+  }, [pieces, zoom, pan, widthMm, onApply, onSelectEdge, onSelectVertex]);
 
   return { handleMouseDown, widthMm };
 }

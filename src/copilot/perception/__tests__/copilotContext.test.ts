@@ -90,6 +90,8 @@ function createMockState(overrides: Partial<any> = {}): RootState {
       selectedPieceIds: ['piece-1'],
       selectedSeamId: null,
       selectedInternalLine: null,
+      selectedEdge: null,
+      selectedVertex: null,
       zoom2D: 1,
       pan2D: { x: 0, y: 0 },
       showSeamAllowance: true,
