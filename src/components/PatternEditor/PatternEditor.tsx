@@ -363,6 +363,12 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           return;
         }
       }
+      // SA mode owns right-click: never fall through to the general (destructive)
+      // piece menu. A miss on both a vertex and an edge does nothing — it must
+      // not surface Delete/Flip/Rotate in a precision editing mode. (The
+      // per-edge editing surface moves to left-click selection + panel next;
+      // this gate stops the collision María reported now.)
+      return;
     }
 
     // Hit-test: find piece whose bounding box contains the point
