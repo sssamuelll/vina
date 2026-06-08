@@ -23,7 +23,7 @@ export const FORMAT_PROFILES: Record<FormatId, FormatProfile> = {
       '8': 'draw', 'DRAW': 'draw',
       '11': 'intcut', 'INTCUT': 'intcut',
       '13': 'label', '14': 'label', '15': 'draw',
-      '84': 'seam', // CLO vendor layer: smooth sew/seam line (María's Adidas export)
+      '84': 'seam', // CLO vendor layer: smooth sew/seam line (seen in real CLO exports)
       'SEAM': 'seam', 'LABEL': 'label',
     },
     layerPatterns: [],

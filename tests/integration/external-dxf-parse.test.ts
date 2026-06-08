@@ -1,17 +1,15 @@
 // @vitest-environment jsdom
 /**
- * Probe — does openclo's existing DXF parser handle María's actual file
- * (`temp.dxf`, exported from her Adidas-internal workflow)? Read-only,
- * no Redux, no agentic loop. Just `parseDXF` + `dxfToPatternPieces` on
- * the raw file. Tells us whether the M3 "agentic DXF import" slice
- * needs only a tool wire (parser already handles real files) or
- * actually needs format-compat work (parser fails / drops pieces).
+ * Probe — does openclo's existing DXF parser handle a real CLO/CAD export?
+ * Read-only, no Redux, no agentic loop. Just `parseDXF` + `dxfToPatternPieces`
+ * on the raw file. Tells us whether the M3 "agentic DXF import" slice needs
+ * only a tool wire (parser already handles real files) or actually needs
+ * format-compat work (parser fails / drops pieces).
  *
- * Opt-in: file path is read from `MARIA_DXF` env var. Default location
- * `~/Desktop/temp.dxf` is reflected in the skip message — the file
- * lives outside the repo and is not committed.
+ * Opt-in: file path is read from the `EXTERNAL_DXF` env var. The file lives
+ * outside the repo and is not committed; the test skips when it is absent.
  *
- *   MARIA_DXF=/path/to/her.dxf npx vitest run tests/integration/maria-dxf-parse.test.ts
+ *   EXTERNAL_DXF=/path/to/export.dxf npx vitest run tests/integration/external-dxf-parse.test.ts
  */
 
 import { describe, it, expect } from 'vitest';
@@ -19,12 +17,12 @@ import { readFileSync, existsSync } from 'node:fs';
 import { parseDXF, dxfToPatternPieces } from '../../src/utils/dxf';
 import { detectDXFFormat, getProfile } from '../../src/utils/dxf';
 
-const MARIA_DXF = process.env.MARIA_DXF ?? 'C:\\Users\\simon\\Desktop\\temp.dxf';
-const shouldRun = existsSync(MARIA_DXF);
+const EXTERNAL_DXF = process.env.EXTERNAL_DXF ?? './external-cad-export.dxf';
+const shouldRun = existsSync(EXTERNAL_DXF);
 
-describe.skipIf(!shouldRun)('María DXF probe', () => {
+describe.skipIf(!shouldRun)('External DXF probe', () => {
   it('parses without throwing and produces at least one pattern piece', () => {
-    const text = readFileSync(MARIA_DXF, 'utf8');
+    const text = readFileSync(EXTERNAL_DXF, 'utf8');
     expect(text.length).toBeGreaterThan(0);
 
     // Stage 1: raw DXF parse
@@ -65,7 +63,7 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
   });
 
   it('M3.5 — extracts the internal-line fidelity a patternmaker expects', () => {
-    const doc = parseDXF(readFileSync(MARIA_DXF, 'utf8'));
+    const doc = parseDXF(readFileSync(EXTERNAL_DXF, 'utf8'));
     const formats = detectDXFFormat(doc);
     const profile = formats.length > 0 ? getProfile(formats[0].profileId) : undefined;
     const pieces = dxfToPatternPieces(doc, profile ? { formatProfile: profile } : undefined);
@@ -77,11 +75,11 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
       // (POLYLINE@8), 1 sew line (POLYLINE@84 → 'seam').
       expect(byType('grainline'), `${p.name} grainline`).toBe(1);
       expect(byType('dart'), `${p.name} darts`).toBe(2);
-      // Hallazgo #3: María's pattern is NET — the dense sew line (192-274
-      // vertices) coincides with the coarse cut boundary (29-56 vertices)
-      // and is PROMOTED to be the outline; the duplicate internal is gone.
+      // Finding #3: the pattern is NET — the dense sew line (192-274 vertices)
+      // coincides with the coarse cut boundary (29-56 vertices) and is
+      // PROMOTED to be the outline; the duplicate internal is gone.
       // (Before: byType('seam') === 1 and outline < 60 cut-only commands —
-      // which drew the faceted double contour she flagged.)
+      // which drew the faceted double contour the export exhibited.)
       expect(byType('seam'), `${p.name} seam promoted, no duplicate`).toBe(0);
     }
     // Outlines are now the dense sew samples (16/192/200/200/274 vertices,
@@ -94,7 +92,7 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
       p.internals.filter((i) => i.type === 'notch').map((n) => ({ piece: p, n })));
     expect(allNotches.length).toBe(8);
 
-    // Hallazgo #5: every CLO notch POINT sits ON the boundary → all 8 are
+    // Finding #5: every CLO notch POINT sits ON the boundary → all 8 are
     // interpreted as edge-anchored notches (native model), not generic ticks.
     for (const { piece, n } of allNotches) {
       expect(n.notchOptions?.shape, `${piece.name} notch model`).toBe('slit');
@@ -105,7 +103,7 @@ describe.skipIf(!shouldRun)('María DXF probe', () => {
       const len = Math.hypot(l.values[0] - m.values[0], l.values[1] - m.values[1]);
       expect(len, `${piece.name} notch length`).toBeCloseTo(8, 1);
       // Notch-precision F2: interpreted notches are back-filled with a
-      // parametric anchor (her garment blocks all have detectable corners).
+      // parametric anchor (the garment blocks all have detectable corners).
       expect(n.notchAnchor, `${piece.name} notch anchor`).toBeDefined();
       expect(n.notchAnchor!.distanceMm).toBeGreaterThan(0);
       expect(['cw', 'ccw']).toContain(n.notchAnchor!.direction);
