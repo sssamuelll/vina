@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { tools } from '../internalTools';
-import type { InternalLine, PatternPiece, Seam } from '../../../../../types/types';
+import type { PatternPiece, Seam } from '../../../../../types/types';
 
 const mirrorNotch = tools.find(t => t.name === 'mirrorNotch')!;
 
@@ -43,7 +43,8 @@ function makeState(withSeam = true) {
 
 describe('mirrorNotch copilot tool', () => {
   it('creates the corresponding notch on the paired piece at the matching distance', async () => {
-    const dispatched: { type: string; payload: { pieceId: string; line: InternalLine } }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dispatched: { type: string; payload: any }[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dispatch = ((a: any) => { dispatched.push(a); return a; }) as unknown as Parameters<typeof mirrorNotch.execute>[1];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -51,16 +52,19 @@ describe('mirrorNotch copilot tool', () => {
 
     const r = await mirrorNotch.execute({ pieceId: 'A', notchLineId: 'n1' }, dispatch, getState);
     expect(r.success).toBe(true);
-    expect(dispatched).toHaveLength(1);
-    expect(dispatched[0].payload.pieceId).toBe('B');
-    const line = dispatched[0].payload.line;
+    const addLine = dispatched.find(d => d.type === 'project/addInternalLine')!;
+    expect(addLine.payload.pieceId).toBe('B');
+    const line = addLine.payload.line;
     expect(line.type).toBe('notch');
     expect(line.path[0].values[0]).toBeCloseTo(0, 3);
     expect(line.path[0].values[1]).toBeCloseTo(100, 3);   // direct sense: 0.25 * 400
+    // B1: a declared pair is also recorded.
+    expect(dispatched.some(d => d.type === 'project/addNotchPair')).toBe(true);
   });
 
   it('invert places the notch on the opposite end (right-sides-together)', async () => {
-    const dispatched: { payload: { line: InternalLine } }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const dispatched: { type: string; payload: any }[] = [];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const dispatch = ((a: any) => { dispatched.push(a); return a; }) as unknown as Parameters<typeof mirrorNotch.execute>[1];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,7 +72,8 @@ describe('mirrorNotch copilot tool', () => {
 
     const r = await mirrorNotch.execute({ pieceId: 'A', notchLineId: 'n1', invert: true }, dispatch, getState);
     expect(r.success).toBe(true);
-    expect(dispatched[0].payload.line.path[0].values[1]).toBeCloseTo(300, 3);   // (1 - 0.25) * 400
+    const addLine = dispatched.find(d => d.type === 'project/addInternalLine')!;
+    expect(addLine.payload.line.path[0].values[1]).toBeCloseTo(300, 3);   // (1 - 0.25) * 400
   });
 
   it('fails with a clear message when there is no seam on the edge', async () => {

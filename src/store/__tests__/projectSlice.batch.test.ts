@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
-import projectReducer, { addPiece, addSeam, addPOM, removePieces, batchSetSeamAllowance, setEdgesSeamAllowance } from '../projectSlice';
+import projectReducer, { addPiece, addSeam, addPOM, removePieces, removePiece, removeInternalLine, batchSetSeamAllowance, setEdgesSeamAllowance, addNotchPair, removeNotchPair } from '../projectSlice';
 
 const initialState = projectReducer(undefined, { type: '@@INIT' });
 
@@ -85,5 +85,35 @@ describe('projectSlice batch operations', () => {
     // Negative clamps to 0.
     state = projectReducer(state, setEdgesSeamAllowance({ items: [{ pieceId: 'p1', edgeId: 'e3' }], width: -5 }));
     expect(state.pieces[0].edges!.find(e => e.id === 'e3')!.seamAllowanceWidth).toBe(0);
+  });
+
+  // ── Notch mirror pairs (Alcance B1) ──
+  const mkPair = () => ({
+    id: 'np1', a: { pieceId: 'A', lineId: 'na' }, b: { pieceId: 'B', lineId: 'nb' }, seamId: 's1', invert: true,
+  });
+
+  it('addNotchPair / removeNotchPair manage the registry', () => {
+    let state = projectReducer(initialState, addNotchPair(mkPair()));
+    expect(state.notchPairs).toHaveLength(1);
+    expect(state.isDirty).toBe(true);
+    state = projectReducer(state, removeNotchPair('np1'));
+    expect(state.notchPairs).toHaveLength(0);
+  });
+
+  it('GC: removing a referenced piece drops the pair', () => {
+    let state = projectReducer(initialState, addPiece({ id: 'A', name: 'A', outline: [], internals: [] } as any));
+    state = projectReducer(state, addPiece({ id: 'B', name: 'B', outline: [], internals: [] } as any));
+    state = projectReducer(state, addNotchPair(mkPair()));
+    state = projectReducer(state, removePiece('B'));
+    expect(state.notchPairs).toHaveLength(0);
+  });
+
+  it('GC: removing a referenced notch line drops the pair', () => {
+    let state = projectReducer(initialState, addPiece({
+      id: 'A', name: 'A', outline: [], internals: [{ id: 'na', type: 'notch', path: [] }],
+    } as any));
+    state = projectReducer(state, addNotchPair(mkPair()));
+    state = projectReducer(state, removeInternalLine({ pieceId: 'A', lineId: 'na' }));
+    expect(state.notchPairs).toHaveLength(0);
   });
 });

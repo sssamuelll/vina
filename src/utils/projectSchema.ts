@@ -29,6 +29,7 @@ const MAX_FABRICS = 1_000;
 const MAX_GROUPS = 1_000;
 const MAX_POMS = 5_000;
 const MAX_SEAM_GROUPS = 10_000;
+const MAX_NOTCH_PAIRS = 50_000;
 const MAX_REFERENCE_IMAGES = 200;
 const MAX_TRIMS = 5_000;
 
@@ -360,6 +361,21 @@ const trimSchema = z
   })
   .loose();
 
+// ─── Notch mirror pairs (Alcance B1) ────────────────────────────────────────
+const notchPairEndpointSchema = z.object({
+  pieceId: boundedString(MAX_ID_LEN),
+  lineId: boundedString(MAX_ID_LEN),
+});
+const notchPairSchema = z
+  .object({
+    id: idString,
+    a: notchPairEndpointSchema,
+    b: notchPairEndpointSchema,
+    seamId: boundedString(MAX_ID_LEN),
+    invert: z.boolean(),
+  })
+  .loose();
+
 // ─── Top-level OpenCloProject ───────────────────────────────────────────────
 const openCloProjectSchema = z
   .object({
@@ -373,6 +389,7 @@ const openCloProjectSchema = z
     groups: z.array(pieceGroupSchema).max(MAX_GROUPS).optional(),
     poms: z.array(pomSchema).max(MAX_POMS).optional(),
     seamGroups: z.array(seamGroupSchema).max(MAX_SEAM_GROUPS).optional(),
+    notchPairs: z.array(notchPairSchema).max(MAX_NOTCH_PAIRS).optional(),
     garmentInfo: garmentInfoSchema.optional(),
     referenceImages: z.array(referenceImageSchema).max(MAX_REFERENCE_IMAGES).optional(),
     trims: z.array(trimSchema).max(MAX_TRIMS).optional(),

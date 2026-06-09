@@ -6,9 +6,10 @@
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
-import { addInternalLine, setInternalLine } from '../../../../store/projectSlice';
+import { addInternalLine, setInternalLine, addNotchPair } from '../../../../store/projectSlice';
 import type { PathCommand, InternalLine } from '../../../../types/types';
 import { lineId, M, L } from '../../../../utils/pathHelpers';
+import { newId } from '../../../../utils/ids';
 
 // ─── addDart ────────────────────────────────────────────────────────────────
 
@@ -347,6 +348,14 @@ const mirrorNotchTool: ToolDefinition = {
     const notchLine = createMirrorNotchLine(pairedPiece.outline, mapped, source);
 
     dispatch(addInternalLine({ pieceId: mapped.pairedPieceId, line: notchLine }));
+    // Record the declared pair (B1): persistent identity, position re-derived.
+    dispatch(addNotchPair({
+      id: newId(),
+      a: { pieceId: params.pieceId as string, lineId: params.notchLineId as string },
+      b: { pieceId: mapped.pairedPieceId, lineId: notchLine.id },
+      seamId: mapped.seamId,
+      invert: !!params.invert,
+    }));
     return { success: true, data: { internalLineId: notchLine.id, pieceId: mapped.pairedPieceId, edge: mapped.pairedEdgeName } };
   },
 };

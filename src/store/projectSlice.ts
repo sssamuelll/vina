@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, NotchAnchor, NotchOptions, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
+import { PatternPiece, Seam, SeamGroup, Fabric, Avatar, OpenCloProject, InternalLine, NotchAnchor, NotchOptions, NotchPair, PathCommand, PieceGroup, PointOfMeasure, Colorway, Pleat, MAX_PLEAT_COUNT, Elastic, clampStretchRatio, ReferenceImage } from '../types/types';
 import type { Trim } from '../types/trim';
 import type { PieceArtwork } from '../types/artwork';
 import { NEW_PROJECT } from './actions';
@@ -195,6 +195,9 @@ interface ProjectState {
   arrangementOverrides: Record<string, [number, number, number]>;
   /** Points of measure */
   poms: PointOfMeasure[];
+  /** Declared notch-mirror pairs (Alcance B1) — identity only, re-derived.
+   *  Optional + guarded (like elastics/trims) so partial test mocks still type. */
+  notchPairs?: NotchPair[];
   /** Reference images for tracing in the 2D pattern editor */
   referenceImages: ReferenceImage[];
   /** Custom layer names (layer number → display name) */
@@ -228,6 +231,7 @@ const initialState: ProjectState = {
   seamGroups: [],
   arrangementOverrides: {},
   poms: [],
+  notchPairs: [],
   referenceImages: [],
   layerNames: {},
   layerLocked: {},
@@ -259,6 +263,7 @@ function applyProjectPayload(state: ProjectState, payload: OpenCloProject, gener
   state.groups = p.groups ?? [];
   state.poms = p.poms ?? [];
   state.seamGroups = (p as any).seamGroups ?? [];
+  state.notchPairs = (p as any).notchPairs ?? [];
   state.isDirty = false;
   // Backfill layer/sublayer for pieces loaded from older project files
   for (const piece of state.pieces) {
@@ -410,6 +415,10 @@ const projectSlice = createSlice({
       state.poms = state.poms.filter(
         pom => pom.pointA.pieceId !== id && pom.pointB.pieceId !== id
       );
+      // Remove notch-mirror pairs referencing the deleted piece (B1 GC)
+      if (state.notchPairs) state.notchPairs = state.notchPairs.filter(
+        np => np.a.pieceId !== id && np.b.pieceId !== id
+      );
       state.isDirty = true;
     },
     removePieces(state, action: PayloadAction<string[]>) {
@@ -430,6 +439,10 @@ const projectSlice = createSlice({
       // Remove POMs referencing deleted pieces
       state.poms = state.poms.filter(
         pom => !ids.has(pom.pointA.pieceId) && !ids.has(pom.pointB.pieceId)
+      );
+      // Remove notch-mirror pairs referencing deleted pieces (B1 GC)
+      if (state.notchPairs) state.notchPairs = state.notchPairs.filter(
+        np => !ids.has(np.a.pieceId) && !ids.has(np.b.pieceId)
       );
       // Remove seamGroups referencing deleted pieces
       state.seamGroups = state.seamGroups.filter(
@@ -490,6 +503,11 @@ const projectSlice = createSlice({
         piece.updatedAt = Date.now();
         state.isDirty = true;
       }
+      // Drop any notch-mirror pair referencing the removed line (B1 GC)
+      const { pieceId, lineId } = action.payload;
+      if (state.notchPairs) state.notchPairs = state.notchPairs.filter(
+        np => !((np.a.pieceId === pieceId && np.a.lineId === lineId) || (np.b.pieceId === pieceId && np.b.lineId === lineId))
+      );
     },
     /** Replace all internals of a given type (e.g. grainline — only one per piece) */
     setInternalLine(state, action: PayloadAction<{ pieceId: string; line: InternalLine }>) {
@@ -895,6 +913,16 @@ const projectSlice = createSlice({
     },
     removePOM(state, action: PayloadAction<string>) {
       state.poms = state.poms.filter(p => p.id !== action.payload);
+      state.isDirty = true;
+    },
+    // ─── Notch mirror pairs (Alcance B1) — persistent identity, position re-derived ───
+    addNotchPair(state, action: PayloadAction<NotchPair>) {
+      if (!state.notchPairs) state.notchPairs = [];
+      state.notchPairs.push(action.payload);
+      state.isDirty = true;
+    },
+    removeNotchPair(state, action: PayloadAction<string>) {
+      if (state.notchPairs) state.notchPairs = state.notchPairs.filter(np => np.id !== action.payload);
       state.isDirty = true;
     },
     recomputePOMValues(state, action: PayloadAction<Array<{ id: string; value: number }>>) {
@@ -1494,6 +1522,7 @@ export const {
   addArtwork, updateArtwork, removeArtwork,
   // POMs
   addPOM, updatePOM, removePOM, recomputePOMValues,
+  addNotchPair, removeNotchPair,
   linkPieces, unlinkPieces, cloneAsLinked,
   // Per-edge seam allowance
   setEdgeSeamAllowance, setEdgesSeamAllowance,
