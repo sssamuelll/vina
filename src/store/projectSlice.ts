@@ -1054,6 +1054,32 @@ const projectSlice = createSlice({
       piece!.updatedAt = Date.now();
       state.isDirty = true;
     },
+    /**
+     * Bulk per-edge seam allowance (multi-select Shift: edit N edges' width in
+     * ONE action). `width: null` clears the override (Inherit) on all. Grouped by
+     * piece so state.pieces is scanned once, not per edge — one project/* dispatch
+     * => one undo entry (no O(project) clone per edge). Mirrors setEdgeSeamAllowance.
+     */
+    setEdgesSeamAllowance(state, action: PayloadAction<{ items: { pieceId: string; edgeId: string }[]; width: number | null }>) {
+      const { items, width } = action.payload;
+      const byPiece = new Map<string, Set<string>>();
+      for (const it of items) {
+        let s = byPiece.get(it.pieceId);
+        if (!s) { s = new Set(); byPiece.set(it.pieceId, s); }
+        s.add(it.edgeId);
+      }
+      const w = width == null ? undefined : Math.max(0, width);
+      for (const piece of state.pieces) {
+        const edgeIds = byPiece.get(piece.id);
+        if (!edgeIds || !piece.edges) continue;
+        let touched = false;
+        for (const edge of piece.edges) {
+          if (edgeIds.has(edge.id)) { edge.seamAllowanceWidth = w; touched = true; }
+        }
+        if (touched) piece.updatedAt = Date.now();
+      }
+      if (items.length > 0) state.isDirty = true;
+    },
 
     cloneToLayer(state, action: PayloadAction<{ pieceId: string; direction: 'over' | 'under' }>) {
       const piece = state.pieces.find(p => p.id === action.payload.pieceId);
@@ -1470,7 +1496,7 @@ export const {
   addPOM, updatePOM, removePOM, recomputePOMValues,
   linkPieces, unlinkPieces, cloneAsLinked,
   // Per-edge seam allowance
-  setEdgeSeamAllowance,
+  setEdgeSeamAllowance, setEdgesSeamAllowance,
   // Layers
   setLayer, setSublayer, cloneToLayer, superimposePiece,
   renameLayer, deleteLayerName, setLayerLocked, addLayer, removeLayer,

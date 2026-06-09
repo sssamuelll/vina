@@ -32,12 +32,15 @@ export default function PropertiesPanel() {
   const selectedSeam = editor.selectedSeamId
     ? seams.find(s => s.id === editor.selectedSeamId)
     : undefined;
-  // Per-edge SA selection (seamAllowance tool) — properties for the focused
-  // edge/vertex live here, bound to the typed selection.
-  const selectedEdge = editor.selectedEdge && pieces.some(p => p.id === editor.selectedEdge!.pieceId)
-    ? editor.selectedEdge : null;
-  const selectedVertex = editor.selectedVertex && pieces.some(p => p.id === editor.selectedVertex!.pieceId)
-    ? editor.selectedVertex : null;
+  // SA-tool selection (one OR many edges, or a single vertex) — properties for
+  // the set live here, bound to the typed discriminated selection. Filter to
+  // items whose piece still exists (addMatcher clears on removal; guard anyway).
+  const saSelection = editor.saSelection;
+  const saEdgeItems = saSelection?.kind === 'edge'
+    ? saSelection.items.filter(it => pieces.some(p => p.id === it.pieceId)) : [];
+  const saVertexItems = saSelection?.kind === 'vertex'
+    ? saSelection.items.filter(it => pieces.some(p => p.id === it.pieceId)) : [];
+  const hasSa = saEdgeItems.length > 0 || saVertexItems.length > 0;
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     piece: false,
     material: false,
@@ -82,7 +85,7 @@ export default function PropertiesPanel() {
 
   return (
     <div className="properties-panel">
-      {!selectedPiece && !selectedSeam && !selectedEdge && !selectedVertex ? (
+      {!selectedPiece && !selectedSeam && !hasSa ? (
         <>
           {/* Tool-scoped: the SA default lives here so the body-click / drag-to-all
               applies an editable width (CLO3D parity), not a hardcoded constant. */}
@@ -92,13 +95,13 @@ export default function PropertiesPanel() {
         </>
       ) : (
         <>
-          {selectedEdge && (
-            // key per edge: remount so the width field reflects the newly
-            // selected edge's value (its local input state re-initializes).
-            <EdgePropertiesSection key={selectedEdge.edgeId} pieceId={selectedEdge.pieceId} edgeId={selectedEdge.edgeId} />
+          {saEdgeItems.length > 0 && (
+            // The set drives the displayed value (multi-select); the buffer
+            // re-seeds on selection change — no per-edge remount key needed.
+            <EdgePropertiesSection items={saEdgeItems} />
           )}
-          {selectedVertex && (
-            <VertexPropertiesSection pieceId={selectedVertex.pieceId} vertexIndex={selectedVertex.vertexIndex} />
+          {saVertexItems.length > 0 && (
+            <VertexPropertiesSection pieceId={saVertexItems[0].pieceId} vertexIndex={saVertexItems[0].vertexIndex} />
           )}
           {selectedPiece && (
             <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />

@@ -65,9 +65,10 @@ function setup(pieces: PatternPiece[] = [piece()]) {
 }
 
 // zoom=1, pan=0, rect at origin → pattern point === client point.
-function clickAt(x: number, y: number, button = 0) {
+function clickAt(x: number, y: number, button = 0, shiftKey = false) {
   return {
     button,
+    shiftKey,
     clientX: x,
     clientY: y,
     currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0 }) },
@@ -91,11 +92,17 @@ describe('useSeamAllowanceTool left-click', () => {
     expect(onApplyAll).not.toHaveBeenCalled();
   });
 
-  it('clicking near an edge midpoint selects that edge', () => {
+  it('clicking near an edge midpoint selects that edge (non-additive)', () => {
     const { onSelectEdge, onApply, hook } = setup();
     act(() => hook.result.current.handleMouseDown(clickAt(100, 2)));
-    expect(onSelectEdge).toHaveBeenCalledWith('p', 'p:top');
+    expect(onSelectEdge).toHaveBeenCalledWith('p', 'p:top', false);
     expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('Shift+click on an edge selects it additively', () => {
+    const { onSelectEdge, hook } = setup();
+    act(() => hook.result.current.handleMouseDown(clickAt(100, 2, 0, true)));
+    expect(onSelectEdge).toHaveBeenCalledWith('p', 'p:top', true);
   });
 
   it('press+release on the piece body (no drag) applies the default width to the whole piece', () => {

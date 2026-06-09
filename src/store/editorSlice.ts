@@ -13,8 +13,7 @@ const initialState: EditorState = {
   selectedPOMId: null,
   selectedElasticId: null,
   selectedInternalLine: null,
-  selectedEdge: null,
-  selectedVertex: null,
+  saSelection: null,
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
   fitViewToken: 0,
@@ -51,13 +50,11 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
     togglePieceSelection(state, action: PayloadAction<string>) {
       state.selectedPOMId = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
       const idx = state.selectedPieceIds.indexOf(action.payload);
       if (idx === -1) {
         state.selectedPieceIds.push(action.payload);
@@ -70,16 +67,14 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
     selectAllPieces(state, action: PayloadAction<string[]>) {
       state.selectedPieceIds = action.payload;
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
     selectAllVisiblePieces(state, action: PayloadAction<{ pieces: PatternPiece[]; layerLocked: Record<number, boolean> }>) {
       const { pieces, layerLocked } = action.payload;
@@ -89,50 +84,63 @@ const editorSlice = createSlice({
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
     selectSeam(state, action: PayloadAction<string>) {
       state.selectedSeamId = action.payload;
       state.selectedPOMId = null;
       state.selectedPieceIds = [];
       state.selectedInternalLine = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
     selectPOM(state, action: PayloadAction<string | null>) {
       state.selectedPOMId = action.payload;
       state.selectedPieceIds = [];
       state.selectedSeamId = null;
       state.selectedInternalLine = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
     selectInternalLine(state, action: PayloadAction<{ pieceId: string; lineId: string }>) {
       state.selectedInternalLine = action.payload;
       state.selectedPieceIds = [action.payload.pieceId];
       state.selectedSeamId = null;
       state.selectedPOMId = null;
-      state.selectedEdge = null;
-      state.selectedVertex = null;
+      state.saSelection = null;
     },
-    // Per-edge SA selection — a typed, mutually-exclusive focus (one edge OR one
-    // vertex at a time). Editing surfaces (width / corner type) bind to these.
-    selectEdge(state, action: PayloadAction<{ pieceId: string; edgeId: string }>) {
-      state.selectedEdge = action.payload;
-      state.selectedVertex = null;
+    // Seam-allowance tool selection — a typed, mutually-exclusive SET (N edges OR
+    // N vertices, never mixed). The discriminated shape makes the illegal mixed
+    // state unrepresentable. Cross-kind exclusivity (vs piece/seam/POM/internal
+    // line) stays manual — that is the deferred debt this feature does not touch.
+    // `additive` (Shift) toggles items into the existing edge set; a plain click
+    // or a kind switch replaces it. Multi-vertex is out of scope: vertices stay
+    // single (spec 2026-06-09 — "solo edges primero").
+    selectSaEdges(state, action: PayloadAction<{ items: { pieceId: string; edgeId: string }[]; additive?: boolean }>) {
+      const { items, additive } = action.payload;
+      if (additive && state.saSelection?.kind === 'edge') {
+        const cur = state.saSelection.items;
+        for (const it of items) {
+          const i = cur.findIndex(e => e.pieceId === it.pieceId && e.edgeId === it.edgeId);
+          if (i === -1) cur.push(it); else cur.splice(i, 1);
+        }
+        state.saSelection = cur.length > 0 ? { kind: 'edge', items: cur } : null;
+      } else {
+        state.saSelection = items.length > 0 ? { kind: 'edge', items } : null;
+      }
       state.selectedPieceIds = [];
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
     },
-    selectVertex(state, action: PayloadAction<{ pieceId: string; vertexIndex: number }>) {
-      state.selectedVertex = action.payload;
-      state.selectedEdge = null;
+    selectSaVertices(state, action: PayloadAction<{ pieceId: string; vertexIndex: number }>) {
+      // Single vertex (multi-vertex deferred): replace the set.
+      state.saSelection = { kind: 'vertex', items: [action.payload] };
       state.selectedPieceIds = [];
       state.selectedSeamId = null;
       state.selectedPOMId = null;
       state.selectedInternalLine = null;
+    },
+    clearSaSelection(state) {
+      state.saSelection = null;
     },
     setZoom2D(state, action: PayloadAction<number>) {
       state.zoom2D = Math.max(0.1, Math.min(10, action.payload));
@@ -238,8 +246,7 @@ const editorSlice = createSlice({
         state.selectedSeamId = null;
         state.selectedPOMId = null;
         state.selectedInternalLine = null;
-        state.selectedEdge = null;
-        state.selectedVertex = null;
+        state.saSelection = null;
       }
     );
   },
@@ -247,7 +254,7 @@ const editorSlice = createSlice({
 
 export const {
   setViewMode, setActiveTool,
-  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectEdge, selectVertex,
+  selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectSaEdges, selectSaVertices, clearSaSelection,
   setZoom2D, setPan2D, requestFitView,
   toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,

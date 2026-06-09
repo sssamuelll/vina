@@ -1,38 +1,63 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { setEdgeSeamAllowance } from '../../store/projectSlice';
+import { setEdgesSeamAllowance } from '../../store/projectSlice';
 
 interface Props {
-  pieceId: string;
-  edgeId: string;
+  /** The SA-tool edge selection — one OR many edges (multi-select Shift). */
+  items: { pieceId: string; edgeId: string }[];
 }
 
 /**
- * Per-edge seam-allowance width, edited in the docked panel (the property home,
- * bound to the seamAllowance-tool edge selection). Commits on Enter or blur;
- * Inherit clears the override back to the piece-level allowance.
+ * Per-edge seam-allowance width for the seamAllowance-tool selection (one or many
+ * edges). Commits the whole set on Enter or blur via setEdgesSeamAllowance (one
+ * undo entry); Inherit clears the override on all. With divergent values the
+ * field shows a `Mixed` placeholder. The controlled buffer re-seeds when the set
+ * or its shown value changes — replaces the per-edge `key` remount hack (PR #865).
  */
-export default function EdgePropertiesSection({ pieceId, edgeId }: Props) {
+export default function EdgePropertiesSection({ items }: Props) {
   const dispatch = useDispatch();
-  const piece = useSelector((s: RootState) => s.project.pieces.find(p => p.id === pieceId));
-  const edge = piece?.edges?.find(e => e.id === edgeId);
-  const pieceDefault = piece?.seamAllowance ?? 0;
-  const effective = edge?.seamAllowanceWidth ?? pieceDefault;
-  const isOverridden = edge?.seamAllowanceWidth != null;
-  const [value, setValue] = useState(String(effective));
+  const pieces = useSelector((s: RootState) => s.project.pieces);
 
-  if (!piece || !edge) return null;
+  const resolved = items
+    .map(({ pieceId, edgeId }) => {
+      const piece = pieces.find(p => p.id === pieceId);
+      const edge = piece?.edges?.find(e => e.id === edgeId);
+      if (!piece || !edge) return null;
+      const pieceDefault = piece.seamAllowance ?? 0;
+      return {
+        pieceId, edgeId, edgeName: edge.name, pieceDefault,
+        effective: edge.seamAllowanceWidth ?? pieceDefault,
+        isOverridden: edge.seamAllowanceWidth != null,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r != null);
+
+  const count = resolved.length;
+  const allSame = count > 0 && resolved.every(r => r.effective === resolved[0].effective);
+  const displayValue = allSame ? String(resolved[0].effective) : '';
+  const anyOverridden = resolved.some(r => r.isOverridden);
+  // Set identity + shown value: re-seeds the editing buffer on selection change.
+  const setKey = resolved.map(r => `${r.pieceId}:${r.edgeId}`).sort().join('|');
+
+  const [value, setValue] = useState(displayValue);
+  useEffect(() => { setValue(displayValue); }, [setKey, displayValue]);
+
+  if (count === 0) return null;
+
+  const commitItems = resolved.map(r => ({ pieceId: r.pieceId, edgeId: r.edgeId }));
 
   const commit = () => {
     const w = parseFloat(value);
-    if (!Number.isFinite(w) || w < 0) { setValue(String(effective)); return; }
-    dispatch(setEdgeSeamAllowance({ pieceId, edgeId, width: w }));
+    if (!Number.isFinite(w) || w < 0) { setValue(displayValue); return; }
+    dispatch(setEdgesSeamAllowance({ items: commitItems, width: w }));
   };
+
+  const subtitle = count === 1 ? `Edge · ${resolved[0].edgeName}` : `${count} edges`;
 
   return (
     <section className="panel-section">
-      <div className="panel-subtitle panel-subtitle--spaced">Edge · {edge.name}</div>
+      <div className="panel-subtitle panel-subtitle--spaced">{subtitle}</div>
       <div className="panel-field">
         <label htmlFor="edge-prop-width">Width (mm)</label>
         <input
@@ -42,6 +67,7 @@ export default function EdgePropertiesSection({ pieceId, edgeId }: Props) {
           min={0}
           max={100}
           value={value}
+          placeholder={allSame ? undefined : 'Mixed'}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') commit(); }}
           onBlur={commit}
@@ -50,11 +76,13 @@ export default function EdgePropertiesSection({ pieceId, edgeId }: Props) {
       <div className="panel-field panel-field--row">
         <button
           className="panel-chip-btn"
-          disabled={!isOverridden}
-          onClick={() => dispatch(setEdgeSeamAllowance({ pieceId, edgeId, width: null }))}
-          title={`Inherit the piece allowance (${pieceDefault}mm)`}
+          disabled={!anyOverridden}
+          onClick={() => dispatch(setEdgesSeamAllowance({ items: commitItems, width: null }))}
+          title={count === 1
+            ? `Inherit the piece allowance (${resolved[0].pieceDefault}mm)`
+            : 'Inherit the piece allowance on all selected edges'}
         >
-          Inherit ({pieceDefault})
+          {count === 1 ? `Inherit (${resolved[0].pieceDefault})` : 'Inherit'}
         </button>
       </div>
     </section>

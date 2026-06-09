@@ -4,7 +4,7 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { addPiece } from '../../../store/projectSlice';
-import editorReducer, { selectEdge } from '../../../store/editorSlice';
+import editorReducer, { selectSaEdges } from '../../../store/editorSlice';
 import EdgePropertiesSection from '../EdgePropertiesSection';
 import VertexPropertiesSection from '../VertexPropertiesSection';
 import PropertiesPanel from '../PropertiesPanel';
@@ -35,13 +35,13 @@ function mount(node: React.ReactElement, p: PatternPiece) {
 
 describe('EdgePropertiesSection', () => {
   it('shows the edge name and the effective width (inherited)', () => {
-    mount(<EdgePropertiesSection pieceId="p" edgeId="p:hem" />, piece());
+    mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     expect(screen.getByText(/hem/i)).toBeTruthy();
     expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('10');
   });
 
   it('commits a per-edge width on Enter', () => {
-    const store = mount(<EdgePropertiesSection pieceId="p" edgeId="p:hem" />, piece());
+    const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece());
     const input = screen.getByLabelText(/width/i);
     fireEvent.change(input, { target: { value: '40' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -50,10 +50,30 @@ describe('EdgePropertiesSection', () => {
   });
 
   it('Inherit clears the per-edge override', () => {
-    const store = mount(<EdgePropertiesSection pieceId="p" edgeId="p:hem" />, piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }));
+    const store = mount(<EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }]} />, piece({ edges: [{ ...hem, seamAllowanceWidth: 40 }] }));
     fireEvent.click(screen.getByRole('button', { name: /inherit/i }));
     const e = store.getState().project.pieces[0].edges!.find(x => x.id === 'p:hem')!;
     expect(e.seamAllowanceWidth).toBeUndefined();
+  });
+
+  it('multi-edge: divergent widths show Mixed; commit writes the same width to all', () => {
+    const twoEdges: SemanticEdge[] = [
+      { id: 'p:hem', name: 'hem', segmentRange: [3, 4], edgeType: 'hem', seamAllowanceWidth: 40 },
+      { id: 'p:side', name: 'side', segmentRange: [2, 3], edgeType: 'seam', seamAllowanceWidth: 10 },
+    ];
+    const store = mount(
+      <EdgePropertiesSection items={[{ pieceId: 'p', edgeId: 'p:hem' }, { pieceId: 'p', edgeId: 'p:side' }]} />,
+      piece({ edges: twoEdges }),
+    );
+    expect(screen.getByText('2 edges')).toBeTruthy();
+    const input = screen.getByLabelText(/width/i) as HTMLInputElement;
+    expect(input.value).toBe('');                       // divergent → Mixed (empty)
+    expect(input.placeholder).toBe('Mixed');
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    const edges = store.getState().project.pieces[0].edges!;
+    expect(edges.find(x => x.id === 'p:hem')!.seamAllowanceWidth).toBe(12);
+    expect(edges.find(x => x.id === 'p:side')!.seamAllowanceWidth).toBe(12);
   });
 });
 
@@ -67,10 +87,10 @@ describe('PropertiesPanel edge switching', () => {
     store.dispatch(addPiece(piece({ edges: twoEdges })));
     render(<Provider store={store}><PropertiesPanel /></Provider>);
 
-    act(() => { store.dispatch(selectEdge({ pieceId: 'p', edgeId: 'p:hem' })); });
+    act(() => { store.dispatch(selectSaEdges({ items: [{ pieceId: 'p', edgeId: 'p:hem' }] })); });
     expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('40');
 
-    act(() => { store.dispatch(selectEdge({ pieceId: 'p', edgeId: 'p:side' })); });
+    act(() => { store.dispatch(selectSaEdges({ items: [{ pieceId: 'p', edgeId: 'p:side' }] })); });
     expect((screen.getByLabelText(/width/i) as HTMLInputElement).value).toBe('10');
   });
 });
