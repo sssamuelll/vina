@@ -6,7 +6,7 @@ import projectReducer, {
   setProjectName, loadProject, updateMeasurements,
   setAvatarMode, setAvatarModelUrl,
   bringToFront, sendToBack, bringForward, sendBackward,
-  lockPiece, unlockPiece,
+  lockPiece, unlockPiece, batchSetSeamAllowance,
 } from '../store/projectSlice';
 import editorReducer, {
   setViewMode, setActiveTool, selectPiece, clearSelection,
@@ -534,6 +534,30 @@ describe('Undo batch grouping', () => {
 
     store.dispatch({ type: 'editor/redo' });
     expect(store.getState().project.pieces).toHaveLength(2);
+  });
+
+  it('drag-to-all (batchSetSeamAllowance in batchUndo) is a single undo entry, not one per piece', () => {
+    const store = createStore();
+    store.dispatch(loadProject({
+      id: 'test', name: 'Test', pieces: [makePiece('p1'), makePiece('p2'), makePiece('p3')],
+      seams: [], fabrics: [], avatar: store.getState().project.avatar,
+      createdAt: Date.now(), updatedAt: Date.now(),
+    }));
+
+    const undoBefore = getUndoLength();
+
+    // Mirrors PatternEditor.handleApplySeamAllowanceAll — the drag-to-all command.
+    batchUndo(store.dispatch, 'Apply 9.5mm to 3 pieces', () => {
+      store.dispatch(batchSetSeamAllowance({ pieceIds: ['p1', 'p2', 'p3'], width: 9.5 }));
+    });
+
+    expect(store.getState().project.pieces.every(p => p.seamAllowance === 9.5)).toBe(true);
+    // Halberg's gate: ONE history entry for the whole gesture, not N.
+    expect(getUndoLength()).toBe(undoBefore + 1);
+
+    // Single undo reverts the whole apply-to-all.
+    store.dispatch({ type: 'editor/undo' });
+    expect(store.getState().project.pieces.every(p => p.seamAllowance === 10)).toBe(true);
   });
 
   it('nested batches only create one undo entry', () => {

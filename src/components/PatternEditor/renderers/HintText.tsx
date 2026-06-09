@@ -1,4 +1,5 @@
 import { PatternPiece, Tool2D } from '../../../types/types';
+import { DEFAULT_SEAM_ALLOWANCE } from '../../../utils/defaults';
 
 interface HintTextProps {
   activeTool: Tool2D;
@@ -84,7 +85,7 @@ export default function HintText({
       {activeTool === 'seamAllowance' && (
         <text x="50%" y="98%" textAnchor="middle" dominantBaseline="auto"
           fill="rgba(255, 215, 0, 0.5)" fontSize="11" fontFamily="Inter, sans-serif">
-          {`Click a piece to apply ${saDefaultWidthMm ?? 10}mm · Right-click an edge for its width · a corner for corner type`}
+          {`Click a piece to apply ${saDefaultWidthMm ?? DEFAULT_SEAM_ALLOWANCE}mm · drag across pieces to apply to all · click an edge for its width · a corner for corner type`}
         </text>
       )}
 

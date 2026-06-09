@@ -10,8 +10,9 @@
 
 // ─── Seam Defaults ──────────────────────────────────────────────────────────
 
-/** Width an EXPLICIT apply-seam-allowance action offers — NOT a birth value. */
-export const DEFAULT_SEAM_ALLOWANCE = 10; // mm
+/** Width an EXPLICIT apply-seam-allowance action offers — NOT a birth value.
+ *  9.5mm ≈ 3/8", the standard serged seam allowance (CLO3D parity). */
+export const DEFAULT_SEAM_ALLOWANCE = 9.5; // mm
 export const DEFAULT_SEAM_TENSION = 100; // 0-200, 100 = normal
 export const DEFAULT_SEAM_STRENGTH = 1.0; // 0-1
 

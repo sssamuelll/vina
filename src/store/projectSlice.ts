@@ -1325,6 +1325,22 @@ const projectSlice = createSlice({
         state.isDirty = true;
       }
     },
+    // Bulk per-piece scalar SA write (drag-to-all: apply the editor default to
+    // every touched piece in ONE action). Modeled on batchSetFabricCode — a
+    // single project/* dispatch so undoMiddleware clones the tree once, not per
+    // piece (the per-edge setEdgeSeamAllowance loop would clone O(project) per
+    // edge → hang). Writes the level-2 scalar only; per-edge overrides untouched.
+    batchSetSeamAllowance(state, action: PayloadAction<{ pieceIds: string[]; width: number }>) {
+      const idSet = new Set(action.payload.pieceIds);
+      const w = Math.max(0, action.payload.width);
+      for (const piece of state.pieces) {
+        if (idSet.has(piece.id)) {
+          piece.seamAllowance = w;
+          piece.updatedAt = Date.now();
+        }
+      }
+      if (idSet.size > 0) state.isDirty = true;
+    },
     mirrorGroup(state, action: PayloadAction<{ groupId: string }>) {
       const group = state.groups.find(g => g.id === action.payload.groupId);
       if (group) {
@@ -1464,7 +1480,7 @@ export const {
   createGroup, renameGroup, deleteGroup, setGroupColor,
   addPiecesToGroup, removePiecesFromGroup,
   setFabricCode, batchSetFabricCode, setPieceFabric,
-  moveGroup, setGroupFabric, setGroupSeamAllowance, mirrorGroup,
+  moveGroup, setGroupFabric, setGroupSeamAllowance, batchSetSeamAllowance, mirrorGroup,
   addFabric, updateFabric,
   updateAvatar, updateMeasurements, setAvatarMode, setAvatarModelUrl,
   // Colorways

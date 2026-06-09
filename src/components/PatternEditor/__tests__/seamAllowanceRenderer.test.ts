@@ -100,7 +100,7 @@ describe('Seam Allowance Rendering', () => {
 
     it('sets default SA width', () => {
       const initial = editorReducer(undefined, { type: '@@INIT' });
-      expect(initial.defaultSeamAllowanceWidth).toBe(10);
+      expect(initial.defaultSeamAllowanceWidth).toBe(9.5);
       const updated = editorReducer(initial, setDefaultSAWidth(15));
       expect(updated.defaultSeamAllowanceWidth).toBe(15);
     });

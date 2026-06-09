@@ -151,6 +151,7 @@ const ACTION_LABELS: Record<string, string> = {
   'project/setAvatarMode': 'Change Avatar',
   'project/setProjectName': 'Rename Project',
   'project/setGroupSeamAllowance': 'Set Seam Allowance',
+  'project/batchSetSeamAllowance': 'Apply seam allowance to all',
   'project/addPOM': 'Add Measurement',
   'project/updatePOM': 'Update Measurement',
   'project/removePOM': 'Remove Measurement',
