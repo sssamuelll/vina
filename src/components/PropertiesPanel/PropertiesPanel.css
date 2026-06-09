@@ -247,6 +247,38 @@ select.panel-input {
   color: var(--success);
 }
 
+/* Two-position labeled toggle (notch-mirror sense) — the active side reads as
+   selected without a baseline, per Iris (not a bare "invert" checkbox). */
+.panel-chip-btn--active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-subtle);
+}
+
+/* Full-width primary action (e.g. Create mirror notch). */
+.panel-btn-primary {
+  width: 100%;
+  margin-top: var(--sp-2);
+  padding: var(--sp-1);
+  background: transparent;
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.panel-btn-primary:hover {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.panel-hint--warn {
+  color: var(--warning);
+}
+
 .panel-delete {
   width: 100%;
   margin-top: var(--sp-2);

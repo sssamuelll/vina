@@ -15,6 +15,7 @@ import { getEdgeEndpoints } from '../../utils/geometry/path';
 import { screenToPattern, screenToPatternLength } from '../../utils/geometry';
 import { useNotchTool } from './useNotchTool';
 import { useSeamAllowanceTool } from './useSeamAllowanceTool';
+import { useNotchMirrorPreview } from './useNotchMirrorPreview';
 import SeamAllowanceSelectionOverlay from './renderers/overlays/SeamAllowanceSelectionOverlay';
 import { showUndoToast } from '../../store/copilotUISlice';
 import { useTrimTool } from './useTrimTool';
@@ -173,6 +174,25 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
   }, [dispatch]);
 
   const notchTool = useNotchTool(zoom2D, pan2D, pieces, handleNotchAdd, undefined, handleNotchUpdate);
+
+  // F3: ghost preview of the corresponding (mirror) notch. Derived from the
+  // selected notch + the shared sense toggle; the helper returns the point in
+  // PAIRED-piece local coords, so add the paired piece position for world.
+  const notchMirror = useNotchMirrorPreview();
+  const notchMirrorGhost = useMemo(() => {
+    if (!notchMirror) return null;
+    const mapped = notchMirror.mapped;
+    if (!mapped.ok) return null;
+    const paired = pieces.find(p => p.id === mapped.pairedPieceId);
+    if (!paired) return null;
+    const ox = paired.position?.x ?? 0;
+    const oy = paired.position?.y ?? 0;
+    return {
+      pointWorld: { x: mapped.point.x + ox, y: mapped.point.y + oy },
+      normal: mapped.normal,
+      options: notchMirror.notch.notchOptions,
+    };
+  }, [notchMirror, pieces]);
 
   // Explicit apply-SA command (pieces are born net; this puts allowance back
   // on purpose). Width comes from editor.defaultSeamAllowanceWidth inside the
@@ -681,6 +701,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
             lineLength={lineTool.lineLength}
             notchHoveredPoint={notchTool.hoveredPoint}
             notchRefineMarker={notchTool.refining ? { refWorld: notchTool.refining.refWorld, notchWorld: notchTool.refining.notchWorld, previewWorld: notchTool.refining.previewWorld } : null}
+            notchMirrorGhost={notchMirrorGhost}
             grainlineIsDragging={grainlineTool.isDragging}
             grainlineStartPoint={grainlineTool.startPoint}
             grainlineEndPoint={grainlineTool.endPoint}

@@ -6,6 +6,7 @@ import type { EditableNode } from '../nodeEditorUtils';
 import POMOverlay from './overlays/POMOverlay';
 import EdgePairOverlay from './overlays/EdgePairOverlay';
 import NotchToolOverlay from './overlays/NotchToolOverlay';
+import NotchMirrorOverlay from './overlays/NotchMirrorOverlay';
 import GrainlineToolOverlay from './overlays/GrainlineToolOverlay';
 import PenToolOverlay from './overlays/PenToolOverlay';
 import LineToolOverlay from './overlays/LineToolOverlay';
@@ -69,6 +70,9 @@ interface ToolOverlayProps {
   seamMode: 'free' | 'point';
   notchHoveredPoint: NotchHover | null;
   notchRefineMarker?: import('./overlays/NotchToolOverlay').NotchRefineMarker | null;
+  /** F3 mirror-notch ghost — shown whenever a notch is selected and maps to a
+   *  paired edge, regardless of activeTool (gated by presence, not tool). */
+  notchMirrorGhost?: import('./overlays/NotchMirrorOverlay').NotchMirrorGhost | null;
   trimHoveredEdge: TrimHover | null;
   grainlineIsDragging: boolean;
   grainlineStartPoint: Point2D | null;
@@ -184,6 +188,9 @@ export default function ToolOverlay(props: ToolOverlayProps) {
           refineMarker={props.notchRefineMarker}
         />
       )}
+
+      {/* Mirror-notch ghost (F3) — gated by presence, not activeTool. */}
+      <NotchMirrorOverlay ghost={props.notchMirrorGhost ?? null} zoom={zoom2D} />
 
       {activeTool === 'trimPlace' && props.trimHoveredEdge && (
         <TrimToolOverlay zoom2D={zoom2D} hoveredEdge={props.trimHoveredEdge} />
