@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
-import projectReducer, { addPiece, addSeam, addPOM, removePieces, batchSetSeamAllowance } from '../projectSlice';
+import projectReducer, { addPiece, addSeam, addPOM, removePieces, batchSetSeamAllowance, setEdgesSeamAllowance } from '../projectSlice';
 
 const initialState = projectReducer(undefined, { type: '@@INIT' });
 
@@ -58,5 +58,32 @@ describe('projectSlice batch operations', () => {
     // Negative widths clamp to 0 (Math.max(0, width)).
     state = projectReducer(state, batchSetSeamAllowance({ pieceIds: ['p1'], width: -3 }));
     expect(state.pieces.find(p => p.id === 'p1')!.seamAllowance).toBe(0);
+  });
+
+  it('setEdgesSeamAllowance writes the per-edge override on listed edges only; null = Inherit', () => {
+    const edges = [
+      { id: 'e1', name: 'a', segmentRange: [1, 2], edgeType: 'seam' },
+      { id: 'e2', name: 'b', segmentRange: [2, 3], edgeType: 'seam' },
+      { id: 'e3', name: 'c', segmentRange: [3, 4], edgeType: 'seam' },
+    ];
+    let state = projectReducer(initialState, addPiece({ id: 'p1', name: 'P1', outline: [], internals: [], seamAllowance: 5, edges } as any));
+
+    // Multi-edit e1 + e2 to 12 in one action; e3 untouched (still inherits).
+    state = projectReducer(state, setEdgesSeamAllowance({ items: [{ pieceId: 'p1', edgeId: 'e1' }, { pieceId: 'p1', edgeId: 'e2' }], width: 12 }));
+    const after = state.pieces[0].edges!;
+    expect(after.find(e => e.id === 'e1')!.seamAllowanceWidth).toBe(12);
+    expect(after.find(e => e.id === 'e2')!.seamAllowanceWidth).toBe(12);
+    expect(after.find(e => e.id === 'e3')!.seamAllowanceWidth).toBeUndefined();
+    expect(state.isDirty).toBe(true);
+
+    // Inherit (null) clears the override on the set.
+    state = projectReducer(state, setEdgesSeamAllowance({ items: [{ pieceId: 'p1', edgeId: 'e1' }, { pieceId: 'p1', edgeId: 'e2' }], width: null }));
+    const cleared = state.pieces[0].edges!;
+    expect(cleared.find(e => e.id === 'e1')!.seamAllowanceWidth).toBeUndefined();
+    expect(cleared.find(e => e.id === 'e2')!.seamAllowanceWidth).toBeUndefined();
+
+    // Negative clamps to 0.
+    state = projectReducer(state, setEdgesSeamAllowance({ items: [{ pieceId: 'p1', edgeId: 'e3' }], width: -5 }));
+    expect(state.pieces[0].edges!.find(e => e.id === 'e3')!.seamAllowanceWidth).toBe(0);
   });
 });

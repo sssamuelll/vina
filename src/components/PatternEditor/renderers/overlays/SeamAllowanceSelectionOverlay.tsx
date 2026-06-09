@@ -1,8 +1,7 @@
-import type { PathCommand, PatternPiece } from '../../../../types/types';
+import type { PathCommand, PatternPiece, SaSelection } from '../../../../types/types';
 
 interface Props {
-  selectedEdge: { pieceId: string; edgeId: string } | null;
-  selectedVertex: { pieceId: string; vertexIndex: number } | null;
+  saSelection: SaSelection | null;
   pieces: PatternPiece[];
   zoom: number;
 }
@@ -26,55 +25,58 @@ function commandEndpoints(outline: PathCommand[]): { x: number; y: number }[] {
 }
 
 /**
- * Highlights the edge or vertex selected for per-edge seam-allowance editing
+ * Highlights the edge(s) or vertex(es) selected for seam-allowance editing
  * (the seamAllowance tool). Selection is visible feedback — the user sees what
- * the panel is about to edit before committing. Renders inside the pan/zoom
- * group, so sizes are divided by zoom to stay constant on screen.
+ * the panel is about to edit before committing. Renders one highlight per item
+ * in the set (multi-select Shift). Inside the pan/zoom group, so sizes are
+ * divided by zoom to stay constant on screen.
  */
-export default function SeamAllowanceSelectionOverlay({ selectedEdge, selectedVertex, pieces, zoom }: Props) {
+export default function SeamAllowanceSelectionOverlay({ saSelection, pieces, zoom }: Props) {
   const stroke = 2.5 / zoom;
   const r = 5 / zoom;
+  if (!saSelection) return null;
 
-  if (selectedVertex) {
-    const piece = pieces.find((p) => p.id === selectedVertex.pieceId);
-    const cmd = piece?.outline?.[selectedVertex.vertexIndex];
-    if (piece && cmd && (cmd.type === 'M' || cmd.type === 'L')) {
-      const cx = (piece.position?.x ?? 0) + cmd.values[0];
-      const cy = (piece.position?.y ?? 0) + cmd.values[1];
-      return (
-        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--accent-2d)" strokeWidth={stroke} pointerEvents="none" />
-      );
-    }
-    return null;
-  }
-
-  if (selectedEdge) {
-    const piece = pieces.find((p) => p.id === selectedEdge.pieceId);
-    const edge = piece?.edges?.find((e) => e.id === selectedEdge.edgeId);
-    if (!piece || !edge || !piece.outline?.length) return null;
-    const ox = piece.position?.x ?? 0;
-    const oy = piece.position?.y ?? 0;
-    const ends = commandEndpoints(piece.outline);
-    const [start, end] = edge.segmentRange;
-    // The edge spans command endpoints [start-1 .. end-1].
-    const from = Math.max(0, start - 1);
-    const pts: string[] = [];
-    for (let i = from; i < end && i < ends.length; i++) {
-      pts.push(`${ox + ends[i].x},${oy + ends[i].y}`);
-    }
-    if (pts.length < 2) return null;
+  if (saSelection.kind === 'vertex') {
     return (
-      <polyline
-        points={pts.join(' ')}
-        fill="none"
-        stroke="var(--accent-2d)"
-        strokeWidth={stroke * 1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        pointerEvents="none"
-      />
+      <>
+        {saSelection.items.map(({ pieceId, vertexIndex }, i) => {
+          const piece = pieces.find((p) => p.id === pieceId);
+          const cmd = piece?.outline?.[vertexIndex];
+          if (!piece || !cmd || (cmd.type !== 'M' && cmd.type !== 'L')) return null;
+          const cx = (piece.position?.x ?? 0) + cmd.values[0];
+          const cy = (piece.position?.y ?? 0) + cmd.values[1];
+          return (
+            <circle key={`${pieceId}:${vertexIndex}:${i}`} cx={cx} cy={cy} r={r}
+              fill="none" stroke="var(--accent-2d)" strokeWidth={stroke} pointerEvents="none" />
+          );
+        })}
+      </>
     );
   }
 
-  return null;
+  return (
+    <>
+      {saSelection.items.map(({ pieceId, edgeId }, i) => {
+        const piece = pieces.find((p) => p.id === pieceId);
+        const edge = piece?.edges?.find((e) => e.id === edgeId);
+        if (!piece || !edge || !piece.outline?.length) return null;
+        const ox = piece.position?.x ?? 0;
+        const oy = piece.position?.y ?? 0;
+        const ends = commandEndpoints(piece.outline);
+        const [start, end] = edge.segmentRange;
+        // The edge spans command endpoints [start-1 .. end-1].
+        const from = Math.max(0, start - 1);
+        const pts: string[] = [];
+        for (let j = from; j < end && j < ends.length; j++) {
+          pts.push(`${ox + ends[j].x},${oy + ends[j].y}`);
+        }
+        if (pts.length < 2) return null;
+        return (
+          <polyline key={`${pieceId}:${edgeId}:${i}`} points={pts.join(' ')}
+            fill="none" stroke="var(--accent-2d)" strokeWidth={stroke * 1.6}
+            strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+        );
+      })}
+    </>
+  );
 }

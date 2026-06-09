@@ -686,6 +686,12 @@ export type Tool3D = 'camera' | 'edit' | 'sew3d' | 'pose' | 'avatar' | 'arrangem
 
 export type UnitSystem = 'mm' | 'cm' | 'inches';
 
+/** Seam-allowance tool selection — a discriminated set: N edges OR N vertices,
+ *  never mixed (exclusivity by construction). Items accumulate with Shift. */
+export type SaSelection =
+  | { kind: 'edge'; items: { pieceId: string; edgeId: string }[] }
+  | { kind: 'vertex'; items: { pieceId: string; vertexIndex: number }[] };
+
 export interface EditorState {
   viewMode: ViewMode;
   activeTool: Tool2D;
@@ -694,10 +700,10 @@ export interface EditorState {
   selectedPOMId: string | null;
   selectedElasticId: string | null;
   selectedInternalLine: { pieceId: string; lineId: string } | null;
-  /** Focused outline edge for per-edge seam-allowance editing (seamAllowance tool). */
-  selectedEdge: { pieceId: string; edgeId: string } | null;
-  /** Focused outline vertex for corner-type editing (seamAllowance tool). */
-  selectedVertex: { pieceId: string; vertexIndex: number } | null;
+  /** Seam-allowance tool selection: a typed, mutually-exclusive set — N edges OR
+   *  N vertices, never mixed. Replaces the old single selectedEdge/selectedVertex
+   *  pair (multi-select Shift; spec 2026-06-09-selection-model-multiselect-design). */
+  saSelection: SaSelection | null;
   zoom2D: number;
   pan2D: Point2D;
   /** Monotonic counter: bumped to request a fit-to-content of the 2D viewport

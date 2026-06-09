@@ -35,7 +35,8 @@ export function useSeamAllowanceTool(
   callbacks: {
     onApply: (pieceId: string, widthMm: number, prevWidthMm: number) => void;
     onApplyAll: (pieceIds: string[], widthMm: number) => void;
-    onSelectEdge: (pieceId: string, edgeId: string) => void;
+    /** `additive` (Shift) toggles the edge into the multi-select set. */
+    onSelectEdge: (pieceId: string, edgeId: string, additive: boolean) => void;
     onSelectVertex: (pieceId: string, vertexIndex: number) => void;
   },
 ) {
@@ -68,7 +69,8 @@ export function useSeamAllowanceTool(
       // Pure click — never start a drag on a vertex/edge (selection, not apply).
       onSelectVertex(target.pieceId, target.vertexIndex);
     } else if (target.kind === 'edge') {
-      onSelectEdge(target.pieceId, target.edgeId);
+      // Shift accumulates the edge into the multi-select set.
+      onSelectEdge(target.pieceId, target.edgeId, !!e.shiftKey);
     } else {
       // Body press: arm the drag. The apply decision (single vs all) is made on
       // mouseUp based on whether the cursor moved past the drag threshold.

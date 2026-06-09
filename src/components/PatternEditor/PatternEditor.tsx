@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
 import { batchUndo } from '../../store/undoMiddleware';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
-import { selectPiece, selectSeam, selectEdge, selectVertex, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
+import { selectPiece, selectSeam, selectSaEdges, selectSaVertices, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
 import type { RootState } from '../../store';
 import { PatternPiece, Seam, InternalLine, Point2D } from '../../types/types';
@@ -204,8 +204,8 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
     onApplyAll: handleApplySeamAllowanceAll,
     // Selecting an edge/vertex opens the Properties panel — its docked home for
     // editing the width / corner type (CLO3D's persistent Property Editor).
-    onSelectEdge: (pieceId, edgeId) => { dispatch(selectEdge({ pieceId, edgeId })); onOpenPanel?.('Properties'); },
-    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectVertex({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
+    onSelectEdge: (pieceId, edgeId, additive) => { dispatch(selectSaEdges({ items: [{ pieceId, edgeId }], additive })); onOpenPanel?.('Properties'); },
+    onSelectVertex: (pieceId, vertexIndex) => { dispatch(selectSaVertices({ pieceId, vertexIndex })); onOpenPanel?.('Properties'); },
   });
 
   const trimTool = useTrimTool(zoom2D, pan2D, pieces, dispatch);
@@ -657,8 +657,7 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
           <TrimRenderer zoom2D={zoom2D} />
           {activeTool === 'seamAllowance' && (
             <SeamAllowanceSelectionOverlay
-              selectedEdge={editor.selectedEdge}
-              selectedVertex={editor.selectedVertex}
+              saSelection={editor.saSelection}
               pieces={pieces}
               zoom={zoom2D}
             />
