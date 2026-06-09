@@ -14,6 +14,7 @@ const initialState: EditorState = {
   selectedElasticId: null,
   selectedInternalLine: null,
   saSelection: null,
+  notchMirrorInvert: true,
   zoom2D: 1,
   pan2D: { x: 0, y: 0 },
   fitViewToken: 0,
@@ -142,6 +143,11 @@ const editorSlice = createSlice({
     clearSaSelection(state) {
       state.saSelection = null;
     },
+    // Notch-mirror sense toggle (F3): which way the corresponding notch maps
+    // across the seam. Shared so the panel control and the canvas ghost agree.
+    setNotchMirrorInvert(state, action: PayloadAction<boolean>) {
+      state.notchMirrorInvert = action.payload;
+    },
     setZoom2D(state, action: PayloadAction<number>) {
       state.zoom2D = Math.max(0.1, Math.min(10, action.payload));
     },
@@ -256,7 +262,7 @@ export const {
   setViewMode, setActiveTool,
   selectPiece, togglePieceSelection, clearSelection, selectAllPieces, selectAllVisiblePieces, selectSeam, selectPOM, selectInternalLine, selectSaEdges, selectSaVertices, clearSaSelection,
   setZoom2D, setPan2D, requestFitView,
-  toggleSeamAllowance, setDefaultSAWidth, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
+  toggleSeamAllowance, setDefaultSAWidth, setNotchMirrorInvert, toggleGrainlines, toggleSnapToGrid, setGridSize, toggleAnchorPoints,
   togglePieceNames, toggleLineLengths, toggleSewingLines, setRenderMode2D,
   toggleReferenceImages, setShowReferenceImages, setSelectedReferenceImage,
   startCalibration, setCalibrationPoint1, cancelCalibration,

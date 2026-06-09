@@ -704,6 +704,9 @@ export interface EditorState {
    *  N vertices, never mixed. Replaces the old single selectedEdge/selectedVertex
    *  pair (multi-select Shift; spec 2026-06-09-selection-model-multiselect-design). */
   saSelection: SaSelection | null;
+  /** Notch-mirror sense (F3): true = paired edge sewn opposite-direction (the
+   *  normal right-sides-together case) → 1-frac. Optional; defaults to true. */
+  notchMirrorInvert?: boolean;
   zoom2D: number;
   pan2D: Point2D;
   /** Monotonic counter: bumped to request a fit-to-content of the 2D viewport

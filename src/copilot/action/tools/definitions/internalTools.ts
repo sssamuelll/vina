@@ -333,7 +333,7 @@ const mirrorNotchTool: ToolDefinition = {
     if (!head || head.values.length < 2) return { success: false, error: 'Source notch has no anchor point' };
     const point = { x: head.values[0], y: head.values[1] };
 
-    const { mapNotchAcrossSeam } = await import('../../../../utils/seam/notchMirror');
+    const { mapNotchAcrossSeam, createMirrorNotchLine } = await import('../../../../utils/seam/notchMirror');
     const mapped = mapNotchAcrossSeam({
       sourcePiece: piece,
       point,
@@ -343,23 +343,8 @@ const mirrorNotchTool: ToolDefinition = {
     });
     if (!mapped.ok) return { success: false, error: mapped.message };
 
-    const depth = source.notchOptions?.length ?? 8;
-    const { computeNotchAnchor } = await import('../../../../utils/notchAnchor');
     const pairedPiece = state.project.pieces.find(p => p.id === mapped.pairedPieceId)!;
-    const anchor = computeNotchAnchor(pairedPiece.outline, mapped.point);
-
-    const notchLine: InternalLine = {
-      id: lineId(),
-      type: 'notch',
-      path: [
-        M(mapped.point.x, mapped.point.y),
-        L(mapped.point.x + mapped.normal.x * depth, mapped.point.y + mapped.normal.y * depth),
-      ],
-      notchOptions: source.notchOptions
-        ? { ...source.notchOptions }
-        : { shape: 'slit', subType: 'straightforward', length: depth, width: 3, angle: 0, count: 1 },
-      ...(anchor ? { notchAnchor: anchor } : {}),
-    };
+    const notchLine = createMirrorNotchLine(pairedPiece.outline, mapped, source);
 
     dispatch(addInternalLine({ pieceId: mapped.pairedPieceId, line: notchLine }));
     return { success: true, data: { internalLineId: notchLine.id, pieceId: mapped.pairedPieceId, edge: mapped.pairedEdgeName } };

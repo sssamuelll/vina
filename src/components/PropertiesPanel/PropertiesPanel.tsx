@@ -22,6 +22,7 @@ import MaterialTab from './MaterialTab';
 import EdgePropertiesSection from './EdgePropertiesSection';
 import VertexPropertiesSection from './VertexPropertiesSection';
 import SeamAllowanceDefaultSection from './SeamAllowanceDefaultSection';
+import NotchPropertiesSection from './NotchPropertiesSection';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -41,6 +42,12 @@ export default function PropertiesPanel() {
   const saVertexItems = saSelection?.kind === 'vertex'
     ? saSelection.items.filter(it => pieces.some(p => p.id === it.pieceId)) : [];
   const hasSa = saEdgeItems.length > 0 || saVertexItems.length > 0;
+  // Notch mirror (F3): a selected internal line that resolves to a notch opens
+  // the mirror control. selectedInternalLine is set by the select tool.
+  const selectedNotch = editor.selectedInternalLine
+    ? pieces.find(p => p.id === editor.selectedInternalLine!.pieceId)
+        ?.internals.find(i => i.id === editor.selectedInternalLine!.lineId && i.type === 'notch') ?? null
+    : null;
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
     piece: false,
     material: false,
@@ -85,7 +92,7 @@ export default function PropertiesPanel() {
 
   return (
     <div className="properties-panel">
-      {!selectedPiece && !selectedSeam && !hasSa ? (
+      {!selectedPiece && !selectedSeam && !hasSa && !selectedNotch ? (
         <>
           {/* Tool-scoped: the SA default lives here so the body-click / drag-to-all
               applies an editable width (CLO3D parity), not a hardcoded constant. */}
@@ -103,6 +110,7 @@ export default function PropertiesPanel() {
           {saVertexItems.length > 0 && (
             <VertexPropertiesSection pieceId={saVertexItems[0].pieceId} vertexIndex={saVertexItems[0].vertexIndex} />
           )}
+          {selectedNotch && <NotchPropertiesSection />}
           {selectedPiece && (
             <PieceProperties piece={selectedPiece} collapsed={!!collapsedSections.piece} onToggle={toggleSection} />
           )}

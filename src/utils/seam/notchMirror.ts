@@ -9,9 +9,12 @@
  * tool runs live). `SemanticEdge.segmentRange` is the [startIdx, endIdx) the
  * arc-length helpers expect directly.
  */
-import type { PatternPiece, SemanticEdge, Seam, Point2D, PathCommand } from '../../types/types';
+import type { PatternPiece, SemanticEdge, Seam, Point2D, PathCommand, InternalLine } from '../../types/types';
 import { computePathArcLength, pointAtPathDistance, distanceAlongPath } from '../geometry/arcLength';
 import { flattenPath } from './index';
+import { generateNotchPath, DEFAULT_NOTCH_OPTIONS } from '../notches';
+import { computeNotchAnchor } from '../notchAnchor';
+import { lineId } from '../pathHelpers';
 
 export interface SeamPartner {
   seam: Seam;
@@ -163,5 +166,27 @@ export function mapNotchAcrossSeam(args: {
     normal: interiorNormalAtPoint(pairedPiece.outline, ptB),
     frac: fracEdgeA,
     seamId: partner.seam.id,
+  };
+}
+
+/**
+ * Build the mirror notch InternalLine for the paired piece from a successful
+ * mapping. The created notch is INDEPENDENT (own frozen path + recomputed
+ * anchor on the paired outline — D-2 "path manda" intact); no persistent pair
+ * link. Shared by the copilot `mirrorNotch` tool and the F3 panel control.
+ */
+export function createMirrorNotchLine(
+  pairedOutline: PathCommand[],
+  mapped: { point: Point2D; normal: Point2D },
+  sourceNotch: { notchOptions?: InternalLine['notchOptions'] },
+): InternalLine {
+  const options = sourceNotch.notchOptions ?? DEFAULT_NOTCH_OPTIONS;
+  const anchor = computeNotchAnchor(pairedOutline, mapped.point);
+  return {
+    id: lineId(),
+    type: 'notch',
+    path: generateNotchPath(mapped.point, mapped.normal, options),
+    notchOptions: { ...options },
+    ...(anchor ? { notchAnchor: anchor } : {}),
   };
 }
