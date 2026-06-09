@@ -69,11 +69,20 @@ describe('NotchPropertiesSection (F3)', () => {
     expect(store.getState().editor.notchMirrorInvert).toBe(false);
   });
 
-  it('Create mirror notch adds a notch to the paired piece', () => {
+  it('Create adds a notch to the paired piece, records a pair, and switches to linked', () => {
     const store = setup();
     fireEvent.click(screen.getByRole('button', { name: /create mirror notch/i }));
     const back = store.getState().project.pieces.find(p => p.id === 'B')!;
     expect(back.internals.filter(i => i.type === 'notch')).toHaveLength(1);
+    expect(store.getState().project.notchPairs).toHaveLength(1);   // B1: declared identity
+    expect(screen.getByText(/break link/i)).toBeTruthy();          // section now linked
+  });
+
+  it('Break link drops the declared pair', () => {
+    const store = setup();
+    fireEvent.click(screen.getByRole('button', { name: /create mirror notch/i }));
+    fireEvent.click(screen.getByRole('button', { name: /break link/i }));
+    expect(store.getState().project.notchPairs).toHaveLength(0);
   });
 
   it('without a seam, shows the feedback message and no create button', () => {

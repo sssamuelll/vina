@@ -590,6 +590,23 @@ export interface GarmentInfo {
   description?: string;
 }
 
+// ─── Notch mirror pairs (Alcance B1) ───
+
+/**
+ * A declared notch-mirror pair: notch `a` and notch `b` are the SAME seam point
+ * on the two pieces a seam joins. Identity only — the geometric correspondence
+ * is re-derived on demand (mapNotchAcrossSeam), never maintained through
+ * transforms. `invert` records the traversal sense chosen at creation so the
+ * pair can be re-derived/verified. GC'd when either piece or line is removed.
+ */
+export interface NotchPair {
+  id: string;
+  a: { pieceId: string; lineId: string };
+  b: { pieceId: string; lineId: string };
+  seamId: string;
+  invert: boolean;
+}
+
 // ─── Project ───
 
 export interface OpenCloProject {
@@ -606,6 +623,11 @@ export interface OpenCloProject {
   poms?: PointOfMeasure[];
   /** Named seam groups (optional for backward compat) */
   seamGroups?: SeamGroup[];
+  /** Declared notch-mirror pairs (Alcance B1): "these two notches ARE a pair
+   *  across this seam". Persistent IDENTITY only — position is re-derived
+   *  on-demand (no enforcement through transforms). Spec
+   *  2026-06-09-notch-mirror-alcance-b-design.md. Optional for backward compat. */
+  notchPairs?: NotchPair[];
   /** Garment metadata (brand, season, style, etc.) */
   garmentInfo?: GarmentInfo;
   /** Reference images for 2D tracing (optional for backward compat) */
