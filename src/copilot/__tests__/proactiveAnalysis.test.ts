@@ -163,6 +163,41 @@ describe('auditNotches', () => {
     expect(warnings.length).toBe(1);
     expect(warnings[0].severity).toBe('warning');
   });
+
+  // ── Positional matching (spec 2026-06-09-notch-mirror-design.md, Alcance C) ──
+  const notch = (x: number, y: number) => ({
+    id: `n-${x}-${y}`, type: 'notch' as const,
+    path: [{ type: 'M' as const, values: [x, y] }, { type: 'L' as const, values: [x, y + 8] }],
+  });
+  const seamAB: Seam = {
+    id: 's-1', pieceA: { pieceId: 'A', edgeName: 'sideSeam' }, pieceB: { pieceId: 'B', edgeName: 'sideSeam' },
+    type: 'standard', tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
+  };
+  // A: default square, right edge (cmd 2) = (200,0)→(200,400). B: left edge (cmd 1) = (0,0)→(0,400).
+  const frontA = (notches: PatternPiece['internals']) => makePiece({
+    id: 'A', name: 'Front', internals: notches,
+    edges: [{ id: 'A:side', name: 'sideSeam', segmentRange: [2, 3], edgeType: 'seam' }],
+  });
+  const backB = (notches: PatternPiece['internals']) => makePiece({
+    id: 'B', name: 'Back', internals: notches,
+    outline: [
+      { type: 'M', values: [0, 0] }, { type: 'L', values: [0, 400] },
+      { type: 'L', values: [200, 400] }, { type: 'L', values: [200, 0] }, { type: 'Z', values: [] },
+    ],
+    edges: [{ id: 'B:side', name: 'sideSeam', segmentRange: [1, 2], edgeType: 'seam' }],
+  });
+
+  it('does NOT warn when notches line up across the seam (same fraction)', () => {
+    const warnings = auditNotches([frontA([notch(200, 100)]), backB([notch(0, 100)])], [seamAB]);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('WARNS when counts match but positions do not align (the old count check missed this)', () => {
+    const warnings = auditNotches([frontA([notch(200, 100)]), backB([notch(0, 380)])], [seamAB]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0].severity).toBe('warning');
+    expect(warnings[0].message).toMatch(/line up/i);
+  });
 });
 
 describe('runProactiveAnalysis', () => {

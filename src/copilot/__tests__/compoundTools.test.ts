@@ -48,8 +48,8 @@ describe('Compound Tools', () => {
 
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
-      // 232 - 2 seamly tools (Seamly removal 2026-06-05)
-      expect(registry.size).toBe(230);
+      // 232 - 2 seamly tools (Seamly removal 2026-06-05) + 1 mirrorNotch (2026-06-09)
+      expect(registry.size).toBe(231);
     });
   });
 });
