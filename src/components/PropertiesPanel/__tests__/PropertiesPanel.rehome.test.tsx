@@ -15,7 +15,7 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import projectReducer, { addPiece, addSeam } from '../../../store/projectSlice';
-import editorReducer, { selectPiece, selectSeam } from '../../../store/editorSlice';
+import editorReducer, { selectPiece, selectSeam, setActiveTool } from '../../../store/editorSlice';
 import simulationReducer from '../../../store/simulationSlice';
 import toolReducer from '../../../store/toolSlice';
 import PropertiesPanel from '../PropertiesPanel';
@@ -80,6 +80,24 @@ describe('PropertiesPanel content', () => {
   it('shows the empty state when nothing is selected', () => {
     renderPanel();
     expect(screen.getByText(/select a piece/i)).toBeTruthy();
+  });
+
+  it('shows the editable SA default when the seamAllowance tool is active and nothing is selected', () => {
+    const store = makeStore();
+    store.dispatch(setActiveTool('seamAllowance'));
+    renderPanel(store);
+    expect(screen.getByText('Seam Allowance Default')).toBeTruthy();
+    const input = screen.getByLabelText('Width (mm)') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '12' } });
+    fireEvent.blur(input);
+    expect(store.getState().editor.defaultSeamAllowanceWidth).toBe(12);
+  });
+
+  it('hides the SA default control for other tools', () => {
+    const store = makeStore();
+    store.dispatch(setActiveTool('select'));
+    renderPanel(store);
+    expect(screen.queryByText('Seam Allowance Default')).toBeNull();
   });
 
   it('shows the PIECE section for the selected piece', () => {

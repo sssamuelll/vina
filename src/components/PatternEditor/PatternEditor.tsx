@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { addPiece, addSeam, addInternalLine, setInternalLine, updateInternalLine, updatePiece, batchSetSeamAllowance, addReferenceImage, removeReferenceImage, updateReferenceImage } from '../../store/projectSlice';
+import { batchUndo } from '../../store/undoMiddleware';
 import { unfoldPiece, offsetInternalLine, optimizePieceCurves } from '../../utils/patternOps';
 import { selectPiece, selectSeam, selectEdge, selectVertex, setZoom2D, setPan2D, computeFitView, startCalibration, setCalibrationPoint1, cancelCalibration } from '../../store/editorSlice';
 import { selectPieces, selectSeams, selectEditor, selectToolOptions } from '../../store/selectors';
@@ -189,8 +190,18 @@ export default function PatternEditor({ onImportDXF, onOpenPanel }: PatternEdito
       ));
     }
   }, [pieces, dispatch]);
+  // Drag-to-all: apply the editor default to every touched piece in ONE batched
+  // action. batchUndo wraps the single bulk dispatch so the undo middleware
+  // clones the tree once (not per piece) and Ctrl+Z reverts the whole gesture.
+  const handleApplySeamAllowanceAll = useCallback((pieceIds: string[], widthMm: number) => {
+    if (pieceIds.length === 0) return;
+    batchUndo(dispatch, `Apply ${widthMm}mm seam allowance to ${pieceIds.length} piece(s)`, () => {
+      dispatch(batchSetSeamAllowance({ pieceIds, width: widthMm }));
+    });
+  }, [dispatch]);
   const seamAllowanceTool = useSeamAllowanceTool(pieces, zoom2D, pan2D, {
     onApply: handleApplySeamAllowance,
+    onApplyAll: handleApplySeamAllowanceAll,
     // Selecting an edge/vertex opens the Properties panel — its docked home for
     // editing the width / corner type (CLO3D's persistent Property Editor).
     onSelectEdge: (pieceId, edgeId) => { dispatch(selectEdge({ pieceId, edgeId })); onOpenPanel?.('Properties'); },

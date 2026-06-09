@@ -21,6 +21,7 @@ import SeamPropertiesPanel from './SeamPropertiesPanel';
 import MaterialTab from './MaterialTab';
 import EdgePropertiesSection from './EdgePropertiesSection';
 import VertexPropertiesSection from './VertexPropertiesSection';
+import SeamAllowanceDefaultSection from './SeamAllowanceDefaultSection';
 import './PropertiesPanel.css';
 
 export default function PropertiesPanel() {
@@ -83,6 +84,9 @@ export default function PropertiesPanel() {
     <div className="properties-panel">
       {!selectedPiece && !selectedSeam && !selectedEdge && !selectedVertex ? (
         <>
+          {/* Tool-scoped: the SA default lives here so the body-click / drag-to-all
+              applies an editable width (CLO3D parity), not a hardcoded constant. */}
+          {editor.activeTool === 'seamAllowance' && <SeamAllowanceDefaultSection />}
           <div className="panel-empty">Select a piece, seam or edge to edit</div>
           {seamsList}
         </>

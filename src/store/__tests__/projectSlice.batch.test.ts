@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
-import projectReducer, { addPiece, addSeam, addPOM, removePieces } from '../projectSlice';
+import projectReducer, { addPiece, addSeam, addPOM, removePieces, batchSetSeamAllowance } from '../projectSlice';
 
 const initialState = projectReducer(undefined, { type: '@@INIT' });
 
@@ -41,5 +41,22 @@ describe('projectSlice batch operations', () => {
 
     // POM pom1 should be gone because it referenced p1
     expect(state.poms).toHaveLength(0);
+  });
+
+  it('batchSetSeamAllowance applies width to listed pieces only, clamps negatives, marks dirty', () => {
+    let state = projectReducer(initialState, addPiece({ id: 'p1', name: 'P1', outline: [], internals: [], seamAllowance: 0 } as any));
+    state = projectReducer(state, addPiece({ id: 'p2', name: 'P2', outline: [], internals: [], seamAllowance: 0 } as any));
+    state = projectReducer(state, addPiece({ id: 'p3', name: 'P3', outline: [], internals: [], seamAllowance: 5 } as any));
+
+    // Apply 9.5 to p1 and p2 only — p3 is left untouched.
+    state = projectReducer(state, batchSetSeamAllowance({ pieceIds: ['p1', 'p2'], width: 9.5 }));
+    expect(state.pieces.find(p => p.id === 'p1')!.seamAllowance).toBe(9.5);
+    expect(state.pieces.find(p => p.id === 'p2')!.seamAllowance).toBe(9.5);
+    expect(state.pieces.find(p => p.id === 'p3')!.seamAllowance).toBe(5);
+    expect(state.isDirty).toBe(true);
+
+    // Negative widths clamp to 0 (Math.max(0, width)).
+    state = projectReducer(state, batchSetSeamAllowance({ pieceIds: ['p1'], width: -3 }));
+    expect(state.pieces.find(p => p.id === 'p1')!.seamAllowance).toBe(0);
   });
 });
