@@ -297,6 +297,75 @@ const addNotchTool: ToolDefinition = {
   },
 };
 
+// ─── mirrorNotch ──────────────────────────────────────────────────────────────
+
+const mirrorNotchTool: ToolDefinition = {
+  name: 'mirrorNotch',
+  description:
+    'Create the corresponding notch on the piece sewn to this one, at the matching ' +
+    'distance along the shared seam, so the sewing lines up (CLO3D "corresponding notch"). ' +
+    'One-shot: creates an independent notch, no persistent link. ' +
+    '/ Crear el piquete correspondiente en la pieza cosida a ésta, a la misma distancia ' +
+    'sobre la costura compartida, para que el cosido calce. One-shot, sin vínculo persistente.',
+  parameters: {
+    type: 'object',
+    properties: {
+      pieceId: { type: 'string', description: 'Source piece ID / ID de la pieza origen' },
+      notchLineId: { type: 'string', description: 'ID of the source notch internal line / ID del piquete origen' },
+      invert: {
+        type: 'boolean',
+        description:
+          'Flip the traversal sense. The normal right-sides-together seam sews edges in OPPOSITE ' +
+          'directions, so invert=true is often correct. Preview the result and toggle if it lands ' +
+          'on the wrong end. / Invertir el sentido. El caso normal cose en sentidos opuestos.',
+      },
+    },
+    required: ['pieceId', 'notchLineId'],
+  },
+  execute: async (params, dispatch, getState): Promise<ToolResult> => {
+    const state = getState();
+    const piece = state.project.pieces.find(p => p.id === params.pieceId);
+    if (!piece) return { success: false, error: `Piece "${params.pieceId}" not found` };
+
+    const source = piece.internals.find(i => i.id === params.notchLineId && i.type === 'notch');
+    if (!source) return { success: false, error: `Notch "${params.notchLineId}" not found on piece` };
+    const head = source.path[0];
+    if (!head || head.values.length < 2) return { success: false, error: 'Source notch has no anchor point' };
+    const point = { x: head.values[0], y: head.values[1] };
+
+    const { mapNotchAcrossSeam } = await import('../../../../utils/seam/notchMirror');
+    const mapped = mapNotchAcrossSeam({
+      sourcePiece: piece,
+      point,
+      seams: state.project.seams,
+      pieces: state.project.pieces,
+      invert: params.invert as boolean | undefined,
+    });
+    if (!mapped.ok) return { success: false, error: mapped.message };
+
+    const depth = source.notchOptions?.length ?? 8;
+    const { computeNotchAnchor } = await import('../../../../utils/notchAnchor');
+    const pairedPiece = state.project.pieces.find(p => p.id === mapped.pairedPieceId)!;
+    const anchor = computeNotchAnchor(pairedPiece.outline, mapped.point);
+
+    const notchLine: InternalLine = {
+      id: lineId(),
+      type: 'notch',
+      path: [
+        M(mapped.point.x, mapped.point.y),
+        L(mapped.point.x + mapped.normal.x * depth, mapped.point.y + mapped.normal.y * depth),
+      ],
+      notchOptions: source.notchOptions
+        ? { ...source.notchOptions }
+        : { shape: 'slit', subType: 'straightforward', length: depth, width: 3, angle: 0, count: 1 },
+      ...(anchor ? { notchAnchor: anchor } : {}),
+    };
+
+    dispatch(addInternalLine({ pieceId: mapped.pairedPieceId, line: notchLine }));
+    return { success: true, data: { internalLineId: notchLine.id, pieceId: mapped.pairedPieceId, edge: mapped.pairedEdgeName } };
+  },
+};
+
 // ─── addFoldLine ────────────────────────────────────────────────────────────
 
 const addFoldLineTool: ToolDefinition = {
@@ -353,5 +422,6 @@ export const tools: ToolDefinition[] = [
   addDartTool,
   addGrainlineTool,
   addNotchTool,
+  mirrorNotchTool,
   addFoldLineTool,
 ];

@@ -10,7 +10,9 @@
  * @module proactiveAnalysis
  */
 
-import type { PatternPiece, Seam, PathCommand } from '../../types/types';
+import type { PatternPiece, Seam, PathCommand, InternalLine, Point2D } from '../../types/types';
+import { findEdgeByName, findEdgeForPoint } from '../../utils/seam/notchMirror';
+import { computePathArcLength, distanceAlongPath } from '../../utils/geometry/arcLength';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -269,10 +271,44 @@ export function auditSeamLengths(
   return warnings;
 }
 
+/** Base point (M command) of a notch internal line. */
+function notchPoint(n: InternalLine): Point2D | null {
+  const h = n.path[0];
+  return h && h.values.length >= 2 ? { x: h.values[0], y: h.values[1] } : null;
+}
+
+/** Fraction (0-1) within the sewn sub-range [t0,t1] of an edge. */
+function sewnFrac(fracEdge: number, t0: number, t1: number): number {
+  const span = t1 - t0;
+  const f = span > 1e-9 ? (fracEdge - t0) / span : fracEdge;
+  return Math.max(0, Math.min(1, f));
+}
+
+/** Greedy count of A↔B matches within tolerance, for one traversal sense. */
+function countMatches(fracsA: number[], fracsB: number[], tolFrac: number): number {
+  const used = new Set<number>();
+  let matched = 0;
+  for (const fa of fracsA) {
+    let bestJ = -1, bestD = tolFrac;
+    for (let j = 0; j < fracsB.length; j++) {
+      if (used.has(j)) continue;
+      const d = Math.abs(fa - fracsB[j]);
+      if (d < bestD) { bestD = d; bestJ = j; }
+    }
+    if (bestJ >= 0) { used.add(bestJ); matched++; }
+  }
+  return matched;
+}
+
 /**
- * Check for matching notches between connected pieces.
- *
- * Connected pieces should have corresponding notches on their shared edges.
+ * Check that notches on connected pieces actually LINE UP across the shared seam
+ * (spec 2026-06-09-notch-mirror-design.md, Alcance C). Replaces the old
+ * count-only check, which passed two notches in totally different positions as
+ * long as the counts matched. Maps each notch to its sewn-fraction along the
+ * edge and pairs A↔B by position, trying BOTH traversal senses (right-sides-
+ * together sews edges in opposite directions) and keeping the better fit. Never
+ * asserts a false "all good": a count match with positions that don't align is
+ * now a warning. Falls back to the count check when edges can't be resolved.
  *
  * @param pieces - All pattern pieces
  * @param seams - All seam connections
@@ -289,22 +325,74 @@ export function auditNotches(
     const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
     if (!pieceA || !pieceB) continue;
 
-    const notchesA = pieceA.internals.filter(i => i.type === 'notch').length;
-    const notchesB = pieceB.internals.filter(i => i.type === 'notch').length;
+    const allNotchesA = pieceA.internals.filter(i => i.type === 'notch');
+    const allNotchesB = pieceB.internals.filter(i => i.type === 'notch');
 
-    if (notchesA === 0 && notchesB === 0) {
+    if (allNotchesA.length === 0 && allNotchesB.length === 0) {
       warnings.push({
         category: 'notch',
         severity: 'info',
         pieceIds: [pieceA.id, pieceB.id],
         message: `No notches on seam between ${pieceA.name} and ${pieceB.name}. Add alignment notches for easier assembly.`,
       });
-    } else if (notchesA !== notchesB) {
+      continue;
+    }
+
+    const edgeA = findEdgeByName(pieceA, seam.pieceA.edgeName);
+    const edgeB = findEdgeByName(pieceB, seam.pieceB.edgeName);
+
+    // Notches that actually sit on the seamed edge of each piece.
+    const onEdge = (piece: PatternPiece, edge: typeof edgeA, notches: InternalLine[]) =>
+      edge
+        ? notches.filter(n => { const pt = notchPoint(n); return pt != null && findEdgeForPoint(piece, pt)?.id === edge.id; })
+        : notches;
+    const notchesA = onEdge(pieceA, edgeA, allNotchesA);
+    const notchesB = onEdge(pieceB, edgeB, allNotchesB);
+
+    const lenA = edgeA ? computePathArcLength(pieceA.outline, edgeA.segmentRange[0], edgeA.segmentRange[1]) : 0;
+    const lenB = edgeB ? computePathArcLength(pieceB.outline, edgeB.segmentRange[0], edgeB.segmentRange[1]) : 0;
+
+    // Fall back to the count check when edges/geometry can't be resolved.
+    if (!edgeA || !edgeB || lenA < 1e-9 || lenB < 1e-9) {
+      if (notchesA.length !== notchesB.length) {
+        warnings.push({
+          category: 'notch', severity: 'warning', pieceIds: [pieceA.id, pieceB.id],
+          message: `Notch count mismatch: ${pieceA.name} has ${notchesA.length}, ${pieceB.name} has ${notchesB.length}`,
+        });
+      }
+      continue;
+    }
+
+    const tA0 = seam.pieceA.tStart ?? 0, tA1 = seam.pieceA.tEnd ?? 1;
+    const tB0 = seam.pieceB.tStart ?? 0, tB1 = seam.pieceB.tEnd ?? 1;
+    const fracsA = notchesA.map(n => {
+      const pt = notchPoint(n)!;
+      return sewnFrac(distanceAlongPath(pieceA.outline, pt, edgeA.segmentRange[0], edgeA.segmentRange[1]) / lenA, tA0, tA1);
+    });
+    const fracsB = notchesB.map(n => {
+      const pt = notchPoint(n)!;
+      return sewnFrac(distanceAlongPath(pieceB.outline, pt, edgeB.segmentRange[0], edgeB.segmentRange[1]) / lenB, tB0, tB1);
+    });
+
+    // Tolerance: ~2% of the shorter sewn span, floored at ~5mm (aligned with the
+    // walk-seam sampling interval). Expressed as a fraction of the sewn span.
+    const sewnA = lenA * (tA1 - tA0), sewnB = lenB * (tB1 - tB0);
+    const tolMm = Math.max(5, 0.02 * Math.min(sewnA, sewnB));
+    const tolFrac = tolMm / Math.max(1e-9, Math.min(sewnA, sewnB));
+
+    const matched = Math.max(
+      countMatches(fracsA, fracsB, tolFrac),
+      countMatches(fracsA, fracsB.map(x => 1 - x), tolFrac), // opposite sense
+    );
+    const unmatchedA = notchesA.length - matched;
+    const unmatchedB = notchesB.length - matched;
+
+    if (unmatchedA > 0 || unmatchedB > 0) {
       warnings.push({
-        category: 'notch',
-        severity: 'warning',
-        pieceIds: [pieceA.id, pieceB.id],
-        message: `Notch count mismatch: ${pieceA.name} has ${notchesA}, ${pieceB.name} has ${notchesB}`,
+        category: 'notch', severity: 'warning', pieceIds: [pieceA.id, pieceB.id],
+        message: `Notches don't line up across the seam between ${pieceA.name} and ${pieceB.name} `
+          + `(${matched} aligned, ${unmatchedA} on ${pieceA.name} and ${unmatchedB} on ${pieceB.name} without a match). `
+          + `Mirror the missing notch to the paired edge.`,
       });
     }
   }
