@@ -403,7 +403,7 @@ export function useSimulationLifecycle({
                 edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
                 stretchingIdsRef.current = ids;
               };
-              await withTimeout(wasmClient.initMultiPiece(placedMeshes), 12000, 'Wasm solver init');
+              await withTimeout(wasmClient.initMultiPiece(placedMeshes, seamInitData), 12000, 'Wasm solver init');
               wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
