@@ -29,7 +29,7 @@
  */
 
 import { extractStretchConstraints, extractBendConstraints } from '../gpu/gpuBuffers';
-import { mergeMeshes, buildSeamConstraints } from '../seamAssembly';
+import { mergeMeshes, buildSeamConstraints, seamInitDataToSeams } from '../seamAssembly';
 import { buildElasticConstraints, type ElasticConstraintSet } from '../elasticAssembly';
 import type { PathCommand, Elastic, SemanticEdge } from '../../../types/types';
 import type { CollisionMeshData } from '../collisionMesh';
@@ -582,9 +582,16 @@ self.onmessage = async (event: MessageEvent) => {
         }
         wasmCachedMergedMesh = { vertices: merged.vertices, indices: new Uint32Array(merged.triIds), pieceOffsets: pieceOffsetsMap };
 
-        // Seam constraints
+        // Seam constraints.
+        // CRITICAL (Fase 5 fix): `msg.seams` is worker-protocol
+        // `SeamInitData[]` — it MUST be converted to the domain `Seam[]`
+        // shape first. Passing it through unconverted (the pre-Fase-5
+        // behavior) made `buildSeamConstraints` read `seam.pieceA.pieceId`
+        // off `undefined` → TypeError on every seam-carrying init → the
+        // tier cascade silently fell back to CPU. `msg` is untyped
+        // (`event.data`), so the compiler never caught it.
         if (msg.seams && msg.seams.length > 0) {
-          const seamConstraints = buildSeamConstraints(msg.seams, outlines, merged, pieceEdges);
+          const seamConstraints = buildSeamConstraints(seamInitDataToSeams(msg.seams), outlines, merged, pieceEdges);
           if (seamConstraints.count > 0) {
             console.log('[WasmWorker] Adding seam constraints:', seamConstraints.count);
             // Convert pairs to Uint32Array for Wasm

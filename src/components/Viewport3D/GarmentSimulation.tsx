@@ -73,6 +73,8 @@ function seamsToInitData(seams: Seam[], seamGroups?: SeamGroup[]): SeamInitData[
       pieceBRange: s.pieceB.tStart != null && s.pieceB.tEnd != null
         ? [s.pieceB.tStart, s.pieceB.tEnd] as [number, number]
         : undefined,
+      // Sewing direction (Fase 5) — flows through every tier's resolution.
+      pieceBReversed: s.pieceB.reversed === true ? true : undefined,
       tension: s.tension ?? 100,
       strength: s.strength ?? 1.0,
       active: true,

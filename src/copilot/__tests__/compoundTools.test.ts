@@ -49,7 +49,7 @@ describe('Compound Tools', () => {
   describe('Total tools count', () => {
     it('should have correct number of tools registered', () => {
       // 232 - 2 seamly tools (Seamly removal 2026-06-05) + 1 mirrorNotch (2026-06-09)
-      expect(registry.size).toBe(231);
+      expect(registry.size).toBe(232); // +1 reverseSeam (Fase 5 paridad CLO3D, 2026-06-11)
     });
   });
 });

@@ -8,8 +8,10 @@ import {
   solveSeamConstraints,
   isFullySewn,
   DEFAULT_SEAM_CONFIG,
+  seamInitDataToSeams,
   type ParameterizedVertex,
   type SeamConstraintSet,
+  type SeamInitData,
 } from './seamAssembly';
 import type { PathCommand, Seam } from '../../types/types';
 
@@ -508,5 +510,150 @@ describe('isFullySewn', () => {
       config: DEFAULT_SEAM_CONFIG,
     };
     expect(isFullySewn(seamSet)).toBe(false);
+  });
+});
+
+// ─── Direction / reversal (parity plan Fase 5) ──────────────────────────────
+
+describe('parameterizeEdge — reverse (Fase 5)', () => {
+  // Rectángulo 10×20: el tramo 0→2 (bottom 10 + right 20) tiene arc-length
+  // ASIMÉTRICO, así el espejo t→1−t es observable (en tramos uniformes el
+  // conjunto de t espejado coincide con el original y el test no probaría nada).
+  const rectOutline: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [10, 0] },
+    { type: 'L', values: [10, 20] },
+    { type: 'L', values: [0, 20] },
+    { type: 'Z', values: [] },
+  ];
+
+  it('flips vertex order and mirrors t, preserving the ascending-t invariant', () => {
+    const fwd = parameterizeEdge(rectOutline, 0, 2, 0, 12, 1000);
+    const rev = parameterizeEdge(rectOutline, 0, 2, 0, 12, 1000, true);
+
+    // fwd: indices [0,1,2], t [0, 1/3, 1] (10 de 30, luego 20 de 30)
+    expect(fwd.map(v => v.index)).toEqual([0, 1, 2]);
+    expect(fwd[1].t).toBeCloseTo(1 / 3);
+
+    // rev: mismos vértices en orden inverso, t espejada → [0, 2/3, 1]
+    expect(rev.map(v => v.index)).toEqual([2, 1, 0]);
+    expect(rev[0].t).toBeCloseTo(0);
+    expect(rev[1].t).toBeCloseTo(2 / 3);
+    expect(rev[2].t).toBeCloseTo(1);
+
+    // Invariante que matchVertices exige: t ascendente.
+    for (let i = 1; i < rev.length; i++) {
+      expect(rev[i].t).toBeGreaterThanOrEqual(rev[i - 1].t);
+    }
+  });
+
+  it('reverse=false (default) is byte-identical to the previous behavior', () => {
+    expect(parameterizeEdge(rectOutline, 0, 2, 0, 12, 1000)).toEqual(
+      parameterizeEdge(rectOutline, 0, 2, 0, 12, 1000, false),
+    );
+  });
+});
+
+describe('buildSeamConstraints — pieceB.reversed (Fase 5)', () => {
+  const outlineA: PathCommand[] = [
+    { type: 'M', values: [0, 0] },
+    { type: 'L', values: [10, 0] },
+    { type: 'L', values: [10, 10] }, // 2: right
+    { type: 'L', values: [0, 10] },
+    { type: 'L', values: [0, 0] },
+    { type: 'Z', values: [] },
+  ];
+  const outlineB: PathCommand[] = [
+    { type: 'M', values: [20, 0] },
+    { type: 'L', values: [30, 0] },
+    { type: 'L', values: [30, 10] },
+    { type: 'L', values: [20, 10] },
+    { type: 'L', values: [20, 0] }, // 4: left
+    { type: 'Z', values: [] },
+  ];
+
+  function makeFixture(reversed: boolean) {
+    const seam: Seam = {
+      id: 's-dir',
+      pieceA: { pieceId: 'a', edgeName: 'rightEdge' },
+      pieceB: { pieceId: 'b', edgeName: 'leftEdge', reversed },
+      type: 'standard',
+      tension: 100, strength: 1.0, active: true, taped: false, tapeWidth: 10,
+    };
+    const merged = mergeMeshes([
+      { pieceId: 'a', vertices: new Float32Array([0,1,0, 10,1,0, 10,1,10, 0,1,10, 0,1,0]), triIds: new Int32Array([0,1,2]) },
+      { pieceId: 'b', vertices: new Float32Array([20,1,0, 30,1,0, 30,1,10, 20,1,10, 20,1,0]), triIds: new Int32Array([0,1,2]) },
+    ]);
+    const outlines = new Map<string, PathCommand[]>([['a', outlineA], ['b', outlineB]]);
+    const pieces = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }> }>([
+      ['a', { edges: [{ name: 'rightEdge', segmentRange: [2, 3] }] }],
+      ['b', { edges: [{ name: 'leftEdge', segmentRange: [4, 5] }] }],
+    ]);
+    return buildSeamConstraints([seam], outlines, merged, pieces);
+  }
+
+  it('reversed=true pairs A:t=0 with B:t=1 — the ids flip on the B side only', () => {
+    const fwd = makeFixture(false);
+    const rev = makeFixture(true);
+
+    // Mismo número de constraints — la dirección no cambia el count.
+    expect(rev.count).toBe(fwd.count);
+    expect(fwd.count).toBe(2);
+
+    // rightEdge = comando 2 → rango aplanado [1,2] (anchor en el endpoint
+    // del comando 1); leftEdge = comando 4 → [3,4] → globales 8,9.
+    // Forward: [a1↔b8, a2↔b9]. Reversed: la mitad B se recorre al revés →
+    // [a1↔b9, a2↔b8].
+    expect(Array.from(fwd.ids)).toEqual([1, 8, 2, 9]);
+    expect(Array.from(rev.ids)).toEqual([1, 9, 2, 8]);
+  });
+});
+
+describe('seamInitDataToSeams (Fase 5 — shared worker mapping)', () => {
+  const init: SeamInitData = {
+    id: 's1',
+    pieceAId: 'a', pieceAEdgeName: 'top',
+    pieceBId: 'b', pieceBEdgeName: 'bottom',
+    type: 'french',
+    pieceARange: [0.1, 0.9],
+    pieceBReversed: true,
+    tension: 80, strength: 0.5, active: true, taped: true,
+  };
+
+  it('maps the flat worker shape to the nested domain shape, reversed included', () => {
+    const [seam] = seamInitDataToSeams([init]);
+    expect(seam).toEqual({
+      id: 's1',
+      pieceA: { pieceId: 'a', edgeName: 'top', tStart: 0.1, tEnd: 0.9 },
+      pieceB: { pieceId: 'b', edgeName: 'bottom', tStart: undefined, tEnd: undefined, reversed: true },
+      type: 'french',
+      tension: 80, strength: 0.5, active: true, taped: true, tapeWidth: 10,
+    });
+  });
+
+  it('filters inactive seams and defaults missing numerics', () => {
+    const seams = seamInitDataToSeams([
+      { ...init, id: 'off', active: false },
+      { ...init, id: 'bare', tension: undefined as never, strength: undefined as never, taped: undefined as never, pieceBReversed: undefined },
+    ]);
+    expect(seams).toHaveLength(1);
+    expect(seams[0]).toMatchObject({ id: 'bare', tension: 100, strength: 1.0, taped: false });
+    expect(seams[0].pieceB.reversed).toBe(false);
+  });
+
+  it('REGRESSION (wasm worker): raw SeamInitData into buildSeamConstraints throws — the conversion is mandatory', () => {
+    // Pre-Fase-5, wasmSolverWorker pasaba msg.seams (SeamInitData[]) sin
+    // convertir: buildSeamConstraints lee seam.pieceA.pieceId sobre
+    // undefined → TypeError → init reventaba → caída silenciosa a CPU.
+    const merged = mergeMeshes([
+      { pieceId: 'a', vertices: new Float32Array([0, 0, 0]), triIds: new Int32Array([]) },
+    ]);
+    expect(() =>
+      buildSeamConstraints([init as never], new Map([['a', [] as PathCommand[]]]), merged),
+    ).toThrow(TypeError);
+    // Y con la conversión, el mismo input es seguro.
+    expect(() =>
+      buildSeamConstraints(seamInitDataToSeams([init]), new Map([['a', [] as PathCommand[]]]), merged),
+    ).not.toThrow();
   });
 });

@@ -318,6 +318,14 @@ export function useSegmentSewingTool(
         const edgeAName = pieceAObj ? resolveEdgeName(pieceAObj, segA.edgeIndex) : `edge-${segA.edgeIndex}`;
         const edgeBName = pieceBObj ? resolveEdgeName(pieceBObj, segB.edgeIndex) : `edge-${segB.edgeIndex}`;
 
+        // FULL-SEGMENT SNAP (parity plan Fase 5 § 5 mitigation): tStart/tEnd
+        // are deliberately OMITTED even though the tool tracks startT/endT
+        // during the drag. Dispatching a sub-range arms the solver bug —
+        // buildSeamConstraints filters vertices by t WITHOUT renormalizing,
+        // so a partial side matched against a full side pairs the wrong
+        // vertices and twists the piece. CLO3D Segment Sewing is also
+        // full-segment (2 clicks). Partial-edge sewing ships only as an
+        // atomic pair with solver renormalization (plan § 5 DEFER).
         const seam: Omit<Seam, 'id'> = {
           pieceA: {
             pieceId: segA.pieceId,

@@ -137,8 +137,12 @@ describe('PropertiesPanel content', () => {
     renderPanel(store);
     fireEvent.click(screen.getByRole('button', { name: 'Reverse' }));
     const after = store.getState().project.seams[0];
-    expect(after.pieceA.pieceId).toBe('p2');
-    expect(after.pieceB.pieceId).toBe('p1');
+    // Fase 5: Reverse alterna pieceB.reversed (direccion real de cosido).
+    // El swap A<->B anterior era un no-op fisico (matchVertices empareja
+    // por t ascendente en ambos lados).
+    expect(after.pieceA.pieceId).toBe('p1');
+    expect(after.pieceB.pieceId).toBe('p2');
+    expect(after.pieceB.reversed).toBe(true);
   });
 
   it('Notch Settings writes tools.toolOptions.notch (NEW live wire, was dead useState)', () => {

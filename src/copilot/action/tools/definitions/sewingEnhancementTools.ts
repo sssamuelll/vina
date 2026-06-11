@@ -16,6 +16,7 @@ import {
   deactivateSeam,
   deactivatePiece,
   addSeamGroup,
+  reverseSeam,
 } from '../../../../store/projectSlice';
 import type { SeamGroup } from '../../../../types/types';
 import { DEFAULT_SEAM_TENSION, DEFAULT_SEAM_STRENGTH } from '../../../../utils/defaults';
@@ -76,9 +77,12 @@ const setSeamRangeTool: ToolDefinition = {
   name: 'setSeamRange',
   description:
     'Set the parametric range [tStart, tEnd] on one side (A or B) of a seam. ' +
-    'tStart and tEnd are 0–1 fractions along the edge. ' +
+    'CURRENTLY only the full range [0, 1] is accepted: partial-edge sewing is deferred ' +
+    'until the solver renormalizes filtered t-values (un-renormalized sub-ranges pair the ' +
+    'wrong vertices and twist the garment). Use full-edge seams instead. ' +
     '/ Establecer el rango paramétrico [tStart, tEnd] en un lado (A o B) de una costura. ' +
-    'tStart y tEnd son fracciones 0–1 a lo largo del borde.',
+    'ACTUALMENTE solo se acepta el rango completo [0, 1]: el cosido parcial está diferido ' +
+    'hasta que el solver renormalice los t filtrados. Usa costuras de borde completo.',
   parameters: {
     type: 'object',
     properties: {
@@ -117,6 +121,22 @@ const setSeamRangeTool: ToolDefinition = {
     }
     if (tStart >= tEnd) {
       return { success: false, error: 'tStart must be less than tEnd' };
+    }
+    // Parity plan Fase 5 mitigation (§ 5 DEFER "partial-edge sewing"):
+    // dispatching a sub-range arms the solver bug — buildSeamConstraints
+    // filters vertices by t WITHOUT renormalizing, so a [0.3, 0.7] side
+    // matched against a full [0, 1] side pairs geometrically wrong
+    // vertices and twists the piece. Refuse honestly until the
+    // dispatch+renormalization pair lands together.
+    if (tStart !== 0 || tEnd !== 1) {
+      return {
+        success: false,
+        error:
+          'Partial-edge ranges are not supported yet: the solver does not renormalize ' +
+          'filtered t-values, so a sub-range seam would sew the wrong vertices and twist ' +
+          'the garment. Use the full range [0, 1] (full-edge seam) — partial-edge sewing ' +
+          'ships together with solver renormalization.',
+      };
     }
 
     const updatedSeam = side === 'A'
@@ -479,6 +499,47 @@ const setSeamShrinkageTool: ToolDefinition = {
   },
 };
 
+// ─── reverseSeam ──────────────────────────────────────────────────────────────
+
+const reverseSeamTool: ToolDefinition = {
+  name: 'reverseSeam',
+  description:
+    'Reverse the sewing direction of a seam (CLO3D "Reverse Sewing", Ctrl+B). ' +
+    'Toggles whether the B half is traversed end-to-start relative to A — use it when the ' +
+    '2D connection lines draw a crossed X or the simulation twists a piece at a seam. ' +
+    'Calling it again restores the original direction. ' +
+    '/ Invertir la dirección de cosido de una costura (Ctrl+B). Úsalo cuando las líneas de ' +
+    'conexión 2D dibujan una X cruzada o la simulación retuerce una pieza en la costura. ' +
+    'Llamarlo de nuevo restaura la dirección original.',
+  parameters: {
+    type: 'object',
+    properties: {
+      seamId: { type: 'string', description: 'Seam ID / ID de la costura' },
+    },
+    required: ['seamId'],
+  },
+  execute: async (
+    params: Record<string, unknown>,
+    dispatch: AppDispatch,
+    getState: () => RootState,
+  ): Promise<ToolResult> => {
+    const seamId = params.seamId as string;
+    const seam = getState().project.seams.find(s => s.id === seamId);
+    if (!seam) return { success: false, error: `Seam "${seamId}" not found` };
+
+    dispatch(reverseSeam(seamId));
+    const reversed = getState().project.seams.find(s => s.id === seamId)?.pieceB.reversed === true;
+
+    return {
+      success: true,
+      data: { seamId, reversed },
+      // Toggle-style rollback (convention per simulationTools): reversing
+      // again restores the original direction.
+      rollback: () => dispatch(reverseSeam(seamId)),
+    };
+  },
+};
+
 export const tools: ToolDefinition[] = [
   setSeamTensionTool,
   setSeamRangeTool,
@@ -489,4 +550,5 @@ export const tools: ToolDefinition[] = [
   getSeamInfoTool,
   analyzeGatheringTool,
   setSeamShrinkageTool,
+  reverseSeamTool,
 ];

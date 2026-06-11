@@ -9,33 +9,16 @@
 
 import { XPBDClothSolver, type ClothSimConfig, type ClothMeshData, type SphereCollider, type CapsuleCollider } from './xpbdSolver';
 import { getComplianceForFabric } from './fabricLibrary';
-import { mergeMeshes, buildSeamConstraints, type MergedMesh } from './seamAssembly';
+import { mergeMeshes, buildSeamConstraints, seamInitDataToSeams, type MergedMesh, type SeamInitData } from './seamAssembly';
 import { buildElasticConstraints } from './elasticAssembly';
 import type { Elastic, PathCommand, SemanticEdge } from '../../types/types';
 
 // ─── Message Protocol ───────────────────────────────────────────────────────
 
-/** Data needed to build seam constraints in the worker */
-export interface SeamInitData {
-  id: string;
-  pieceAId: string;
-  pieceAEdgeName: string;
-  pieceBId: string;
-  pieceBEdgeName: string;
-  type: 'standard' | 'french' | 'flat-felled' | 'overlock';
-  /** t-parameter range on piece A side (partial-edge sewing) */
-  pieceARange?: [number, number];
-  /** t-parameter range on piece B side (partial-edge sewing) */
-  pieceBRange?: [number, number];
-  /** Tension applied to seam (0-200, default 100) */
-  tension: number;
-  /** Strength of the seam bond (0-1, default 1.0) */
-  strength: number;
-  /** Whether this seam participates in simulation */
-  active: boolean;
-  /** Whether seam tape is applied */
-  taped: boolean;
-}
+// SeamInitData moved to seamAssembly.ts (environment-neutral home next to
+// its `seamInitDataToSeams` conversion — Fase 5). Re-exported here so the
+// existing `from './clothWorker'` import surface keeps working.
+export type { SeamInitData } from './seamAssembly';
 
 /** Messages sent from main thread → worker */
 export type WorkerInMessage =
@@ -178,22 +161,11 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
         };
         solver = new XPBDClothSolver(mergedMeshData, msg.config);
 
-        // Build and set seam constraints
-        // Filter to only active seams
-        const activeSeams = msg.seams.filter(s => s.active !== false);
-        if (activeSeams.length > 0) {
+        // Build and set seam constraints (shared SeamInitData → Seam
+        // mapping; filters inactive seams — see seamAssembly Fase 5 note)
+        const seams = seamInitDataToSeams(msg.seams);
+        if (seams.length > 0) {
           progress('Building seam constraints...');
-          const seams: import('../../types/types').Seam[] = activeSeams.map(s => ({
-            id: s.id,
-            pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName, tStart: s.pieceARange?.[0], tEnd: s.pieceARange?.[1] },
-            pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName, tStart: s.pieceBRange?.[0], tEnd: s.pieceBRange?.[1] },
-            type: s.type,
-            tension: s.tension ?? 100,
-            strength: s.strength ?? 1.0,
-            active: true,
-            taped: s.taped ?? false,
-            tapeWidth: 10,
-          }));
           const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
           for (const [id, cmds] of outlines) {
             outlineMap.set(id, cmds as import('../../types/types').PathCommand[]);
@@ -240,19 +212,8 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
 
       case 'setSeams': {
         if (solver && cachedMergedMesh && cachedOutlines) {
-          // Filter to only active seams
-          const activeSeams = msg.seams.filter(s => s.active !== false);
-          const seams: import('../../types/types').Seam[] = activeSeams.map(s => ({
-            id: s.id,
-            pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName, tStart: s.pieceARange?.[0], tEnd: s.pieceARange?.[1] },
-            pieceB: { pieceId: s.pieceBId, edgeName: s.pieceBEdgeName, tStart: s.pieceBRange?.[0], tEnd: s.pieceBRange?.[1] },
-            type: s.type,
-            tension: s.tension ?? 100,
-            strength: s.strength ?? 1.0,
-            active: true,
-            taped: s.taped ?? false,
-            tapeWidth: 10,
-          }));
+          // Shared SeamInitData → Seam mapping (filters inactive seams)
+          const seams = seamInitDataToSeams(msg.seams);
           const outlineMap = new Map<string, import('../../types/types').PathCommand[]>();
           for (const [id, cmds] of cachedOutlines) {
             outlineMap.set(id, cmds as import('../../types/types').PathCommand[]);

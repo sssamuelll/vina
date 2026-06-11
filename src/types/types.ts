@@ -347,10 +347,19 @@ export interface SemanticEdge {
 /** A seam connects two named edges from different pattern pieces */
 export interface Seam {
   id: string;
-  /** First piece + semantic edge name */
+  /** First piece + semantic edge name. The A half is the direction REFERENCE. */
   pieceA: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number };
-  /** Second piece + semantic edge name */
-  pieceB: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number };
+  /**
+   * Second piece + semantic edge name.
+   *
+   * `reversed` — sewing direction of the B half relative to A (CLO3D parity
+   * plan Fase 5). When true, B's edge is traversed end→start: vertex
+   * matching pairs A's t=0 with B's t=1 (`parameterizeEdge` inverts t).
+   * Toggled by `reverseSeam` (Ctrl+B / panel / copilot tool). Lives on ONE
+   * half by design — reversal is a relative property of the pair, and A is
+   * the fixed reference. Undefined = false (legacy seams predate the field).
+   */
+  pieceB: { pieceId: string; edgeName: string; tStart?: number; tEnd?: number; reversed?: boolean };
   /** Seam type affects 3D simulation */
   type: 'standard' | 'french' | 'flat-felled' | 'overlock';
   /** Tension applied to seam (0-200, default 100) */

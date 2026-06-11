@@ -9,7 +9,7 @@
  * el outline aplanado, donde cada C/Q expande a `resolution` puntos.
  */
 import { describe, it, expect } from 'vitest';
-import { commandRangeToFlattened, flattenPath, flattenPathWithSource } from '../index';
+import { commandRangeToFlattened, flattenPath, flattenPathWithSource, resolveEdgePolyline } from '../index';
 import type { PathCommand } from '../../../types/types';
 
 // Cuadrado con cierre EXPLÍCITO (el lado izquierdo es un comando real,
@@ -93,5 +93,48 @@ describe('commandRangeToFlattened', () => {
 
   it('respects a custom curve resolution', () => {
     expect(commandRangeToFlattened(curved, [2, 3], 4)).toEqual([1, 5]);
+  });
+});
+
+// ─── resolveEdgePolyline (Fase 5 — dirección en el renderer 2D) ──────────────
+
+describe('resolveEdgePolyline', () => {
+  const edges = [
+    { name: 'top', segmentRange: [1, 2] as [number, number] },
+    { name: 'right', segmentRange: [2, 3] as [number, number] },
+  ];
+
+  it('resolves a semantic straight edge to its anchored 2-point polyline', () => {
+    const pts = resolveEdgePolyline(square, edges, 'top');
+    expect(pts).toHaveLength(2);
+    expect(pts[0]).toMatchObject({ x: 0, y: 0 });
+    expect(pts[1]).toMatchObject({ x: 10, y: 0 });
+  });
+
+  it('expands a semantic curved edge to the full sampled sub-polyline (BP-3 en el renderer)', () => {
+    // El bug que tenía SeamRenderer: indexaba segmentRange[0] (espacio de
+    // comandos) directo — una curva debe expandir a 13 puntos (1..13).
+    const pts = resolveEdgePolyline(curved, [{ name: 'right', segmentRange: [2, 3] }], 'right');
+    expect(pts).toHaveLength(13);
+    expect(pts[0]).toMatchObject({ x: 10, y: 0 }); // anchor (endpoint del comando 1)
+    expect(pts[12].x).toBeCloseTo(10);
+    expect(pts[12].y).toBeCloseTo(12);
+  });
+
+  it('reversed=true flips traversal order — start becomes what the solver treats as t=0 reversed', () => {
+    const fwd = resolveEdgePolyline(square, edges, 'top');
+    const rev = resolveEdgePolyline(square, edges, 'top', true);
+    expect(rev).toEqual([...fwd].reverse());
+  });
+
+  it('falls back to edge-N names over the flattened outline', () => {
+    const flat = flattenPath(square);
+    const pts = resolveEdgePolyline(square, undefined, 'edge-1');
+    expect(pts).toEqual([flat[1], flat[2]]);
+  });
+
+  it('returns [] for unknown edge names and empty outlines', () => {
+    expect(resolveEdgePolyline(square, edges, 'noSuchEdge')).toEqual([]);
+    expect(resolveEdgePolyline([], edges, 'top')).toEqual([]);
   });
 });

@@ -148,6 +148,53 @@ export function commandRangeToFlattened(
 }
 
 /**
+ * Resolve a seam half's edge name to its sub-polyline over the FLATTENED
+ * outline, in traversal order (parity plan Fase 5 — direction-aware
+ * rendering).
+ *
+ * Resolution mirrors the solver pipeline (`buildSeamConstraints` /
+ * `seamPairs.resolveSegmentRange`): semantic edge names map through
+ * `commandRangeToFlattened` (command space → flattened space, BP-3);
+ * the legacy "edge-N" fallback indexes the flattened outline directly.
+ *
+ * `reversed` flips the point order — the renderer's "start" then matches
+ * what `parameterizeEdge(..., reverse=true)` treats as t=0, so connection
+ * lines and direction ticks tell the same story the solver enforces.
+ *
+ * Returns [] when the edge cannot be resolved (unknown name, empty
+ * outline) — callers fall back to non-directional rendering.
+ */
+export function resolveEdgePolyline(
+  outline: PathCommand[],
+  edges: Array<{ name: string; segmentRange: [number, number] }> | undefined,
+  edgeName: string,
+  reversed: boolean = false,
+  resolution: number = CURVE_RESOLUTION,
+): Point2D[] {
+  const flat = flattenPath(outline, resolution);
+  if (flat.length === 0) return [];
+
+  let range: [number, number] | null = null;
+  const semantic = edges?.find(e => e.name === edgeName);
+  if (semantic) {
+    range = commandRangeToFlattened(outline, semantic.segmentRange, resolution);
+  } else {
+    const m = edgeName.match(/^edge-(\d+)$/);
+    if (m) {
+      const idx = parseInt(m[1], 10);
+      if (idx < flat.length) range = [idx, (idx + 1) % flat.length];
+    }
+  }
+  if (!range) return [];
+
+  const pts = range[1] >= range[0]
+    ? flat.slice(range[0], range[1] + 1)
+    : [...flat.slice(range[0]), ...flat.slice(0, range[1] + 1)];
+
+  return reversed ? pts.slice().reverse() : pts;
+}
+
+/**
  * Flatten PathCommand[] (including curves) to Point2D[].
  */
 export function flattenPath(commands: PathCommand[], resolution: number = CURVE_RESOLUTION): Point2D[] {

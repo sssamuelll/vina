@@ -625,3 +625,36 @@ describe('isDataImageUri helper', () => {
     expect(__testing.isDataImageUri(input)).toBe(expected);
   });
 });
+
+// ─── Seam direction round-trip (parity plan Fase 5) ──────────────────────────
+
+describe('seam pieceB.reversed survives parse (Fase 5)', () => {
+  it('preserves reversed:true through parseOpenCloProject', () => {
+    const r = parseOpenCloProject(makeProject({
+      seams: [{
+        id: 's1',
+        pieceA: { pieceId: 'p1', edgeName: 'sideSeam' },
+        pieceB: { pieceId: 'p2', edgeName: 'sideSeam', reversed: true },
+        type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10,
+      }],
+    }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.project.seams[0].pieceB.reversed).toBe(true);
+      expect(r.project.seams[0].pieceA).not.toHaveProperty('reversed');
+    }
+  });
+
+  it('legacy seams without the field parse clean (reversed undefined)', () => {
+    const r = parseOpenCloProject(makeProject({
+      seams: [{
+        id: 's1',
+        pieceA: { pieceId: 'p1', edgeName: 'a' },
+        pieceB: { pieceId: 'p2', edgeName: 'b' },
+        type: 'standard', tension: 100, strength: 1, active: true, taped: false, tapeWidth: 10,
+      }],
+    }));
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.project.seams[0].pieceB.reversed).toBeUndefined();
+  });
+});

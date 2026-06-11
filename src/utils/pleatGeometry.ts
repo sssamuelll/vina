@@ -49,8 +49,11 @@ function dist(a: Point2D, b: Point2D): number {
 /**
  * Sample a point along a polyline at arc-length `t` in [0, 1].
  * Returns { point, tangent }.
+ *
+ * Exported (Fase 5): also consumed by `SeamRenderer` for the seam
+ * directional tick at t≈0.05 — generic polyline sampling, not pleat-specific.
  */
-function samplePolyline(
+export function samplePolyline(
   pts: Point2D[],
   t: number,
 ): { point: Point2D; tangent: Point2D } {
@@ -97,8 +100,9 @@ function samplePolyline(
   return { point, tangent };
 }
 
-/** Rotate a 2D unit vector 90° counter-clockwise: (x,y) → (-y, x) */
-function perpendicular(v: Point2D): Point2D {
+/** Rotate a 2D unit vector 90° counter-clockwise: (x,y) → (-y, x).
+ *  Exported (Fase 5): also consumed by `SeamRenderer` (directional tick). */
+export function perpendicular(v: Point2D): Point2D {
   return { x: -v.y, y: v.x };
 }
 
