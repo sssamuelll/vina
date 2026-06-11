@@ -727,7 +727,14 @@ export default function Viewport3D({ activeTool3D = 'camera', hideChrome = false
       onContextMenu={handleContextMenu}
     >
       {!hideChrome && <SimModeToggle />}
-      {!hideChrome && <SimulationStatusOverlay />}
+      {/* NOT gated on hideChrome (same rationale as SurfaceModePill below):
+          AppShell — the only production shell — mounts Viewport3D with
+          hideChrome, which left this overlay permanently dark. It is the
+          ratified observability surface (C4 § 3.1.A tool silent-absence;
+          parity plan Fase 4 seam constraint count + zero-constraint
+          warnings), not legacy chrome. Caught by the R1 replay specs:
+          the Fase 4 "aviso explícito" was invisible in the real shell. */}
+      <SimulationStatusOverlay />
       <div ref={boxOverlayRef} style={{
         display: 'none', position: 'absolute', border: '1px dashed #00e5ff',
         backgroundColor: 'rgba(0, 229, 255, 0.08)', pointerEvents: 'none', zIndex: 10,
