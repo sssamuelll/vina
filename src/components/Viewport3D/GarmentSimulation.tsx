@@ -30,6 +30,7 @@ import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationS
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
 import PinRenderer from './PinRenderer';
+import SimSeamLines from './SimSeamLines';
 import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
@@ -1038,6 +1039,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         </mesh>
       )}
       <PinRenderer livePositions={positionsRef.current || undefined} />
+      {/* Seam connection lines over the live garment (R2 #880): the pairs
+          the solver is sewing, fed from positionsRef each frame. Gated on
+          showSeamlines3D inside the component. */}
+      <SimSeamLines
+        positionsRef={positionsRef}
+        placedMeshes={placedMeshes}
+        seamInitData={seamInitData}
+      />
       {/* Steam brush cursor */}
       {activeTool3D === 'steamBrush' && (
         <mesh ref={brushCursorRef} visible={false}>
