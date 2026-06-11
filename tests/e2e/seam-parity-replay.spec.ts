@@ -1,0 +1,475 @@
+/**
+ * Seam parity replay specs — lote 1 (post-ship plan R1, épica #879).
+ *
+ * El benchmark CLO3D (docs/research/2026-06-11-clo3d-sewing-ux-reference.md)
+ * como spec FALSABLE: un replay por comportamiento del manual, ejercitando lo
+ * que el plan de paridad shippeó (#871-#876). Estos specs son además la red
+ * de regresión de la épica E1 (boundary entity, #878) — cada rebanada del
+ * refactor debe dejarlos verdes.
+ *
+ * Convenciones del harness (sewing-tools.spec.ts / helpers/sim.ts):
+ * estado vía `window.__OPENCLO_STORE__` dispatch (geometría determinista),
+ * interacción real solo donde el comportamiento ES la interacción (clicks de
+ * cosido, Ctrl+B).
+ */
+import { test, expect, Page } from '@playwright/test';
+import { switchView, startSimulation } from './helpers/sim';
+
+// ─── Harness ─────────────────────────────────────────────────────────────────
+
+async function waitFor2D(page: Page) {
+  await page.goto('/');
+  await page.waitForSelector('svg.pattern-svg', { timeout: 15000 });
+  await page.waitForFunction(
+    () => Boolean((window as unknown as { __OPENCLO_STORE__?: unknown }).__OPENCLO_STORE__),
+    { timeout: 15000 },
+  );
+  await page.waitForTimeout(500);
+}
+
+async function dispatch(page: Page, action: { type: string; payload?: unknown }) {
+  await page.evaluate((act) => {
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+      | { dispatch: (a: unknown) => void }
+      | undefined;
+    store?.dispatch(act);
+  }, action);
+}
+
+async function getState<T = unknown>(page: Page, path: string): Promise<T> {
+  return page.evaluate((sel) => {
+    const store = (window as unknown as Record<string, unknown>).__OPENCLO_STORE__ as
+      | { getState: () => unknown }
+      | undefined;
+    if (!store) return null;
+    const state = store.getState();
+    return sel
+      .split('.')
+      .reduce((o: unknown, k) => (o as Record<string, unknown> | null)?.[k], state) as T;
+  }, path) as Promise<T>;
+}
+
+/** Pattern-space (mm) → screen coords. Defaults: zoom=1, pan=(0,0). */
+async function patternToScreen(page: Page, px: number, py: number) {
+  const box = await page.locator('svg.pattern-svg').boundingBox();
+  if (!box) throw new Error('pattern svg not visible');
+  const zoom = (await getState<number>(page, 'editor.zoom2D')) ?? 1;
+  const pan = (await getState<{ x: number; y: number }>(page, 'editor.pan2D')) ?? { x: 0, y: 0 };
+  return { x: box.x + pan.x + px * zoom, y: box.y + pan.y + py * zoom };
+}
+
+/** Press a tool shortcut until the canonical store field reflects it. */
+async function activateToolKey(page: Page, key: string, expected: string) {
+  await expect
+    .poll(
+      async () => {
+        await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+        await page.keyboard.press(key);
+        await page.waitForTimeout(120);
+        return getState<string>(page, 'editor.activeTool');
+      },
+      { timeout: 8000, intervals: [150, 150, 150, 150] },
+    )
+    .toBe(expected);
+}
+
+/**
+ * Rect piece (W=100) con cierre L explícito y edges semánticos en espacio de
+ * COMANDOS (el contrato del producer). top [1,2] / right [2,3] /
+ * bottom [3,4] / left [4,5].
+ */
+function rectPiece(id: string, name: string, x: number, y: number, height = 100) {
+  const now = Date.now();
+  return {
+    id,
+    name,
+    outline: [
+      { type: 'M', values: [0, 0] },
+      { type: 'L', values: [100, 0] },
+      { type: 'L', values: [100, height] },
+      { type: 'L', values: [0, height] },
+      { type: 'L', values: [0, 0] },
+      { type: 'Z', values: [] },
+    ],
+    edges: [
+      { id: `${id}:top`, name: 'top', segmentRange: [1, 2], edgeType: 'other' },
+      { id: `${id}:right`, name: 'right', segmentRange: [2, 3], edgeType: 'other' },
+      { id: `${id}:bottom`, name: 'bottom', segmentRange: [3, 4], edgeType: 'other' },
+      { id: `${id}:left`, name: 'left', segmentRange: [4, 5], edgeType: 'other' },
+    ],
+    internals: [],
+    position: { x, y },
+    rotation: 0,
+    mirrored: false,
+    seamAllowance: 10,
+    layer: 1,
+    sublayer: 0,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function makeSeam(
+  id: string,
+  aId: string,
+  aEdge: string,
+  bId: string,
+  bEdge: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    id,
+    pieceA: { pieceId: aId, edgeName: aEdge },
+    pieceB: { pieceId: bId, edgeName: bEdge },
+    type: 'standard',
+    tension: 100,
+    strength: 1,
+    active: true,
+    taped: false,
+    tapeWidth: 10,
+    ...overrides,
+  };
+}
+
+/** CCW-based segment intersection (the crossed-X predicate). */
+function ccw(ax: number, ay: number, bx: number, by: number, cx: number, cy: number) {
+  return (cy - ay) * (bx - ax) > (by - ay) * (cx - ax);
+}
+function segmentsIntersect(
+  a: number[], b: number[],
+) {
+  const [x1, y1, x2, y2] = a;
+  const [x3, y3, x4, y4] = b;
+  return (
+    ccw(x1, y1, x3, y3, x4, y4) !== ccw(x2, y2, x3, y3, x4, y4) &&
+    ccw(x1, y1, x2, y2, x3, y3) !== ccw(x1, y1, x2, y2, x4, y4)
+  );
+}
+
+/** Read the two .seam-detail connection lines as [x1,y1,x2,y2] tuples. */
+async function readConnectionLines(page: Page): Promise<number[][]> {
+  return page.evaluate(() => {
+    const lines = Array.from(
+      document.querySelectorAll('g.seam-connection .seam-detail > line'),
+    );
+    return lines.map((l) => [
+      parseFloat(l.getAttribute('x1') ?? '0'),
+      parseFloat(l.getAttribute('y1') ?? '0'),
+      parseFloat(l.getAttribute('x2') ?? '0'),
+      parseFloat(l.getAttribute('y2') ?? '0'),
+    ]);
+  });
+}
+
+// ─── Replays ─────────────────────────────────────────────────────────────────
+
+test.describe('Seam parity replay — lote 1', () => {
+  // CLO3D: "2-click sewing" (Seam/Free Sewing tool) — click una mitad,
+  // click la otra → par creado.
+  test('2 clicks crean un seam entre dos piezas (Seam tool)', async ({ page }) => {
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
+    await page.waitForTimeout(300);
+
+    await activateToolKey(page, 'b', 'seam');
+
+    // Click 1: borde derecho de A (midpoint). Click 2: borde izquierdo de B.
+    const c1 = await patternToScreen(page, 140, 90);
+    await page.mouse.click(c1.x, c1.y);
+    await page.waitForTimeout(250);
+    const c2 = await patternToScreen(page, 220, 90);
+    await page.mouse.click(c2.x, c2.y);
+
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, {
+        timeout: 5000,
+      })
+      .toBe(1);
+
+    const seam = (await getState<Array<Record<string, { pieceId: string; edgeName: string }>>>(
+      page,
+      'project.seams',
+    ))![0];
+    expect(seam.pieceA.pieceId).toBe('pa');
+    expect(seam.pieceB.pieceId).toBe('pb');
+    await expect(page.locator('g.seam-connection')).toHaveCount(1);
+  });
+
+  // CLO3D Segment Sewing: "Cose segmentos completos" — 2 clicks por mitad +
+  // Enter. La mitigación Fase 5 pinneada E2E: el seam resultante NO lleva
+  // tStart/tEnd (full-segment snap; despachar t-ranges sin renormalización
+  // arma el bug del solver).
+  test('segment sewing full-segment: 4 clicks + Enter, sin t-ranges', async ({ page }) => {
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
+    await page.waitForTimeout(300);
+
+    await activateToolKey(page, 'n', 'segmentSewing');
+
+    // Mitad A: dos clicks sobre el borde derecho de A (start + end del tramo).
+    for (const [px, py] of [[140, 70], [140, 110]]) {
+      const c = await patternToScreen(page, px, py);
+      await page.mouse.click(c.x, c.y);
+      await page.waitForTimeout(200);
+    }
+    // Mitad B: dos clicks sobre el borde izquierdo de B.
+    for (const [px, py] of [[220, 70], [220, 110]]) {
+      const c = await patternToScreen(page, px, py);
+      await page.mouse.click(c.x, c.y);
+      await page.waitForTimeout(200);
+    }
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press('Enter');
+
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, {
+        timeout: 5000,
+      })
+      .toBe(1);
+
+    const seam = (await getState<
+      Array<{ pieceA: Record<string, unknown>; pieceB: Record<string, unknown> }>
+    >(page, 'project.seams'))![0];
+    // Full-segment snap (plan § 5): nada de t-ranges en el seam despachado.
+    expect(seam.pieceA.tStart).toBeUndefined();
+    expect(seam.pieceA.tEnd).toBeUndefined();
+    expect(seam.pieceB.tStart).toBeUndefined();
+    expect(seam.pieceB.tEnd).toBeUndefined();
+  });
+
+  // El núcleo del plan: el seam VIVE en el tier por defecto (WASM). Este
+  // replay habría cazado el bug del worker (Fase 5): el init con seams
+  // crasheaba y caía a CPU en silencio — el tier reportado habría sido
+  // 'cpu-worker'.
+  test('la sim con seams arranca en WASM con constraints activos', async ({ page }) => {
+    test.setTimeout(90_000);
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
+    await dispatch(page, {
+      type: 'project/addSeam',
+      payload: makeSeam('s-sim', 'pa', 'right', 'pb', 'left'),
+    });
+
+    await switchView(page, '3D');
+    await startSimulation(page);
+
+    // El cascade elige tier asíncronamente (fetch + compile del WASM).
+    await expect
+      .poll(async () => getState<string>(page, 'simulation.solverTier'), { timeout: 45_000 })
+      .not.toBe('none');
+
+    const tier = await getState<string>(page, 'simulation.solverTier');
+    expect(tier).toBe('wasm');
+
+    // Observabilidad Fase 4: el summary main-thread reporta constraints > 0
+    // y ningún seam a cero.
+    const summary = await getState<{
+      totalConstraints: number;
+      zeroConstraintSeams: unknown[];
+    }>(page, 'simulation.seamResolution');
+    expect(summary).not.toBeNull();
+    expect(summary!.totalConstraints).toBeGreaterThan(0);
+    expect(summary!.zeroConstraintSeams).toHaveLength(0);
+
+    // Y el overlay lo enseña al usuario.
+    await expect(page.locator('text=/seam constraints/')).toBeVisible({ timeout: 10_000 });
+  });
+
+  // Fase 4: un seam irresoluble NO falla en silencio — toast de error +
+  // warning en el overlay; la sim arranca igual (degradación, no aborto).
+  test('seam irresoluble → toast "will not sew" + warning en overlay', async ({ page }) => {
+    test.setTimeout(90_000);
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
+    await dispatch(page, {
+      type: 'project/addSeam',
+      payload: makeSeam('s-bad', 'pa', 'noSuchEdge', 'pb', 'left'),
+    });
+
+    await switchView(page, '3D');
+    await startSimulation(page);
+
+    await expect(page.locator('.toast--error .toast__message')).toContainText('will not sew', {
+      timeout: 30_000,
+    });
+
+    const summary = await getState<{ zeroConstraintSeams: Array<{ seamId: string }> }>(
+      page,
+      'simulation.seamResolution',
+    );
+    expect(summary!.zeroConstraintSeams.map((z) => z.seamId)).toEqual(['s-bad']);
+    await expect(page.locator('text=/resolved to 0 constraints/')).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
+  // CLO3D: "When Directional Notches are crossed, the Sewing Lines are
+  // crossed as well" — la X es la señal de error pre-sim.
+  test('mitades en direcciones opuestas dibujan la X cruzada', async ({ page }) => {
+    await waitFor2D(page);
+    // A right [2,3] corre (100,0)→(100,120) hacia abajo; B left [4,5] corre
+    // (0,120)→(0,0) hacia arriba → start↔start y end↔end se cruzan.
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 60, 120) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 240, 60, 120) });
+    await dispatch(page, {
+      type: 'project/addSeam',
+      payload: makeSeam('s-x', 'pa', 'right', 'pb', 'left'),
+    });
+    await page.waitForTimeout(400);
+
+    const lines = await readConnectionLines(page);
+    expect(lines).toHaveLength(2);
+    expect(segmentsIntersect(lines[0], lines[1])).toBe(true);
+  });
+
+  // CLO3D: "se corrige con Reverse Sewing (Ctrl+B)" — el atajo completo de
+  // punta a punta: ShortcutProvider → handler → reducer → renderer.
+  test('Ctrl+B invierte la dirección y deshace la X; otro Ctrl+B la restaura', async ({ page }) => {
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 60, 120) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 240, 60, 120) });
+    await dispatch(page, {
+      type: 'project/addSeam',
+      payload: makeSeam('s-rev', 'pa', 'right', 'pb', 'left'),
+    });
+    await dispatch(page, { type: 'editor/selectSeam', payload: 's-rev' });
+    await page.waitForTimeout(300);
+
+    const before = await readConnectionLines(page);
+    expect(segmentsIntersect(before[0], before[1])).toBe(true);
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press('Control+b');
+
+    await expect
+      .poll(async () => {
+        const seams = await getState<Array<{ pieceB: { reversed?: boolean } }>>(
+          page,
+          'project.seams',
+        );
+        return seams?.[0]?.pieceB?.reversed === true;
+      }, { timeout: 5000 })
+      .toBe(true);
+
+    const after = await readConnectionLines(page);
+    expect(segmentsIntersect(after[0], after[1])).toBe(false);
+
+    // Ctrl+B de nuevo = identidad (criterio done de Fase 5).
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press('Control+b');
+    await expect
+      .poll(async () => {
+        const seams = await getState<Array<{ pieceB: { reversed?: boolean } }>>(
+          page,
+          'project.seams',
+        );
+        return seams?.[0]?.pieceB?.reversed === true;
+      }, { timeout: 5000 })
+      .toBe(false);
+    const restored = await readConnectionLines(page);
+    expect(segmentsIntersect(restored[0], restored[1])).toBe(true);
+  });
+
+  // CLO3D: "cada par tiene color chip estable" — Fase 6: la identidad nunca
+  // desaparece al interactuar ni cuando se borra un vecino.
+  test('el color del par sobrevive a la selección y al borrado de un vecino', async ({ page }) => {
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pc', 'Sleeve', 400, 40) });
+    await dispatch(page, { type: 'project/addSeam', payload: makeSeam('s-1', 'pa', 'right', 'pb', 'left') });
+    await dispatch(page, { type: 'project/addSeam', payload: makeSeam('s-2', 'pb', 'right', 'pc', 'left') });
+    await page.waitForTimeout(400);
+
+    const readStroke = () =>
+      page.evaluate(() => {
+        const g = document.querySelectorAll('g.seam-connection')[0];
+        const p = g?.querySelector(
+          'path[fill="none"]:not(.seam-direction-tick):not(.seam-selection-glow)',
+        ) as SVGPathElement | null;
+        return { stroke: p?.style.stroke ?? '', width: p?.getAttribute('stroke-width') ?? '' };
+      });
+
+    const base = await readStroke();
+    expect(base.stroke).not.toBe('');
+
+    // Selección: peso, no recolor.
+    await dispatch(page, { type: 'editor/selectSeam', payload: 's-1' });
+    await page.waitForTimeout(300);
+    const selected = await readStroke();
+    expect(selected.stroke).toBe(base.stroke);
+    expect(parseFloat(selected.width)).toBeGreaterThan(parseFloat(base.width));
+
+    // Borrar el vecino no recolorea al superviviente (hash de id, no índice).
+    await dispatch(page, { type: 'project/removeSeam', payload: 's-2' });
+    await page.waitForTimeout(300);
+    const survivor = await readStroke();
+    expect(survivor.stroke).toBe(base.stroke);
+  });
+
+  // CLO3D: "diferencia de longitud... si supera 1 mm se muestra en rojo" —
+  // Fase 6: mm absolutos (19mm en 400mm = 4.75%, invisible para el viejo 5%).
+  test('mismatch de longitud en mm absolutos, rojo sobre 1mm', async ({ page }) => {
+    await waitFor2D(page);
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pa', 'Front', 40, 40, 400) });
+    await dispatch(page, { type: 'project/addPiece', payload: rectPiece('pb', 'Back', 220, 40, 419) });
+    await dispatch(page, {
+      type: 'project/addSeam',
+      payload: makeSeam('s-mm', 'pa', 'right', 'pb', 'left'),
+    });
+    await page.waitForTimeout(400);
+
+    await expect(page.locator('svg.pattern-svg text', { hasText: '19.0mm mismatch' })).toBeVisible();
+  });
+
+  // Fase 6: los anchos per-edge del SA tool sobreviven el load generativo
+  // (re-key por nombre) — antes desaparecían en cada load→save→reload.
+  test('per-edge SA width sobrevive el load generativo (re-key por nombre)', async ({ page }) => {
+    await waitFor2D(page);
+
+    const basePayload = (pieces: unknown[]) => ({
+      id: 'proj-sa',
+      name: 'SA widths',
+      createdAt: 0,
+      updatedAt: 0,
+      fabrics: [],
+      avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} },
+      pieces,
+      seams: [],
+    });
+
+    // 1ª carga: pieza categorizada SIN edges → el load los auto-detecta.
+    const piece = {
+      ...rectPiece('bf', 'Bodice Front', 40, 40),
+      category: 'bodice',
+      edges: undefined,
+    };
+    await dispatch(page, { type: 'project/loadProject', payload: basePayload([piece]) });
+    await page.waitForTimeout(300);
+
+    const detected = await getState<Array<{ name: string }>>(page, 'project.pieces.0.edges');
+    expect(detected!.length).toBeGreaterThan(0);
+    const targetName = detected![0].name;
+
+    // 2ª carga (el round-trip save→reload): mismos edges con un width puesto.
+    const withWidth = {
+      ...rectPiece('bf', 'Bodice Front', 40, 40),
+      category: 'bodice',
+      edges: detected!.map((e, i) => (i === 0 ? { ...e, seamAllowanceWidth: 40 } : e)),
+    };
+    await dispatch(page, { type: 'project/loadProject', payload: basePayload([withWidth]) });
+    await page.waitForTimeout(300);
+
+    const reloaded = await getState<Array<{ name: string; seamAllowanceWidth?: number }>>(
+      page,
+      'project.pieces.0.edges',
+    );
+    const target = reloaded!.find((e) => e.name === targetName);
+    expect(target?.seamAllowanceWidth).toBe(40);
+  });
+});

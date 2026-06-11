@@ -140,12 +140,14 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
             className={`seam-connection${isSelected ? ' seam-connection--selected' : ''}`}
             opacity={isInactive ? 0.5 : 1}
           >
-            {/* Selection glow (wider semi-transparent behind main stroke) */}
+            {/* Selection glow (wider semi-transparent halo BEHIND the pair
+                color — selection is weight, never recolor, Fase 6). The class
+                lets E2E specs separate the halo from the edge highlights. */}
             {isSelected && pathDA && (
-              <path d={pathDA} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
+              <path className="seam-selection-glow" d={pathDA} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
             )}
             {isSelected && pathDB && (
-              <path d={pathDB} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
+              <path className="seam-selection-glow" d={pathDB} fill="none" style={{ stroke: 'var(--accent-2d)' }} strokeWidth={edgeWidth * 3} strokeLinecap="round" opacity={0.2} />
             )}
             {/* Edge A highlight (follows curves) */}
             {pathDA ? (
