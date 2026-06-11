@@ -60,6 +60,7 @@ interface WasmXpbdSolver {
   set_bend(ids: Uint32Array, rest_distances: Float32Array): void;
   set_bend_with_types(ids: Uint32Array, rest_distances: Float32Array, edge_types: Uint8Array): void;
   set_seams_with_compliance(ids: Uint32Array, target: Float32Array, compliances: Float32Array): void;
+  set_seam_shrink_params(shrinkFactor: number, sewedThreshold: number): void;
   set_triangles(tri_ids: Uint32Array): void;
   set_adjacency(offsets: Uint32Array, neighbors: Uint32Array): void;
   set_pins(indices: Uint32Array, positions: Float32Array): void;
@@ -594,6 +595,16 @@ self.onmessage = async (event: MessageEvent) => {
             // solver then hardcoded alpha=0 and treated every seam as rigid
             // regardless of tension/strength. Now plumbed end-to-end.
             solver.set_seams_with_compliance(ids, seamConstraints.restLengths, seamConstraints.compliances);
+            // Fase 2 (BP-2): push the decay schedule so the Rust solver
+            // shrinks targets per substep exactly like the CPU tier.
+            // `seamConstraints.config` carries DEFAULT_SEAM_CONFIG's
+            // shrinkFactor/sewedThreshold; the Rust constructor defaults
+            // are the same values, but config-driven beats duplicated
+            // constants if DEFAULT_SEAM_CONFIG ever moves.
+            solver.set_seam_shrink_params(
+              seamConstraints.config.shrinkFactor,
+              seamConstraints.config.sewedThreshold,
+            );
           }
         }
 
