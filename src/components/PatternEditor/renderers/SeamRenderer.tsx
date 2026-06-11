@@ -220,9 +220,10 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                   <circle cx={polyA[0].x} cy={polyA[0].y} r={3 / zoom2D} style={{ fill: baseColor }} />
                   <circle cx={polyB[0].x} cy={polyB[0].y} r={3 / zoom2D} style={{ fill: baseColor }} />
                   {/* Directional notches (perpendicular tick at t≈0.05 from
-                      each start — the CLO3D direction language) */}
-                  {tickA && <path d={tickA} style={{ stroke: baseColor }} strokeWidth={2 / zoom2D} fill="none" opacity={0.9} />}
-                  {tickB && <path d={tickB} style={{ stroke: baseColor }} strokeWidth={2 / zoom2D} fill="none" opacity={0.9} />}
+                      each start — the CLO3D direction language). The class
+                      lets E2E specs separate ticks from edge highlights. */}
+                  {tickA && <path className="seam-direction-tick" d={tickA} style={{ stroke: baseColor }} strokeWidth={2 / zoom2D} fill="none" opacity={0.9} />}
+                  {tickB && <path className="seam-direction-tick" d={tickB} style={{ stroke: baseColor }} strokeWidth={2 / zoom2D} fill="none" opacity={0.9} />}
                 </>
               ) : (
                 <>

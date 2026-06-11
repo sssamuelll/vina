@@ -124,7 +124,7 @@ test.describe('Seam curved edge highlights', () => {
     const seamGroups = page.locator('g.seam-connection');
     await expect(seamGroups).toHaveCount(2);
 
-    const highlightPaths = page.locator('g.seam-connection path[fill="none"]');
+    const highlightPaths = page.locator('g.seam-connection path[fill="none"]:not(.seam-direction-tick)');
     await expect(highlightPaths).toHaveCount(4);
 
     const pathDs = await highlightPaths.evaluateAll((nodes) =>
@@ -146,7 +146,10 @@ test.describe('Seam curved edge highlights', () => {
     const fallbackLines = page.locator('g.seam-connection > line');
     await expect(fallbackLines).toHaveCount(0);
     const seamLines = page.locator('g.seam-connection .seam-detail > line');
-    await expect(seamLines).toHaveCount(2); // one dotted connection line per seam
+    // Fase 5 (direction): two connection lines per seam — start→start and
+    // end→end. Aligned halves render parallel lines; a reversed half makes
+    // them cross (the X). 2 seams × 2 = 4.
+    await expect(seamLines).toHaveCount(4);
   });
 
   test('renders cubic seam highlights as SVG path C commands', async ({ page }) => {
@@ -242,7 +245,7 @@ test.describe('Seam curved edge highlights', () => {
 
     await page.waitForTimeout(500);
 
-    const highlightPaths = page.locator('g.seam-connection path[fill="none"]');
+    const highlightPaths = page.locator('g.seam-connection path[fill="none"]:not(.seam-direction-tick)');
     await expect(highlightPaths).toHaveCount(2);
 
     const pathDs = await highlightPaths.evaluateAll((nodes) =>
@@ -342,7 +345,7 @@ test.describe('Seam curved edge highlights', () => {
 
     await page.waitForTimeout(500);
 
-    const highlightPaths = page.locator('g.seam-connection path[fill="none"]');
+    const highlightPaths = page.locator('g.seam-connection path[fill="none"]:not(.seam-direction-tick)');
     await expect(highlightPaths).toHaveCount(2);
 
     const pathDs = await highlightPaths.evaluateAll((nodes) =>
