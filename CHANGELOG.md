@@ -3,7 +3,43 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.10.0] — 2026-03-29 (Current)
+## [0.11.0] — 2026-06-11 (Current)
+
+CLO3D seam/sewing parity release — the full parity plan (`docs/plans/2026-06-11-clo3d-seam-sewing-parity-plan.md`, Fases 0-6) shipped as PRs #871-#876. Garments now actually sew in the default solver tier: two curved pieces close in ≤2s on WASM, every seam pair has a stable identity color, sewing direction is real (crossed-X warning + Ctrl+B), and unresolvable seams warn instead of silently falling.
+
+> Interim note: work between 0.10.0 (2026-03-29) and this release — drift audit closures (A2-A7, B-, C-, D-, E-series RFCs), Epic-746 boundary contracts, MVP v1 Opt C, housekeeping #500-#870 — is not backfilled here; see git history. This entry covers the parity plan release.
+
+### Added
+- **Seam closure on WASM (default tier)** — per-substep seam target decay in the Rust solver (`set_seam_shrink_params`), mirroring the CPU reference; seams close in ≤2s sim-time. CI now smoke-tests seam closure against the committed WASM binary (#872).
+- **Sewing direction + Reverse Sewing (Ctrl+B)** — `Seam.pieceB.reversed` flows through every tier's vertex matching (`parameterizeEdge` mirrors t). 2D connection lines draw start→start + end→end (a reversed half shows the crossed-X error signal, CLO3D-style) with perpendicular directional notches at each start. Ctrl+B, panel button, context menu and the new `reverseSeam` copilot tool all toggle it (#875).
+- **Seam observability** — when a seam resolves to 0 XPBD constraints the user gets an error toast, an inspector entry, and the simulation overlay shows the live seam constraint count. Capability flag `seams` per solver tier: the cascade skips WebGPU/Neural (with a visible notice) when a project has seams (#874).
+- **Stable seam pair colors** — pair identity color hashed from the seam id (deleting a neighbor no longer recolors survivors); selection shows as weight + glow, never recolor; both sewing overlays now share one pick-color language (first=green, second=blue) (#876).
+- **Seam length mismatch in absolute mm** — red warning above 1mm (CLO3D parity), replacing the 5% relative threshold that hid a 19mm error on a 400mm seam (#876).
+
+### Fixed
+- **The demo-killer chain** — the default tier simulated with ZERO seams: the WASM init callsite dropped `seamInitData` (BP-1, #871); the WASM worker then crashed on seam-carrying inits (unconverted `SeamInitData` shape → TypeError) and silently fell back to CPU (#875); and `segmentRange` was produced in command space but consumed in flattened space, so curved edges (armholes, necklines) sewed, picked and highlighted the wrong vertices (BP-3) — fixed via the single canonical boundary `commandRangeToFlattened` (#873).
+- **Per-edge seam allowance widths lost on load** — generative load re-detected edges without copying `seamAllowanceWidth`; widths now survive re-keyed by edge name (#876).
+- **`reverseSeam` was a physical no-op** — it swapped pieceA↔pieceB, which produces identical constraint pairs; it now reverses actual traversal direction (#875).
+
+### Changed
+- **Shrinkage slider removed** — it was `100 − tension` rendered twice; gathering/easing intent stays on the Tension slider. The copilot keeps `setSeamShrinkage` as a semantic alias (#876).
+- **`setSeamRange` (copilot) refuses partial ranges** — the solver does not renormalize filtered t-values yet; sub-range seams would sew wrong vertices. Full-edge `[0,1]` still accepted; partial-edge sewing ships as an atomic pair with renormalization (#486) (#875).
+
+### Known Issues (deferred by plan § 5, tracked post-ship)
+- Partial-edge sewing (tStart/tEnd) — only as an atomic pair with solver renormalization (#486).
+- SeamGroup M:N proportional subdivision — needs the t-range substrate (épica #878).
+- WebGPU/Neural tiers do not close seams — honestly capability-gated; WebGPU itself blocked by Three.js 0.183 `atomicAdd` upstream (#708, #731).
+- Seam lines not yet drawn over the simulated garment — `SeamRenderer3D` renders in arrange mode only (#880).
+- Editing seams during simulation requires a restart (live edit deferred).
+- Corner types on curved outlines (partial fix in #859), typographic polish, Clipper2 SA-offset memoization in `PieceRenderer` — deferred polish batch.
+- Boundary-as-domain-entity refactor (épica #878) and the CLO3D benchmark as falsifiable E2E spec (épica #879) are the structural post-ship tracks (`docs/plans/2026-06-11-post-ship-plan.md`).
+
+### Stats
+- 5,574 automated tests passing across 380 files (+1,138 since 0.10.0).
+- 232 copilot tools registered (+1: `reverseSeam`).
+- 6 PRs, ~2,600 lines changed, shipped 8 days ahead of the 2026-06-19 target.
+
+## [0.10.0] — 2026-03-29
 
 ### Added
 - **Tech Pack & BOM Generation** — Auto-populated Bill of Materials extracting fabrics, interfacing, thread, seam tape, elastics, and trims from the garment project. Multi-page tech pack PDF export with 3D views, measurements, BOM table, construction notes, and colorway swatches. Per-colorway cost comparison. 8 copilot tools (#225, PR #482).
