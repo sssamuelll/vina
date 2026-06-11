@@ -41,6 +41,18 @@ export interface SolverPoolError {
   timestamp: number;
 }
 
+/**
+ * A seam that resolved to zero XPBD constraints at simulation init — it
+ * will NOT sew (CLO3D parity plan Fase 4, seam observability).
+ */
+export interface SeamResolutionError {
+  seamId: string;
+  /** Resolution failure cause (e.g. 'unknown-edge', 'empty-match'). */
+  reason: string;
+  message: string;
+  timestamp: number;
+}
+
 export interface InspectorState {
   /** The element currently being inspected. null = panel closed / no selection. */
   target: InspectionTarget | null;
@@ -67,6 +79,15 @@ export interface InspectorState {
    * `null` = no recent error / cleared.
    */
   lastSolverError: SolverPoolError | null;
+  /**
+   * Seams that resolved to zero constraints at the last simulation init.
+   *
+   * Parity plan Fase 4 (same dual-surface convention as `lastSolverError`,
+   * E-async § 3.5.3.A): a toast is dispatched in parallel for the transient
+   * surface; this field preserves per-seam detail for inspection. Replaced
+   * wholesale on every init; empty = all seams resolved.
+   */
+  seamResolutionErrors: SeamResolutionError[];
 }
 
 const initialState: InspectorState = {
@@ -78,6 +99,7 @@ const initialState: InspectorState = {
   agentError: null,
   unresolvedCount: 0,
   lastSolverError: null,
+  seamResolutionErrors: [],
 };
 
 // ============================================================================
@@ -157,6 +179,16 @@ const inspectorSlice = createSlice({
     },
 
     /**
+     * Replace the zero-constraint seam list from the latest simulation init.
+     *
+     * Parity plan Fase 4: paired with an error toast dispatched in parallel
+     * from `useSimulationLifecycle`. Pass `[]` when every seam resolved.
+     */
+    setSeamResolutionErrors(state, action: PayloadAction<SeamResolutionError[]>) {
+      state.seamResolutionErrors = action.payload;
+    },
+
+    /**
      * Reset the inspector to its initial (closed) state.
      */
     clearInspection() {
@@ -177,6 +209,7 @@ export const {
   setAgentError,
   setUnresolvedCount,
   setLastSolverError,
+  setSeamResolutionErrors,
   clearInspection,
 } = inspectorSlice.actions;
 

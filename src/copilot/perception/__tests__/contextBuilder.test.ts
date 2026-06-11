@@ -130,6 +130,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       solverTier: 'none' as const,
       frameTimeMs: 0,
       particleCount: 0,
+      seamResolution: null,
       bodyCollision: false, viewMode3D: 'arrange' as const, arrangementSnapshot: null,
       pinnedVertices: {}, selectedPinId: null, selectedVertices: [], selectBox3D: null, selectLasso3D: null,
       showGarment: true, showSeamlines3D: true, showInternalLines3D: true, surfaceMode3D: 'textured' as const,
@@ -300,6 +301,7 @@ function mockState(overrides?: Partial<RootState>): RootState {
       agentError: null,
       unresolvedCount: 0,
       lastSolverError: null,
+      seamResolutionErrors: [],
     },
     bom: {
       entries: [],
@@ -825,6 +827,7 @@ describe('Context Builder - Enhanced Agent Context', () => {
       snapshots: [],
       activeSnapshotId: null,
       particleCount: 0,
+      seamResolution: null,
     },
   } as unknown as RootState;
 

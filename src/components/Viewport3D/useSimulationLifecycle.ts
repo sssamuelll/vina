@@ -95,13 +95,16 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { seamInitDataToPairs } from '../../utils/cloth/seamPairs';
+import { seamInitDataToPairs, summarizeSeamResolution } from '../../utils/cloth/seamPairs';
 import { isWebGPUAvailable, WEBGPU_FEATURE_FLAG_KEY } from '../../utils/cloth/gpu/webgpuDetect';
 import { cmToM } from '../../utils/geometry';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
 import { NeuralDrapeClient } from '../../utils/cloth/neural/neuralDrapeClient';
-import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting } from '../../store/simulationSlice';
+import { setSolverTier, setFrameTime, setBodyCollision, setIsWarmStarting, setSeamResolution } from '../../store/simulationSlice';
+import { setSeamResolutionErrors } from '../../store/inspectorSlice';
+import { showWarningToast, showErrorToast } from '../../store/copilotUISlice';
+import { GPU_CAPABILITIES, NEURAL_CAPABILITIES } from '../../utils/cloth/solverCapabilities';
 import { safeGetItem } from '../../utils/safeStorage';
 import { getPhysicalFabric } from '../../utils/cloth/physicalFabric';
 import { extractAvatarCollisionMesh } from '../../utils/cloth/avatarCollisionMesh';
@@ -324,8 +327,54 @@ export function useSimulationLifecycle({
       const cancelFlag = { get value() { return cancelled; } };
 
       const startSim = async () => {
+        // Seam capability gate (CLO3D parity plan Fase 4): tiers declaring
+        // `seams: false` are skipped — with a visible notice, never silently —
+        // when the project has active seams. Honest capability declaration
+        // per A7/C4 doctrine.
+        const projectHasSeams = seamInitData.some(s => s.active !== false);
+
+        // ─── Seam observability (parity plan Fase 4) ──────────────────
+        // Same resolution the workers run (`summarizeSeamResolution` shares
+        // the parameterizeEdge + matchVertices pipeline), computed here so
+        // the UI can tell the user — before any solver init — which seams
+        // resolve to zero constraints and will NOT sew. Dual surface per
+        // E-async § 3.5.3.A: overlay summary + error toast + inspector
+        // detail.
+        if (projectHasSeams) {
+          const entries = summarizeSeamResolution(seamInitData, placedMeshes);
+          const zero = entries.filter(e => e.constraintCount === 0);
+          dispatch(setSeamResolution({
+            totalConstraints: entries.reduce((acc, e) => acc + e.constraintCount, 0),
+            zeroConstraintSeams: zero.map(e => ({ seamId: e.seamId, reason: e.failure ?? 'empty-match' })),
+          }));
+          dispatch(setSeamResolutionErrors(zero.map(e => ({
+            seamId: e.seamId,
+            reason: e.failure ?? 'empty-match',
+            message: `Seam ${e.seamId} resolved to 0 constraints (${e.failure ?? 'empty-match'})`,
+            timestamp: Date.now(),
+          }))));
+          if (zero.length > 0) {
+            console.warn('[SimLifecycle] Seams resolved to 0 constraints (will not sew):', zero);
+            dispatch(showErrorToast(
+              zero.length === 1
+                ? '1 seam could not be resolved and will not sew — check its edge pairing'
+                : `${zero.length} seams could not be resolved and will not sew — check their edge pairing`,
+            ));
+          }
+        } else {
+          dispatch(setSeamResolution(null));
+          dispatch(setSeamResolutionErrors([]));
+        }
+
         // ─── WebGPU GPU solver ────────────────────────────────────────
-        if (isWebGPUFeatureEnabled() && isWebGPUAvailable()) {
+        const wantsWebGPU = isWebGPUFeatureEnabled() && isWebGPUAvailable();
+        if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams) {
+          // The TSL seam kernel lacks closure parity (no target decay) — a
+          // seam would constrain but never close. Fall through to WASM
+          // (seams: true) and tell the user why their opt-in was bypassed.
+          console.warn('[SimLifecycle] Project has seams — WebGPU tier declares seams:false, skipping to WASM');
+          dispatch(showWarningToast('Sewing is not supported on the WebGPU solver yet — using the WASM solver for this project'));
+        } else if (wantsWebGPU) {
           try {
             let device = gpuDeviceRef.current;
             if (!device || gpuDeviceLostRef.current) {
@@ -461,6 +510,15 @@ export function useSimulationLifecycle({
 
         // ─── Neural Drape (analytical fallback) ────────────────────────
         if (cancelled) return;
+        if (projectHasSeams && !NEURAL_CAPABILITIES.seams) {
+          // Last tier in the cascade and it cannot sew (`initMultiPiece`
+          // takes no seam parameter) — starting it would silently drop
+          // every seam. Honest failure instead: no tier, visible error.
+          console.error('[SimLifecycle] All seam-capable tiers failed and Neural Drape cannot sew — simulation not started');
+          dispatch(showErrorToast('Simulation could not start: no available solver supports sewing on this device'));
+          dispatch(setSolverTier('none'));
+          return;
+        }
         console.log('[SimLifecycle] 🔵 Using Neural Drape (analytical preview)');
         dispatch(setSolverTier('neural-drape'));
         const neuralClient = new NeuralDrapeClient();
@@ -509,6 +567,10 @@ export function useSimulationLifecycle({
       positionsRef.current = null;
       dispatch(setSolverTier('none'));
       dispatch(setFrameTime(0));
+      // Clear the overlay summary; `inspector.seamResolutionErrors` is
+      // intentionally kept for post-stop inspection (same convention as
+      // `lastSolverError`) and replaced wholesale on the next init.
+      dispatch(setSeamResolution(null));
     } else if (simulationState === 'paused') {
       // ─── Cleanup cascade ─── (paused branch — stop only, no dispose)
       clientRef.current?.stop();

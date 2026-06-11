@@ -53,6 +53,22 @@ export interface PinData {
   strength: PinStrength;
 }
 
+/**
+ * Per-init summary of how the project's active seams resolved to XPBD
+ * constraints (CLO3D parity plan Fase 4 — seam observability).
+ *
+ * Computed on the main thread by `summarizeSeamResolution` (seamPairs.ts)
+ * with the same `parameterizeEdge` + `matchVertices` resolution the solver
+ * workers run, so the numbers shown are the numbers the solver gets.
+ * `null` = no simulation init yet, or project has no active seams.
+ */
+export interface SeamResolutionSummary {
+  /** Total XPBD constraint pairs across all active seams. */
+  totalConstraints: number;
+  /** Active seams that resolved to ZERO constraints — they will NOT sew. */
+  zeroConstraintSeams: Array<{ seamId: string; reason: string }>;
+}
+
 /** Metadata for a simulation state snapshot. Heavy data stays in worker. */
 export interface SimSnapshotMeta {
   id: string;
@@ -85,6 +101,8 @@ interface SimulationSliceState {
   frameTimeMs: number;
   /** Particle count in active simulation */
   particleCount: number;
+  /** Seam → constraint resolution summary for the running init (null = none) */
+  seamResolution: SeamResolutionSummary | null;
   /** Whether body collision is active */
   bodyCollision: boolean;
   /** 3D viewport mode */
@@ -189,6 +207,7 @@ const initialState: SimulationSliceState = {
   solverTier: 'none' as SolverTier,
   frameTimeMs: 0,
   particleCount: 0,
+  seamResolution: null,
   bodyCollision: false,
   viewMode3D: 'arrange' as ViewMode3D,
   arrangementSnapshot: null,
@@ -303,6 +322,15 @@ const simulationSlice = createSlice({
     /** Set particle count. */
     setParticleCount(state, action: PayloadAction<number>) {
       state.particleCount = action.payload;
+    },
+    /**
+     * Record the seam → constraint resolution summary for the current init.
+     * Pass `null` to clear (sim teardown / project without seams).
+     * Surfaced in `SimulationStatusOverlay`; zero-constraint seams also get
+     * a toast + `inspector.seamResolutionErrors` entry (E-async conventions).
+     */
+    setSeamResolution(state, action: PayloadAction<SeamResolutionSummary | null>) {
+      state.seamResolution = action.payload;
     },
     /** Set body collision status. */
     setBodyCollision(state, action: PayloadAction<boolean>) {
@@ -701,6 +729,7 @@ export const {
   startSimulation,
   pauseSimulation,
   resetSimulation,
+  setSeamResolution,
   setFabric,
   setDefaultFabric,
   setParticleDistance,
