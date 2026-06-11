@@ -96,6 +96,58 @@ export function flattenPathWithSource(
 }
 
 /**
+ * Convert a `SemanticEdge.segmentRange` — index range [start, end) over the
+ * outline's PathCommand array (the producer contract: `detectSemanticEdges`
+ * emits one segment per draw command; see types.ts) — into the equivalent
+ * INCLUSIVE point range [firstPoint, lastPoint] over the FLATTENED outline
+ * that `parameterizeEdge`, the edge picker and the highlight renderers
+ * consume.
+ *
+ * This is the single canonical command→flattened boundary (Fase 3 / BP-3).
+ * Before it existed, consumers indexed command ranges straight into the
+ * flattened array, where every C/Q command expands to `resolution` points —
+ * so any piece with curves (armhole, neckline) sewed, picked and highlighted
+ * the wrong vertices.
+ *
+ * The start of the returned range is the ANCHOR point: the endpoint of the
+ * previous command (a draw command starts where the previous one ended). It
+ * is found as `firstEmittedPoint - 1` rather than by searching backwards by
+ * tag, because the Z closing point is tagged with the M's command index
+ * (`flattenPathWithSource`) and would false-match a backwards search.
+ *
+ * Defensive:
+ * - Empty outline → [0, 0].
+ * - A range that emits no points (only M/Z inside it) → [0, 0]; downstream
+ *   yields 0–1 vertices → no constraints (the observable 0-constraint case).
+ * - A malformed wrapped/empty range (end <= start) degrades to "the single
+ *   command at start" — the producer never emits wrapping ranges.
+ */
+export function commandRangeToFlattened(
+  commands: PathCommand[],
+  range: [number, number],
+  resolution: number = CURVE_RESOLUTION,
+): [number, number] {
+  const pts = flattenPathWithSource(commands, resolution);
+  if (pts.length === 0) return [0, 0];
+
+  const cmdStart = range[0];
+  const cmdEnd = range[1] > range[0] ? range[1] : range[0] + 1;
+
+  let firstEmitted = -1;
+  let lastEmitted = -1;
+  for (let i = 0; i < pts.length; i++) {
+    const c = pts[i].cmd;
+    if (c >= cmdStart && c < cmdEnd) {
+      if (firstEmitted === -1) firstEmitted = i;
+      lastEmitted = i;
+    }
+  }
+  if (firstEmitted === -1) return [0, 0];
+
+  return [Math.max(0, firstEmitted - 1), lastEmitted];
+}
+
+/**
  * Flatten PathCommand[] (including curves) to Point2D[].
  */
 export function flattenPath(commands: PathCommand[], resolution: number = CURVE_RESOLUTION): Point2D[] {

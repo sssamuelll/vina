@@ -13,6 +13,8 @@ import { useMemo, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import type { PathCommand, SemanticEdge } from '../../types/types';
 import { outlineToLocal3D } from '../../utils/3d/edgePicker';
+import { commandRangeToFlattened } from '../../utils/seam/index';
+import { useDisposable } from './hooks/useDisposable';
 
 interface EdgeHighlightProps {
   outline: PathCommand[];
@@ -28,7 +30,10 @@ export default function EdgeHighlight({ outline, edge, color }: EdgeHighlightPro
     const local3D = outlineToLocal3D(outline);
     if (local3D.length === 0) return null;
 
-    const [start, end] = edge.segmentRange;
+    // segmentRange is COMMAND-space (detectSemanticEdges contract) —
+    // convert to the flattened-point indices local3D uses (Fase 3 / BP-3),
+    // otherwise the highlight draws the wrong sub-polyline on curved edges.
+    const [start, end] = commandRangeToFlattened(outline, edge.segmentRange);
     const clampedStart = Math.max(0, Math.min(start, local3D.length - 1));
     const clampedEnd = Math.max(clampedStart + 1, Math.min(end + 1, local3D.length));
     const edgePoints = local3D.slice(clampedStart, clampedEnd);
@@ -48,26 +53,26 @@ export default function EdgeHighlight({ outline, edge, color }: EdgeHighlightPro
     matRef.current = mat;
 
     const line = new THREE.Line(geo, mat);
-    return line;
+    // Wrap as a single disposable so useDisposable (RFC C1) cleans up the
+    // geometry + material on change/unmount.
+    return {
+      line,
+      dispose() {
+        geo.dispose();
+        mat.dispose();
+      },
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- color updated via matRef, not recreation
   }, [outline, edge]);
+
+  useDisposable(lineObj);
 
   // Update color in-place without recreating geometry
   useEffect(() => {
     if (matRef.current) matRef.current.color.set(color);
   }, [color]);
 
-  // Dispose on unmount or when lineObj changes
-  useEffect(() => {
-    return () => {
-      if (lineObj) {
-        lineObj.geometry.dispose();
-        (lineObj.material as THREE.Material).dispose();
-      }
-    };
-  }, [lineObj]);
-
   if (!lineObj) return null;
 
-  return <primitive object={lineObj} />;
+  return <primitive object={lineObj.line} />;
 }

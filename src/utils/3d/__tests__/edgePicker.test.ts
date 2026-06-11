@@ -4,20 +4,26 @@ import { pickEdge, outlineToLocal3D, pieceHighlightRotation, edgeMidpointLocal3D
 
 // ─── Test Fixtures ──────────────────────────────────────────────────────────
 
-// Simple rectangle: 100mm wide × 200mm tall
+// Simple rectangle: 100mm wide × 200mm tall. Left edge closes with an
+// EXPLICIT L (the producer never emits edges over the implicit Z close);
+// the flattened sequence is identical to the Z-closed version (5 points).
 const outline: PathCommand[] = [
   { type: 'M', values: [0, 0] },
-  { type: 'L', values: [100, 0] },     // top edge
-  { type: 'L', values: [100, 200] },   // right edge
-  { type: 'L', values: [0, 200] },     // bottom edge
-  { type: 'Z', values: [] },           // left edge (closes back to 0,0)
+  { type: 'L', values: [100, 0] },     // 1: top edge
+  { type: 'L', values: [100, 200] },   // 2: right edge
+  { type: 'L', values: [0, 200] },     // 3: bottom edge
+  { type: 'L', values: [0, 0] },       // 4: left edge
+  { type: 'Z', values: [] },
 ];
 
+// segmentRange in COMMAND space ([start, end) over PathCommand[]) — the
+// detectSemanticEdges contract. The picker converts at the boundary via
+// commandRangeToFlattened (Fase 3 / BP-3).
 const edges: SemanticEdge[] = [
-  { id: 'e0', name: 'top', segmentRange: [0, 1], edgeType: 'seam' },
-  { id: 'e1', name: 'right', segmentRange: [1, 2], edgeType: 'seam' },
-  { id: 'e2', name: 'bottom', segmentRange: [2, 3], edgeType: 'seam' },
-  { id: 'e3', name: 'left', segmentRange: [3, 4], edgeType: 'seam' },
+  { id: 'e0', name: 'top', segmentRange: [1, 2], edgeType: 'seam' },
+  { id: 'e1', name: 'right', segmentRange: [2, 3], edgeType: 'seam' },
+  { id: 'e2', name: 'bottom', segmentRange: [3, 4], edgeType: 'seam' },
+  { id: 'e3', name: 'left', segmentRange: [4, 5], edgeType: 'seam' },
 ];
 
 // After flattening: points (0,0), (100,0), (100,200), (0,200), (0,0)

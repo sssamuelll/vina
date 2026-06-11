@@ -35,7 +35,7 @@ import {
   SEAM_CURVE_RESOLUTION,
   SEAM_MAX_EDGE_LENGTH,
 } from './seamAssembly';
-import { flattenPath } from '../seam/index';
+import { flattenPath, commandRangeToFlattened } from '../seam/index';
 
 /**
  * Branded vertex index — piece-LOCAL (not merged-mesh global).
@@ -88,7 +88,17 @@ function resolveSegmentRange(
   edgeName: string,
 ): [number, number] | null {
   const semantic = piece.edges?.find(e => e.name === edgeName);
-  if (semantic) return semantic.segmentRange;
+  // Semantic ranges live in COMMAND space (the detectSemanticEdges
+  // contract) — convert at this boundary to the flattened-point space
+  // parameterizeEdge consumes (Fase 3 / BP-3). The "edge-N" fallback
+  // below already indexes the flattened outline, so no conversion.
+  if (semantic) {
+    return commandRangeToFlattened(
+      toPathCommands(piece.outline),
+      semantic.segmentRange,
+      SEAM_CURVE_RESOLUTION,
+    );
+  }
 
   const match = edgeName.match(/^edge-(\d+)$/);
   if (!match) return null;

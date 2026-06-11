@@ -3,11 +3,14 @@ import { buildElasticConstraints, ELASTIC_COMPLIANCE } from '../elasticAssembly'
 import type { Elastic } from '../../../types/types';
 import type { PathCommand } from '../../../types/types';
 
+// segmentRange de los fixtures en espacio de COMANDOS (contrato del
+// producer): 'top' = comando 1. buildElasticConstraints convierte en la
+// frontera vía commandRangeToFlattened (Fase 3 / BP-3).
 const squareOutline: PathCommand[] = [
   { type: 'M', values: [0, 0] },
-  { type: 'L', values: [100, 0] },
-  { type: 'L', values: [100, 100] },
-  { type: 'L', values: [0, 100] },
+  { type: 'L', values: [100, 0] }, // 1: top
+  { type: 'L', values: [100, 100] }, // 2: right
+  { type: 'L', values: [0, 100] }, // 3: bottom
   { type: 'Z', values: [] },
 ];
 
@@ -19,7 +22,7 @@ describe('buildElasticConstraints', () => {
       [],
       new Map([[pieceId, squareOutline]]),
       { vertices: new Float32Array(24), indices: new Uint32Array(6), pieceOffsets: new Map([[pieceId, { vertexOffset: 0, indexOffset: 0 }]]) },
-      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [0, 1] as [number, number] }] }]]),
+      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [1, 2] as [number, number] }] }]]),
     );
     expect(result.constraints).toEqual([]);
   });
@@ -45,7 +48,7 @@ describe('buildElasticConstraints', () => {
       [elastic],
       new Map([[pieceId, squareOutline]]),
       { vertices, indices: new Uint32Array(6), pieceOffsets: new Map([[pieceId, { vertexOffset: 0, indexOffset: 0 }]]) },
-      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [0, 1] as [number, number] }] }]]),
+      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [1, 2] as [number, number] }] }]]),
     );
     expect(result.constraints.length).toBeGreaterThan(0);
     for (const c of result.constraints) {
@@ -62,7 +65,7 @@ describe('buildElasticConstraints', () => {
       [elastic],
       new Map([[pieceId, squareOutline]]),
       { vertices: new Float32Array(24), indices: new Uint32Array(6), pieceOffsets: new Map([[pieceId, { vertexOffset: 0, indexOffset: 0 }]]) },
-      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [0, 1] as [number, number] }] }]]),
+      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [1, 2] as [number, number] }] }]]),
     );
     expect(result.constraints).toEqual([]);
   });
@@ -81,7 +84,7 @@ describe('buildElasticConstraints', () => {
       [elastic],
       new Map([[pieceId, squareOutline]]),
       { vertices: new Float32Array(24), indices: new Uint32Array(6), pieceOffsets: new Map([[pieceId, { vertexOffset: 0, indexOffset: 0 }]]) },
-      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [0, 1] as [number, number] }] }]]),
+      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [1, 2] as [number, number] }] }]]),
     );
     expect(result.constraints).toEqual([]);
   });
@@ -95,7 +98,7 @@ describe('buildElasticConstraints', () => {
       [elastic],
       new Map([[pieceId, squareOutline]]),
       { vertices: new Float32Array(24), indices: new Uint32Array(6), pieceOffsets: new Map([[pieceId, { vertexOffset: 0, indexOffset: 0 }]]) },
-      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [0, 1] as [number, number] }] }]]),
+      new Map([[pieceId, { edges: [{ name: 'top', segmentRange: [1, 2] as [number, number] }] }]]),
     );
     expect(result.constraints).toEqual([]);
   });

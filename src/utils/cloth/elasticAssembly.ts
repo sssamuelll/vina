@@ -6,6 +6,7 @@
 
 import type { Elastic, ElasticType, PathCommand, SemanticEdge } from '../../types/types';
 import { parameterizeEdge } from './seamAssembly';
+import { commandRangeToFlattened } from '../seam/index';
 
 export interface ElasticConstraint {
   vertexA: number;
@@ -49,10 +50,15 @@ export function buildElasticConstraints(
     const edgeDef = pieceData.edges?.find(e => e.name === elastic.edgeName);
     if (!edgeDef) continue;
 
+    // Semantic ranges live in COMMAND space (detectSemanticEdges contract)
+    // — convert at this boundary to the flattened-point indices
+    // parameterizeEdge consumes (Fase 3 / BP-3). Same default resolution
+    // on both sides (CURVE_RESOLUTION = SEAM_CURVE_RESOLUTION = 12).
+    const [flatStart, flatEnd] = commandRangeToFlattened(outline, edgeDef.segmentRange);
     let vertices = parameterizeEdge(
       outline,
-      edgeDef.segmentRange[0],
-      edgeDef.segmentRange[1],
+      flatStart,
+      flatEnd,
       offset.vertexOffset,
     );
 

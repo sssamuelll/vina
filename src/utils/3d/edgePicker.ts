@@ -8,7 +8,7 @@
  */
 
 import type { PathCommand, SemanticEdge } from '../../types/types';
-import { flattenPath } from '../seam/index';
+import { flattenPath, commandRangeToFlattened } from '../seam/index';
 
 const SCALE = 0.001; // 1mm = 0.001m
 const DEFAULT_THRESHOLD = 0.015; // 15mm in meters
@@ -155,7 +155,10 @@ export function edgeMidpointLocal3D(
 ): { x: number; z: number } | null {
   const local3D = outlineToLocal3D(outline);
   if (local3D.length === 0) return null;
-  const [start, end] = edge.segmentRange;
+  // segmentRange is COMMAND-space (detectSemanticEdges contract) — convert
+  // to the flattened-point indices `local3D` uses (Fase 3 / BP-3). Same
+  // default resolution as outlineToLocal3D's flattenPath.
+  const [start, end] = commandRangeToFlattened(outline, edge.segmentRange);
   const clampedStart = Math.max(0, Math.min(start, local3D.length - 1));
   const clampedEnd = Math.max(clampedStart + 1, Math.min(end + 1, local3D.length));
   const pts = local3D.slice(clampedStart, clampedEnd);
@@ -197,7 +200,10 @@ export function pickEdge(
   const thresholdSq = threshold * threshold;
 
   for (const edge of edges) {
-    const [start, end] = edge.segmentRange;
+    // COMMAND-space → flattened-point indices (Fase 3 / BP-3); without the
+    // conversion, curved outlines made the picker measure distance against
+    // the wrong sub-polyline.
+    const [start, end] = commandRangeToFlattened(outline, edge.segmentRange);
     const distSq = pointToPolylineDistanceSq(localHitX, localHitZ, pts, start, end);
 
     if (distSq < bestDistSq) {

@@ -9,15 +9,15 @@
  * vía `parameterizeEdge`) los interpretan como índices del outline APLANADO,
  * donde cada comando C/Q expande a SEAM_CURVE_RESOLUTION=12 puntos.
  *
- * Consecuencia: cualquier seam sobre/tras una curva (sisa, escote — el caso
- * normal) resuelve a los vértices equivocados y a una fracción de los pares.
- * Ningún test previo cruzaba productor→consumidor con curvas: los fixtures
- * existentes son cuadrados M/L/Z con rangos elegidos a mano.
+ * Consecuencia (pre-Fase 3): cualquier seam sobre/tras una curva (sisa,
+ * escote — el caso normal) resolvía a los vértices equivocados y a una
+ * fracción de los pares (2 pares mid-curve en vez de 13 cubriendo el borde).
  *
- * El test de mismatch usa `it.fails` para que la suite quede verde mientras
- * el bug está documentado. La Fase 3 (`commandRangeToFlattened` canónico en
- * la frontera) debe convertirlo en `it` — si el fix aterriza y `it.fails`
- * empieza a fallar "porque ahora pasa", ese es el comportamiento esperado.
+ * Fase 3 introdujo `commandRangeToFlattened` como frontera canónica única
+ * (consumida por seamAssembly, seamPairs, edgePicker, elasticAssembly y
+ * EdgeHighlight); el test de mismatch dejó de ser `it.fails` y ahora PINNEA
+ * la conversión: primer test del repo que cruza productor real → consumidor
+ * real con curvas.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -175,13 +175,13 @@ describe('seam sobre bordes curvos (productor real → consumidor real)', () => 
     }
   });
 
-  // ─── BP-3: ROJO HOY — la Fase 3 debe quitar el `.fails` ────────────────────
-  it.fails('FASE 3 (BP-3): un seam entre dos bordes curvos cubre el borde completo', () => {
+  // ─── BP-3: cerrado en Fase 3 (commandRangeToFlattened en la frontera) ──────
+  it('FASE 3 (BP-3): un seam entre dos bordes curvos cubre el borde completo', () => {
     const { result, merged } = buildFixture();
 
     // Cada borde curvo tiene 13 vértices aplanados; matchVertices empareja el
-    // lado más corto → 13 pares. Hoy: segmentRange [2,3]/[4,5] leído en
-    // espacio aplanado selecciona 2 muestras intermedias de la curva → count 2.
+    // lado más corto → 13 pares. Pre-Fase 3: segmentRange [2,3]/[4,5] leído en
+    // espacio aplanado seleccionaba 2 muestras intermedias de la curva → count 2.
     expect(result.count).toBeGreaterThanOrEqual(13);
 
     // Mapeo correcto: los vértices cosidos de A deben incluir AMBOS extremos
