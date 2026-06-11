@@ -256,6 +256,8 @@ function resolveSeamVertexPairs(
     SEAM_CURVE_RESOLUTION,
     SEAM_MAX_EDGE_LENGTH,
   );
+  // Direction (Fase 5): mirror `buildSeamConstraints` — the B half may be
+  // traversed end→start, pairing A's t=0 with B's t=1.
   let edgeB = parameterizeEdge(
     toPathCommands(pieceB.outline),
     rangeB[0],
@@ -263,6 +265,7 @@ function resolveSeamVertexPairs(
     0,
     SEAM_CURVE_RESOLUTION,
     SEAM_MAX_EDGE_LENGTH,
+    seam.pieceBReversed === true,
   );
 
   if (seam.pieceARange) {

@@ -185,6 +185,8 @@ const seamEndpointSchema = z
     edgeName: boundedString(MAX_NAME_LEN),
     tStart: finiteNumber.optional(),
     tEnd: finiteNumber.optional(),
+    /** Sewing direction (parity plan Fase 5) — only honored on pieceB. */
+    reversed: z.boolean().optional(),
   })
   .loose();
 

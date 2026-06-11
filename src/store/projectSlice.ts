@@ -784,13 +784,20 @@ const projectSlice = createSlice({
       }
     },
 
-    /** Reverse sewing direction — swap pieceA and pieceB */
+    /**
+     * Reverse sewing direction (Ctrl+B / panel / copilot tool) — toggles
+     * `pieceB.reversed` (parity plan Fase 5).
+     *
+     * History: this used to swap pieceA ↔ pieceB, which is a PHYSICAL
+     * no-op — `matchVertices` pairs both edges by ascending t, so swapping
+     * the halves produces the same constraint pairs. Real reversal flips
+     * the traversal of one half relative to the other; `parameterizeEdge`
+     * mirrors t for the B half when the flag is set.
+     */
     reverseSeam(state, action: PayloadAction<string>) {
       const seam = state.seams.find(s => s.id === action.payload);
       if (seam) {
-        const temp = seam.pieceA;
-        seam.pieceA = seam.pieceB;
-        seam.pieceB = temp;
+        seam.pieceB.reversed = seam.pieceB.reversed !== true;
         state.isDirty = true;
       }
     },

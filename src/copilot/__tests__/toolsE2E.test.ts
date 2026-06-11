@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 230 tools registered', () => {
-      expect(registry.size).toBe(231); // 232 - 2 seamly tools (2026-06-05) + 1 mirrorNotch (2026-06-09)
+      expect(registry.size).toBe(232); // 231 + 1 reverseSeam (Fase 5 paridad CLO3D, 2026-06-11)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(231); // 232 - 2 seamly tools (2026-06-05) + 1 mirrorNotch (2026-06-09)
+      expect(names.length).toBe(232); // 231 + 1 reverseSeam (Fase 5 paridad CLO3D, 2026-06-11)
 
       // Key tools from every category
       const expected = [

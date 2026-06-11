@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import reducer, {
   addSeam, updateSeam,
-  setSeamTension, deactivateSeam, deactivatePiece,
+  setSeamTension, deactivateSeam, deactivatePiece, reverseSeam,
   addSeamGroup, removeSeamGroup,
   loadProject,
 } from '../projectSlice';
@@ -303,5 +303,31 @@ describe('projectSlice — loadProject backfills', () => {
     const project = { ...baseProject, pieces: [], seams: [] };
     const next = reducer(undefined, loadProject(project));
     expect(next.seamGroups).toEqual([]);
+  });
+});
+
+// ─── reverseSeam (parity plan Fase 5 — direction toggle) ─────────────────────
+
+describe('reverseSeam', () => {
+  it('toggles pieceB.reversed (NOT a pieceA↔pieceB swap — that was a physical no-op)', () => {
+    const state = baseState({ seams: [makeSeam('s1')] });
+
+    const once = reducer(state, reverseSeam('s1'));
+    expect(once.seams[0].pieceB.reversed).toBe(true);
+    // Las mitades NO se intercambian: A sigue siendo la referencia.
+    expect(once.seams[0].pieceA.pieceId).toBe('p1');
+    expect(once.seams[0].pieceB.pieceId).toBe('p2');
+    expect(once.isDirty).toBe(true);
+
+    // Ctrl+B dos veces = identidad (criterio done de la fase).
+    const twice = reducer(once, reverseSeam('s1'));
+    expect(twice.seams[0].pieceB.reversed).toBe(false);
+  });
+
+  it('is a no-op for unknown seam ids', () => {
+    const state = baseState({ seams: [makeSeam('s1')] });
+    const next = reducer(state, reverseSeam('ghost'));
+    expect(next.seams[0].pieceB.reversed).toBeUndefined();
+    expect(next.isDirty).toBe(false);
   });
 });

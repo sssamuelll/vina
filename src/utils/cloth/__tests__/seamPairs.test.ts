@@ -375,3 +375,33 @@ describe('summarizeSeamResolution', () => {
     expect(summarizeSeamResolution([makeSeam({ active: false })], pieces)).toEqual([]);
   });
 });
+
+// ─── pieceBReversed (parity plan Fase 5 — direction) ─────────────────────────
+
+describe('seamInitDataToPairs — pieceBReversed', () => {
+  it('reverses the B side of every pair; the A side is untouched', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    // top↔top en outlines idénticos: forward empareja índice a índice.
+    const fwd = seamInitDataToPairs([makeSeam({ pieceBEdgeName: 'top' })], pieces)[0];
+    const rev = seamInitDataToPairs(
+      [makeSeam({ pieceBEdgeName: 'top', pieceBReversed: true })],
+      pieces,
+    )[0];
+
+    expect(rev.vertexPairs.length).toBe(fwd.vertexPairs.length);
+    expect(rev.vertexPairs.map(([a]) => a)).toEqual(fwd.vertexPairs.map(([a]) => a));
+    // La mitad B se recorre end→start: la secuencia de índices B es la
+    // del forward invertida.
+    expect(rev.vertexPairs.map(([, b]) => b)).toEqual(
+      fwd.vertexPairs.map(([, b]) => b).reverse(),
+    );
+  });
+
+  it('summarizeSeamResolution: reversal never changes the constraint count', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    const fwd = summarizeSeamResolution([makeSeam()], pieces);
+    const rev = summarizeSeamResolution([makeSeam({ pieceBReversed: true })], pieces);
+    expect(rev[0].constraintCount).toBe(fwd[0].constraintCount);
+    expect(rev[0].failure).toBeNull();
+  });
+});

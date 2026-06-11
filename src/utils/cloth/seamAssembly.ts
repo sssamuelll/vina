@@ -164,7 +164,12 @@ export function computeArcLengthParams(points: Point2D[]): number[] {
  * @param globalOffset - Offset to add to vertex indices for the merged mesh
  * @param curveResolution - Resolution for flattening curves
  * @param maxEdgeLength - Maximum allowed edge length before subdivision
- * @returns Array of parameterized vertices along the edge
+ * @param reverse - Traverse the edge end→start (parity plan Fase 5,
+ *   `Seam.pieceB.reversed`): vertex order is flipped and t is mirrored
+ *   (t → 1−t), preserving the ascending-t invariant `matchVertices`
+ *   requires. Any t-range filter applied downstream refers to the
+ *   REVERSED parameterization.
+ * @returns Array of parameterized vertices along the edge (ascending t)
  */
 export function parameterizeEdge(
   outline: PathCommand[],
@@ -173,6 +178,7 @@ export function parameterizeEdge(
   globalOffset: number = 0,
   curveResolution: number = SEAM_CURVE_RESOLUTION,
   maxEdgeLength: number = SEAM_MAX_EDGE_LENGTH,
+  reverse: boolean = false,
 ): ParameterizedVertex[] {
   const flatPoints = flattenPath(outline, curveResolution);
   if (flatPoints.length === 0) return [];
@@ -249,6 +255,13 @@ export function parameterizeEdge(
     for (let i = 0; i < seamVertices.length; i++) {
       seamVertices[i].t = total > 0 ? distances[i] / total : 0;
     }
+  }
+
+  if (reverse) {
+    // Mirror the traversal: reverse vertex order (descending original t)
+    // and map t → 1−t, which restores ascending t over the new order.
+    seamVertices.reverse();
+    for (const v of seamVertices) v.t = 1 - v.t;
   }
 
   return seamVertices;
@@ -358,6 +371,83 @@ export function mergeMeshes(
   return { vertices, triIds, pieces: offsets, uvs };
 }
 
+// ─── Worker-shape conversion ────────────────────────────────────────────────
+
+/**
+ * Data needed to build seam constraints in a solver worker — the
+ * worker-protocol counterpart of the domain `Seam` (flat ids instead of
+ * nested halves, so it survives structured clone untouched).
+ *
+ * Lives here (not in clothWorker.ts) because this module owns the
+ * conversion (`seamInitDataToSeams`) and is environment-neutral — the
+ * worker files need DOM/worker libs and would drag them into every
+ * consumer's program (e.g. bench/, lib ES2023-only). clothWorker
+ * re-exports this type, so existing `from './clothWorker'` imports keep
+ * working.
+ */
+export interface SeamInitData {
+  id: string;
+  pieceAId: string;
+  pieceAEdgeName: string;
+  pieceBId: string;
+  pieceBEdgeName: string;
+  type: 'standard' | 'french' | 'flat-felled' | 'overlock';
+  /** t-parameter range on piece A side (partial-edge sewing) */
+  pieceARange?: [number, number];
+  /** t-parameter range on piece B side (partial-edge sewing) */
+  pieceBRange?: [number, number];
+  /**
+   * Sewing direction of the B half relative to A (parity plan Fase 5,
+   * mirrors `Seam.pieceB.reversed`). When true, B's edge is traversed
+   * end→start during vertex matching. Undefined = false.
+   */
+  pieceBReversed?: boolean;
+  /** Tension applied to seam (0-200, default 100) */
+  tension: number;
+  /** Strength of the seam bond (0-1, default 1.0) */
+  strength: number;
+  /** Whether this seam participates in simulation */
+  active: boolean;
+  /** Whether seam tape is applied */
+  taped: boolean;
+}
+
+/**
+ * Convert worker-protocol `SeamInitData[]` to the domain `Seam[]` shape
+ * `buildSeamConstraints` consumes. THE single canonical mapping, used by
+ * BOTH solver workers (clothWorker + wasmSolverWorker).
+ *
+ * History (parity plan Fase 5): the CPU worker carried two inline copies of
+ * this mapping; the WASM worker had NONE and passed `msg.seams`
+ * (SeamInitData) straight into `buildSeamConstraints`, which reads
+ * `seam.pieceA.pieceId` → TypeError on init whenever seams existed → the
+ * cascade silently fell back to the CPU tier. Centralizing the mapping
+ * fixes the WASM crash and gives `pieceBReversed` one home.
+ *
+ * Inactive seams are filtered (the worker convention both call sites had).
+ */
+export function seamInitDataToSeams(seamData: SeamInitData[]): Seam[] {
+  return seamData
+    .filter(s => s.active !== false)
+    .map(s => ({
+      id: s.id,
+      pieceA: { pieceId: s.pieceAId, edgeName: s.pieceAEdgeName, tStart: s.pieceARange?.[0], tEnd: s.pieceARange?.[1] },
+      pieceB: {
+        pieceId: s.pieceBId,
+        edgeName: s.pieceBEdgeName,
+        tStart: s.pieceBRange?.[0],
+        tEnd: s.pieceBRange?.[1],
+        reversed: s.pieceBReversed === true,
+      },
+      type: s.type,
+      tension: s.tension ?? 100,
+      strength: s.strength ?? 1.0,
+      active: true,
+      taped: s.taped ?? false,
+      tapeWidth: 10,
+    }));
+}
+
 // ─── Seam Constraint Generation ─────────────────────────────────────────────
 
 /**
@@ -446,8 +536,10 @@ export function buildSeamConstraints(
     // TODO: pass curveResolution / maxEdgeLength from config (currently
     // pinned to SEAM_CURVE_RESOLUTION / SEAM_MAX_EDGE_LENGTH to keep CPU/
     // WASM/GPU pair-count parity — see seamPairs.ts).
+    // Direction (Fase 5): the B half may be reversed relative to A —
+    // parameterizeEdge mirrors t so matching pairs A:t=0 with B:t=1.
     let edgeA = parameterizeEdge(outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
-    let edgeB = parameterizeEdge(outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
+    let edgeB = parameterizeEdge(outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH, seam.pieceB.reversed === true);
 
     // Apply t-range filtering: restrict parameterized vertices to the sub-range
     if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {

@@ -8,8 +8,10 @@
  * - Selected seam highlighted
  */
 
-import { PatternPiece, Seam } from '../../../types/types';
+import { PatternPiece, Point2D, Seam } from '../../../types/types';
 import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
+import { resolveEdgePolyline } from '../../../utils/seam/index';
+import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -18,27 +20,18 @@ interface SeamRendererProps {
   selectedSeamId: string | null;
 }
 
-/** Compute a small arrow marker at the midpoint of an edge, pointing in sewing direction */
-function directionArrow(
-  start: { x: number; y: number },
-  end: { x: number; y: number },
-  offset: { x: number; y: number },
-  zoom: number,
-) {
-  const mx = (start.x + end.x) / 2 + offset.x;
-  const my = (start.y + end.y) / 2 + offset.y;
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 0.01) return null;
-  const ux = dx / len;
-  const uy = dy / len;
-  const s = 6 / zoom; // arrow size
-  // Arrow tip at midpoint, two barbs behind
-  const tip = { x: mx + ux * s * 0.5, y: my + uy * s * 0.5 };
-  const left = { x: mx - ux * s * 0.5 - uy * s * 0.4, y: my - uy * s * 0.5 + ux * s * 0.4 };
-  const right = { x: mx - ux * s * 0.5 + uy * s * 0.4, y: my - uy * s * 0.5 - ux * s * 0.4 };
-  return `M${tip.x},${tip.y} L${left.x},${left.y} L${right.x},${right.y} Z`;
+/**
+ * Directional notch (CLO3D parity, Fase 5): a short tick perpendicular to
+ * the edge near its START (t≈0.05). The point near the tick is the start
+ * point; the far one is the end point — same convention as CLO3D's
+ * Directional Notch. Returns an SVG path, or null for degenerate edges.
+ */
+function directionTick(pts: Point2D[], zoom: number): string | null {
+  if (pts.length < 2) return null;
+  const { point, tangent } = samplePolyline(pts, 0.05);
+  const perp = perpendicular(tangent);
+  const s = 5 / zoom;
+  return `M${point.x - perp.x * s},${point.y - perp.y * s} L${point.x + perp.x * s},${point.y + perp.y * s}`;
 }
 
 // Categorical palette for distinguishing seam groups — muted for the cream
@@ -128,9 +121,25 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         }
         const edgeWidth = (isSelected ? 4 : seam.taped ? 4 : 2.5) / zoom2D;
 
-        // Direction arrows
-        const arrowA = directionArrow(epA.start, epA.end, offA, zoom2D);
-        const arrowB = directionArrow(epB.start, epB.end, offB, zoom2D);
+        // ─── Direction-aware geometry (Fase 5) ───
+        // Resolve each half's sub-polyline in TRAVERSAL order (B honors
+        // `reversed`), same resolution pipeline as the solver. Falls back
+        // to the legacy midpoint connection when an edge can't resolve.
+        const toCanvas = (pts: Point2D[], off: { x: number; y: number }) =>
+          pts.map(p => ({ x: p.x + off.x, y: p.y + off.y }));
+        const polyA = toCanvas(
+          resolveEdgePolyline(pieceA.outline, pieceA.edges, seam.pieceA.edgeName),
+          offA,
+        );
+        const polyB = toCanvas(
+          resolveEdgePolyline(pieceB.outline, pieceB.edges, seam.pieceB.edgeName, seam.pieceB.reversed === true),
+          offB,
+        );
+        const hasDirection = polyA.length >= 2 && polyB.length >= 2;
+
+        // Directional notches (perpendicular tick near each start, t≈0.05)
+        const tickA = hasDirection ? directionTick(polyA, zoom2D) : null;
+        const tickB = hasDirection ? directionTick(polyB, zoom2D) : null;
 
         return (
           <g
@@ -184,22 +193,53 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 the canvas into noise. The edge highlights remain the ambient
                 signal; details appear on demand via CSS (.seam-detail). */}
             <g className="seam-detail">
-              {/* Connection line (dotted) */}
-              <line
-                x1={midA.x} y1={midA.y}
-                x2={midB.x} y2={midB.y}
-                style={{ stroke: baseColor }}
-                strokeWidth={1 / zoom2D}
-                strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
-                opacity={0.6}
-              />
-              {/* Midpoint dots */}
-              <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} style={{ fill: baseColor }} />
-              <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} style={{ fill: baseColor }} />
-
-              {/* Directional arrows */}
-              {arrowA && <path d={arrowA} style={{ fill: baseColor }} opacity={0.8} />}
-              {arrowB && <path d={arrowB} style={{ fill: baseColor }} opacity={0.8} />}
+              {hasDirection ? (
+                <>
+                  {/* Connection lines start→start + end→end (Fase 5). When
+                      the halves are aligned the two lines are roughly
+                      parallel; a reversed half makes them CROSS — the X is
+                      the pre-simulation error signal CLO3D shows, fixed by
+                      Ctrl+B (Reverse Sewing). */}
+                  <line
+                    x1={polyA[0].x} y1={polyA[0].y}
+                    x2={polyB[0].x} y2={polyB[0].y}
+                    style={{ stroke: baseColor }}
+                    strokeWidth={1 / zoom2D}
+                    strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
+                    opacity={0.6}
+                  />
+                  <line
+                    x1={polyA[polyA.length - 1].x} y1={polyA[polyA.length - 1].y}
+                    x2={polyB[polyB.length - 1].x} y2={polyB[polyB.length - 1].y}
+                    style={{ stroke: baseColor }}
+                    strokeWidth={1 / zoom2D}
+                    strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
+                    opacity={0.6}
+                  />
+                  {/* Start anchors */}
+                  <circle cx={polyA[0].x} cy={polyA[0].y} r={3 / zoom2D} style={{ fill: baseColor }} />
+                  <circle cx={polyB[0].x} cy={polyB[0].y} r={3 / zoom2D} style={{ fill: baseColor }} />
+                  {/* Directional notches (perpendicular tick at t≈0.05 from
+                      each start — the CLO3D direction language) */}
+                  {tickA && <path d={tickA} style={{ stroke: baseColor }} strokeWidth={2 / zoom2D} fill="none" opacity={0.9} />}
+                  {tickB && <path d={tickB} style={{ stroke: baseColor }} strokeWidth={2 / zoom2D} fill="none" opacity={0.9} />}
+                </>
+              ) : (
+                <>
+                  {/* Legacy fallback: edge unresolvable (Fase 4 surfaces it
+                      in sim) — midpoint connection keeps the seam visible. */}
+                  <line
+                    x1={midA.x} y1={midA.y}
+                    x2={midB.x} y2={midB.y}
+                    style={{ stroke: baseColor }}
+                    strokeWidth={1 / zoom2D}
+                    strokeDasharray={`${5 / zoom2D} ${3 / zoom2D}`}
+                    opacity={0.6}
+                  />
+                  <circle cx={midA.x} cy={midA.y} r={3 / zoom2D} style={{ fill: baseColor }} />
+                  <circle cx={midB.x} cy={midB.y} r={3 / zoom2D} style={{ fill: baseColor }} />
+                </>
+              )}
             </g>
 
             {/* Length mismatch warning */}
