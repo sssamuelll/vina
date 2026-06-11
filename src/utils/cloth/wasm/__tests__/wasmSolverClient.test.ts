@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 import { type PieceMeshData, WasmSolverClient } from '../wasmSolverClient';
+import type { SeamInitData } from '../../clothWorker';
 import { stubWorkerGlobal } from './fakeWorker';
 
 /**
@@ -315,6 +316,61 @@ describe('WasmSolverClient', () => {
 
       await expect(initPromise).rejects.toThrow(/Wasm worker crashed/);
       expect(onError).toHaveBeenCalledWith('Wasm worker crashed');
+    });
+  });
+
+  // ── Contract #8 — seam forwarding at init (BP-1 / Fase 1) ───────────────
+  describe('init seam forwarding (#8 / BP-1)', () => {
+    const seams: SeamInitData[] = [
+      {
+        id: 'seam-1',
+        pieceAId: 'a',
+        pieceAEdgeName: 'rightEdge',
+        pieceBId: 'b',
+        pieceBEdgeName: 'leftEdge',
+        type: 'standard',
+        tension: 100,
+        strength: 1.0,
+        active: true,
+        taped: false,
+      },
+    ];
+
+    it('forwards seams verbatim in the init message', async () => {
+      const { worker } = stubWorkerGlobal();
+      const client = new WasmSolverClient();
+
+      const initPromise = client.initMultiPiece([makePiece('a'), makePiece('b')], seams);
+
+      expect(worker.postMessage).toHaveBeenCalledOnce();
+      const [initMsg] = worker.postMessage.mock.calls[0];
+      expect(initMsg.type).toBe('init');
+      // Reference pass-through: the bridge must not copy or filter — the
+      // worker is the single owner of constraint construction
+      // (buildSeamConstraints → set_seams_with_compliance, BUG-3 #606).
+      expect(initMsg.seams).toBe(seams);
+
+      worker.emitMessage({ type: 'ready', numParticles: 6 });
+      await expect(initPromise).resolves.toBeUndefined();
+    });
+
+    it('defaults to zero seams when the argument is omitted — the BP-1 footgun', async () => {
+      // This default is what silently disabled sewing on the entire WASM
+      // tier: the production callsite (useSimulationLifecycle, marker
+      // `─── WASM XPBD ───`) forgot the argument and no signal fired.
+      // Pinned here so the default's existence is a documented contract,
+      // not an accident. Observability for the 0-constraint case lands in
+      // Fase 4 (capability flag + toast).
+      const { worker } = stubWorkerGlobal();
+      const client = new WasmSolverClient();
+
+      const initPromise = client.initMultiPiece([makePiece()]);
+
+      const [initMsg] = worker.postMessage.mock.calls[0];
+      expect(initMsg.seams).toEqual([]);
+
+      worker.emitMessage({ type: 'ready', numParticles: 3 });
+      await expect(initPromise).resolves.toBeUndefined();
     });
   });
 });
