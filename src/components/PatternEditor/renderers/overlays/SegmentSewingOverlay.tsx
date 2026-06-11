@@ -1,6 +1,7 @@
 import type { PatternPiece } from '../../../../types/types';
 import type { SegmentSelection, SnapResult } from '../../useSegmentSewingTool';
 import { getEdgeEndpoints } from '../../../../utils/geometry/path';
+import { SEWING_PICK_FIRST, SEWING_PICK_SECOND } from '../seamVisuals';
 
 interface SegmentSewingOverlayProps {
   zoom2D: number;
@@ -57,8 +58,11 @@ function SegmentHighlight({
 export default function SegmentSewingOverlay({
   zoom2D, pieces, phase, segmentA, segmentB, pendingSnap, hoveredSnap,
 }: SegmentSewingOverlayProps) {
-  const colorA = '#3498db';
-  const colorB = '#2ecc71';
+  // Shared pick language (Fase 6): FIRST selection green, SECOND blue —
+  // this overlay had the assignment inverted relative to EdgePairOverlay,
+  // teaching two contradictory color meanings for the same gesture.
+  const colorA = SEWING_PICK_FIRST;
+  const colorB = SEWING_PICK_SECOND;
 
   const midA = segmentA ? {
     x: (segmentA.startPoint.x + segmentA.endPoint.x) / 2,
@@ -110,7 +114,7 @@ export default function SegmentSewingOverlay({
       {midA && midB && (
         <line
           x1={midA.x} y1={midA.y} x2={midB.x} y2={midB.y}
-          stroke="#2ecc71" strokeWidth={1 / zoom2D}
+          stroke={SEWING_PICK_FIRST} strokeWidth={1 / zoom2D}
           strokeDasharray={`${4 / zoom2D} ${3 / zoom2D}`}
           opacity={0.5} pointerEvents="none"
         />

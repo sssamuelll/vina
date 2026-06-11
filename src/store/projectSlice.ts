@@ -9,7 +9,7 @@ import { generatePleatFoldLines } from '../utils/pleatGeometry';
 import type { ValidationDiagnostic, Quarantine } from '../utils/projectValidator';
 import { uid } from '../utils/pathHelpers';
 import { newId } from '../utils/ids';
-import { detectSemanticEdges } from '../utils/semanticEdges';
+import { detectSemanticEdges, preserveEdgeWidthsByName } from '../utils/semanticEdges';
 import { autoSew } from '../utils/autoSew';
 
 // ─── Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D) ────
@@ -290,10 +290,12 @@ function applyProjectPayload(state: ProjectState, payload: OpenCloProject, gener
     // Auto-rename duplicate pieces (e.g., all named "Detail" from Seamly2D)
     autoRenameDuplicatePieces(state.pieces);
 
-    // Re-detect edges on pieces that were renamed (category/side now set)
+    // Re-detect edges on pieces that were renamed (category/side now set).
+    // Per-edge SA widths survive the re-detection re-keyed by edge NAME
+    // (Fase 6 — they vanished silently here on every generative load).
     for (const piece of state.pieces) {
       if (piece.category && piece.category !== 'other') {
-        piece.edges = detectSemanticEdges(piece);
+        piece.edges = preserveEdgeWidthsByName(piece.edges, detectSemanticEdges(piece));
       }
     }
 

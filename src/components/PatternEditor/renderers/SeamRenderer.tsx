@@ -12,6 +12,7 @@ import { PatternPiece, Point2D, Seam } from '../../../types/types';
 import { getEdgeEndpoints, getEdgeArcLength, getEdgePathD } from '../../../utils/geometry/path';
 import { resolveEdgePolyline } from '../../../utils/seam/index';
 import { samplePolyline, perpendicular } from '../../../utils/pleatGeometry';
+import { seamPairColor, seamMismatchMm, SEAM_MISMATCH_THRESHOLD_MM } from './seamVisuals';
 
 interface SeamRendererProps {
   seams: Seam[];
@@ -34,16 +35,10 @@ function directionTick(pts: Point2D[], zoom: number): string | null {
   return `M${point.x - perp.x * s},${point.y - perp.y * s} L${point.x + perp.x * s},${point.y + perp.y * s}`;
 }
 
-// Categorical palette for distinguishing seam groups — muted for the cream
-// paper ground. Three hues (Iris cut 3): beyond three, adjacent seams read
-// as a parade of color rather than groups; cycling three keeps neighbors
-// distinct without competing with the selection/error language.
-const SEAM_PALETTE = ['#4a7fb5', '#b56d8a', '#5a9e72'];
-
 export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: SeamRendererProps) {
   return (
     <>
-      {seams.map((seam, seamIndex) => {
+      {seams.map((seam) => {
         const pieceA = pieces.find(p => p.id === seam.pieceA.pieceId);
         const pieceB = pieces.find(p => p.id === seam.pieceB.pieceId);
         if (!pieceA || !pieceB) return null;
@@ -87,25 +82,23 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
         // autoSew pairs edges by arc length, so a chord-based mismatch wildly
         // over-reports curved seams (armholes, caps, necklines) — a correctly
         // matched curved seam would otherwise show a huge false mismatch.
+        // Mismatch in ABSOLUTE mm, red above 1mm (Fase 6 / CLO3D parity):
+        // 5% relative hid a 19mm error on a 400mm side seam and cried wolf
+        // at 0.6mm on a 10mm notch seam. The craft works in mm.
         const lenA = getEdgeArcLength(pieceA.outline, segIdxA);
         const lenB = getEdgeArcLength(pieceB.outline, segIdxB);
-        const maxLen = Math.max(lenA, lenB, 0.01);
-        const mismatch = Math.abs(lenA - lenB) / maxLen;
-        const hasMismatch = mismatch > 0.05; // >5% difference
+        const mismatchMm = seamMismatchMm(lenA, lenB);
+        const hasMismatch = mismatchMm > SEAM_MISMATCH_THRESHOLD_MM;
 
         const isSelected = selectedSeamId === seam.id;
         const isInactive = seam.active === false;
-        const paletteColor = SEAM_PALETTE[seamIndex % SEAM_PALETTE.length];
-        // State colors borrow the piece selection/error language; otherwise the
-        // muted seam-group palette. var() tokens must be applied via `style`
-        // (SVG presentation attrs can't read CSS variables).
-        const baseColor = isInactive
-          ? 'var(--ink-on-light-3)'
-          : isSelected
-            ? 'var(--accent-2d)'
-            : hasMismatch
-              ? 'var(--piece-error-2d)'
-              : paletteColor;
+        // One channel per concern (Fase 6, Iris N3): the pair color is
+        // IDENTITY and never changes under interaction — selection shows as
+        // weight (wider stroke + accent glow halo behind), mismatch as the
+        // red label only. Inactive is the one state that mutes the color
+        // (the pair is out of the simulation). var() tokens must be applied
+        // via `style` (SVG presentation attrs can't read CSS variables).
+        const baseColor = isInactive ? 'var(--ink-on-light-3)' : seamPairColor(seam.id);
         // Type-specific line styles (CLO3D parity)
         const z = zoom2D;
         let edgeDash: string | undefined;
@@ -253,7 +246,7 @@ export default function SeamRenderer({ seams, pieces, zoom2D, selectedSeamId }: 
                 fontWeight={600}
                 style={{ fill: 'var(--piece-error-2d)', fontFamily: 'var(--font-mono-2d)' }}
               >
-                ⚠ {Math.round(mismatch * 100)}% mismatch
+                ⚠ {mismatchMm.toFixed(1)}mm mismatch
               </text>
             )}
 

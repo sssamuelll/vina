@@ -7,6 +7,7 @@ import reducer, {
   loadProject,
 } from '../projectSlice';
 import type { Seam, SeamGroup } from '../../types/types';
+import { detectSemanticEdges } from '../../utils/semanticEdges';
 
 function baseState(overrides: Partial<any> = {}): any {
   return {
@@ -329,5 +330,47 @@ describe('reverseSeam', () => {
     const next = reducer(state, reverseSeam('ghost'));
     expect(next.seams[0].pieceB.reversed).toBeUndefined();
     expect(next.isDirty).toBe(false);
+  });
+});
+
+// ─── Per-edge SA widths sobreviven el generative load (Fase 6) ───────────────
+
+describe('loadProject preserves per-edge SA widths (re-key por nombre)', () => {
+  it('a width set with the SA tool survives the generative edge re-detection', () => {
+    // Pieza con categoría ≠ 'other' → loadProject re-detecta edges
+    // (projectSlice applyProjectPayload, rama generative). Antes del fix,
+    // detectSemanticEdges reemplazaba piece.edges sin copiar
+    // seamAllowanceWidth → pérdida silenciosa en cada load.
+    const piece: any = {
+      id: 'bf', name: 'Bodice Front', category: 'bodice',
+      outline: [
+        { type: 'M', values: [0, 0] },
+        { type: 'L', values: [200, 0] },
+        { type: 'C', values: [220, 0, 220, 150, 200, 200] },
+        { type: 'L', values: [200, 500] },
+        { type: 'L', values: [0, 500] },
+        { type: 'Z', values: [] },
+      ],
+      internals: [], position: { x: 0, y: 0 }, rotation: 0, mirrored: false,
+      seamAllowance: 10, layer: 1, sublayer: 0, active: true, createdAt: 0, updatedAt: 0,
+    };
+    const detected = detectSemanticEdges(piece);
+    expect(detected.length).toBeGreaterThan(0);
+    const targetName = detected[0].name;
+    piece.edges = detected.map((e: any, i: number) =>
+      i === 0 ? { ...e, seamAllowanceWidth: 40 } : e,
+    );
+
+    const next = reducer(undefined, loadProject({
+      id: 'proj-w', name: 'Widths', createdAt: 0, updatedAt: 0,
+      fabrics: [],
+      avatar: { id: 'a', name: 'A', modelUrl: '', measurements: {} },
+      pieces: [piece],
+      seams: [],
+    } as any));
+
+    const loaded = next.pieces.find(p => p.id === 'bf');
+    const target = loaded?.edges?.find(e => e.name === targetName);
+    expect(target?.seamAllowanceWidth).toBe(40);
   });
 });
