@@ -4,11 +4,15 @@ import { SEAM_MAX_EDGE_LENGTH } from '../seamAssembly';
 import type { SeamInitData } from '../clothWorker';
 import type { PathCommand } from '../../../types/types';
 
+// Cierre con L explícito: el lado izquierdo es un comando real (el producer
+// detectSemanticEdges nunca emite edges sobre el cierre implícito del Z).
+// La secuencia aplanada es idéntica a la versión Z-cerrada (5 puntos).
 const squareOutline: Array<{ type: string; values: number[] }> = [
   { type: 'M', values: [0, 0] },
-  { type: 'L', values: [100, 0] },
-  { type: 'L', values: [100, 100] },
-  { type: 'L', values: [0, 100] },
+  { type: 'L', values: [100, 0] }, // 1: top
+  { type: 'L', values: [100, 100] }, // 2: right
+  { type: 'L', values: [0, 100] }, // 3: bottom
+  { type: 'L', values: [0, 0] }, // 4: left
   { type: 'Z', values: [] },
 ] satisfies PathCommand[];
 
@@ -16,11 +20,14 @@ function makeSquarePiece(pieceId: string): PieceWithOutline {
   return {
     pieceId,
     outline: squareOutline,
+    // segmentRange en espacio de COMANDOS ([start, end) sobre PathCommand[]),
+    // el contrato del producer — la conversión a espacio aplanado ocurre en
+    // la frontera del consumidor (commandRangeToFlattened, Fase 3 / BP-3).
     edges: [
-      { name: 'top', segmentRange: [0, 1] },
-      { name: 'right', segmentRange: [1, 2] },
-      { name: 'bottom', segmentRange: [2, 3] },
-      { name: 'left', segmentRange: [3, 0] },
+      { name: 'top', segmentRange: [1, 2] },
+      { name: 'right', segmentRange: [2, 3] },
+      { name: 'bottom', segmentRange: [3, 4] },
+      { name: 'left', segmentRange: [4, 5] },
     ],
   };
 }
@@ -154,8 +161,8 @@ describe('seamInitDataToPairs', () => {
       { type: 'Z', values: [] },
     ];
     const tinyPieces: PieceWithOutline[] = [
-      { pieceId: 'A', outline: tinyOutline, edges: [{ name: 'top', segmentRange: [0, 1] }] },
-      { pieceId: 'B', outline: tinyOutline, edges: [{ name: 'bottom', segmentRange: [2, 3] }] },
+      { pieceId: 'A', outline: tinyOutline, edges: [{ name: 'top', segmentRange: [1, 2] }] },
+      { pieceId: 'B', outline: tinyOutline, edges: [{ name: 'bottom', segmentRange: [3, 4] }] },
     ];
 
     const result = seamInitDataToPairs(
@@ -282,7 +289,7 @@ describe('seamInitDataToPairs', () => {
       {
         pieceId: 'A',
         outline: badOutline,
-        edges: [{ name: 'top', segmentRange: [0, 1] }],
+        edges: [{ name: 'top', segmentRange: [1, 2] }],
       },
       makeSquarePiece('B'),
     ];

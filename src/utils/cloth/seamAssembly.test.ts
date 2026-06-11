@@ -318,24 +318,30 @@ describe('mergeMeshes', () => {
 // ─── Seam Constraint Building ───────────────────────────────────────────────
 
 describe('buildSeamConstraints', () => {
-  // Two square pieces side by side
+  // Two square pieces side by side. Outlines close with an EXPLICIT L (the
+  // producer never emits edges over the implicit Z close); the flattened
+  // sequence is identical to the Z-closed version (5 points each).
   const outlineA: PathCommand[] = [
     { type: 'M', values: [0, 0] },
-    { type: 'L', values: [10, 0] },
-    { type: 'L', values: [10, 10] },
-    { type: 'L', values: [0, 10] },
+    { type: 'L', values: [10, 0] }, // 1: top
+    { type: 'L', values: [10, 10] }, // 2: right
+    { type: 'L', values: [0, 10] }, // 3: bottom
+    { type: 'L', values: [0, 0] }, // 4: left
     { type: 'Z', values: [] },
   ];
   const outlineB: PathCommand[] = [
     { type: 'M', values: [20, 0] },
-    { type: 'L', values: [30, 0] },
-    { type: 'L', values: [30, 10] },
-    { type: 'L', values: [20, 10] },
+    { type: 'L', values: [30, 0] }, // 1: top
+    { type: 'L', values: [30, 10] }, // 2: right
+    { type: 'L', values: [20, 10] }, // 3: bottom
+    { type: 'L', values: [20, 0] }, // 4: left
     { type: 'Z', values: [] },
   ];
 
   it('generates constraints for matching edges', () => {
-    // Sew right edge of A (vertices 1→2) to left edge of B (vertices 0→3)
+    // Sew right edge of A (command 2) to left edge of B (command 4).
+    // segmentRange is COMMAND-space — buildSeamConstraints converts at the
+    // boundary via commandRangeToFlattened (Fase 3 / BP-3).
     const seam: Seam = {
       id: 's1',
       pieceA: { pieceId: 'a', edgeName: 'rightEdge' },
@@ -354,8 +360,8 @@ describe('buildSeamConstraints', () => {
     outlines.set('b', outlineB);
 
     const pieces = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }> }>();
-    pieces.set('a', { edges: [{ name: 'rightEdge', segmentRange: [1, 2] }] });
-    pieces.set('b', { edges: [{ name: 'leftEdge', segmentRange: [0, 3] }] });
+    pieces.set('a', { edges: [{ name: 'rightEdge', segmentRange: [2, 3] }] });
+    pieces.set('b', { edges: [{ name: 'leftEdge', segmentRange: [4, 5] }] });
 
     const result = buildSeamConstraints([seam], outlines, merged, pieces);
     expect(result.count).toBe(2); // 2 vertices on shorter edge
@@ -394,8 +400,8 @@ describe('buildSeamConstraints', () => {
     outlines.set('b', outlineB);
 
     const pieces = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }> }>();
-    pieces.set('a', { edges: [{ name: 'rightEdge', segmentRange: [1, 2] }] });
-    pieces.set('b', { edges: [{ name: 'leftEdge', segmentRange: [0, 3] }] });
+    pieces.set('a', { edges: [{ name: 'rightEdge', segmentRange: [2, 3] }] });
+    pieces.set('b', { edges: [{ name: 'leftEdge', segmentRange: [4, 5] }] });
 
     const result = buildSeamConstraints([seam], outlines, merged, pieces);
     expect(result.count).toBe(2);

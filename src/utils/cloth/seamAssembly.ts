@@ -9,7 +9,7 @@
  */
 
 import type { PathCommand, Point2D, Seam, SemanticEdge } from '../../types/types';
-import { flattenPath } from '../seam/index';
+import { flattenPath, commandRangeToFlattened } from '../seam/index';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -402,39 +402,52 @@ export function buildSeamConstraints(
     // Resolve edge names to segment ranges (semantic lookup + "edge-N" fallback)
     const pieceAData = pieces?.get(seam.pieceA.pieceId);
     const pieceBData = pieces?.get(seam.pieceB.pieceId);
-    let edgeADef = pieceAData?.edges?.find(e => e.name === seam.pieceA.edgeName);
-    let edgeBDef = pieceBData?.edges?.find(e => e.name === seam.pieceB.edgeName);
+    const semanticA = pieceAData?.edges?.find(e => e.name === seam.pieceA.edgeName);
+    const semanticB = pieceBData?.edges?.find(e => e.name === seam.pieceB.edgeName);
 
-    // Fallback: parse "edge-N" pattern to extract segment index
-    // segmentRange uses indices into the flattened outline (same as parameterizeEdge expects)
-    if (!edgeADef) {
+    // Semantic ranges live in COMMAND space ([start, end) over the
+    // PathCommand array — the detectSemanticEdges contract). Convert at
+    // this boundary to the flattened-point space parameterizeEdge consumes
+    // (Fase 3 / BP-3): every C/Q command expands to SEAM_CURVE_RESOLUTION
+    // points, so indexing command ranges into the flattened array sewed
+    // the wrong vertices on any piece with curves.
+    let rangeA: [number, number] | undefined = semanticA
+      ? commandRangeToFlattened(outlineA, semanticA.segmentRange, SEAM_CURVE_RESOLUTION)
+      : undefined;
+    let rangeB: [number, number] | undefined = semanticB
+      ? commandRangeToFlattened(outlineB, semanticB.segmentRange, SEAM_CURVE_RESOLUTION)
+      : undefined;
+
+    // Fallback: parse "edge-N" pattern — N indexes the FLATTENED outline
+    // (legacy auto-naming), so no conversion applies here.
+    if (!rangeA) {
       const match = seam.pieceA.edgeName.match(/^edge-(\d+)$/);
       if (match) {
         const idx = parseInt(match[1], 10);
         const numSegments = flattenPath(outlineA).length;
         if (idx < numSegments) {
-          edgeADef = { name: seam.pieceA.edgeName, segmentRange: [idx, (idx + 1) % numSegments] };
+          rangeA = [idx, (idx + 1) % numSegments];
         }
       }
     }
-    if (!edgeBDef) {
+    if (!rangeB) {
       const match = seam.pieceB.edgeName.match(/^edge-(\d+)$/);
       if (match) {
         const idx = parseInt(match[1], 10);
         const numSegments = flattenPath(outlineB).length;
         if (idx < numSegments) {
-          edgeBDef = { name: seam.pieceB.edgeName, segmentRange: [idx, (idx + 1) % numSegments] };
+          rangeB = [idx, (idx + 1) % numSegments];
         }
       }
     }
 
-    if (!edgeADef || !edgeBDef) continue;
+    if (!rangeA || !rangeB) continue;
 
     // TODO: pass curveResolution / maxEdgeLength from config (currently
     // pinned to SEAM_CURVE_RESOLUTION / SEAM_MAX_EDGE_LENGTH to keep CPU/
     // WASM/GPU pair-count parity — see seamPairs.ts).
-    let edgeA = parameterizeEdge(outlineA, edgeADef.segmentRange[0], edgeADef.segmentRange[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
-    let edgeB = parameterizeEdge(outlineB, edgeBDef.segmentRange[0], edgeBDef.segmentRange[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
+    let edgeA = parameterizeEdge(outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
+    let edgeB = parameterizeEdge(outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
 
     // Apply t-range filtering: restrict parameterized vertices to the sub-range
     if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {
