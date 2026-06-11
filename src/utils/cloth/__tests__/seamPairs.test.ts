@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { seamInitDataToPairs, type PieceWithOutline } from '../seamPairs';
+import { seamInitDataToPairs, summarizeSeamResolution, type PieceWithOutline } from '../seamPairs';
 import { SEAM_MAX_EDGE_LENGTH } from '../seamAssembly';
 import type { SeamInitData } from '../clothWorker';
 import type { PathCommand } from '../../../types/types';
@@ -311,5 +311,67 @@ describe('seamInitDataToPairs', () => {
     // structural assertion we can make here is that the tuple holds numbers.
     expect(typeof pairs[0].vertexPairs[0][0]).toBe('number');
     expect(typeof pairs[0].vertexPairs[0][1]).toBe('number');
+  });
+});
+
+// ─── summarizeSeamResolution (parity plan Fase 4 — observability) ────────────
+
+describe('summarizeSeamResolution', () => {
+  it('returns one entry per ACTIVE seam with its constraint count', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    const entries = summarizeSeamResolution(
+      [makeSeam(), makeSeam({ id: 'seam-2', active: false })],
+      pieces,
+    );
+    expect(entries).toHaveLength(1);
+    expect(entries[0].seamId).toBe('seam-1');
+    expect(entries[0].constraintCount).toBeGreaterThan(0);
+    expect(entries[0].failure).toBeNull();
+  });
+
+  it('matches the pair count seamInitDataToPairs produces (shared resolution core)', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    const seams = [makeSeam()];
+    const pairs = seamInitDataToPairs(seams, pieces);
+    const entries = summarizeSeamResolution(seams, pieces);
+    expect(entries[0].constraintCount).toBe(pairs[0].vertexPairs.length);
+  });
+
+  it('reports unknown-edge failure with zero constraints', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    const entries = summarizeSeamResolution(
+      [makeSeam({ pieceAEdgeName: 'noSuchEdge' })],
+      pieces,
+    );
+    expect(entries).toEqual([
+      { seamId: 'seam-1', constraintCount: 0, failure: 'unknown-edge' },
+    ]);
+  });
+
+  it('reports missing-piece and self-seam failures', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    const entries = summarizeSeamResolution(
+      [
+        makeSeam({ id: 's-missing', pieceBId: 'ghost' }),
+        makeSeam({ id: 's-self', pieceBId: 'A' }),
+      ],
+      pieces,
+    );
+    expect(entries).toEqual([
+      { seamId: 's-missing', constraintCount: 0, failure: 'missing-piece' },
+      { seamId: 's-self', constraintCount: 0, failure: 'self-seam' },
+    ]);
+  });
+
+  it('is silent on console — failures surface via toast/inspector, not warns', () => {
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+    summarizeSeamResolution([makeSeam({ pieceAEdgeName: 'noSuchEdge' })], pieces);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns [] when every seam is inactive or the list is empty', () => {
+    const pieces = [makeSquarePiece('A')];
+    expect(summarizeSeamResolution([], pieces)).toEqual([]);
+    expect(summarizeSeamResolution([makeSeam({ active: false })], pieces)).toEqual([]);
   });
 });

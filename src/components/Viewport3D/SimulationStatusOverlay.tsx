@@ -24,6 +24,7 @@ export function SimulationStatusOverlay() {
   const particleCount = useSelector((s: RootState) => s.simulation.particleCount);
   const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
   const bodyCollision = useSelector((s: RootState) => s.simulation.bodyCollision);
+  const seamResolution = useSelector((s: RootState) => s.simulation.seamResolution);
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
 
   // Tool tier coverage per C4 RFC § 2.3: steam brush is GPU-only;
@@ -63,6 +64,22 @@ export function SimulationStatusOverlay() {
       )}
       {particleCount > 0 && (
         <div>{particleCount.toLocaleString()} particles</div>
+      )}
+      {seamResolution && (
+        <div>🧵 {seamResolution.totalConstraints.toLocaleString()} seam constraints</div>
+      )}
+      {seamResolution && seamResolution.zeroConstraintSeams.length > 0 && (
+        <div
+          style={{ color: '#ef4444', fontSize: 10, maxWidth: 200, marginTop: 2 }}
+          title={
+            'These seams resolved to 0 XPBD constraints, so the solver cannot pull them together. ' +
+            'Per-seam cause: ' +
+            seamResolution.zeroConstraintSeams.map(z => `${z.seamId} (${z.reason})`).join(', ') +
+            '. Check the seam edge pairing in 2D. Parity plan Fase 4.'
+          }
+        >
+          ⚠️ {seamResolution.zeroConstraintSeams.length} seam{seamResolution.zeroConstraintSeams.length === 1 ? '' : 's'} resolved to 0 constraints — will not sew
+        </div>
       )}
       <div style={{ opacity: 0.6 }}>
         Mode: {simulationMode}{isMobile ? ' · Mobile' : ''}

@@ -40,6 +40,34 @@ export interface SolverCapabilities {
   /** Per-piece stiffness multipliers (compliance scaling). */
   pieceStiffness: boolean;
   /**
+   * Seam (sewing) constraints — XPBD distance constraints between matched
+   * boundary vertices of two pieces, with per-substep target decay so the
+   * seam *closes* (CLO3D-parity plan Fase 2). `true` means the tier both
+   * accepts seam init data AND closes seams at parity with the CPU
+   * reference (`solveSeamConstraints`).
+   *
+   * Per-tier coverage:
+   * - CPU: `buildSeamConstraints` + `solveSeamConstraints` shrink schedule
+   *   (reference implementation).
+   * - WASM: `set_seams_with_compliance` + `set_seam_shrink_params` target
+   *   decay (BUG-3 #606 + parity plan Fase 2) — full parity.
+   * - GPU (TSL): kernel accepts `seamPairs` but lacks closure parity
+   *   (no compliance SBA, no graph coloring, no target decay) — a seam
+   *   constrains but never closes. DEFER per parity plan § 5; flag stays
+   *   `false` until the kernel reaches parity.
+   * - Neural: no seams in the inference contract (`initMultiPiece` takes
+   *   pieces only) — architectural exclusion per C4 RFC § 2.3.
+   *
+   * Consumer: the tier cascade in `useSimulationLifecycle` skips tiers
+   * declaring `seams: false` when the project has seams, with a visible
+   * toast (parity plan Fase 4 — honest capability declaration per A7/C4
+   * doctrine, never a silent downgrade).
+   *
+   * Like `tools` (per C4 follow-up #701) the field is **required** so a
+   * new tier constant cannot silently omit its seam stance.
+   */
+  seams: boolean;
+  /**
    * TSL execution model — when `true`, the consumer drives frames via
    * `useFrame` (or equivalent), and the client's `start()`/`stop()` are
    * no-ops. When `false` (or unset), the client manages its own animation
@@ -93,6 +121,8 @@ export const CPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   pressure: true,
   fold: true,
   pieceStiffness: true,
+  /** Reference implementation: `buildSeamConstraints` + shrink schedule. */
+  seams: true,
   tools: { steamBrush: false, meshGrab: false },
 });
 
@@ -115,6 +145,13 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   pressure: false,
   fold: false,
   pieceStiffness: false,
+  /**
+   * Seams at full parity with the CPU reference: `set_seams_with_compliance`
+   * (BUG-3 #606) + `set_seam_shrink_params` per-substep target decay
+   * (parity plan Fase 2, verified against the committed binary by
+   * `scripts/verify-wasm-smoke.mjs`).
+   */
+  seams: true,
   /**
    * Tools: mesh grab supported via `setPins` with positional pin shape
    * (positional semantics per A6 RFC Q2). Steam brush absent — would
@@ -167,6 +204,15 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   pressure: false,
   fold: false,
   pieceStiffness: false,
+  /**
+   * GPU seam kernel exists (`initMultiPieceTsl` consumes `seamPairs` via
+   * `seamInitDataToPairs`) but lacks closure parity with CPU/WASM: no
+   * per-constraint compliance SBA, no graph coloring, no per-substep
+   * target decay — a seam holds distance but never *closes*. Same shape
+   * as `selfCollision` above (scaffolded ≠ capable). Stays `false` until
+   * the parity work ratified as DEFER in the CLO3D parity plan § 5 lands.
+   */
+  seams: false,
   frameDriven: true,
   /**
    * Tools: full surface. Steam brush via `setBrushParams` + TSL
@@ -209,6 +255,12 @@ export const NEURAL_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   pressure: false,
   fold: false,
   pieceStiffness: false,
+  /**
+   * No seams in the inference contract — `initMultiPiece(pieces)` takes no
+   * seam parameter at all (polymorphic init per the client's module doc).
+   * Architectural exclusion per C4 RFC § 2.3, same as body collision.
+   */
+  seams: false,
   frameDriven: false,
   /**
    * Tools: none. Neural drape predicts vertex positions from rest mesh +

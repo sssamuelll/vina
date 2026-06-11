@@ -35,6 +35,7 @@ function createTestStore() {
         solverTier: 'none' as SolverTier,
         frameTimeMs: 0,
         particleCount: 0,
+        seamResolution: null,
         bodyCollision: false,
         viewMode3D: 'arrange' as ViewMode3D,
         arrangementSnapshot: null,

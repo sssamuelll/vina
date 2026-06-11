@@ -714,3 +714,74 @@ describe('readPositionsToCPU TSL readback (behavior #9 — #759)', () => {
     warnSpy.mockRestore();
   });
 });
+
+// ─── Behavior #10 — seam pair packing (parity plan Fase 4) ──────────────────
+//
+// Closes the Epic-746 gap: `initMultiPieceTsl(pieces, seamPairs)` had zero
+// coverage (seam SBA creation was only tested at the tslBuffers layer).
+// Pins the LOCAL → GLOBAL offset translation (the LocalVertexIndex brand
+// contract from seamPairs.ts #738) and the loud-skip on unknown pieces.
+// Also covers the vertex-offset guard that replaced the silent `?? 0`
+// default in `pieceVertexRanges` packing.
+
+describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
+  function makeSeamPairs(): Parameters<GpuSolverClient['initMultiPieceTsl']>[1] {
+    return [
+      {
+        pieceAId: 'a',
+        pieceBId: 'b',
+        // LOCAL piece-relative indices (the seamPairs.ts brand contract).
+        vertexPairs: [[0, 0], [1, 1]] as Array<[never, never]>,
+      },
+    ];
+  }
+
+  it('packs seam pairs into seamIdsSBA applying per-piece GLOBAL vertex offsets', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], makeSeamPairs());
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    const seamIds = buffers.seamIdsSBA as TestSBA | null;
+    const seamDist = buffers.seamTargetDistSBA as TestSBA | null;
+    expect(seamIds).not.toBeNull();
+    // Piece 'a' offset 0, piece 'b' offset 4 (4-vertex quads): local pairs
+    // [0,0],[1,1] become global [0,4],[1,5]. A double-offset regression
+    // (global indices fed in) would yield [0,8],[1,9] instead.
+    expect(Array.from(seamIds!.array)).toEqual([0, 4, 1, 5]);
+    expect(Array.from(seamDist!.array)).toEqual([0, 0]);
+  });
+
+  it('skips pairs referencing unknown pieces with a loud warn; no seam SBA when none survive', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    const pairs = makeSeamPairs();
+    pairs![0] = { ...pairs![0], pieceBId: 'ghost' };
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], pairs);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    expect(buffers.seamIdsSBA).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ghost'));
+    warnSpy.mockRestore();
+  });
+
+  it('yields null seam SBAs when seamPairs is omitted or empty', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')], []);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    expect(buffers.seamIdsSBA).toBeNull();
+    expect(buffers.seamTargetDistSBA).toBeNull();
+  });
+});

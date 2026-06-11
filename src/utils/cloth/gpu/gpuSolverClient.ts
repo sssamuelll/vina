@@ -286,7 +286,16 @@ export class GpuSolverClient implements ClothSolverClient {
     // Store piece vertex ranges for freeze/unfreeze support
     this.pieceVertexRanges = new Map();
     for (const p of pieces) {
-      const start = vertexOffsets.get(p.pieceId) ?? 0;
+      const start = vertexOffsets.get(p.pieceId);
+      if (start === undefined) {
+        // Unreachable by construction (the offsets map is built from this
+        // same `pieces` array above) — fail loudly instead of silently
+        // mapping the piece onto offset 0, which would corrupt
+        // freeze/unfreeze ranges and any seam packing keyed off them
+        // (parity plan Fase 4: no silent vertex-offset defaults). The init
+        // throw is caught by the tier cascade, which falls through to WASM.
+        throw new Error(`[GpuSolverClient] missing vertex offset for piece ${p.pieceId}`);
+      }
       const count = p.vertices.length / 3;
       this.pieceVertexRanges.set(p.pieceId, { start, count });
     }

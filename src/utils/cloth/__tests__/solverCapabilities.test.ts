@@ -97,6 +97,7 @@ describe('SolverCapabilities frozen shape', () => {
       pressure: true,
       fold: true,
       pieceStiffness: true,
+      seams: true,
       tools: { steamBrush: false, meshGrab: false },
     });
   });
@@ -109,11 +110,12 @@ describe('SolverCapabilities frozen shape', () => {
       pressure: false,
       fold: false,
       pieceStiffness: false,
+      seams: true,
       tools: { steamBrush: false, meshGrab: true },
     });
   });
 
-  it('GPU pin — bodyCollision stays false until drape verifies against baseline', () => {
+  it('GPU pin — bodyCollision + seams stay false until each verifies against baseline', () => {
     expect(GPU_CAPABILITIES).toEqual({
       selfCollision: false,
       bodyCollision: false,
@@ -121,6 +123,7 @@ describe('SolverCapabilities frozen shape', () => {
       pressure: false,
       fold: false,
       pieceStiffness: false,
+      seams: false,
       frameDriven: true,
       tools: { steamBrush: true, meshGrab: true },
     });
@@ -134,6 +137,7 @@ describe('SolverCapabilities frozen shape', () => {
       pressure: false,
       fold: false,
       pieceStiffness: false,
+      seams: false,
       frameDriven: false,
       tools: { steamBrush: false, meshGrab: false },
     });
@@ -164,13 +168,18 @@ describe('SolverCapabilities frozen shape', () => {
 //      `frameDriven`); flag `false` ↔ method absent. A mismatch is a
 //      real bug.
 //   2. Config-anchored flags — `selfCollision`, `bodyCollision`, `lra`,
-//      `pressure`, `fold`, `pieceStiffness`. These flow through
-//      per-tier `setConfig` / construct-time toggles, NOT method
-//      presence. The frozen-shape pins above already enforce their
-//      declared values per tier; there is no separate
+//      `pressure`, `fold`, `pieceStiffness`, `seams`. These flow through
+//      per-tier `setConfig` / construct-time toggles / init parameters,
+//      NOT method presence. The frozen-shape pins above already enforce
+//      their declared values per tier; there is no separate
 //      method-presence contract to pin (intentionally — a `setConfig`
 //      method exists on every tier regardless of which sub-fields it
-//      honors).
+//      honors, and `initMultiPiece` exists on every tier regardless of
+//      whether it consumes a seam parameter). `seams` consumption per
+//      tier is pinned by the Epic-746 bridge suites instead:
+//      `wasmSolverClient.test.ts` (seams forwarded verbatim, BP-1
+//      default), `clothWorkerClient` contracts (seamData in init), and
+//      `gpuSolverClient.test.ts` (seamPairs shape).
 //
 // `meshGrab=true` has tier-specific implementation surface (per
 // `solverCapabilities.ts:54-79`):
