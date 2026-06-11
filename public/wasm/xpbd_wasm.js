@@ -207,6 +207,26 @@ export class XpbdSolver {
         wasm.xpbdsolver_set_pins(this.__wbg_ptr, ptr0, len0, ptr1, len1);
     }
     /**
+     * Configure the seam target decay schedule (Fase 2 / BP-2).
+     *
+     * Mirrors the CPU shrink semantics in `solveSeamConstraints`
+     * (`src/utils/cloth/seamAssembly.ts`): each substep multiplies every
+     * seam target by `shrink_factor` and snaps it to 0 once it falls
+     * below `sewed_threshold`, so seams CLOSE instead of holding their
+     * init-time distance forever. The constructor defaults (0.97 / 1e-6)
+     * match `DEFAULT_SEAM_CONFIG` on the JS side; this setter keeps the
+     * values config-driven if that constant ever moves.
+     *
+     * Defensive (A3): non-finite inputs are ignored (current values kept);
+     * `shrink_factor` clamps to [0, 1] (a factor > 1 would GROW the gap
+     * every substep); negative thresholds clamp to 0.
+     * @param {number} shrink_factor
+     * @param {number} sewed_threshold
+     */
+    set_seam_shrink_params(shrink_factor, sewed_threshold) {
+        wasm.xpbdsolver_set_seam_shrink_params(this.__wbg_ptr, shrink_factor, sewed_threshold);
+    }
+    /**
      * Set seam constraints with per-constraint XPBD compliance.
      *
      * `compliances` is a per-seam alpha value: 0.0 = perfectly rigid seam,

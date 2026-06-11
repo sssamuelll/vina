@@ -35,8 +35,14 @@ pub struct XpbdSolver {
 
     // Seam constraints
     seam_ids: Vec<u32>,         // [a,b, a,b, ...]
-    seam_target: Vec<f32>,      // target distance (usually 0)
+    seam_target: Vec<f32>,      // target distance — decays per substep toward 0 (Fase 2 / BP-2)
     seam_compliance: Vec<f32>,  // XPBD compliance per seam (0 = rigid; larger = stretchy)
+    // Seam target decay schedule (Fase 2 / BP-2). Mirrors CPU
+    // `DEFAULT_SEAM_CONFIG` in `src/utils/cloth/seamAssembly.ts`:
+    // each substep multiplies every target by `seam_shrink_factor`;
+    // once below `seam_sewed_threshold` it snaps to 0 ("fully sewn").
+    seam_shrink_factor: f32,
+    seam_sewed_threshold: f32,
 
     // Self-collision
     self_collision: bool,
@@ -130,6 +136,8 @@ impl XpbdSolver {
             seam_ids: Vec::new(),
             seam_target: Vec::new(),
             seam_compliance: Vec::new(),
+            seam_shrink_factor: 0.97,
+            seam_sewed_threshold: 1e-6,
             self_collision: false,
             thickness: 0.002,
             adjacency: None,
@@ -226,6 +234,28 @@ impl XpbdSolver {
         self.seam_ids = ids.to_vec();
         self.seam_target = target_dist.to_vec();
         self.seam_compliance = compliances.to_vec();
+    }
+
+    /// Configure the seam target decay schedule (Fase 2 / BP-2).
+    ///
+    /// Mirrors the CPU shrink semantics in `solveSeamConstraints`
+    /// (`src/utils/cloth/seamAssembly.ts`): each substep multiplies every
+    /// seam target by `shrink_factor` and snaps it to 0 once it falls
+    /// below `sewed_threshold`, so seams CLOSE instead of holding their
+    /// init-time distance forever. The constructor defaults (0.97 / 1e-6)
+    /// match `DEFAULT_SEAM_CONFIG` on the JS side; this setter keeps the
+    /// values config-driven if that constant ever moves.
+    ///
+    /// Defensive (A3): non-finite inputs are ignored (current values kept);
+    /// `shrink_factor` clamps to [0, 1] (a factor > 1 would GROW the gap
+    /// every substep); negative thresholds clamp to 0.
+    pub fn set_seam_shrink_params(&mut self, shrink_factor: f32, sewed_threshold: f32) {
+        if shrink_factor.is_finite() {
+            self.seam_shrink_factor = shrink_factor.clamp(0.0, 1.0);
+        }
+        if sewed_threshold.is_finite() {
+            self.seam_sewed_threshold = sewed_threshold.max(0.0);
+        }
     }
 
     /// Set triangle indices for air drag calculation.
@@ -617,6 +647,23 @@ impl XpbdSolver {
     }
 
     fn solve_seams(&mut self, sdt: f32) {
+        // Fase 2 (BP-2): decay seam targets toward zero each substep,
+        // mirroring CPU `solveSeamConstraints` — shrink BEFORE solving,
+        // snap to 0 below the threshold. Without this, the target stayed
+        // at its init-time distance (buildSeamConstraints seeds
+        // restLength = current distance) and seams never closed on the
+        // WASM tier: pieces hovered at exactly the gap they were placed.
+        let shrink = self.seam_shrink_factor;
+        let floor = self.seam_sewed_threshold;
+        for t in self.seam_target.iter_mut() {
+            if *t > floor {
+                *t *= shrink;
+                if *t < floor {
+                    *t = 0.0;
+                }
+            }
+        }
+
         let num = self.seam_ids.len() / 2;
         let inv_dt2 = 1.0 / (sdt * sdt);
 
@@ -1386,6 +1433,111 @@ mod tests {
         // Second seam (1↔2) had compliance=0 → should pull them together.
         let dist_12 = (s.positions[6] - s.positions[3]).abs();
         assert!(dist_12 < 1e-5, "second seam should be rigid (compliance fallback to 0)");
+    }
+
+    /// Fase 2 (BP-2): seam targets must decay per substep with a floor,
+    /// mirroring CPU `solveSeamConstraints` (`seamAssembly.ts`) — shrink
+    /// BEFORE the solve, snap to 0 once below `sewed_threshold`. The
+    /// pre-Fase-2 solver kept the target static at its init distance, so
+    /// pieces hovered apart forever instead of sewing shut.
+    #[test]
+    fn solve_seams_decays_target_per_substep() {
+        // Rigid seam whose target equals the current distance — exactly
+        // how `buildSeamConstraints` seeds restLength on the JS side.
+        let positions = vec![0.0, 0.0, 0.0, 2.0, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.set_seams_with_compliance(&[0u32, 1u32], &[2.0f32], &[0.0f32]);
+
+        let sdt = 1.0 / 60.0 / 15.0;
+        s.solve_seams(sdt);
+
+        // One decay tick: 2.0 × 0.97. The rigid solve then moves the pair
+        // exactly to the decayed target.
+        assert!(
+            (s.seam_target[0] - 1.94).abs() < 1e-5,
+            "target should decay ×0.97 per substep; got {}",
+            s.seam_target[0]
+        );
+        let dist = s.positions[3] - s.positions[0];
+        assert!(
+            (dist - 1.94).abs() < 1e-4,
+            "rigid seam should track the decayed target; got dist={dist}"
+        );
+
+        // 2.0 × 0.97^n < 1e-6 at n ≈ 477 → after 600 more substeps the
+        // target must have hit the floor and snapped to exactly 0.
+        for _ in 0..600 {
+            s.solve_seams(sdt);
+        }
+        assert_eq!(
+            s.seam_target[0], 0.0,
+            "target below sewed_threshold must snap to exactly 0"
+        );
+    }
+
+    /// Fase 2 done-criterion: with the standard-seam compliance from
+    /// `DEFAULT_SEAM_CONFIG` (1e-4) and constructor-default substeps (15),
+    /// a seam starting 10 cm apart must close below 1 mm within 2 s of
+    /// sim-time (120 frames @ 60 fps).
+    #[test]
+    fn seam_closes_within_two_seconds_sim_time() {
+        // y=1.0 keeps the pair clear of the ground plane (ground_y = 0);
+        // gravity is zeroed via `configure` to isolate seam closure from
+        // free-fall (all other values are the constructor defaults).
+        let positions = vec![0.0, 1.0, 0.0, 0.1, 1.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+        s.configure(
+            15, 0.99, 0.0, // substeps, damping, gravity_y (off)
+            0.0, 1.0, // stretch/bend compliance
+            false, 0.002, 0.005, // self-collision, thickness, margin
+            0.0, 1.0, // ground_y, drag
+            0.0, 0.0, 0.001, // stretch warp/weft/shear
+            1.0, 1.0, // bend warp/weft
+            0.3, // internal damping
+        );
+        s.set_seams_with_compliance(&[0u32, 1u32], &[0.1f32], &[0.0001f32]);
+
+        for _ in 0..120 {
+            s.step(1.0 / 60.0);
+        }
+
+        let dx = s.positions[3] - s.positions[0];
+        let dy = s.positions[4] - s.positions[1];
+        let dz = s.positions[5] - s.positions[2];
+        let dist = (dx * dx + dy * dy + dz * dz).sqrt();
+        assert!(
+            dist < 0.001,
+            "seam should close below 1 mm within 2 s of sim-time; got {dist}"
+        );
+        assert_eq!(
+            s.seam_target[0], 0.0,
+            "target should have decayed to the floor and snapped to 0"
+        );
+    }
+
+    /// Defensive (A3): non-finite or out-of-range shrink params must not
+    /// poison the decay schedule — NaN/Inf are ignored, a factor > 1
+    /// (which would GROW the gap every substep) clamps to 1, and negative
+    /// thresholds clamp to 0.
+    #[test]
+    fn set_seam_shrink_params_is_defensive() {
+        let positions = vec![0.0, 0.0, 0.0, 1.0, 0.0, 0.0];
+        let inv_mass = vec![1.0, 1.0];
+        let mut s = XpbdSolver::new(&positions, &inv_mass);
+
+        s.set_seam_shrink_params(f32::NAN, f32::INFINITY);
+        assert_eq!(s.seam_shrink_factor, 0.97, "NaN factor must keep the default");
+        assert_eq!(s.seam_sewed_threshold, 1e-6, "Inf threshold must keep the default");
+
+        s.set_seam_shrink_params(1.5, -3.0);
+        assert_eq!(s.seam_shrink_factor, 1.0, "factor > 1 must clamp to 1");
+        assert_eq!(s.seam_sewed_threshold, 0.0, "negative threshold must clamp to 0");
+
+        s.set_seam_shrink_params(0.9, 1e-5);
+        assert_eq!(s.seam_shrink_factor, 0.9);
+        assert_eq!(s.seam_sewed_threshold, 1e-5);
     }
 
     /// SpatialHashGrid port (#608, #676 per A7 § 3.1.1) smoke test.

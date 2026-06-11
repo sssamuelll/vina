@@ -33,7 +33,7 @@ const wasmJsPath = resolve(repoRoot, 'public/wasm/xpbd_wasm.js');
 const wasmBinPath = resolve(repoRoot, 'public/wasm/xpbd_wasm_bg.wasm');
 
 const { default: init, XpbdSolver } = await import(wasmJsPath);
-await init({ module_or_path: readFileSync(wasmBinPath) });
+const wasm = await init({ module_or_path: readFileSync(wasmBinPath) });
 
 // Two particles 1m apart on the x-axis, both unit mass. One stretch
 // constraint with rest length 1.0 (already at rest). One step at 1/60 s
@@ -49,3 +49,38 @@ solver.step(1 / 60);
 // + step path all ran without throwing — the gate this smoke test enforces.
 console.log('[verify-wasm-smoke] ✓ public/wasm/ loaded, XpbdSolver.step() ran without throwing');
 solver.free();
+
+// ─── Seam closure (Fase 2 / BP-2) ────────────────────────────────────────────
+// The committed binary must CLOSE seams, not hold them at their init-time
+// distance (the pre-Fase-2 behavior: static seam_target → pieces hover apart
+// forever). Two unit-mass particles 10 cm apart, one standard seam seeded the
+// way `buildSeamConstraints` does (target = current distance, compliance
+// 1e-4), zero gravity, 2 s of sim-time at 60 fps → distance must fall below
+// 1 mm. Mirrors the `seam_closes_within_two_seconds_sim_time` cargo test, but
+// against the artifact that actually ships.
+const seamPositions = new Float32Array([0, 1, 0, 0.1, 1, 0]);
+const seamInvMass = new Float32Array([1, 1]);
+const seamSolver = new XpbdSolver(seamPositions, seamInvMass);
+// configure(substeps, damping, gravityY, stretchC, bendC, selfCollision,
+//           thickness, margin, groundY, drag, warpC, weftC, shearC,
+//           bendWarpC, bendWeftC, internalDamping) — defaults except gravity=0.
+seamSolver.configure(15, 0.99, 0.0, 0.0, 1.0, false, 0.002, 0.005, 0.0, 1.0, 0.0, 0.0, 0.001, 1.0, 1.0, 0.3);
+seamSolver.set_seams_with_compliance(
+  new Uint32Array([0, 1]),
+  new Float32Array([0.1]),
+  new Float32Array([0.0001]),
+);
+for (let i = 0; i < 120; i++) seamSolver.step(1 / 60);
+
+const ptr = seamSolver.positions_ptr();
+const pos = new Float32Array(wasm.memory.buffer, ptr, 6);
+const dist = Math.hypot(pos[3] - pos[0], pos[4] - pos[1], pos[5] - pos[2]);
+if (!(dist < 0.001)) {
+  console.error(
+    `[verify-wasm-smoke] ✗ seam did not close: distance after 2 s of sim-time is ${dist} m (expected < 0.001). ` +
+    'The committed binary is missing or regressing the seam target decay (Fase 2 / BP-2).',
+  );
+  process.exit(1);
+}
+console.log(`[verify-wasm-smoke] ✓ seam closed to ${dist.toExponential(2)} m within 2 s of sim-time`);
+seamSolver.free();
