@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectSemanticEdges, findEdgeByName, findMatchingEdges } from '../semanticEdges';
+import { detectSemanticEdges, findEdgeByName, findMatchingEdges, preserveEdgeWidthsByName } from '../semanticEdges';
 import type { PatternPiece, PathCommand } from '../../types/types';
 
 function makePiece(name: string, outline: PathCommand[]): PatternPiece {
@@ -207,5 +207,45 @@ describe('findMatchingEdges', () => {
     const b = makePiece('B', rectOutline);
     const matches = findMatchingEdges(a, b);
     expect(matches).toEqual([]);
+  });
+});
+
+// ─── preserveEdgeWidthsByName (Fase 6 — per-edge widths en generative load) ──
+
+describe('preserveEdgeWidthsByName', () => {
+  it('re-keys user-set widths onto re-detected edges by NAME', () => {
+    const piece = makePiece('Bodice Front', bodiceFrontOutline);
+    const oldEdges = detectSemanticEdges(piece).map((e, i) =>
+      i === 0 ? { ...e, seamAllowanceWidth: 40 } : e,
+    );
+    const targetName = oldEdges[0].name;
+
+    // Re-detección: mismos nombres, sin widths (detectSemanticEdges nunca
+    // los copia — este era el vector de pérdida silenciosa en loadProject).
+    const redetected = detectSemanticEdges(piece);
+    expect(redetected.every(e => e.seamAllowanceWidth == null)).toBe(true);
+
+    const preserved = preserveEdgeWidthsByName(oldEdges, redetected);
+    const target = preserved.find(e => e.name === targetName);
+    expect(target?.seamAllowanceWidth).toBe(40);
+    // Los edges sin width siguen heredando el piece-level (undefined).
+    expect(preserved.filter(e => e.seamAllowanceWidth != null)).toHaveLength(1);
+  });
+
+  it('drops widths whose edge name vanished (no honest re-attach target)', () => {
+    const piece = makePiece('Panel', rectOutline);
+    const newEdges = detectSemanticEdges(piece);
+    const oldEdges = [
+      { ...newEdges[0], name: 'ghost-edge', seamAllowanceWidth: 25 },
+    ];
+    const preserved = preserveEdgeWidthsByName(oldEdges, newEdges);
+    expect(preserved.every(e => e.seamAllowanceWidth == null)).toBe(true);
+  });
+
+  it('is a no-op (same array) when no old widths exist', () => {
+    const piece = makePiece('Panel', rectOutline);
+    const newEdges = detectSemanticEdges(piece);
+    expect(preserveEdgeWidthsByName(undefined, newEdges)).toBe(newEdges);
+    expect(preserveEdgeWidthsByName(detectSemanticEdges(piece), newEdges)).toBe(newEdges);
   });
 });

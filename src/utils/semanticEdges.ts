@@ -324,3 +324,36 @@ export function findMatchingEdges(
 
   return matches;
 }
+
+// ─── Per-edge metadata preservation (parity plan Fase 6) ──────────────────────
+
+/**
+ * Carry user-set per-edge SA widths across an edge re-detection, re-keying
+ * by edge NAME (stable across re-detection; positional `segmentRange`
+ * indices are not).
+ *
+ * Fase 6 fix: the generative load path (`loadProject` → re-detect after
+ * category/side classification) replaced `piece.edges` wholesale —
+ * `detectSemanticEdges` never copies `seamAllowanceWidth`, so widths the
+ * user set with the Seam Allowance tool silently vanished on every
+ * load→save→reload round trip.
+ *
+ * Only widths whose edge NAME survives the re-detection are preserved; a
+ * width on a renamed/vanished edge is dropped (there is no honest target
+ * to re-attach it to).
+ */
+export function preserveEdgeWidthsByName(
+  oldEdges: SemanticEdge[] | undefined,
+  newEdges: SemanticEdge[],
+): SemanticEdge[] {
+  if (!oldEdges || oldEdges.length === 0) return newEdges;
+  const widthByName = new Map<string, number>();
+  for (const e of oldEdges) {
+    if (e.seamAllowanceWidth != null) widthByName.set(e.name, e.seamAllowanceWidth);
+  }
+  if (widthByName.size === 0) return newEdges;
+  return newEdges.map(e => {
+    const w = widthByName.get(e.name);
+    return w != null ? { ...e, seamAllowanceWidth: w } : e;
+  });
+}

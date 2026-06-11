@@ -49,16 +49,11 @@ export default function SeamPropertiesPanel({ seam, pieceAName, pieceBName, coll
         <span className="panel-value">{seam.tension}%</span>
       </div>
 
-      {/* Shrinkage / Gathering slider (CLO3D parity) */}
-      <div className="panel-field">
-        <label>Shrinkage</label>
-        <input
-          type="range" className="panel-slider"
-          min={0} max={90} value={Math.max(0, 100 - seam.tension)}
-          onChange={e => dispatch(setSeamTension({ seamId: seam.id, tension: 100 - Number(e.target.value) }))}
-        />
-        <span className="panel-value">{Math.max(0, 100 - seam.tension)}%</span>
-      </div>
+      {/* Shrinkage slider DELETED (Fase 6): it was `100 − tension` rendered
+          twice — the same variable as the Tension slider above, with two
+          thumbs that fought each other. Gathering/easing intent is already
+          labeled on Tension; the copilot keeps `setSeamShrinkage` as a
+          semantic alias that maps to tension. */}
 
       {/* Strength slider */}
       <div className="panel-field">
