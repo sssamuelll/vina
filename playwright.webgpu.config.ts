@@ -10,9 +10,18 @@ export default defineConfig({
   ...base,
   grep: /@gpu-local/,
   workers: 1,
+  // Perf debe fallar ruidosamente: un retry re-mide bajo instrumentación de trace.
+  retries: 0,
   use: {
     ...base.use,
     headless: false,
-    launchOptions: { args: ['--enable-unsafe-webgpu'] },
+    launchOptions: {
+      args: [
+        '--enable-unsafe-webgpu',
+        // Evita el throttling de rAF cuando la ventana headed queda ocluida.
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+      ],
+    },
   },
 });

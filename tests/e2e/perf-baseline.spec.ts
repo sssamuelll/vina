@@ -68,12 +68,36 @@ test.describe('perf baseline @gpu-local — camisa de María', () => {
       .not.toBe('none');
     const tier = await getState<string>(page, 'simulation.solverTier');
 
-    await page.waitForTimeout(10_000); // warmup
-    const solverSamples: number[] = [];
-    for (let i = 0; i < 20; i++) {
-      await page.waitForTimeout(500);
-      solverSamples.push(await getState<number>(page, 'simulation.frameTimeMs'));
-    }
+    // Acumula cada CAMBIO de frameTimeMs: el store solo publica una vez por
+    // ventana de 30 frames (~15s en tiers lentos) — un grid fijo de 500ms
+    // re-lee valores stale y la mediana colapsa a una sola ventana.
+    await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      const store = w.__OPENCLO_STORE__ as {
+        getState: () => { simulation: { frameTimeMs: number } };
+        subscribe: (f: () => void) => void;
+      };
+      const samples: number[] = [];
+      let last = store.getState().simulation.frameTimeMs;
+      store.subscribe(() => {
+        const v = store.getState().simulation.frameTimeMs;
+        if (v !== last) {
+          last = v;
+          if (v > 0) samples.push(v);
+        }
+      });
+      w.__PERF_FRAMETIMES__ = samples;
+    });
+    await page.waitForFunction(
+      () =>
+        ((window as unknown as { __PERF_FRAMETIMES__?: number[] }).__PERF_FRAMETIMES__?.length ??
+          0) >= 4,
+      undefined,
+      { timeout: 120_000 },
+    );
+    const [, ...solverSamples] = await page.evaluate(
+      () => (window as unknown as { __PERF_FRAMETIMES__: number[] }).__PERF_FRAMETIMES__,
+    ); // descarta ventana 1 = arranque frío
 
     const renderFps = await page.evaluate(
       () =>
@@ -94,6 +118,6 @@ test.describe('perf baseline @gpu-local — camisa de María', () => {
     console.log(
       `[perf-baseline] tier=${tier} particles=${particleCount} solverFrameMs(median)=${med(solverSamples)} solverFps=${(1000 / med(solverSamples)).toFixed(1)} renderFps=${renderFps.toFixed(1)}`,
     );
-    expect(solverSamples.some((s) => s > 0) || tier === 'webgpu').toBe(true);
+    expect(solverSamples.length).toBeGreaterThan(0);
   });
 });
