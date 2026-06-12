@@ -169,6 +169,13 @@ function isWebGPUFeatureEnabled(): boolean {
   return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) === 'true';
 }
 
+/** DEV-ONLY (#897 F1): permite probar costuras GPU antes del flip de
+ *  capability (la calibración de colisión llega en F2; el flip en el PR
+ *  final). Se ELIMINA en ese PR. No documentado a usuarios. */
+function isWebGpuSeamsUnsafeOptIn(): boolean {
+  return safeGetItem('openclo-webgpu-seams-unsafe') === 'true';
+}
+
 /** Race a promise against a timeout */
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -404,13 +411,18 @@ export function useSimulationLifecycle({
 
         // ─── WebGPU GPU solver ────────────────────────────────────────
         const wantsWebGPU = isWebGPUFeatureEnabled() && isWebGPUAvailable();
-        if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams) {
+        if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams && !isWebGpuSeamsUnsafeOptIn()) {
           // The TSL seam kernel lacks closure parity (no target decay) — a
           // seam would constrain but never close. Fall through to WASM
           // (seams: true) and tell the user why their opt-in was bypassed.
           console.warn('[SimLifecycle] Project has seams — WebGPU tier declares seams:false, skipping to WASM');
           dispatch(showWarningToast('Sewing is not supported on the WebGPU solver yet — using the WASM solver for this project'));
         } else if (wantsWebGPU) {
+          if (projectHasSeams && !GPU_CAPABILITIES.seams) {
+            // Solo se llega aquí con el bypass dev activo (si no, el gate
+            // de arriba habría caído a WASM) — dejar rastro explícito.
+            console.warn('[SimLifecycle] openclo-webgpu-seams-unsafe activo — costuras GPU sin flip de capability (dev-only)');
+          }
           try {
             let device = gpuDeviceRef.current;
             if (!device || gpuDeviceLostRef.current) {
