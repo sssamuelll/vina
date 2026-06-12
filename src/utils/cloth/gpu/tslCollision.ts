@@ -63,6 +63,7 @@ import {
   float,
   uint,
   int,
+  select,
   instanceIndex,
   atomicLoad,
   atomicStore,
@@ -282,7 +283,9 @@ export function createTslCollisionBody(
 
                     // Branch on inside-projection vs edge-fallback. Each branch
                     // computes its own distance and issues atomicMin directly —
-                    // no outer-scope toVar tracking, no select(). Storage WRITES
+                    // no outer-scope toVar tracking, no cross-branch select()
+                    // (the value-level select() below is a per-branch NaN guard,
+                    // not branch selection). Storage WRITES
                     // (atomicMin / atomicStore) inside nested Ifs DO propagate
                     // (mirrors the tslSelfCollision precedent).
                     // greaterThanEqual/lessThanEqual missing from @types/three at runtime.
@@ -295,7 +298,18 @@ export function createTslCollisionBody(
                         .and((u.add(v) as any).lessThanEqual(float(1))),
                       () => {
                         // Inside-projection: dist = |dot|.
-                        const distI32 = int(dot.abs().mul(uDistScale));
+                        // §9 cand. 5+6 (#897 F2): NaN→i32 es UB en WGSL — un triángulo
+                        // degenerado envenenaría el atomicMin con un mínimo fantasma; y
+                        // >2.147m desborda i32 a escala 1e6. NaN ≠ NaN ⇒ equal(self) falso.
+                        // TSL select(cond, ifTrue, ifFalse) — cond va PRIMERO
+                        // (ConditionalNode), orden opuesto al select(f, t, cond) de WGSL.
+                        const distFloat = dot.abs();
+                        const distClamped = distFloat.min(float(2.0));
+                        const distI32 = select(
+                          distFloat.equal(distFloat),
+                          int(distClamped.mul(uDistScale)),
+                          int(INT32_MAX),
+                        );
                         const oldDist = atomicMin(bestDistBuf.element(i), distI32);
                         If(oldDist.greaterThan(distI32), () => {
                           atomicStore(bestTriIdxBuf.element(i), int(triIdx));
@@ -340,8 +354,17 @@ export function createTslCollisionBody(
                       const dsqBC = dBCx.mul(dBCx).add(dBCy.mul(dBCy)).add(dBCz.mul(dBCz));
 
                       // Min of the three edge dsq, sqrt'd, atomicMin'd.
+                      // §9 cand. 5+6 (#897 F2): mismo guard que la rama
+                      // inside-projection — NaN→i32 es UB en WGSL; >2.147m
+                      // desborda i32 a escala 1e6. NaN ≠ NaN ⇒ equal(self) falso.
                       const minEdgeDsq = dsqAB.min(dsqAC).min(dsqBC);
-                      const distI32 = int(minEdgeDsq.sqrt().mul(uDistScale));
+                      const distFloat = minEdgeDsq.sqrt();
+                      const distClamped = distFloat.min(float(2.0));
+                      const distI32 = select(
+                        distFloat.equal(distFloat),
+                        int(distClamped.mul(uDistScale)),
+                        int(INT32_MAX),
+                      );
                       const oldDist = atomicMin(bestDistBuf.element(i), distI32);
                       If(oldDist.greaterThan(distI32), () => {
                         atomicStore(bestTriIdxBuf.element(i), int(triIdx));
