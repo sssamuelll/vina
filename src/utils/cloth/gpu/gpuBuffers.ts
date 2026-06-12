@@ -438,6 +438,20 @@ function packSimParams(p: SimParams): ArrayBuffer {
  * This enables race-free parallel constraint solving: each color group
  * can be dispatched as a separate compute pass, with all constraints in
  * the group guaranteed to operate on independent vertices.
+ *
+ * Greedy assignment runs in smallest-degree-last (degeneracy) order, not
+ * input order (#897 F4.3d). Each color group costs one compute dispatch per
+ * substep, so the color count multiplies per-frame CPU dispatch overhead;
+ * input-order greedy is order-sensitive and wasted colors on the irregular
+ * CDT edge order of production meshes. Measured (2026-06-13): shuffled 20×20
+ * warp/weft/shear grid fixture 11 → 8 colors (= maxConstraintsPerVertex,
+ * the edge-coloring floor); María's mesh 57 → 10 stretch colors
+ * (855 → 150 stretch dispatches/frame at 15 substeps). Honest caveat: the
+ * frame median did NOT move (31-32fps before and after, n=2 each) — post
+ * F4.3b/c the frame is not CPU-dispatch-bound, so the win is dispatch
+ * headroom and order-robustness, not measured fps.
+ * Any proper coloring is physics-equivalent — only group membership and
+ * intra-pass ordering change, both invisible to consumers.
  */
 export interface ColoredConstraints {
   /** Constraint IDs reordered by color [color0..., color1..., ...] */
@@ -471,11 +485,53 @@ export function colorConstraints(
     vertexConstraints.get(v1)!.push(i);
   }
 
-  // Greedy graph coloring
+  // ── Smallest-degree-last (degeneracy) ordering ──────────────────────────
+  // Approximate conflict degree per constraint: occurrences of OTHER
+  // constraints in its two endpoint lists. Self appears once in each list
+  // (hence -2); a neighbor sharing both endpoints counts twice — consistent
+  // with the per-occurrence decrement below, so degrees never go negative.
+  const degrees = new Int32Array(numConstraints);
+  for (let i = 0; i < numConstraints; i++) {
+    degrees[i] =
+      vertexConstraints.get(ids[i * 2])!.length +
+      vertexConstraints.get(ids[i * 2 + 1])!.length - 2;
+  }
+
+  // Bucket queue with lazy deletion: repeatedly remove the min-degree
+  // constraint, decrementing surviving neighbors. Coloring in REVERSE
+  // removal order keeps greedy within (degeneracy + 1) colors — at the
+  // edge-coloring floor on planar-ish cloth meshes, independent of input
+  // order. O(total adjacency) pushes.
+  const buckets: number[][] = [];
+  for (let i = 0; i < numConstraints; i++) {
+    (buckets[degrees[i]] ??= []).push(i);
+  }
+  const removed = new Uint8Array(numConstraints);
+  const removalOrder = new Int32Array(numConstraints);
+  let nRemoved = 0;
+  let cursor = 0;
+  while (nRemoved < numConstraints) {
+    while (buckets[cursor] === undefined || buckets[cursor].length === 0) cursor++;
+    const i = buckets[cursor].pop()!;
+    if (removed[i] === 1 || degrees[i] !== cursor) continue; // stale lazy entry
+    removed[i] = 1;
+    removalOrder[nRemoved++] = i;
+    for (const endpoint of [ids[i * 2], ids[i * 2 + 1]]) {
+      for (const j of vertexConstraints.get(endpoint)!) {
+        if (j === i || removed[j] === 1) continue;
+        degrees[j]--;
+        (buckets[degrees[j]] ??= []).push(j);
+        if (degrees[j] < cursor) cursor = degrees[j];
+      }
+    }
+  }
+
+  // Greedy graph coloring in smallest-degree-last order
   const constraintColors = new Int32Array(numConstraints).fill(-1);
   let numColors = 0;
 
-  for (let i = 0; i < numConstraints; i++) {
+  for (let k = numConstraints - 1; k >= 0; k--) {
+    const i = removalOrder[k];
     const usedColors = new Set<number>();
     const v0 = ids[i * 2];
     const v1 = ids[i * 2 + 1];
