@@ -152,6 +152,8 @@ interface UseSimulationLifecycleResult {
   edgeDataRef: React.MutableRefObject<SolverEdgeData | null>;
   /** Stable onFrame callback for solver clients */
   onFrame: (positions: Float32Array) => void;
+  /** Tick de frame-time para tiers frame-driven (GPU TSL) — misma contabilidad que onFrame */
+  recordFrameTick: () => void;
   /** TSL solver ref for renderer.compute() dispatch */
   tslSolverRef: React.MutableRefObject<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>;
 }
@@ -316,21 +318,32 @@ export function useSimulationLifecycle({
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const collisionRebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const lastFrameTimeRef = useRef(0);
+  const windowStartRef = useRef<number | null>(null);
   const frameCountRef = useRef(0);
+
+  /**
+   * Frame-time compartido por todos los tiers. Workers (WASM/CPU/Neural) vía
+   * onFrame; el tier GPU TSL lo llama directo desde useFrame (GarmentSimulation)
+   * porque ahí onFrame nunca dispara (frameDriven). Media real de ventana de 30.
+   */
+  const recordFrameTick = useCallback(() => {
+    const now = performance.now();
+    if (windowStartRef.current === null) {
+      windowStartRef.current = now;
+      return;
+    }
+    frameCountRef.current++;
+    if (frameCountRef.current % 30 === 0) {
+      const avgMs = (now - windowStartRef.current) / 30;
+      dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
+      windowStartRef.current = now;
+    }
+  }, [dispatch]);
 
   const onFrame = useCallback((positions: Float32Array) => {
     positionsRef.current = positions;
-    const now = performance.now();
-    if (lastFrameTimeRef.current > 0) {
-      frameCountRef.current++;
-      if (frameCountRef.current % 30 === 0) {
-        const avgMs = (now - lastFrameTimeRef.current) / 30;
-        dispatch(setFrameTime(Math.round(avgMs * 10) / 10));
-      }
-    }
-    lastFrameTimeRef.current = now;
-  }, [dispatch]);
+    recordFrameTick();
+  }, [recordFrameTick]);
 
   // ─── Tier cascade ─── (Start/stop simulation — solver tier cascade)
   useEffect(() => {
@@ -599,6 +612,8 @@ export function useSimulationLifecycle({
       positionsRef.current = null;
       dispatch(setSolverTier('none'));
       dispatch(setFrameTime(0));
+      windowStartRef.current = null;
+      frameCountRef.current = 0;
       // Clear the overlay summary; `inspector.seamResolutionErrors` is
       // intentionally kept for post-stop inspection (same convention as
       // `lastSolverError`) and replaced wholesale on the next init.
@@ -699,6 +714,7 @@ export function useSimulationLifecycle({
     positionsRef,
     edgeDataRef,
     onFrame,
+    recordFrameTick,
     tslSolverRef,
   };
 }
