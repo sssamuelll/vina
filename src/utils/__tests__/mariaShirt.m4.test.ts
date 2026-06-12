@@ -162,13 +162,27 @@ function probeSeams(pieces: PatternPiece[], seams: Seam[]): { worldSeams: WorldS
   return { worldSeams, particleCount: merged.vertices.length / 3 };
 }
 
-describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en mundo', () => {
-  it('ninguna de las costuras del autoSew cose en X tras el placement anatómico', { timeout: 60_000 }, () => {
+// La sonda meshea las 5 piezas reales a 5mm (~30k partículas) — cara. Se
+// computa UNA vez y se comparte entre tests: en CI (con coverage) una
+// pasada tarda ~2min; dos pasadas reventaban el timeout. El cache además
+// evita que el `it.fails` de M4-C pase vacuamente por timeout propio.
+let probeCache: { seamCount: number; worldSeams: WorldSeam[]; particleCount: number } | null = null;
+function getProbe() {
+  if (!probeCache) {
     const pieces = importClassified();
     const result = autoSew(pieces, { minConfidence: 0.3 });
-    expect(result.seams.length).toBeGreaterThanOrEqual(6);
-
     const { worldSeams, particleCount } = probeSeams(pieces, result.seams.map(s => s.seam));
+    probeCache = { seamCount: result.seams.length, worldSeams, particleCount };
+  }
+  return probeCache;
+}
+
+describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en mundo', () => {
+  // Timeout generoso: en CI el runner con coverage tarda ~2min la primera
+  // pasada (en local ~12s). El segundo test reusa el cache en ms.
+  it('ninguna de las costuras del autoSew cose en X tras el placement anatómico', { timeout: 300_000 }, () => {
+    const { seamCount, worldSeams, particleCount } = getProbe();
+    expect(seamCount).toBeGreaterThanOrEqual(6);
 
     // Telemetría de la sonda (diagnóstico M4, no assertion):
      
@@ -222,10 +236,8 @@ describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en 
   // bocabajo en mundo (armhole del delantero en y≈0.98 vs escote de la
   // espalda en y≈1.51). El done de M4-C: emparejamiento y dirección se
   // resuelven en espacio MUNDO tras el placement.
-  it.fails('M4-C: cada costura conecta edges CERCANOS en mundo (sin diagonales por el torso)', { timeout: 60_000 }, () => {
-    const pieces = importClassified();
-    const result = autoSew(pieces, { minConfidence: 0.3 });
-    const { worldSeams } = probeSeams(pieces, result.seams.map(s => s.seam));
+  it.fails('M4-C: cada costura conecta edges CERCANOS en mundo (sin diagonales por el torso)', { timeout: 300_000 }, () => {
+    const { worldSeams } = getProbe();
 
     // Gap delantero↔espalda = 2×(chestRadius+GAP) ≈ 0.366m. Una costura
     // bien emparejada promedia MENOS que eso (los edges convergen); las
