@@ -111,21 +111,19 @@ type TestSBA = {
   version: number;
 };
 
+// Mock-shaped SeamColorGroup (the real one carries StorageBufferAttribute;
+// the mock factory above substitutes MockSBA, so per-group SBAs are TestSBAs).
+type TestSeamColorGroup = {
+  idsSBA: TestSBA;
+  targetDistSBA: TestSBA;
+  complianceSBA: TestSBA;
+  count: number;
+};
+
 vi.mock('three/webgpu', () => sharedMock());
 vi.mock('three/tsl', () => sharedMock());
 
-// Transparent passthrough spy on createTslBuffers: behavior #11 inspects the
-// packed TslSeamConstraintData handed to the buffer factory (compliance and
-// colorRanges have no SBA surface until F1.3 retypes the factory's consumer
-// side). Every other behavior hits the real implementation unchanged.
-vi.mock('../tslBuffers', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../tslBuffers')>();
-  return { ...actual, createTslBuffers: vi.fn(actual.createTslBuffers) };
-});
-
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
-import * as tslBuffersModule from '../tslBuffers';
-import type { TslSeamConstraintData } from '../tslBuffers';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -750,7 +748,7 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
     ];
   }
 
-  it('packs seam pairs into seamIdsSBA applying per-piece GLOBAL vertex offsets', async () => {
+  it('packs seam pairs into per-color seam SBAs applying per-piece GLOBAL vertex offsets', async () => {
     const device = new FakeGPUDevice();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new GpuSolverClient(device as any);
@@ -759,17 +757,19 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffers = (client as any).tslBuffers;
-    const seamIds = buffers.seamIdsSBA as TestSBA | null;
-    const seamDist = buffers.seamTargetDistSBA as TestSBA | null;
-    expect(seamIds).not.toBeNull();
+    const seamColors = buffers.seamColors as TestSeamColorGroup[];
+    // No shared vertices between the two pairs → single color group of 2.
+    expect(seamColors).toHaveLength(1);
+    expect(seamColors[0].count).toBe(2);
+    expect(buffers.numSeamConstraints).toBe(2);
     // Piece 'a' offset 0, piece 'b' offset 4 (4-vertex quads): local pairs
     // [0,0],[1,1] become global [0,4],[1,5]. A double-offset regression
     // (global indices fed in) would yield [0,8],[1,9] instead.
-    expect(Array.from(seamIds!.array)).toEqual([0, 4, 1, 5]);
+    expect(Array.from(seamColors[0].idsSBA.array)).toEqual([0, 4, 1, 5]);
     // Still [0, 0] under #897 F1 seeding (targetDist = world distance ×
     // tensionFactor): both quads are coincident, so the seeded distance is 0.
     // The non-zero seeding path is pinned by behavior #11.
-    expect(Array.from(seamDist!.array)).toEqual([0, 0]);
+    expect(Array.from(seamColors[0].targetDistSBA.array)).toEqual([0, 0]);
   });
 
   it('skips pairs referencing unknown pieces with a loud warn; no seam SBA when none survive', async () => {
@@ -784,12 +784,12 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffers = (client as any).tslBuffers;
-    expect(buffers.seamIdsSBA).toBeNull();
+    expect(buffers.seamColors).toEqual([]);
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('ghost'));
     warnSpy.mockRestore();
   });
 
-  it('yields null seam SBAs when seamPairs is omitted or empty', async () => {
+  it('yields empty seamColors when seamPairs is omitted or empty', async () => {
     const device = new FakeGPUDevice();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new GpuSolverClient(device as any);
@@ -798,8 +798,8 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffers = (client as any).tslBuffers;
-    expect(buffers.seamIdsSBA).toBeNull();
-    expect(buffers.seamTargetDistSBA).toBeNull();
+    expect(buffers.seamColors).toEqual([]);
+    expect(buffers.numSeamConstraints).toBe(0);
   });
 });
 
@@ -810,28 +810,17 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
 // distance × tensionFactor (decays on GPU), per-constraint compliance, and
 // graph coloring (colorConstraints) for race-free parallel dispatch.
 //
-// Observable: at this commit createTslBuffers only consumes seam.{ids,
-// targetDist}, so targetDist is asserted on the seamTargetDistSBA surface
-// (behavior #10's observable) while compliance/colorRanges are asserted on
-// the packed TslSeamConstraintData captured by the passthrough spy above.
+// Observable: since F1.3 the buffer factory slices the packed seam data into
+// per-color SeamColorGroup SBAs, so seeding/compliance/coloring are asserted
+// directly on `tslBuffers.seamColors` — the transitional createTslBuffers
+// passthrough spy from the F1.2 commit is retired.
 
 describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', () => {
-  beforeEach(() => {
-    vi.mocked(tslBuffersModule.createTslBuffers).mockClear();
-  });
-
   /** Quad piece rigidly shifted +dx in world x — local indices stay identical. */
   function makeQuadPieceAt(id: string, dx: number): PieceMeshData {
     const p = makeQuadPiece(id);
     for (let i = 0; i < p.vertices.length; i += 3) p.vertices[i] += dx;
     return p;
-  }
-
-  /** The packed seam object handed to createTslBuffers (4th positional arg). */
-  function lastSeamArg(): TslSeamConstraintData | null {
-    const calls = vi.mocked(tslBuffersModule.createTslBuffers).mock.calls;
-    expect(calls.length).toBeGreaterThan(0);
-    return calls[calls.length - 1][3] as TslSeamConstraintData | null;
   }
 
   it('seeds targetDist = world distance × tensionFactor and per-constraint compliance, colored', async () => {
@@ -852,18 +841,16 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
       }],
     );
 
-    const seam = lastSeamArg();
-    expect(seam).not.toBeNull();
-    // Seeding mirror of CPU/WASM: 0.3 × 0.5 = 0.15 (rigid packing seeded 0).
-    expect(seam!.targetDist[0]).toBeCloseTo(0.15, 6);
-    expect(seam!.compliance[0]).toBeCloseTo(0.0001, 8);
-    // Single constraint → one color group.
-    expect(seam!.colorRanges).toEqual([{ offset: 0, count: 1 }]);
-
-    // Same seeding visible on the SBA surface consumed by the solver today.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buffers = (client as any).tslBuffers;
-    expect((buffers.seamTargetDistSBA as TestSBA).array[0]).toBeCloseTo(0.15, 6);
+    const seamColors = buffers.seamColors as TestSeamColorGroup[];
+    // Single constraint → one color group of 1.
+    expect(seamColors).toHaveLength(1);
+    expect(seamColors[0].count).toBe(1);
+    expect(Array.from(seamColors[0].idsSBA.array)).toEqual([0, 4]);
+    // Seeding mirror of CPU/WASM: 0.3 × 0.5 = 0.15 (rigid packing seeded 0).
+    expect(seamColors[0].targetDistSBA.array[0]).toBeCloseTo(0.15, 6);
+    expect(seamColors[0].complianceSBA.array[0]).toBeCloseTo(0.0001, 8);
   });
 
   it('splits shared-vertex pairs into separate color groups', async () => {
@@ -884,12 +871,13 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
       }],
     );
 
-    const seam = lastSeamArg();
-    expect(seam).not.toBeNull();
-    expect(seam!.colorRanges).toHaveLength(2);
-    expect(seam!.colorRanges[0].count).toBe(1);
-    expect(seam!.colorRanges[1].count).toBe(1);
-    // Both constraints survive the reorder: 2 pairs → 4 ids.
-    expect(seam!.ids).toHaveLength(4);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    const seamColors = buffers.seamColors as TestSeamColorGroup[];
+    expect(seamColors).toHaveLength(2);
+    expect(seamColors[0].count).toBe(1);
+    expect(seamColors[1].count).toBe(1);
+    // Both constraints survive the reorder.
+    expect(buffers.numSeamConstraints).toBe(2);
   });
 });

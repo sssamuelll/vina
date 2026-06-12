@@ -391,17 +391,19 @@ export class GpuSolverClient implements ClothSolverClient {
         }
       }
       if (seamIds.length > 0) {
-        const colored = colorConstraints(
+        const seamColored = colorConstraints(
           new Uint32Array(seamIds),
           new Float32Array(seamDist),
           seamIds.length / 2,
           new Float32Array(seamCompliance),
         );
         seam = {
-          ids: colored.ids,
-          targetDist: colored.restLengths,
-          compliance: colored.compliance!,
-          colorRanges: colored.colorRanges,
+          ids: seamColored.ids,
+          targetDist: seamColored.restLengths,
+          // compliance! safe: always passed above, and the length>0 guard
+          // skips colorConstraints' compliance-less zero-constraint early return.
+          compliance: seamColored.compliance!,
+          colorRanges: seamColored.colorRanges,
         };
       }
     }
@@ -441,6 +443,7 @@ export class GpuSolverClient implements ClothSolverClient {
         stretchColors: colored.colorRanges.length,
         bendConstraints: bend.ids.length / 4,
         seamConstraints: seam ? seam.ids.length / 2 : 0,
+        seamColors: seam ? seam.colorRanges.length : 0,
         hasUvs,
         fabric: fabricCompliance ? 'custom' : 'defaults',
       });

@@ -14,7 +14,7 @@
  *   1. preSolve     — save prevPos, integrate gravity + damping (per-particle)
  *   2. stretch      — graph-colored distance constraints (per-color dispatch)
  *   3. bend         — single Jacobi distance constraint on opposite verts
- *   4. seam         — distance constraint pulling seam pairs together
+ *   4. seam         — graph-colored distance constraints pulling seam pairs together
  *   5. groundClamp  — clamp positions to ground plane (AFTER constraints)
  *   6. postSolve    — velocity update, ground friction, NaN guard, speed clamp
  *
@@ -73,8 +73,13 @@ export interface TslSolver {
   stretchColors: ComputeNode[];
   /** Bend constraint compute node (null if no bend constraints) */
   bend: ComputeNode | null;
-  /** Seam constraint compute node (null if no seam constraints) */
-  seam: ComputeNode | null;
+  /**
+   * Per-color seam constraint compute nodes (empty if no seam constraints).
+   * F1.3 (#897): per-constraint compliance (from SeamPair) replaces the
+   * seamStiffness uniform; targets are the seeded distances. The in-kernel
+   * target decay arrives in F1.4.
+   */
+  seamColors: ComputeNode[];
   /** Ground plane clamping (dispatch AFTER constraints, BEFORE postSolve) */
   groundClamp: ComputeNode;
   /** Post-solve compute node (velocity update + ground friction + clamping) */
@@ -274,7 +279,8 @@ function makeGroundClampFn(
 /**
  * Factory for distance constraint solvers (stretch, bend, seam).
  *
- * Compliance source: per-constraint buffer (stretch/bend) or uniform (seam).
+ * Compliance source: per-constraint buffer (stretch/bend/seam) or uniform
+ * (legacy fallback — no production caller since #897 F1.3).
  * Exactly one of complianceBuf/complianceUniform must be non-null.
  */
 function makeDistanceConstraintFn(
@@ -564,7 +570,7 @@ function makeNormalNormalizeFn(
  * enabling zero-copy rendering.
  *
  * Execution order per substep (matching CPU solver):
- *   preSolve → stretch(per-color) → bend → seam → groundClamp → postSolve
+ *   preSolve → stretch(per-color) → bend → seam(per-color) → groundClamp → postSolve
  */
 export function createTslSolver(
   buffers: TslBufferSet,
@@ -619,20 +625,24 @@ export function createTslSolver(
     bend = compute(fn, buffers.numBendConstraints, [64]);
   }
 
-  // ─── Seam constraints (uniform compliance) ─────────────────────────
-  let seam: ComputeNode | null = null;
-  if (buffers.seamIdsSBA && buffers.seamTargetDistSBA && buffers.numSeamConstraints > 0) {
-    const seamIdsBuf = storage(buffers.seamIdsSBA, 'uint', buffers.numSeamConstraints * 2);
-    const seamRestBuf = storage(buffers.seamTargetDistSBA, 'float', buffers.numSeamConstraints);
+  // ─── Seam constraints (per-color, per-constraint compliance) ───────
+  // F1.3 (#897) structural half of F1.4: same distance kernel as stretch,
+  // one dispatch per color group, compliance read per-constraint from the
+  // group's SBA (the seamStiffness uniform is no longer consumed here; it
+  // is removed in F1.4 along with the dedicated decaying-target kernel).
+  const seamColors = buffers.seamColors.map((color) => {
+    const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
+    const targetBuf = storage(color.targetDistSBA, 'float', color.count);
+    const compBuf = storage(color.complianceSBA, 'float', color.count);
 
     const fn = makeDistanceConstraintFn(
-      posBuf, invMassBuf, seamIdsBuf, seamRestBuf,
+      posBuf, invMassBuf, idsBuf, targetBuf,
       uniforms.sdt,
       2, 0, 1,
-      null, uniforms.seamStiffness,
+      compBuf, null,
     );
-    seam = compute(fn, buffers.numSeamConstraints, [64]);
-  }
+    return compute(fn, color.count, [64]);
+  });
 
   // ─── Ground clamp (AFTER constraints, BEFORE postSolve) ───────────
   const groundClampFn = makeGroundClampFn(posBuf, invMassBuf, uniforms.groundY);
@@ -801,7 +811,7 @@ export function createTslSolver(
     preSolve,
     stretchColors,
     bend,
-    seam,
+    seamColors,
     groundClamp,
     postSolve,
     positionSBA: buffers.positionSBA,

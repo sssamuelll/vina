@@ -126,12 +126,10 @@ describe('createTslBuffers', () => {
     expect(buffers.numBendConstraints).toBe(1);
   });
 
-  it('creates seam SBAs when seam data provided', () => {
+  it('creates seam color groups when seam data provided', () => {
     const mesh = makeTestMesh();
     const { colored } = makeTestStretch();
     const bend = makeTestBend();
-    // TslSeamConstraintData (#897 F1) — compliance/colorRanges still unused
-    // by the factory at this commit (consumed from F1.3 onward).
     const seam: TslSeamConstraintData = {
       ids: new Uint32Array([0, 2]),
       targetDist: new Float32Array([0]),
@@ -140,8 +138,41 @@ describe('createTslBuffers', () => {
     };
     const buffers = createTslBuffers(mesh, colored, bend, seam);
 
-    expect(buffers.seamIdsSBA).not.toBeNull();
+    expect(buffers.seamColors).toHaveLength(1);
     expect(buffers.numSeamConstraints).toBe(1);
+  });
+
+  it('slices seam constraints into per-color groups (#897 F1.3)', () => {
+    const mesh = makeTestMesh();
+    const { colored } = makeTestStretch();
+    const bend = makeTestBend();
+    // 2 constraints already reordered by color (colorConstraints output
+    // shape): both touch vertex 2, forcing the 2-color split. Each value
+    // must land in its own group's SBA slice.
+    const seam: TslSeamConstraintData = {
+      ids: new Uint32Array([0, 2, 1, 2]),
+      targetDist: new Float32Array([0.15, 0.3]),
+      compliance: new Float32Array([0.0001, 0.0002]),
+      colorRanges: [{ offset: 0, count: 1 }, { offset: 1, count: 1 }],
+    };
+    const buffers = createTslBuffers(mesh, colored, bend, seam);
+
+    expect(buffers.numSeamConstraints).toBe(2);
+    expect(buffers.seamColors).toHaveLength(2);
+
+    const [g0, g1] = buffers.seamColors;
+    expect(Array.from(g0.idsSBA.array)).toEqual([0, 2]);
+    expect(g0.idsSBA.itemSize).toBe(2);
+    expect(g0.targetDistSBA.array[0]).toBeCloseTo(0.15, 6);
+    expect(g0.targetDistSBA.itemSize).toBe(1);
+    expect(g0.complianceSBA.array[0]).toBeCloseTo(0.0001, 8);
+    expect(g0.complianceSBA.itemSize).toBe(1);
+    expect(g0.count).toBe(1);
+
+    expect(Array.from(g1.idsSBA.array)).toEqual([1, 2]);
+    expect(g1.targetDistSBA.array[0]).toBeCloseTo(0.3, 6);
+    expect(g1.complianceSBA.array[0]).toBeCloseTo(0.0002, 8);
+    expect(g1.count).toBe(1);
   });
 
   it('handles null seams', () => {
@@ -150,7 +181,7 @@ describe('createTslBuffers', () => {
     const bend = makeTestBend();
     const buffers = createTslBuffers(mesh, colored, bend, null);
 
-    expect(buffers.seamIdsSBA).toBeNull();
+    expect(buffers.seamColors).toEqual([]);
     expect(buffers.numSeamConstraints).toBe(0);
   });
 });
@@ -216,10 +247,10 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 14 fixed SBAs (position, prevPos, velocity, invMass, normal, normalAccum,
-    // triangleIds, grabMask, grabOffset, bendIds, bendRest, bendCompliance,
-    // seamIds, seamTargetDist) + 3 SBAs per stretch color group.
-    const expected = 14 + buffers.stretchColors.length * 3;
+    // 12 fixed SBAs (position, prevPos, velocity, invMass, normal, normalAccum,
+    // triangleIds, grabMask, grabOffset, bendIds, bendRest, bendCompliance)
+    // + 3 SBAs per stretch color group + 3 SBAs per seam color group.
+    const expected = 12 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
 
     // Spot-check that core SBAs were each passed.
@@ -230,10 +261,15 @@ describe('destroyTslBufferSet', () => {
     expect(deleteSpy).toHaveBeenCalledWith(buffers.normalSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.triangleIdsSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.bendIdsSBA);
-    expect(deleteSpy).toHaveBeenCalledWith(buffers.seamIdsSBA);
     for (const color of buffers.stretchColors) {
       expect(deleteSpy).toHaveBeenCalledWith(color.idsSBA);
       expect(deleteSpy).toHaveBeenCalledWith(color.restLengthsSBA);
+      expect(deleteSpy).toHaveBeenCalledWith(color.complianceSBA);
+    }
+    expect(buffers.seamColors.length).toBeGreaterThan(0);
+    for (const color of buffers.seamColors) {
+      expect(deleteSpy).toHaveBeenCalledWith(color.idsSBA);
+      expect(deleteSpy).toHaveBeenCalledWith(color.targetDistSBA);
       expect(deleteSpy).toHaveBeenCalledWith(color.complianceSBA);
     }
   });
@@ -257,7 +293,8 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 9 fixed non-null SBAs (5 bend/seam are null) + stretch colors * 3
+    // 9 fixed non-null SBAs (3 bend are null) + stretch colors * 3;
+    // empty seamColors contributes nothing.
     const expected = 9 + buffers.stretchColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
   });

@@ -138,6 +138,8 @@ import { StorageBufferAttribute } from 'three/webgpu';
 function makeMockBufferSet(options?: {
   numBend?: number;
   numSeam?: number;
+  /** Per-color seam constraint counts — overrides numSeam's single group */
+  seamColorCounts?: number[];
   numStretchColors?: number;
 }): TslBufferSet {
   const numParticles = 4;
@@ -172,13 +174,14 @@ function makeMockBufferSet(options?: {
     bendComplianceSBA = new StorageBufferAttribute(new Float32Array(numBend), 1);
   }
 
-  // Seam
-  let seamIdsSBA: StorageBufferAttribute | null = null;
-  let seamTargetDistSBA: StorageBufferAttribute | null = null;
-  if (numSeam > 0) {
-    seamIdsSBA = new StorageBufferAttribute(new Uint32Array(numSeam * 2), 2);
-    seamTargetDistSBA = new StorageBufferAttribute(new Float32Array(numSeam), 1);
-  }
+  // Seam (per-color groups — #897 F1.3)
+  const seamColorCounts = options?.seamColorCounts ?? (numSeam > 0 ? [numSeam] : []);
+  const seamColors = seamColorCounts.map((count) => ({
+    idsSBA: new StorageBufferAttribute(new Uint32Array(count * 2), 2),
+    targetDistSBA: new StorageBufferAttribute(new Float32Array(count), 1),
+    complianceSBA: new StorageBufferAttribute(new Float32Array(count), 1),
+    count,
+  }));
 
   const triangles = new Uint32Array([0, 1, 2, 0, 2, 3]);
 
@@ -192,9 +195,8 @@ function makeMockBufferSet(options?: {
     bendRestSBA,
     bendComplianceSBA,
     numBendConstraints: numBend,
-    seamIdsSBA,
-    seamTargetDistSBA,
-    numSeamConstraints: numSeam,
+    seamColors,
+    numSeamConstraints: seamColorCounts.reduce((a, b) => a + b, 0),
     triangles,
     normalSBA: new StorageBufferAttribute(new Float32Array(numParticles * 3), 3),
     normalAccumSBA: new StorageBufferAttribute(new Int32Array(numParticles * 3), 1),
@@ -287,19 +289,19 @@ describe('createTslSolver', () => {
     expect(solver.bend).toBeNull();
   });
 
-  it('returns seam compute node when constraints exist', () => {
+  it('returns per-color seam compute nodes when constraints exist', () => {
     const buffers = makeMockBufferSet({ numSeam: 3 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    expect(solver.seam).not.toBeNull();
-    expect(solver.seam).toHaveProperty('__tslCompute', true);
+    expect(solver.seamColors).toHaveLength(1);
+    expect(solver.seamColors[0]).toHaveProperty('__tslCompute', true);
   });
 
-  it('returns null seam when no constraints', () => {
+  it('returns empty seamColors when no constraints', () => {
     const buffers = makeMockBufferSet({ numSeam: 0 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    expect(solver.seam).toBeNull();
+    expect(solver.seamColors).toEqual([]);
   });
 
   it('exposes positionSBA from buffers', () => {
@@ -381,11 +383,21 @@ describe('createTslSolver', () => {
     expect(solver.bend).toHaveProperty('dispatchCount', 5);
   });
 
-  it('seam dispatch count matches seam constraint count', () => {
+  it('seam dispatch count matches seam constraint count (single group)', () => {
     const buffers = makeMockBufferSet({ numSeam: 7 });
     const solver = createTslSolver(buffers, { ...defaultConfig });
 
-    expect(solver.seam).toHaveProperty('dispatchCount', 7);
+    expect(solver.seamColors).toHaveLength(1);
+    expect(solver.seamColors[0]).toHaveProperty('dispatchCount', 7);
+  });
+
+  it('seam dispatch count matches per-color constraint count', () => {
+    const buffers = makeMockBufferSet({ seamColorCounts: [4, 3] });
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.seamColors).toHaveLength(2);
+    expect(solver.seamColors[0]).toHaveProperty('dispatchCount', 4);
+    expect(solver.seamColors[1]).toHaveProperty('dispatchCount', 3);
   });
 
   it('returns normalZero compute node with dispatch count matching numParticles', () => {
