@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so MockSBA + setAtomicCalls are
 // available to both mocks. `setAtomicCalls` is exposed for the atomic
 // regression guards on the per-body scratch buffers.
-const { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCalls } = vi.hoisted(() => {
+const { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCalls, storageCalls, breakCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
   // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
   // WGSL spec requires atomicLoad on every read of an array<atomic<T>>
@@ -16,6 +16,12 @@ const { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCa
   const selectCalls: Array<unknown[]> = [];
   const intCalls: Array<unknown> = [];
   const floatCalls: Array<unknown> = [];
+  // `storageCalls` / `breakCalls` are exposed for the #897 F4.3b threaded-
+  // traversal pins: the skip (escape-pointer) buffer must be wired as a
+  // 'uint' storage node, and the bounded Loop must carry a Break() guard for
+  // the cursor walk-off.
+  const storageCalls: Array<unknown[]> = [];
+  const breakCalls: Array<unknown> = [];
   const MockSBA = class MockSBA {
     array: ArrayLike<number>;
     itemSize: number;
@@ -24,7 +30,7 @@ const { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCa
       this.itemSize = itemSize;
     }
   };
-  return { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCalls };
+  return { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCalls, storageCalls, breakCalls };
 });
 
 vi.mock('three/webgpu', () => ({
@@ -59,6 +65,7 @@ vi.mock('three/tsl', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Fn: (cb?: (...args: any[]) => any) => () => { tryInvoke(cb); return proxy; },
     storage: (...args: unknown[]) => {
+      storageCalls.push(args);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const node: any = new Proxy(function () {}, {
         get(_target, prop) {
@@ -97,6 +104,7 @@ vi.mock('three/tsl', () => {
     },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: proxy }); return proxy; },
+    Break: () => { breakCalls.push(true); return proxy; },
     atomicAdd: () => proxy,
     atomicStore: () => proxy,
     atomicLoad: (dest: unknown) => {
@@ -125,11 +133,15 @@ function buildKernel(opts?: {
   selectCalls.length = 0;
   intCalls.length = 0;
   floatCalls.length = 0;
+  storageCalls.length = 0;
+  breakCalls.length = 0;
   const numParticles = opts?.numParticles ?? 16;
   const numNodes = opts?.numNodes ?? 4;
   const numTris = opts?.numTris ?? 2;
 
   const bvhNodesSBA = new StorageBufferAttribute(new Float32Array(numNodes * 8), 1);
+  // Escape pointers for the threaded traversal (#897 F4.3b) — Uint32, one per node.
+  const bvhSkipSBA = new StorageBufferAttribute(new Uint32Array(numNodes), 1);
   const triVertsSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
   const triNormalsSBA = new StorageBufferAttribute(new Float32Array(numTris * 3), 1);
 
@@ -148,6 +160,7 @@ function buildKernel(opts?: {
     mockNode,
     mockNode,
     bvhNodesSBA,
+    bvhSkipSBA,
     triVertsSBA,
     triNormalsSBA,
     numParticles,
@@ -360,5 +373,36 @@ describe('findBest NaN guard + i32 clamp (#897 F2, §9 cand. 5-6)', () => {
   it('clamps distance to 2.0 m before the ×1e6 scale at both sites (i32 overflow)', () => {
     buildKernel();
     expect(floatCalls.filter((v) => v === 2.0).length).toBe(2);
+  });
+});
+
+// ─── #897 F4.3b: threaded BVH traversal structural pins ─────────────────────
+// The findBest pass replaces the flat Loop(numNodes) scan (93% of the María
+// frame: 29,338 particles × 11,955 nodes × 15 substeps ≈ 5.3B AABB tests) with
+// an escape-pointer traversal that visits O(hit path) nodes. Structural pins
+// only — the mock cannot execute WGSL. The CPU-side traversal SEMANTICS (skip
+// array + cursor walk == flat-scan triangle set) are pinned for real in
+// bvh.test.ts; GPU behavior is F4 browser verification. The F2 pins above
+// double as leaf-code-intact guards: the per-triangle inner block (barycentric
+// + edge fallback + NaN guard + atomicMin) must survive the mechanism swap.
+
+describe('findBest threaded BVH traversal (#897 F4.3b)', () => {
+  it('wires the skip buffer as a uint storage node sized numNodes', () => {
+    buildKernel({ numNodes: 7 });
+    const skipCall = storageCalls.find(
+      (args) => (args[0] as { array?: unknown } | undefined)?.array instanceof Uint32Array,
+    );
+    expect(skipCall).toBeDefined();
+    expect(skipCall![1]).toBe('uint');
+    expect(skipCall![2]).toBe(7);
+  });
+
+  it('emits a Break() walk-off guard inside the bounded traversal Loop', () => {
+    // The Loop bound stays numNodes (each node is visited at most once — the
+    // cursor strictly increases), so termination does not depend on skip-array
+    // integrity; the Break fires when the cursor reaches the root's escape
+    // sentinel (numNodes).
+    buildKernel();
+    expect(breakCalls.length).toBeGreaterThanOrEqual(1);
   });
 });

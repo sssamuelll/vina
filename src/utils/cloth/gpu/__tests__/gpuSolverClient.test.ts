@@ -99,6 +99,7 @@ const { sharedMock, setAtomicCalls, uniformCalls } = vi.hoisted(() => {
     vec3: () => createChainProxy(),
     instanceIndex: createChainProxy(),
     Loop: () => createChainProxy(),
+    Break: () => createChainProxy(),
     If: () => createChainProxy(),
     atomicStore: () => createChainProxy(),
     atomicAdd: () => createChainProxy(),
@@ -616,6 +617,58 @@ describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', 
 
     expect(renderer._attributes.delete).toHaveBeenCalledWith(bestDist);
     expect(renderer._attributes.delete).toHaveBeenCalledWith(bestTriIdx);
+  });
+
+  // #897 F4.3b: setTslCollisionBody now allocates a 4th BVH SBA — the
+  // escape-pointer (skip) buffer for the threaded findBest traversal. It must
+  // ride the same per-body dispose chain as nodes/triVerts/triNormals (#753):
+  // replace-by-id, removeTslCollisionBody, and disposeTslResources.
+
+  it('tracks the skip SBA (escape pointers, #897 F4.3b) and disposes it on replace', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const renderer = new FakeRenderer();
+    await client.readbackPositionsToGeometry(
+      renderer as unknown as Parameters<typeof client.readbackPositionsToGeometry>[0],
+      makeMockGeometry(),
+    );
+
+    client.setTslCollisionBody('avatar', makeTriCollisionMesh());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tracked = (client as any).collisionBodySBAs.get('avatar');
+    expect(tracked.bvhSkipSBA).toBeDefined();
+    expect((tracked.bvhSkipSBA as TestSBA).array).toBeInstanceOf(Uint32Array);
+    // One escape pointer per BVH node.
+    expect((tracked.bvhSkipSBA as TestSBA).array.length).toBe(
+      (tracked.bvhNodesSBA as TestSBA).array.length / 8,
+    );
+
+    client.setTslCollisionBody('avatar', makeTriCollisionMesh());
+    expect(renderer._attributes.delete).toHaveBeenCalledWith(tracked.bvhSkipSBA);
+  });
+
+  it('removeTslCollisionBody also disposes the skip SBA (#897 F4.3b)', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const renderer = new FakeRenderer();
+    await client.readbackPositionsToGeometry(
+      renderer as unknown as Parameters<typeof client.readbackPositionsToGeometry>[0],
+      makeMockGeometry(),
+    );
+
+    client.setTslCollisionBody('prop', makeTriCollisionMesh());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tracked = (client as any).collisionBodySBAs.get('prop');
+    expect(tracked.bvhSkipSBA).toBeDefined();
+
+    client.removeTslCollisionBody('prop');
+    expect(renderer._attributes.delete).toHaveBeenCalledWith(tracked.bvhSkipSBA);
   });
 });
 

@@ -10,14 +10,21 @@
  * (a prior toVar-based attempt produced ~200 WGSL validation warnings; the
  * atomic-emulation pattern below was the recommended fix).
  *
- * Pass 1 — `findBestNode`: per particle, scan BVH leaves (flat iteration —
- *   no parent/child descent), for each leaf-matched triangle compute
- *   closest-point distance with edge fallback. Issue
- *   `atomicMin` against `bestDistBuf[i]` (fixed-point i32 distance scaled by
- *   1e6); when this thread's value won the min, `atomicStore` the triangle
- *   index into `bestTriIdxBuf[i]`. Distance is computed via two branches
- *   (inside-projection vs. edge-min); only the chosen branch issues an
- *   atomicMin, so the per-triangle work is O(1) atomics.
+ * Pass 1 — `findBestNode`: per particle, threaded BVH traversal via escape
+ *   (skip) pointers (#897 F4.3b — the previous flat Loop over ALL nodes was
+ *   93% of the frame on the María fixture: 29,338 particles × 11,955 avatar
+ *   nodes × 15 substeps ≈ 5.3B AABB tests/frame). The cursor starts at the
+ *   root; AABB hit on an internal node descends into the left child (slot 6,
+ *   preorder = parent+1); AABB miss — or a processed leaf — jumps to
+ *   `skip[i]`, the first preorder node outside i's subtree (see bvh.ts). For
+ *   each leaf-matched triangle compute closest-point distance with edge
+ *   fallback. Issue `atomicMin` against `bestDistBuf[i]` (fixed-point i32
+ *   distance scaled by 1e6); when this thread's value won the min,
+ *   `atomicStore` the triangle index into `bestTriIdxBuf[i]`. Distance is
+ *   computed via two branches (inside-projection vs. edge-min); only the
+ *   chosen branch issues an atomicMin, so the per-triangle work is O(1)
+ *   atomics. Parent AABBs contain child AABBs, so gating descent on the same
+ *   margin-expanded test reaches exactly the leaves the flat scan matched.
  *
  * Pass 2 — `applyPushNode`: per particle, `atomicLoad bestTriIdx` at function
  *   top (avoids the nested-If pitfall). When a triangle was found, re-read its
@@ -38,8 +45,11 @@
  *
  * BVH node format (8 floats per node, stored in a flat StorageBufferAttribute):
  *   [minX, minY, minZ, maxX, maxY, maxZ, child/triStart, triCount]
- *   Internal node: triCount=0, child=leftChildIndex (right=left+1)
+ *   Internal node: triCount=0, child=leftChildIndex (== parent+1, preorder;
+ *     the right child is found implicitly via skip[leftChildIndex])
  *   Leaf node: triCount>0, child=triStart (index into triVerts)
+ *   Skip buffer (1 uint per node): escape pointer — first preorder node
+ *     outside node i's subtree; root escapes to numNodes (terminate sentinel)
  *
  * Triangle format (9 floats per triangle): [v0x,v0y,v0z, v1x,v1y,v1z, v2x,v2y,v2z]
  * Normal format (3 floats per triangle): [nx,ny,nz]
@@ -54,6 +64,7 @@
 
 import { StorageBufferAttribute } from 'three/webgpu';
 import {
+  Break,
   Fn,
   If,
   Loop,
@@ -80,7 +91,7 @@ type TslNode = any;
 
 export interface TslCollisionBody {
   id: string;
-  /** Pass 1: per-particle scan of BVH leaves, atomic min on distance, atomic store on tri idx. */
+  /** Pass 1: per-particle threaded BVH traversal (escape pointers), atomic min on distance, atomic store on tri idx. */
   findBestNode: ComputeNode;
   /** Pass 2: per-particle apply push using atomic load on best tri idx, then reset scratch. */
   applyPushNode: ComputeNode;
@@ -95,8 +106,9 @@ export interface TslCollisionBody {
    * GPUBuffer is freed when the renderer's `_attributes` WeakMap entry is
    * cleared, which requires the renderer reference to route through.
    *
-   * The BVH input SBAs (`bvhNodesSBA`, `triVertsSBA`, `triNormalsSBA`) are
-   * NOT freed here — they're caller-owned (see `GpuSolverClient.collisionBodySBAs`).
+   * The BVH input SBAs (`bvhNodesSBA`, `bvhSkipSBA`, `triVertsSBA`,
+   * `triNormalsSBA`) are NOT freed here — they're caller-owned (see
+   * `GpuSolverClient.collisionBodySBAs`).
    */
   dispose(renderer?: unknown): void;
 }
@@ -134,6 +146,7 @@ const INT32_MAX = 0x7FFFFFFF;
  * @param prevPosBuf - Previous positions (read-only, for friction computation)
  * @param invMassBuf - Inverse mass per particle (read-only, 0 = pinned)
  * @param bvhNodesSBA - Linearized BVH nodes (8 floats per node)
+ * @param bvhSkipSBA - Escape pointers (1 uint per node) for threaded traversal (#897 F4.3b)
  * @param triVertsSBA - Expanded triangle vertices (9 floats per tri)
  * @param triNormalsSBA - Face normals (3 floats per tri)
  * @param numParticles - Number of cloth particles (dispatch count)
@@ -148,6 +161,7 @@ export function createTslCollisionBody(
   prevPosBuf: TslNode,
   invMassBuf: TslNode,
   bvhNodesSBA: StorageBufferAttribute,
+  bvhSkipSBA: StorageBufferAttribute,
   triVertsSBA: StorageBufferAttribute,
   triNormalsSBA: StorageBufferAttribute,
   numParticles: number,
@@ -167,6 +181,9 @@ export function createTslCollisionBody(
 
   // Wrap input SBAs as storage nodes (flat float access — itemSize=1, no vec4 padding).
   const bvhBuf = storage(bvhNodesSBA, 'float', numNodes * 8);
+  // Escape pointers (#897 F4.3b): skipBuf[i] = first preorder node outside
+  // node i's subtree; root escapes to numNodes (terminate sentinel).
+  const skipBuf = storage(bvhSkipSBA, 'uint', numNodes);
   const triVertBuf = storage(triVertsSBA, 'float', numTris * 9);
   const triNormBuf = storage(triNormalsSBA, 'float', numTris * 3);
 
@@ -192,9 +209,11 @@ export function createTslCollisionBody(
   const uAabbMargin = uniform(Math.max(margin, 0.1));
 
   // ─── Pass 1: findBestNode ───────────────────────────────────────────────
-  // Per particle: scan BVH leaves (flat Loop over all nodes; internal nodes
-  // skipped by `triCount > 0` filter). For each candidate triangle compute
-  // distance, atomicMin on bestDistBuf[i], atomicStore triIdx if won.
+  // Per particle: threaded BVH traversal via escape pointers (#897 F4.3b).
+  // Internal-node AABB hit → descend (left child, slot 6); miss or processed
+  // leaf → jump to skipBuf[node] (past the subtree). For each candidate
+  // triangle compute distance, atomicMin on bestDistBuf[i], atomicStore
+  // triIdx if won.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const findBestFn = (Fn as any)(() => {
     const i = instanceIndex;
@@ -207,9 +226,25 @@ export function createTslCollisionBody(
 
       // NaN guard: NaN != NaN.
       If(px.equal(px), () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        Loop(numNodes, ({ i: nodeIdx }: { i: any }) => {
-          const nodeBase = uint(nodeIdx).mul(uint(8));
+        // Threaded traversal cursor (#897 F4.3b): every step strictly
+        // increases it — descend goes to nodeIdx+1 (preorder left child),
+        // miss/leaf jumps past the subtree (skip > nodeIdx) — so each node is
+        // visited at most once and Loop(numNodes) is a hard bound, not the
+        // visit count. Termination therefore does NOT depend on skip-array
+        // integrity. Replaces the flat scan over ALL nodes that profiled at
+        // 93% of the frame on the María fixture (29,338 particles × 11,955
+        // avatar nodes × 15 substeps ≈ 5.3B AABB tests/frame).
+        const nodeIdx = uint(0).toVar('nodeIdx');
+        Loop(numNodes, () => {
+          // Cursor walked off the tree (root escape sentinel = numNodes).
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          If((nodeIdx as any).greaterThanEqual(uint(numNodes)), () => { Break(); });
+
+          // Snapshot the slot base BEFORE the cursor is reassigned below —
+          // TSL inlines operator nodes at each use site, so a bare
+          // `nodeIdx.mul(8)` read after `nodeIdx.assign(...)` would address
+          // the NEXT node's slots.
+          const nodeBase = nodeIdx.mul(uint(8)).toVar('nodeBase');
           const nMinX = bvhBuf.element(nodeBase);
           const nMinY = bvhBuf.element(nodeBase.add(uint(1)));
           const nMinZ = bvhBuf.element(nodeBase.add(uint(2)));
@@ -218,17 +253,25 @@ export function createTslCollisionBody(
           const nMaxZ = bvhBuf.element(nodeBase.add(uint(5)));
           const triCount = bvhBuf.element(nodeBase.add(uint(7)));
 
-          If(triCount.greaterThan(float(0)), () => {
-            // AABB overlap test (point ± uAabbMargin vs leaf AABB).
-            // See uAabbMargin definition above for the calibration rationale.
-            If(
-              px.add(uAabbMargin).greaterThanEqual(nMinX)
-                .and(px.sub(uAabbMargin).lessThanEqual(nMaxX))
-                .and(py.add(uAabbMargin).greaterThanEqual(nMinY))
-                .and(py.sub(uAabbMargin).lessThanEqual(nMaxY))
-                .and(pz.add(uAabbMargin).greaterThanEqual(nMinZ))
-                .and(pz.sub(uAabbMargin).lessThanEqual(nMaxZ)),
-              () => {
+          // AABB overlap test (point ± uAabbMargin vs node AABB) — the same
+          // test the flat scan applied to leaves, now also gating descent.
+          // Parent AABBs contain child AABBs, so the margin-expanded test
+          // reaches exactly the leaves the flat scan matched (wider margin →
+          // more subtree visits, same hits). See uAabbMargin definition above
+          // for the calibration rationale.
+          If(
+            px.add(uAabbMargin).greaterThanEqual(nMinX)
+              .and(px.sub(uAabbMargin).lessThanEqual(nMaxX))
+              .and(py.add(uAabbMargin).greaterThanEqual(nMinY))
+              .and(py.sub(uAabbMargin).lessThanEqual(nMaxY))
+              .and(pz.add(uAabbMargin).greaterThanEqual(nMinZ))
+              .and(pz.sub(uAabbMargin).lessThanEqual(nMaxZ)),
+            () => {
+              If(triCount.greaterThan(float(0)), () => {
+                // Leaf — per-triangle processing below is byte-identical to
+                // the pre-F4.3b flat scan (barycentric + edge fallback + F2
+                // NaN guard/clamp + atomicMin); only the node-iteration
+                // mechanism changed.
                 const triStart = bvhBuf.element(nodeBase.add(uint(6)));
                 const count = int(triCount);
 
@@ -372,8 +415,17 @@ export function createTslCollisionBody(
                     });
                   });
                 });
-              },
-            );
+
+                // Leaf processed → escape past this subtree.
+                nodeIdx.assign(skipBuf.element(nodeIdx));
+              }).Else(() => {
+                // Internal hit → descend into the left child (slot 6 == nodeIdx+1, preorder).
+                nodeIdx.assign(uint(bvhBuf.element(nodeBase.add(uint(6)))));
+              });
+            },
+          ).Else(() => {
+            // Miss → skip the whole subtree.
+            nodeIdx.assign(skipBuf.element(nodeIdx));
           });
         });
       });

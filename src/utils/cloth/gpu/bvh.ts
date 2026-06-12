@@ -10,7 +10,17 @@
  *   Leaf:     [minX, minY, minZ, maxX, maxY, maxZ, triStart, triCount]
  *
  * Internal nodes: triCount=0, leftChildIndex points to left child.
- * Right child is always leftChildIndex + 1 (DFS layout guarantee).
+ * Layout is preorder DFS: leftChildIndex === parent + 1 always; the right
+ * child is leftChildIndex + (left subtree size) — NOT leftChildIndex + 1
+ * (that older claim was false whenever the left child is internal).
+ *
+ * Alongside the nodes, a `skip` (escape) array threads the tree for stackless
+ * GPU traversal (#897 F4.3b): `skip[i]` = first preorder index OUTSIDE node
+ * i's subtree, i.e. where to jump on an AABB miss or after processing a leaf.
+ * `skip[i] = i + subtreeSize(i)`; the root escapes to `nodeCount` (terminate
+ * sentinel). Because preorder puts the right child immediately after the left
+ * subtree, `skip[leftChild]` IS the right child's index — descent needs no
+ * explicit right-child pointer.
  *
  * @module bvh
  */
@@ -28,6 +38,12 @@ export interface LinearBVH {
   triVerts: Float32Array;
   /** 3 floats per triangle: [nx,ny,nz] — reordered to match triVerts */
   triNormals: Float32Array;
+  /**
+   * Escape pointer per node: first preorder index outside node i's subtree
+   * (= i + subtreeSize(i)); root escapes to nodeCount (terminate sentinel).
+   * GPU traversal jumps here on AABB miss or after processing a leaf (#897 F4.3b).
+   */
+  skip: Uint32Array;
   nodeCount: number;
   triCount: number;
 }
@@ -59,6 +75,7 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
       nodes: new Float32Array(0),
       triVerts: new Float32Array(0),
       triNormals: new Float32Array(0),
+      skip: new Uint32Array(0),
       nodeCount: 0,
       triCount: 0,
     };
@@ -128,6 +145,8 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
   countNodes(0);
 
   const outNodes = new Float32Array(nodeCount * 8);
+  // Escape pointers for stackless GPU traversal — see module header (#897 F4.3b).
+  const outSkip = new Uint32Array(nodeCount);
   // triOrder collects original triangle indices in BVH leaf traversal order
   const triOrder: number[] = [];
   let outIdx = 0;
@@ -172,11 +191,16 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
       const rightN32 = n32 + relativeRight * UINT32_PER_NODE;
 
       const leftChildIdx = linearize(leftN32);
-      outNodes[base + 6] = leftChildIdx;   // left child index (right = left + 1)
+      outNodes[base + 6] = leftChildIdx;   // left child index (== myIdx + 1, preorder)
       outNodes[base + 7] = 0;              // triCount=0 marks internal node
 
       linearize(rightN32);
     }
+
+    // Both children (if any) are linearized at this point, so outIdx is the
+    // first preorder index past this node's subtree — exactly the escape
+    // target: skip[i] = i + subtreeSize(i). Root gets nodeCount (sentinel).
+    outSkip[myIdx] = outIdx;
 
     return myIdx;
   }
@@ -203,6 +227,7 @@ export function buildLinearBVH(mesh: CollisionMeshData): LinearBVH {
     nodes: outNodes,
     triVerts: outTriVerts,
     triNormals: outTriNormals,
+    skip: outSkip,
     nodeCount,
     triCount: mesh.triCount,
   };

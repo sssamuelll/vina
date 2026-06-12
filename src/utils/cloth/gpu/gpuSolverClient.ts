@@ -109,11 +109,17 @@ export class GpuSolverClient implements ClothSolverClient {
   /**
    * Tracks BVH SBAs per collision body id so `setTslCollisionBody` can free
    * the previous allocation when called again for the same id (avatar pose
-   * updates re-allocate 3 SBAs each call, see #753).
+   * updates re-allocate 4 SBAs each call, see #753; the 4th — escape
+   * pointers for the threaded traversal — joined in #897 F4.3b).
    */
   private collisionBodySBAs: Map<
     string,
-    { bvhNodesSBA: StorageBufferAttribute; triVertsSBA: StorageBufferAttribute; triNormalsSBA: StorageBufferAttribute }
+    {
+      bvhNodesSBA: StorageBufferAttribute;
+      bvhSkipSBA: StorageBufferAttribute;
+      triVertsSBA: StorageBufferAttribute;
+      triNormalsSBA: StorageBufferAttribute;
+    }
   > = new Map();
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
@@ -860,20 +866,22 @@ export class GpuSolverClient implements ClothSolverClient {
     }
 
     // Re-allocation cleanup: avatar pose updates call this method repeatedly
-    // for the same body id. Without this, each call leaks 3 SBAs worth of
-    // GPUBuffer (BVH nodes, tri verts, tri normals) — #753.
+    // for the same body id. Without this, each call leaks 4 SBAs worth of
+    // GPUBuffer (BVH nodes, skip pointers, tri verts, tri normals) — #753.
     const previous = this.collisionBodySBAs.get(id);
     if (previous) {
       disposeStorageBufferAttribute(previous.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triNormalsSBA, this.rendererRef);
     }
 
     // Create StorageBufferAttributes for GPU upload
     const bvhNodesSBA = createSBA(bvh.nodes, 1);
+    const bvhSkipSBA = createSBA(bvh.skip, 1);
     const triVertsSBA = createSBA(bvh.triVerts, 1);
     const triNormalsSBA = createSBA(bvh.triNormals, 1);
-    this.collisionBodySBAs.set(id, { bvhNodesSBA, triVertsSBA, triNormalsSBA });
+    this.collisionBodySBAs.set(id, { bvhNodesSBA, bvhSkipSBA, triVertsSBA, triNormalsSBA });
 
     // Use shared buffer nodes from the solver
     const N = this.tslSolver.numParticles;
@@ -886,6 +894,7 @@ export class GpuSolverClient implements ClothSolverClient {
       prevPosBuf,
       invMassBuf,
       bvhNodesSBA,
+      bvhSkipSBA,
       triVertsSBA,
       triNormalsSBA,
       N,
@@ -914,6 +923,7 @@ export class GpuSolverClient implements ClothSolverClient {
     const tracked = this.collisionBodySBAs.get(id);
     if (tracked) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
       this.collisionBodySBAs.delete(id);
@@ -928,6 +938,7 @@ export class GpuSolverClient implements ClothSolverClient {
   private disposeTslResources(): void {
     for (const tracked of this.collisionBodySBAs.values()) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
     }
