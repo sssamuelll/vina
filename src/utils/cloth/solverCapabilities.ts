@@ -186,20 +186,39 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
 export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   selfCollision: false,
   /**
-   * GPU body collision — atomic-emulation kernel lands; calibration gap
-   * remains. The 2-pass TSL kernel (`findBestNode` + `applyPushNode` in
-   * `tslCollision.ts`) compiles cleanly with zero WebGPU validation errors
-   * and the expected `array<atomic<i32>>` bindings. Current runtime state on
-   * the T-Shirt + body-avatar drape scenario: cloth settles at the knees
-   * (~y=0.3-0.4m), roughly 30cm below the WASM tier baseline at the waist
-   * (~y=0.5-0.7m). Widening the AABB filter to 100mm lifted cloth from the
-   * floor up to the knee but did not close the residual divergence. The
-   * capability stays `false` until the drape gap closes. See `@see` for
-   * candidate root causes + recommended diagnostic moves.
+   * GPU body collision — verified at WASM parity (#897 F2, 2026-06-12).
+   * The historical 30cm gap (cloth settled at the knees ~y=0.3-0.4m vs
+   * WASM at the waist) was four verified GPU↔WASM divergences, closed in
+   * F2.1-F2.5:
+   *
+   * 1. M4-D avatar calibration applied on BOTH GPU routes (friction 0.4,
+   *    margin 8mm) — GPU was running pre-M4-D constants (`8c6ff0d2`).
+   * 2. Damping double-application — the internal 0.99 factor was applied
+   *    twice per substep, depressing momentum vs WASM (`08b62801`).
+   * 3. Velocity derivation included the collision push — pre-collision
+   *    position snapshot + inelastic response + position NaN-check,
+   *    mirroring `wasmSolverWorker` semantics (`284f3a5d`).
+   * 4. NaN guard + i32 clamp in `findBest` (design doc § 9 candidates
+   *    5-6, `ceaaf554`).
+   *
+   * Measured on the REAL María pattern (maria_patrones_samuel_2M.dxf,
+   * auto-sew, real browser, GPU tier), M4 drape thresholds:
+   *
+   *   [f2-verify] tier=webgpu bodyCollision=true particles=29338
+   *   constraints=402 nan=0 belowHipPct=0.1295 minY=0.7916 maxY=1.5834
+   *   meanAbsZ=0.0890 frameMs=207.1000
+   *
+   * (Acceptance: nan=0, belowHipPct<5, minY>0.5 hem at hip, maxY>1.3
+   * shoulders up — all pass; hem at ~0.79 vs WASM baseline 0.88.)
+   *
+   * NOTE: this flag is documentary — the tier cascade in
+   * `useSimulationLifecycle` gates only on `seams`; nothing gates on
+   * `bodyCollision`. Consumers read it for honest capability declaration
+   * (A7/C4 doctrine), not for tier selection.
    *
    * @see docs/reports/2026-05-04-733-gpu-body-collision-design.md § 9
    */
-  bodyCollision: false,
+  bodyCollision: true,
   lra: false,
   pressure: false,
   fold: false,
