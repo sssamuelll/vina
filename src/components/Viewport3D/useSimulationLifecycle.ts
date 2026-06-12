@@ -97,6 +97,8 @@ import { ClothWorkerClient } from '../../utils/cloth/clothWorkerClient';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
 import { seamInitDataToPairs, summarizeSeamResolution } from '../../utils/cloth/seamPairs';
 import { isWebGPUAvailable, WEBGPU_FEATURE_FLAG_KEY } from '../../utils/cloth/gpu/webgpuDetect';
+import { SIMULATION_MODES } from '../../utils/cloth/gpu/qualityPresets';
+import { mapClothSimConfigToWasmSolverConfig } from '../../utils/cloth/configBridge';
 import { cmToM } from '../../utils/geometry';
 import { GpuSolverClient } from '../../utils/cloth/gpu/gpuSolverClient';
 import { WasmSolverClient, isWasmSolverAvailable } from '../../utils/cloth/wasm/wasmSolverClient';
@@ -266,6 +268,7 @@ export function useSimulationLifecycle({
   const windEnabled = useSelector((s: RootState) => s.simulation.windEnabled);
   const dragCoefficient = useSelector((s: RootState) => s.simulation.dragCoefficient);
   const frozenPieceIds = useSelector((s: RootState) => s.simulation.frozenPieceIds);
+  const simulationMode = useSelector((s: RootState) => s.simulation.simulationMode);
 
   const positionsRef = useRef<Float32Array | null>(null);
   const edgeDataRef = useRef<SolverEdgeData | null>(null);
@@ -285,6 +288,15 @@ export function useSimulationLifecycle({
   avatarHeightRef.current = avatarHeight;
   const elasticsRef = useRef(elastics);
   elasticsRef.current = elastics;
+  // Quality preset at init (M4-D): the mode-sync effect in GarmentSimulation
+  // is NOT guaranteed to deliver after async init (no Redux selector it
+  // subscribes to changes when init completes), so the worker otherwise
+  // runs on its OWN defaults — substeps 15 instead of the preset's 5, and
+  // selfCollision at whatever the default says. The init call passes the
+  // preset explicitly; mode CHANGES during a run still flow via the sync
+  // effect. Ref (not dep) so switching mode doesn't reinit the solver.
+  const simulationModeRef = useRef(simulationMode);
+  simulationModeRef.current = simulationMode;
 
   const clientRef = useRef<ClothWorkerClient | null>(null);
   const gpuClientRef = useRef<GpuSolverClient | null>(null);
@@ -452,7 +464,19 @@ export function useSimulationLifecycle({
                 edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
                 stretchingIdsRef.current = ids;
               };
-              await withTimeout(wasmClient.initMultiPiece(placedMeshes, seamInitData), 12000, 'Wasm solver init');
+              // Preset config at init (M4-D — see simulationModeRef note).
+              const wasmMode = SIMULATION_MODES[simulationModeRef.current];
+              await withTimeout(
+                wasmClient.initMultiPiece(
+                  placedMeshes,
+                  seamInitData,
+                  mapClothSimConfigToWasmSolverConfig({
+                    numSubsteps: wasmMode.substeps,
+                    selfCollision: wasmMode.selfCollision,
+                  }),
+                ),
+                12000, 'Wasm solver init',
+              );
               wasmClient.requestEdgeData();
 
               // Load collision BEFORE starting (prevents explosion)
@@ -490,7 +514,15 @@ export function useSimulationLifecycle({
               edgeDataRef.current = { stretchingIds: ids, stretchingLengths: lengths };
               stretchingIdsRef.current = ids;
             };
-            await withTimeout(client.initMultiPiece(placedMeshes, seamInitData), 15000, 'CPU worker init');
+            // Preset config at init (M4-D — see simulationModeRef note).
+            const cpuMode = SIMULATION_MODES[simulationModeRef.current];
+            await withTimeout(
+              client.initMultiPiece(placedMeshes, seamInitData, {
+                numSubsteps: cpuMode.substeps,
+                selfCollision: cpuMode.selfCollision,
+              }),
+              15000, 'CPU worker init',
+            );
             client.setFabric(fabricId);
             client.requestEdgeData();
 

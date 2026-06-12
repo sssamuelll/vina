@@ -358,7 +358,14 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     // CPU + WASM via shared CPU shape + bridge translation (A2 § 3.2.B).
     // Narrowed to shared subset so the helper rejects CPU-only fields at
     // compile time (#696, A2 § 8 #3 closure).
-    const sharedConfig: Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>> = { numSubsteps: mode.substeps };
+    // selfCollision (M4-D): the preset's flag finally reaches the solvers —
+    // before, this object only carried substeps and the mode's
+    // selfCollision promise (e.g. 'complete': true) was silently dropped,
+    // so the runtime flag could never change from its default.
+    const sharedConfig: Partial<Pick<ClothSimConfig, SharedClothSimConfigKeys>> = {
+      numSubsteps: mode.substeps,
+      selfCollision: mode.selfCollision,
+    };
     clients.cpu?.setConfig(sharedConfig);
     clients.wasm?.setConfig(mapClothSimConfigToWasmSolverConfig(sharedConfig));
   }, [simulationMode, tslSolverRef, clients]);

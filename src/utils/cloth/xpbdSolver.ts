@@ -756,7 +756,9 @@ export class XPBDClothSolver {
         id: '__avatar__',
         mesh,
         hash: new TriangleSpatialHash(mesh, cellSize),
-        friction: 0,
+        // M4-D: 0.4 — tier parity with the WASM worker's avatar body
+        // (was 0 on both: frictionless cloth crept off the body).
+        friction: 0.4,
         margin: this.config.clothThickness ?? 0.005,
       }];
     } else {

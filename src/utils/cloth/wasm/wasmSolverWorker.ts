@@ -147,9 +147,17 @@ type AppliedSolverConfig = Required<WasmSolverConfig>;
  * CPU-only fields independent.
  *
  * Aligned 2026-05-02 (A2 closure): `bendCompliance: 1.0` matches CPU + per-
- * edge consensus. `selfCollision: false` is the canonical default-off on
- * both tiers; runtime opt-in via the config flag (port landed in #608 /
- * A7 § 3.1.1 — WASM tier now implements self-collision in `solve_self_collision`).
+ * edge consensus.
+ *
+ * `selfCollision: true` (M4-D, camisa de María): aligned with the CPU
+ * constructor default (`xpbdSolver.ts` selfCollision: true) — the previous
+ * `false` here claimed to be "the canonical default-off on both tiers",
+ * which was never true of the CPU tier, and it left multi-piece garments
+ * with ZERO cloth-cloth resistance on the tier that actually runs them
+ * (pieces interpenetrated freely while seams pulled). The kernel is the
+ * #608 port (`solve_self_collision`, particle-particle, adjacency CSR
+ * uploaded every init). Quality presets may still disable it per-mode via
+ * the runtime config flag.
  */
 const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   substeps: 15,
@@ -157,7 +165,7 @@ const DEFAULT_SOLVER_CONFIG: AppliedSolverConfig = {
   gravityY: -9.81,
   stretchCompliance: 0.0,
   bendCompliance: 1.0,
-  selfCollision: false,
+  selfCollision: true,
   thickness: 0.002,
   collisionMargin: 0.005,
   groundY: 0.0,
@@ -659,8 +667,15 @@ self.onmessage = async (event: MessageEvent) => {
             id: '__avatar__',
             mesh: msg.mesh,
             hash: new TriangleSpatialHash(msg.mesh, Math.max(0.02, currentConfig.thickness * 10)),
-            friction: 0,
-            margin: 0.005,
+            // M4-D: 0.4 (was 0 hardcoded — the friction kernel in
+            // triangleCollision.ts was dead code for the avatar, so cloth
+            // slid off the body frictionlessly: a draped shirt would keep
+            // creeping down. 0.4 ≈ cotton-on-skin; gives garments grip on
+            // shoulders without sticking artifacts.
+            friction: 0.4,
+            // 8mm (was 5): with the garment resting ON the chest, 5mm let
+            // skin patches z-fight through the cloth (M4-D visual).
+            margin: 0.008,
           });
           console.log('[WasmWorker] Collision mesh set (avatar):', msg.mesh.triCount, 'triangles');
         }

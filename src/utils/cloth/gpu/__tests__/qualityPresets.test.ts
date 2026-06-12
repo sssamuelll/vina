@@ -35,7 +35,9 @@ describe('SIMULATION_MODES', () => {
 describe('presetToSolverConfig', () => {
   it('maps normal to moderate substeps', () => {
     const cfg = presetToSolverConfig(SIMULATION_MODES.normal);
-    expect(cfg.substeps).toBe(5);
+    // 15 (M4-D): con 5 la colisión avatar-tela corre 3× más gruesa por
+    // paso y la prenda se escurre — ver comentario en qualityPresets.ts.
+    expect(cfg.substeps).toBe(15);
     expect(cfg.selfCollision).toBe(false);
   });
 
