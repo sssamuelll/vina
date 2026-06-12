@@ -80,7 +80,7 @@ vi.mock('../../../utils/import/meshImporter', () => ({
 
 import { useSimulationLifecycle, type PlacedMesh } from '../useSimulationLifecycle';
 import projectReducer from '../../../store/projectSlice';
-import simulationReducer from '../../../store/simulationSlice';
+import simulationReducer, { startSimulation, pauseSimulation } from '../../../store/simulationSlice';
 import avatarReducer from '../../../store/avatarSlice';
 import collisionBodyReducer from '../../../store/collisionBodySlice';
 import copilotUIReducer from '../../../store/copilotUISlice';
@@ -171,16 +171,21 @@ describe('useSimulationLifecycle — contabilidad de frame-time (F0 #897)', () =
 
     const positions = new Float32Array(3);
     act(() => {
-      for (let i = 0; i <= 30; i++) {
+      for (let i = 0; i <= 60; i++) {
         nowValue = 1000 + i * 100; // 100ms entre frames → media real 100
         onFrame(positions);
       }
     });
 
+    // 61 ticks = 2 ventanas completas → 2 dispatches. Ambos deben ser ≈100:
+    // el segundo pinea la RE-SIEMBRA de la ventana (windowStart = now tras
+    // cada dispatch). Sin re-siembra el segundo sería (7000-1000)/30 = 200
+    // (media acumulada, no de ventana). El código buggy original despachaba
+    // ~3.3 (delta de un frame / 30).
     const actions = frameTimeActions(dispatched);
-    expect(actions.length).toBeGreaterThan(0);
-    // El código buggy despacha ~3.3 (delta de un frame / 30).
-    expect(actions.at(-1)?.payload).toBeCloseTo(100, 0);
+    expect(actions).toHaveLength(2);
+    expect(actions[0]?.payload).toBeCloseTo(100, 0);
+    expect(actions[1]?.payload).toBeCloseTo(100, 0);
     expect(store.getState().simulation.frameTimeMs).toBeCloseTo(100, 0);
   });
 
@@ -203,5 +208,58 @@ describe('useSimulationLifecycle — contabilidad de frame-time (F0 #897)', () =
     expect(actions.length).toBeGreaterThan(0);
     expect(actions.at(-1)?.payload).toBeCloseTo(16.7, 1);
     expect(store.getState().simulation.frameTimeMs).toBeCloseTo(16.7, 1);
+  });
+
+  it('running→paused resets the window: the first resumed window is NOT polluted by the pause gap', async () => {
+    // El cleanup del branch 'running' (que corre en running→paused) debe
+    // resetear windowStartRef/frameCountRef. Si no lo hace, tras una pausa
+    // de 60s la primera ventana reanudada promedia el gap: con 10 ticks
+    // pre-pausa + 21 post-resume el dispatch sería (64000-1000)/30 = 2100,
+    // no 100. Se conduce la transición real running→paused→running vía el
+    // store (mismo patrón que el harness de seamInit.test.tsx); el cascade
+    // de tiers corre contra los stubs herméticos de arriba.
+    const dispatched: RecordedAction[] = [];
+    const store = makeStore(dispatched);
+    store.dispatch(startSimulation());
+    const { result } = renderLifecycle(store);
+    const { recordFrameTick } = result.current;
+
+    // 10 ticks a 100ms — ventana a medias (seed + frameCount=9, sin dispatch).
+    act(() => {
+      for (let i = 0; i < 10; i++) {
+        nowValue = 1000 + i * 100;
+        recordFrameTick();
+      }
+    });
+
+    // running→paused: dispara el cleanup del branch 'running'.
+    await act(async () => {
+      store.dispatch(pauseSimulation());
+    });
+
+    // 60s de pausa.
+    nowValue += 60_000;
+
+    // paused→running: reanuda.
+    await act(async () => {
+      store.dispatch(startSimulation());
+    });
+
+    // Descarta el ruido del cascade (setSolverTier, etc. — sin setFrameTime).
+    dispatched.length = 0;
+
+    // 31 ticks a 100ms tras reanudar → exactamente una ventana limpia.
+    const resumeStart = nowValue;
+    act(() => {
+      for (let i = 1; i <= 31; i++) {
+        nowValue = resumeStart + i * 100;
+        recordFrameTick();
+      }
+    });
+
+    const actions = frameTimeActions(dispatched);
+    expect(actions).toHaveLength(1);
+    expect(actions[0]?.payload).toBeCloseTo(100, 0);
+    expect(store.getState().simulation.frameTimeMs).toBeCloseTo(100, 0);
   });
 });

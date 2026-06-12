@@ -322,6 +322,17 @@ export function useSimulationLifecycle({
   const frameCountRef = useRef(0);
 
   /**
+   * Descarta la ventana de frame-time en curso. Debe llamarse en TODO
+   * cleanup que pare la sim (running→paused y branch 'idle') — si la
+   * ventana sobrevive a una pausa, el gap se promedia dentro de los
+   * primeros 30 frames reanudados y el FPS miente durante ~medio segundo.
+   */
+  const resetFrameWindow = useCallback(() => {
+    windowStartRef.current = null;
+    frameCountRef.current = 0;
+  }, []);
+
+  /**
    * Frame-time compartido por todos los tiers. Workers (WASM/CPU/Neural) vía
    * onFrame; el tier GPU TSL lo llama directo desde useFrame (GarmentSimulation)
    * porque ahí onFrame nunca dispara (frameDriven). Media real de ventana de 30.
@@ -592,6 +603,7 @@ export function useSimulationLifecycle({
         neuralClientRef.current?.dispose();
         neuralClientRef.current = null;
         positionsRef.current = null;
+        resetFrameWindow();
       };
     } else if (simulationState === 'idle') {
       // ─── Cleanup cascade ─── (idle branch)
@@ -612,8 +624,7 @@ export function useSimulationLifecycle({
       positionsRef.current = null;
       dispatch(setSolverTier('none'));
       dispatch(setFrameTime(0));
-      windowStartRef.current = null;
-      frameCountRef.current = 0;
+      resetFrameWindow();
       // Clear the overlay summary; `inspector.seamResolutionErrors` is
       // intentionally kept for post-stop inspection (same convention as
       // `lastSolverError`) and replaced wholesale on the next init.
