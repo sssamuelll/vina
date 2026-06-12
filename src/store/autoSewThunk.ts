@@ -15,7 +15,29 @@ import type { AppDispatch, RootState } from './index';
 import { addSeam } from './projectSlice';
 import { showSuccessToast, showInfoToast } from './copilotUISlice';
 import { autoSew } from '../utils/autoSew';
-import type { Seam } from '../types/types';
+import { refineSeamsInWorld } from '../utils/autoSew/worldRefine';
+import { placeGarmentPieces, applyArrangementOverrides } from '../utils/cloth/garmentPlacement';
+import type { PatternPiece, Seam } from '../types/types';
+
+/**
+ * World-space refinement of the proposals (M4-C): partner reassignment by
+ * world proximity + `reversed` seeding — autoSew scores in 2D, but which
+ * edges are ADJACENT (and in which traversal direction) is a placement
+ * fact. Shared by the ⌘K thunk and the copilot tools so every dispatch
+ * path proposes the same seams the simulation will actually converge on.
+ */
+export function refineProposalsAgainstState(
+  seams: Seam[],
+  pieces: PatternPiece[],
+  state: RootState,
+): Seam[] {
+  const placements = applyArrangementOverrides(
+    placeGarmentPieces(pieces, state.project.avatar.measurements),
+    pieces,
+    state.project.arrangementOverrides,
+  );
+  return refineSeamsInWorld(seams, pieces, placements);
+}
 
 /** Same default the copilot tool uses (autoSewTools.ts). */
 const DEFAULT_MIN_CONFIDENCE = 0.4;
@@ -35,10 +57,12 @@ export function runAutoSew(minConfidence: number = DEFAULT_MIN_CONFIDENCE) {
     const existing = state.project.seams;
 
     const result = autoSew(pieces, { minConfidence });
+    const refined = refineProposalsAgainstState(
+      result.seams.map(p => p.seam), pieces, state,
+    );
 
     let added = 0;
-    for (const proposal of result.seams) {
-      const seam = proposal.seam;
+    for (const seam of refined) {
       if (existing.some(e => samePair(e, seam))) continue;
       dispatch(addSeam({ ...seam, createdBy: 'ai' }));
       added++;

@@ -8,6 +8,7 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { autoSew } from '../../../../utils/autoSew';
 import { addSeam } from '../../../../store/projectSlice';
+import { refineProposalsAgainstState } from '../../../../store/autoSewThunk';
 import { startSimulation } from '../../../../store/simulationSlice';
 
 // ─── runGarmentPipeline ─────────────────────────────────────────────────────
@@ -72,6 +73,11 @@ const runGarmentPipelineTool: ToolDefinition = {
 
       if (pieces.length >= 2) {
         const sewResult = autoSew(pieces, { minConfidence: Math.min(minConf, 0.3) }); // detect broadly
+        // World-space refinement (M4-C): same pass as the ⌘K thunk.
+        const refinedSeams = refineProposalsAgainstState(
+          sewResult.seams.map(p => p.seam), pieces, getState(),
+        );
+        sewResult.seams.forEach((p, i) => { p.seam = refinedSeams[i]; });
         result.seamsDetected = sewResult.seams.length;
         result.unmatchedEdges = sewResult.unmatchedEdges.length;
 

@@ -47,9 +47,12 @@ export interface MeshedPiece {
    * Boundary-subdivision maxEdgeLength (mm) this piece was MESHED with
    * (= its particleDistance). Seam/elastic builders downstream re-derive
    * the mesher's boundary vertex numbering and must subdivide with the
-   * same value (M4 — see `PieceSeamData` in seamAssembly).
+   * same value (M4 — see `PieceSeamData` in seamAssembly). Legacy fallback;
+   * superseded by `boundaryOrig`.
    */
   meshMaxEdgeLength?: number;
+  /** Mesher boundary provenance (M4) — see ClothMeshData.boundaryOrig. */
+  boundaryOrig?: Float64Array;
 }
 
 interface UseMeshingProps {

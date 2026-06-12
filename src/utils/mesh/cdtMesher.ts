@@ -113,7 +113,8 @@ export function meshPieceOutline(
   }
 
   // Simplify dense outlines (300+ points from offset operations)
-  cleanOutline = simplifyOutline(cleanOutline, 200, 0.5);
+  const simplifyResult = simplifyOutline(cleanOutline, 200, 0.5);
+  cleanOutline = simplifyResult.points;
 
   // Ensure clockwise winding (positive signedArea in screen coords / y-down)
   // CDT2D's interior:true needs CW winding to correctly identify interior triangles.
@@ -128,15 +129,31 @@ export function meshPieceOutline(
     return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
   }
 
-  // 2. Clean PSLG to fix intersections (critical for complex patterns)
+  // 2. Clean PSLG to fix intersections (critical for complex patterns).
   cleanPSLG(points, edges);
 
   // 3. Generate interior grid points for density
   // We use the cleaned outline for point-in-polygon tests
   const boundaryPoints = cleanOutline.map(p => [p.x, p.y]);
   const interiorPoints = generateInteriorGrid(points, boundaryPoints, config.maxEdgeLength);
-  
+
   const allPoints = [...points, ...interiorPoints];
+
+  // ── Boundary provenance (M4) ──────────────────────────────────────────
+  // Seam/elastic constraint builders need to know WHICH mesh vertex sits
+  // where along the ORIGINAL flattened outline. Reconstructing that
+  // numbering outside the mesher is impossible (dedupe drops CAD's
+  // duplicated corner points on every real pattern, CCW outlines get
+  // reversed, dense outlines get Douglas-Peucker'd, cleanPSLG snaps), and
+  // index-space bookkeeping through those stages mis-assigns whenever a
+  // dropped point bordered an edge (a dedupe'd corner smeared origs across
+  // half of María's side seam). PHYSICAL PROJECTION is the single source
+  // of truth: every surviving boundary point still LIES ON the original
+  // polyline (within the DP epsilon), so each gets its fractional original
+  // index from the nearest original segment; internal-line points project
+  // far from the outline and stay NaN, as do interior grid points.
+  const projTolerance = Math.max(0.5, simplifyResult.epsilonUsed * 1.2);
+  const allOrig = projectOntoOutline(allPoints, points.length, outlinePoints, projTolerance);
 
   // 4. Run CDT
   let triangles: number[][];
@@ -167,7 +184,7 @@ export function meshPieceOutline(
     console.error('[cdtMesher] Still 0 triangles after fallback. Points:', allPoints.length, 'Edges:', edges.length);
   }
 
-  return convertToClothMeshData(allPoints, triangles, config);
+  return convertToClothMeshData(allPoints, triangles, config, allOrig);
 }
 
 // ─── Helper Functions ───────────────────────────────────────────────────────
@@ -216,9 +233,11 @@ function removeDuplicatePoints(points: Point2D[], tolerance: number = 0.1): Poin
 /**
  * Simplify a dense outline using Douglas-Peucker algorithm.
  * Only simplifies if the outline has more points than the threshold.
+ * Returns the epsilon actually used (0 when no simplification ran) so the
+ * boundary-provenance projection can size its tolerance (M4).
  */
-function simplifyOutline(points: Point2D[], maxPoints: number = 200, minEpsilon: number = 0.5): Point2D[] {
-  if (points.length <= maxPoints) return points;
+function simplifyOutline(points: Point2D[], maxPoints: number = 200, minEpsilon: number = 0.5): { points: Point2D[]; epsilonUsed: number } {
+  if (points.length <= maxPoints) return { points, epsilonUsed: 0 };
 
   // Adaptive epsilon: start small, increase until we're under maxPoints
   let epsilon = minEpsilon;
@@ -230,8 +249,8 @@ function simplifyOutline(points: Point2D[], maxPoints: number = 200, minEpsilon:
   }
 
   // Ensure we have at least 3 points
-  if (simplified.length < 3) return points.slice(0, maxPoints);
-  return simplified;
+  if (simplified.length < 3) return { points: points.slice(0, maxPoints), epsilonUsed: 0 };
+  return { points: simplified, epsilonUsed: epsilon };
 }
 
 /**
@@ -309,7 +328,7 @@ function convertToPSLG(
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    
+
     let startIdx = points.length - 1;
     if (startIdx < 0 || points[startIdx][0] !== p1.x || points[startIdx][1] !== p1.y) {
       points.push([p1.x, p1.y]);
@@ -343,13 +362,55 @@ function convertToPSLG(
   for (const line of internalLines) {
     const linePoints = flattenPath(line.path, curveResolution);
     if (linePoints.length < 2) continue;
-    
+
     for (let i = 0; i < linePoints.length - 1; i++) {
       addSubdividedEdge(linePoints[i], linePoints[i + 1]);
     }
   }
 
   return { points, edges };
+}
+
+/**
+ * Boundary provenance by physical projection (M4): for each of the first
+ * `candidateCount` points (the PSLG points — boundary + internal lines),
+ * find the nearest segment of the ORIGINAL flattened outline; if it lies
+ * within `tolerance`, assign the fractional original index `j + t`.
+ * Points farther than the tolerance (internal lines, interior grid) stay
+ * NaN. This survives every order-breaking mesher stage by construction —
+ * it never looks at indices, only at geometry.
+ */
+function projectOntoOutline(
+  allPoints: number[][],
+  candidateCount: number,
+  outline: Point2D[],
+  tolerance: number,
+): number[] {
+  const N = outline.length;
+  const out: number[] = new Array(allPoints.length).fill(Number.NaN);
+  if (N < 2) return out;
+
+  for (let i = 0; i < candidateCount; i++) {
+    const px = allPoints[i][0], py = allPoints[i][1];
+    let bestD = tolerance;
+    let bestOrig = Number.NaN;
+    for (let j = 0; j < N; j++) {
+      const a = outline[j];
+      const b = outline[(j + 1) % N];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const lenSq = dx * dx + dy * dy;
+      let t = lenSq > 0 ? ((px - a.x) * dx + (py - a.y) * dy) / lenSq : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const qx = a.x + dx * t, qy = a.y + dy * t;
+      const d = Math.hypot(px - qx, py - qy);
+      if (d < bestD) {
+        bestD = d;
+        bestOrig = (j + t) % N;
+      }
+    }
+    out[i] = bestOrig;
+  }
+  return out;
 }
 
 /**
@@ -364,6 +425,7 @@ function convertToClothMeshData(
   points: number[][],
   triangles: number[][],
   config: Required<MeshConfig>,
+  pointOrig?: number[],
 ): ClothMeshData {
   // Center using bounding box center (must match PieceMesh.tsx's ShapeGeometry centering)
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -400,8 +462,20 @@ function convertToClothMeshData(
     uvs[i * 2 + 1] = (points[i][1] - centerY) / PATTERN_UV_SCALE;
   }
 
-    return { vertices, triIds, uvs };
+  // Boundary provenance (M4): original flattened-outline index per vertex
+  // (NaN = interior / internal-line vertex). Lets seam/elastic builders
+  // address the REAL boundary vertices instead of reconstructing the
+  // mesher's numbering (dedupe/simplify/winding made that impossible).
+  let boundaryOrig: Float64Array | undefined;
+  if (pointOrig && pointOrig.some(Number.isFinite)) {
+    boundaryOrig = new Float64Array(points.length);
+    for (let i = 0; i < points.length; i++) {
+      boundaryOrig[i] = pointOrig[i] ?? Number.NaN;
+    }
   }
+
+  return { vertices, triIds, uvs, boundaryOrig };
+}
   
   /**
    * Generate interior grid points inside a polygon at the given spacing.

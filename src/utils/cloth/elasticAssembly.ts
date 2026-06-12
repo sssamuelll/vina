@@ -5,8 +5,8 @@
  */
 
 import type { Elastic, ElasticType, PathCommand } from '../../types/types';
-import { parameterizeEdge, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH, type PieceSeamData } from './seamAssembly';
-import { commandRangeToFlattened } from '../seam/index';
+import { parameterizeEdge, parameterizeEdgeFromBoundary, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH, type PieceSeamData } from './seamAssembly';
+import { commandRangeToFlattened, flattenPath } from '../seam/index';
 
 export interface ElasticConstraint {
   vertexA: number;
@@ -55,16 +55,25 @@ export function buildElasticConstraints(
     // parameterizeEdge consumes (Fase 3 / BP-3). Same default resolution
     // on both sides (CURVE_RESOLUTION = SEAM_CURVE_RESOLUTION = 12).
     const [flatStart, flatEnd] = commandRangeToFlattened(outline, edgeDef.segmentRange);
-    // Boundary subdivision MUST mirror the mesher's per-piece value (M4
-    // patient zero — see PieceSeamData.meshMaxEdgeLength in seamAssembly).
-    let vertices = parameterizeEdge(
-      outline,
-      flatStart,
-      flatEnd,
-      offset.vertexOffset,
-      SEAM_CURVE_RESOLUTION,
-      pieceData.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
-    );
+    // Boundary resolution (M4): prefer the mesher's provenance — the
+    // legacy reconstruction mis-addresses vertices on real patterns
+    // (dedupe/winding/simplify). See PieceSeamData in seamAssembly.
+    let vertices = pieceData.boundaryOrig
+      ? parameterizeEdgeFromBoundary(
+          pieceData.boundaryOrig,
+          mergedMesh.vertices,
+          offset.vertexOffset,
+          flattenPath(outline, SEAM_CURVE_RESOLUTION).length,
+          [flatStart, flatEnd],
+        )
+      : parameterizeEdge(
+          outline,
+          flatStart,
+          flatEnd,
+          offset.vertexOffset,
+          SEAM_CURVE_RESOLUTION,
+          pieceData.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
+        );
 
     vertices = vertices.filter(v => v.t >= elastic.tStart && v.t <= elastic.tEnd);
 

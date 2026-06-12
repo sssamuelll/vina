@@ -39,6 +39,7 @@ import type { PathCommand } from '../../types/types';
 import type { SeamInitData } from './clothWorker';
 import {
   parameterizeEdge,
+  parameterizeEdgeFromBoundary,
   matchVertices,
   SEAM_CURVE_RESOLUTION,
   SEAM_MAX_EDGE_LENGTH,
@@ -85,9 +86,18 @@ export interface PieceWithOutline {
   /**
    * Boundary-subdivision maxEdgeLength (mm) the MESHER used for this piece
    * (= per-piece particleDistance). MUST match or the reconstructed vertex
-   * numbering drifts — see `PieceSeamData` in seamAssembly (M4).
+   * numbering drifts — see `PieceSeamData` in seamAssembly (M4). Legacy
+   * fallback; superseded by `boundaryOrig` when present.
    */
   meshMaxEdgeLength?: number;
+  /**
+   * Mesher boundary provenance + piece-local vertex positions (M4): when
+   * BOTH are present, resolution addresses the real boundary vertices via
+   * `parameterizeEdgeFromBoundary` — required for real patterns, where
+   * dedupe/winding/simplify break the legacy reconstruction.
+   */
+  boundaryOrig?: Float64Array;
+  vertices?: Float32Array;
 }
 
 function toPathCommands(outline: PieceWithOutline['outline']): PathCommand[] {
@@ -254,28 +264,32 @@ function resolveSeamVertexPairs(
     );
   }
 
-  // Per-piece boundary subdivision mirrors the mesher (M4 — see
-  // PieceWithOutline.meshMaxEdgeLength); keeps GPU pair-count parity with
-  // buildSeamConstraints, which threads the same per-piece value.
-  let edgeA = parameterizeEdge(
-    toPathCommands(pieceA.outline),
-    rangeA[0],
-    rangeA[1],
-    0,
-    SEAM_CURVE_RESOLUTION,
-    pieceA.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
-  );
+  // Boundary resolution (M4): prefer the mesher's provenance (boundaryOrig
+  // + vertices) — mirrors buildSeamConstraints exactly, preserving GPU
+  // pair-count parity. Legacy reconstruction only for pieces meshed
+  // outside the CDT mesher.
+  const reversedB = seam.pieceBReversed === true;
+  let edgeA = pieceA.boundaryOrig && pieceA.vertices
+    ? parameterizeEdgeFromBoundary(
+        pieceA.boundaryOrig, pieceA.vertices, 0,
+        flattenPath(toPathCommands(pieceA.outline)).length, rangeA,
+      )
+    : parameterizeEdge(
+        toPathCommands(pieceA.outline), rangeA[0], rangeA[1], 0,
+        SEAM_CURVE_RESOLUTION, pieceA.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
+      );
   // Direction (Fase 5): mirror `buildSeamConstraints` — the B half may be
   // traversed end→start, pairing A's t=0 with B's t=1.
-  let edgeB = parameterizeEdge(
-    toPathCommands(pieceB.outline),
-    rangeB[0],
-    rangeB[1],
-    0,
-    SEAM_CURVE_RESOLUTION,
-    pieceB.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
-    seam.pieceBReversed === true,
-  );
+  let edgeB = pieceB.boundaryOrig && pieceB.vertices
+    ? parameterizeEdgeFromBoundary(
+        pieceB.boundaryOrig, pieceB.vertices, 0,
+        flattenPath(toPathCommands(pieceB.outline)).length, rangeB, reversedB,
+      )
+    : parameterizeEdge(
+        toPathCommands(pieceB.outline), rangeB[0], rangeB[1], 0,
+        SEAM_CURVE_RESOLUTION, pieceB.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
+        reversedB,
+      );
 
   if (seam.pieceARange) {
     const [t0, t1] = seam.pieceARange;
