@@ -919,3 +919,57 @@ describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.
     expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.sewedThreshold);
   });
 });
+
+// ─── Behavior #13 — avatar calibration M4-D on both routes (#897 F2) ─────────
+//
+// The WASM tier ships the M4-D drape calibration for the avatar body
+// (friction 0.4 ≈ cotton-on-skin, margin 8mm anti z-fight — see
+// wasmSolverWorker.ts `setCollisionMesh`); the GPU tier never received it and
+// kept the generic TSL defaults (0.3 / 5mm), so cloth slid off the TSL avatar
+// and z-fought at contact. BOTH '__avatar__' routes must pass the calibrated
+// values: `setCollisionMesh` (initial set) and `updateCollisionMesh` (pose
+// updates — no live caller today, but a latent calibration trap).
+// `setTslCollisionBody(id, mesh, friction, margin)` is a public method, so a
+// prototype spy (real implementation preserved) observes the exact arg
+// binding — `uniformCalls` containment alone could not distinguish friction
+// from margin. The custom-body route (`updateCollisionBody`) keeps
+// caller-provided values and is deliberately NOT covered here.
+
+describe('avatar collision calibration M4-D (behavior #13 — #897 F2)', () => {
+  afterEach(() => {
+    // Restores the prototype spy; fakes are re-created per test so the
+    // blanket restore cannot strand stale vi.fn state.
+    vi.restoreAllMocks();
+  });
+
+  it('setCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008', async () => {
+    const spy = vi.spyOn(GpuSolverClient.prototype, 'setTslCollisionBody');
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const mesh = makeTriCollisionMesh();
+    client.setCollisionMesh(mesh);
+
+    expect(spy).toHaveBeenCalledWith('__avatar__', mesh, 0.4, 0.008);
+  });
+
+  it('updateCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008', async () => {
+    const spy = vi.spyOn(GpuSolverClient.prototype, 'setTslCollisionBody');
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const { vertices, normals } = makeTriCollisionMesh();
+    client.updateCollisionMesh(vertices, normals);
+
+    expect(spy).toHaveBeenCalledWith(
+      '__avatar__',
+      { vertices, normals, triCount: 1 },
+      0.4,
+      0.008,
+    );
+  });
+});

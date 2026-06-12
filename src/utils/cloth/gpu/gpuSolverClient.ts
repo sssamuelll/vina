@@ -33,6 +33,13 @@ import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
 
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+/** Calibración M4-D del avatar (espejo wasmSolverWorker.ts setCollisionMesh):
+ *  0.4 ≈ algodón sobre piel; 8mm anti z-fight (#897 F2 — GPU no la había recibido). */
+const AVATAR_FRICTION = 0.4;
+const AVATAR_MARGIN = 0.008;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface PieceMeshData {
@@ -758,7 +765,7 @@ export class GpuSolverClient implements ClothSolverClient {
   setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
     if (this.tslSolver) {
       // TSL mode: build BVH and create TSL collision body
-      this.setTslCollisionBody('__avatar__', mesh);
+      this.setTslCollisionBody('__avatar__', mesh, AVATAR_FRICTION, AVATAR_MARGIN);
       return;
     }
     this.solver.setCollisionMesh(mesh);
@@ -771,7 +778,7 @@ export class GpuSolverClient implements ClothSolverClient {
     if (this.tslSolver) {
       // TSL mode: rebuild BVH (topology may differ, so full rebuild)
       const triCount = vertices.length / 9;
-      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount });
+      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount }, AVATAR_FRICTION, AVATAR_MARGIN);
       return;
     }
     this.solver.updateCollisionMesh(vertices, normals);
