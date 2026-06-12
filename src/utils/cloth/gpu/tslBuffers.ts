@@ -8,7 +8,7 @@
  */
 
 import { StorageBufferAttribute } from 'three/webgpu';
-import type { ClothMeshData, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
+import type { ClothMeshData, BendConstraints, ColoredConstraints } from './gpuBuffers';
 import type { SelfCollisionBufferSet } from './tslSelfCollision';
 import { destroySelfCollisionBuffers } from './tslSelfCollision';
 import type { WindBufferSet } from './tslWind';
@@ -23,6 +23,15 @@ export interface FabricComplianceConfig {
   shearCompliance: number;
   bendComplianceWarp: number;
   bendComplianceWeft: number;
+}
+
+/** Seam constraints del path TSL (#897 F1) — coloreadas, con compliance.
+ *  Distinto de SeamConstraintData (legacy WGSL, intocable). */
+export interface TslSeamConstraintData {
+  ids: Uint32Array;                 // GLOBAL, reordenados por color
+  targetDist: Float32Array;         // seed = distancia mundial × tension (decae en GPU)
+  compliance: Float32Array;         // per-constraint
+  colorRanges: Array<{ offset: number; count: number }>;
 }
 
 export interface StretchColorGroup {
@@ -107,7 +116,7 @@ export function createTslBuffers(
   mesh: ClothMeshData,
   coloredStretch: ColoredConstraints,
   bend: BendConstraints,
-  seam: SeamConstraintData | null,
+  seam: TslSeamConstraintData | null,
   fabricCompliance?: FabricComplianceConfig,
 ): TslBufferSet {
   const N = mesh.positions.length / 3;

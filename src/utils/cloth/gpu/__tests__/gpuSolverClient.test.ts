@@ -114,7 +114,18 @@ type TestSBA = {
 vi.mock('three/webgpu', () => sharedMock());
 vi.mock('three/tsl', () => sharedMock());
 
+// Transparent passthrough spy on createTslBuffers: behavior #11 inspects the
+// packed TslSeamConstraintData handed to the buffer factory (compliance and
+// colorRanges have no SBA surface until F1.3 retypes the factory's consumer
+// side). Every other behavior hits the real implementation unchanged.
+vi.mock('../tslBuffers', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../tslBuffers')>();
+  return { ...actual, createTslBuffers: vi.fn(actual.createTslBuffers) };
+});
+
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
+import * as tslBuffersModule from '../tslBuffers';
+import type { TslSeamConstraintData } from '../tslBuffers';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -732,6 +743,9 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
         pieceBId: 'b',
         // LOCAL piece-relative indices (the seamPairs.ts brand contract).
         vertexPairs: [[0, 0], [1, 1]] as Array<[never, never]>,
+        // Required since the param became SeamPair[] (#897 F1 retyping).
+        compliance: 0.0001,
+        tensionFactor: 1.0,
       },
     ];
   }
@@ -752,6 +766,9 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
     // [0,0],[1,1] become global [0,4],[1,5]. A double-offset regression
     // (global indices fed in) would yield [0,8],[1,9] instead.
     expect(Array.from(seamIds!.array)).toEqual([0, 4, 1, 5]);
+    // Still [0, 0] under #897 F1 seeding (targetDist = world distance ×
+    // tensionFactor): both quads are coincident, so the seeded distance is 0.
+    // The non-zero seeding path is pinned by behavior #11.
     expect(Array.from(seamDist!.array)).toEqual([0, 0]);
   });
 
@@ -783,5 +800,96 @@ describe('initMultiPieceTsl with seamPairs (behavior #10 — Fase 4)', () => {
     const buffers = (client as any).tslBuffers;
     expect(buffers.seamIdsSBA).toBeNull();
     expect(buffers.seamTargetDistSBA).toBeNull();
+  });
+});
+
+// ─── Behavior #11 — seam closure packing (#897 F1) ──────────────────────────
+//
+// F1 replaces the rigid snap-to-zero packing (targetDist = 0, no compliance,
+// no coloring) with the CPU/WASM mirror: targetDist seeds at current world
+// distance × tensionFactor (decays on GPU), per-constraint compliance, and
+// graph coloring (colorConstraints) for race-free parallel dispatch.
+//
+// Observable: at this commit createTslBuffers only consumes seam.{ids,
+// targetDist}, so targetDist is asserted on the seamTargetDistSBA surface
+// (behavior #10's observable) while compliance/colorRanges are asserted on
+// the packed TslSeamConstraintData captured by the passthrough spy above.
+
+describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', () => {
+  beforeEach(() => {
+    vi.mocked(tslBuffersModule.createTslBuffers).mockClear();
+  });
+
+  /** Quad piece rigidly shifted +dx in world x — local indices stay identical. */
+  function makeQuadPieceAt(id: string, dx: number): PieceMeshData {
+    const p = makeQuadPiece(id);
+    for (let i = 0; i < p.vertices.length; i += 3) p.vertices[i] += dx;
+    return p;
+  }
+
+  /** The packed seam object handed to createTslBuffers (4th positional arg). */
+  function lastSeamArg(): TslSeamConstraintData | null {
+    const calls = vi.mocked(tslBuffersModule.createTslBuffers).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[calls.length - 1][3] as TslSeamConstraintData | null;
+  }
+
+  it('seeds targetDist = world distance × tensionFactor and per-constraint compliance, colored', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    // Local vertex 0 of A sits at (-0.5, 1, 0); piece B shifted +0.3 puts its
+    // local vertex 0 at (-0.2, 1, 0) → world distance 0.3.
+    await client.initMultiPieceTsl(
+      [makeQuadPiece('A'), makeQuadPieceAt('B', 0.3)],
+      [{
+        pieceAId: 'A',
+        pieceBId: 'B',
+        vertexPairs: [[0, 0]] as Array<[never, never]>,
+        compliance: 0.0001,
+        tensionFactor: 0.5,
+      }],
+    );
+
+    const seam = lastSeamArg();
+    expect(seam).not.toBeNull();
+    // Seeding mirror of CPU/WASM: 0.3 × 0.5 = 0.15 (rigid packing seeded 0).
+    expect(seam!.targetDist[0]).toBeCloseTo(0.15, 6);
+    expect(seam!.compliance[0]).toBeCloseTo(0.0001, 8);
+    // Single constraint → one color group.
+    expect(seam!.colorRanges).toEqual([{ offset: 0, count: 1 }]);
+
+    // Same seeding visible on the SBA surface consumed by the solver today.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const buffers = (client as any).tslBuffers;
+    expect((buffers.seamTargetDistSBA as TestSBA).array[0]).toBeCloseTo(0.15, 6);
+  });
+
+  it('splits shared-vertex pairs into separate color groups', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    // Pairs [[0,0],[1,0]] both touch B's local vertex 0 (global 4) →
+    // colorConstraints must split them into 2 color groups of 1.
+    await client.initMultiPieceTsl(
+      [makeQuadPiece('A'), makeQuadPieceAt('B', 0.3)],
+      [{
+        pieceAId: 'A',
+        pieceBId: 'B',
+        vertexPairs: [[0, 0], [1, 0]] as Array<[never, never]>,
+        compliance: 0.0001,
+        tensionFactor: 1.0,
+      }],
+    );
+
+    const seam = lastSeamArg();
+    expect(seam).not.toBeNull();
+    expect(seam!.colorRanges).toHaveLength(2);
+    expect(seam!.colorRanges[0].count).toBe(1);
+    expect(seam!.colorRanges[1].count).toBe(1);
+    // Both constraints survive the reorder: 2 pairs → 4 ids.
+    expect(seam!.ids).toHaveLength(4);
   });
 });

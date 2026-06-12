@@ -32,8 +32,8 @@ vi.mock('three/tsl', () => ({
   atomicLoad: () => undefined,
 }));
 
-import { createTslBuffers, destroyTslBufferSet, disposeStorageBufferAttribute } from '../tslBuffers';
-import type { ClothMeshData, StretchConstraints, BendConstraints, SeamConstraintData } from '../gpuBuffers';
+import { createTslBuffers, destroyTslBufferSet, disposeStorageBufferAttribute, type TslSeamConstraintData } from '../tslBuffers';
+import type { ClothMeshData, StretchConstraints, BendConstraints } from '../gpuBuffers';
 import { colorConstraints } from '../gpuBuffers';
 
 function makeTestMesh(): ClothMeshData {
@@ -130,7 +130,14 @@ describe('createTslBuffers', () => {
     const mesh = makeTestMesh();
     const { colored } = makeTestStretch();
     const bend = makeTestBend();
-    const seam: SeamConstraintData = { ids: new Uint32Array([0, 2]), targetDist: new Float32Array([0]) };
+    // TslSeamConstraintData (#897 F1) — compliance/colorRanges still unused
+    // by the factory at this commit (consumed from F1.3 onward).
+    const seam: TslSeamConstraintData = {
+      ids: new Uint32Array([0, 2]),
+      targetDist: new Float32Array([0]),
+      compliance: new Float32Array([0.0001]),
+      colorRanges: [{ offset: 0, count: 1 }],
+    };
     const buffers = createTslBuffers(mesh, colored, bend, seam);
 
     expect(buffers.seamIdsSBA).not.toBeNull();
@@ -199,9 +206,11 @@ describe('destroyTslBufferSet', () => {
     const mesh = makeTestMesh();
     const { colored } = makeTestStretch();
     const bend = makeTestBend();
-    const seam: SeamConstraintData = {
+    const seam: TslSeamConstraintData = {
       ids: new Uint32Array([0, 2]),
       targetDist: new Float32Array([0]),
+      compliance: new Float32Array([0.0001]),
+      colorRanges: [{ offset: 0, count: 1 }],
     };
     const buffers = createTslBuffers(mesh, colored, bend, seam);
 
