@@ -448,6 +448,23 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         // dispatch are visible to the next, so cross-color shared vertices
         // are race-free.
         if (solver.seamColors.length > 0) renderer.compute(solver.seamColors);
+        // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
+        // en esa tier el ground corre DENTRO del step de Rust y la colisión
+        // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
+        // el snapshot pre-colisión captura la posición post-ground y la
+        // velocidad natural excluye solo el push del cuerpo.
+        renderer.compute(solver.groundClamp);
+        // Mesh grab ANTES del snapshot: su desplazamiento SÍ debe entrar en
+        // la velocidad (vNat = (preCol - prev) / sdt) → momentum natural al
+        // soltar en vez de caída muerta.
+        if (grabActive) {
+          renderer.compute(solver.grabNodes.grabNode);
+        }
+        // Snapshot pos → preCollisionPos (espejo de preCollisionBuf.set(
+        // posView) en wasmSolverWorker.ts:352). Siempre se despacha: con 0
+        // cuerpos, preCollisionPos == pos y postSolve degrada al
+        // comportamiento previo exacto.
+        renderer.compute(solver.snapshotPreCollision);
         for (const body of solver.collisionBodies) {
           // 2-pass body collision (atomic-emulation pattern in tslCollision.ts):
           // findBest fills per-body atomic scratch; applyPush reads it,
@@ -455,13 +472,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           renderer.compute(body.findBestNode);
           renderer.compute(body.applyPushNode);
         }
-        renderer.compute(solver.groundClamp);
-        // Mesh grab: lerp grabbed particles BEFORE postSolve so velocity
-        // derivation (vel = (pos - prevPos) / sdt) captures grab displacement
-        // → natural momentum on release instead of dead drop
-        if (grabActive) {
-          renderer.compute(solver.grabNodes.grabNode);
-        }
+        // postSolve deriva la velocidad de preCollisionPos (no de pos): el
+        // push de colisión corrige posición sin crear velocidad, + respuesta
+        // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).
         renderer.compute(solver.postSolve);
       }
 

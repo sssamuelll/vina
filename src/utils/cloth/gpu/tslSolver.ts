@@ -16,7 +16,10 @@
  *   3. bend         — single Jacobi distance constraint on opposite verts
  *   4. seam         — graph-colored decaying-target constraints closing seam pairs
  *   5. groundClamp  — clamp positions to ground plane (AFTER constraints)
- *   6. postSolve    — velocity update, ground friction, NaN guard, speed clamp
+ *   6. snapshotPreCollision — pos → preCollisionPos (tras grab, ANTES de
+ *      colisión de cuerpo; espejo de preCollisionBuf en wasmSolverWorker)
+ *   7. postSolve    — velocity from preCollisionPos (collision push excluded),
+ *      inelastic response, ground friction, NaN guard, speed clamp
  *
  * @module tslSolver
  */
@@ -92,7 +95,18 @@ export interface TslSolver {
   seamColors: ComputeNode[];
   /** Ground plane clamping (dispatch AFTER constraints, BEFORE postSolve) */
   groundClamp: ComputeNode;
-  /** Post-solve compute node (velocity update + ground friction + clamping) */
+  /**
+   * pos → preCollisionPos snapshot (#897 F2.3). Dispatch tras grab y ANTES
+   * de los cuerpos de colisión, en cada substep — incluso con 0 cuerpos
+   * (entonces preCollisionPos == pos y postSolve degrada al comportamiento
+   * previo exacto). Espejo de `preCollisionBuf.set(posView)` en
+   * wasmSolverWorker.ts:352.
+   */
+  snapshotPreCollision: ComputeNode;
+  /**
+   * Post-solve compute node: velocity derived from preCollisionPos (collision
+   * push excluded), inelastic response, ground friction, NaN guard, clamping.
+   */
   postSolve: ComputeNode;
   /** Position SBA — shared with vertex shader for zero-copy rendering */
   positionSBA: StorageBufferAttribute;
@@ -421,11 +435,25 @@ function makeSeamConstraintFn(
   })();
 }
 
+// ─── Pre-collision snapshot kernel ───────────────────────────────────────────
+
+/** pos → preCollisionPos. Tras grab, antes de colisión de cuerpo (espejo de
+ *  preCollisionBuf.set(posView) en wasmSolverWorker). Siempre se despacha:
+ *  con 0 cuerpos preCollisionPos==pos ⇒ postSolve degrada al comportamiento
+ *  actual exacto. */
+function makeSnapshotPreCollisionFn(posBuf: TslNode, preColBuf: TslNode) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    preColBuf.element(instanceIndex).assign(posBuf.element(instanceIndex));
+  })();
+}
+
 // ─── Post-solve kernel ───────────────────────────────────────────────────────
 
 /**
- * Post-solve: compute velocity from position change, apply ground friction,
- * clamp speed, guard against NaN.
+ * Post-solve: compute velocity from PRE-COLLISION position change (#897 F2.3
+ * — collision push corrects position but must NOT create velocity), apply
+ * inelastic collision response, ground friction, clamp speed, guard NaN.
  *
  * Ground friction uses a simplified Coulomb model matching the CPU solver:
  * - Static friction: zero horizontal velocity when tangent speed < threshold
@@ -435,6 +463,7 @@ function makeSeamConstraintFn(
 function makePostSolveFn(
   posBuf: TslNode,
   prevPosBuf: TslNode,
+  preColBuf: TslNode,
   velBuf: TslNode,
   invMassBuf: TslNode,
   uniforms: SolverUniforms,
@@ -445,14 +474,41 @@ function makePostSolveFn(
     const w = invMassBuf.element(i);
 
     If(w.greaterThan(float(0.0)), () => {
-      // vel = (pos - prevPos) / sdt
-      const v = posBuf.element(i).sub(prevPosBuf.element(i)).div(uniforms.sdt);
+      // Velocidad NATURAL pre-colisión (espejo wasmSolverWorker.ts:367-375):
+      // el push corrige posición pero NO crea velocidad (a 900Hz, 5cm → 45m/s).
+      const vNat = preColBuf.element(i).sub(prevPosBuf.element(i)).div(uniforms.sdt).toVar('vNat');
+
+      // Inelástica (espejo :377-399): si hubo push, anular la componente de
+      // vNat que apunta HACIA la superficie.
+      //
+      // Idioma TSL — vNat.subAssign(...) sobre un toVar vec3 dentro de Ifs
+      // anidados (sin Loop) compone dos patrones ya establecidos: .assign
+      // sobre toVars escalares en Ifs anidados (tslCollision bestSide/
+      // bestDist/pushDist) y compound-assign sobre vec3 (preSolve
+      // velBuf.addAssign). El pitfall outer-toVar documentado en
+      // tslCollision.ts aplica a acumulación desde el interior de un Loop —
+      // aquí no hay Loop.
+      const push = posBuf.element(i).sub(preColBuf.element(i));
+      const pushLen2 = push.dot(push);
+      If(pushLen2.greaterThan(float(1e-20)), () => {
+        const n = push.div(pushLen2.sqrt());
+        const vn = vNat.dot(n);
+        If(vn.lessThan(float(0.0)), () => {
+          vNat.subAssign(n.mul(vn));
+        });
+      });
+
+      const v = vNat;
 
       // Speed squared
       const speed2 = v.dot(v);
 
-      // NaN guard: NaN != NaN, so speed2.equal(speed2) is false when NaN
-      If(speed2.equal(speed2), () => {
+      // NaN guard: NaN != NaN, so the self-equal is false when NaN.
+      // NaN-check de pos ADEMÁS del de v (review S3): pos puede ser NaN con
+      // vNat finita (NaN nacido en los kernels de colisión, post-snapshot) —
+      // WASM cubre esa ventana con guardNaN(posView) tras la colisión.
+      const posLen2 = posBuf.element(i).dot(posBuf.element(i));
+      If(speed2.equal(speed2).and(posLen2.equal(posLen2)), () => {
         // Check if particle is on or near ground (within tolerance)
         const groundTolerance = float(0.001);
 
@@ -645,8 +701,9 @@ function makeNormalNormalizeFn(
  * All data is stored in StorageBufferAttributes shared with the vertex shader,
  * enabling zero-copy rendering.
  *
- * Execution order per substep (matching CPU solver):
- *   preSolve → stretch(per-color) → bend → seam(per-color) → groundClamp → postSolve
+ * Execution order per substep (espejo WASM — ver GarmentSimulation.tsx):
+ *   preSolve → stretch(per-color) → bend → seam(per-color) → groundClamp →
+ *   [grab] → snapshotPreCollision → collision bodies → postSolve
  */
 export function createTslSolver(
   buffers: TslBufferSet,
@@ -663,6 +720,7 @@ export function createTslSolver(
   // 'float' with flat N*3 indexing would misalign at stride boundaries.
   const posBuf = storage(buffers.positionSBA, 'vec3', N);
   const prevPosBuf = storage(buffers.prevPosSBA, 'vec3', N);
+  const preColBuf = storage(buffers.preCollisionPosSBA, 'vec3', N);
   const velBuf = storage(buffers.velocitySBA, 'vec3', N);
   const invMassBuf = storage(buffers.invMassSBA, 'float', N);
 
@@ -724,8 +782,12 @@ export function createTslSolver(
   const groundClampFn = makeGroundClampFn(posBuf, invMassBuf, uniforms.groundY);
   const groundClamp = compute(groundClampFn, N, [64]);
 
-  // ─── Post-solve (velocity update + ground friction + NaN guard) ────
-  const postSolveFn = makePostSolveFn(posBuf, prevPosBuf, velBuf, invMassBuf, uniforms);
+  // ─── Pre-collision snapshot (tras grab, ANTES de colisión — #897 F2.3) ──
+  const snapshotPreCollisionFn = makeSnapshotPreCollisionFn(posBuf, preColBuf);
+  const snapshotPreCollision = compute(snapshotPreCollisionFn, N, [64]);
+
+  // ─── Post-solve (velocity from preCollisionPos + friction + NaN guard) ──
+  const postSolveFn = makePostSolveFn(posBuf, prevPosBuf, preColBuf, velBuf, invMassBuf, uniforms);
   const postSolve = compute(postSolveFn, N, [64]);
 
   // ─── GPU smooth normals (atomic accumulation) ─────────────────────
@@ -888,6 +950,7 @@ export function createTslSolver(
     bend,
     seamColors,
     groundClamp,
+    snapshotPreCollision,
     postSolve,
     positionSBA: buffers.positionSBA,
     positionBufNode: posBuf,

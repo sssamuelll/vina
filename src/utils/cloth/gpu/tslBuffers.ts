@@ -59,6 +59,13 @@ export interface TslBufferSet {
   // Core particle buffers
   positionSBA: StorageBufferAttribute;
   prevPosSBA: StorageBufferAttribute;
+  /**
+   * Snapshot de pos tomado tras grab y ANTES de la colisión de cuerpo
+   * (#897 F2.3) — espejo de `preCollisionBuf` en wasmSolverWorker.ts.
+   * postSolve deriva la velocidad de aquí: el push de colisión corrige
+   * posición pero NO crea velocidad.
+   */
+  preCollisionPosSBA: StorageBufferAttribute;
   velocitySBA: StorageBufferAttribute;
   invMassSBA: StorageBufferAttribute;
 
@@ -142,6 +149,10 @@ export function createTslBuffers(
   // ─── Core particle buffers ──────────────────────────────────────────
   const positionSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
   const prevPosSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
+  // #897 F2.3: snapshot pre-colisión (espejo de preCollisionBuf en
+  // wasmSolverWorker). Seed = positions, igual que prevPos: si postSolve
+  // corriera antes del primer snapshot, vNat = preCol - prev = 0 (benigno).
+  const preCollisionPosSBA = new StorageBufferAttribute(new Float32Array(mesh.positions), 3);
   const velocitySBA = new StorageBufferAttribute(new Float32Array(N * 3), 3);
   const invMassSBA = new StorageBufferAttribute(new Float32Array(mesh.invMass), 1);
 
@@ -229,6 +240,7 @@ export function createTslBuffers(
   return {
     positionSBA,
     prevPosSBA,
+    preCollisionPosSBA,
     velocitySBA,
     invMassSBA,
     stretchColors,
@@ -302,7 +314,7 @@ export function disposeStorageBufferAttribute(
 /**
  * Release every GPU buffer owned by a TslBufferSet.
  *
- * Iterates the 12 fixed SBA fields plus per-color stretch and seam SBAs, then
+ * Iterates the 13 fixed SBA fields plus per-color stretch and seam SBAs, then
  * delegates self-collision and wind buffer disposal to their owning modules.
  * See `disposeStorageBufferAttribute` for the renderer-routing rationale.
  */
@@ -313,6 +325,7 @@ export function destroyTslBufferSet(
   const sbas: Array<StorageBufferAttribute | null> = [
     set.positionSBA,
     set.prevPosSBA,
+    set.preCollisionPosSBA,
     set.velocitySBA,
     set.invMassSBA,
     set.normalSBA,

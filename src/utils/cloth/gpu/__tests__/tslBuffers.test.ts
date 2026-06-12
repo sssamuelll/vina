@@ -102,6 +102,21 @@ describe('createTslBuffers', () => {
     expect(buffers.invMassSBA.array[0]).toBe(1.0);
   });
 
+  it('creates preCollisionPos SBA (N vec3) seeded from positions (#897 F2.3)', () => {
+    const mesh = makeTestMesh();
+    const { colored } = makeTestStretch();
+    const bend = makeTestBend();
+    const buffers = createTslBuffers(mesh, colored, bend, null);
+
+    expect(buffers.preCollisionPosSBA.count).toBe(4);
+    expect(buffers.preCollisionPosSBA.itemSize).toBe(3);
+    expect(buffers.preCollisionPosSBA.array.length).toBe(12);
+    // Seed = positions (igual que prevPos): si postSolve corriera antes del
+    // primer snapshot, vNat = preCol - prev = 0 (degradación benigna).
+    expect(buffers.preCollisionPosSBA.array[0]).toBeCloseTo(-0.5);
+    expect(buffers.preCollisionPosSBA.array[1]).toBeCloseTo(1.0);
+  });
+
   it('creates per-color stretch constraint SBAs', () => {
     const mesh = makeTestMesh();
     const { colored } = makeTestStretch();
@@ -247,15 +262,17 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 12 fixed SBAs (position, prevPos, velocity, invMass, normal, normalAccum,
-    // triangleIds, grabMask, grabOffset, bendIds, bendRest, bendCompliance)
+    // 13 fixed SBAs (position, prevPos, preCollisionPos, velocity, invMass,
+    // normal, normalAccum, triangleIds, grabMask, grabOffset, bendIds,
+    // bendRest, bendCompliance)
     // + 3 SBAs per stretch color group + 3 SBAs per seam color group.
-    const expected = 12 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
+    const expected = 13 + buffers.stretchColors.length * 3 + buffers.seamColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
 
     // Spot-check that core SBAs were each passed.
     expect(deleteSpy).toHaveBeenCalledWith(buffers.positionSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.prevPosSBA);
+    expect(deleteSpy).toHaveBeenCalledWith(buffers.preCollisionPosSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.velocitySBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.invMassSBA);
     expect(deleteSpy).toHaveBeenCalledWith(buffers.normalSBA);
@@ -293,9 +310,9 @@ describe('destroyTslBufferSet', () => {
 
     destroyTslBufferSet(buffers, renderer);
 
-    // 9 fixed non-null SBAs (3 bend are null) + stretch colors * 3;
+    // 10 fixed non-null SBAs (3 bend are null) + stretch colors * 3;
     // empty seamColors contributes nothing.
-    const expected = 9 + buffers.stretchColors.length * 3;
+    const expected = 10 + buffers.stretchColors.length * 3;
     expect(deleteSpy).toHaveBeenCalledTimes(expected);
   });
 
