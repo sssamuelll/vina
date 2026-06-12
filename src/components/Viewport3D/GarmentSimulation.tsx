@@ -18,6 +18,9 @@ import { Suspense, useRef, useEffect, useCallback, useMemo, useState, forwardRef
 import { useDisposable } from './hooks/useDisposable';
 import * as THREE from 'three';
 import { MeshStandardNodeMaterial } from 'three/webgpu';
+// Same type-only deep import as tslSolver.ts/tslCollision.ts — the TSL solver
+// node fields are typed against this, so the per-substep batch list reuses it.
+import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import { useFrame, useThree } from '@react-three/fiber';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
@@ -428,54 +431,58 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
         }
       }
 
+      // #897 F2 (H-Q2): UN renderer.compute(array) por substep = un submit
+      // (antes ~12+). Las barreras implícitas de WebGPU entre dispatches del
+      // mismo pass preservan el orden secuencial exacto del loop anterior.
+      // La lista se construye UNA vez por frame: grabActive se lee una vez
+      // arriba y collisionBodies solo muta entre frames (setTslCollisionBody).
+      const substepNodes: ComputeNode[] = [solver.preSolve];
+      // Wind force (two-pass: accumulate per-triangle, apply per-particle)
+      if (solver.windNodes) {
+        substepNodes.push(solver.windNodes.accumNode, solver.windNodes.applyNode);
+      }
+      // Batch all stretch colors — graph coloring guarantees no two
+      // constraints WITHIN a color share a vertex, so each color's parallel
+      // dispatch is race-free; cross-color shared vertices are ordered by
+      // the sequential dispatches inside the pass (same guarantee as the
+      // seam batch below).
+      substepNodes.push(...solver.stretchColors);
+      if (solver.bend) substepNodes.push(solver.bend);
+      // Seam colors batched like stretch (#897 F1.3): sequential dispatches
+      // inside one compute pass — WebGPU guarantees storage writes from one
+      // dispatch are visible to the next, so cross-color shared vertices
+      // are race-free.
+      substepNodes.push(...solver.seamColors);
+      // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
+      // en esa tier el ground corre DENTRO del step de Rust y la colisión
+      // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
+      // el snapshot pre-colisión captura la posición post-ground y la
+      // velocidad natural excluye solo el push del cuerpo.
+      substepNodes.push(solver.groundClamp);
+      // Mesh grab ANTES del snapshot: su desplazamiento SÍ debe entrar en
+      // la velocidad (vNat = (preCol - prev) / sdt) → momentum natural al
+      // soltar en vez de caída muerta.
+      if (grabActive) {
+        substepNodes.push(solver.grabNodes.grabNode);
+      }
+      // Snapshot pos → preCollisionPos (espejo de preCollisionBuf.set(
+      // posView) en wasmSolverWorker.ts:352). Siempre se despacha: con 0
+      // cuerpos, preCollisionPos == pos y postSolve degrada al
+      // comportamiento previo exacto.
+      substepNodes.push(solver.snapshotPreCollision);
+      // 2-pass body collision (atomic-emulation pattern in tslCollision.ts):
+      // findBest fills per-body atomic scratch; applyPush reads it,
+      // pushes the particle, and resets the scratch for the next substep.
+      for (const body of solver.collisionBodies) {
+        substepNodes.push(body.findBestNode, body.applyPushNode);
+      }
+      // postSolve deriva la velocidad de preCollisionPos (no de pos): el
+      // push de colisión corrige posición sin crear velocidad, + respuesta
+      // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).
+      substepNodes.push(solver.postSolve);
+
       for (let s = 0; s < substeps; s++) {
-        renderer.compute(solver.preSolve);
-        // Wind force (two-pass: accumulate per-triangle, apply per-particle)
-        if (solver.windNodes) {
-          renderer.compute(solver.windNodes.accumNode);
-          renderer.compute(solver.windNodes.applyNode);
-        }
-        // Batch all stretch colors in one call — graph coloring guarantees
-        // no two constraints WITHIN a color share a vertex, so each color's
-        // parallel dispatch is race-free; cross-color shared vertices are
-        // ordered by the sequential dispatches inside the pass (same
-        // guarantee as the seam batch below).
-        // Reduces ~57 separate submit() calls to 1 per substep.
-        renderer.compute(solver.stretchColors);
-        if (solver.bend) renderer.compute(solver.bend);
-        // Seam colors batched like stretch (#897 F1.3): sequential dispatches
-        // inside one compute pass — WebGPU guarantees storage writes from one
-        // dispatch are visible to the next, so cross-color shared vertices
-        // are race-free.
-        if (solver.seamColors.length > 0) renderer.compute(solver.seamColors);
-        // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
-        // en esa tier el ground corre DENTRO del step de Rust y la colisión
-        // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
-        // el snapshot pre-colisión captura la posición post-ground y la
-        // velocidad natural excluye solo el push del cuerpo.
-        renderer.compute(solver.groundClamp);
-        // Mesh grab ANTES del snapshot: su desplazamiento SÍ debe entrar en
-        // la velocidad (vNat = (preCol - prev) / sdt) → momentum natural al
-        // soltar en vez de caída muerta.
-        if (grabActive) {
-          renderer.compute(solver.grabNodes.grabNode);
-        }
-        // Snapshot pos → preCollisionPos (espejo de preCollisionBuf.set(
-        // posView) en wasmSolverWorker.ts:352). Siempre se despacha: con 0
-        // cuerpos, preCollisionPos == pos y postSolve degrada al
-        // comportamiento previo exacto.
-        renderer.compute(solver.snapshotPreCollision);
-        for (const body of solver.collisionBodies) {
-          // 2-pass body collision (atomic-emulation pattern in tslCollision.ts):
-          // findBest fills per-body atomic scratch; applyPush reads it,
-          // pushes the particle, and resets the scratch for the next substep.
-          renderer.compute(body.findBestNode);
-          renderer.compute(body.applyPushNode);
-        }
-        // postSolve deriva la velocidad de preCollisionPos (no de pos): el
-        // push de colisión corrige posición sin crear velocidad, + respuesta
-        // inelástica (#897 F2.3, espejo wasmSolverWorker.ts:367-399).
-        renderer.compute(solver.postSolve);
+        renderer.compute(substepNodes);
       }
 
       // Steam brush (once per frame, after substeps settle; skip when inactive)
