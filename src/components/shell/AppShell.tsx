@@ -3,8 +3,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../../store';
 import { setSplitRatio } from '../../store/layoutSlice';
 import { addPiece } from '../../store/projectSlice';
+import { classifyImportedPieces } from '../../utils/geometricClassifier';
 import { selectPiece, requestFitView } from '../../store/editorSlice';
-import { showSuccessToast, showErrorToast } from '../../store/copilotUISlice';
+import { showSuccessToast, showErrorToast, showInfoToast } from '../../store/copilotUISlice';
 import { readAndParseDXFFile } from '../../utils/dxf';
 import { dxfErrorMessage, piecesLabel } from './dxfImport';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
@@ -91,10 +92,28 @@ export default function AppShell() {
   const importDXFFile = useCallback(async (file: File) => {
     try {
       const { result } = await readAndParseDXFFile(file, { unit: 'auto', autoDetect: true });
+      // Hybrid classification at import (camisa de María plan, M1): name
+      // first, geometry for nameless CAD blocks ("PATRONES PARA SAMUEL-N").
+      // With category/side set BEFORE dispatch, the addPiece reducer's
+      // detectSemanticEdges pass emits role-bearing edges (armhole,
+      // neckline, sleeveCap) instead of inert positional ones — the
+      // missing link zero behind the alien-blob drape.
+      const classification = classifyImportedPieces(result.pieces);
       for (const piece of result.pieces) dispatch(addPiece(piece));
       dispatch(selectPiece(result.pieces[0].id));
       dispatch(requestFitView()); // frame the freshly imported pattern (no more blank/tiny canvas)
-      dispatch(showSuccessToast(`Cargué tu patrón: ${piecesLabel(result.pieces.length)}`));
+      dispatch(showSuccessToast(
+        `Cargué tu patrón: ${piecesLabel(result.pieces.length)}` +
+        (classification.classified > 0
+          ? ` · ${classification.classified} clasificada${classification.classified === 1 ? '' : 's'} automáticamente`
+          : ''),
+      ));
+      if (classification.unclassified > 0) {
+        // Honest non-silence: the agent's classifyPiece tool is the override.
+        dispatch(showInfoToast(
+          `${classification.unclassified} pieza${classification.unclassified === 1 ? '' : 's'} sin clasificar — pide al copiloto que las clasifique`,
+        ));
+      }
     } catch (err) {
       dispatch(showErrorToast(dxfErrorMessage(err)));
     }

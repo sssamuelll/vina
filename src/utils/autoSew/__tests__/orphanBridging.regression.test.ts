@@ -161,12 +161,18 @@ describe('#506 — orphan-bridging post-processing', () => {
     // way the cuff↔sleeve bridge can fire after cuff↔cuffInterface consumes
     // all 4 cuff edges in the main pass.
     //
-    // Topology: cuff and cuffInterface have identical geometry (4 perfect
-    // matches consume all cuff edges); sleeve shares the 290mm wrist length
-    // with the cuff so it has a high-confidence length-matched candidate to
-    // cuff that the main pass cannot satisfy (edges exhausted).
+    // Topology: cuffInterface is STACKED on the cuff (same coordinates —
+    // how an interface physically lives on its fabric), so the 4 identical
+    // edge pairs are unbeatable proximity+length matches and the main pass
+    // deterministically consumes all 4 cuff edges. The sleeve shares the
+    // 290mm wrist length, so its high-confidence candidate to the cuff can
+    // only fire as a bridge re-using a consumed edge.
+    //
+    // (M1 camisa de María: edges now come from the shared tram segmentation
+    // with TRUE arc midpoints and outward normals; the old side-by-side
+    // layout depended on corner-as-midpoint artifacts to rank the pairs.)
     const cuff = makeRect('cuff', 'Cuff', 0, 0, 290, 60);
-    const cuffInterface = makeRect('cuff-interface', 'CuffInterface', 400, 0, 290, 60);
+    const cuffInterface = makeRect('cuff-interface', 'CuffInterface', 0, 0, 290, 60);
     const sleeve = makeRect('sleeve', 'FullSleeve', 800, 0, 290, 600);
 
     const result = autoSew([cuff, cuffInterface, sleeve], { minConfidence: 0.3 });

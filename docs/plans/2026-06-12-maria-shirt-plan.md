@@ -51,3 +51,13 @@
 - **No tocar los nombres de María** ni pedir curación manual — si el clasificador no puede con una pieza, lo dice (Fase 4 style: aviso explícito, no silencio).
 - **Cada hallazgo colateral (A/B/C) se verifica antes de arreglarse** — el guardarraíl de claims del plan de paridad.
 - La autorización de merge sigue siendo por-PR (la durable se agotó con el plan de paridad).
+
+## 6. Addendum M0+M1 (2026-06-12, ejecutado)
+
+La verificación previa ("aunque existan las funciones igual tenemos que revisar que funcionan") cambió el alcance de M1 — para bien:
+
+- **Inventario**: existían CUATRO clasificadores (pieceClassifier, detectFromName, autoRenameDuplicatePieces, analyzeGarment LLM huérfano) — todos por nombre o inaplicables al import real. Y un quinto hallazgo: `detectSemanticEdges` SÍ tenía geometría, pero (a) `hasCurve` miraba el TIPO de comando (C/Q) → código muerto para polilíneas CAD; (b) segmentación por flip-de-zona → fragmentación arbitraria; (c) asumía medio-patrón al doblez (el costado izquierdo de una pieza completa salía 'centerFront').
+- **Tercer paciente del mismo patógeno**: `autoSew/edgeExtractor.findCorners` medía ángulo por micro-segmento → cero esquinas en polilíneas → el outline entero era UN `edge-0` → autoSew emparejaba outlines completos.
+- **Lo construido (M1)**: `outlineAnalysis` (esquinas binarias |giro|>30° + clusters + tramos con sagitta firmada; cmdRange por SEGMENTOS — el rect canónico da exactamente top[1,2]/right[2,3]/bottom[3,4]/left[4,5] per Fase 3); `geometricClassifier` (manga=campana convexa, bodice=escote+sisas cóncavos, front/back=profundidad RELATIVA de escote 0.41 vs 0.14, tira=aspect 11:1) con confianza+razones honestas; `detectSemanticEdges` reescrito sobre tramos (curvatura real, piezas completas); `extractEdges` de autoSew consume la MISMA segmentación (una autoridad); cableado en el import del shell (toast "N clasificadas automáticamente" + aviso honesto de las no clasificadas → override del agente).
+- **Híbrido**: capa LLM (`analyzeGarment`) diferida con issue #885 — el override del agente HOY es `classifyPiece` (ya registrado); la geometría resuelve la camisa de María sin tokens.
+- **Evidencia para M3** (umbral/scorer): con semántica completa, autoSew propone 12 — hombros ✓ y costados ✓, pero las coincidencias de longitud roban pares (tira 456mm ↔ copa 451mm; mitades de tira 228mm ↔ sisas 231mm) y faltan sisa↔copa y tira↔escote. El `it.fails` M1+M3 del contrato M0 queda rojo apuntando exactamente ahí.

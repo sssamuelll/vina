@@ -10,8 +10,9 @@
  * @module autoSew/edgeExtractor
  */
 
-import type { PatternPiece, PathCommand } from '../../types/types';
+import type { PatternPiece } from '../../types/types';
 import { detectSemanticEdges } from '../semanticEdges';
+import { analyzeOutline } from '../outlineAnalysis';
 
 export interface Point2D {
   x: number;
@@ -45,244 +46,114 @@ export interface Edge {
   matchHint?: string;
 }
 
-// ─── Geometry helpers ───────────────────────────────────────────────────────
+// ─── Extraction (single segmentation authority: analyzeOutline) ─────────────
+//
+// M1 (camisa de María): this module used to run its OWN corner detection
+// with a per-segment angle threshold. On real CAD imports — dense polylines
+// whose micro-segments each turn ≤5° — it found ZERO corners, collapsed the
+// whole outline into one `edge-0`, and autoSew paired entire outlines
+// against each other (the `edge-0 ↔ edge-0` failure). Edges now come from
+// the same corner-cluster trams `detectSemanticEdges` uses
+// (`analyzeOutline`), so naming, geometry and pairing share ONE
+// segmentation truth — and the seam proposals reference edge names that
+// actually exist on `piece.edges`.
 
 function dist(a: Point2D, b: Point2D): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-function cubicAt(p0: Point2D, p1: Point2D, p2: Point2D, p3: Point2D, t: number): Point2D {
-  const u = 1 - t;
-  const u2 = u * u;
-  const u3 = u2 * u;
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return {
-    x: u3 * p0.x + 3 * u2 * t * p1.x + 3 * u * t2 * p2.x + t3 * p3.x,
-    y: u3 * p0.y + 3 * u2 * t * p1.y + 3 * u * t2 * p2.y + t3 * p3.y,
-  };
-}
-
-function cubicArcLength(p0: Point2D, p1: Point2D, p2: Point2D, p3: Point2D, samples = 20): number {
-  let length = 0;
-  let prev = p0;
-  for (let i = 1; i <= samples; i++) {
-    const pt = cubicAt(p0, p1, p2, p3, i / samples);
-    length += dist(prev, pt);
-    prev = pt;
-  }
-  return length;
-}
-
-function sampleCubic(p0: Point2D, p1: Point2D, p2: Point2D, p3: Point2D, count = 10): Point2D[] {
-  const pts: Point2D[] = [];
-  for (let i = 0; i <= count; i++) {
-    pts.push(cubicAt(p0, p1, p2, p3, i / count));
-  }
-  return pts;
-}
-
-function angleBetween(v1: Point2D, v2: Point2D): number {
-  const dot = v1.x * v2.x + v1.y * v2.y;
-  const m1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
-  const m2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
-  if (m1 < 1e-9 || m2 < 1e-9) return 0;
-  return Math.acos(Math.max(-1, Math.min(1, dot / (m1 * m2))));
-}
-
-// ─── Corner detection ───────────────────────────────────────────────────────
-
-const CORNER_ANGLE_THRESHOLD = Math.PI / 3; // ~60°
-
-interface SegmentInfo {
-  index: number;
-  startPt: Point2D;
-  endPt: Point2D;
-  arcLength: number;
-  points: Point2D[];
-  dirOut: Point2D;
-  dirIn: Point2D;
-}
-
-function normalize2D(v: Point2D): Point2D {
-  const m = Math.sqrt(v.x * v.x + v.y * v.y);
-  return m > 1e-9 ? { x: v.x / m, y: v.y / m } : { x: 0, y: 0 };
-}
-
-function parseSegments(outline: PathCommand[]): SegmentInfo[] {
-  const segments: SegmentInfo[] = [];
-  let cursor: Point2D = { x: 0, y: 0 };
-
-  for (let i = 0; i < outline.length; i++) {
-    const cmd = outline[i];
-    const v = cmd.values;
-
-    if (cmd.type === 'M') {
-      cursor = { x: v[0], y: v[1] };
-    } else if (cmd.type === 'L') {
-      const end = { x: v[0], y: v[1] };
-      const dx = end.x - cursor.x;
-      const dy = end.y - cursor.y;
-      const len = Math.sqrt(dx * dx + dy * dy);
-      const dir = normalize2D({ x: dx, y: dy });
-      segments.push({
-        index: i,
-        startPt: { ...cursor },
-        endPt: end,
-        arcLength: len,
-        points: [{ ...cursor }, end],
-        dirIn: dir,
-        dirOut: dir,
-      });
-      cursor = end;
-    } else if (cmd.type === 'C') {
-      const p0 = { ...cursor };
-      const p1 = { x: v[0], y: v[1] };
-      const p2 = { x: v[2], y: v[3] };
-      const p3 = { x: v[4], y: v[5] };
-      const len = cubicArcLength(p0, p1, p2, p3);
-      const pts = sampleCubic(p0, p1, p2, p3, 10);
-
-      let dIn = { x: p1.x - p0.x, y: p1.y - p0.y };
-      if (dist(p0, p1) < 1e-9) dIn = { x: p2.x - p0.x, y: p2.y - p0.y };
-
-      let dOut = { x: p3.x - p2.x, y: p3.y - p2.y };
-      if (dist(p2, p3) < 1e-9) dOut = { x: p3.x - p1.x, y: p3.y - p1.y };
-
-      segments.push({
-        index: i,
-        startPt: p0,
-        endPt: p3,
-        arcLength: len,
-        points: pts,
-        dirIn: normalize2D(dIn),
-        dirOut: normalize2D(dOut),
-      });
-      cursor = p3;
-    }
-    // Z: skip
-  }
-  return segments;
-}
-
-function findCorners(segments: SegmentInfo[]): Set<number> {
-  const corners = new Set<number>();
-  if (segments.length < 2) return corners;
-  corners.add(0);
-
-  for (let i = 0; i < segments.length; i++) {
-    const curr = segments[i];
-    const next = segments[(i + 1) % segments.length];
-    const angle = angleBetween(curr.dirOut, next.dirIn);
-    if (angle > CORNER_ANGLE_THRESHOLD) {
-      corners.add((i + 1) % segments.length);
-    }
-  }
-  return corners;
-}
-
-// ─── Edge extraction ────────────────────────────────────────────────────────
-
-export function extractEdges(piece: PatternPiece): Edge[] {
-  const segments = parseSegments(piece.outline);
-  if (segments.length === 0) return [];
-
-  const corners = findCorners(segments);
-  const edges: Edge[] = [];
-
-  if (corners.size <= 1) {
-    const allPts = segments.flatMap(s => s.points);
-    const totalLen = segments.reduce((sum, s) => sum + s.arcLength, 0);
-    const mid = allPts[Math.floor(allPts.length / 2)] || segments[0].startPt;
-    edges.push({
-      pieceId: piece.id,
-      edgeIndex: 0,
-      segStart: segments[0].index,
-      segEnd: segments[segments.length - 1].index,
-      arcLength: totalLen,
-      midpoint: mid,
-      normal: computeNormal(allPts, mid),
-      start: segments[0].startPt,
-      end: segments[segments.length - 1].endPt,
-      points: allPts,
-      name: '',
-    });
-    assignSemanticNames(edges, piece);
-    return edges;
-  }
-
-  const cornerIndices = Array.from(corners).sort((a, b) => a - b);
-  for (let c = 0; c < cornerIndices.length; c++) {
-    const start = cornerIndices[c];
-    const end = cornerIndices[(c + 1) % cornerIndices.length];
-
-    const edgeSegments: SegmentInfo[] = [];
-    let idx = start;
-    while (true) {
-      edgeSegments.push(segments[idx]);
-      idx = (idx + 1) % segments.length;
-      if (idx === end) break;
-      if (edgeSegments.length > segments.length) break;
-    }
-
-    if (edgeSegments.length === 0) continue;
-
-    const allPts = edgeSegments.flatMap(s => s.points);
-    const totalLen = edgeSegments.reduce((sum, s) => sum + s.arcLength, 0);
-    const midIdx = Math.floor(allPts.length / 2);
-    const mid = allPts[midIdx] || edgeSegments[0].startPt;
-
-    edges.push({
-      pieceId: piece.id,
-      edgeIndex: edges.length,
-      segStart: edgeSegments[0].index,
-      segEnd: edgeSegments[edgeSegments.length - 1].index,
-      arcLength: totalLen,
-      midpoint: mid,
-      normal: computeNormal(allPts, mid),
-      start: edgeSegments[0].startPt,
-      end: edgeSegments[edgeSegments.length - 1].endPt,
-      points: allPts,
-      name: '',
-    });
-  }
-
-  assignSemanticNames(edges, piece);
-  return edges;
+  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /**
- * Match extracted edges to semantic edge names using detectSemanticEdges.
- * Falls back to `edge-{index}` when no semantic edge overlaps.
+ * True midpoint + tangent at half the ARC length (not the middle array
+ * element: a straight 2-point tram's middle element is its end corner).
  */
-function assignSemanticNames(edges: Edge[], piece: PatternPiece): void {
-  const semanticEdges = detectSemanticEdges(piece);
-  for (const edge of edges) {
-    const match = semanticEdges.find(se =>
-      se.segmentRange[0] <= edge.segStart && se.segmentRange[1] >= edge.segEnd
-    );
-    edge.name = match?.name ?? `edge-${edge.edgeIndex}`;
-    edge.matchHint = match?.matchHint;
+function arcMidpoint(pts: Point2D[]): { point: Point2D; tangent: Point2D } {
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
   }
+  const target = total / 2;
+  let acc = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1];
+    const b = pts[i];
+    const seg = Math.hypot(b.x - a.x, b.y - a.y);
+    if (acc + seg >= target && seg > 1e-9) {
+      const t = (target - acc) / seg;
+      return {
+        point: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t },
+        tangent: { x: (b.x - a.x) / seg, y: (b.y - a.y) / seg },
+      };
+    }
+    acc += seg;
+  }
+  const last = pts[pts.length - 1];
+  return { point: last, tangent: { x: 1, y: 0 } };
 }
 
-function computeNormal(points: Point2D[], at: Point2D): Point2D {
-  let minDist = Infinity;
-  let closestIdx = 0;
-  for (let i = 0; i < points.length; i++) {
-    const d = dist(points[i], at);
-    if (d < minDist) { minDist = d; closestIdx = i; }
+/** Outward unit normal (away from the piece interior). */
+function outwardNormal(tangent: Point2D, orientation: 1 | -1): Point2D {
+  // With positive orientation (interior on the LEFT of travel) the outward
+  // side is the right: rotate the tangent -90°. Negative orientation flips.
+  return orientation === 1
+    ? { x: tangent.y, y: -tangent.x }
+    : { x: -tangent.y, y: tangent.x };
+}
+
+export function extractEdges(piece: PatternPiece): Edge[] {
+  const analysis = analyzeOutline(piece.outline);
+
+  if (!analysis || analysis.trams.length === 0) {
+    // Degenerate input (open line / too few points): one edge spanning
+    // whatever geometry exists — the old extractor's tolerance, preserved.
+    const pts: Point2D[] = [];
+    let cx = 0, cy = 0;
+    for (const cmd of piece.outline) {
+      if (cmd.type === 'M' || cmd.type === 'L') {
+        cx = cmd.values[0]; cy = cmd.values[1];
+        pts.push({ x: cx, y: cy });
+      }
+    }
+    if (pts.length < 2) return [];
+    let arc = 0;
+    for (let i = 1; i < pts.length; i++) arc += dist(pts[i - 1], pts[i]);
+    const { point, tangent } = arcMidpoint(pts);
+    return [{
+      pieceId: piece.id,
+      edgeIndex: 0,
+      segStart: 0,
+      segEnd: piece.outline.length - 1,
+      arcLength: arc,
+      midpoint: point,
+      normal: outwardNormal(tangent, 1),
+      start: pts[0],
+      end: pts[pts.length - 1],
+      points: pts,
+      name: 'edge-0',
+    }];
   }
 
-  const prev = points[Math.max(0, closestIdx - 1)];
-  const next = points[Math.min(points.length - 1, closestIdx + 1)];
-  const tx = next.x - prev.x;
-  const ty = next.y - prev.y;
-  const tLen = Math.sqrt(tx * tx + ty * ty);
-  if (tLen < 1e-9) return { x: 0, y: 1 };
-  return { x: -ty / tLen, y: tx / tLen };
+  // Same trams, same order — detectSemanticEdges emits exactly one edge per
+  // tram, so names/matchHints align 1:1 by index.
+  const semantic = detectSemanticEdges(piece);
+
+  return analysis.trams.map((tram, i) => {
+    const pts = tram.pts;
+    const { point: midpoint, tangent } = arcMidpoint(pts);
+    return {
+      pieceId: piece.id,
+      edgeIndex: i,
+      segStart: tram.cmdRange[0],
+      segEnd: tram.cmdRange[1] - 1,
+      arcLength: tram.arcLength,
+      midpoint,
+      normal: outwardNormal(tangent, analysis.orientation),
+      start: pts[0],
+      end: pts[pts.length - 1],
+      points: pts,
+      name: semantic[i]?.name ?? `edge-${i}`,
+      matchHint: semantic[i]?.matchHint,
+    };
+  });
 }
 
 export function extractAllEdges(pieces: PatternPiece[]): Edge[] {

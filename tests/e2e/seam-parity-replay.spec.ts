@@ -504,26 +504,28 @@ test.describe('Seam parity replay — patrón real de María', () => {
       .toBe(5);
 
     const pieces = (await getState<
-      Array<{ id: string; outline: unknown[]; edges?: Array<{ name: string }> }>
+      Array<{ id: string; outline: unknown[]; category?: string; side?: string; edges?: Array<{ name: string }> }>
     >(page, 'project.pieces'))!;
     // Outlines curvos de verdad — el patrón sintético nunca pasa de ~6 comandos.
     expect(pieces.filter((p) => p.outline.length > 100).length).toBeGreaterThanOrEqual(3);
 
+    // M1 (camisa de María): el import clasifica automáticamente por
+    // geometría — los bloques CAD sin nombre útil reciben category/side y
+    // los edges salen con anatomía real (armhole/neckline/sideSeam).
+    const cats = pieces.map((p) => p.category);
+    expect(cats.filter((c) => c === 'bodice')).toHaveLength(2);
+    expect(cats.filter((c) => c === 'sleeve')).toHaveLength(2);
+    expect(new Set(pieces.filter((p) => p.category === 'bodice').map((p) => p.side)))
+      .toEqual(new Set(['front', 'back']));
+
     // El import DXF NO auto-cose (by design, fixtures README) — cosemos los
-    // costadillos delantero↔espalda: las dos piezas bodice (patrón de 5 edges
-    // con left/right) excluyendo la tira pequeña.
-    const bodices = pieces.filter(
-      (p) =>
-        p.outline.length > 50 &&
-        p.edges?.length === 5 &&
-        p.edges.some((e) => e.name === 'rightEdge') &&
-        p.edges.some((e) => e.name === 'leftEdge'),
-    );
-    expect(bodices.length).toBe(2);
-    const [front, back] = bodices;
+    // costadillos delantero↔espalda con los nombres SEMÁNTICOS nuevos.
+    const front = pieces.find((p) => p.category === 'bodice' && p.side === 'front')!;
+    const back = pieces.find((p) => p.category === 'bodice' && p.side === 'back')!;
+    expect(front.edges!.some((e) => e.name.startsWith('armhole'))).toBe(true);
     for (const [i, [aEdge, bEdge]] of [
-      ['rightEdge', 'leftEdge'],
-      ['leftEdge', 'rightEdge'],
+      ['sideSeam', 'sideSeam'],
+      ['sideSeam-2', 'sideSeam-2'],
     ].entries()) {
       await dispatch(page, {
         type: 'project/addSeam',
@@ -532,8 +534,10 @@ test.describe('Seam parity replay — patrón real de María', () => {
     }
     await expect(page.locator('g.seam-connection')).toHaveCount(2);
 
-    // Sim en el tier por defecto: los costadillos curvos resuelven a
-    // constraints de verdad (≈146 con SEAM_MAX_EDGE_LENGTH=15) y ninguno a 0.
+    // Sim en el tier por defecto: los dos costadillos de 340mm resuelven a
+    // ≈24 pares cada uno (SEAM_MAX_EDGE_LENGTH=15) y ninguno a 0. (El viejo
+    // ≈146 venía de edges zonales que abarcaban costado+sisa+hombro de más
+    // — los sideSeam semánticos de M1 son el costado exacto.)
     await switchView(page, '3D');
     await startSimulation(page);
     await expect
@@ -545,7 +549,7 @@ test.describe('Seam parity replay — patrón real de María', () => {
       totalConstraints: number;
       zeroConstraintSeams: unknown[];
     }>(page, 'simulation.seamResolution');
-    expect(summary!.totalConstraints).toBeGreaterThan(100);
+    expect(summary!.totalConstraints).toBeGreaterThan(40);
     expect(summary!.zeroConstraintSeams).toHaveLength(0);
     await expect(page.locator('text=/seam constraints/')).toBeVisible({ timeout: 10_000 });
   });
