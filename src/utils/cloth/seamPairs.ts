@@ -82,6 +82,12 @@ export interface PieceWithOutline {
   pieceId: string;
   outline: Array<{ type: string; values: number[] }>;
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
+  /**
+   * Boundary-subdivision maxEdgeLength (mm) the MESHER used for this piece
+   * (= per-piece particleDistance). MUST match or the reconstructed vertex
+   * numbering drifts — see `PieceSeamData` in seamAssembly (M4).
+   */
+  meshMaxEdgeLength?: number;
 }
 
 function toPathCommands(outline: PieceWithOutline['outline']): PathCommand[] {
@@ -248,13 +254,16 @@ function resolveSeamVertexPairs(
     );
   }
 
+  // Per-piece boundary subdivision mirrors the mesher (M4 — see
+  // PieceWithOutline.meshMaxEdgeLength); keeps GPU pair-count parity with
+  // buildSeamConstraints, which threads the same per-piece value.
   let edgeA = parameterizeEdge(
     toPathCommands(pieceA.outline),
     rangeA[0],
     rangeA[1],
     0,
     SEAM_CURVE_RESOLUTION,
-    SEAM_MAX_EDGE_LENGTH,
+    pieceA.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
   );
   // Direction (Fase 5): mirror `buildSeamConstraints` — the B half may be
   // traversed end→start, pairing A's t=0 with B's t=1.
@@ -264,7 +273,7 @@ function resolveSeamVertexPairs(
     rangeB[1],
     0,
     SEAM_CURVE_RESOLUTION,
-    SEAM_MAX_EDGE_LENGTH,
+    pieceB.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
     seam.pieceBReversed === true,
   );
 

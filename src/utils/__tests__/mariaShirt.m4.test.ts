@@ -1,0 +1,237 @@
+/**
+ * M4 — sonda del camino de costura completo sobre el patrón real de María
+ * (docs/plans/2026-06-12-maria-shirt-plan.md, fase M4).
+ *
+ * Reproduce el camino de producción ENTERO en node — mesher puro (mismas
+ * opciones que SimulationInitClient), placement anatómico, transformación
+ * Euler de GarmentSimulation, mergeMeshes y buildSeamConstraints — y mide
+ * cada costura propuesta en espacio MUNDO.
+ *
+ * Lo que esta sonda desenterró (paciente cero del drape, M4-A):
+ * `parameterizeEdge` reconstruye la numeración de vértices de frontera del
+ * mesher subdividiendo a SEAM_MAX_EDGE_LENGTH=15mm, pero producción meshea
+ * a particleDistance=5mm — los índices derivaban y las 260 constraints
+ * cosían spans comprimidos a ⅓ de cada edge sobre vértices equivocados
+ * (TODA costura de producción, no solo María). Contrato pineado abajo:
+ * spans completos con el meshMaxEdgeLength por pieza.
+ *
+ * Pendiente (target rojo, M4-C): el emparejamiento por nombre 2D conecta
+ * lados opuestos del cuerpo (espejo X de la espalda) y los CAD reales no
+ * garantizan orientación 2D consistente entre piezas — emparejamiento y
+ * dirección deben resolverse en espacio mundo tras el placement.
+ */
+import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { importDXFContent } from '../../utils/dxf';
+import { detectSemanticEdges } from '../semanticEdges';
+import { classifyPiecesGeometric } from '../geometricClassifier';
+import { autoSew } from '../autoSew';
+import { meshPiece } from '../mesh';
+import { placeGarmentPieces } from '../cloth/garmentPlacement';
+import { mergeMeshes, buildSeamConstraints } from '../cloth/seamAssembly';
+import type { PatternPiece, Seam } from '../../types/types';
+
+const FIXTURE = resolve(__dirname, '../../../tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
+
+const MEASUREMENTS = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 };
+
+/** Mismas opciones que SimulationInitClient.meshPiece (producción). */
+const MESH_OPTIONS = {
+  yHeight: 0,
+  scale: 0.001,
+  maxEdgeLength: 5, // simulationSlice.particleDistance default
+  minAngle: 25,
+  maxRefinementPasses: 3,
+  curveResolution: 12,
+};
+
+function importClassified(): PatternPiece[] {
+  const pieces = importDXFContent(readFileSync(FIXTURE, 'utf-8'), { unit: 'auto', autoDetect: true }).pieces;
+  const map = classifyPiecesGeometric(pieces);
+  for (const p of pieces) {
+    const c = map.get(p.id)!;
+    if (c.category !== 'other') {
+      p.category = c.category;
+      if (c.side) p.side = c.side;
+    }
+    p.edges = detectSemanticEdges(p);
+  }
+  return pieces;
+}
+
+/** Transformación rígida EXACTA de GarmentSimulation.placedMeshes (Euler XYZ + traslación). */
+function transformVertices(
+  vertices: Float32Array,
+  rotation: [number, number, number],
+  position: [number, number, number],
+): Float32Array {
+  const [rx, ry, rz] = rotation;
+  const [px, py, pz] = position;
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  const out = new Float32Array(vertices.length);
+  for (let vi = 0; vi < vertices.length / 3; vi++) {
+    const vx = vertices[vi * 3], vy = vertices[vi * 3 + 1], vz = vertices[vi * 3 + 2];
+    const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
+    const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
+    const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
+    out[vi * 3] = x3 + px;
+    out[vi * 3 + 1] = y3 + py;
+    out[vi * 3 + 2] = z2 + pz;
+  }
+  return out;
+}
+
+interface WorldSeam {
+  label: string;
+  pairCount: number;
+  /** Σ distancias con el emparejamiento actual. */
+  straightSum: number;
+  /** Σ distancias emparejando t=0↔t=1 (espejo). Si es claramente menor, la costura cruza. */
+  flippedSum: number;
+  crossed: boolean;
+  meanPairDist: number;
+  /** Posiciones mundo del primer y último par [Ax,Ay,Az, Bx,By,Bz] — diagnóstico. */
+  firstPair: number[];
+  lastPair: number[];
+}
+
+/** Construye el estado mundo de producción y mide cada costura propuesta. */
+function probeSeams(pieces: PatternPiece[], seams: Seam[]): { worldSeams: WorldSeam[]; particleCount: number } {
+  const placements = placeGarmentPieces(pieces, MEASUREMENTS);
+  const meshed = pieces.map((p, i) => {
+    const mesh = meshPiece(p, MESH_OPTIONS);
+    return {
+      pieceId: p.id,
+      vertices: transformVertices(mesh.vertices, placements[i].rotation, placements[i].position),
+      triIds: mesh.triIds,
+    };
+  });
+  const merged = mergeMeshes(meshed);
+  const outlines = new Map(pieces.map(p => [p.id, p.outline]));
+  // meshMaxEdgeLength: el contrato de índices de frontera (M4) — los
+  // constraints DEBEN subdividir con el mismo valor que meshPiece usó.
+  const pieceMap = new Map(pieces.map(p => [
+    p.id,
+    { edges: p.edges, meshMaxEdgeLength: MESH_OPTIONS.maxEdgeLength },
+  ]));
+
+  const catOf = (id: string) => pieces.find(p => p.id === id)?.category ?? '?';
+  const worldSeams: WorldSeam[] = [];
+
+  for (const seam of seams) {
+    // Una costura por llamada para atribuir los pares a SU seam.
+    const set = buildSeamConstraints([seam], outlines, merged, pieceMap);
+    if (set.count === 0) continue;
+
+    const pos = merged.vertices;
+    let straightSum = 0;
+    for (let k = 0; k < set.count; k++) {
+      const ai = set.ids[2 * k] * 3, bi = set.ids[2 * k + 1] * 3;
+      straightSum += Math.hypot(pos[ai] - pos[bi], pos[ai + 1] - pos[bi + 1], pos[ai + 2] - pos[bi + 2]);
+    }
+    // Espejo: el lado B recorrido al revés (lo que produciría reversed=true).
+    let flippedSum = 0;
+    for (let k = 0; k < set.count; k++) {
+      const ai = set.ids[2 * k] * 3;
+      const bi = set.ids[2 * (set.count - 1 - k) + 1] * 3;
+      flippedSum += Math.hypot(pos[ai] - pos[bi], pos[ai + 1] - pos[bi + 1], pos[ai + 2] - pos[bi + 2]);
+    }
+
+    const pairPos = (k: number): number[] => {
+      const ai = set.ids[2 * k] * 3, bi = set.ids[2 * k + 1] * 3;
+      return [pos[ai], pos[ai + 1], pos[ai + 2], pos[bi], pos[bi + 1], pos[bi + 2]];
+    };
+
+    worldSeams.push({
+      label: `${catOf(seam.pieceA.pieceId)}:${seam.pieceA.edgeName} ↔ ${catOf(seam.pieceB.pieceId)}:${seam.pieceB.edgeName}`,
+      pairCount: set.count,
+      straightSum,
+      flippedSum,
+      // Margen del 20%: una costura derecha puede tener flipped ligeramente
+      // menor por geometría curva; un cruce real es drásticamente menor.
+      crossed: flippedSum < straightSum * 0.8,
+      meanPairDist: straightSum / set.count,
+      firstPair: pairPos(0),
+      lastPair: pairPos(set.count - 1),
+    });
+  }
+
+  return { worldSeams, particleCount: merged.vertices.length / 3 };
+}
+
+describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en mundo', () => {
+  it('ninguna de las costuras del autoSew cose en X tras el placement anatómico', { timeout: 60_000 }, () => {
+    const pieces = importClassified();
+    const result = autoSew(pieces, { minConfidence: 0.3 });
+    expect(result.seams.length).toBeGreaterThanOrEqual(6);
+
+    const { worldSeams, particleCount } = probeSeams(pieces, result.seams.map(s => s.seam));
+
+    // Telemetría de la sonda (diagnóstico M4, no assertion):
+     
+    console.log(`[M4 probe] partículas totales: ${particleCount}`);
+    const fmt = (v: number[]) => `A(${v[0].toFixed(2)},${v[1].toFixed(2)},${v[2].toFixed(2)})↔B(${v[3].toFixed(2)},${v[4].toFixed(2)},${v[5].toFixed(2)})`;
+    for (const ws of worldSeams) {
+       
+      console.log(
+        `[M4 probe] ${ws.label}: ${ws.pairCount} pares, derecho=${ws.straightSum.toFixed(3)}m, ` +
+        `espejo=${ws.flippedSum.toFixed(3)}m, media=${(ws.meanPairDist * 100).toFixed(1)}cm → ${ws.crossed ? 'CRUZADA ✗' : 'derecha ✓'}\n` +
+        `           primero ${fmt(ws.firstPair)} | último ${fmt(ws.lastPair)}`,
+      );
+    }
+
+    // Sanidad: las costuras resuelven a constraints reales.
+    expect(worldSeams.length).toBeGreaterThanOrEqual(6);
+    for (const ws of worldSeams) expect(ws.pairCount).toBeGreaterThan(0);
+
+    // CONTRATO M4-A (contrato de índices de frontera): el span mundo de
+    // cada costura cubre el edge COMPLETO. Antes del fix, parameterizeEdge
+    // reconstruía la numeración del mesher con SEAM_MAX_EDGE_LENGTH=15mm
+    // mientras el mesh subdividía a particleDistance=5mm → los índices
+    // derivaban y cada costura cosía un span comprimido a ⅓ del edge
+    // (sideSeam de 340mm → 11cm de vértices equivocados). Con el contrato
+    // arreglado, 70 pares × 5mm ≈ 350mm reconstruyen el costadillo entero.
+    const sideSeams = worldSeams.filter(ws => /sideSeam/.test(ws.label));
+    expect(sideSeams.length).toBeGreaterThanOrEqual(2);
+    for (const ws of sideSeams) {
+      // 340mm de edge a 5mm de subdivisión → ≥60 pares (vs 24 con el bug).
+      expect(ws.pairCount).toBeGreaterThanOrEqual(60);
+      // Span 3D del lado A ≈ longitud real del edge (no comprimido).
+      const [ax0, ay0, az0] = ws.firstPair;
+      const [ax1, ay1, az1] = ws.lastPair;
+      const spanA = Math.hypot(ax1 - ax0, ay1 - ay0, az1 - az0);
+      expect(spanA).toBeGreaterThan(0.25); // 340mm de cuerda menos curvatura
+    }
+
+    // CONTRATO M4 (dirección): cero costuras cruzadas dentro de sí mismas.
+    const crossed = worldSeams.filter(ws => ws.crossed);
+    expect(crossed.map(ws => ws.label)).toEqual([]);
+  });
+
+  // ── TARGET (rojo hasta M4-C: emparejamiento en espacio mundo) ────────────
+  //
+  // La sonda con el contrato de índices arreglado revela que autoSew
+  // empareja por NOMBRE 2D: el sideSeam izquierdo-2D del delantero cose con
+  // el izquierdo-2D de la espalda — pero la rotación π de la espalda espeja
+  // X, así que conecta lados OPUESTOS del cuerpo en diagonal (media de par
+  // 63cm vs los ~37cm del gap delantero↔espalda). Además los patrones CAD
+  // reales no garantizan orientación 2D consistente: una pieza puede estar
+  // bocabajo en mundo (armhole del delantero en y≈0.98 vs escote de la
+  // espalda en y≈1.51). El done de M4-C: emparejamiento y dirección se
+  // resuelven en espacio MUNDO tras el placement.
+  it.fails('M4-C: cada costura conecta edges CERCANOS en mundo (sin diagonales por el torso)', { timeout: 60_000 }, () => {
+    const pieces = importClassified();
+    const result = autoSew(pieces, { minConfidence: 0.3 });
+    const { worldSeams } = probeSeams(pieces, result.seams.map(s => s.seam));
+
+    // Gap delantero↔espalda = 2×(chestRadius+GAP) ≈ 0.366m. Una costura
+    // bien emparejada promedia MENOS que eso (los edges convergen); las
+    // diagonales lado-opuesto promedian 0.5-0.7m.
+    for (const ws of worldSeams) {
+      expect(ws.meanPairDist, ws.label).toBeLessThan(0.45);
+    }
+  });
+});

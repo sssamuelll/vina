@@ -43,6 +43,13 @@ export interface MeshedPiece {
   uvs?: Float32Array;
   /** Per-piece stiffness multiplier (>1 = stiffer, from interfacing/solidify). Default 1. */
   stiffnessMultiplier?: number;
+  /**
+   * Boundary-subdivision maxEdgeLength (mm) this piece was MESHED with
+   * (= its particleDistance). Seam/elastic builders downstream re-derive
+   * the mesher's boundary vertex numbering and must subdivide with the
+   * same value (M4 — see `PieceSeamData` in seamAssembly).
+   */
+  meshMaxEdgeLength?: number;
 }
 
 interface UseMeshingProps {
@@ -92,6 +99,7 @@ export function useMeshing({
           ...m,
           outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
           edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
+          meshMaxEdgeLength: pieceParticleDistances[m.pieceId] ?? globalParticleDistance,
         };
       });
 
@@ -161,6 +169,7 @@ export function useMeshing({
               ...m,
               outline: (piece?.outline ?? []) as Array<{ type: string; values: number[] }>,
               edges: piece?.edges?.map(e => ({ name: e.name, segmentRange: e.segmentRange })),
+              meshMaxEdgeLength: pieceParticleDistances[m.pieceId] ?? globalParticleDistance,
             };
           }));
 

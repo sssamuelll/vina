@@ -41,6 +41,13 @@ export interface PieceMeshData {
   edges?: Array<{ name: string; segmentRange: [number, number] }>;
   /** UV coordinates [u0,v0, u1,v1, ...] for anisotropic stretch */
   uvs?: Float32Array;
+  /**
+   * Boundary-subdivision maxEdgeLength (mm) the mesher used for this piece
+   * (= per-piece particleDistance). Seam/elastic constraint builders MUST
+   * subdivide with the same value or vertex indices drift (M4 — see
+   * `PieceSeamData` in seamAssembly).
+   */
+  meshMaxEdgeLength?: number;
 }
 
 /**

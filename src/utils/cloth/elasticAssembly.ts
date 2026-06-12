@@ -4,8 +4,8 @@
  * @module elasticAssembly
  */
 
-import type { Elastic, ElasticType, PathCommand, SemanticEdge } from '../../types/types';
-import { parameterizeEdge } from './seamAssembly';
+import type { Elastic, ElasticType, PathCommand } from '../../types/types';
+import { parameterizeEdge, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH, type PieceSeamData } from './seamAssembly';
 import { commandRangeToFlattened } from '../seam/index';
 
 export interface ElasticConstraint {
@@ -35,7 +35,7 @@ export function buildElasticConstraints(
   elastics: Elastic[],
   outlines: Map<string, PathCommand[]>,
   mergedMesh: MergedMeshInfo,
-  pieces?: Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>,
+  pieces?: Map<string, PieceSeamData>,
 ): ElasticConstraintSet {
   const constraints: ElasticConstraint[] = [];
 
@@ -55,11 +55,15 @@ export function buildElasticConstraints(
     // parameterizeEdge consumes (Fase 3 / BP-3). Same default resolution
     // on both sides (CURVE_RESOLUTION = SEAM_CURVE_RESOLUTION = 12).
     const [flatStart, flatEnd] = commandRangeToFlattened(outline, edgeDef.segmentRange);
+    // Boundary subdivision MUST mirror the mesher's per-piece value (M4
+    // patient zero — see PieceSeamData.meshMaxEdgeLength in seamAssembly).
     let vertices = parameterizeEdge(
       outline,
       flatStart,
       flatEnd,
       offset.vertexOffset,
+      SEAM_CURVE_RESOLUTION,
+      pieceData.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
     );
 
     vertices = vertices.filter(v => v.t >= elastic.tStart && v.t <= elastic.tEnd);

@@ -109,8 +109,32 @@ function findPieceOffsetById(index: readonly PieceOffsetIndexEntry[], pieceId: s
 
 /** Curve flattening resolution shared across CPU/WASM seam construction and GPU seam-pair extraction. MUST match across tiers (pair count parity invariant). */
 export const SEAM_CURVE_RESOLUTION = 12;
-/** Maximum edge length before CDT subdivision. MUST match across tiers (pair count parity invariant). */
+/**
+ * FALLBACK boundary-subdivision length (mm) for legacy callers that don't
+ * declare the mesher's real value. `parameterizeEdge` reconstructs the CDT
+ * mesher's boundary vertex NUMBERING — both sides must subdivide with the
+ * SAME maxEdgeLength or every seam/elastic constraint addresses wrong mesh
+ * vertices. Production meshes at `simulation.particleDistance` (default
+ * 5mm), so consumers MUST thread that per-piece value via
+ * `PieceSeamData.meshMaxEdgeLength`; this pinned 15 only remains as the
+ * default for tests/tools that mesh at the historic value.
+ *
+ * (M4 camisa de María, paciente cero del drape: mesh a 5mm + costuras
+ * reconstruidas a 15mm cosían spans comprimidos a ⅓ de cada edge — 260
+ * constraints de producción uniendo vértices equivocados.)
+ */
 export const SEAM_MAX_EDGE_LENGTH = 15;
+
+/**
+ * Per-piece data consumed by seam/elastic constraint builders: semantic
+ * edges for name→range resolution, plus the boundary-subdivision length the
+ * MESHER actually used for this piece (see SEAM_MAX_EDGE_LENGTH docs).
+ */
+export interface PieceSeamData {
+  edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>>;
+  /** maxEdgeLength (mm) the CDT mesher subdivided this piece's boundary with. */
+  meshMaxEdgeLength?: number;
+}
 
 // ─── Default Config ─────────────────────────────────────────────────────────
 
@@ -468,7 +492,7 @@ export function buildSeamConstraints(
   seams: Seam[],
   outlines: Map<string, PathCommand[]>,
   mergedMesh: MergedMesh,
-  pieces?: Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>,
+  pieces?: Map<string, PieceSeamData>,
   config: SeamConstraintConfig = DEFAULT_SEAM_CONFIG,
 ): SeamConstraintSet {
   const allPairs: Array<{ idA: number; idB: number; compliance: number; tension: number }> = [];
@@ -533,13 +557,15 @@ export function buildSeamConstraints(
 
     if (!rangeA || !rangeB) continue;
 
-    // TODO: pass curveResolution / maxEdgeLength from config (currently
-    // pinned to SEAM_CURVE_RESOLUTION / SEAM_MAX_EDGE_LENGTH to keep CPU/
-    // WASM/GPU pair-count parity — see seamPairs.ts).
+    // Boundary subdivision MUST mirror what the mesher used for EACH piece
+    // (per-piece particleDistance) or indices drift — see PieceSeamData.
+    // curveResolution stays pinned to SEAM_CURVE_RESOLUTION (parity).
     // Direction (Fase 5): the B half may be reversed relative to A —
     // parameterizeEdge mirrors t so matching pairs A:t=0 with B:t=1.
-    let edgeA = parameterizeEdge(outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH);
-    let edgeB = parameterizeEdge(outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, SEAM_MAX_EDGE_LENGTH, seam.pieceB.reversed === true);
+    const maxEdgeA = pieceAData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH;
+    const maxEdgeB = pieceBData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH;
+    let edgeA = parameterizeEdge(outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, maxEdgeA);
+    let edgeB = parameterizeEdge(outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, maxEdgeB, seam.pieceB.reversed === true);
 
     // Apply t-range filtering: restrict parameterized vertices to the sub-range
     if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {
