@@ -329,7 +329,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   const activeElastics = useMemo(() => elastics.filter(e => e.active !== false), [elastics]);
 
-  const { clients, positionsRef, edgeDataRef, onFrame, tslSolverRef } = useSimulationLifecycle({
+  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
     elastics: activeElastics,
@@ -466,6 +466,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       renderer.compute(solver.normalZero);
       renderer.compute(solver.normalAccum);
       renderer.compute(solver.normalNormalize);
+
+      // F0 (#897): en TSL la cadencia de render == cadencia de sim.
+      recordFrameTick();
 
       // GPU→CPU position readback — keeps CPU geometry in sync with GPU positions
       // so raycasting (for grab/brush tools) works against actual cloth position.
