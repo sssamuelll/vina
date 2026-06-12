@@ -446,3 +446,34 @@ export function placeGarmentPieces(
     });
   });
 }
+
+// ─── Arrangement overrides (camisa de María plan, M2) ────────────────────────
+
+/**
+ * Apply the user's arrange-mode drag positions on top of the computed
+ * anatomical placements.
+ *
+ * M2 fix (hallazgo A del diagnóstico del blob, ya sospechado por el
+ * addendum v3 del DoD #506): `arrangementOverrides` — escrito por el drag
+ * de DraggablePiece y leído por TODA la vista arrange (DraggablePiece,
+ * SeamRenderer3D, Sew3DTool) — nunca llegaba al solver: `placedMeshes`
+ * usaba solo `placeGarmentPieces`, así que al pulsar Simulate la
+ * colocación manual del usuario se descartaba en silencio. Esta función
+ * es el cable: la simulación arranca EXACTAMENTE donde la vista arrange
+ * dice que están las piezas.
+ *
+ * Only POSITION is overridable (the drag surface moves pieces; rotation
+ * stays anatomical). Pieces without an override keep their computed
+ * placement untouched.
+ */
+export function applyArrangementOverrides(
+  placements: PlacementResult[],
+  pieces: Array<{ id: string }>,
+  overrides: Record<string, [number, number, number]> | undefined,
+): PlacementResult[] {
+  if (!overrides || Object.keys(overrides).length === 0) return placements;
+  return placements.map((placement, i) => {
+    const override = overrides[pieces[i]?.id];
+    return override ? { ...placement, position: override } : placement;
+  });
+}

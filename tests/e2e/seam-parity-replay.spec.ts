@@ -554,3 +554,60 @@ test.describe('Seam parity replay — patrón real de María', () => {
     await expect(page.locator('text=/seam constraints/')).toBeVisible({ timeout: 10_000 });
   });
 });
+
+// ─── Replay M2: el drag de arrange LLEGA al solver ───────────────────────────
+//
+// Hallazgo A del diagnóstico del blob (sospechado ya por el addendum v3 del
+// DoD #506): arrangementOverrides alimentaba TODA la vista arrange
+// (DraggablePiece, SeamRenderer3D, Sew3DTool) pero el solver la ignoraba —
+// Simulate descartaba en silencio la colocación manual. Este replay pinea
+// el cable: piezas de María, una arrastrada lejos, la sim arranca ahí.
+
+test.describe('Seam parity replay — arrange→solver (M2)', () => {
+  test('la pieza arrastrada en arrange simula DONDE el usuario la dejó', async ({ page }) => {
+    test.setTimeout(180_000);
+    await waitFor2D(page);
+
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const fixture = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/garments/maria_patrones_samuel_2M.dxf',
+    );
+    await page.locator('input[accept=".dxf"]').setInputFiles(fixture);
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.pieces')) ?? []).length, {
+        timeout: 30_000,
+      })
+      .toBe(5);
+
+    // Drag simulado: la tira (collar) a un punto inconfundible, lejos del
+    // rango anatómico (|x| < ~0.6m).
+    const pieces = (await getState<Array<{ id: string; category?: string }>>(page, 'project.pieces'))!;
+    const strip = pieces.find((p) => p.category === 'collar')!;
+    await dispatch(page, {
+      type: 'project/setArrangement3D',
+      payload: { pieceId: strip.id, position: [1.8, 1.2, 0] },
+    });
+
+    await switchView(page, '3D');
+    await startSimulation(page);
+    await expect
+      .poll(async () => getState<string>(page, 'simulation.solverTier'), { timeout: 60_000 })
+      .not.toBe('none');
+
+    // El cloth mesh fusionado debe contener vértices cerca de x=1.8 — solo
+    // posible si el override llegó a placedMeshes (antes del fix: max |x|
+    // anatómico ≈ 0.6m y el assert falla).
+    const maxX = await page.evaluate(() => {
+      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: { geometry: { getAttribute: (n: string) => { array: Float32Array } } } }).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      const arr = mesh.geometry.getAttribute('position').array;
+      let mx = -Infinity;
+      for (let i = 0; i < arr.length; i += 3) if (arr[i] > mx) mx = arr[i];
+      return mx;
+    });
+    expect(maxX).not.toBeNull();
+    expect(maxX!).toBeGreaterThan(1.2);
+  });
+});
