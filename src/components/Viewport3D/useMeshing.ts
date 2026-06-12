@@ -29,6 +29,7 @@ import { SimulationInitClient } from '../../utils/cloth/simulationInitClient';
 import { classifyEdit } from '../../utils/cloth/editClassifier';
 import { computeRestLengths } from '../../utils/cloth/restLengthComputer';
 import { setParticleCount, setIsWarmStarting } from '../../store/simulationSlice';
+import { showErrorToast } from '../../store/copilotUISlice';
 import type { SimulationClients } from './useSimulationLifecycle';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -95,6 +96,23 @@ export function useMeshing({
     (async () => {
       const meshed = await client.meshAllPieces(pieces, pieceParticleDistances, globalParticleDistance);
       if (cancelled) return;
+
+      // Noisy meshing failure (#895, CLO3D doctrine: explicit message +
+      // exclude the piece, never silence). Before this, a piece whose CDT
+      // failed or timed out was dropped with at most a console.warn — the
+      // sim then started with N-1 pieces and every seam referencing the
+      // missing piece resolved to 0 constraints ("missing piece"), which
+      // is how María's front bodice vanished in production unnoticed.
+      if (meshed.length < pieces.length) {
+        const meshedIds = new Set(meshed.map(m => m.pieceId));
+        const missing = pieces.filter(p => !meshedIds.has(p.id));
+        for (const p of missing) {
+          dispatch(showErrorToast(
+            `La pieza «${p.name}» no se pudo mallar y queda fuera de la simulación — ` +
+            'su contorno puede tener problemas; prueba a subir su densidad de partícula o simplificarlo',
+          ));
+        }
+      }
 
       const result = meshed.map(m => {
         const piece = pieces.find(p => p.id === m.pieceId);

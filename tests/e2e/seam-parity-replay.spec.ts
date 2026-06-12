@@ -725,6 +725,16 @@ test.describe('Seam parity replay — drape sobre el avatar (M4)', () => {
       .poll(async () => getState<boolean>(page, 'simulation.bodyCollision'), { timeout: 30_000 })
       .toBe(true);
 
+    // #895: las CINCO piezas malladas. El bug de producción (lazo abierto
+    // de 1 ulp → CDT 0 triángulos → timeout del fallback) descartaba el
+    // delantero EN SILENCIO: la sim arrancaba con 4 piezas / ~18.6k
+    // partículas y 7 de 8 costuras a cero constraints — y este replay
+    // pasaba porque solo asertaba >100 constraints. El total real a 5mm
+    // es ~29.3k; el umbral detecta cualquier pieza grande ausente.
+    expect(await getState<number>(page, 'simulation.particleCount')).toBeGreaterThan(25_000);
+    const resolution = await getState<{ zeroConstraintSeams: unknown[] }>(page, 'simulation.seamResolution');
+    expect(resolution!.zeroConstraintSeams).toHaveLength(0);
+
     // Drape real: ~25s de sim de pared (las costuras cierran y la prenda
     // se asienta — calibrado en local a ~20s con margen CI).
     await page.waitForTimeout(25_000);

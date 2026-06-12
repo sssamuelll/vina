@@ -168,20 +168,18 @@ export function meshPieceOutline(
   }
 
   if (triangles.length === 0) {
-    console.warn('[cdtMesher] CDT returned 0 interior triangles. Trying fallback with exterior:true...');
-    try {
-      triangles = cdt2d(allPoints, edges, {
-        interior: true,
-        exterior: true,
-      });
-    } catch (error) {
-      console.error('[cdtMesher] All CDT attempts failed:', error);
-      return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
-    }
-  }
-
-  if (triangles.length === 0) {
-    console.error('[cdtMesher] Still 0 triangles after fallback. Points:', allPoints.length, 'Edges:', edges.length);
+    // #895: NO exterior:true fallback. It doubled the cdt2d cost (timeout
+    // in the browser worker) and — worse — triangulated the CONVEX HULL,
+    // silently capping necklines and armholes with fabric. 0 interior
+    // triangles means the boundary loop is broken (open chain /
+    // self-intersection); the honest answer is an empty mesh that the
+    // caller surfaces LOUDLY to the user (CLO3D's pattern: explicit
+    // message + exclude the piece, never a wrong mesh).
+    console.error(
+      '[cdtMesher] CDT returned 0 interior triangles — boundary loop is not closed/valid. ' +
+      `Points: ${allPoints.length}, edges: ${edges.length}. Piece will be excluded from meshing.`,
+    );
+    return { vertices: new Float32Array(0), triIds: new Int32Array(0) };
   }
 
   return convertToClothMeshData(allPoints, triangles, config, allOrig);
@@ -324,13 +322,27 @@ function convertToPSLG(
   const points: number[][] = [];
   const edges: number[][] = [];
 
+  // Chain-continuity epsilon (#895): consecutive addSubdividedEdge calls
+  // share p2→p1; comparing with exact equality let a 1-ulp float mismatch
+  // (≈5e-15 mm — see the subdivision endpoint note below) insert TWO
+  // nearly-coincident points with NO edge between them. cdt2d's interior
+  // flood-fill escapes through that invisible gap, classifies everything
+  // as exterior, and returns 0 interior triangles (María's front bodice,
+  // 2/2 reproducible in prod). 1e-9 mm is 5 orders above ulp noise and 6
+  // below any real pattern feature.
+  const CHAIN_EPS = 1e-9;
+
   function addSubdividedEdge(p1: Point2D, p2: Point2D) {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     let startIdx = points.length - 1;
-    if (startIdx < 0 || points[startIdx][0] !== p1.x || points[startIdx][1] !== p1.y) {
+    if (
+      startIdx < 0 ||
+      Math.abs(points[startIdx][0] - p1.x) > CHAIN_EPS ||
+      Math.abs(points[startIdx][1] - p1.y) > CHAIN_EPS
+    ) {
       points.push([p1.x, p1.y]);
       startIdx = points.length - 1;
     }
@@ -343,7 +355,15 @@ function convertToPSLG(
       let prevIdx = startIdx;
       for (let i = 1; i <= numSegments; i++) {
         const t = i / numSegments;
-        points.push([p1.x + dx * t, p1.y + dy * t]);
+        // #895: the FINAL subdivision point must be p2 EXACTLY — computing
+        // it as p1 + d·1.0 differs from p2 by up to 1 ulp in float, which
+        // broke the closed loop (see CHAIN_EPS note). Interior points stay
+        // interpolated.
+        if (i === numSegments) {
+          points.push([p2.x, p2.y]);
+        } else {
+          points.push([p1.x + dx * t, p1.y + dy * t]);
+        }
         const currIdx = points.length - 1;
         edges.push([prevIdx, currIdx]);
         prevIdx = currIdx;
