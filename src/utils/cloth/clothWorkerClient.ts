@@ -104,7 +104,7 @@ export class ClothWorkerClient implements ClothSolverClient {
    * @returns Promise that resolves when worker is ready
    */
   async initMultiPiece(
-    pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }>; stiffnessMultiplier?: number; pressurePa?: number; internals?: Array<{ id: string; type: string; path: Array<{ type: string; values: number[] }>; foldOptions?: { direction: string; creaseAngleDeg: number; pleatId?: string } }> }>,
+    pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }>; stiffnessMultiplier?: number; pressurePa?: number; meshMaxEdgeLength?: number; internals?: Array<{ id: string; type: string; path: Array<{ type: string; values: number[] }>; foldOptions?: { direction: string; creaseAngleDeg: number; pleatId?: string } }> }>,
     seams: SeamInitData[],
     config?: Partial<ClothSimConfig>,
   ): Promise<void> {

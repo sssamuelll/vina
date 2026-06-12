@@ -29,9 +29,9 @@
  */
 
 import { extractStretchConstraints, extractBendConstraints } from '../gpu/gpuBuffers';
-import { mergeMeshes, buildSeamConstraints, seamInitDataToSeams } from '../seamAssembly';
+import { mergeMeshes, buildSeamConstraints, seamInitDataToSeams, type PieceSeamData } from '../seamAssembly';
 import { buildElasticConstraints, type ElasticConstraintSet } from '../elasticAssembly';
-import type { PathCommand, Elastic, SemanticEdge } from '../../../types/types';
+import type { PathCommand, Elastic } from '../../../types/types';
 import type { CollisionMeshData } from '../collisionMesh';
 import { TriangleSpatialHash, solveTriangleCollision } from '../triangleCollision';
 import { computeBendRestDistances } from './bendRestDistances';
@@ -109,7 +109,7 @@ let collisionBodies: WorkerCollisionBody[] = [];
 let elasticConstraintSet: ElasticConstraintSet | null = null;
 /** Cached outline + edge data for rebuilding elastic constraints */
 let wasmCachedOutlines: Map<string, PathCommand[]> | null = null;
-let wasmCachedPieceEdges: Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }> | null = null;
+let wasmCachedPieceEdges: Map<string, PieceSeamData> | null = null;
 /** Cached merged mesh reference for elastic constraint building */
 let wasmCachedMergedMesh: { vertices: Float32Array; indices: Uint32Array; pieceOffsets: Map<string, { vertexOffset: number; indexOffset: number }> } | null = null;
 
@@ -566,12 +566,15 @@ self.onmessage = async (event: MessageEvent) => {
           );
         }
 
-        // Cache outline and edge data for elastic constraint building
+        // Cache outline and edge data for elastic constraint building.
+        // Every piece gets an entry (even without semantic edges): the
+        // "edge-N" fallback path also parameterizes the boundary and needs
+        // the mesher's per-piece meshMaxEdgeLength (M4 — index drift).
         const outlines = new Map<string, PathCommand[]>();
-        const pieceEdges = new Map<string, { edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>> }>();
+        const pieceEdges = new Map<string, PieceSeamData>();
         for (const p of pieces) {
           if (p.outline) outlines.set(p.pieceId, p.outline as PathCommand[]);
-          if (p.edges) pieceEdges.set(p.pieceId, { edges: p.edges });
+          pieceEdges.set(p.pieceId, { edges: p.edges, meshMaxEdgeLength: p.meshMaxEdgeLength });
         }
         wasmCachedOutlines = outlines;
         wasmCachedPieceEdges = pieceEdges;
