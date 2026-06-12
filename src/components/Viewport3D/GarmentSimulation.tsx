@@ -23,7 +23,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { placeGarmentPieces } from '../../utils/cloth/garmentPlacement';
+import { placeGarmentPieces, applyArrangementOverrides } from '../../utils/cloth/garmentPlacement';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
@@ -163,6 +163,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const activeTool3D = useSelector((s: RootState) => s.tools.activeTool3D);
   const pinStrength = useSelector((s: RootState) => s.tools.toolOptions?.['pin']?.pinStrength || 'strong') as 'weak' | 'medium' | 'strong';
   const avatarMeasurements = useSelector((s: RootState) => s.project.avatar.measurements);
+  // M2 (camisa de María): the user's arrange-mode drags MUST reach the
+  // solver — before this selector, placedMeshes ignored them and Simulate
+  // silently discarded manual placement (hallazgo A).
+  const arrangementOverrides = useSelector((s: RootState) => s.project.arrangementOverrides);
   const pieceTints = useSelector((s: RootState) => s.simulation.pieceTints);
   const pieceUVTransforms = useSelector((s: RootState) => s.simulation.pieceUVTransforms);
   const pieceOpacity = useSelector((s: RootState) => s.simulation.pieceOpacity);
@@ -210,7 +214,9 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    const placements = placeGarmentPieces(activePieces, avatarMeasurements);
+    const placements = applyArrangementOverrides(
+      placeGarmentPieces(activePieces, avatarMeasurements), activePieces, arrangementOverrides,
+    );
 
     let totalVerts = 0;
     for (const p of pieceMeshes) {
@@ -276,7 +282,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     geo.computeVertexNormals();
 
     return { staticGeometry: geo };
-  }, [pieceMeshes, activePieces, avatarMeasurements]);
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides]);
   useDisposable(staticGeometry);
 
   const seamInitData = useMemo(() => seamsToInitData(seams, seamGroups), [seams, seamGroups]);
@@ -286,7 +292,11 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const placedMeshes = useMemo(() => {
     if (pieceMeshes.length === 0) return [];
 
-    const placements = placeGarmentPieces(activePieces, avatarMeasurements);
+    // M2: arrange-mode drags apply here too — what the user sees in the
+    // arrange view is EXACTLY where the solver starts.
+    const placements = applyArrangementOverrides(
+      placeGarmentPieces(activePieces, avatarMeasurements), activePieces, arrangementOverrides,
+    );
 
     return pieceMeshes.map((pm, i) => {
       const placement = placements[i] || { position: [0, 1.0, -0.2], rotation: [0, 0, 0] };
@@ -313,7 +323,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
       return { ...pm, vertices: transformed, stiffnessMultiplier, pressurePa, internals: foldInternals };
     });
-  }, [pieceMeshes, activePieces, avatarMeasurements]);
+  }, [pieceMeshes, activePieces, avatarMeasurements, arrangementOverrides]);
 
   // ─── Simulation lifecycle (solver cascade + collision) ──────────────────────
 

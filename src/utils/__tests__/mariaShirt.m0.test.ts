@@ -149,3 +149,64 @@ describe('M0 — la camisa de María: contrato del clasificador (M1)', () => {
     expect(pieces.filter(p => p.outline.length > 100)).toHaveLength(4);
   });
 });
+
+// ─── M2: colocación anatómica + cable arrange→solver ─────────────────────────
+
+describe('M2 — applyArrangementOverrides (el cable arrange→solver)', () => {
+  it('reemplaza solo la POSICIÓN de las piezas arrastradas; rotación y resto intactos', async () => {
+    const { applyArrangementOverrides, placeGarmentPieces } = await import('../cloth/garmentPlacement');
+    const pieces = importMaria();
+    const { classifyPiecesGeometric } = await import('../geometricClassifier');
+    const map = classifyPiecesGeometric(pieces);
+    for (const p of pieces) {
+      const c = map.get(p.id)!;
+      if (c.category !== 'other') { p.category = c.category; if (c.side) p.side = c.side; }
+    }
+
+    const measurements = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 };
+    const placements = placeGarmentPieces(pieces, measurements);
+
+    const dragged = pieces[2].id;
+    const overridden = applyArrangementOverrides(placements, pieces, {
+      [dragged]: [1.5, 1.2, 0.3],
+    });
+
+    for (let i = 0; i < pieces.length; i++) {
+      if (pieces[i].id === dragged) {
+        expect(overridden[i].position).toEqual([1.5, 1.2, 0.3]);
+        expect(overridden[i].rotation).toEqual(placements[i].rotation);
+      } else {
+        expect(overridden[i]).toBe(placements[i]);
+      }
+    }
+    // Sin overrides: identidad (mismo array, cero coste).
+    expect(applyArrangementOverrides(placements, pieces, undefined)).toBe(placements);
+    expect(applyArrangementOverrides(placements, pieces, {})).toBe(placements);
+  });
+
+  it('M1+M2: con categorías del import, la camisa colocada por defecto separa delantero (+Z) y espalda (−Z)', async () => {
+    const { placeGarmentPieces, detectBodyRegion } = await import('../cloth/garmentPlacement');
+    const { classifyPiecesGeometric } = await import('../geometricClassifier');
+    const pieces = importMaria();
+    const map = classifyPiecesGeometric(pieces);
+    for (const p of pieces) {
+      const c = map.get(p.id)!;
+      if (c.category !== 'other') { p.category = c.category; if (c.side) p.side = c.side; }
+    }
+
+    const measurements = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 };
+    const placements = placeGarmentPieces(pieces, measurements);
+    const regions = pieces.map(p => detectBodyRegion(p));
+
+    type Region = (typeof regions)[number];
+    const zOf = (region: Region) => placements[regions.indexOf(region)].position[2];
+    const xOf = (region: Region) => placements[regions.indexOf(region)].position[0];
+
+    // El blob nacía de 5 piezas apiladas al frente — ahora: anatomía.
+    expect(zOf('front-torso')).toBeGreaterThan(0.1);
+    expect(zOf('back-torso')).toBeLessThan(-0.1);
+    expect(xOf('left-sleeve')).toBeLessThan(-0.2);
+    expect(xOf('right-sleeve')).toBeGreaterThan(0.2);
+    expect(regions).toContain('collar'); // la tira = neckband
+  });
+});
