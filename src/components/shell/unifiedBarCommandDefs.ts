@@ -15,6 +15,7 @@ import {
   SlidersHorizontal, type LucideIcon,
 } from 'lucide-react';
 import { setUserScheme } from '../../store/inputSchemeSlice';
+import { runAutoSew } from '../../store/autoSewThunk';
 
 export interface CommandDef {
   id: string;
@@ -31,7 +32,9 @@ export interface CommandCallbacks {
 
 export const COMMANDS: CommandDef[] = [
   // ─── Patterns ───
-  { id: 'auto-sew', name: 'Auto-Sew Pieces', description: 'Detect and create seams automatically', icon: Scissors, action: (_d, cb) => cb.onOpenPanel('Auto-Sew') },
+  // M3 (camisa de María): execute for real — the old action opened the
+  // 'Auto-Sew' panel name, which AppShell renders as a dead placeholder.
+  { id: 'auto-sew', name: 'Auto-Sew Pieces', description: 'Detect and create seams automatically', icon: Scissors, action: (d) => d(runAutoSew()) },
 
   // ─── Simulation ───
   { id: 'dress-avatar', name: 'Dress Avatar', description: 'Place pieces and start simulation', icon: Shirt, action: (d) => { d(setViewMode3D('simulate')); d(startSimulation()); } },

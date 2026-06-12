@@ -92,7 +92,7 @@ describe('M0 — la camisa de María: contrato del clasificador (M1)', () => {
     expect(cap!.matchHint).toContain('armhole');
   });
 
-  it.fails('M1+M3: autoSew propone la camisa (≥6 costuras anatómicamente correctas)', async () => {
+  it('M1+M3 ✓: autoSew propone la camisa (≥6 costuras anatómicamente correctas)', async () => {
     const { classifyPiecesGeometric } = await import('../geometricClassifier');
     const pieces = importMaria();
     const map = classifyPiecesGeometric(pieces);
@@ -208,5 +208,44 @@ describe('M2 — applyArrangementOverrides (el cable arrange→solver)', () => {
     expect(xOf('left-sleeve')).toBeLessThan(-0.2);
     expect(xOf('right-sleeve')).toBeGreaterThan(0.2);
     expect(regions).toContain('collar'); // la tira = neckband
+  });
+});
+
+// ─── M3: el trigger de usuario cose la camisa de verdad ─────────────────────
+
+describe('M3 — runAutoSew (thunk del comando ⌘K "Auto-Sew Pieces")', () => {
+  it('sobre el patrón clasificado de María: ≥6 costuras con provenance ai, sin duplicar en re-ejecución', async () => {
+    const { configureStore } = await import('@reduxjs/toolkit');
+    const projectReducer = (await import('../../store/projectSlice')).default;
+    const copilotUIReducer = (await import('../../store/copilotUISlice')).default;
+    const { runAutoSew } = await import('../../store/autoSewThunk');
+    const { classifyPiecesGeometric } = await import('../geometricClassifier');
+    const { detectSemanticEdges } = await import('../semanticEdges');
+
+    const pieces = importMaria();
+    const map = classifyPiecesGeometric(pieces);
+    for (const p of pieces) {
+      const c = map.get(p.id)!;
+      if (c.category !== 'other') { p.category = c.category; if (c.side) p.side = c.side; }
+      p.edges = detectSemanticEdges(p);
+    }
+
+    const store = configureStore({
+      reducer: { project: projectReducer, copilotUI: copilotUIReducer },
+    });
+    for (const p of pieces) store.dispatch({ type: 'project/addPiece', payload: p });
+
+    const result = store.dispatch(runAutoSew(0.3) as never) as unknown as { added: number };
+    expect(result.added).toBeGreaterThanOrEqual(6);
+
+    const seams = (store.getState() as { project: { seams: Array<{ createdBy?: string }> } }).project.seams;
+    expect(seams.length).toBe(result.added);
+    // Provenance ai → ámbar "review me" en el 3D (doctrina del flujo de vestido).
+    expect(seams.every(s => s.createdBy === 'ai')).toBe(true);
+
+    // Re-ejecutar es idempotente (dedupe contra existentes) y lo dice.
+    const again = store.dispatch(runAutoSew(0.3) as never) as unknown as { added: number };
+    expect(again.added).toBe(0);
+    expect(seams.length).toBe(result.added);
   });
 });

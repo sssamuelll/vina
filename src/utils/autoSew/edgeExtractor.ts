@@ -44,6 +44,10 @@ export interface Edge {
    *  semantic edge carried one. Lets the scorer reward edges whose roles are
    *  known seam partners — the signal DXF pieces otherwise lack. */
   matchHint?: string;
+  /** Semantic edge type (seam/hem/fold/opening/unknown). The scorer gates
+   *  non-'seam' edges out of candidacy unless their hints mutually align —
+   *  a hemline is a finished edge, not seam material (M3). */
+  edgeType?: string;
 }
 
 // ─── Extraction (single segmentation authority: analyzeOutline) ─────────────
@@ -152,6 +156,7 @@ export function extractEdges(piece: PatternPiece): Edge[] {
       points: pts,
       name: semantic[i]?.name ?? `edge-${i}`,
       matchHint: semantic[i]?.matchHint,
+      edgeType: semantic[i]?.edgeType,
     };
   });
 }
