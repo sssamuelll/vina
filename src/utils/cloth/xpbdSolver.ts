@@ -226,6 +226,14 @@ export interface ClothMeshData {
   triIds: Int32Array;
   /** Optional UV coordinates [u0,v0, u1,v1, ...] for anisotropic stretch */
   uvs?: Float32Array;
+  /**
+   * Boundary provenance (M4): original flattened-outline index per vertex
+   * (fractional for subdivided boundary points, NaN for interior). The
+   * mesher's dedupe/simplify/winding stages make outside reconstruction of
+   * the boundary numbering impossible — seam/elastic builders MUST prefer
+   * this when present. Produced by cdtMesher.convertToPSLG.
+   */
+  boundaryOrig?: Float64Array;
 }
 
 /**

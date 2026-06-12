@@ -15,10 +15,12 @@
  * (TODA costura de producción, no solo María). Contrato pineado abajo:
  * spans completos con el meshMaxEdgeLength por pieza.
  *
- * Pendiente (target rojo, M4-C): el emparejamiento por nombre 2D conecta
- * lados opuestos del cuerpo (espejo X de la espalda) y los CAD reales no
- * garantizan orientación 2D consistente entre piezas — emparejamiento y
- * dirección deben resolverse en espacio mundo tras el placement.
+ * M4-C (cerrado): el emparejamiento por nombre 2D conectaba lados opuestos
+ * del cuerpo (espejo X del facing) y los CAD reales no garantizan
+ * orientación 2D consistente entre piezas (delantero y mangas nacían
+ * bocabajo — SVG y-down). Cerrado por normalizeInPlaneOrientation
+ * (anatomía arriba) + refineSeamsInWorld (partners por proximidad mundo +
+ * reversed por extremos) — el contrato de cercanía está pineado abajo.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -29,6 +31,7 @@ import { classifyPiecesGeometric } from '../geometricClassifier';
 import { autoSew } from '../autoSew';
 import { meshPiece } from '../mesh';
 import { placeGarmentPieces } from '../cloth/garmentPlacement';
+import { refineSeamsInWorld } from '../autoSew/worldRefine';
 import { mergeMeshes, buildSeamConstraints } from '../cloth/seamAssembly';
 import type { PatternPiece, Seam } from '../../types/types';
 
@@ -107,15 +110,21 @@ function probeSeams(pieces: PatternPiece[], seams: Seam[]): { worldSeams: WorldS
       pieceId: p.id,
       vertices: transformVertices(mesh.vertices, placements[i].rotation, placements[i].position),
       triIds: mesh.triIds,
+      boundaryOrig: mesh.boundaryOrig,
     };
   });
   const merged = mergeMeshes(meshed);
   const outlines = new Map(pieces.map(p => [p.id, p.outline]));
-  // meshMaxEdgeLength: el contrato de índices de frontera (M4) — los
-  // constraints DEBEN subdividir con el mismo valor que meshPiece usó.
-  const pieceMap = new Map(pieces.map(p => [
+  // boundaryOrig: la procedencia de frontera del mesher (M4) — la única
+  // resolución correcta en patrones reales (dedupe/winding/simplify rompen
+  // cualquier reconstrucción externa). meshMaxEdgeLength queda de fallback.
+  const pieceMap = new Map(pieces.map((p, i) => [
     p.id,
-    { edges: p.edges, meshMaxEdgeLength: MESH_OPTIONS.maxEdgeLength },
+    {
+      edges: p.edges,
+      meshMaxEdgeLength: MESH_OPTIONS.maxEdgeLength,
+      boundaryOrig: meshed[i].boundaryOrig,
+    },
   ]));
 
   const catOf = (id: string) => pieces.find(p => p.id === id)?.category ?? '?';
@@ -171,8 +180,15 @@ function getProbe() {
   if (!probeCache) {
     const pieces = importClassified();
     const result = autoSew(pieces, { minConfidence: 0.3 });
-    const { worldSeams, particleCount } = probeSeams(pieces, result.seams.map(s => s.seam));
-    probeCache = { seamCount: result.seams.length, worldSeams, particleCount };
+    // Mismo camino que el thunk runAutoSew (M4-C): refinado en mundo de
+    // partners + reversed contra los placements normalizados.
+    const refined = refineSeamsInWorld(
+      result.seams.map(s => s.seam),
+      pieces,
+      placeGarmentPieces(pieces, MEASUREMENTS),
+    );
+    const { worldSeams, particleCount } = probeSeams(pieces, refined);
+    probeCache = { seamCount: refined.length, worldSeams, particleCount };
   }
   return probeCache;
 }
@@ -225,18 +241,17 @@ describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en 
     expect(crossed.map(ws => ws.label)).toEqual([]);
   });
 
-  // ── TARGET (rojo hasta M4-C: emparejamiento en espacio mundo) ────────────
+  // ── CONTRATO M4-C: emparejamiento en espacio mundo ───────────────────────
   //
-  // La sonda con el contrato de índices arreglado revela que autoSew
-  // empareja por NOMBRE 2D: el sideSeam izquierdo-2D del delantero cose con
-  // el izquierdo-2D de la espalda — pero la rotación π de la espalda espeja
-  // X, así que conecta lados OPUESTOS del cuerpo en diagonal (media de par
-  // 63cm vs los ~37cm del gap delantero↔espalda). Además los patrones CAD
-  // reales no garantizan orientación 2D consistente: una pieza puede estar
-  // bocabajo en mundo (armhole del delantero en y≈0.98 vs escote de la
-  // espalda en y≈1.51). El done de M4-C: emparejamiento y dirección se
-  // resuelven en espacio MUNDO tras el placement.
-  it.fails('M4-C: cada costura conecta edges CERCANOS en mundo (sin diagonales por el torso)', { timeout: 300_000 }, () => {
+  // Antes del refinado, autoSew emparejaba por NOMBRE 2D: el sideSeam
+  // izquierdo-2D del delantero cosía con el izquierdo-2D de la espalda —
+  // pero la rotación de facing espeja X, así que conectaba lados OPUESTOS
+  // del cuerpo en diagonal (media de par 63cm vs los ~37cm del gap
+  // delantero↔espalda); y el delantero/mangas nacían bocabajo (los CAD
+  // reales no garantizan orientación 2D — SVG y-down). Cerrado por:
+  // normalizeInPlaneOrientation (anatomía arriba, garmentPlacement) +
+  // refineSeamsInWorld (partners por proximidad mundo + reversed).
+  it('M4-C: cada costura conecta edges CERCANOS en mundo (sin diagonales por el torso)', { timeout: 300_000 }, () => {
     const { worldSeams } = getProbe();
 
     // Gap delantero↔espalda = 2×(chestRadius+GAP) ≈ 0.366m. Una costura

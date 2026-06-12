@@ -12,6 +12,7 @@
 import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 import { mmToM, cmToM } from '../geometry';
+import { flattenPath, commandRangeToFlattened } from '../seam/index';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -255,12 +256,14 @@ export function computePlacement(
   // "Z=forward") and the default camera sits at +Z looking toward it. So a
   // FRONT piece lands on the +Z side (toward camera) and a BACK piece on -Z.
   //
-  // FACING vs UP are decoupled. A front piece uses [-π/2, 0, 0]: stand up
-  // (pattern-up → world-up) and face +Z. A back piece must face the OTHER way
-  // while staying upright. We get that with a π about Z (rotation in the
-  // piece's own plane — a reflection-equivalent that preserves pattern-up →
-  // world-up), NOT a π about Y. A π about Y flips facing AND inverts the up
-  // axis, which is the "boca abajo" bug that made back pieces render head-down.
+  // UP is NOT guaranteed by these rotations. Whether "pattern-up" lands
+  // world-up depends on the 2D drawing's y direction, which real CAD does
+  // not promise (María's DXF draws anatomy toward negative y — SVG y-down —
+  // so [-π/2, 0, 0] landed the front upside-down while the back's in-plane π
+  // happened to un-invert it). The anatomical orientation pass
+  // (normalizeInPlaneOrientation, M4-C) measures where the classified
+  // anatomy actually lands and flips in-plane when inverted — these base
+  // rotations only fix FACING (+Z / −Z / ±X).
   switch (region) {
     case 'front-torso':
       return {
@@ -335,6 +338,135 @@ export function computePlacement(
   }
 }
 
+// ── Placement transform (shared) ─────────────────────────────────────────────
+
+/**
+ * EXACT same rigid transform the render/solver paths apply to placed meshes
+ * (GarmentSimulation staticGeometry + placedMeshes, placementWorker): Euler
+ * XYZ intrinsic order (Rx, then Ry, then Rz) + translation. Any consumer
+ * that reasons about world positions of pattern geometry (orientation
+ * normalization below, autoSew world refinement) MUST use this, not its own
+ * derivation — the mariaShirt.m4 sonda pins world coherence end-to-end.
+ */
+export function placementLocalToWorld(
+  local: [number, number, number],
+  placement: PlacementResult,
+): [number, number, number] {
+  const [vx, vy, vz] = local;
+  const [rx, ry, rz] = placement.rotation;
+  const [px, py, pz] = placement.position;
+  const cx = Math.cos(rx), sx = Math.sin(rx);
+  const cy = Math.cos(ry), sy = Math.sin(ry);
+  const cz = Math.cos(rz), sz = Math.sin(rz);
+  const y1 = vy * cx - vz * sx, z1 = vy * sx + vz * cx;
+  const x2 = vx * cy + z1 * sy, z2 = -vx * sy + z1 * cy;
+  const x3 = x2 * cz - y1 * sz, y3 = x2 * sz + y1 * cz;
+  return [x3 + px, y3 + py, z2 + pz];
+}
+
+/**
+ * Map a 2D pattern point (mm) to world (m) under a placement, using the
+ * mesher's local convention: ((x−cx)·0.001, 0, (y−cy)·0.001) with cx/cy the
+ * piece bbox center (cdtMesher.convertToClothMeshData).
+ */
+export function patternPointToWorld(
+  x2d: number,
+  y2d: number,
+  bboxCenter: { cx: number; cy: number },
+  placement: PlacementResult,
+): [number, number, number] {
+  return placementLocalToWorld(
+    [(x2d - bboxCenter.cx) * 0.001, 0, (y2d - bboxCenter.cy) * 0.001],
+    placement,
+  );
+}
+
+/** Bbox center (mm) of the flattened outline — the mesher's centering. */
+export function outlineBBoxCenter(outline: PathCommand[]): { cx: number; cy: number } {
+  const pts = flattenPath(outline, 12);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+// ── Anatomical in-plane orientation (camisa de María plan, M4-C) ────────────
+//
+// Real CAD patterns make NO orientation promises: María's DXF draws all 5
+// pieces with anatomy toward negative Y (the app's 2D editor is SVG y-down,
+// so they LOOK upright), and the raw placement mapped 2D y positively into
+// world Y — front and both sleeves landed upside-down (neckline at the hem
+// height, sleeve cuffs above the caps) while the back came out upright only
+// because its facing π happened to un-invert it. Convention guessing is
+// exactly what burned the removed 2026-05-30 pass (see note below): the fix
+// is to read the ANATOMY. M1's geometric classifier guarantees imported
+// pieces carry role-bearing edges, so we measure where the anatomical TOP
+// (neckline / shoulder / sleeveCap) and BOTTOM (hemline / cuffEdge) actually
+// land in world and flip in-plane when they're inverted.
+//
+// The in-plane 180° flip has a closed Euler form for our [-π/2, ry, rz]
+// triples: prepending a local Ry(π) (negate both in-plane axes) equals
+// [-π/2, −ry, rz+π] under the Rx→Ry→Rz application order (verified
+// algebraically + pinned by the mariaShirt.m4 sonda). X-mirroring across
+// pieces is NOT resolved here — left/right pairing is the autoSew world
+// refinement's job; this pass only guarantees anatomy-up.
+
+const ANATOMY_TOP_ROOTS = new Set(['neckline', 'shoulder', 'sleevecap', 'collarneckedge']);
+const ANATOMY_BOTTOM_ROOTS = new Set(['hemline', 'cuffedge', 'collarouteredge']);
+
+function edgeRoot(name: string): string {
+  return name.toLowerCase().replace(/-\d+$/, '');
+}
+
+/** Mean world-Y of the endpoints of the piece's edges whose root is in `roots`. */
+function meanEdgeWorldY(
+  piece: PatternPiece,
+  placement: PlacementResult,
+  roots: Set<string>,
+): number | null {
+  if (!piece.edges || piece.edges.length === 0) return null;
+  const center = outlineBBoxCenter(piece.outline);
+  const flat = flattenPath(piece.outline, 12);
+  let sum = 0;
+  let n = 0;
+  for (const e of piece.edges) {
+    if (!roots.has(edgeRoot(e.name))) continue;
+    const [fs, fe] = commandRangeToFlattened(piece.outline, e.segmentRange, 12);
+    for (const idx of [fs, fe % flat.length]) {
+      const p = flat[idx];
+      if (!p) continue;
+      sum += patternPointToWorld(p.x, p.y, center, placement)[1];
+      n++;
+    }
+  }
+  return n > 0 ? sum / n : null;
+}
+
+/**
+ * Flip pieces whose anatomy lands upside-down in world. Returns a new array;
+ * placements without anatomical evidence (no semantic edges, no top/bottom
+ * roles — synthetic rectangles, unclassified pieces) pass through untouched.
+ */
+export function normalizeInPlaneOrientation(
+  pieces: PatternPiece[],
+  placements: PlacementResult[],
+): PlacementResult[] {
+  return placements.map((placement, i) => {
+    const piece = pieces[i];
+    if (!piece) return placement;
+    const topY = meanEdgeWorldY(piece, placement, ANATOMY_TOP_ROOTS);
+    const bottomY = meanEdgeWorldY(piece, placement, ANATOMY_BOTTOM_ROOTS);
+    if (topY == null || bottomY == null) return placement;
+    if (topY >= bottomY) return placement; // anatomy already up
+    const [rx, ry, rz] = placement.rotation;
+    return { ...placement, rotation: [rx, -ry, rz + Math.PI] as [number, number, number] };
+  });
+}
+
 // ── Batch placement ──────────────────────────────────────────────────────────
 
 /**
@@ -345,13 +477,15 @@ export function computePlacement(
  * to adjust vertical positioning (skirts hang from waist, sleeves from shoulder).
  */
 // NOTE: per-piece "boca abajo" correction used to live here as
-// isPieceUpsideDown + applyVerticalOrientation. It was removed 2026-05-30: it
-// keyed off semantic edge-role names that DXF imports never carry (their edges
-// are geometric — topEdge/bottomEdge/…), so it never fired on the actual input,
-// and the real cause of upside-down pieces was a forward-axis convention bug in
-// computePlacement (front/back used opposite up-axes), now fixed above. If a
-// genuine per-piece flip is ever needed, the renderer already exposes a true
-// reflection via `flippedPieceIds` (DraggablePiece scale-z) the human can drive.
+// isPieceUpsideDown + applyVerticalOrientation. It was removed 2026-05-30
+// because back then DXF imports never carried role-bearing edges (only
+// geometric topEdge/bottomEdge/…), so the pass never fired on real input.
+// M1 (camisa de María) changed that premise: the geometric classifier now
+// guarantees imported pieces carry anatomy (neckline/shoulder/sleeveCap/
+// hemline/cuffEdge), so the idea returned as normalizeInPlaneOrientation
+// (M4-C, above) — anatomy-measured, not convention-guessed. The renderer's
+// `flippedPieceIds` (DraggablePiece scale-z) remains the human override for
+// true reflections.
 
 export function placeGarmentPieces(
   pieces: PatternPiece[],
@@ -388,7 +522,7 @@ export function placeGarmentPieces(
   const allUnknown = unknownCount === pieces.length && pieces.length > 0;
   let unknownIndex = 0;
 
-  return pieces.map((piece, i) => {
+  const raw = pieces.map((piece, i) => {
     const region = regions[i];
     const geo = outlineBBox(piece.outline);
 
@@ -445,6 +579,11 @@ export function placeGarmentPieces(
       heightMm: geo.height,
     });
   });
+
+  // Anatomical orientation pass (M4-C): single exit point so EVERY consumer
+  // (solver init, arrange view, sew tools, thunks) sees the same upright
+  // placements.
+  return normalizeInPlaneOrientation(pieces, raw);
 }
 
 // ─── Arrangement overrides (camisa de María plan, M2) ────────────────────────

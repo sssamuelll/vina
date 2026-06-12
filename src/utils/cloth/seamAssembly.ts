@@ -134,6 +134,16 @@ export interface PieceSeamData {
   edges?: Array<Pick<SemanticEdge, 'name' | 'segmentRange'>>;
   /** maxEdgeLength (mm) the CDT mesher subdivided this piece's boundary with. */
   meshMaxEdgeLength?: number;
+  /**
+   * Boundary provenance from the mesher (M4 — `ClothMeshData.boundaryOrig`):
+   * original flattened-outline index per piece-local vertex (NaN interior).
+   * When present, constraint builders address boundary vertices DIRECTLY
+   * via `parameterizeEdgeFromBoundary` — the only correct option for real
+   * patterns, where the mesher's dedupe (every piece), winding reversal
+   * (CCW outlines) and Douglas-Peucker (dense outlines) make the legacy
+   * `parameterizeEdge` reconstruction address wrong vertices.
+   */
+  boundaryOrig?: Float64Array;
 }
 
 // ─── Default Config ─────────────────────────────────────────────────────────
@@ -289,6 +299,83 @@ export function parameterizeEdge(
   }
 
   return seamVertices;
+}
+
+// ─── Boundary-provenance parameterization (M4) ──────────────────────────────
+
+/**
+ * Parameterize an edge range directly from the mesher's boundary provenance
+ * (`ClothMeshData.boundaryOrig`) instead of reconstructing the mesher's
+ * numbering. Selects the piece's boundary vertices whose original outline
+ * index falls inside `range` (wraparound supported), orders them along the
+ * original traversal, and assigns t by cumulative arc length over their
+ * REAL positions.
+ *
+ * @param boundaryOrig - per piece-local vertex: original flattened-outline
+ *   index (fractional for subdivided points, NaN for interior vertices)
+ * @param positions - flat xyz positions indexed by GLOBAL vertex id
+ * @param vertexOffset - piece's vertex offset inside `positions`
+ * @param flatCount - number of points in the piece's flattened outline (N)
+ * @param range - [start, end] in flattened-outline index space (end may wrap)
+ * @param reverse - traverse end→start (Seam.pieceB.reversed)
+ */
+export function parameterizeEdgeFromBoundary(
+  boundaryOrig: ArrayLike<number>,
+  positions: Float32Array,
+  vertexOffset: number,
+  flatCount: number,
+  range: [number, number],
+  reverse: boolean = false,
+): ParameterizedVertex[] {
+  const [fs, fe] = range;
+  const N = flatCount;
+  if (N <= 0) return [];
+  const EPS = 1e-6;
+
+  const wrapped = fe < fs;
+  const selected: Array<{ local: number; d: number }> = [];
+  for (let local = 0; local < boundaryOrig.length; local++) {
+    const orig = boundaryOrig[local];
+    if (!Number.isFinite(orig)) continue;
+    const inRange = wrapped
+      ? orig >= fs - EPS || orig <= fe + EPS
+      : orig >= fs - EPS && orig <= fe + EPS;
+    if (!inRange) continue;
+    // Distance along the original traversal from the range start — sorts
+    // correctly for wrapped ranges too.
+    const d = (((orig - fs) % N) + N) % N;
+    selected.push({ local, d });
+  }
+  if (selected.length === 0) return [];
+  selected.sort((a, b) => a.d - b.d || a.local - b.local);
+
+  // t by cumulative arc length over real vertex positions.
+  const verts: ParameterizedVertex[] = new Array(selected.length);
+  const dists: number[] = new Array(selected.length);
+  dists[0] = 0;
+  let total = 0;
+  for (let i = 1; i < selected.length; i++) {
+    const a = (vertexOffset + selected[i - 1].local) * 3;
+    const b = (vertexOffset + selected[i].local) * 3;
+    total += Math.hypot(
+      positions[b] - positions[a],
+      positions[b + 1] - positions[a + 1],
+      positions[b + 2] - positions[a + 2],
+    );
+    dists[i] = total;
+  }
+  for (let i = 0; i < selected.length; i++) {
+    verts[i] = {
+      index: vertexOffset + selected[i].local,
+      t: total > 0 ? dists[i] / total : 0,
+    };
+  }
+
+  if (reverse) {
+    verts.reverse();
+    for (const v of verts) v.t = 1 - v.t;
+  }
+  return verts;
 }
 
 // ─── Vertex Pairing ─────────────────────────────────────────────────────────
@@ -557,15 +644,32 @@ export function buildSeamConstraints(
 
     if (!rangeA || !rangeB) continue;
 
-    // Boundary subdivision MUST mirror what the mesher used for EACH piece
-    // (per-piece particleDistance) or indices drift — see PieceSeamData.
-    // curveResolution stays pinned to SEAM_CURVE_RESOLUTION (parity).
+    // Boundary resolution (M4): prefer the mesher's provenance
+    // (boundaryOrig) — the legacy reconstruction silently addresses wrong
+    // vertices on real patterns (dedupe/winding/simplify). The legacy path
+    // remains for synthetic meshes built without the CDT mesher, where the
+    // per-piece meshMaxEdgeLength contract still holds.
     // Direction (Fase 5): the B half may be reversed relative to A —
-    // parameterizeEdge mirrors t so matching pairs A:t=0 with B:t=1.
-    const maxEdgeA = pieceAData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH;
-    const maxEdgeB = pieceBData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH;
-    let edgeA = parameterizeEdge(outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset, SEAM_CURVE_RESOLUTION, maxEdgeA);
-    let edgeB = parameterizeEdge(outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset, SEAM_CURVE_RESOLUTION, maxEdgeB, seam.pieceB.reversed === true);
+    // both paths mirror t so matching pairs A:t=0 with B:t=1.
+    const reversedB = seam.pieceB.reversed === true;
+    let edgeA = pieceAData?.boundaryOrig
+      ? parameterizeEdgeFromBoundary(
+          pieceAData.boundaryOrig, positions, offsetA.vertexOffset,
+          flattenPath(outlineA, SEAM_CURVE_RESOLUTION).length, rangeA,
+        )
+      : parameterizeEdge(
+          outlineA, rangeA[0], rangeA[1], offsetA.vertexOffset,
+          SEAM_CURVE_RESOLUTION, pieceAData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH,
+        );
+    let edgeB = pieceBData?.boundaryOrig
+      ? parameterizeEdgeFromBoundary(
+          pieceBData.boundaryOrig, positions, offsetB.vertexOffset,
+          flattenPath(outlineB, SEAM_CURVE_RESOLUTION).length, rangeB, reversedB,
+        )
+      : parameterizeEdge(
+          outlineB, rangeB[0], rangeB[1], offsetB.vertexOffset,
+          SEAM_CURVE_RESOLUTION, pieceBData?.meshMaxEdgeLength ?? SEAM_MAX_EDGE_LENGTH, reversedB,
+        );
 
     // Apply t-range filtering: restrict parameterized vertices to the sub-range
     if (seam.pieceA.tStart != null && seam.pieceA.tEnd != null) {

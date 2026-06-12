@@ -23,7 +23,7 @@ export type { SeamInitData } from './seamAssembly';
 /** Messages sent from main thread → worker */
 export type WorkerInMessage =
   | { type: 'init'; meshData: { vertices: Float32Array; triIds: Int32Array }; config?: Partial<ClothSimConfig> }
-  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }>; stiffnessMultiplier?: number; meshMaxEdgeLength?: number }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
+  | { type: 'initMultiPiece'; pieces: Array<{ pieceId: string; vertices: Float32Array; triIds: Int32Array; outline: Array<{ type: string; values: number[] }>; edges?: Array<{ name: string; segmentRange: [number, number] }>; stiffnessMultiplier?: number; meshMaxEdgeLength?: number; boundaryOrig?: Float64Array }>; seams: SeamInitData[]; config?: Partial<ClothSimConfig> }
   | { type: 'setSeams'; seams: SeamInitData[] }
   | { type: 'setElastics'; elastics: Elastic[] }
   | { type: 'start' }
@@ -147,10 +147,10 @@ self.onmessage = async (event: MessageEvent<WorkerInMessage>) => {
         // the constraint builders re-derive the mesher's boundary vertex
         // numbering and MUST subdivide with the same per-piece value (M4).
         const outlines = new Map<string, Array<{ type: string; values: number[] }>>();
-        const pieceEdges = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }>; meshMaxEdgeLength?: number }>();
+        const pieceEdges = new Map<string, { edges?: Array<{ name: string; segmentRange: [number, number] }>; meshMaxEdgeLength?: number; boundaryOrig?: Float64Array }>();
         for (const p of msg.pieces) {
           outlines.set(p.pieceId, p.outline);
-          pieceEdges.set(p.pieceId, { edges: p.edges, meshMaxEdgeLength: p.meshMaxEdgeLength });
+          pieceEdges.set(p.pieceId, { edges: p.edges, meshMaxEdgeLength: p.meshMaxEdgeLength, boundaryOrig: p.boundaryOrig });
         }
         cachedOutlines = outlines;
         cachedPieceEdges = pieceEdges;

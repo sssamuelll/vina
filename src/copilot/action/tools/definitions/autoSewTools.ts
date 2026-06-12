@@ -7,6 +7,7 @@
 import type { ToolDefinition, ToolResult } from '../registry';
 import { autoSew } from '../../../../utils/autoSew';
 import { addSeam } from '../../../../store/projectSlice';
+import { refineProposalsAgainstState } from '../../../../store/autoSewThunk';
 
 // ─── autoDetectSeams ────────────────────────────────────────────────────────
 
@@ -47,6 +48,13 @@ const autoDetectSeamsTool: ToolDefinition = {
       minConfidence: (params.minConfidence as number) ?? 0.4,
       excludePieceIds: params.excludePieceIds as string[] | undefined,
     });
+    // World-space refinement (M4-C): same pass as the ⌘K thunk — partner
+    // reassignment by world proximity + reversed seeding. 2D names lie
+    // about adjacency on real CAD patterns.
+    const refinedSeams = refineProposalsAgainstState(
+      result.seams.map(p => p.seam), pieces, state,
+    );
+    result.seams.forEach((p, i) => { p.seam = refinedSeams[i]; });
 
     const autoApply = params.autoApply as boolean ?? false;
     const applied: string[] = [];

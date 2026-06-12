@@ -31,6 +31,8 @@ export interface MeshPieceResponse {
   vertices: Float32Array;
   triIds: Int32Array;
   uvs?: Float32Array;
+  /** Mesher boundary provenance (M4) — see ClothMeshData.boundaryOrig. */
+  boundaryOrig?: Float64Array;
   error?: string;
 }
 
@@ -60,9 +62,11 @@ ctx.addEventListener('message', (event: MessageEvent<WorkerRequest>) => {
         vertices: result.vertices,
         triIds: result.triIds,
         uvs: result.uvs,
+        boundaryOrig: result.boundaryOrig,
       };
       const transfers: ArrayBuffer[] = [result.vertices.buffer, result.triIds.buffer];
       if (result.uvs) transfers.push(result.uvs.buffer);
+      if (result.boundaryOrig) transfers.push(result.boundaryOrig.buffer);
       ctx.postMessage(response, transfers);
     } catch (err) {
       const response: MeshPieceResponse = {

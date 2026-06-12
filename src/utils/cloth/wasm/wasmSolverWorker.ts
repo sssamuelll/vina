@@ -574,7 +574,11 @@ self.onmessage = async (event: MessageEvent) => {
         const pieceEdges = new Map<string, PieceSeamData>();
         for (const p of pieces) {
           if (p.outline) outlines.set(p.pieceId, p.outline as PathCommand[]);
-          pieceEdges.set(p.pieceId, { edges: p.edges, meshMaxEdgeLength: p.meshMaxEdgeLength });
+          pieceEdges.set(p.pieceId, {
+            edges: p.edges,
+            meshMaxEdgeLength: p.meshMaxEdgeLength,
+            boundaryOrig: p.boundaryOrig,
+          });
         }
         wasmCachedOutlines = outlines;
         wasmCachedPieceEdges = pieceEdges;

@@ -16,6 +16,8 @@ export interface MeshedPiece {
   vertices: Float32Array;
   triIds: Int32Array;
   uvs?: Float32Array;
+  /** Mesher boundary provenance (M4) — see ClothMeshData.boundaryOrig. */
+  boundaryOrig?: Float64Array;
 }
 
 export interface SimInitProgress {
@@ -31,7 +33,7 @@ const SCALE = 0.001; // 1 SVG unit = 1mm = 0.001m
 export class SimulationInitClient {
   private worker: Worker | null = null;
   private pendingMesh = new Map<string, {
-    resolve: (v: { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array }) => void;
+    resolve: (v: { vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array }) => void;
     reject: (e: Error) => void;
   }>();
   onProgress?: (p: SimInitProgress) => void;
@@ -64,7 +66,7 @@ export class SimulationInitClient {
         if (msg.error) {
           pending.reject(new Error(msg.error));
         } else {
-          pending.resolve({ vertices: msg.vertices, triIds: msg.triIds, uvs: msg.uvs });
+          pending.resolve({ vertices: msg.vertices, triIds: msg.triIds, uvs: msg.uvs, boundaryOrig: msg.boundaryOrig });
         }
       }
     }
@@ -77,7 +79,7 @@ export class SimulationInitClient {
   /**
    * Mesh a pattern piece off the main thread.
    */
-  async meshPiece(piece: PatternPiece, particleDistance: number): Promise<{ vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array }> {
+  async meshPiece(piece: PatternPiece, particleDistance: number): Promise<{ vertices: Float32Array; triIds: Int32Array; uvs?: Float32Array; boundaryOrig?: Float64Array }> {
     const options = {
       yHeight: 0,
       scale: SCALE,
@@ -124,13 +126,14 @@ export class SimulationInitClient {
       this.onProgress?.({ stage: 'Meshing pieces', current: i + 1, total: pieces.length });
 
       try {
-        const { vertices, triIds, uvs } = await this.meshPiece(piece, pd);
+        const { vertices, triIds, uvs, boundaryOrig } = await this.meshPiece(piece, pd);
         if (vertices.length > 0 && triIds.length > 0) {
           results.push({
             pieceId: piece.id,
             vertices,
             triIds,
             uvs,
+            boundaryOrig,
           });
         }
       } catch (err) {

@@ -45,9 +45,12 @@ export interface PieceMeshData {
    * Boundary-subdivision maxEdgeLength (mm) the mesher used for this piece
    * (= per-piece particleDistance). Seam/elastic constraint builders MUST
    * subdivide with the same value or vertex indices drift (M4 — see
-   * `PieceSeamData` in seamAssembly).
+   * `PieceSeamData` in seamAssembly). Legacy fallback; superseded by
+   * `boundaryOrig`.
    */
   meshMaxEdgeLength?: number;
+  /** Mesher boundary provenance (M4) — see ClothMeshData.boundaryOrig. */
+  boundaryOrig?: Float64Array;
 }
 
 /**
