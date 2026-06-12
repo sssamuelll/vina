@@ -26,6 +26,14 @@ export async function extractAvatarCollisionMesh(
   });
 
   importerToMetres(result.scene);
+  // NOTE (M4-D): do NOT applyAPose() here. The visual avatar starts in
+  // A-pose while this collision mesh bakes the GLB's T-pose bind — a real
+  // mismatch — but applying the pose at this point CORRUPTS the skinned
+  // bake (measured: the whole garment fell through to the ground,
+  // minY≈0, vs a correct drape without it; rotating bones after the
+  // import's scale pass desyncs the bind matrices `extractMeshData`
+  // bakes with). Pose-matched collision needs the bake to happen in the
+  // same skeleton state the renderer uses — tracked as a follow-up issue.
   result.scene.updateMatrixWorld(true);
 
   const { vertices, indices, normals } = extractMeshData(result.scene);

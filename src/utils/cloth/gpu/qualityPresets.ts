@@ -33,7 +33,19 @@ export const SIMULATION_MODES: Record<SimulationMode, QualityPreset> = {
   normal: {
     label: 'Normal',
     particleDistance: 5,
-    substeps: 5,
+    // 15 (M4-D, medido): con 5 substeps la colisión avatar-tela corre 3×
+    // más gruesa por paso y la prenda penetra y se escurre (86% de
+    // vértices bajo cintura vs 10% con 15). El valor 5 nunca llegó al
+    // solver de facto (el sync de modo no se entregaba post-init y el
+    // worker usaba SU default 15) — al arreglar la entrega del preset en
+    // el init, el 5 entró en vigor por primera vez y degradó el drape.
+    substeps: 15,
+    // M4-D: false is a MEASURED perf decision, not a stale default — the
+    // #608 kernel runs at ~1 FPS on a 29k-particle garment (5 substeps ×
+    // per-particle heap alloc + hash rebuild per substep). The flag now
+    // actually REACHES the solver (GarmentSimulation mode sync), so
+    // 'complete' truly enables it; flip this once the kernel is optimized
+    // (see issue filed with the M4-D numbers).
     selfCollision: false,
     collisionResolution: 32,
     bendingEnabled: true,

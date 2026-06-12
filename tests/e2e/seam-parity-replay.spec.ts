@@ -670,3 +670,93 @@ test.describe('Seam parity replay — auto-sew end-to-end (M3)', () => {
     expect(summary!.zeroConstraintSeams).toHaveLength(0);
   });
 });
+
+// ─── Replay M4: la camisa drapea SOBRE el avatar (DoD del plan) ──────────────
+//
+// El cierre del demo-killer: tras coser (M3) y con la costura
+// geométricamente correcta (M4-A/B/C), la camisa debe QUEDARSE PUESTA.
+// Métrica anti-colapso (la maraña/blob caía al suelo): <5% de vértices
+// bajo la cadera (y=0.8; el hem de una camisa real queda EN la cadera
+// ~0.88, así que "bajo cintura" del DoD original contaría la falda
+// natural de la prenda), nada cerca del suelo, colisión de avatar
+// CARGADA (la extracción tiene timeout con degradación silenciosa que
+// ningún otro test pinea — aquí se vuelve fallo explícito) y cero NaN.
+// Calibrado en M4-D: belowHip 0.0%, minY 0.88 con fricción de avatar 0.4
+// + margin 8mm + substeps 15.
+
+test.describe('Seam parity replay — drape sobre el avatar (M4)', () => {
+  test('la camisa cosida se queda puesta: colisión cargada, hem en la cadera, sin colapso', async ({ page }) => {
+    test.setTimeout(240_000);
+    await waitFor2D(page);
+
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const fixture = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/garments/maria_patrones_samuel_2M.dxf',
+    );
+    await page.locator('input[accept=".dxf"]').setInputFiles(fixture);
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.pieces')) ?? []).length, {
+        timeout: 30_000,
+      })
+      .toBe(5);
+
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press('Control+k');
+    await page.waitForTimeout(400);
+    await page.getByText('Auto-Sew Pieces', { exact: false }).first().click();
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(6);
+
+    await switchView(page, '3D');
+    await startSimulation(page);
+    await expect
+      .poll(async () => getState<string>(page, 'simulation.solverTier'), { timeout: 60_000 })
+      .toBe('wasm');
+
+    // La colisión del avatar DEBE estar cargada — la extracción degrada en
+    // silencio si su timeout vence (useSimulationLifecycle), y sin avatar
+    // esta métrica de drape no significa nada.
+    await expect
+      .poll(async () => getState<boolean>(page, 'simulation.bodyCollision'), { timeout: 30_000 })
+      .toBe(true);
+
+    // Drape real: ~25s de sim de pared (las costuras cierran y la prenda
+    // se asienta — calibrado en local a ~20s con margen CI).
+    await page.waitForTimeout(25_000);
+
+    const drape = await page.evaluate(() => {
+      const mesh = (window as unknown as { __OPENCLO_CLOTH_MESH__?: {
+        geometry: { attributes: { position: { count: number; getY: (i: number) => number } } };
+      } }).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      const pos = mesh.geometry.attributes.position;
+      const n = pos.count;
+      let belowHip = 0;
+      let nan = 0;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      for (let i = 0; i < n; i++) {
+        const y = pos.getY(i);
+        if (Number.isNaN(y)) { nan++; continue; }
+        if (y < 0.8) belowHip++;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+      return { n, nan, belowHipPct: (belowHip / n) * 100, minY, maxY };
+    });
+
+    expect(drape).not.toBeNull();
+    expect(drape!.nan).toBe(0);
+    // Anti-colapso: la maraña/blob ponía la prenda entera en el suelo.
+    expect(drape!.belowHipPct).toBeLessThan(5);
+    // El hem queda en la cadera (~0.88) — nada cuelga hacia el suelo.
+    expect(drape!.minY).toBeGreaterThan(0.5);
+    // Los hombros siguen arriba: la prenda no se escurrió entera.
+    expect(drape!.maxY).toBeGreaterThan(1.3);
+  });
+});
