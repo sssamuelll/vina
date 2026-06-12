@@ -41,6 +41,7 @@ import {
   parameterizeEdge,
   parameterizeEdgeFromBoundary,
   matchVertices,
+  DEFAULT_SEAM_CONFIG,
   SEAM_CURVE_RESOLUTION,
   SEAM_MAX_EDGE_LENGTH,
 } from './seamAssembly';
@@ -73,6 +74,10 @@ export interface SeamPair {
   pieceBId: string;
   /** [localVertexIdxInPieceA, localVertexIdxInPieceB] pairs. */
   vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]>;
+  /** Compliance XPBD per-seam: base[type] / strength × (taped ? 0.1 : 1) — espejo de buildSeamConstraints. */
+  compliance: number;
+  /** tension/100 — escala el target inicial (1 = distancia actual). */
+  tensionFactor: number;
 }
 
 /**
@@ -175,10 +180,16 @@ export function seamInitDataToPairs(
     const resolved = resolveSeamVertexPairs(seam, pieceById, true);
     if (resolved.failure) continue;
 
+    // Per-seam physics, mirroring buildSeamConstraints (seamAssembly.ts):
+    // compliance = base[type] / strength × (taped ? 0.1 : 1);
+    // tensionFactor scales the initial rest length (restLength = dist × tension/100).
+    const baseCompliance = DEFAULT_SEAM_CONFIG.compliance[seam.type];
     pairs.push({
       pieceAId: seam.pieceAId,
       pieceBId: seam.pieceBId,
       vertexPairs: resolved.vertexPairs,
+      compliance: (baseCompliance / (seam.strength ?? 1.0)) * (seam.taped ? 0.1 : 1.0),
+      tensionFactor: (seam.tension ?? 100) / 100,
     });
   }
 
