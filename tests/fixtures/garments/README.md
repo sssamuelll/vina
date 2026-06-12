@@ -13,6 +13,7 @@ connectivity suite can be retargeted onto the DXF import path (backlog issue).
 | `tshirt_test.dxf` | 5 | Seamly2D `tshirt_test` — Front/Back Bodice, Sleeves L/R, Neckband |
 | `pajama_top_wrap2.dxf` | 9 | Seamly2D `pajama_top_wrap2` |
 | `jacket1_52-176.dxf` | 5 | Seamly2D `jacket1_52-176` — Cyrillic piece names (index-prefixed*) |
+| `maria_patrones_samuel_2M.dxf` | 5 | **María (patternmaker), 2026-06-11** — real external CAD export (AC1009, block `PATRONES PARA SAMUEL-2_M`): front/back bodices, 2 sleeves, strip. NOT Seamly2D-derived — this is the canonical real-pattern substrate; the user mandated all integration-level verification use it (`seam-parity-replay.spec.ts`). |
 
 **How they were produced** (one-shot script, deleted after running — it
 imported modules that died with the nuke): for each pattern JSON, replicate

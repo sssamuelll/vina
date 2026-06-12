@@ -473,3 +473,80 @@ test.describe('Seam parity replay — lote 1', () => {
     expect(target?.seamAllowanceWidth).toBe(40);
   });
 });
+
+// ─── Replay sobre el patrón REAL (María) ─────────────────────────────────────
+//
+// Mandato del usuario (2026-06-11): las pruebas con rectángulos sintéticos no
+// valen como prueba de realidad — la verificación de integración corre sobre
+// el patrón de María (tests/fixtures/garments/maria_patrones_samuel_2M.dxf:
+// delantero, espalda, 2 mangas con copas curvas, tira; outlines de 194-276
+// comandos). Import por el camino REAL (input file del shell), costadillos
+// cosidos como en producción, sim en el tier por defecto.
+
+test.describe('Seam parity replay — patrón real de María', () => {
+  test('import DXF real → coser costadillos → sim WASM con constraints reales', async ({ page }) => {
+    test.setTimeout(180_000);
+    await waitFor2D(page);
+
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const fixture = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/garments/maria_patrones_samuel_2M.dxf',
+    );
+    await page.locator('input[accept=".dxf"]').setInputFiles(fixture);
+
+    // 5 piezas reales con edges semánticos auto-detectados.
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.pieces')) ?? []).length, {
+        timeout: 30_000,
+      })
+      .toBe(5);
+
+    const pieces = (await getState<
+      Array<{ id: string; outline: unknown[]; edges?: Array<{ name: string }> }>
+    >(page, 'project.pieces'))!;
+    // Outlines curvos de verdad — el patrón sintético nunca pasa de ~6 comandos.
+    expect(pieces.filter((p) => p.outline.length > 100).length).toBeGreaterThanOrEqual(3);
+
+    // El import DXF NO auto-cose (by design, fixtures README) — cosemos los
+    // costadillos delantero↔espalda: las dos piezas bodice (patrón de 5 edges
+    // con left/right) excluyendo la tira pequeña.
+    const bodices = pieces.filter(
+      (p) =>
+        p.outline.length > 50 &&
+        p.edges?.length === 5 &&
+        p.edges.some((e) => e.name === 'rightEdge') &&
+        p.edges.some((e) => e.name === 'leftEdge'),
+    );
+    expect(bodices.length).toBe(2);
+    const [front, back] = bodices;
+    for (const [i, [aEdge, bEdge]] of [
+      ['rightEdge', 'leftEdge'],
+      ['leftEdge', 'rightEdge'],
+    ].entries()) {
+      await dispatch(page, {
+        type: 'project/addSeam',
+        payload: makeSeam(`maria-side-${i}`, front.id, aEdge as string, back.id, bEdge as string),
+      });
+    }
+    await expect(page.locator('g.seam-connection')).toHaveCount(2);
+
+    // Sim en el tier por defecto: los costadillos curvos resuelven a
+    // constraints de verdad (≈146 con SEAM_MAX_EDGE_LENGTH=15) y ninguno a 0.
+    await switchView(page, '3D');
+    await startSimulation(page);
+    await expect
+      .poll(async () => getState<string>(page, 'simulation.solverTier'), { timeout: 60_000 })
+      .not.toBe('none');
+    expect(await getState<string>(page, 'simulation.solverTier')).toBe('wasm');
+
+    const summary = await getState<{
+      totalConstraints: number;
+      zeroConstraintSeams: unknown[];
+    }>(page, 'simulation.seamResolution');
+    expect(summary!.totalConstraints).toBeGreaterThan(100);
+    expect(summary!.zeroConstraintSeams).toHaveLength(0);
+    await expect(page.locator('text=/seam constraints/')).toBeVisible({ timeout: 10_000 });
+  });
+});
