@@ -342,15 +342,19 @@ describe('buildLinearBVH skip pointers (#897 F4.3b)', () => {
   it('skip-traversal collects exactly the flat-scan triangle set (random 200-tri soup)', () => {
     const bvh = buildLinearBVH(makeRandomSoup(200, 0xFEED));
     const points = randomPoints(50, 3, -0.2, 1.2);
-    // uAabbMargin floor in the kernel is 0.1 m; also pin a tighter margin so
-    // the equivalence doesn't hold only for AABBs that swallow everything.
+    // uAabbMargin floor in the kernel is 0.03 m (#897 F4.3c sweep); also pin
+    // a wider and a tighter margin so the equivalence doesn't hold only for
+    // AABBs that swallow everything (or for one lucky radius).
     expectTraversalMatchesFlatScan(bvh, points, 0.1);
+    expectTraversalMatchesFlatScan(bvh, points, 0.03);
     expectTraversalMatchesFlatScan(bvh, points, 0.01);
   });
 
   it('a hit on the soup actually collects a non-empty triangle set (sanity: not vacuous)', () => {
     const bvh = buildLinearBVH(makeRandomSoup(200, 0xFEED));
-    // Center of the unit cube with the kernel's default margin — must hit.
+    // Center of the unit cube with a wide margin — must hit. (Deliberately
+    // wider than the kernel's 0.03 floor: this guards non-vacuousness of the
+    // equivalence suite above, not the kernel default.)
     const { tris } = traverseTriangles(bvh, [0.5, 0.5, 0.5], 0.1);
     expect(tris.size).toBeGreaterThan(0);
   });

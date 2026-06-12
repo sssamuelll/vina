@@ -196,17 +196,40 @@ export function createTslCollisionBody(
   const uMargin = uniform(margin);
   const uFriction = uniform(friction);
   const uDistScale = uniform(DIST_SCALE);
-  // BVH AABB filter expansion: terminal-velocity per-substep displacement is
-  // ~11mm at 9.81m/s² × (1/900s)², well above margin (5mm). Empirically, an
-  // AABB margin of 5mm leaves cloth at floor — too tight to
-  // catch fast-falling particles before they tunnel past surface leaves. 30mm
-  // catches them at shin level. 100mm catches them at body — matches the CPU
-  // spatial hash's effective query radius (~3 × cellSize, default 30-50mm)
-  // plus headroom for the largest expected per-frame displacement. Per-
-  // triangle exact distance test inside the leaf is unchanged; wider AABB
-  // just means more candidate triangles considered (negligible perf cost
-  // since the BVH still culls most leaves).
-  const uAabbMargin = uniform(Math.max(margin, 0.1));
+  // BVH AABB query expansion — the breadth driver of the traversal: wider
+  // margin ⇒ more subtree visited per particle per substep (same hits; the
+  // per-triangle exact distance test inside the leaf is unchanged).
+  //
+  // History: the original calibration (design doc §9 era: 5mm → cloth at
+  // floor; 30mm → shin; 100mm → knee) PREDATES the F2 fixes. The tunneling
+  // that demanded 100mm was caused by the velocity bug F2 removed (collision
+  // push leaked into velocity; with inelastic response + velocity exclusion
+  // + damping 0.99 + M4-D calibration, particles no longer accelerate
+  // through the surface). That table is obsolete — 100mm was a workaround,
+  // not a requirement.
+  //
+  // F4.3c sweep (2026-06-13, María fixture 29,338 particles, post-F4.3b
+  // escape-pointer traversal, headed Chromium + real GPU, medians over ≥26
+  // 30-frame windows; drape sampled per window so values compare at MATCHED
+  // sim-time — the tier steps fixed dt per frame, so wall-clock marks are
+  // not comparable across fps):
+  //
+  //   floor   frameMs   fps    drape vs 0.1-control at matched sim-time
+  //   0.1     117.8     8.5    control (M4 green at settle, ~2s sim)
+  //   0.05     46.5    21.5    indistinguishable from control
+  //   0.03     30.7/31.3 32.6/32.0 (n=2) indistinguishable from control
+  //   0.02     24.6/24.4 40.7/41.0 (n=2) REPRODUCIBLY degraded post-settle:
+  //            faster creep (+5-7% belowHip from ~4s sim), early shoulder
+  //            slip (maxY < 1.3 by ~9s sim in rep2) — the cliff edge.
+  //
+  // Physical floor: the margin bounds the maximum rescuable penetration
+  // depth. Push margin (8mm, M4-D) + terminal per-substep displacement
+  // (~11mm at sdt=1/900) ≈ 19mm — 0.02 sits ~1mm above that sum and shows
+  // it; 0.03 keeps ~11mm headroom and tracks the control through settle,
+  // creep, and slide (n=2). Known issue, margin-INDEPENDENT: a slow creep
+  // (garment slides down the avatar from ~3s sim) exists at every value
+  // including 0.1 — that is a separate physics item, not a query-radius one.
+  const uAabbMargin = uniform(Math.max(margin, 0.03));
 
   // ─── Pass 1: findBestNode ───────────────────────────────────────────────
   // Per particle: threaded BVH traversal via escape pointers (#897 F4.3b).
