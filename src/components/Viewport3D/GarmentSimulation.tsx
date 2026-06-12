@@ -436,7 +436,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           renderer.compute(solver.windNodes.applyNode);
         }
         // Batch all stretch colors in one call — graph coloring guarantees
-        // no two colors share a vertex, so parallel dispatch is race-free.
+        // no two constraints WITHIN a color share a vertex, so each color's
+        // parallel dispatch is race-free; cross-color shared vertices are
+        // ordered by the sequential dispatches inside the pass (same
+        // guarantee as the seam batch below).
         // Reduces ~57 separate submit() calls to 1 per substep.
         renderer.compute(solver.stretchColors);
         if (solver.bend) renderer.compute(solver.bend);

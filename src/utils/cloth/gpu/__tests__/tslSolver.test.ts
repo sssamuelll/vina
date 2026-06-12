@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so shared mocks are available to both.
 // `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
 // call returns a node whose `.setAtomic` records {sba, value} into this array.
-const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() => {
+const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
   // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
   // every atomicLoad(buf.element(i)) call in the production code increments
@@ -11,6 +11,12 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() =
   // array<atomic<T>> buffers; a future refactor that drops it would silently
   // fail Dawn validation. Symmetric to `setAtomicCalls`.
   const atomicLoadCalls: Array<unknown> = [];
+  // `uniformNodes` records every node created via the top-level `uniform()`
+  // export (NOT the derived mockUniform(0) chain results). The SolverUniforms
+  // object is internal to createTslSolver, so constructor capture is the only
+  // observable for "config field X was wired into a uniform with value V" —
+  // used by the #897 F1.4 seam-decay pins.
+  const uniformNodes: Array<{ value: number }> = [];
 
   const MockSBA = class MockSBA {
     array: Float32Array | Uint32Array | Int32Array;
@@ -84,7 +90,11 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() =
       __tslCompute: true,
       dispatchCount: count,
     }),
-    uniform: (val: number) => mockUniform(val),
+    uniform: (val: number) => {
+      const u = mockUniform(val);
+      uniformNodes.push(u);
+      return u;
+    },
     float: (val: number) => ({
       value: val,
       mul: () => mockElement(),
@@ -113,7 +123,7 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() =
     },
   };
 
-  return { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls };
+  return { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes };
 });
 
 // Note: three/webgpu and three/tsl resolve to the same bundle (three.webgpu.js),
@@ -215,7 +225,8 @@ const defaultConfig: TslSolverConfig = {
   gravity: [0, -9.81, 0],
   damping: 0.99,
   internalDamping: 0.3,
-  seamStiffness: 0.0001,
+  seamShrinkFactor: 0.97,
+  seamSewedThreshold: 1e-6,
   groundY: -10.0,
   dt: 1 / 60,
 };
@@ -497,7 +508,6 @@ describe('updateConfig', () => {
 
     solver.updateConfig({
       internalDamping: 0.5,
-      seamStiffness: 0.01,
     });
   });
 
@@ -680,5 +690,62 @@ describe('#554 atomic buffer regression guards', () => {
     createTslSolver(buffers, { ...defaultConfig });
 
     expect(atomicLoadCalls.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── #897 F1.4 — seam target decay uniforms ──────────────────────────────────
+//
+// The seam kernel decays each constraint's target per substep (×shrinkFactor,
+// snap to 0 below sewedThreshold) before XPBD projection, mirroring Rust
+// `solve_seams` (lib.rs:649-711). These pins anchor the uniform wiring.
+//
+// Limitation: the Fn() mock invokes kernel bodies but records nothing about
+// which uniform nodes a given kernel closure captured, so "the seam kernel
+// reads shrink/threshold" cannot be asserted at the kernel level here — the
+// pin is at the createUniforms level (constructor capture via `uniformNodes`);
+// the kernel wiring is a direct pass-through of uniforms.seamShrinkFactor /
+// uniforms.seamSewedThreshold in tslSolver.ts.
+
+describe('#897 F1.4 seam target decay uniforms', () => {
+  it('creates a seamShrinkFactor uniform with the config value (0.97)', () => {
+    uniformNodes.length = 0;
+    const buffers = makeMockBufferSet({ numSeam: 2 });
+    createTslSolver(buffers, { ...defaultConfig });
+
+    // 0.97 appears nowhere else in the init path (damping 0.99, grav -9.81,
+    // internalDamping 0.3, groundY -10, sdt 1/900, wind 0/1, brush 0/0.05,
+    // grab 0/0.08/0.6/15) — it uniquely identifies the shrink uniform.
+    expect(uniformNodes.some((u) => u.value === 0.97)).toBe(true);
+  });
+
+  it('creates a seamSewedThreshold uniform with the config value (1e-6)', () => {
+    uniformNodes.length = 0;
+    const buffers = makeMockBufferSet({ numSeam: 2 });
+    createTslSolver(buffers, { ...defaultConfig });
+
+    expect(uniformNodes.some((u) => u.value === 1e-6)).toBe(true);
+  });
+
+  it('seam decay params are init-only — updateConfig does not write them (mirrors WASM init-wired set_seam_shrink_params)', () => {
+    uniformNodes.length = 0;
+    const buffers = makeMockBufferSet({ numSeam: 2 });
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    const shrinkNode = uniformNodes.find((u) => u.value === 0.97);
+    const thresholdNode = uniformNodes.find((u) => u.value === 1e-6);
+    expect(shrinkNode).toBeDefined();
+    expect(thresholdNode).toBeDefined();
+
+    solver.updateConfig({ seamShrinkFactor: 0.5, seamSewedThreshold: 0.1 });
+
+    expect(shrinkNode!.value).toBe(0.97);
+    expect(thresholdNode!.value).toBe(1e-6);
+  });
+
+  it('TslSolverConfig no longer accepts seamStiffness (compile-level pin)', () => {
+    // @ts-expect-error — seamStiffness was removed from TslSolverConfig in
+    // #897 F1.4 (per-constraint compliance + in-kernel decay replaced it).
+    const rejected: TslSolverConfig = { ...defaultConfig, seamStiffness: 0.01 };
+    expect(rejected).toBeDefined();
   });
 });

@@ -14,7 +14,7 @@
  *   1. preSolve     — save prevPos, integrate gravity + damping (per-particle)
  *   2. stretch      — graph-colored distance constraints (per-color dispatch)
  *   3. bend         — single Jacobi distance constraint on opposite verts
- *   4. seam         — graph-colored distance constraints pulling seam pairs together
+ *   4. seam         — graph-colored decaying-target constraints closing seam pairs
  *   5. groundClamp  — clamp positions to ground plane (AFTER constraints)
  *   6. postSolve    — velocity update, ground friction, NaN guard, speed clamp
  *
@@ -55,7 +55,17 @@ export interface TslSolverConfig {
   gravity: [number, number, number];
   damping: number;
   internalDamping: number;
-  seamStiffness: number;
+  /**
+   * Per-substep seam target decay factor (target ×= shrink each substep).
+   * Init-only — espejo de WASM, donde `set_seam_shrink_params` se cablea en
+   * init; updateConfig no tiene rama para este campo.
+   */
+  seamShrinkFactor: number;
+  /**
+   * Seam target floor: below it the target snaps to 0 ("sewed"). Init-only,
+   * same rationale as seamShrinkFactor.
+   */
+  seamSewedThreshold: number;
   groundY: number;
   dt: number;
   selfCollision?: boolean;
@@ -75,9 +85,9 @@ export interface TslSolver {
   bend: ComputeNode | null;
   /**
    * Per-color seam constraint compute nodes (empty if no seam constraints).
-   * F1.3 (#897): per-constraint compliance (from SeamPair) replaces the
-   * seamStiffness uniform; targets are the seeded distances. The in-kernel
-   * target decay arrives in F1.4.
+   * F1.4 (#897): dedicated kernel (`makeSeamConstraintFn`) with in-kernel
+   * per-substep target decay + per-constraint compliance (from SeamPair),
+   * espejo behavioral de Rust `solve_seams`.
    */
   seamColors: ComputeNode[];
   /** Ground plane clamping (dispatch AFTER constraints, BEFORE postSolve) */
@@ -188,7 +198,8 @@ interface SolverUniforms {
   gravZ: FloatUniform;
   damping: FloatUniform;
   internalDamping: FloatUniform;
-  seamStiffness: FloatUniform;
+  seamShrinkFactor: FloatUniform;
+  seamSewedThreshold: FloatUniform;
   groundY: FloatUniform;
 }
 
@@ -201,7 +212,8 @@ function createUniforms(config: TslSolverConfig): SolverUniforms {
     gravZ: uniform(config.gravity[2]),
     damping: uniform(config.damping),
     internalDamping: uniform(config.internalDamping),
-    seamStiffness: uniform(config.seamStiffness),
+    seamShrinkFactor: uniform(config.seamShrinkFactor),
+    seamSewedThreshold: uniform(config.seamSewedThreshold),
     groundY: uniform(config.groundY),
   };
 }
@@ -277,11 +289,11 @@ function makeGroundClampFn(
 // ─── Shared distance constraint kernel factory ───────────────────────────────
 
 /**
- * Factory for distance constraint solvers (stretch, bend, seam).
+ * Factory for distance constraint solvers (stretch, bend).
  *
- * Compliance source: per-constraint buffer (stretch/bend/seam) or uniform
- * (legacy fallback — no production caller since #897 F1.3).
- * Exactly one of complianceBuf/complianceUniform must be non-null.
+ * Compliance is always per-constraint (complianceBuf). The legacy uniform
+ * fallback was removed in #897 F1.4 — seams, its last caller, now use the
+ * dedicated `makeSeamConstraintFn` with in-kernel target decay.
  */
 function makeDistanceConstraintFn(
   posBuf: TslNode,
@@ -292,8 +304,7 @@ function makeDistanceConstraintFn(
   idStride: number,
   idOffset0: number,
   idOffset1: number,
-  complianceBuf: TslNode | null,
-  complianceUniform: FloatUniform | null,
+  complianceBuf: TslNode,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (Fn as any)(() => {
@@ -323,24 +334,89 @@ function makeDistanceConstraintFn(
       // Constraint violation
       const C = len.sub(restLen);
 
-      // XPBD compliance — per-constraint buffer or uniform fallback
-      const complianceVal = complianceBuf
-        ? complianceBuf.element(ci)
-        : complianceUniform!;
-      const alpha = complianceVal.div(sdt.mul(sdt));
+      // XPBD compliance — per-constraint
+      const alpha = complianceBuf.element(ci).div(sdt.mul(sdt));
 
-      // Correction scalar
       const denom = w0.add(w1).add(alpha);
-      const s = C.negate().div(denom);
+      // Guard 0/0 (espejo de Rust `if w_sum == 0 { continue }` y del solver CPU):
+      // pieza congelada (invMass=0 en ambos extremos) + compliance 0 (default
+      // warp/weft) producía NaN permanente — postSolve no restaura pinned.
+      If(denom.greaterThan(float(0.0)), () => {
+        // Correction scalar
+        const s = C.negate().div(denom);
 
-      // Normalized gradient
-      const n = delta.div(len);
+        // Normalized gradient
+        const n = delta.div(len);
 
-      // Push particle 0 along gradient (toward particle 1 when stretched)
-      posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
+        // Push particle 0 along gradient (toward particle 1 when stretched)
+        posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
 
-      // Push particle 1 in opposite direction
-      posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+        // Push particle 1 in opposite direction
+        posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+      });
+    });
+  })();
+}
+
+// ─── Seam constraint kernel factory ──────────────────────────────────────────
+
+/**
+ * Seam kernel — espejo behavioral de Rust `solve_seams` (lib.rs:649-711):
+ * decay del target ANTES de resolver (×shrink por substep, snap a 0 bajo
+ * threshold), luego proyección XPBD con compliance per-constraint.
+ * Race-free: (a) dentro de un color no se comparten vértices; (b) cada
+ * constraint posee su slot de target en exclusiva; (c) cada constraint vive
+ * en exactamente un color → el decay tickea una vez por substep. Cadencia
+ * por frame = 0.97^substeps — igual que WASM en la rama con avatar (la de
+ * producción); la rama WASM sin avatar (1 tick/frame a sdt=1/60) es una
+ * divergencia preexistente de WASM, no el target de paridad. El
+ * write-then-re-read de targetBuf dentro de la invocación es coherente
+ * (program order + element nodes frescos emiten load tras el store).
+ */
+function makeSeamConstraintFn(
+  posBuf: TslNode,
+  invMassBuf: TslNode,
+  idsBuf: TslNode,
+  targetBuf: TslNode,
+  complianceBuf: TslNode,
+  sdt: FloatUniform,
+  shrink: FloatUniform,
+  threshold: FloatUniform,
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (Fn as any)(() => {
+    const ci = instanceIndex; // constraint index
+
+    // ── Decay (shrink-before-solve, espejo lib.rs:656-664) ──
+    const tgt = targetBuf.element(ci);
+    If(tgt.greaterThan(threshold), () => {
+      const shrunk = tgt.mul(shrink);
+      If(shrunk.lessThan(threshold), () => {
+        targetBuf.element(ci).assign(float(0.0));
+      }).Else(() => {
+        targetBuf.element(ci).assign(shrunk);
+      });
+    });
+
+    // ── Proyección XPBD (espejo lib.rs:666-700) ──
+    const id0 = idsBuf.element(uint(ci).mul(uint(2)));
+    const id1 = idsBuf.element(uint(ci).mul(uint(2)).add(uint(1)));
+    const w0 = invMassBuf.element(id0);
+    const w1 = invMassBuf.element(id1);
+    const delta = posBuf.element(id1).sub(posBuf.element(id0));
+    const len = delta.dot(delta).sqrt();
+
+    If(len.greaterThan(float(1e-7)), () => {
+      const restLen = targetBuf.element(ci); // re-leído post-decay
+      const C = len.sub(restLen);
+      const alpha = complianceBuf.element(ci).div(sdt.mul(sdt));
+      const denom = w0.add(w1).add(alpha);
+      If(denom.greaterThan(float(0.0)), () => {
+        const s = C.negate().div(denom);
+        const n = delta.div(len);
+        posBuf.element(id0).addAssign(n.mul(s).mul(w0).negate());
+        posBuf.element(id1).addAssign(n.mul(s).mul(w1));
+      });
     });
   })();
 }
@@ -604,7 +680,7 @@ export function createTslSolver(
       posBuf, invMassBuf, idsBuf, restBuf,
       uniforms.sdt,
       2, 0, 1,
-      compBuf, null,
+      compBuf,
     );
     return compute(fn, color.count, [64]);
   });
@@ -620,26 +696,26 @@ export function createTslSolver(
       posBuf, invMassBuf, bendIdsBuf, bendRestBuf,
       uniforms.sdt,
       4, 2, 3, // quad stride, opposite vertex indices
-      bendCompBuf, null,
+      bendCompBuf,
     );
     bend = compute(fn, buffers.numBendConstraints, [64]);
   }
 
-  // ─── Seam constraints (per-color, per-constraint compliance) ───────
-  // F1.3 (#897) structural half of F1.4: same distance kernel as stretch,
-  // one dispatch per color group, compliance read per-constraint from the
-  // group's SBA (the seamStiffness uniform is no longer consumed here; it
-  // is removed in F1.4 along with the dedicated decaying-target kernel).
+  // ─── Seam constraints (per-color, decaying target + compliance) ────
+  // F1.4 (#897): dedicated kernel — per-substep target decay in-kernel
+  // (espejo de Rust solve_seams) + compliance per-constraint from the
+  // group's SBA. One dispatch per color group; each constraint owns its
+  // targetDist slot exclusively, so the decay tick is race-free.
   const seamColors = buffers.seamColors.map((color) => {
     const idsBuf = storage(color.idsSBA, 'uint', color.count * 2);
     const targetBuf = storage(color.targetDistSBA, 'float', color.count);
     const compBuf = storage(color.complianceSBA, 'float', color.count);
 
-    const fn = makeDistanceConstraintFn(
-      posBuf, invMassBuf, idsBuf, targetBuf,
+    const fn = makeSeamConstraintFn(
+      posBuf, invMassBuf, idsBuf, targetBuf, compBuf,
       uniforms.sdt,
-      2, 0, 1,
-      compBuf, null,
+      uniforms.seamShrinkFactor,
+      uniforms.seamSewedThreshold,
     );
     return compute(fn, color.count, [64]);
   });
@@ -775,10 +851,9 @@ export function createTslSolver(
       config.internalDamping = partial.internalDamping;
       uniforms.internalDamping.value = partial.internalDamping;
     }
-    if (partial.seamStiffness !== undefined) {
-      config.seamStiffness = partial.seamStiffness;
-      uniforms.seamStiffness.value = partial.seamStiffness;
-    }
+    // seamShrinkFactor / seamSewedThreshold: init-only a propósito — espejo
+    // de WASM, donde set_seam_shrink_params se cablea en init (sin rama
+    // runtime). No branches here.
     if (partial.groundY !== undefined) {
       config.groundY = partial.groundY;
       uniforms.groundY.value = partial.groundY;

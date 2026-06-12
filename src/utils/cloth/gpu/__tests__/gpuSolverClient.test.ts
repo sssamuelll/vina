@@ -13,8 +13,13 @@ import { FakeGPUDevice, FakeRenderer } from './fakeDevice';
 // • `setAtomicCalls` — captures every `storage(sba, …).setAtomic(value)` call so
 //   the per-body atomic scratch SBAs from `createTslCollisionBody` can be
 //   identified by their fill values (behavior #8).
-const { sharedMock, setAtomicCalls } = vi.hoisted(() => {
+// • `uniformCalls` — captures every `uniform(value)` constructor value so the
+//   init-time solver config can be observed (behavior #12): local modules are
+//   NOT mocked here, so the only seam-param observable is the value each
+//   config scalar is wrapped with inside `createTslSolver`'s createUniforms.
+const { sharedMock, setAtomicCalls, uniformCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
+  const uniformCalls: unknown[] = [];
 
   class MockSBA {
     array: Float32Array | Uint32Array | Int32Array;
@@ -84,7 +89,10 @@ const { sharedMock, setAtomicCalls } = vi.hoisted(() => {
       __tslCompute: true,
       dispatchCount: count,
     }),
-    uniform: (val: unknown) => makeUniform(val),
+    uniform: (val: unknown) => {
+      uniformCalls.push(val);
+      return makeUniform(val);
+    },
     float: (val: unknown) => makeUniform(val),
     int: (val: unknown) => makeUniform(val),
     uint: (val: unknown) => makeUniform(val),
@@ -99,7 +107,7 @@ const { sharedMock, setAtomicCalls } = vi.hoisted(() => {
   });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  return { sharedMock, setAtomicCalls };
+  return { sharedMock, setAtomicCalls, uniformCalls };
 });
 
 // Shape of the mock StorageBufferAttribute (kept here as a plain type so the
@@ -124,6 +132,7 @@ vi.mock('three/webgpu', () => sharedMock());
 vi.mock('three/tsl', () => sharedMock());
 
 import { GpuSolverClient, type PieceMeshData } from '../gpuSolverClient';
+import { DEFAULT_SEAM_CONFIG } from '../../seamAssembly';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -879,5 +888,34 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
     expect(seamColors[1].count).toBe(1);
     // Both constraints survive the reorder.
     expect(buffers.numSeamConstraints).toBe(2);
+  });
+});
+
+// ─── Behavior #12 — default seam decay config (#897 F1.4) ────────────────────
+//
+// initMultiPieceTsl's defaultConfig must seed the TSL solver with
+// DEFAULT_SEAM_CONFIG.shrinkFactor / .sewedThreshold (the CPU/WASM parity
+// values for in-kernel seam target decay) instead of the removed
+// seamStiffness. Local modules are deliberately NOT mocked in this file (only
+// three/*), so the observable is the `uniform()` constructor: createTslSolver
+// wraps each config scalar in uniform(value), and 0.97 / 1e-6 appear nowhere
+// else in the TSL init path (audited: wind 0/1, brush 0/0.05, grab
+// 0/0.08/0.6/15, damping 0.9603, gravity -9.81, sdt 1/900, groundY 0).
+
+describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.4)', () => {
+  it('seeds seamShrinkFactor and seamSewedThreshold from DEFAULT_SEAM_CONFIG', async () => {
+    // Anchor the literals first so the wiring assertion below can't go
+    // tautological if DEFAULT_SEAM_CONFIG drifts.
+    expect(DEFAULT_SEAM_CONFIG.shrinkFactor).toBe(0.97);
+    expect(DEFAULT_SEAM_CONFIG.sewedThreshold).toBe(1e-6);
+
+    uniformCalls.length = 0;
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.shrinkFactor);
+    expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.sewedThreshold);
   });
 });

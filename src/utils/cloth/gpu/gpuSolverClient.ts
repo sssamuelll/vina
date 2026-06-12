@@ -25,6 +25,7 @@ import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolv
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
+import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
 import type { ClothSolverClient } from '../solverProtocol';
 import type { LocalVertexIndex, SeamPair } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
@@ -429,7 +430,8 @@ export class GpuSolverClient implements ClothSolverClient {
         gravity: [0, -9.81, 0],
         damping: 0.9603,
         internalDamping: 0.3,
-        seamStiffness: 0.0,
+        seamShrinkFactor: DEFAULT_SEAM_CONFIG.shrinkFactor,
+        seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
         groundY: 0.0,
         dt: 1 / 60,
         ...solverConfig,
