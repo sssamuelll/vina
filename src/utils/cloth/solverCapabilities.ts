@@ -168,9 +168,10 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  * imported and conditionally instantiated in `tslSolver.ts:634` (gated by
  * `config.selfCollision && buffers.scBuffers`). However:
  * - Default `config.selfCollision = false` (`gpuSolver.ts:62`).
- * - `selfCollisionNodes.{hashCount,prefixSum,scatter,resolve,apply}Node`
- *   are NEVER dispatched in `GarmentSimulation.tsx:380-435` substep loop
- *   (only stretch/bend/seam/wind/grab/postSolve/etc. are computed).
+ * - `selfCollisionNodes.{cellClear,scatter,resolve,apply}Node` (#897 F3
+ *   bucket pipeline) are NEVER dispatched in the `GarmentSimulation.tsx`
+ *   substep loop (only stretch/bend/seam/wind/grab/postSolve/etc. are
+ *   computed). Production allocation + dispatch is F3.3.
  *
  * Same shape as BUG-5 was for WASM tier (scaffolded but no wiring).
  * Capability stays `false` until the kernels are dispatched per substep
