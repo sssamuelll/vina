@@ -435,7 +435,12 @@ export class GpuSolverClient implements ClothSolverClient {
       const defaultConfig: TslSolverConfig = {
         substeps: 15,
         gravity: [0, -9.81, 0],
-        damping: 0.9603,
+        // 0.99, NO 0.9603: el kernel preSolve multiplica
+        // damping × (1 − internalDamping×0.1) igual que Rust pre_solve, así
+        // que 0.99 × 0.97 = 0.9603 efectivo = paridad WASM. El valor viejo
+        // re-aplicaba el factor (efectivo 0.9315/substep → momentum ×0.34
+        // por frame vs ×0.54 en WASM) y deprimía el asentamiento (#897 F2).
+        damping: 0.99,
         internalDamping: 0.3,
         seamShrinkFactor: DEFAULT_SEAM_CONFIG.shrinkFactor,
         seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,

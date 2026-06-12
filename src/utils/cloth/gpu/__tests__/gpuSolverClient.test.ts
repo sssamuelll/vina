@@ -900,7 +900,8 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
 // three/*), so the observable is the `uniform()` constructor: createTslSolver
 // wraps each config scalar in uniform(value), and 0.97 / 1e-6 appear nowhere
 // else in the TSL init path (audited: wind 0/1, brush 0/0.05, grab
-// 0/0.08/0.6/15, damping 0.9603, gravity -9.81, sdt 1/900, groundY 0).
+// 0/0.08/0.6/15, damping 0.99 — behavior #14, gravity -9.81, sdt 1/900,
+// groundY 0).
 
 describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.4)', () => {
   it('seeds seamShrinkFactor and seamSewedThreshold from DEFAULT_SEAM_CONFIG', async () => {
@@ -971,5 +972,32 @@ describe('avatar collision calibration M4-D (behavior #13 — #897 F2)', () => {
       0.4,
       0.008,
     );
+  });
+});
+
+// ─── Behavior #14 — default damping 0.99, not 0.9603 (#897 F2) ───────────────
+//
+// The TSL preSolve kernel multiplies damping × (1 − internalDamping×0.1)
+// (same formula as Rust pre_solve). WASM ships damping=0.99 +
+// internalDamping=0.3 → effective 0.99×0.97 = 0.9603/substep. The old GPU
+// defaultConfig baked the EFFECTIVE value (0.9603) in, so the kernel applied
+// the ×0.97 factor AGAIN → 0.9315/substep → velocity ×0.34/frame vs ×0.54 on
+// WASM — depressed momentum, wrong settling. Observable: the `uniform()`
+// constructor capture (same mechanism as behavior #12); 0.99 appears nowhere
+// else in the TSL init path (audit in the behavior #12 comment), and 0.9603
+// must be gone entirely. The WGSL path (gpuSolver.ts damping 0.9603) is
+// intentionally untouched: its kernel has no internalDamping term, so the
+// pre-multiplied value is correct there.
+
+describe('initMultiPieceTsl default damping (behavior #14 — #897 F2)', () => {
+  it('seeds the damping uniform with 0.99 (raw), not 0.9603 (pre-multiplied)', async () => {
+    uniformCalls.length = 0;
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    expect(uniformCalls).toContain(0.99);
+    expect(uniformCalls).not.toContain(0.9603);
   });
 });
