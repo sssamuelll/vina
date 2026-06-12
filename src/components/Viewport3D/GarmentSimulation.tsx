@@ -453,6 +453,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // dispatch are visible to the next, so cross-color shared vertices
       // are race-free.
       substepNodes.push(...solver.seamColors);
+      // Self-collision (#897 F3): los 4 pases bucket ANTES de groundClamp —
+      // espejo del orden Rust (self corre DENTRO de la dinámica natural,
+      // pre-snapshot), así su corrección SÍ entra en la velocidad (vNat),
+      // igual que en WASM donde self corre dentro del step de Rust.
+      // Siempre-on en el tier GPU (divergencia ratificada vs preset
+      // 'normal'); este gate de dispatch es el kill-switch.
+      if (solver.selfCollisionNodes) {
+        const sc = solver.selfCollisionNodes;
+        substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
+      }
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así

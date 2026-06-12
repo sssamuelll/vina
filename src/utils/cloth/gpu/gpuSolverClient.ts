@@ -22,6 +22,9 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
+import { createSelfCollisionBuffers } from './tslSelfCollision';
+import { buildAdjacency, nextPrime } from '../selfCollision';
+import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
@@ -432,6 +435,24 @@ export class GpuSolverClient implements ClothSolverClient {
         fabric,
       );
 
+      // Self-collision (#897 F3): SIEMPRE activo en el tier GPU. RATIFICADO:
+      // diverge del preset 'normal' (selfCollision false) — esa es una
+      // decisión de perf MEDIDA EN WASM (#608/#892, kernel a 1FPS) que no
+      // aplica a compute GPU (buckets K=8, 4 pases). El kill-switch es el
+      // gate de dispatch en GarmentSimulation. La adyacencia se construye
+      // sobre los triángulos MERGED (offsets de pieza ya horneados) y el
+      // tamaño de tabla espeja SpatialHashGrid.build: nextPrime(2N).
+      // scBuffers DEBE asignarse antes de createTslSolver — su gate
+      // (`config.selfCollision && buffers.scBuffers`) lee el campo en init.
+      const adjSets = buildAdjacency(new Int32Array(triangles), totalVerts); // firma pide Int32Array (S8)
+      const csr = buildAdjacencyCSR(adjSets, totalVerts);
+      this.tslBuffers.scBuffers = createSelfCollisionBuffers(
+        totalVerts,
+        nextPrime(totalVerts * 2),
+        csr.offsets,
+        csr.neighbors,
+      );
+
       const defaultConfig: TslSolverConfig = {
         substeps: 15,
         gravity: [0, -9.81, 0],
@@ -446,6 +467,10 @@ export class GpuSolverClient implements ClothSolverClient {
         seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
         groundY: 0.0,
         dt: 1 / 60,
+        // Always-on en GPU (#897 F3, ver bloque scBuffers arriba); thickness
+        // = clothThickness, paridad con los defaults CPU/WASM (2mm).
+        selfCollision: true,
+        thickness: 0.002,
         ...solverConfig,
       };
 

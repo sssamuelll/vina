@@ -1001,3 +1001,79 @@ describe('initMultiPieceTsl default damping (behavior #14 — #897 F2)', () => {
     expect(uniformCalls).not.toContain(0.9603);
   });
 });
+
+// ─── Behavior #15 — self-collision allocation + always-on wiring (#897 F3.3) ─
+//
+// Production never allocated `scBuffers` (createTslBuffers hardcodes null in
+// its return literal) nor passed `selfCollision: true`, so the 4-pass bucket
+// pipeline from F3.1/F3.2 was dead code. F3.3 wires the allocation in
+// initMultiPieceTsl: CSR adjacency built from the MERGED triangle ids (so
+// cross-piece vertex offsets are baked in), bucket table sized nextPrime(2N)
+// (mirror of SpatialHashGrid.build), and `selfCollision: true` + thickness
+// 0.002 in the default config so createTslSolver's gate
+// (`config.selfCollision && buffers.scBuffers`) constructs the nodes.
+// Always-on is a RATIFIED divergence vs SIMULATION_MODES['normal'].selfCollision
+// = false — that false is a WASM-measured perf decision (#608/#892 kernel at
+// 1FPS) that does not apply to GPU compute (buckets K=8, 4 passes); the
+// off-switch is the dispatch gate in GarmentSimulation.
+
+describe('initMultiPieceTsl self-collision allocation (behavior #15 — #897 F3.3)', () => {
+  it('allocates scBuffers with real CSR adjacency and a nextPrime(2N) bucket table', async () => {
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')]);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sc = (client as any).tslBuffers.scBuffers;
+    expect(sc).not.toBeNull();
+
+    // N = 8 (two 4-vertex quads) → CSR offsets carry the N+1 sentinel shape.
+    const offsets = sc.adjOffsetsSBA.array as Uint32Array;
+    expect(offsets.length).toBe(9);
+
+    // REAL adjacency, not zero-fill: quad [0,1,2, 0,2,3] gives vertex 0 the
+    // triangle-shared neighbor set {1,2,3}; per-vertex sizes (3,2,3,2)=10
+    // per quad → offsets [0,3,5,8,10, 13,15,18,20] across both pieces.
+    expect(Array.from(offsets)).toEqual([0, 3, 5, 8, 10, 13, 15, 18, 20]);
+    const neighbors = sc.adjNeighborsSBA.array as Uint32Array;
+    expect(neighbors.length).toBe(20);
+    const p0 = Array.from(neighbors.slice(offsets[0], offsets[1])).sort((a, b) => a - b);
+    expect(p0).toEqual([1, 2, 3]);
+    // Piece 'b' is offset +4 in the merged mesh: its first vertex (global 4)
+    // must neighbor {5,6,7} — a missing vertex offset would yield {1,2,3}.
+    const p4 = Array.from(neighbors.slice(offsets[4], offsets[5])).sort((a, b) => a - b);
+    expect(p4).toEqual([5, 6, 7]);
+
+    // tableSize = nextPrime(2N) = nextPrime(16) = 17 (SpatialHashGrid.build
+    // mirror); bucket entries are tableSize × CELL_CAPACITY (8).
+    expect(sc.tableSize).toBe(17);
+    expect(sc.cellEntriesSBA.array.length).toBe(17 * 8);
+  });
+
+  it('passes selfCollision: true + thickness to createTslSolver — selfCollisionNodes wired', async () => {
+    uniformCalls.length = 0;
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+
+    await client.initMultiPieceTsl([makeQuadPiece('a'), makeQuadPiece('b')]);
+
+    const solver = client.getTslSolver()!;
+    // The gate is `config.selfCollision && buffers.scBuffers` — non-null
+    // nodes prove BOTH halves arrived (flag + allocation).
+    expect(solver.selfCollisionNodes).not.toBeNull();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodes = solver.selfCollisionNodes as any;
+    // Dispatch counts baked into the compute() wraps: [tableSize, N, N, N].
+    expect(nodes.cellClearNode.dispatchCount).toBe(17);
+    expect(nodes.scatterNode.dispatchCount).toBe(8);
+    expect(nodes.resolveNode.dispatchCount).toBe(8);
+    expect(nodes.applyNode.dispatchCount).toBe(8);
+    // thickness default 0.002 (clothThickness parity with CPU/WASM) reaches
+    // the kernel as a uniform; 0.002 appears nowhere else in the TSL init
+    // path (audit in the behavior #12 comment).
+    expect(uniformCalls).toContain(0.002);
+  });
+});

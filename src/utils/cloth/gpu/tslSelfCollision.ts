@@ -269,7 +269,9 @@ export function makeSelfCollisionComputeNodes(
         .bitXor(yi.mul(int(HASH_PRIME_Y)))
         .bitXor(zi.mul(int(HASH_PRIME_Z)));
       const tSize = int(uTableSize);
-      const modded = rawHash.modInt(tSize);
+      // .mod, no .modInt: ambos operandos ya son i32, emite el mismo `%`
+      // WGSL bit-idéntico; modInt está deprecado desde three r175.
+      const modded = rawHash.mod(tSize);
       // Ensure non-negative: if modded < 0, add tableSize
       const hVar = uint(0).toVar('hScatter');
       If(modded.lessThan(int(0)), () => {
@@ -338,7 +340,8 @@ export function makeSelfCollisionComputeNodes(
                 .bitXor(cyi.mul(int(HASH_PRIME_Y)))
                 .bitXor(czi.mul(int(HASH_PRIME_Z)));
               const tSize = int(uTableSize);
-              const modded = rawHash.modInt(tSize);
+              // .mod, no .modInt — mismo razonamiento que en scatter.
+              const modded = rawHash.mod(tSize);
               // Compute hash: handle negative modulo
               const hVar = uint(0).toVar('hResolve');
               If(modded.lessThan(int(0)), () => {

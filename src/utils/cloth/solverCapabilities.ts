@@ -163,19 +163,20 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
 /**
  * GPU TSL/WebGPU solver capabilities (post-A6-closure state).
  *
- * **`selfCollision: false` despite scaffolded TSL kernels** —
- * `tslSelfCollision.ts` exports `makeSelfCollisionComputeNodes` which is
- * imported and conditionally instantiated in `tslSolver.ts:634` (gated by
- * `config.selfCollision && buffers.scBuffers`). However:
- * - Default `config.selfCollision = false` (`gpuSolver.ts:62`).
- * - `selfCollisionNodes.{cellClear,scatter,resolve,apply}Node` (#897 F3
- *   bucket pipeline) are NEVER dispatched in the `GarmentSimulation.tsx`
- *   substep loop (only stretch/bend/seam/wind/grab/postSolve/etc. are
- *   computed). Production allocation + dispatch is F3.3.
+ * **`selfCollision: false` with dispatch fully wired (#897 F3.3)** —
+ * `initMultiPieceTsl` now allocates `scBuffers` (CSR adjacency from the
+ * merged triangle ids + `nextPrime(2N)` bucket table) and passes
+ * `selfCollision: true` to `createTslSolver`, so the gate
+ * (`config.selfCollision && buffers.scBuffers`) constructs the nodes, and
+ * the 4-pass bucket pipeline (`cellClear → scatter → resolve → apply`)
+ * dispatches every substep in the `GarmentSimulation.tsx` loop (before
+ * groundClamp — Rust step-order mirror). Always-on on this tier is a
+ * ratified divergence vs the 'normal' preset (that `false` is a
+ * WASM-measured perf decision, #608/#892).
  *
- * Same shape as BUG-5 was for WASM tier (scaffolded but no wiring).
- * Capability stays `false` until the kernels are dispatched per substep
- * AND a default-on path or explicit toggle is wired through the consumer.
+ * Capability flag stays `false` pending F4.1, which flips `seams` +
+ * `selfCollision` together after end-to-end verification on the real
+ * María pattern.
  *
  * `lra`, `pressure`, `fold`, `pieceStiffness` — no GPU implementation
  * exists. Same as WASM CPU-only-by-design gaps (A7 § 3.1).
