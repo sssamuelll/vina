@@ -169,13 +169,6 @@ function isWebGPUFeatureEnabled(): boolean {
   return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) === 'true';
 }
 
-/** DEV-ONLY (#897 F1): permite probar costuras GPU antes del flip de
- *  capability (la calibración de colisión llega en F2; el flip en el PR
- *  final). Se ELIMINA en ese PR. No documentado a usuarios. */
-function isWebGpuSeamsUnsafeOptIn(): boolean {
-  return safeGetItem('openclo-webgpu-seams-unsafe') === 'true';
-}
-
 /** Race a promise against a timeout */
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([
@@ -411,18 +404,15 @@ export function useSimulationLifecycle({
 
         // ─── WebGPU GPU solver ────────────────────────────────────────
         const wantsWebGPU = isWebGPUFeatureEnabled() && isWebGPUAvailable();
-        if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams && !isWebGpuSeamsUnsafeOptIn()) {
-          // The TSL seam kernel lacks closure parity (no target decay) — a
-          // seam would constrain but never close. Fall through to WASM
-          // (seams: true) and tell the user why their opt-in was bypassed.
+        if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams) {
+          // Honest capability gate (parity plan Fase 4). Since #897 F4 the
+          // GPU tier declares `seams: true` (closure parity verified on the
+          // real María pattern), so this branch is a dormant guardrail: it
+          // only fires again if the capability ever regresses — and then it
+          // falls through to WASM with a visible notice, never silently.
           console.warn('[SimLifecycle] Project has seams — WebGPU tier declares seams:false, skipping to WASM');
           dispatch(showWarningToast('Sewing is not supported on the WebGPU solver yet — using the WASM solver for this project'));
         } else if (wantsWebGPU) {
-          if (projectHasSeams && !GPU_CAPABILITIES.seams) {
-            // Solo se llega aquí con el bypass dev activo (si no, el gate
-            // de arriba habría caído a WASM) — dejar rastro explícito.
-            console.warn('[SimLifecycle] openclo-webgpu-seams-unsafe activo — costuras GPU sin flip de capability (dev-only)');
-          }
           try {
             let device = gpuDeviceRef.current;
             if (!device || gpuDeviceLostRef.current) {

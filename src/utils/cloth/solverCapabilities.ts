@@ -51,10 +51,10 @@ export interface SolverCapabilities {
    *   (reference implementation).
    * - WASM: `set_seams_with_compliance` + `set_seam_shrink_params` target
    *   decay (BUG-3 #606 + parity plan Fase 2) — full parity.
-   * - GPU (TSL): kernel accepts `seamPairs` but lacks closure parity
-   *   (no compliance SBA, no graph coloring, no target decay) — a seam
-   *   constrains but never closes. DEFER per parity plan § 5; flag stays
-   *   `false` until the kernel reaches parity.
+   * - GPU (TSL): closure parity landed in #897 F1 (per-constraint
+   *   compliance SBA by color, graph coloring, in-kernel per-substep
+   *   target decay mirroring `lib.rs solve_seams`) — flag `true` since
+   *   the F4 flip. Behavioral parity, not bit-exact.
    * - Neural: no seams in the inference contract (`initMultiPiece` takes
    *   pieces only) — architectural exclusion per C4 RFC § 2.3.
    *
@@ -161,22 +161,14 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
 });
 
 /**
- * GPU TSL/WebGPU solver capabilities (post-A6-closure state).
+ * GPU TSL/WebGPU solver capabilities (post-#897-F4 state).
  *
- * **`selfCollision: false` with dispatch fully wired (#897 F3.3)** —
- * `initMultiPieceTsl` now allocates `scBuffers` (CSR adjacency from the
- * merged triangle ids + `nextPrime(2N)` bucket table) and passes
- * `selfCollision: true` to `createTslSolver`, so the gate
- * (`config.selfCollision && buffers.scBuffers`) constructs the nodes, and
- * the 4-pass bucket pipeline (`cellClear → scatter → resolve → apply`)
- * dispatches every substep in the `GarmentSimulation.tsx` loop (before
- * groundClamp — Rust step-order mirror). Always-on on this tier is a
- * ratified divergence vs the 'normal' preset (that `false` is a
- * WASM-measured perf decision, #608/#892).
- *
- * Capability flag stays `false` pending F4.1, which flips `seams` +
- * `selfCollision` together after end-to-end verification on the real
- * María pattern.
+ * **#897 F4 flip:** `seams` + `selfCollision` flipped to `true` together
+ * after end-to-end verification on the real María pattern in a real
+ * browser (2026-06-12). With this flip the tier cascade no longer skips
+ * the GPU tier for seamed projects when the WebGPU opt-in
+ * (`openclo-use-webgpu`) is set — this is the user-facing activation of
+ * the epic. Parity status + ratified divergences per flag below.
  *
  * `lra`, `pressure`, `fold`, `pieceStiffness` — no GPU implementation
  * exists. Same as WASM CPU-only-by-design gaps (A7 § 3.1).
@@ -186,7 +178,24 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  * is documented as no-op for the TSL path. Per A6 § 3.1 Constraint B.
  */
 export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
-  selfCollision: false,
+  /**
+   * Self-collision GPU (#897 F3): buckets de K=8 candidatos sin
+   * prefix-sum serial — pipeline de 4 pases por substep
+   * (`cellClear → scatter → resolve → apply`), dispatch cableado en
+   * `initMultiPieceTsl` (CSR adjacency + tabla de buckets `nextPrime(2N)`,
+   * F3.3) y ejecutado en el loop de `GarmentSimulation.tsx` antes de
+   * groundClamp (espejo del orden de pasos de Rust).
+   *
+   * Divergencias RATIFICADAS vs CPU/WASM (behavioral, no bit-exact):
+   * `cellSize = thickness` (vs 2×thickness), respuesta Jacobi promediada
+   * (vs Gauss-Seidel secuencial), truncado a 8 candidatos/celda,
+   * exclusión por adyacencia CSR con cap de 64 vecinos.
+   *
+   * Always-on en este tier — el preset 'normal' (selfCollision off) NO
+   * aplica aquí: aquel `false` es una decisión de perf medida en WASM
+   * (#608), no una limitación del kernel GPU.
+   */
+  selfCollision: true,
   /**
    * GPU body collision — verified at WASM parity (#897 F2, 2026-06-12).
    * The historical 30cm gap (cloth settled at the knees ~y=0.3-0.4m vs
@@ -226,14 +235,19 @@ export const GPU_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
   fold: false,
   pieceStiffness: false,
   /**
-   * GPU seam kernel exists (`initMultiPieceTsl` consumes `seamPairs` via
-   * `seamInitDataToPairs`) but lacks closure parity with CPU/WASM: no
-   * per-constraint compliance SBA, no graph coloring, no per-substep
-   * target decay — a seam holds distance but never *closes*. Same shape
-   * as `selfCollision` above (scaffolded ≠ capable). Stays `false` until
-   * the parity work ratified as DEFER in the CLO3D parity plan § 5 lands.
+   * Paridad de cierre con CPU/WASM (#897 F1): compliance per-constraint
+   * (`SeamPair.compliance` → SBA por color), graph coloring (reusa
+   * `colorConstraints`), target decay en-kernel por substep — espejo de
+   * `lib.rs solve_seams` (×0.97/substep, snap a 0 bajo 1e-6). Paridad
+   * behavioral, NO bit-exact.
+   *
+   * Verificado con el patrón real de María (maria_patrones_samuel_2M.dxf)
+   * en navegador real: 402 constraints, convergencia de cierre
+   * (2026-06-12). Flip en #897 F4 — desde entonces el cascade de
+   * `useSimulationLifecycle` ya no salta el tier GPU en proyectos con
+   * costuras.
    */
-  seams: false,
+  seams: true,
   frameDriven: true,
   /**
    * Tools: full surface. Steam brush via `setBrushParams` + TSL

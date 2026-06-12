@@ -136,10 +136,10 @@ export class GpuSolverClient implements ClothSolverClient {
    * execution modes this tier supports. Per A6 § 3.4 Option A
    * (capability extension to GPU + Neural).
    *
-   * Currently all physics flags `false` (selfCollision is scaffolded
-   * but unwired — see `GPU_CAPABILITIES` JSDoc). `frameDriven: true`
-   * signals consumers to dispatch frames via `useFrame` rather than
-   * calling `start()`.
+   * `bodyCollision` (#897 F2), `seams` + `selfCollision` (#897 F4) are
+   * `true` — parity status and ratified divergences live in the
+   * `GPU_CAPABILITIES` JSDoc. `frameDriven: true` signals consumers to
+   * dispatch frames via `useFrame` rather than calling `start()`.
    */
   get capabilities(): SolverCapabilities {
     return GPU_CAPABILITIES;
