@@ -153,6 +153,11 @@ describe('tslSelfCollision', () => {
     expect(buffers.corrCountSBA.array).toBeInstanceOf(Uint32Array);
     expect(buffers.corrCountSBA.array.length).toBe(50);
   });
+
+  it('copies adjacency neighbor DATA into the SBA (not a zero-filled array)', () => {
+    const buffers = createSelfCollisionBuffers(4, 8, new Uint32Array([0, 1, 2, 3, 3]), new Uint32Array([3, 7, 11]));
+    expect(Array.from(buffers.adjNeighborsSBA.array as Uint32Array)).toEqual([3, 7, 11]);
+  });
 });
 
 describe('makeSelfCollisionComputeNodes', () => {

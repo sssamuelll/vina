@@ -114,8 +114,12 @@ export function createSelfCollisionBuffers(
     cellStartSBA: new StorageBufferAttribute(new Uint32Array(tableSize), 1),
     cellEntriesSBA: new StorageBufferAttribute(new Uint32Array(numParticles), 1),
     adjOffsetsSBA: new StorageBufferAttribute(new Uint32Array(adjacencyOffsets), 1),
+    // Copy the neighbor DATA — `new Uint32Array(length)` allocates zeros and
+    // silently breaks adjacency exclusion (every lookup misses). Empty
+    // adjacency still needs a 1-element buffer: WGSL forbids zero-sized
+    // storage bindings.
     adjNeighborsSBA: new StorageBufferAttribute(
-      new Uint32Array(Math.max(adjacencyNeighbors.length, 1)),
+      adjacencyNeighbors.length > 0 ? new Uint32Array(adjacencyNeighbors) : new Uint32Array(1),
       1,
     ),
     deltaSBA: new StorageBufferAttribute(new Int32Array(numParticles * 3), 1),
