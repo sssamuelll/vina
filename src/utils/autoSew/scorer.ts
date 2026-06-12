@@ -112,11 +112,46 @@ function semanticMatchScore(edgeA: Edge, edgeB: Edge): number {
   const hintB = edgeB.matchHint?.toLowerCase() ?? '';
   if (hintA && hintA.includes(nameB)) return 1;
   if (hintB && hintB.includes(nameA)) return 1;
+  // CONTRADICTION (M3, camisa de María): both edges DECLARE a partner and
+  // neither declaration references the other — pairing them contradicts
+  // both. This is what let length coincidences steal anatomy: the 456mm
+  // collar outer edge vs the 451mm sleeve cap, the 228mm collar halves vs
+  // the 231mm armholes. A declared-elsewhere pair must lose to any aligned
+  // or neutral candidate.
+  if (hintA && hintB) return -1;
   return 0;
+}
+
+/**
+ * True when the two edges DECLARE each other (one's matchHint references
+ * the other's role). Exported for candidate GENERATION (index.ts): declared
+ * anatomy must always reach the scorer — the Hungarian length-assignment
+ * can otherwise pre-empt a true pair with a length coincidence.
+ */
+export function areDeclaredPartners(edgeA: Edge, edgeB: Edge): boolean {
+  return semanticMatchScore(edgeA, edgeB) === 1;
 }
 
 /** How far a confirmed semantic match lifts confidence toward 1. */
 const SEMANTIC_LIFT = 0.55;
+/** Multiplier when both edges declare partners that contradict the pair. */
+const CONTRADICTION_FACTOR = 0.3;
+/** Edge types that are NOT seam material unless hints mutually align. */
+const NON_SEAM_TYPES = new Set(['hem', 'fold', 'opening']);
+/** Multiplier when a non-seam edge (hemline, fold, …) is paired without alignment. */
+const NON_SEAM_FACTOR = 0.15;
+/**
+ * Generic zone names (unclassified pieces): their edgeTypes are heuristic
+ * DEFAULTS (bottomEdge→'hem', leftEdge→'fold'), not semantic declarations —
+ * the sewability gate only applies to role-bearing edges (hemline,
+ * waistbandFold, neckline…), where the type IS anatomy.
+ */
+const GENERIC_NAMES = new Set(['topedge', 'bottomedge', 'leftedge', 'rightedge', 'edge']);
+function isDeclaredNonSeam(edge: Edge): boolean {
+  if (!edge.edgeType || !NON_SEAM_TYPES.has(edge.edgeType)) return false;
+  const root = edge.name?.toLowerCase().replace(/-\d+$/, '') ?? '';
+  return !GENERIC_NAMES.has(root) && !root.startsWith('edge-');
+}
 
 // ─── Composite scoring ─────────────────────────────────────────────────────
 
@@ -168,7 +203,15 @@ export function scoreEdgePair(
   const lenRatio = Math.min(edgeA.arcLength, edgeB.arcLength) / maxLen;
   const geometricallyPlausible = lenRatio >= 0.5;
   const semanticMatch = geometricallyPlausible ? semanticMatchScore(edgeA, edgeB) : 0;
-  const confidence = semanticMatch > 0 ? base + SEMANTIC_LIFT * (1 - base) : base;
+
+  let confidence = semanticMatch > 0 ? base + SEMANTIC_LIFT * (1 - base) : base;
+  // Declared-elsewhere contradiction: heavy penalty (see semanticMatchScore).
+  if (semanticMatch < 0) confidence = base * CONTRADICTION_FACTOR;
+  // Sewability gate (M3): hemlines, folds and openings are finished edges,
+  // not seam material — unless their hints mutually align (the
+  // neckline↔collarNeckEdge case, where 'opening' IS the declared partner).
+  const nonSeam = isDeclaredNonSeam(edgeA) || isDeclaredNonSeam(edgeB);
+  if (nonSeam && semanticMatch !== 1) confidence *= NON_SEAM_FACTOR;
 
   return {
     edgeA,

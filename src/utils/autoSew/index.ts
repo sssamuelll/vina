@@ -18,7 +18,7 @@ import type { PatternPiece, Seam } from '../../types/types';
 import { extractEdges, type Edge } from './edgeExtractor';
 import { scorePieceNames } from './namingHeuristics';
 import { matchEdgesByLength, lengthSimilarity } from './arcLengthMatcher';
-import { scoreEdgePair, rankAndDeduplicate, type ScoredSeamCandidate, type ScorerWeights } from './scorer';
+import { scoreEdgePair, rankAndDeduplicate, areDeclaredPartners, type ScoredSeamCandidate, type ScorerWeights } from './scorer';
 
 // ─── Public types ───────────────────────────────────────────────────────────
 
@@ -127,6 +127,30 @@ export function autoSew(
           weights ? { ...DEFAULT_WEIGHTS, ...weights } : undefined
         );
         allCandidates.push(candidate);
+      }
+
+      // Semantic-aligned pairs are ALWAYS candidates (M3, camisa de María):
+      // the Hungarian length-assignment is 1:1 optimal on LENGTH alone and
+      // can pre-empt declared anatomy — on the real shirt it assigned the
+      // 228mm collarNeckEdge to the 231mm armhole (similarity 0.99), so the
+      // true collarNeckEdge↔neckline pair never existed as a candidate, and
+      // armhole↔sleeveCap (231 vs 451mm) never survived the tolerance. An
+      // edge pair that DECLARES itself (mutual matchHint) reaches the
+      // scorer regardless.
+      for (const eA of edgesA) {
+        for (const eB of edgesB) {
+          if (!areDeclaredPartners(eA, eB)) continue;
+          const alreadyMatched = lengthMatches.some(
+            lm => lm.edgeA.edgeIndex === eA.edgeIndex && lm.edgeB.edgeIndex === eB.edgeIndex
+          );
+          if (alreadyMatched) continue;
+          const sim = lengthSimilarity(eA.arcLength, eB.arcLength, lengthTolerance);
+          allCandidates.push(scoreEdgePair(
+            eA, eB, namingResult,
+            { edgeA: eA, edgeB: eB, similarity: sim, lengthDiff: Math.abs(eA.arcLength - eB.arcLength) },
+            weights ? { ...DEFAULT_WEIGHTS, ...weights } : undefined
+          ));
+        }
       }
 
       // Also try edges not in Hungarian matches (naming might override length)

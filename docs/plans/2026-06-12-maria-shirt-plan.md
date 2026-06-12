@@ -70,3 +70,12 @@ La revisión del sistema de arrangement (mandato: "tenemos arrange points en est
 - **Fix**: `applyArrangementOverrides` (helper puro en garmentPlacement, posición override / rotación anatómica) aplicado en los DOS sitios de GarmentSimulation (staticGeometry + placedMeshes) con deps correctas. Replay E2E pinea el cable: pieza de María arrastrada a x=1.8 → el cloth mesh simula ahí.
 - **M1 ya había matado el apilamiento**: con categorías fluyendo del import, `computePlacement` coloca delantero +Z / espalda −Z / mangas ±X / tira al cuello — verificado con test unit (separación Z) y captura (camisa explotada anatómicamente, mangas drapeando EN los hombros sin coser).
 - **Diferido con issue #887**: snap-to-anchor al soltar drag + asignación explícita pieza→punto (las dos opciones que `arrangement.tsx` promete y hoy son console.log).
+
+## 8. Addendum M3 (2026-06-12, ejecutado)
+
+- **Dos fixes de principio en autoSew**, guiados por la evidencia del contrato M0:
+  1. *Scorer*: contradicción de matchHints (ambos edges declaran pareja y ninguno se refiere al otro) = penalización ×0.3 — mata los robos por coincidencia de longitud (tira 456↔copa 451; mitades de tira 228↔sisas 231). Gate de sewability: edges con rol semántico de tipo hem/fold/opening no son candidatos salvo hints mutuamente alineados (neckline↔collarNeckEdge sí); los edges GENÉRICOS de piezas sin clasificar quedan exentos (sus tipos son defaults heurísticos, no anatomía).
+  2. *Generación*: los pares declarados (matchHints mutuos) SIEMPRE llegan al scorer — el matching húngaro por longitud asignaba collarNeckEdge→armhole (0.99 de similitud) y el par verdadero collarNeckEdge↔neckline nunca existía como candidato; sisa↔copa (231 vs 451) no sobrevivía la tolerancia.
+- **Resultado sobre el patrón real**: 8 propuestas, 8 correctas, 0 falsas — costados×2, hombros×2, sisas↔copas×2 (1:1 honesto: la copa de 451mm = sisa delantera 231 + trasera 220 EXACTOS; el armscye completo es M:N, épica R5), tira↔escotes×2 (el neckband rodea el cuello entero).
+- **Trigger de usuario**: el comando ⌘K "Auto-Sew Pieces" abría un panel placeholder muerto — ahora ejecuta de verdad (`runAutoSew` thunk): propone con provenance `ai` (ámbar = revisar), dedupe idempotente, toast honesto incluso cuando la respuesta es "nada con confianza suficiente".
+- **Estado visual**: la camisa SE COSE (260 constraints activos, seam lines de R2 visibles) pero el drape colapsa en maraña — selfCollision OFF en runtime + shrink sin tregua: exactamente el alcance de M4.

@@ -611,3 +611,62 @@ test.describe('Seam parity replay — arrange→solver (M2)', () => {
     expect(maxX!).toBeGreaterThan(1.2);
   });
 });
+
+// ─── Replay M3: la camisa de María se cose sola y simula ────────────────────
+//
+// El viaje completo del demo-killer: import real (clasificación automática
+// M1) → ⌘K "Auto-Sew Pieces" (M3: el comando ejecuta de verdad — antes
+// abría un panel placeholder muerto) → la camisa cosida simula en WASM con
+// la anatomía completa.
+
+test.describe('Seam parity replay — auto-sew end-to-end (M3)', () => {
+  test('import → ⌘K Auto-Sew → la camisa completa simula', async ({ page }) => {
+    test.setTimeout(180_000);
+    await waitFor2D(page);
+
+    const path = await import('path');
+    const { fileURLToPath } = await import('url');
+    const fixture = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../fixtures/garments/maria_patrones_samuel_2M.dxf',
+    );
+    await page.locator('input[accept=".dxf"]').setInputFiles(fixture);
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.pieces')) ?? []).length, {
+        timeout: 30_000,
+      })
+      .toBe(5);
+
+    // ⌘K abre el modo commands del UnifiedBar; click en Auto-Sew Pieces.
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur?.());
+    await page.keyboard.press('Control+k');
+    await page.waitForTimeout(400);
+    await page.getByText('Auto-Sew Pieces', { exact: false }).first().click();
+
+    // La camisa completa: hombros×2 + costados×2 + sisas↔copas×2 + tira↔escotes.
+    await expect
+      .poll(async () => ((await getState<unknown[]>(page, 'project.seams')) ?? []).length, {
+        timeout: 10_000,
+      })
+      .toBeGreaterThanOrEqual(6);
+
+    const seams = (await getState<Array<{ createdBy?: string }>>(page, 'project.seams'))!;
+    expect(seams.every((s) => s.createdBy === 'ai')).toBe(true);
+
+    await switchView(page, '3D');
+    await startSimulation(page);
+    await expect
+      .poll(async () => getState<string>(page, 'simulation.solverTier'), { timeout: 60_000 })
+      .not.toBe('none');
+    expect(await getState<string>(page, 'simulation.solverTier')).toBe('wasm');
+
+    const summary = await getState<{
+      totalConstraints: number;
+      zeroConstraintSeams: unknown[];
+    }>(page, 'simulation.seamResolution');
+    // ≥8 costuras reales sobre bordes curvos — muy por encima de los 2
+    // costadillos del replay anterior (≈48).
+    expect(summary!.totalConstraints).toBeGreaterThan(100);
+    expect(summary!.zeroConstraintSeams).toHaveLength(0);
+  });
+});
