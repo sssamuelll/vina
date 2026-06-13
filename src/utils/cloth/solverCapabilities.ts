@@ -166,9 +166,10 @@ export const WASM_CAPABILITIES: Readonly<SolverCapabilities> = Object.freeze({
  * **#897 F4 flip:** `seams` + `selfCollision` flipped to `true` together
  * after end-to-end verification on the real María pattern in a real
  * browser (2026-06-12). With this flip the tier cascade no longer skips
- * the GPU tier for seamed projects when the WebGPU opt-in
- * (`openclo-use-webgpu`) is set — this is the user-facing activation of
- * the epic. Parity status + ratified divergences per flag below.
+ * the GPU tier for seamed projects — combined with the default-on flip of
+ * the solver flag (`openclo-use-webgpu` is opt-out: the tier runs unless
+ * explicitly `'false'`), this is the user-facing activation of the epic.
+ * Parity status + ratified divergences per flag below.
  *
  * `lra`, `pressure`, `fold`, `pieceStiffness` — no GPU implementation
  * exists. Same as WASM CPU-only-by-design gaps (A7 § 3.1).

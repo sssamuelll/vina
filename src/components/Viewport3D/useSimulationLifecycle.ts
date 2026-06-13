@@ -160,13 +160,16 @@ interface UseSimulationLifecycleResult {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Check localStorage feature flag. Default: false (WebGPU disabled).
- *  Three.js 0.183 TSL atomicAdd doesn't propagate isAtomic to StorageBufferNode,
- *  so WGSL declares array<i32> instead of array<atomic<i32>>. All compute shaders
- *  silently fail. WASM XPBD solver is used until a Three.js upstream fix lands.
- *  Set 'openclo-use-webgpu' to 'true' to opt-in. */
+/** WebGPU cloth-solver tier opt-out flag. Default: ENABLED.
+ *  Opt-out semantics mirror the renderer flag (webgpuDetect.isWebGPURendererActive):
+ *  the tier runs unless localStorage('openclo-use-webgpu') is explicitly 'false'.
+ *  Hardware support is still gated by isWebGPUAvailable() at the callsite, so
+ *  browsers without WebGPU fall back to WASM regardless.
+ *  Default flipped ON in #897 after the tier reached ≥30fps prod-verified on the
+ *  María fixture (seams close, body+self collision). Known debt: the long-horizon
+ *  drape creep (#902) is now visible at real-time fps — escape hatch is 'false'. */
 function isWebGPUFeatureEnabled(): boolean {
-  return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) === 'true';
+  return safeGetItem(WEBGPU_FEATURE_FLAG_KEY) !== 'false';
 }
 
 /** Race a promise against a timeout */
