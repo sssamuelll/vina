@@ -33,6 +33,13 @@ import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
 import { withErrorScope, attachUncapturedErrorListener, instrumentShaderCapture } from './webgpuDebug';
 
+// ─── Constants ──────────────────────────────────────────────────────────────
+
+/** Calibración M4-D del avatar (espejo wasmSolverWorker.ts setCollisionMesh):
+ *  0.4 ≈ algodón sobre piel; 8mm anti z-fight (#897 F2 — GPU no la había recibido). */
+const AVATAR_FRICTION = 0.4;
+const AVATAR_MARGIN = 0.008;
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface PieceMeshData {
@@ -428,7 +435,12 @@ export class GpuSolverClient implements ClothSolverClient {
       const defaultConfig: TslSolverConfig = {
         substeps: 15,
         gravity: [0, -9.81, 0],
-        damping: 0.9603,
+        // 0.99, NO 0.9603: el kernel preSolve multiplica
+        // damping × (1 − internalDamping×0.1) igual que Rust pre_solve, así
+        // que 0.99 × 0.97 = 0.9603 efectivo = paridad WASM. El valor viejo
+        // re-aplicaba el factor (efectivo 0.9315/substep → momentum ×0.34
+        // por frame vs ×0.54 en WASM) y deprimía el asentamiento (#897 F2).
+        damping: 0.99,
         internalDamping: 0.3,
         seamShrinkFactor: DEFAULT_SEAM_CONFIG.shrinkFactor,
         seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
@@ -758,7 +770,7 @@ export class GpuSolverClient implements ClothSolverClient {
   setCollisionMesh(mesh: { vertices: Float32Array; normals: Float32Array; triCount: number }): void {
     if (this.tslSolver) {
       // TSL mode: build BVH and create TSL collision body
-      this.setTslCollisionBody('__avatar__', mesh);
+      this.setTslCollisionBody('__avatar__', mesh, AVATAR_FRICTION, AVATAR_MARGIN);
       return;
     }
     this.solver.setCollisionMesh(mesh);
@@ -771,7 +783,7 @@ export class GpuSolverClient implements ClothSolverClient {
     if (this.tslSolver) {
       // TSL mode: rebuild BVH (topology may differ, so full rebuild)
       const triCount = vertices.length / 9;
-      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount });
+      this.setTslCollisionBody('__avatar__', { vertices, normals, triCount }, AVATAR_FRICTION, AVATAR_MARGIN);
       return;
     }
     this.solver.updateCollisionMesh(vertices, normals);

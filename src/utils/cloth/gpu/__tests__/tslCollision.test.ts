@@ -3,12 +3,19 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so MockSBA + setAtomicCalls are
 // available to both mocks. `setAtomicCalls` is exposed for the atomic
 // regression guards on the per-body scratch buffers.
-const { MockSBA, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() => {
+const { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
   // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
   // WGSL spec requires atomicLoad on every read of an array<atomic<T>>
   // buffer. Symmetric to `setAtomicCalls`.
   const atomicLoadCalls: Array<unknown> = [];
+  // `selectCalls` / `intCalls` / `floatCalls` are exposed for the #897 F2
+  // NaN-guard + i32-clamp pins (§9 candidates 5-6). All args are opaque chain
+  // proxies except literal numbers, so the pins assert presence + count + the
+  // literal constants (INT32_MAX fallback, 2.0 m clamp) — not dataflow.
+  const selectCalls: Array<unknown[]> = [];
+  const intCalls: Array<unknown> = [];
+  const floatCalls: Array<unknown> = [];
   const MockSBA = class MockSBA {
     array: ArrayLike<number>;
     itemSize: number;
@@ -17,7 +24,7 @@ const { MockSBA, setAtomicCalls, atomicLoadCalls } = vi.hoisted(() => {
       this.itemSize = itemSize;
     }
   };
-  return { MockSBA, setAtomicCalls, atomicLoadCalls };
+  return { MockSBA, setAtomicCalls, atomicLoadCalls, selectCalls, intCalls, floatCalls };
 });
 
 vi.mock('three/webgpu', () => ({
@@ -71,10 +78,23 @@ vi.mock('three/tsl', () => {
     uniform: () => proxy,
     instanceIndex: proxy,
     uint: () => proxy,
-    int: () => proxy,
-    float: () => proxy,
+    int: (v: unknown) => { intCalls.push(v); return proxy; },
+    float: (v: unknown) => { floatCalls.push(v); return proxy; },
+    select: (...args: unknown[]) => { selectCalls.push(args); return proxy; },
+    // If(...) returns a chainable whose Else/ElseIf ALSO invoke their
+    // callbacks — the §9 cand. 5-6 guard lives in the edge-fallback Else
+    // branch, which a bare-proxy return would silently skip (the proxy's
+    // apply() does not invoke function args).
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    If: (_cond: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb); return proxy; },
+    If: (_cond: unknown, cb?: (...args: any[]) => any) => {
+      tryInvoke(cb);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ifChain: any = {
+        Else: (ecb?: unknown) => { tryInvoke(ecb); return ifChain; },
+        ElseIf: (_c: unknown, ecb?: unknown) => { tryInvoke(ecb); return ifChain; },
+      };
+      return ifChain;
+    },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     Loop: (_count: unknown, cb?: (...args: any[]) => any) => { tryInvoke(cb, { i: proxy }); return proxy; },
     atomicAdd: () => proxy,
@@ -102,6 +122,9 @@ function buildKernel(opts?: {
   id?: string;
 }) {
   setAtomicCalls.length = 0;
+  selectCalls.length = 0;
+  intCalls.length = 0;
+  floatCalls.length = 0;
   const numParticles = opts?.numParticles ?? 16;
   const numNodes = opts?.numNodes ?? 4;
   const numTris = opts?.numTris ?? 2;
@@ -110,11 +133,15 @@ function buildKernel(opts?: {
   const triVertsSBA = new StorageBufferAttribute(new Float32Array(numTris * 9), 1);
   const triNormalsSBA = new StorageBufferAttribute(new Float32Array(numTris * 3), 1);
 
-  // Minimal mock TSL node — supports `.element(i).x/y/z` and arbitrary chained
-  // ops via the test's proxy mock. Solver passes its own buffer nodes here in
-  // production; for construction we just need the chain shape.
+  // Full chain-proxy mock TSL node — same pattern as the three/tsl mock. The
+  // kernel body calls `.toVar()`, `.equal()`, etc. on posBuf elements; a plain
+  // object literal would throw on the first missing method and (because the
+  // mock's tryInvoke swallows errors) silently skip the rest of the pass-1
+  // body — leaving the select/int/float recorders empty (#897 F2 pins).
   /* eslint-disable @typescript-eslint/no-explicit-any */
-  const mockNode: any = { element: () => mockNode, x: { sub: () => mockNode, add: () => mockNode, mul: () => mockNode } };
+  const chainNode = (): any =>
+    new Proxy(function () {}, { get: () => chainNode(), apply: () => chainNode() });
+  const mockNode: any = chainNode();
 
   return createTslCollisionBody(
     mockNode,
@@ -299,5 +326,39 @@ describe('atomic-buffer regression guards', () => {
     // Both bestDist (idx 0) and bestTriIdx (idx 1) must be distinct allocations.
     expect(a1Scratch[0]).not.toBe(a2Scratch[0]);
     expect(a1Scratch[1]).not.toBe(a2Scratch[1]);
+  });
+});
+
+// ─── #897 F2: NaN guard + i32 clamp on the findBest cast sites (§9 5-6) ─────
+// NaN→i32 cast is UB in WGSL — a degenerate triangle (or sqrt of a negative
+// epsilon) would poison atomicMin with a phantom minimum; and distances
+// >2.147 m overflow i32 at scale 1e6. Both pass-1 cast sites (inside-
+// projection + edge fallback) must route through select(equal-self) with an
+// int(INT32_MAX) fallback, clamping the float distance to 2.0 m first.
+//
+// Mock limitation (stated): all select/int args are opaque chain proxies, so
+// these pins assert presence + count + the literal constants — they cannot
+// verify that the select RESULT is the value fed to atomicMin (dataflow).
+// That end-to-end behavior is covered by F2.6 browser verification.
+
+describe('findBest NaN guard + i32 clamp (#897 F2, §9 cand. 5-6)', () => {
+  it('guards both i32 cast sites with select() — inside-projection + edge fallback', () => {
+    buildKernel();
+    expect(selectCalls.length).toBe(2);
+    // TSL select(cond, ifTrue, ifFalse) — all three args present at each site.
+    for (const call of selectCalls) {
+      expect(call.length).toBe(3);
+    }
+  });
+
+  it('uses int(INT32_MAX) as the NaN fallback at both sites (sentinel = no distance)', () => {
+    buildKernel();
+    // 2 guard fallbacks (pass 1) + 1 scratch reset (applyPush tail).
+    expect(intCalls.filter((v) => v === 0x7FFFFFFF).length).toBe(3);
+  });
+
+  it('clamps distance to 2.0 m before the ×1e6 scale at both sites (i32 overflow)', () => {
+    buildKernel();
+    expect(floatCalls.filter((v) => v === 2.0).length).toBe(2);
   });
 });

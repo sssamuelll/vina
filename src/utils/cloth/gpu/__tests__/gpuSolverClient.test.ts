@@ -900,7 +900,8 @@ describe('initMultiPieceTsl seam closure packing (behavior #11 — #897 F1)', ()
 // three/*), so the observable is the `uniform()` constructor: createTslSolver
 // wraps each config scalar in uniform(value), and 0.97 / 1e-6 appear nowhere
 // else in the TSL init path (audited: wind 0/1, brush 0/0.05, grab
-// 0/0.08/0.6/15, damping 0.9603, gravity -9.81, sdt 1/900, groundY 0).
+// 0/0.08/0.6/15, damping 0.99 — behavior #14, gravity -9.81, sdt 1/900,
+// groundY 0).
 
 describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.4)', () => {
   it('seeds seamShrinkFactor and seamSewedThreshold from DEFAULT_SEAM_CONFIG', async () => {
@@ -917,5 +918,86 @@ describe('initMultiPieceTsl default seam decay config (behavior #12 — #897 F1.
 
     expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.shrinkFactor);
     expect(uniformCalls).toContain(DEFAULT_SEAM_CONFIG.sewedThreshold);
+  });
+});
+
+// ─── Behavior #13 — avatar calibration M4-D on both routes (#897 F2) ─────────
+//
+// The WASM tier ships the M4-D drape calibration for the avatar body
+// (friction 0.4 ≈ cotton-on-skin, margin 8mm anti z-fight — see
+// wasmSolverWorker.ts `setCollisionMesh`); the GPU tier never received it and
+// kept the generic TSL defaults (0.3 / 5mm), so cloth slid off the TSL avatar
+// and z-fought at contact. BOTH '__avatar__' routes must pass the calibrated
+// values: `setCollisionMesh` (initial set) and `updateCollisionMesh` (pose
+// updates — no live caller today, but a latent calibration trap).
+// `setTslCollisionBody(id, mesh, friction, margin)` is a public method, so a
+// prototype spy (real implementation preserved) observes the exact arg
+// binding — `uniformCalls` containment alone could not distinguish friction
+// from margin. The custom-body route (`updateCollisionBody`) keeps
+// caller-provided values and is deliberately NOT covered here.
+
+describe('avatar collision calibration M4-D (behavior #13 — #897 F2)', () => {
+  afterEach(() => {
+    // Restores the prototype spy; fakes are re-created per test so the
+    // blanket restore cannot strand stale vi.fn state.
+    vi.restoreAllMocks();
+  });
+
+  it('setCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008', async () => {
+    const spy = vi.spyOn(GpuSolverClient.prototype, 'setTslCollisionBody');
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const mesh = makeTriCollisionMesh();
+    client.setCollisionMesh(mesh);
+
+    expect(spy).toHaveBeenCalledWith('__avatar__', mesh, 0.4, 0.008);
+  });
+
+  it('updateCollisionMesh routes __avatar__ with friction 0.4 and margin 0.008', async () => {
+    const spy = vi.spyOn(GpuSolverClient.prototype, 'setTslCollisionBody');
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    const { vertices, normals } = makeTriCollisionMesh();
+    client.updateCollisionMesh(vertices, normals);
+
+    expect(spy).toHaveBeenCalledWith(
+      '__avatar__',
+      { vertices, normals, triCount: 1 },
+      0.4,
+      0.008,
+    );
+  });
+});
+
+// ─── Behavior #14 — default damping 0.99, not 0.9603 (#897 F2) ───────────────
+//
+// The TSL preSolve kernel multiplies damping × (1 − internalDamping×0.1)
+// (same formula as Rust pre_solve). WASM ships damping=0.99 +
+// internalDamping=0.3 → effective 0.99×0.97 = 0.9603/substep. The old GPU
+// defaultConfig baked the EFFECTIVE value (0.9603) in, so the kernel applied
+// the ×0.97 factor AGAIN → 0.9315/substep → velocity ×0.34/frame vs ×0.54 on
+// WASM — depressed momentum, wrong settling. Observable: the `uniform()`
+// constructor capture (same mechanism as behavior #12); 0.99 appears nowhere
+// else in the TSL init path (audit in the behavior #12 comment), and 0.9603
+// must be gone entirely. The WGSL path (gpuSolver.ts damping 0.9603) is
+// intentionally untouched: its kernel has no internalDamping term, so the
+// pre-multiplied value is correct there.
+
+describe('initMultiPieceTsl default damping (behavior #14 — #897 F2)', () => {
+  it('seeds the damping uniform with 0.99 (raw), not 0.9603 (pre-multiplied)', async () => {
+    uniformCalls.length = 0;
+    const device = new FakeGPUDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const client = new GpuSolverClient(device as any);
+    await client.initMultiPieceTsl([makeQuadPiece()]);
+
+    expect(uniformCalls).toContain(0.99);
+    expect(uniformCalls).not.toContain(0.9603);
   });
 });

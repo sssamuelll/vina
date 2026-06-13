@@ -3,8 +3,12 @@ import { describe, it, expect, vi } from 'vitest';
 // vi.hoisted runs before vi.mock hoisting, so shared mocks are available to both.
 // `setAtomicCalls` is exposed for #554 regression guard tests — every storage(...)
 // call returns a node whose `.setAtomic` records {sba, value} into this array.
-const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes } = vi.hoisted(() => {
+const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes, storageCalls } = vi.hoisted(() => {
   const setAtomicCalls: Array<{ sba: unknown; value: unknown }> = [];
+  // `storageCalls` records the SBA passed to every top-level `storage(...)`
+  // call — the observable for "SBA X was wrapped as a storage node inside
+  // createTslSolver" (used by the #897 F2.3 preCollisionPos wiring pin).
+  const storageCalls: Array<unknown> = [];
   // `atomicLoadCalls` is exposed for #554 spec-compliance regression tests —
   // every atomicLoad(buf.element(i)) call in the production code increments
   // this counter. WGSL spec mandates atomicLoad for read passes against
@@ -35,6 +39,7 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes } = v
   const mockElement = (): any => ({
     assign: () => {},
     addAssign: () => {},
+    subAssign: () => {},
     sub: () => mockElement(),
     mul: () => mockElement(),
     div: () => mockElement(),
@@ -48,7 +53,10 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes } = v
     z: { mul: () => mockElement(), sub: () => mockElement() },
     greaterThan: () => true,
     lessThan: () => false,
-    equal: () => true,
+    // equal returns a node (not a bare boolean) so `.and()` chains — the
+    // #897 F2.3 postSolve NaN guard composes `speed2.equal(speed2).and(...)`.
+    equal: () => mockElement(),
+    and: () => mockElement(),
     greaterThanEqual: () => true,
   });
 
@@ -67,6 +75,7 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes } = v
   const tslExports = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     storage: (...args: any[]) => {
+      storageCalls.push(args[0]);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const node: any = {
         element: () => mockElement(),
@@ -123,7 +132,7 @@ const { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes } = v
     },
   };
 
-  return { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes };
+  return { MockSBA, tslExports, setAtomicCalls, atomicLoadCalls, uniformNodes, storageCalls };
 });
 
 // Note: three/webgpu and three/tsl resolve to the same bundle (three.webgpu.js),
@@ -159,6 +168,7 @@ function makeMockBufferSet(options?: {
 
   const positionSBA = new StorageBufferAttribute(new Float32Array(numParticles * 3), 3);
   const prevPosSBA = new StorageBufferAttribute(new Float32Array(numParticles * 3), 3);
+  const preCollisionPosSBA = new StorageBufferAttribute(new Float32Array(numParticles * 3), 3);
   const velocitySBA = new StorageBufferAttribute(new Float32Array(numParticles * 3), 3);
   const invMassSBA = new StorageBufferAttribute(new Float32Array(numParticles), 1);
 
@@ -198,6 +208,7 @@ function makeMockBufferSet(options?: {
   return {
     positionSBA,
     prevPosSBA,
+    preCollisionPosSBA,
     velocitySBA,
     invMassSBA,
     stretchColors,
@@ -747,5 +758,42 @@ describe('#897 F1.4 seam target decay uniforms', () => {
     // #897 F1.4 (per-constraint compliance + in-kernel decay replaced it).
     const rejected: TslSolverConfig = { ...defaultConfig, seamStiffness: 0.01 };
     expect(rejected).toBeDefined();
+  });
+});
+
+// ─── #897 F2.3 — pre-collision snapshot + inelastic postSolve ────────────────
+//
+// On WASM the collision push corrects position but is EXCLUDED from velocity
+// derivation (wasmSolverWorker.ts:351-402): preCollisionBuf.set(posView) before
+// the per-body collision loop, then vel = (preCol - prev) * invSdt, then the
+// vn<0 inelastic zeroing. The TSL mirror is a snapshot kernel (pos →
+// preCollisionPos, dispatched after grab / before collision bodies) plus a
+// postSolve that derives velocity from preCollisionPos.
+//
+// Limitation (same as the F1.4 note above): the Fn() mock invokes kernel
+// bodies but cannot attribute element() reads to a specific kernel, so
+// "postSolve reads preCollisionPos" is not assertable at the kernel level.
+// The pin here is (a) the snapshot ComputeNode surface and (b) the SBA being
+// wrapped as a storage node inside createTslSolver; the kernel wiring is a
+// direct pass-through of preColBuf into makePostSolveFn in tslSolver.ts.
+// The substep dispatch order in GarmentSimulation.tsx has no unit harness —
+// it is pinned by the F2.6 browser verification.
+
+describe('#897 F2.3 snapshotPreCollision', () => {
+  it('exposes snapshotPreCollision compute node with dispatchCount = numParticles', () => {
+    const buffers = makeMockBufferSet();
+    const solver = createTslSolver(buffers, { ...defaultConfig });
+
+    expect(solver.snapshotPreCollision).toBeDefined();
+    expect(solver.snapshotPreCollision).toHaveProperty('__tslCompute', true);
+    expect(solver.snapshotPreCollision).toHaveProperty('dispatchCount', 4);
+  });
+
+  it('wraps preCollisionPosSBA as a storage node (postSolve/snapshot wiring pin)', () => {
+    storageCalls.length = 0;
+    const buffers = makeMockBufferSet();
+    createTslSolver(buffers, { ...defaultConfig });
+
+    expect(storageCalls).toContain(buffers.preCollisionPosSBA);
   });
 });

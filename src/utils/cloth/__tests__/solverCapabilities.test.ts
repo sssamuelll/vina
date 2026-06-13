@@ -115,10 +115,15 @@ describe('SolverCapabilities frozen shape', () => {
     });
   });
 
-  it('GPU pin — bodyCollision + seams stay false until each verifies against baseline', () => {
+  it('GPU pin — seams stays false until it verifies against baseline; bodyCollision verified', () => {
     expect(GPU_CAPABILITIES).toEqual({
       selfCollision: false,
-      bodyCollision: false,
+      // Flipped to `true` in #897 F2 after the María-pattern drape
+      // verification on the GPU tier passed all M4 thresholds (nan=0,
+      // belowHipPct=0.13<5, minY=0.79>0.5, maxY=1.58>1.3) — the 4
+      // GPU↔WASM divergences behind the historical 30cm gap were closed
+      // in F2.1-F2.5. See the JSDoc on `GPU_CAPABILITIES.bodyCollision`.
+      bodyCollision: true,
       lra: false,
       pressure: false,
       fold: false,
