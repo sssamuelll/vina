@@ -436,11 +436,18 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
           renderer.compute(solver.windNodes.applyNode);
         }
         // Batch all stretch colors in one call — graph coloring guarantees
-        // no two colors share a vertex, so parallel dispatch is race-free.
+        // no two constraints WITHIN a color share a vertex, so each color's
+        // parallel dispatch is race-free; cross-color shared vertices are
+        // ordered by the sequential dispatches inside the pass (same
+        // guarantee as the seam batch below).
         // Reduces ~57 separate submit() calls to 1 per substep.
         renderer.compute(solver.stretchColors);
         if (solver.bend) renderer.compute(solver.bend);
-        if (solver.seam) renderer.compute(solver.seam);
+        // Seam colors batched like stretch (#897 F1.3): sequential dispatches
+        // inside one compute pass — WebGPU guarantees storage writes from one
+        // dispatch are visible to the next, so cross-color shared vertices
+        // are race-free.
+        if (solver.seamColors.length > 0) renderer.compute(solver.seamColors);
         for (const body of solver.collisionBodies) {
           // 2-pass body collision (atomic-emulation pattern in tslCollision.ts):
           // findBest fills per-body atomic scratch; applyPush reads it,

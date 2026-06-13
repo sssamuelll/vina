@@ -18,14 +18,16 @@ import {
   destroyTslBufferSet,
   disposeStorageBufferAttribute,
   type TslBufferSet,
+  type TslSeamConstraintData,
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
+import { DEFAULT_SEAM_CONFIG } from '../seamAssembly';
 import type { ClothSolverClient } from '../solverProtocol';
-import type { LocalVertexIndex } from '../seamPairs';
+import type { LocalVertexIndex, SeamPair } from '../seamPairs';
 import type { StorageBufferAttribute } from 'three/webgpu';
 import * as THREE from 'three';
 import { EdgeType } from './gpuBuffers';
@@ -268,7 +270,7 @@ export class GpuSolverClient implements ClothSolverClient {
    */
   async initMultiPieceTsl(
     pieces: PieceMeshData[],
-    seamPairs?: Array<{ pieceAId: string; pieceBId: string; vertexPairs: Array<[LocalVertexIndex, LocalVertexIndex]> }>,
+    seamPairs?: SeamPair[],
     solverConfig?: Partial<TslSolverConfig>,
     fabricCompliance?: FabricComplianceConfig,
   ): Promise<void> {
@@ -359,11 +361,14 @@ export class GpuSolverClient implements ClothSolverClient {
 
     const colored = colorConstraints(stretch.ids, stretch.restLengths, numStretch, stretchCompliance);
 
-    // Build seam constraints
-    let seam: SeamConstraintData | null = null;
+    // Seam packing (#897 F1) — espejo del seeding CPU/WASM: target inicial =
+    // distancia mundial actual × tension/100 (decae en GPU), compliance
+    // per-constraint, coloreado para dispatch paralelo race-free.
+    let seam: TslSeamConstraintData | null = null;
     if (seamPairs && seamPairs.length > 0) {
       const seamIds: number[] = [];
       const seamDist: number[] = [];
+      const seamCompliance: number[] = [];
       for (const sp of seamPairs) {
         const offA = vertexOffsets.get(sp.pieceAId);
         const offB = vertexOffsets.get(sp.pieceBId);
@@ -376,12 +381,31 @@ export class GpuSolverClient implements ClothSolverClient {
           continue;
         }
         for (const [a, b] of sp.vertexPairs) {
-          seamIds.push(a + offA, b + offB);
-          seamDist.push(0);
+          const ga = a + offA;
+          const gb = b + offB;
+          const dx = positions[ga * 3] - positions[gb * 3];
+          const dy = positions[ga * 3 + 1] - positions[gb * 3 + 1];
+          const dz = positions[ga * 3 + 2] - positions[gb * 3 + 2];
+          seamIds.push(ga, gb);
+          seamDist.push(Math.sqrt(dx * dx + dy * dy + dz * dz) * sp.tensionFactor);
+          seamCompliance.push(sp.compliance);
         }
       }
       if (seamIds.length > 0) {
-        seam = { ids: new Uint32Array(seamIds), targetDist: new Float32Array(seamDist) };
+        const seamColored = colorConstraints(
+          new Uint32Array(seamIds),
+          new Float32Array(seamDist),
+          seamIds.length / 2,
+          new Float32Array(seamCompliance),
+        );
+        seam = {
+          ids: seamColored.ids,
+          targetDist: seamColored.restLengths,
+          // compliance! safe: always passed above, and the length>0 guard
+          // skips colorConstraints' compliance-less zero-constraint early return.
+          compliance: seamColored.compliance!,
+          colorRanges: seamColored.colorRanges,
+        };
       }
     }
 
@@ -406,7 +430,8 @@ export class GpuSolverClient implements ClothSolverClient {
         gravity: [0, -9.81, 0],
         damping: 0.9603,
         internalDamping: 0.3,
-        seamStiffness: 0.0,
+        seamShrinkFactor: DEFAULT_SEAM_CONFIG.shrinkFactor,
+        seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
         groundY: 0.0,
         dt: 1 / 60,
         ...solverConfig,
@@ -420,6 +445,7 @@ export class GpuSolverClient implements ClothSolverClient {
         stretchColors: colored.colorRanges.length,
         bendConstraints: bend.ids.length / 4,
         seamConstraints: seam ? seam.ids.length / 2 : 0,
+        seamColors: seam ? seam.colorRanges.length : 0,
         hasUvs,
         fabric: fabricCompliance ? 'custom' : 'defaults',
       });

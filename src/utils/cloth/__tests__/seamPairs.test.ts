@@ -299,6 +299,31 @@ describe('seamInitDataToPairs', () => {
     expect(warnSpy.mock.calls[0][0]).toContain('non-finite outline');
   });
 
+  // ─── Per-seam physics (#897 F1 — GPU compliance/tension parity) ────────
+
+  it('computes per-seam compliance and tension factor mirroring buildSeamConstraints', () => {
+    const seams = [makeSeam({ type: 'french', strength: 0.5, taped: true, tension: 80 })];
+    const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
+
+    const pairs = seamInitDataToPairs(seams, pieces);
+
+    // french base 0.00001 / strength 0.5 × taped 0.1 = 0.000002
+    expect(pairs[0].compliance).toBeCloseTo(0.000002, 9);
+    // tension 80 / 100 = 0.8
+    expect(pairs[0].tensionFactor).toBeCloseTo(0.8, 6);
+  });
+
+  it('defaults: standard type, strength 1, no tape, tension 100', () => {
+    // makeSeam() defaults: type 'standard', strength 1, taped false, tension 100.
+    const pairs = seamInitDataToPairs(
+      [makeSeam()],
+      [makeSquarePiece('A'), makeSquarePiece('B')],
+    );
+
+    expect(pairs[0].compliance).toBeCloseTo(0.0001, 9); // standard base, unmodified
+    expect(pairs[0].tensionFactor).toBe(1);
+  });
+
   // ─── Branded type (#738) ──────────────────────────────────────────────
 
   it('returns vertexPairs typed as LocalVertexIndex tuples', () => {

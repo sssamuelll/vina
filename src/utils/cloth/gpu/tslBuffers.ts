@@ -8,7 +8,7 @@
  */
 
 import { StorageBufferAttribute } from 'three/webgpu';
-import type { ClothMeshData, BendConstraints, SeamConstraintData, ColoredConstraints } from './gpuBuffers';
+import type { ClothMeshData, BendConstraints, ColoredConstraints } from './gpuBuffers';
 import type { SelfCollisionBufferSet } from './tslSelfCollision';
 import { destroySelfCollisionBuffers } from './tslSelfCollision';
 import type { WindBufferSet } from './tslWind';
@@ -25,6 +25,15 @@ export interface FabricComplianceConfig {
   bendComplianceWeft: number;
 }
 
+/** Seam constraints del path TSL (#897 F1) — coloreadas, con compliance.
+ *  Distinto de SeamConstraintData (legacy WGSL, intocable). */
+export interface TslSeamConstraintData {
+  ids: Uint32Array;                 // GLOBAL, reordenados por color
+  targetDist: Float32Array;         // seed = distancia mundial × tension (decae en GPU)
+  compliance: Float32Array;         // per-constraint
+  colorRanges: Array<{ offset: number; count: number }>;
+}
+
 export interface StretchColorGroup {
   /** Pairs of particle indices for this color [a,b, a,b, ...] */
   idsSBA: StorageBufferAttribute;
@@ -33,6 +42,16 @@ export interface StretchColorGroup {
   /** Per-constraint compliance values for this color */
   complianceSBA: StorageBufferAttribute;
   /** Number of constraints in this color group */
+  count: number;
+}
+
+export interface SeamColorGroup {
+  /** Pares de índices GLOBALES [a,b, ...] de este color */
+  idsSBA: StorageBufferAttribute;
+  /** Target per-constraint — el kernel lo DECAE in-place cada substep */
+  targetDistSBA: StorageBufferAttribute;
+  /** Compliance per-constraint */
+  complianceSBA: StorageBufferAttribute;
   count: number;
 }
 
@@ -52,9 +71,8 @@ export interface TslBufferSet {
   bendComplianceSBA: StorageBufferAttribute | null;
   numBendConstraints: number;
 
-  // Seam constraints
-  seamIdsSBA: StorageBufferAttribute | null;
-  seamTargetDistSBA: StorageBufferAttribute | null;
+  // Seam constraints (per-color for race-free dispatch — #897 F1.3)
+  seamColors: SeamColorGroup[];
   numSeamConstraints: number;
 
   // Triangle index buffer
@@ -107,7 +125,7 @@ export function createTslBuffers(
   mesh: ClothMeshData,
   coloredStretch: ColoredConstraints,
   bend: BendConstraints,
-  seam: SeamConstraintData | null,
+  seam: TslSeamConstraintData | null,
   fabricCompliance?: FabricComplianceConfig,
 ): TslBufferSet {
   const N = mesh.positions.length / 3;
@@ -177,13 +195,25 @@ export function createTslBuffers(
     bendComplianceSBA = new StorageBufferAttribute(bendCompliance, 1);
   }
 
-  // ─── Seam constraints ──────────────────────────────────────────────
-  let seamIdsSBA: StorageBufferAttribute | null = null;
-  let seamTargetDistSBA: StorageBufferAttribute | null = null;
+  // ─── Per-color seam constraints with per-constraint compliance ─────
+  // Mirrors the stretchColors slicing: seam.{ids, targetDist, compliance}
+  // arrive reordered by color (colorConstraints output), so each colorRange
+  // is a contiguous slice (#897 F1.3).
+  const seamColors: SeamColorGroup[] = [];
   const numSeam = seam ? seam.ids.length / 2 : 0;
   if (seam && numSeam > 0) {
-    seamIdsSBA = new StorageBufferAttribute(new Uint32Array(seam.ids), 2);
-    seamTargetDistSBA = new StorageBufferAttribute(new Float32Array(seam.targetDist), 1);
+    for (const range of seam.colorRanges) {
+      const colorIds = seam.ids.slice(range.offset * 2, (range.offset + range.count) * 2);
+      const colorTarget = seam.targetDist.slice(range.offset, range.offset + range.count);
+      const colorCompliance = seam.compliance.slice(range.offset, range.offset + range.count);
+
+      seamColors.push({
+        idsSBA: new StorageBufferAttribute(new Uint32Array(colorIds), 2),
+        targetDistSBA: new StorageBufferAttribute(new Float32Array(colorTarget), 1),
+        complianceSBA: new StorageBufferAttribute(new Float32Array(colorCompliance), 1),
+        count: range.count,
+      });
+    }
   }
 
   // ─── Grab tool buffers (GPU-only: init kernel writes, grab kernel reads) ──
@@ -206,8 +236,7 @@ export function createTslBuffers(
     bendRestSBA,
     bendComplianceSBA,
     numBendConstraints: numBend,
-    seamIdsSBA,
-    seamTargetDistSBA,
+    seamColors,
     numSeamConstraints: numSeam,
     triangles: mesh.triangles,
     grabMaskSBA,
@@ -273,9 +302,9 @@ export function disposeStorageBufferAttribute(
 /**
  * Release every GPU buffer owned by a TslBufferSet.
  *
- * Iterates the 14 fixed SBA fields plus per-color stretch SBAs, then delegates
- * self-collision and wind buffer disposal to their owning modules. See
- * `disposeStorageBufferAttribute` for the renderer-routing rationale.
+ * Iterates the 12 fixed SBA fields plus per-color stretch and seam SBAs, then
+ * delegates self-collision and wind buffer disposal to their owning modules.
+ * See `disposeStorageBufferAttribute` for the renderer-routing rationale.
  */
 export function destroyTslBufferSet(
   set: TslBufferSet,
@@ -294,11 +323,12 @@ export function destroyTslBufferSet(
     set.bendIdsSBA,
     set.bendRestSBA,
     set.bendComplianceSBA,
-    set.seamIdsSBA,
-    set.seamTargetDistSBA,
   ];
   for (const color of set.stretchColors) {
     sbas.push(color.idsSBA, color.restLengthsSBA, color.complianceSBA);
+  }
+  for (const color of set.seamColors) {
+    sbas.push(color.idsSBA, color.targetDistSBA, color.complianceSBA);
   }
   for (const sba of sbas) {
     disposeStorageBufferAttribute(sba, renderer);

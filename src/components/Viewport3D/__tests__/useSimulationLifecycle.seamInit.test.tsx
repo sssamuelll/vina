@@ -188,6 +188,7 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
   afterEach(() => {
     vi.clearAllMocks();
     localStorage.removeItem(WEBGPU_FEATURE_FLAG_KEY);
+    localStorage.removeItem('openclo-webgpu-seams-unsafe');
     webgpuMocks.isWebGPUAvailable.mockReturnValue(false);
   });
 
@@ -260,6 +261,33 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
     expect(toasts[0].type).toBe('warning');
     expect(toasts[0].message).toMatch(/WebGPU/);
     expect(store.getState().simulation.solverTier).toBe('wasm');
+  });
+
+  it('F1.5 (#897): bypass dev openclo-webgpu-seams-unsafe → el gate NO dispara toast y se intenta GPU', async () => {
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'true');
+    localStorage.setItem('openclo-webgpu-seams-unsafe', 'true');
+    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
+    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
+    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    // Con el bypass dev el hook SÍ entra en la rama GPU pese a seams:false:
+    // en jsdom navigator.gpu no existe, el try lanza y cae a WASM por el
+    // mismo fallthrough natural del caso control sin seams. La diferencia
+    // observable vs el caso del gate es la AUSENCIA del toast de aviso +
+    // el console.warn del bypass.
+    renderLifecycle(store, seamInitData);
+
+    await waitFor(() => expect(wasmMocks.initMultiPiece).toHaveBeenCalledTimes(1));
+
+    expect(store.getState().copilotUI.toasts).toHaveLength(0);
+    expect(store.getState().simulation.solverTier).toBe('wasm');
+    expect(
+      warnSpy.mock.calls.some((c) => String(c[0]).includes('openclo-webgpu-seams-unsafe activo')),
+    ).toBe(true);
+    warnSpy.mockRestore();
   });
 
   it('FASE 4 (control): WebGPU opt-in SIN seams → el gate no dispara toast', async () => {
