@@ -9,6 +9,7 @@ import base from './playwright.config';
 export default defineConfig({
   ...base,
   grep: /@gpu-local/,
+  grepInvert: undefined, // anula la exclusión heredada del config base
   workers: 1,
   // Perf debe fallar ruidosamente: un retry re-mide bajo instrumentación de trace.
   retries: 0,
