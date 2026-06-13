@@ -36,8 +36,9 @@ const cpuMocks = vi.hoisted(() => ({
 const neuralMocks = vi.hoisted(() => ({
   initMultiPiece: vi.fn(),
 }));
-// isWebGPUAvailable es controlable por test; el flag de opt-in se controla
-// vía localStorage ('openclo-use-webgpu') que es lo que lee el hook real.
+// isWebGPUAvailable es controlable por test; el flag del tier GPU (opt-out
+// desde #897: default ON, 'false' lo apaga) se controla vía localStorage
+// ('openclo-use-webgpu'), que es lo que lee el hook real.
 const webgpuMocks = vi.hoisted(() => ({
   isWebGPUAvailable: vi.fn(() => false),
 }));
@@ -316,6 +317,58 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
     expect(wasmMocks.initMultiPiece).not.toHaveBeenCalled();
   });
 
+  it('F-default-on (#897): key SIN setear + seams → GPU tier por defecto (opt-out)', async () => {
+    // El corazón del flip opt-in→opt-out: NO se llama localStorage.setItem.
+    // Con HW disponible y la key ausente, el default debe ser GPU (como 'true'),
+    // no WASM. Mismo escenario que el caso opt-in de arriba SIN la línea
+    // `setItem(WEBGPU_FEATURE_FLAG_KEY, 'true')`.
+    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
+    gpuMocks.initMultiPieceTsl.mockResolvedValue(undefined);
+    const fakeDevice = {
+      lost: new Promise(() => {}), // nunca resuelve
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      pushErrorScope: vi.fn(),
+      popErrorScope: vi.fn().mockResolvedValue(null),
+    };
+    (globalThis.navigator as { gpu?: unknown }).gpu = {
+      requestAdapter: async () => ({ requestDevice: async () => fakeDevice }),
+    };
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    const placedMeshes = renderLifecycle(store, seamInitData);
+
+    await waitFor(() => expect(gpuMocks.initMultiPieceTsl).toHaveBeenCalledTimes(1));
+
+    const [piecesArg, seamPairsArg] = gpuMocks.initMultiPieceTsl.mock.calls[0];
+    expect(piecesArg).toBe(placedMeshes);
+    expect(seamPairsArg.length).toBeGreaterThan(0);
+
+    await waitFor(() => expect(store.getState().simulation.solverTier).toBe('webgpu'));
+    expect(store.getState().copilotUI.toasts).toHaveLength(0);
+    expect(wasmMocks.initMultiPiece).not.toHaveBeenCalled();
+  });
+
+  it('F-default-on (#897): escape hatch — key en \'false\' → GPU NO se intenta (cae a WASM)', async () => {
+    // La salida de emergencia del opt-out: 'false' explícito desactiva el tier
+    // GPU aunque el HW esté disponible. Prueba que el default ON no es absoluto.
+    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'false');
+    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
+    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
+    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+    // Si la rama GPU corriese, instanciaría el cliente GPU; al estar 'false'
+    // ni siquiera se toca navigator.gpu — no lo fakeamos a propósito.
+
+    const store = makeStore();
+    store.dispatch(startSimulation());
+    renderLifecycle(store, seamInitData);
+
+    await waitFor(() => expect(wasmMocks.initMultiPiece).toHaveBeenCalledTimes(1));
+    expect(gpuMocks.initMultiPieceTsl).not.toHaveBeenCalled();
+    expect(store.getState().simulation.solverTier).toBe('wasm');
+  });
+
   it('FASE 4 (control): WebGPU opt-in SIN seams → el gate no dispara toast', async () => {
     localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'true');
     webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
@@ -348,7 +401,8 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
   });
 
   it('FASE 4: todos los tiers con seams fallan → Neural NO arranca, toast de error, tier none', async () => {
-    // GPU deshabilitado (sin opt-in), WASM no disponible, CPU revienta:
+    // GPU no disponible en este test (isWebGPUAvailable=false, el default del
+    // beforeEach — ya no es por falta de opt-in), WASM no disponible, CPU revienta:
     // el último tier (Neural, seams:false) descartaría las costuras en
     // silencio — el cascade debe negarse a arrancarlo y avisar.
     wasmMocks.isWasmSolverAvailable.mockResolvedValue(false);
