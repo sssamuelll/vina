@@ -106,7 +106,7 @@ export function SimulationStatusOverlay() {
           style={{ color: '#fb923c', fontSize: 10, maxWidth: 200, marginTop: 2 }}
           title={
             activeTool3D === 'steamBrush'
-              ? 'Steam brush requires the WebGPU tier (TSL kernels write per-particle velocity damping). Switch to WebGPU tier (opt-in via localStorage) when upstream Three.js fix lands. See C4 RFC § 2.3.'
+              ? 'Steam brush requires the WebGPU tier (TSL kernels write per-particle velocity damping). The WebGPU tier is on by default; if you disabled it, clear localStorage(\'openclo-use-webgpu\'). See C4 RFC § 2.3.'
               : 'Mesh grab requires the WebGPU or WASM tier (CPU has no positional pin; Neural has no per-particle interactivity). Switch to WASM or WebGPU tier. See C4 RFC § 2.3.'
           }
         >
