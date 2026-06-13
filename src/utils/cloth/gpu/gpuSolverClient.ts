@@ -22,6 +22,9 @@ import {
   type FabricComplianceConfig,
 } from './tslBuffers';
 import { createTslSolver, type TslSolver, type TslSolverConfig } from './tslSolver';
+import { createSelfCollisionBuffers } from './tslSelfCollision';
+import { buildAdjacency, nextPrime } from '../selfCollision';
+import { buildAdjacencyCSR } from '../wasm/adjacencyCSR';
 import { buildLinearBVH } from './bvh';
 import { createTslCollisionBody } from './tslCollision';
 import { type SolverCapabilities, GPU_CAPABILITIES } from '../solverCapabilities';
@@ -106,11 +109,17 @@ export class GpuSolverClient implements ClothSolverClient {
   /**
    * Tracks BVH SBAs per collision body id so `setTslCollisionBody` can free
    * the previous allocation when called again for the same id (avatar pose
-   * updates re-allocate 3 SBAs each call, see #753).
+   * updates re-allocate 4 SBAs each call, see #753; the 4th — escape
+   * pointers for the threaded traversal — joined in #897 F4.3b).
    */
   private collisionBodySBAs: Map<
     string,
-    { bvhNodesSBA: StorageBufferAttribute; triVertsSBA: StorageBufferAttribute; triNormalsSBA: StorageBufferAttribute }
+    {
+      bvhNodesSBA: StorageBufferAttribute;
+      bvhSkipSBA: StorageBufferAttribute;
+      triVertsSBA: StorageBufferAttribute;
+      triNormalsSBA: StorageBufferAttribute;
+    }
   > = new Map();
 
   constructor(device: GPUDevice, config?: Partial<GpuSolverConfig>) {
@@ -133,10 +142,10 @@ export class GpuSolverClient implements ClothSolverClient {
    * execution modes this tier supports. Per A6 § 3.4 Option A
    * (capability extension to GPU + Neural).
    *
-   * Currently all physics flags `false` (selfCollision is scaffolded
-   * but unwired — see `GPU_CAPABILITIES` JSDoc). `frameDriven: true`
-   * signals consumers to dispatch frames via `useFrame` rather than
-   * calling `start()`.
+   * `bodyCollision` (#897 F2), `seams` + `selfCollision` (#897 F4) are
+   * `true` — parity status and ratified divergences live in the
+   * `GPU_CAPABILITIES` JSDoc. `frameDriven: true` signals consumers to
+   * dispatch frames via `useFrame` rather than calling `start()`.
    */
   get capabilities(): SolverCapabilities {
     return GPU_CAPABILITIES;
@@ -432,6 +441,24 @@ export class GpuSolverClient implements ClothSolverClient {
         fabric,
       );
 
+      // Self-collision (#897 F3): SIEMPRE activo en el tier GPU. RATIFICADO:
+      // diverge del preset 'normal' (selfCollision false) — esa es una
+      // decisión de perf MEDIDA EN WASM (#608/#892, kernel a 1FPS) que no
+      // aplica a compute GPU (buckets K=8, 4 pases). El kill-switch es el
+      // gate de dispatch en GarmentSimulation. La adyacencia se construye
+      // sobre los triángulos MERGED (offsets de pieza ya horneados) y el
+      // tamaño de tabla espeja SpatialHashGrid.build: nextPrime(2N).
+      // scBuffers DEBE asignarse antes de createTslSolver — su gate
+      // (`config.selfCollision && buffers.scBuffers`) lee el campo en init.
+      const adjSets = buildAdjacency(new Int32Array(triangles), totalVerts); // firma pide Int32Array (S8)
+      const csr = buildAdjacencyCSR(adjSets, totalVerts);
+      this.tslBuffers.scBuffers = createSelfCollisionBuffers(
+        totalVerts,
+        nextPrime(totalVerts * 2),
+        csr.offsets,
+        csr.neighbors,
+      );
+
       const defaultConfig: TslSolverConfig = {
         substeps: 15,
         gravity: [0, -9.81, 0],
@@ -446,6 +473,10 @@ export class GpuSolverClient implements ClothSolverClient {
         seamSewedThreshold: DEFAULT_SEAM_CONFIG.sewedThreshold,
         groundY: 0.0,
         dt: 1 / 60,
+        // Always-on en GPU (#897 F3, ver bloque scBuffers arriba); thickness
+        // = clothThickness, paridad con los defaults CPU/WASM (2mm).
+        selfCollision: true,
+        thickness: 0.002,
         ...solverConfig,
       };
 
@@ -835,20 +866,22 @@ export class GpuSolverClient implements ClothSolverClient {
     }
 
     // Re-allocation cleanup: avatar pose updates call this method repeatedly
-    // for the same body id. Without this, each call leaks 3 SBAs worth of
-    // GPUBuffer (BVH nodes, tri verts, tri normals) — #753.
+    // for the same body id. Without this, each call leaks 4 SBAs worth of
+    // GPUBuffer (BVH nodes, skip pointers, tri verts, tri normals) — #753.
     const previous = this.collisionBodySBAs.get(id);
     if (previous) {
       disposeStorageBufferAttribute(previous.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(previous.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(previous.triNormalsSBA, this.rendererRef);
     }
 
     // Create StorageBufferAttributes for GPU upload
     const bvhNodesSBA = createSBA(bvh.nodes, 1);
+    const bvhSkipSBA = createSBA(bvh.skip, 1);
     const triVertsSBA = createSBA(bvh.triVerts, 1);
     const triNormalsSBA = createSBA(bvh.triNormals, 1);
-    this.collisionBodySBAs.set(id, { bvhNodesSBA, triVertsSBA, triNormalsSBA });
+    this.collisionBodySBAs.set(id, { bvhNodesSBA, bvhSkipSBA, triVertsSBA, triNormalsSBA });
 
     // Use shared buffer nodes from the solver
     const N = this.tslSolver.numParticles;
@@ -861,6 +894,7 @@ export class GpuSolverClient implements ClothSolverClient {
       prevPosBuf,
       invMassBuf,
       bvhNodesSBA,
+      bvhSkipSBA,
       triVertsSBA,
       triNormalsSBA,
       N,
@@ -889,6 +923,7 @@ export class GpuSolverClient implements ClothSolverClient {
     const tracked = this.collisionBodySBAs.get(id);
     if (tracked) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
       this.collisionBodySBAs.delete(id);
@@ -903,6 +938,7 @@ export class GpuSolverClient implements ClothSolverClient {
   private disposeTslResources(): void {
     for (const tracked of this.collisionBodySBAs.values()) {
       disposeStorageBufferAttribute(tracked.bvhNodesSBA, this.rendererRef);
+      disposeStorageBufferAttribute(tracked.bvhSkipSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triVertsSBA, this.rendererRef);
       disposeStorageBufferAttribute(tracked.triNormalsSBA, this.rendererRef);
     }

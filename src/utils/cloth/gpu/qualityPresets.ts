@@ -46,6 +46,7 @@ export const SIMULATION_MODES: Record<SimulationMode, QualityPreset> = {
     // actually REACHES the solver (GarmentSimulation mode sync), so
     // 'complete' truly enables it; flip this once the kernel is optimized
     // (see issue filed with the M4-D numbers).
+    // NOTA: el tier GPU/TSL ignora este flag — self-collision corre siempre-on allí (ratificado #897 F3).
     selfCollision: false,
     collisionResolution: 32,
     bendingEnabled: true,

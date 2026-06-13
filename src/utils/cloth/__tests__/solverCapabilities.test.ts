@@ -115,9 +115,16 @@ describe('SolverCapabilities frozen shape', () => {
     });
   });
 
-  it('GPU pin — seams stays false until it verifies against baseline; bodyCollision verified', () => {
+  it('GPU pin — seams + selfCollision flipped in #897 F4 after María verification; bodyCollision verified (F2)', () => {
     expect(GPU_CAPABILITIES).toEqual({
-      selfCollision: false,
+      // Flipped to `true` in #897 F4 together with `seams` — buckets K=8
+      // self-collision without serial prefix-sum (4 passes/substep, F3),
+      // with ratified divergences vs CPU/WASM (cellSize=thickness, Jacobi
+      // averaging, 8-candidate truncation, CSR adjacency cap 64).
+      // Always-on on this tier (the 'normal' preset's `false` is a
+      // WASM-measured perf decision, #608 — does not apply here). See the
+      // JSDoc on `GPU_CAPABILITIES.selfCollision`.
+      selfCollision: true,
       // Flipped to `true` in #897 F2 after the María-pattern drape
       // verification on the GPU tier passed all M4 thresholds (nan=0,
       // belowHipPct=0.13<5, minY=0.79>0.5, maxY=1.58>1.3) — the 4
@@ -128,7 +135,14 @@ describe('SolverCapabilities frozen shape', () => {
       pressure: false,
       fold: false,
       pieceStiffness: false,
-      seams: false,
+      // Flipped to `true` in #897 F4: seam closure parity with CPU/WASM
+      // landed in F1 (per-constraint compliance SBA by color, coloring,
+      // in-kernel per-substep target decay mirroring lib.rs solve_seams)
+      // and was verified on the real María pattern in a real browser
+      // (402 constraints, closure convergence, 2026-06-12). This is THE
+      // user-facing flip of the epic — the tier cascade no longer skips
+      // GPU for seamed projects. See `GPU_CAPABILITIES.seams` JSDoc.
+      seams: true,
       frameDriven: true,
       tools: { steamBrush: true, meshGrab: true },
     });

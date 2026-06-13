@@ -42,8 +42,10 @@ const HASH_MUL_X = 92837111;
 const HASH_MUL_Y = 689287499;
 const HASH_MUL_Z = 283923481;
 
-/** Find a prime >= n. */
-function nextPrime(n: number): number {
+/** Find a prime >= n. Exported (#897 F3.3) so the GPU tier sizes its bucket
+ *  hash table with the same `nextPrime(numParticles * 2)` derivation as
+ *  `SpatialHashGrid.build` below — body unchanged. */
+export function nextPrime(n: number): number {
   if (n <= 2) return 2;
   let candidate = n % 2 === 0 ? n + 1 : n;
   while (true) {

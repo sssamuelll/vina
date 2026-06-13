@@ -10,10 +10,15 @@
  * contrato del cascade.
  *
  * Fase 4 añade el capability gate: tiers que declaran `seams: false`
- * (GPU TSL sin parity de cierre; Neural sin seams en el contrato de
- * inferencia) se saltan con aviso visible cuando el proyecto tiene seams
- * activos — nunca silenciosamente (doctrina A7/C4, guardarraíl "no
- * cobardes" del plan § 7).
+ * se saltan con aviso visible cuando el proyecto tiene seams activos —
+ * nunca silenciosamente (doctrina A7/C4, guardarraíl "no cobardes" del
+ * plan § 7).
+ *
+ * #897 F4 flipea `GPU_CAPABILITIES.seams` a `true` (paridad de cierre
+ * verificada con María en navegador real): el gate GPU deja de disparar y
+ * el caso positivo de abajo pinna que el cascade SÍ intenta el tier GPU
+ * con seamPairs resueltos. El gate queda vivo solo para Neural (exclusión
+ * arquitectónica) y como guardarraíl ante una regresión de capability.
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
@@ -35,6 +40,9 @@ const neuralMocks = vi.hoisted(() => ({
 // vía localStorage ('openclo-use-webgpu') que es lo que lee el hook real.
 const webgpuMocks = vi.hoisted(() => ({
   isWebGPUAvailable: vi.fn(() => false),
+}));
+const gpuMocks = vi.hoisted(() => ({
+  initMultiPieceTsl: vi.fn(),
 }));
 
 vi.mock('../../../utils/cloth/wasm/wasmSolverClient', () => {
@@ -76,10 +84,26 @@ vi.mock('../../../utils/cloth/clothWorkerClient', () => ({
     updateCollisionBody = vi.fn();
   },
 }));
+// El mock reemplaza el módulo entero — el constructor real (que llama
+// instrumentShaderCapture/attachUncapturedErrorListener sobre el device)
+// nunca corre. Superficie = exactamente lo que la rama GPU del cascade
+// toca tras el init: getTslSolver (tslSolverRef), loadCollision
+// (setCollisionMesh/updateCollisionBody), freezePieces, setWind (efecto
+// de viento), stop/dispose (cleanup cascade).
 vi.mock('../../../utils/cloth/gpu/gpuSolverClient', () => ({
   GpuSolverClient: class {
-    dispose = vi.fn();
+    onFrame: ((positions: Float32Array) => void) | null = null;
+    initMultiPieceTsl = gpuMocks.initMultiPieceTsl;
+    getTslSolver = () => ({});
+    getPieceVertexRanges = () => null;
+    setCollisionMesh = vi.fn();
+    updateCollisionBody = vi.fn();
+    freezePieces = vi.fn();
+    setWind = vi.fn();
+    setBrushParams = vi.fn();
+    start = vi.fn();
     stop = vi.fn();
+    dispose = vi.fn();
   },
 }));
 vi.mock('../../../utils/cloth/neural/neuralDrapeClient', () => ({
@@ -188,8 +212,10 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
   afterEach(() => {
     vi.clearAllMocks();
     localStorage.removeItem(WEBGPU_FEATURE_FLAG_KEY);
-    localStorage.removeItem('openclo-webgpu-seams-unsafe');
     webgpuMocks.isWebGPUAvailable.mockReturnValue(false);
+    // El caso positivo GPU instala un navigator.gpu fake — restaurar el
+    // jsdom desnudo para que los casos de fallthrough sigan lanzando.
+    delete (globalThis.navigator as { gpu?: unknown }).gpu;
   });
 
   it('FASE 1 (BP-1): el init del tier WASM recibe seamInitData', async () => {
@@ -243,51 +269,51 @@ describe('useSimulationLifecycle — tier WASM (cascade por defecto)', () => {
     expect(errors[0]).toMatchObject({ seamId: 'seam-1', reason: 'unknown-edge' });
   });
 
-  it('FASE 4: WebGPU opt-in + seams activos → GPU saltado con toast de aviso, cae a WASM', async () => {
+  // (#897 F4) Aquí vivía el caso "opt-in + seams → GPU saltado con toast de
+  // aviso, cae a WASM": obsoleto con el flip de GPU_CAPABILITIES.seams a
+  // true — el gate ya no dispara para GPU. Sustituido por el caso positivo
+  // de abajo. Git history lo conserva.
+
+  // (#897 F4) Aquí vivía el caso del bypass dev de costuras GPU vía
+  // localStorage (F1.5): el bypass se eliminó en este mismo PR junto con el
+  // flip — la ruta GPU con seams ya es la ruta normal, sin key dev. Git
+  // history conserva el caso y la key.
+
+  it('F4 (#897): opt-in + seams → GPU tier intentado con seamPairs (capability flip)', async () => {
     localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'true');
     webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
-    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
-    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
+    gpuMocks.initMultiPieceTsl.mockResolvedValue(undefined);
+    // jsdom no tiene navigator.gpu — fake mínimo para que la rama GPU del
+    // cascade corra de verdad (requestAdapter → requestDevice → init):
+    const fakeDevice = {
+      lost: new Promise(() => {}), // nunca resuelve
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      pushErrorScope: vi.fn(),
+      popErrorScope: vi.fn().mockResolvedValue(null),
+    };
+    (globalThis.navigator as { gpu?: unknown }).gpu = {
+      requestAdapter: async () => ({ requestDevice: async () => fakeDevice }),
+    };
 
     const store = makeStore();
     store.dispatch(startSimulation());
-    renderLifecycle(store, seamInitData);
+    const placedMeshes = renderLifecycle(store, seamInitData);
 
-    await waitFor(() => expect(wasmMocks.initMultiPiece).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(gpuMocks.initMultiPieceTsl).toHaveBeenCalledTimes(1));
 
-    // Aviso visible — nunca un downgrade silencioso (plan § 7, "no cobardes").
-    const toasts = store.getState().copilotUI.toasts;
-    expect(toasts).toHaveLength(1);
-    expect(toasts[0].type).toBe('warning');
-    expect(toasts[0].message).toMatch(/WebGPU/);
-    expect(store.getState().simulation.solverTier).toBe('wasm');
-  });
+    // Señal POSITIVA del flip: el tier GPU recibe los seamPairs RESUELTOS
+    // (misma pipeline parameterizeEdge + matchVertices que el summary) —
+    // no un array vacío ni un downgrade a WASM.
+    const [piecesArg, seamPairsArg] = gpuMocks.initMultiPieceTsl.mock.calls[0];
+    expect(piecesArg).toBe(placedMeshes);
+    expect(seamPairsArg.length).toBeGreaterThan(0);
+    expect(seamPairsArg[0].vertexPairs.length).toBeGreaterThan(0);
 
-  it('F1.5 (#897): bypass dev openclo-webgpu-seams-unsafe → el gate NO dispara toast y se intenta GPU', async () => {
-    localStorage.setItem(WEBGPU_FEATURE_FLAG_KEY, 'true');
-    localStorage.setItem('openclo-webgpu-seams-unsafe', 'true');
-    webgpuMocks.isWebGPUAvailable.mockReturnValue(true);
-    wasmMocks.isWasmSolverAvailable.mockResolvedValue(true);
-    wasmMocks.initMultiPiece.mockResolvedValue(undefined);
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    const store = makeStore();
-    store.dispatch(startSimulation());
-    // Con el bypass dev el hook SÍ entra en la rama GPU pese a seams:false:
-    // en jsdom navigator.gpu no existe, el try lanza y cae a WASM por el
-    // mismo fallthrough natural del caso control sin seams. La diferencia
-    // observable vs el caso del gate es la AUSENCIA del toast de aviso +
-    // el console.warn del bypass.
-    renderLifecycle(store, seamInitData);
-
-    await waitFor(() => expect(wasmMocks.initMultiPiece).toHaveBeenCalledTimes(1));
-
+    // El viejo toast de aviso del gate NO se dispatcha y el tier es webgpu.
+    await waitFor(() => expect(store.getState().simulation.solverTier).toBe('webgpu'));
     expect(store.getState().copilotUI.toasts).toHaveLength(0);
-    expect(store.getState().simulation.solverTier).toBe('wasm');
-    expect(
-      warnSpy.mock.calls.some((c) => String(c[0]).includes('openclo-webgpu-seams-unsafe activo')),
-    ).toBe(true);
-    warnSpy.mockRestore();
+    expect(wasmMocks.initMultiPiece).not.toHaveBeenCalled();
   });
 
   it('FASE 4 (control): WebGPU opt-in SIN seams → el gate no dispara toast', async () => {

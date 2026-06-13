@@ -2,18 +2,29 @@
  * TSL Self-Collision — atomic i32 accumulation for race-free self-collision on GPU.
  *
  * Creates StorageBufferAttributes for the spatial hash + correction buffers,
- * and TSL Fn() compute nodes for the 5-pass pipeline.
+ * and compute()-wrapped TSL nodes for the 4-pass fixed-capacity-bucket
+ * pipeline (#897 F3, H-BP1 redesign — replaces the 5-pass counting-sort
+ * layout whose SERIAL prefix-sum pass ran 1 GPU thread × tableSize iterations
+ * per substep: 180-900ms/frame at María scale, dead-on-arrival for ≥30fps).
  *
- * Pipeline passes:
- *   1. hashCount    — hash particle position to cell, atomicAdd cellCount
- *   2. prefixSum    — serial exclusive prefix sum over cellCount → cellStart
- *   3. scatter      — scatter particle indices into cellEntries via cellStart + atomicAdd
- *   4. resolve      — detect pairs in 27-cell neighborhood, atomicAdd i32 corrections
- *   5. apply        — drain deltas, average, apply to positions, reset buffers
+ * Pipeline passes (the FULL sequence must run EVERY substep — cellClear
+ * resets the counters scatter accumulates into):
+ *   1. cellClear — atomicStore 0 into every cellCount      (dispatch: tableSize)
+ *   2. scatter   — hash particle pos → cell h; claim slot via
+ *                  atomicAdd(cellCount[h], 1); write particle index into
+ *                  cellEntries[h*K + slot] if slot < K     (dispatch: N)
+ *   3. resolve   — detect pairs in the 27-cell neighborhood, atomicAdd
+ *                  i32 fixed-point corrections             (dispatch: N)
+ *   4. apply     — drain deltas, average, apply to positions, reset
+ *                  delta/corrCount                         (dispatch: N)
+ *
+ * cellEntries is tableSize × CELL_CAPACITY: no prefix sum, no cellStart, no
+ * separate count pass. Cells with more than CELL_CAPACITY particles truncate
+ * candidates (ratified divergence vs unbounded CPU/WASM — see CELL_CAPACITY).
  *
  * Adjacency is pre-uploaded (CSR flat list + offsets) to skip connected neighbors.
  *
- * Race-free: resolveCollisions uses atomicAdd on i32 delta buffers (scaled by 1e6)
+ * Race-free: resolve uses atomicAdd on i32 delta buffers (scaled by 1e6)
  * for BOTH particles in each pair. No direct position writes in resolve pass.
  *
  * @module tslSelfCollision
@@ -23,6 +34,7 @@ import { StorageBufferAttribute } from 'three/webgpu';
 import {
   Fn,
   storage,
+  compute,
   uniform,
   instanceIndex,
   uint,
@@ -34,6 +46,7 @@ import {
   atomicLoad,
   atomicStore,
 } from 'three/tsl';
+import type ComputeNode from 'three/src/nodes/gpgpu/ComputeNode.js';
 import { makeAtomicStorage } from './atomicStorage';
 // TSL node types vary across @types/three versions; use loose types for stability.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,10 +55,9 @@ type TslNode = any;
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 export interface SelfCollisionBufferSet {
-  // Spatial hash
-  cellCountSBA: StorageBufferAttribute;   // Uint32Array, tableSize
-  cellStartSBA: StorageBufferAttribute;   // Uint32Array, tableSize
-  cellEntriesSBA: StorageBufferAttribute; // Uint32Array, numParticles
+  // Spatial hash (fixed-capacity buckets)
+  cellCountSBA: StorageBufferAttribute;   // Uint32Array, tableSize (atomic)
+  cellEntriesSBA: StorageBufferAttribute; // Uint32Array, tableSize * CELL_CAPACITY
 
   // Adjacency (CSR)
   adjOffsetsSBA: StorageBufferAttribute;  // Uint32Array, numParticles+1
@@ -60,21 +72,32 @@ export interface SelfCollisionBufferSet {
   numParticles: number;
 }
 
+/**
+ * The 4 compute()-wrapped nodes of the bucket pipeline, ready for
+ * `renderer.compute(node)` dispatch. Dispatch counts are baked in:
+ * [tableSize, N, N, N] with [64] workgroups (module convention — same as
+ * tslSolver / tslWind / tslBrush).
+ */
 export interface SelfCollisionComputeNodes {
-  /** TSL node returned by Fn(...)() — typed loosely because Fn is cast to any for void-returning compute kernels */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  hashCountNode: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  prefixSumNode: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  scatterNode: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resolveNode: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  applyNode: any;
+  /** Zero cellCount — MUST run every substep before scatter (dispatch: tableSize) */
+  cellClearNode: ComputeNode;
+  /** Hash particles into fixed-capacity cell buckets (dispatch: numParticles) */
+  scatterNode: ComputeNode;
+  /** Pair detection + atomic i32 correction accumulation (dispatch: numParticles) */
+  resolveNode: ComputeNode;
+  /** Average + apply corrections, reset delta/corrCount (dispatch: numParticles) */
+  applyNode: ComputeNode;
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
+
+/** Capacidad por celda. 27 celdas × 8 = 216 candidatos/partícula máximo.
+ *  A 5mm de spacing con celda = thickness (2mm), >8 partículas/celda solo
+ *  ocurre en interpenetración masiva — truncar ahí es aceptable (divergencia
+ *  ratificada vs CPU/WASM unbounded; plan B: port Blelloch del WGSL legacy).
+ *  Sustituye al prefix-sum serial: 1 hilo × ~59k iter × 15 substeps era
+ *  180-900ms/frame — inviable para el DoD ≥30fps (#897 H-BP1). */
+export const CELL_CAPACITY = 8;
 
 /**
  * Fixed-point scale for atomic<i32> accumulation (WGSL has no atomic<f32>).
@@ -111,11 +134,17 @@ export function createSelfCollisionBuffers(
 ): SelfCollisionBufferSet {
   return {
     cellCountSBA: new StorageBufferAttribute(new Uint32Array(tableSize), 1),
-    cellStartSBA: new StorageBufferAttribute(new Uint32Array(tableSize), 1),
-    cellEntriesSBA: new StorageBufferAttribute(new Uint32Array(numParticles), 1),
+    cellEntriesSBA: new StorageBufferAttribute(
+      new Uint32Array(tableSize * CELL_CAPACITY),
+      1,
+    ),
     adjOffsetsSBA: new StorageBufferAttribute(new Uint32Array(adjacencyOffsets), 1),
+    // Copy the neighbor DATA — `new Uint32Array(length)` allocates zeros and
+    // silently breaks adjacency exclusion (every lookup misses). Empty
+    // adjacency still needs a 1-element buffer: WGSL forbids zero-sized
+    // storage bindings.
     adjNeighborsSBA: new StorageBufferAttribute(
-      new Uint32Array(Math.max(adjacencyNeighbors.length, 1)),
+      adjacencyNeighbors.length > 0 ? new Uint32Array(adjacencyNeighbors) : new Uint32Array(1),
       1,
     ),
     deltaSBA: new StorageBufferAttribute(new Int32Array(numParticles * 3), 1),
@@ -146,7 +175,6 @@ export function destroySelfCollisionBuffers(
   if (!attrs || typeof attrs.delete !== 'function') return;
   const sbas: StorageBufferAttribute[] = [
     buffers.cellCountSBA,
-    buffers.cellStartSBA,
     buffers.cellEntriesSBA,
     buffers.adjOffsetsSBA,
     buffers.adjNeighborsSBA,
@@ -165,7 +193,9 @@ export function destroySelfCollisionBuffers(
 // ─── Compute Node Factory ───────────────────────────────────────────────────
 
 /**
- * Create the 5 TSL Fn() compute nodes for the self-collision pipeline.
+ * Create the 4 compute()-wrapped TSL nodes for the bucket self-collision
+ * pipeline. Dispatch ALL FOUR per substep, in order: cellClear → scatter →
+ * resolve → apply.
  *
  * @param positionBufNode  - Cloth particle positions (vec3 storage, shared with solver)
  * @param invMassBufNode   - Inverse mass per particle (float storage, 0 = pinned)
@@ -185,8 +215,7 @@ export function makeSelfCollisionComputeNodes(
   // ─── Wrap SBAs as TSL storage nodes ──────────────────────────────
   // cellCount/delta/corrCount need atomic access for atomicAdd/atomicStore.
   const cellCountBuf = makeAtomicStorage(buffers.cellCountSBA, 'int', T);
-  const cellStartBuf = storage(buffers.cellStartSBA, 'uint', T);
-  const cellEntriesBuf = storage(buffers.cellEntriesSBA, 'uint', N);
+  const cellEntriesBuf = storage(buffers.cellEntriesSBA, 'uint', T * CELL_CAPACITY);
   const adjOffsetsBuf = storage(buffers.adjOffsetsSBA, 'uint', N + 1);
   const adjNeighborsBuf = storage(buffers.adjNeighborsSBA, 'uint', adjNeighborCount);
   const deltaBuf = makeAtomicStorage(buffers.deltaSBA, 'int', N * 3);
@@ -197,11 +226,31 @@ export function makeSelfCollisionComputeNodes(
   const uTableSize = uniform(T);
   const uThickness = uniform(thickness);
 
-  // ─── Pass 1: hashCount ───────────────────────────────────────────
-  // Hash each particle position to a cell, atomicAdd cellCount.
-  // Dispatch: N particles.
+  // ─── Pass 1: cellClear ───────────────────────────────────────────
+  // Zero cellCount so scatter's atomicAdd starts from 0. MUST run every
+  // substep before scatter — there is no other reset (the legacy 5-pass
+  // layout reset counters inside prefixSum; buckets have no such pass).
+  // Dispatch: tableSize cells.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hashCountNode = (Fn as any)(() => {
+  const cellClearFn = (Fn as any)(() => {
+    const i = instanceIndex;
+
+    If(uint(i).lessThan(uint(uTableSize)), () => {
+      // toVar() forces explicit i32 in WGSL — bare int(0) emits AbstractInt
+      // which some WebGPU implementations reject for atomicStore (same
+      // idiom as makeNormalZeroFn in tslSolver.ts).
+      atomicStore(cellCountBuf.element(i), int(0).toVar());
+    });
+  })();
+  const cellClearNode = compute(cellClearFn, T, [64]);
+
+  // ─── Pass 2: scatter ─────────────────────────────────────────────
+  // Hash each particle position to a cell, claim a slot via atomicAdd, and
+  // write the particle index into the cell's fixed-capacity bucket. Slots
+  // beyond CELL_CAPACITY are truncated (counter keeps counting; the write
+  // is skipped). Dispatch: N particles.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const scatterFn = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
@@ -220,77 +269,39 @@ export function makeSelfCollisionComputeNodes(
         .bitXor(yi.mul(int(HASH_PRIME_Y)))
         .bitXor(zi.mul(int(HASH_PRIME_Z)));
       const tSize = int(uTableSize);
-      const modded = rawHash.modInt(tSize);
+      // .mod, no .modInt: ambos operandos ya son i32, emite el mismo `%`
+      // WGSL bit-idéntico; modInt está deprecado desde three r175.
+      const modded = rawHash.mod(tSize);
       // Ensure non-negative: if modded < 0, add tableSize
-      const h = If(modded.lessThan(int(0)), () => {
-        const hVal = uint(modded.add(tSize)).toVar('hVal1');
-        atomicAdd(cellCountBuf.element(hVal), int(1));
-      }).Else(() => {
-        const hVal = uint(modded).toVar('hVal2');
-        atomicAdd(cellCountBuf.element(hVal), int(1));
-      });
-      void h;
-    });
-  })();
-
-  // ─── Pass 2: prefixSum ───────────────────────────────────────────
-  // Serial exclusive prefix sum over cellCount → cellStart.
-  // Dispatch: 1 thread. Resets cellCount for the scatter pass.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const prefixSumNode = (Fn as any)(() => {
-    const runningSum = int(0).toVar('runningSum');
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Loop(T, ({ i: cellIdx }: { i: any }) => {
-      // atomicLoad required because cellCountBuf is array<atomic<i32>> (#554).
-      const count = atomicLoad(cellCountBuf.element(cellIdx));
-      cellStartBuf.element(cellIdx).assign(uint(runningSum));
-      runningSum.addAssign(count);
-      // Reset cellCount to 0 for scatter pass
-      atomicStore(cellCountBuf.element(cellIdx), int(0).toVar());
-    });
-  })();
-
-  // ─── Pass 3: scatter ─────────────────────────────────────────────
-  // Each particle writes its index into cellEntries at the correct offset.
-  // Dispatch: N particles.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const scatterNode = (Fn as any)(() => {
-    const i = instanceIndex;
-
-    If(uint(i).lessThan(uint(uNumParticles)), () => {
-      const invCS = float(1.0).div(uThickness);
-
-      const pos = positionBufNode.element(i);
-
-      const xi = int(pos.x.mul(invCS).floor());
-      const yi = int(pos.y.mul(invCS).floor());
-      const zi = int(pos.z.mul(invCS).floor());
-
-      const rawHash = xi.mul(int(HASH_PRIME_X))
-        .bitXor(yi.mul(int(HASH_PRIME_Y)))
-        .bitXor(zi.mul(int(HASH_PRIME_Z)));
-      const tSize = int(uTableSize);
-      const modded = rawHash.modInt(tSize);
-
+      const hVar = uint(0).toVar('hScatter');
       If(modded.lessThan(int(0)), () => {
-        const h = uint(modded.add(tSize)).toVar('hScatter1');
-        const offset = uint(atomicAdd(cellCountBuf.element(h), int(1)));
-        cellEntriesBuf.element(cellStartBuf.element(h).add(offset)).assign(uint(i));
+        hVar.assign(uint(modded.add(tSize)));
       }).Else(() => {
-        const h = uint(modded).toVar('hScatter2');
-        const offset = uint(atomicAdd(cellCountBuf.element(h), int(1)));
-        cellEntriesBuf.element(cellStartBuf.element(h).add(offset)).assign(uint(i));
+        hVar.assign(uint(modded));
+      });
+
+      // atomicAdd returns the OLD value (= the claimed slot) as i32 — same
+      // old-value contract tslCollision.ts relies on for atomicMin. toVar()
+      // materializes it so the two uses below don't re-emit the atomic op.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const slot = (atomicAdd(cellCountBuf.element(hVar), int(1)) as any).toVar('slot');
+      If(slot.lessThan(int(CELL_CAPACITY)), () => {
+        // Inside this branch slot ∈ [0, CELL_CAPACITY) → i32→u32 cast is
+        // safe; index math stays in uint like every entries access.
+        cellEntriesBuf
+          .element(hVar.mul(uint(CELL_CAPACITY)).add(uint(slot)))
+          .assign(uint(i));
       });
     });
   })();
+  const scatterNode = compute(scatterFn, N, [64]);
 
-  // ─── Pass 4: resolveCollisions ───────────────────────────────────
+  // ─── Pass 3: resolveCollisions ───────────────────────────────────
   // For each particle, query 27 neighbor cells. For each pair (i<j),
   // compute correction and atomicAdd to delta buffers.
   // Dispatch: N particles.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const resolveNode = (Fn as any)(() => {
+  const resolveFn = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
@@ -329,7 +340,8 @@ export function makeSelfCollisionComputeNodes(
                 .bitXor(cyi.mul(int(HASH_PRIME_Y)))
                 .bitXor(czi.mul(int(HASH_PRIME_Z)));
               const tSize = int(uTableSize);
-              const modded = rawHash.modInt(tSize);
+              // .mod, no .modInt — mismo razonamiento que en scatter.
+              const modded = rawHash.mod(tSize);
               // Compute hash: handle negative modulo
               const hVar = uint(0).toVar('hResolve');
               If(modded.lessThan(int(0)), () => {
@@ -338,16 +350,19 @@ export function makeSelfCollisionComputeNodes(
                 hVar.assign(uint(modded));
               });
 
-              const cellStart = cellStartBuf.element(hVar);
+              // Bucket iteration: clamp to CELL_CAPACITY — the counter keeps
+              // counting past the bucket (scatter truncates writes, not the
+              // count), so entries beyond K-1 don't exist.
               // atomicLoad required because cellCountBuf is array<atomic<i32>> (#554).
-              const cellCount = uint(atomicLoad(cellCountBuf.element(hVar)));
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const cellCount = (uint(atomicLoad(cellCountBuf.element(hVar))) as any)
+                .min(uint(CELL_CAPACITY));
+              const entriesBase = hVar.mul(uint(CELL_CAPACITY));
 
-              // Iterate entries in this cell
-              // Use a fixed max bound; break early via flag
+              // Iterate entries in this cell's bucket
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               Loop({ start: uint(0), end: cellCount, type: 'uint', condition: '<' }, ({ i: ki }: { i: any }) => {
-                const entryIdx = cellStart.add(ki);
-                const j = cellEntriesBuf.element(entryIdx);
+                const j = cellEntriesBuf.element(entriesBase.add(ki));
 
                 // Only process pairs where j > i to avoid duplicates
                 If(j.greaterThan(uint(i)), () => {
@@ -420,13 +435,14 @@ export function makeSelfCollisionComputeNodes(
       });
     });
   })();
+  const resolveNode = compute(resolveFn, N, [64]);
 
-  // ─── Pass 5: applyCorrections ────────────────────────────────────
+  // ─── Pass 4: applyCorrections ────────────────────────────────────
   // Drain atomic deltas, average by correction count, add to positions.
   // Always reset buffers for next substep.
   // Dispatch: N particles.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const applyNode = (Fn as any)(() => {
+  const applyFn = (Fn as any)(() => {
     const i = instanceIndex;
 
     If(uint(i).lessThan(uint(uNumParticles)), () => {
@@ -458,10 +474,10 @@ export function makeSelfCollisionComputeNodes(
       atomicStore(corrCountBuf.element(uint(i)), zeroI32);
     });
   })();
+  const applyNode = compute(applyFn, N, [64]);
 
   return {
-    hashCountNode,
-    prefixSumNode,
+    cellClearNode,
     scatterNode,
     resolveNode,
     applyNode,

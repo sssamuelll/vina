@@ -30,6 +30,7 @@ import { placeGarmentPieces, applyArrangementOverrides } from '../../utils/cloth
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
+import { showErrorToast } from '../../store/copilotUISlice';
 import { textureManager } from '../../utils/textures/TextureManager';
 import type { Texture } from 'three';
 import PinRenderer from './PinRenderer';
@@ -453,6 +454,16 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // dispatch are visible to the next, so cross-color shared vertices
       // are race-free.
       substepNodes.push(...solver.seamColors);
+      // Self-collision (#897 F3): los 4 pases bucket ANTES de groundClamp —
+      // espejo del orden Rust (self corre DENTRO de la dinámica natural,
+      // pre-snapshot), así su corrección SÍ entra en la velocidad (vNat),
+      // igual que en WASM donde self corre dentro del step de Rust.
+      // Siempre-on en el tier GPU (divergencia ratificada vs preset
+      // 'normal'); este gate de dispatch es el kill-switch.
+      if (solver.selfCollisionNodes) {
+        const sc = solver.selfCollisionNodes;
+        substepNodes.push(sc.cellClearNode, sc.scatterNode, sc.resolveNode, sc.applyNode);
+      }
       // Ground ANTES de la colisión de cuerpo (#897 F2.3) — espejo WASM:
       // en esa tier el ground corre DENTRO del step de Rust y la colisión
       // de triángulos JS corre después (wasmSolverWorker.ts:336,359). Así
@@ -1037,6 +1048,27 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       canvas.removeEventListener('pointerdown', onDown);
     };
   }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, makeTiers]);
+
+  // #897 F4 (H-RC1): los kernels TSL corren en el device del RENDERER; el
+  // device.lost que vigila el lifecycle pertenece a otro device (señuelo).
+  // Detección mínima honesta: toast + error. La cascada automática a WASM
+  // tras pérdida queda como follow-up (#901).
+  useEffect(() => {
+    if (!tslMaterial) return;
+    const device = (threeGl as unknown as { backend?: { device?: GPUDevice } })?.backend?.device;
+    if (!device) return;
+    let cancelled = false;
+    device.lost.then((info) => {
+      if (cancelled) return;
+      console.error('[GarmentSimulation] WebGPU device lost:', info?.message);
+      dispatch(showErrorToast('WebGPU device lost — restart the simulation to fall back to WASM'));
+    });
+    const onUncaptured = (e: Event) => {
+      console.error('[GarmentSimulation] uncaptured GPU error:', (e as { error?: { message?: string } }).error?.message);
+    };
+    device.addEventListener?.('uncapturederror', onUncaptured);
+    return () => { cancelled = true; device.removeEventListener?.('uncapturederror', onUncaptured); };
+  }, [tslMaterial, threeGl, dispatch]);
 
   if (!staticGeometry) return null;
 

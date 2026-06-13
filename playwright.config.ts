@@ -2,6 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  // Los specs @gpu-local (DoD #897, perf) requieren GPU/WebGPU real — corren
+  // SOLO bajo playwright.webgpu.config.ts (npm run test:e2e:gpu). Aquí (config
+  // por defecto, SwiftShader/CI) se excluyen: sin WebGPU fallan por timeout.
+  grepInvert: /@gpu-local/,
   // CI runners (SwiftShader software GL, 2 workers) run 3-6× slower than a dev
   // machine — basic interactions (goto, mouse.move) blow a 30s budget under
   // contention. Sim-heavy specs already set test.setTimeout(120s) themselves.
