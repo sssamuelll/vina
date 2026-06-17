@@ -79,11 +79,14 @@ not this one.
    load. These are dead today and would be redesigned by #53 anyway, so retaining them is pure
    debt.
 
-4. **Keep the blueprint persistence substrate dormant (Tier 2).** `saveUserBlueprint`,
-   `listBlueprints`, and the `blueprints[]` CRUD (`loadBlueprints` / `saveBlueprint` /
-   `removeBlueprint`) are retained but marked dormant. They are write-only without an executor,
-   but they are the persistence substrate that #53 (blueprint authoring) will reuse, and the
-   retention cost is near zero. (Decided over a "total cut" alternative.)
+4. **Keep the blueprint substrate dormant (Tier 2) — and make the dormancy real.**
+   `saveUserBlueprint` / `listBlueprints` and the `blueprints[]` CRUD (`loadBlueprints` /
+   `saveBlueprint` / `removeBlueprint`) are retained as source for #53, but **un-registered from
+   the live tool set** (removed from `registry.ts` `ALL_TOOL_MODULES`) so the agent cannot reach
+   them — otherwise the "dormant" label is a lie (the tools were agent-callable). Note: this
+   substrate is in-memory only (no IDB/LS); it never persisted, so "persistence substrate" was a
+   misnomer — it is a schema/source substrate. (Decided over a "total cut" alternative;
+   un-register correction added post roster-review — see Post-review correction.)
 
 5. **Keep the skills dormant, documented.** The drafting skills + registry stay in the tree.
    Each skill-definitions entry (or the registry barrel) gets a header comment declaring the
@@ -109,9 +112,10 @@ not this one.
   `npm run lint`.
 - **AC2 — engine intact.** Grading still works end-to-end; the `GradingTab` / `batchGrader` tests
   pass — the proof the engine survived the cut.
-- **AC3 — dormancy documented.** The drafting skills (and the retained blueprint persistence
-  tools) carry a header comment/JSDoc declaring their dormant, not-wired status and pointing to
-  the deferring issue (#243 / #53).
+- **AC3 — dormancy real + documented.** The drafting skills carry a header comment declaring
+  their dormant, not-wired status (#243). The blueprint tools are un-registered from the live
+  tool set (agent-unreachable) and their header documents the dormant, non-persistent status
+  (#53).
 
 ## Non-goals
 
@@ -119,8 +123,31 @@ not this one.
 - No skills→agent wiring (`getRelevantSkills` / `buildSkillContext` stay unused).
 - No folder rename (that is the separate hygiene issue).
 - No change to grading behavior.
-- No removal of the blueprint persistence substrate (Tier 2 stays dormant).
+- No deletion of the blueprint substrate files (Tier 2 stays as dormant source; tools
+  un-registered, not deleted).
 
 ## Open questions
 
-None. Tier 2 resolved to "keep dormant" in the approving session.
+None. Tier 2 resolved to "keep dormant"; a post-implementation roster review corrected the
+dormancy from *labeled* to *real* by un-registering the tools (see below).
+
+## Post-review correction (roster review, 2026-06-17)
+
+A full-roster review of the branch surfaced one verified theme (Axiom-0: *"a subsystem's state
+is declared by its wiring, not its comment"*) — three labels diverged from the wiring. All three
+fixed on this branch before merge:
+
+1. **Dormancy made real, not just labeled.** `saveUserBlueprint` / `listBlueprints` were still in
+   `registry.ts` `ALL_TOOL_MODULES` — agent-reachable, so "DORMANT" was false. Un-registered them
+   (the agent can no longer create un-executable blueprints). Source files retained for #53.
+2. **"Persistence substrate" was a misnomer.** `blueprints[]` is in-memory Redux only (no IDB/LS);
+   a saved blueprint dies on reload. Corrected the `SLICES_THAT_SURVIVE` reason and the tool/type
+   headers to state in-memory/non-persistent honestly.
+3. **Tombstones removed.** `templateEngine.ts` error text and `types/blueprint.ts` header still
+   referenced the deleted executor / `searchBlueprints`. Rewritten to match the post-cut reality.
+
+Refuted by the adversarial pass (not acted on): "AC3 violated" (spec §5 permits the barrel),
+"skillRegistry has no consumer" (a marketplace UI reads it), "no migration for saved blueprints"
+(nothing ever persisted). Noted-but-not-blocking: the TL;DR's "~42 pre-converted Seamly patterns"
+import route has no live loader in `src/`; the "indie-with-DXF" target user is asserted, not
+evidenced.

@@ -26,7 +26,7 @@ import { tools as autoSewToolDefs } from './definitions/autoSewTools';
 import { tools as fabricToolDefs } from './definitions/fabricTools';
 import { tools as semanticToolDefs } from './definitions/semanticTools';
 import { tools as constructionToolDefs } from './definitions/constructionTools';
-import { tools as blueprintToolDefs } from './definitions/blueprintTools';
+// blueprintTools un-registered (#847): dormant, agent-unreachable. Source retained for #53.
 import { tools as garmentPipelineToolDefs } from './definitions/garmentPipelineTool';
 import { tools as edgeToolDefs } from './definitions/edgeTools';
 import { tools as dartToolDefs } from './definitions/dartTools';
@@ -358,7 +358,6 @@ const ALL_TOOL_MODULES: ToolDefinition[][] = [
   fabricToolDefs,
   semanticToolDefs,
   constructionToolDefs,
-  blueprintToolDefs,
   garmentPipelineToolDefs,
   edgeToolDefs,
   dartToolDefs,

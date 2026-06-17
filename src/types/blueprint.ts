@@ -8,8 +8,9 @@
  * It contains one or more Blocks (e.g., Front Body, Back Body, Sleeve).
  * Each Block uses a Method (e.g., Aldrich, Müller) and has ordered construction steps.
  * 
- * The LLM does NOT invent construction steps. It finds the right blueprint
- * and executes all its blocks with the user's measurements.
+ * DORMANT (M2, #847): the blueprint executor was removed; nothing runs these
+ * blocks today. These types are retained as the schema substrate for blueprint
+ * authoring (#53, post-M2). The slice + tools are not wired to the live agent.
  */
 
 // ─── Step Types ─────────────────────────────────────────────────────────────
