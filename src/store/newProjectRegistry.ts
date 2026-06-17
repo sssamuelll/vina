@@ -16,7 +16,6 @@ export const SLICES_THAT_RESET: readonly string[] = [
   'animationSlice',
   'avatarSlice',
   'avatarTapeSlice',
-  'blueprintSlice',
   'cameraSlice',
   'collisionBodySlice',
   'constructionSlice',
@@ -42,6 +41,7 @@ export const SLICES_THAT_RESET: readonly string[] = [
  */
 export const SLICES_THAT_SURVIVE: readonly { slice: string; reason: string }[] = [
   { slice: 'layoutSlice', reason: 'UI layout preferences are user-level (panel positions, sizes)' },
+  { slice: 'blueprintSlice', reason: 'User-saved blueprints are a cross-project reusable-template library (dormant per #847); they always persisted across NEW_PROJECT — the removed handler only reset transient stepping pointers, not the library.' },
   { slice: 'pluginSlice', reason: 'Installed/enabled plugins are global, not per-project' },
   { slice: 'renderSettingsSlice', reason: 'Render/lighting/export preferences are user-level defaults (HDRI preset, tone mapping, exposure, format). Custom lights are user setups, not project-derived.' },
   { slice: 'dockSlice', reason: 'Kept auto-suggestion ids are a user UI preference, not project data — intentionally persists across projects.' },
