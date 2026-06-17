@@ -4,6 +4,10 @@
  * searchBlueprints and executeBlueprint removed — no AI-generated blueprints.
  * Real patterns come from the user's imported DXF (file entry is always a
  * user gesture). Users can save their own constructions as blueprints.
+ *
+ * DORMANT (M2, #847): write-only persistence — there is NO executor for saved
+ * blueprints in M2. Retained as the persistence substrate for blueprint
+ * authoring (#53, post-M2).
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';
