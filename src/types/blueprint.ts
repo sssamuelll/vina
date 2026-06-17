@@ -130,14 +130,6 @@ export interface Blueprint {
 // ─── Library State ──────────────────────────────────────────────────────────
 
 export interface BlueprintLibraryState {
-  /** All available blueprints */
+  /** All available user blueprints (dormant — no executor in M2, see #847) */
   blueprints: Blueprint[];
-  /** Currently executing blueprint (null if none) */
-  activeBlueprintId: string | null;
-  /** Currently executing block index */
-  activeBlockIndex: number;
-  /** Current step index within active block */
-  activeStepIndex: number;
-  /** Whether execution is paused (patronista reviewing) */
-  paused: boolean;
 }
