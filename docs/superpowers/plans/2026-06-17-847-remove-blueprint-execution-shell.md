@@ -57,7 +57,6 @@ Expected: clean (exit 0). No "cannot find module" — nothing imported it.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add -A
 git commit -m "refactor(847): remove dead blueprintExecutor (no callers)"
 ```
 
@@ -175,7 +174,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add -A
+git add src/types/blueprint.ts src/store/blueprintSlice.ts src/copilot/perception/__tests__/contextBuilder.test.ts
 git commit -m "refactor(847): strip never-dispatched blueprint stepping from slice"
 ```
 
@@ -234,7 +233,7 @@ Expected: clean.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A
+git add src/store/index.ts
 git commit -m "refactor(847): drop empty BUILTIN_BLUEPRINTS boot load"
 ```
 
@@ -297,7 +296,7 @@ Expected: clean (comment-only change).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add -A
+git add src/copilot/action/skills/coreSkills.ts src/copilot/action/tools/definitions/blueprintTools.ts
 git commit -m "docs(847): mark dormant skills + blueprint persistence (AC3)"
 ```
 
