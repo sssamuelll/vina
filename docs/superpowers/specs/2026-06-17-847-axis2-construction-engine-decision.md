@@ -9,8 +9,9 @@
 
 ## TL;DR
 
-OpenClo is **DXF-in for M2**. The only pattern-creation path is import (DXF, or the
-~42 pre-converted Seamly patterns). We do **not** build an agent-driven parametric
+OpenClo is **DXF-in for M2**. The only live pattern-creation path is DXF import — the
+Seamly pattern route (`loadSeamlyPattern` + its ~42 converted JSONs) was deleted by the
+nuke (#841/#842) and no longer exists, verified. We do **not** build an agent-driven parametric
 drafting surface in M2. The parametric engine **stays** — not because we plan drafting,
 but because **grading already depends on it in production**. We remove only the genuinely
 dead blueprint *execution* shell; the blueprint *persistence* substrate and the
@@ -148,6 +149,21 @@ fixed on this branch before merge:
 
 Refuted by the adversarial pass (not acted on): "AC3 violated" (spec §5 permits the barrel),
 "skillRegistry has no consumer" (a marketplace UI reads it), "no migration for saved blueprints"
-(nothing ever persisted). Noted-but-not-blocking: the TL;DR's "~42 pre-converted Seamly patterns"
-import route has no live loader in `src/`; the "indie-with-DXF" target user is asserted, not
-evidenced.
+(nothing ever persisted).
+
+A fourth label error turned out to be a flat factual error, so it was **corrected**, not
+deferred: the TL;DR claimed a second import route ("~42 pre-converted Seamly patterns"), but
+`loadSeamlyPattern` / `listSeamlyPatterns` survive only as a negation assertion in
+`protocol.test.ts:108`, `seamlyTools.ts` no longer exists, and `tools/seamly2d-converter/output/`
+is empty — the nuke (#841/#842) deleted the whole route. TL;DR corrected to DXF-only.
+
+## Pending validation
+
+One observation is not code-verifiable and is **not resolved** by this branch — it gates the
+soundness of the M2 product bet, not the cut:
+
+- **The "indie without CLO3D, brings their own DXF, wants to simulate" target user is asserted,
+  not evidenced.** The DXF-in moat rests on this archetype, but there is no user research or
+  telemetry behind it. Validate with real prospective users before M2 commits hard to
+  import-only — if the actual wedge is "designs from measurements" (the #243/#53 archetype), the
+  moat is mis-aimed. This is the one open question the brainstorm's "discover" answer deferred.
