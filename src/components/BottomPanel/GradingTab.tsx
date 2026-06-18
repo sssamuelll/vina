@@ -23,7 +23,7 @@ import {
 } from '../../store/gradingSlice';
 import type { GradingState } from '../../store/gradingSlice';
 import { addPiece, removePieces, renameLayer } from '../../store/projectSlice';
-import { gradePiece } from '../../utils/grading/gradingEngine';
+import { gradePieceToSize } from '../../utils/grading/gradingEngine';
 import { batchUndo } from '../../store/undoMiddleware';
 import {
   getSizeSystems,
@@ -195,7 +195,9 @@ export default function GradingTab() {
 
         const pieceIds: string[] = [];
         for (const piece of basePieces) {
-          const scaled = gradePiece(piece, baseCm, targetCm, 'chest');
+          // Per-point grade rules (Level 1, #847 choice A) when the piece carries
+          // them; uniform scaling otherwise — routed by gradePieceToSize.
+          const scaled = gradePieceToSize(piece, baseCm, targetCm, 'chest');
           const newId = generateId();
           const gradedPiece = {
             ...scaled,
@@ -204,6 +206,9 @@ export default function GradingTab() {
             locked: true,
             layer: GRADING_LAYER,
             gradedSize: size,
+            // Derived variants don't carry the base's grade rules — their
+            // anchors reference the pre-grade outline (stale, dead metadata).
+            gradeRules: undefined,
           };
           dispatch(addPiece(gradedPiece));
           pieceIds.push(newId);
