@@ -58,6 +58,8 @@ export interface PatternPiece {
   side?: PieceSide;
   /** Named semantic edges (armhole, shoulder, hemline, etc.) */
   edges?: SemanticEdge[];
+  /** Per-point grade rules for imported/flat pieces (Level 1 — shallow parametric grading, #847 choice A). */
+  gradeRules?: PointGradeRule[];
   /** Fabric assignment (links to PhysicalFabric for simulation) */
   fabricId?: string;
   /** Production fabric code classification (SELF, LINING, etc.) */
@@ -247,6 +249,38 @@ export interface NotchAnchor {
   refPoint: Point2D;       // reference corner/point, piece-local coords
   direction: 'cw' | 'ccw'; // measuring direction along the outline
   distanceMm: number;      // arc distance from refPoint, >= 0
+}
+
+/**
+ * Per-measurement grade growth for one point.
+ *
+ * Unit contract: `deltaX`/`deltaY` are outline-coordinate units of point
+ * movement per **one unit of the measurement value as passed to the grader**.
+ * The measurement space and the outline must therefore share a convention —
+ * today measurements reach the grader in cm (GradingTab converts mm→cm) and
+ * outlines are in mm, so a value is "mm of travel per cm of measurement". A
+ * producer of grade rules must honour this or movement is off by the unit
+ * ratio. (Flagged in the Level-1 decision doc; pin before a producer ships.)
+ */
+export interface GradeRule {
+  measurement: string;
+  deltaX: number;
+  deltaY: number;
+}
+
+/**
+ * A grade rule bound to a point on a piece outline by arc-distance anchor
+ * (reuses {@link NotchAnchor} — D-3: a patternmaker thinks "12cm from the
+ * armhole", and the anchor survives outline resampling/renumbering). Drives
+ * per-point grading of imported, history-less patterns (Level 1, shallow
+ * parametricity — see
+ * `docs/superpowers/plans/2026-06-18-level1-imported-pattern-editing-scope.md`).
+ * The outline/path stays the render/export truth (D-2: path manda).
+ */
+export interface PointGradeRule {
+  id: string;
+  anchor: NotchAnchor;
+  rules: GradeRule[];
 }
 
 export interface TopstitchOptions {

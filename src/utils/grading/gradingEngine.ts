@@ -1,5 +1,6 @@
-import type { Point2D, PathCommand, PatternPiece } from '../../types/types';
+import type { Point2D, PathCommand, PatternPiece, GradeRule } from '../../types/types';
 import type { GradedPoint, GradeTable, GradingOptions } from './types';
+import { resolveNotchAnchor } from '../notchAnchor';
 
 /**
  * Grade a set of points from the base size to a target size using measurement-based grading rules.
@@ -178,4 +179,119 @@ export function gradePiece(
     outline: scaledOutline,
     internals: scaledInternals,
   };
+}
+
+/**
+ * Grade a piece to a target size, routing to the per-point rule engine when the
+ * piece carries grade rules and falling back to uniform scaling otherwise. This
+ * is the single entry point the UI/agent should call — it keeps the
+ * Level-1 (per-point) vs uniform decision in one place.
+ *
+ * @param piece - The piece to grade
+ * @param baseMeasurements - Body measurements for the base size
+ * @param targetMeasurements - Body measurements for the target size
+ * @param primaryMeasurement - Drives the uniform-scale fallback (default `'chest'`)
+ * @returns A new graded pattern piece
+ */
+export function gradePieceToSize(
+  piece: PatternPiece,
+  baseMeasurements: Record<string, number>,
+  targetMeasurements: Record<string, number>,
+  primaryMeasurement: string = 'chest',
+): PatternPiece {
+  if (piece.gradeRules && piece.gradeRules.length > 0) {
+    return gradePieceByRules(piece, baseMeasurements, targetMeasurements);
+  }
+  return gradePiece(piece, baseMeasurements, targetMeasurements, primaryMeasurement);
+}
+
+/** Endpoint (last coordinate pair) of a path command, or null for valueless/short commands (e.g. `Z`). */
+function commandEndpoint(cmd: PathCommand): Point2D | null {
+  const n = cmd.values.length;
+  if (n < 2) return null;
+  return { x: cmd.values[n - 2], y: cmd.values[n - 1] };
+}
+
+/**
+ * Grade an imported (history-less) piece by its per-point grade rules — the
+ * Level-1 path for #847 choice A (shallow parametricity; not construction
+ * regeneration). Each {@link PointGradeRule} anchors to a point on the current
+ * outline (via {@link resolveNotchAnchor}); the per-point shift is computed by
+ * the existing {@link gradePoints} engine and written back onto the nearest
+ * outline vertex.
+ *
+ * v1 scope (deliberate, not silent — see review 2026-06-18):
+ * - Moves only the tagged outline vertex; curve blending between grade points
+ *   is a follow-up. On curved (C/Q) outlines this shifts the command endpoint
+ *   only, not its control points.
+ * - **Grades the OUTLINE only. Internals (darts/notches/grainlines) are carried
+ *   unchanged** — unlike the uniform {@link gradePiece}, which scales them.
+ *   Proper internal grading lands with the displacement-field/blending
+ *   increment; until then a producer of `gradeRules` must surface this so a
+ *   piece with internals is not silently regressed. (Scope plan, Step 2.)
+ * - A rule whose anchor no longer lies on the outline is dropped (D-2: path
+ *   manda). Returns the piece unchanged when it has no rules.
+ *
+ * @param piece - The imported piece to grade (must carry `gradeRules` to do anything)
+ * @param baseMeasurements - Body measurements for the base size
+ * @param targetMeasurements - Body measurements for the target size
+ * @returns A new pattern piece with the graded outline (input is not mutated)
+ */
+export function gradePieceByRules(
+  piece: PatternPiece,
+  baseMeasurements: Record<string, number>,
+  targetMeasurements: Record<string, number>,
+): PatternPiece {
+  const gradeRules = piece.gradeRules;
+  if (!gradeRules || gradeRules.length === 0) return { ...piece };
+
+  // Resolve each rule's anchor to a live point on the current outline. A rule
+  // whose refPoint no longer sits on the outline is dropped (D-2: path manda).
+  const resolved: { point: Point2D; rules: GradeRule[] }[] = [];
+  for (const gr of gradeRules) {
+    const hit = resolveNotchAnchor(piece.outline, gr.anchor);
+    if (!hit) continue;
+    resolved.push({ point: hit.point, rules: gr.rules });
+  }
+  if (resolved.length === 0) return { ...piece };
+
+  // Per-point measurement-driven shift via the existing grade engine. The
+  // engine reads target values from `gradeTable.sizes[targetSize]`, so we adapt
+  // the target measurement record into a single-entry table.
+  const gradedPoints: GradedPoint[] = resolved.map((r) => ({ x: r.point.x, y: r.point.y, rules: r.rules }));
+  const shifted = gradePoints(gradedPoints, {
+    baseSize: 'base',
+    targetSize: 'target',
+    gradeTable: { sizes: { target: targetMeasurements } },
+    baseMeasurements,
+  });
+
+  // Write each shift back onto the nearest outline vertex.
+  const outline: PathCommand[] = piece.outline.map((cmd) => ({ type: cmd.type, values: [...cmd.values] }));
+  for (let i = 0; i < resolved.length; i++) {
+    const from = resolved[i].point;
+    const dx = shifted[i].x - from.x;
+    const dy = shifted[i].y - from.y;
+    if (dx === 0 && dy === 0) continue;
+
+    let bestIdx = -1;
+    let bestDist = Infinity;
+    for (let c = 0; c < outline.length; c++) {
+      const ep = commandEndpoint(outline[c]);
+      if (!ep) continue;
+      const d = Math.hypot(ep.x - from.x, ep.y - from.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestIdx = c;
+      }
+    }
+    if (bestIdx >= 0) {
+      const v = outline[bestIdx].values;
+      v[v.length - 2] += dx;
+      v[v.length - 1] += dy;
+    }
+  }
+
+  // v1: internals are carried unchanged (outline-only grading) — see docstring.
+  return { ...piece, outline };
 }
