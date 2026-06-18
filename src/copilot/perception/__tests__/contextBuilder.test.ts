@@ -226,9 +226,6 @@ function mockState(overrides?: Partial<RootState>): RootState {
     },
     blueprints: {
       blueprints: [],
-      activeBlueprintId: null,
-      activeBlockIndex: 0, activeStepIndex: 0,
-      paused: false,
     },
     copilotUI: {
       highlights: [],

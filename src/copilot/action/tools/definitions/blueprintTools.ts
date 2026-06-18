@@ -1,9 +1,16 @@
 /**
- * Blueprint Tools — user blueprint management only.
+ * Blueprint Tools — user blueprint management (DORMANT, not registered).
  *
  * searchBlueprints and executeBlueprint removed — no AI-generated blueprints.
  * Real patterns come from the user's imported DXF (file entry is always a
- * user gesture). Users can save their own constructions as blueprints.
+ * user gesture).
+ *
+ * DORMANT (M2, #847): these tools are NOT registered in the live tool set
+ * (removed from registry.ts ALL_TOOL_MODULES), so the agent cannot reach them.
+ * They also do not persist — `saveBlueprint` writes only to in-memory Redux
+ * (no IDB/localStorage), so saved blueprints do not survive a reload. Retained
+ * as the source substrate for blueprint authoring (#53, post-M2), which will
+ * re-register them and add an executor + durable persistence.
  */
 
 import type { ToolDefinition, ToolResult } from '../registry';

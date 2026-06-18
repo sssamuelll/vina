@@ -10,7 +10,7 @@ import avatarTapeReducer from './avatarTapeSlice';
 import toolReducer from './toolSlice';
 import parametricReducer from './parametricSlice';
 import constructionReducer from './constructionSlice';
-import blueprintReducer, { loadBlueprints } from './blueprintSlice';
+import blueprintReducer from './blueprintSlice';
 import copilotUIReducer from './copilotUISlice';
 import cameraReducer from './cameraSlice';
 import collisionBodyReducer from './collisionBodySlice';
@@ -29,7 +29,6 @@ import { undoMiddleware } from './undoMiddleware';
 import { linkedEditingMiddleware } from './linkedEditingMiddleware';
 import { reactiveSolverMiddleware } from './reactiveSolverMiddleware';
 import { gradingStalenessMiddleware } from './gradingStalenessMiddleware';
-import { BUILTIN_BLUEPRINTS } from '../utils/construction/blueprints';
 
 export const store = configureStore({
   reducer: {
@@ -79,9 +78,6 @@ export const store = configureStore({
       },
     }).concat(confirmationMiddleware, linkedEditingMiddleware, undoMiddleware, reactiveSolverMiddleware, gradingStalenessMiddleware),
 });
-
-// Load builtin recipes synchronously — must be available before first copilot turn
-store.dispatch(loadBlueprints(BUILTIN_BLUEPRINTS));
 
 const savedWorkflow = loadWorkflow();
 if (savedWorkflow) {

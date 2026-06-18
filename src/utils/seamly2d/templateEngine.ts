@@ -141,7 +141,7 @@ export class PatternTemplateEngine {
       // The caller should use the construction engine / recipes instead.
       throw new Error(
         'Template has construction data but no piece definitions. ' +
-        'Use a blueprint (searchBlueprints) or the construction engine to build pieces from this pattern.'
+        'Use the construction engine to build pieces from this pattern.'
       );
     }
 

@@ -16,7 +16,6 @@ export const SLICES_THAT_RESET: readonly string[] = [
   'animationSlice',
   'avatarSlice',
   'avatarTapeSlice',
-  'blueprintSlice',
   'cameraSlice',
   'collisionBodySlice',
   'constructionSlice',
@@ -42,6 +41,7 @@ export const SLICES_THAT_RESET: readonly string[] = [
  */
 export const SLICES_THAT_SURVIVE: readonly { slice: string; reason: string }[] = [
   { slice: 'layoutSlice', reason: 'UI layout preferences are user-level (panel positions, sizes)' },
+  { slice: 'blueprintSlice', reason: 'Dormant per #847: in-memory blueprint store with no live writer (tools un-registered) and no durable persistence (no IDB/LS) — empty in practice, survives NEW_PROJECT only in-session, not across reload. Retained as #53 head-start; the removed handler only reset transient stepping pointers.' },
   { slice: 'pluginSlice', reason: 'Installed/enabled plugins are global, not per-project' },
   { slice: 'renderSettingsSlice', reason: 'Render/lighting/export preferences are user-level defaults (HDRI preset, tone mapping, exposure, format). Custom lights are user setups, not project-derived.' },
   { slice: 'dockSlice', reason: 'Kept auto-suggestion ids are a user UI preference, not project data — intentionally persists across projects.' },

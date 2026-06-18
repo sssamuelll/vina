@@ -75,7 +75,7 @@ describe('Tools E2E', () => {
 
   describe('Registry', () => {
     it('has 230 tools registered', () => {
-      expect(registry.size).toBe(232); // 231 + 1 reverseSeam (Fase 5 paridad CLO3D, 2026-06-11)
+      expect(registry.size).toBe(230); // 229 + 1 reverseSeam; −2 blueprint tools un-registered (#847)
     });
 
     it('every tool has name, description, parameters, execute', () => {
@@ -410,7 +410,7 @@ describe('Tools E2E', () => {
   describe('Coverage', () => {
     it('all tool names present', () => {
       const names = registry.list().map(t => t.name).sort();
-      expect(names.length).toBe(232); // 231 + 1 reverseSeam (Fase 5 paridad CLO3D, 2026-06-11)
+      expect(names.length).toBe(230); // 229 + 1 reverseSeam; −2 blueprint tools un-registered (#847)
 
       // Key tools from every category
       const expected = [

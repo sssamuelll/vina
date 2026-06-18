@@ -4,6 +4,12 @@
  * All skills that ship with OpenClo are defined here with their
  * namespace identifiers for the unified registry.
  *
+ * DORMANT (M2, #847): these skills encode real drafting formulas but are NOT
+ * wired to the AgenticLoop — `getRelevantSkills()` / `buildSkillContext()` are
+ * never called, so the agent never sees or executes them. Retained as the
+ * head-start for agent-driven parametric drafting (#243, post-M2). Do not treat
+ * as live behavior.
+ *
  * @module skills/coreSkills
  */
 
