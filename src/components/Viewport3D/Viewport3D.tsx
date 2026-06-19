@@ -14,6 +14,7 @@ import Mannequin from './Mannequin';
 import AvatarModel from './AvatarModel';
 import GarmentSimulation from './GarmentSimulation';
 import type { GarmentSimulationHandle } from './GarmentSimulation';
+import { markRendererDeviceLost } from './rendererDeviceLost';
 import { SimulationErrorBoundary } from './SimulationErrorBoundary';
 import { SimulationStatusOverlay } from './SimulationStatusOverlay';
 import JointGizmos from './JointGizmos';
@@ -129,6 +130,12 @@ function createWebGPURenderer(canvas: HTMLCanvasElement): WebGPURenderer {
 
   renderer.init().then(() => {
     backendReady = true;
+    // Record renderer-device loss in the module registry (#901) so the cloth
+    // sim downgrades to WASM/CPU on the next Simulate even when the loss happens
+    // while idle — GarmentSimulation (the in-sim watcher) is unmounted then, so
+    // this renderer-scoped listener is the only one that catches an idle loss.
+    const device = (renderer as unknown as { backend?: { device?: GPUDevice } }).backend?.device;
+    if (device) device.lost.then(() => markRendererDeviceLost(device));
   }).catch((err) => {
     console.warn('[Viewport3D] WebGPURenderer.init() failed:', err);
     // Allow render anyway — may work with degraded fallback

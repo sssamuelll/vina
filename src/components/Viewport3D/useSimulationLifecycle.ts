@@ -142,6 +142,12 @@ interface UseSimulationLifecycleProps {
   fabricId: string;
   /** Ref populated by this hook with stretching constraint IDs (for warm-start) */
   stretchingIdsRef: React.MutableRefObject<Int32Array | null>;
+  /** Seed for the GPU-downgrade latch on mount (#901). GarmentSimulation passes
+   *  `true` when the renderer's WebGPU device is already known-lost (from the
+   *  module-level registry) so a Stop→Start over a dead renderer device skips the
+   *  GPU tier from the first cascade run instead of re-entering it and re-freezing
+   *  during init. Default false. */
+  gpuInitiallyDowngraded?: boolean;
 }
 
 interface UseSimulationLifecycleResult {
@@ -156,6 +162,9 @@ interface UseSimulationLifecycleResult {
   recordFrameTick: () => void;
   /** TSL solver ref for renderer.compute() dispatch */
   tslSolverRef: React.MutableRefObject<import('../../utils/cloth/gpu/tslSolver').TslSolver | null>;
+  /** Notify the lifecycle that the RENDERER's WebGPU device was lost so it can
+   *  drop the GPU tier and re-run the cascade to a CPU-side fallback (#901). */
+  handleGpuDeviceLost: () => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -261,6 +270,7 @@ export function useSimulationLifecycle({
   elastics,
   fabricId,
   stretchingIdsRef,
+  gpuInitiallyDowngraded = false,
 }: UseSimulationLifecycleProps): UseSimulationLifecycleResult {
   const dispatch = useDispatch();
   const simulationState = useSelector((s: RootState) => s.simulation.simulationState);
@@ -312,11 +322,31 @@ export function useSimulationLifecycle({
   const gpuDeviceRef = useRef<GPUDevice | null>(null);
   const gpuDeviceLostRef = useRef(false);
 
+  /** GPU-tier downgrade latch after a RENDERER device loss (#901).
+   *  The TSL kernels run on the renderer's WebGPU device (`threeGl.backend.device`),
+   *  NOT the lifecycle's own `requestDevice()` — see the decoy-device note in
+   *  GarmentSimulation. A lost renderer device cannot be revived in-place.
+   *
+   *  This ref resets on every GarmentSimulation REMOUNT — which happens on each
+   *  Stop→Start (`useClothSim` unmounts the component on idle) and does NOT bring
+   *  a fresh renderer (the `<Canvas>` outlives us). So the ref alone cannot
+   *  remember a loss across a restart; the seed `gpuInitiallyDowngraded` (sourced
+   *  from the module-level renderer-device-lost registry, keyed by the stable
+   *  device object) carries the downgrade across remounts. Within a mount,
+   *  `handleGpuDeviceLost` flips it on a live loss. */
+  const gpuDowngradedRef = useRef(gpuInitiallyDowngraded);
+
   // State counter to force re-render after async TSL solver init completes.
   // Without this, tslSolverRef.current changes inside an async callback but
   // no React state change occurs, so GarmentSimulation never re-renders to
   // pick up the new solver and create the TSL material.
   const [, setTslGeneration] = useState(0);
+
+  // Bumped by handleGpuDeviceLost to force the tier-cascade effect to re-run
+  // after a renderer device loss. gpuDowngradedRef is a ref (non-reactive), so
+  // the cascade needs an explicit reactive dep to re-enter startSim and fall
+  // through to WASM — without it, device loss required a manual restart (#901).
+  const [deviceLostGeneration, setDeviceLostGeneration] = useState(0);
 
   const warmStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const collisionRebuildTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -358,6 +388,25 @@ export function useSimulationLifecycle({
     positionsRef.current = positions;
     recordFrameTick();
   }, [recordFrameTick]);
+
+  /**
+   * Renderer WebGPU device loss → drop the GPU tier and re-run the cascade so
+   * the sim falls through to WASM/CPU automatically — no manual restart (#901).
+   *
+   * Called by GarmentSimulation, which owns the renderer device
+   * (`threeGl.backend.device`) — the one the TSL kernels actually run on, not
+   * the lifecycle's own `requestDevice()` (decoy-device fix). Watching the
+   * right device here is what makes the auto-fallback fire on a real loss.
+   *
+   * Idempotent + sticky: the first call flips `gpuDowngradedRef` and bumps the
+   * cascade generation; later calls (multiple `device.lost` handlers, re-renders
+   * over an already-dead device) early-return so the sim doesn't thrash.
+   */
+  const handleGpuDeviceLost = useCallback(() => {
+    if (gpuDowngradedRef.current) return;
+    gpuDowngradedRef.current = true;
+    setDeviceLostGeneration(g => g + 1);
+  }, []);
 
   // ─── Tier cascade ─── (Start/stop simulation — solver tier cascade)
   useEffect(() => {
@@ -406,7 +455,11 @@ export function useSimulationLifecycle({
         }
 
         // ─── WebGPU GPU solver ────────────────────────────────────────
-        const wantsWebGPU = isWebGPUFeatureEnabled() && isWebGPUAvailable();
+        // `gpuDowngradedRef` gate (#901): after a renderer device loss the GPU
+        // tier is unusable for the renderer's life, so skip the whole GPU
+        // section and fall straight to WASM on the re-run handleGpuDeviceLost
+        // triggers.
+        const wantsWebGPU = isWebGPUFeatureEnabled() && isWebGPUAvailable() && !gpuDowngradedRef.current;
         if (wantsWebGPU && projectHasSeams && !GPU_CAPABILITIES.seams) {
           // Honest capability gate (parity plan Fase 4). Since #897 F4 the
           // GPU tier declares `seams: true` (closure parity verified on the
@@ -642,13 +695,17 @@ export function useSimulationLifecycle({
       neuralClientRef.current?.stop();
     }
     return undefined;
+    // deviceLostGeneration: bumped by handleGpuDeviceLost so a renderer device
+    // loss re-enters startSim (and, with gpuDowngradedRef set, falls to WASM).
     // eslint-disable-next-line react-hooks/exhaustive-deps -- collisionBodies/avatarModelUrl/avatarHeight read from refs to prevent reinit cascades (#315); live updates handled by separate effects. windEnabled/windForce/dragCoefficient also handled separately.
-  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch]);
+  }, [simulationState, placedMeshes, seamInitData, fabricId, onFrame, stretchingIdsRef, dispatch, deviceLostGeneration]);
 
   // ─── Debounced collision mesh rebuild on measurement/morph change ───────────
   useEffect(() => {
-    // Only rebuild if simulation is running and we have a solver client
-    const activeClient = gpuClientRef.current || wasmClientRef.current || clientRef.current;
+    // Only rebuild if simulation is running and we have a solver client.
+    // Skip a downgraded GPU client (#901): its setCollisionMesh routes a BVH
+    // upload through the lost renderer device — wasted work + uncaptured errors.
+    const activeClient = (gpuDowngradedRef.current ? null : gpuClientRef.current) || wasmClientRef.current || clientRef.current;
     if (!activeClient || simulationState !== 'running' || !avatarModelUrl) return;
 
     // Debounce 200ms to batch rapid slider movements
@@ -661,8 +718,9 @@ export function useSimulationLifecycle({
         const collisionMesh = await extractAvatarCollisionMesh(avatarModelUrl, avatarHeight);
         if (!collisionMesh) return;
 
-        // Check client is still alive (user may have stopped sim)
-        const client = gpuClientRef.current || wasmClientRef.current || clientRef.current;
+        // Check client is still alive (user may have stopped sim); skip a
+        // downgraded GPU client for the same reason as above (#901).
+        const client = (gpuDowngradedRef.current ? null : gpuClientRef.current) || wasmClientRef.current || clientRef.current;
         if (client) {
           console.log('[SimLifecycle] ♻️ Collision mesh rebuilt for measurement change:', collisionMesh.triCount, 'tris');
           client.setCollisionMesh(collisionMesh);
@@ -732,5 +790,6 @@ export function useSimulationLifecycle({
     onFrame,
     recordFrameTick,
     tslSolverRef,
+    handleGpuDeviceLost,
   };
 }

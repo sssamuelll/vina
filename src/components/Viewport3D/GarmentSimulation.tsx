@@ -39,6 +39,7 @@ import { registerSimulationCallbacks } from '../../store/undoMiddleware';
 import { ThreeEvent } from '@react-three/fiber';
 import { useGeometricPreview } from './useGeometricPreview';
 import { useSimulationLifecycle, SimulationClients } from './useSimulationLifecycle';
+import { isRendererDeviceLost, markRendererDeviceLost } from './rendererDeviceLost';
 import { useCollisionBodies } from './useCollisionBodies';
 import { useMeshing } from './useMeshing';
 import { useSimulationRecorder } from '../../hooks/useSimulationRecorder';
@@ -139,6 +140,14 @@ interface GarmentSimulationProps {
  */
 const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationProps>(function MergedSimulation({ pieces, seams, onFitMapStats }, ref) {
   const dispatch = useDispatch();
+  // Renderer obtained early (before the lifecycle hook) so we can seed the
+  // GPU-downgrade latch from the renderer device's known-lost state (#901).
+  const { camera, gl: threeGl } = useThree();
+  const rendererDevice = (threeGl as unknown as { backend?: { device?: GPUDevice } })?.backend?.device;
+  // This component remounts on every Stop→Start (`useClothSim`), but the
+  // renderer/device outlive it; the module-level registry remembers a past loss
+  // so a restart over a dead renderer device skips the GPU tier immediately.
+  const rendererDeviceAlreadyLost = !!rendererDevice && isRendererDeviceLost(rendererDevice);
   const meshRef = useRef<THREE.Mesh>(null);
   const brushDragging = useRef(false);
   const brushCursorRef = useRef<THREE.Mesh>(null);
@@ -151,6 +160,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const tslFrameCounter = useRef(0);
   const tslReadbackPending = useRef(false);
+  // Renderer WebGPU device-loss latch (#901). Set the instant the renderer's
+  // device.lost resolves so useFrame stops dispatching renderer.compute() on a
+  // dead device — without waiting for the lifecycle effect to tear down the TSL
+  // solver. Seeded from the registry so a remount over an already-dead renderer
+  // device (Stop→Start, which resets per-mount refs but NOT the renderer) starts
+  // latched. The renderer can't be revived in-place; recovery needs a reload.
+  const rendererDeviceLostRef = useRef(rendererDeviceAlreadyLost);
   const pieceColorsRef = useRef<Float32Array | null>(null);
   const [tslMaterial, setTslMaterial] = useState<InstanceType<typeof MeshStandardNodeMaterial> | null>(null);
 
@@ -333,12 +349,13 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
   const activeElastics = useMemo(() => elastics.filter(e => e.active !== false), [elastics]);
 
-  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef } = useSimulationLifecycle({
+  const { clients, positionsRef, edgeDataRef, onFrame, recordFrameTick, tslSolverRef, handleGpuDeviceLost } = useSimulationLifecycle({
     placedMeshes,
     seamInitData,
     elastics: activeElastics,
     fabricId,
     stretchingIdsRef,
+    gpuInitiallyDowngraded: rendererDeviceAlreadyLost,
   });
 
   // Sync clientsRef so useMeshing's warm-start can access latest solver clients
@@ -416,7 +433,10 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     const solver = tslSolverRef.current;
 
     // ─── TSL zero-copy path ──────────────────────────────────────────
-    if (solver) {
+    // rendererDeviceLostRef gate (#901): once the renderer device is lost,
+    // dispatching compute on it is futile; bail to the CPU-readback path until
+    // the lifecycle cascade swaps in the WASM/CPU tier.
+    if (solver && !rendererDeviceLostRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const renderer = gl as any;
       const substeps = substepsRef.current;
@@ -973,7 +993,8 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   // rendered at GPU-computed positions while the CPU geometry may lag behind.
   // This manual raycaster listens directly on the Canvas DOM element and does
   // its own raycast against the readback-updated geometry.
-  const { camera, gl: threeGl } = useThree();
+  // (camera + threeGl are obtained near the top of the component, before the
+  // lifecycle hook, so the renderer device can seed the GPU-downgrade latch.)
   const manualRaycaster = useMemo(() => new THREE.Raycaster(), []);
 
   useEffect(() => {
@@ -1049,26 +1070,42 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
     };
   }, [activeTool3D, camera, threeGl, staticGeometry, manualRaycaster, meshGrab.radius, meshGrab.strength, handleBrushStroke, releaseGrab, makeTiers]);
 
-  // #897 F4 (H-RC1): los kernels TSL corren en el device del RENDERER; el
-  // device.lost que vigila el lifecycle pertenece a otro device (señuelo).
-  // Detección mínima honesta: toast + error. La cascada automática a WASM
-  // tras pérdida queda como follow-up (#901).
+  // #901: los kernels TSL corren en el device del RENDERER (no en el device
+  // propio del lifecycle, que es un señuelo), así que ESTE es el device cuya
+  // pérdida importa. Se engancha en el mount (NO gated por tslMaterial, que
+  // llega ~1-2 renders tarde) para no perder una pérdida durante el init de GPU.
+  // Al perderse: marcamos el registro (sobrevive a remounts), latcheamos el ref
+  // (corta el useFrame al instante) y avisamos al lifecycle para que la cascada
+  // re-entre y caiga a WASM/CPU sola. El renderer no revive in-place — el toast
+  // es honesto: el solver sigue, pero la vista 3D necesita reload.
   useEffect(() => {
-    if (!tslMaterial) return;
-    const device = (threeGl as unknown as { backend?: { device?: GPUDevice } })?.backend?.device;
+    // rendererDevice (derived at the top) as the dep so this re-runs if the
+    // device goes undefined→present after an async renderer.init (#901) instead
+    // of latching device-loss detection to a single mount-time read.
+    const device = rendererDevice;
     if (!device) return;
+    // Ya muerto desde un montaje anterior (Stop→Start sobre el mismo renderer):
+    // re-latchear sin re-enganchar un listener nuevo.
+    if (isRendererDeviceLost(device)) {
+      rendererDeviceLostRef.current = true;
+      handleGpuDeviceLost();
+      return;
+    }
     let cancelled = false;
     device.lost.then((info) => {
+      markRendererDeviceLost(device);
       if (cancelled) return;
       console.error('[GarmentSimulation] WebGPU device lost:', info?.message);
-      dispatch(showErrorToast('WebGPU device lost — restart the simulation to fall back to WASM'));
+      rendererDeviceLostRef.current = true;
+      handleGpuDeviceLost();
+      dispatch(showErrorToast('WebGPU device lost — simulating on the fallback solver; reload to restore the 3D view'));
     });
     const onUncaptured = (e: Event) => {
       console.error('[GarmentSimulation] uncaptured GPU error:', (e as { error?: { message?: string } }).error?.message);
     };
     device.addEventListener?.('uncapturederror', onUncaptured);
     return () => { cancelled = true; device.removeEventListener?.('uncapturederror', onUncaptured); };
-  }, [tslMaterial, threeGl, dispatch]);
+  }, [rendererDevice, dispatch, handleGpuDeviceLost]);
 
   if (!staticGeometry) return null;
 
