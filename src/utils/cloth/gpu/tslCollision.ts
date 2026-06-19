@@ -612,11 +612,12 @@ export function createTslCollisionBody(
           posBuf.element(i).y.addAssign(nny.mul(pushDist));
           posBuf.element(i).z.addAssign(nnz.mul(pushDist));
 
-          // Coulomb position-based friction con stiction (#902) — espejo de CPU
-          // triangleCollision.ts. Presupuesta la corrección tangencial por la
-          // profundidad de corrección normal (pushDist): scale = min(μ·depth/|t|, 1).
-          // scale==1 ⇒ stick total (sin creep); <1 ⇒ deslizamiento cinético.
-          // Div-guard branch-free vía max(|t|, 1e-8) (si |t|→0 el slide ya es ~0).
+          // Hybrid Coulomb friction with stiction (#902) — mirror of CPU
+          // triangleCollision.ts. scale = min(1, max(friction, friction*pushDist/|t|)).
+          // max(friction, …) keeps the old kinetic floor so the garment holds during
+          // the high-motion settling phase; the depth-budgeted Coulomb term raises
+          // scale → 1 as motion slows (stiction at rest → no creep). scale ∈
+          // [friction, 1] → PBD-safe. Div-guard branch-free via max(|t|, 1e-8).
           If(uFriction.greaterThan(float(0)), () => {
             const dx = posBuf.element(i).x.sub(prevPosBuf.element(i).x);
             const dy = posBuf.element(i).y.sub(prevPosBuf.element(i).y);
@@ -628,7 +629,7 @@ export function createTslCollisionBody(
             const tz = dz.sub(vn.mul(nnz));
 
             const tLen = tx.mul(tx).add(ty.mul(ty)).add(tz.mul(tz)).sqrt();
-            const scale = uFriction.mul(pushDist).div(tLen.max(float(1e-8))).min(float(1.0));
+            const scale = uFriction.mul(pushDist).div(tLen.max(float(1e-8))).max(uFriction).min(float(1.0));
 
             posBuf.element(i).x.subAssign(tx.mul(scale));
             posBuf.element(i).y.subAssign(ty.mul(scale));
