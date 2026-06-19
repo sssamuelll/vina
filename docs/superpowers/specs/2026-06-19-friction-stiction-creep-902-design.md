@@ -56,6 +56,9 @@ stiction, no la ausencia de fricción.
 
 ## Solución — clamp de Coulomb position-based (Macklin, 1 coeficiente)
 
+> ⚠️ **SUPERSEDED — esta sección describe el modelo A1, que falló en GPU real.
+> El modelo mergeado es el HYBRID. Ver "Enmienda 2026-06-19" al final.**
+
 Reemplazar la **aplicación** de la fricción por el clamp canónico de PBD (Macklin
 et al., *Unified Particle Physics for Real-Time Applications*, 2014), en el que el
 presupuesto de fricción escala con la profundidad de corrección normal del

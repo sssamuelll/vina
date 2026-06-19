@@ -1,5 +1,16 @@
 # Fricción con stiction (creep/slide-off del drape #902) — Implementation Plan
 
+> ⚠️ **SUPERSEDED en parte (2026-06-19) — leer la enmienda de la spec antes de
+> usar este plan.** Este plan describe el modelo **A1** (Coulomb puro,
+> `scale = min(friction*pushDist/|t|, 1)`) y la red E2E con banda de tolerancia.
+> A1 **falló empíricamente en GPU real** (rompió el asentamiento) y fue
+> reemplazado por el modelo **HYBRID** `scale = min(1, max(friction, friction*pushDist/|t|))`.
+> Además los valores esperados de los unit tests aquí (p.ej. 0.994, 0.9625) son
+> de A1 y **NO** corresponden al código mergeado, y la red E2E a 10s quedó en
+> **log-only** (no banda) por el no-determinismo del drape. Para lo que de verdad
+> se construyó y por qué, ver la **"Enmienda 2026-06-19"** en
+> `docs/superpowers/specs/2026-06-19-friction-stiction-creep-902-design.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Detener el creep/slide-off de la prenda añadiendo stiction de Coulomb (Macklin, 1 coeficiente) al modelo de fricción de contacto avatar↔tela, en los dos kernels que sí tienen collider de avatar (TSL = tier default, CPU = espejo), preservando su paridad.

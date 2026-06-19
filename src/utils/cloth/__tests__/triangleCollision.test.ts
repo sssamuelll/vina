@@ -337,4 +337,19 @@ describe('solveTriangleCollision — Coulomb stiction (#902)', () => {
     expect(pos[1]).toBeCloseTo(margin, 3);
     expect(pos[0]).toBeCloseTo(1.0 - 0.4, 3); // 0.6 — kinetic floor (old behavior)
   });
+
+  it('mid-regime: Coulomb term between the floor and the ceiling (scale ∈ (friction,1))', () => {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const margin = 0.005;
+    // pushDist = margin + 0.01 = 0.015. Slide 0.01 chosen so the Coulomb term
+    // 0.4*0.015/0.01 = 0.6 sits strictly between the floor (0.4) and 1 ⇒
+    // scale = 0.6 — the genuinely-hybrid segment (neither old floor nor full stick).
+    const pos = new Float32Array([0.01, -0.01, 0]);
+    const prevPos = new Float32Array([0.0, -0.01, 0]);
+    const invMass = new Float32Array([1.0]);
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, margin, 0.4, prevPos);
+    expect(pos[1]).toBeCloseTo(margin, 3);
+    expect(pos[0]).toBeCloseTo(0.01 - 0.01 * 0.6, 4); // 0.004 (scale 0.6)
+  });
 });
