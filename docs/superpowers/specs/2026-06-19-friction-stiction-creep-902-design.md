@@ -205,12 +205,23 @@ GPU real reveló, y cómo cerró el trabajo:
    fricción realista lo arregla** — la prenda debe cargar el peso por estructura
    (hombros + tubo cerrado), no por fricción. Re-scoped como follow-up estructural.
 
-5. **Varianza caótica.** El drape a 10s dio `belowHipPct` 7.59% y 37.13% en dos
-   runs de código idéntico. Una banda apretada a 10s sería flaky. Por eso la red
-   de regresión #912 quedó en **modo anti-colapso**: `nan=0` + `maxY > 1.3`
-   (hombros arriba — estable ~1.57 en todos los runs). El checkpoint de 2.5s sigue
-   siendo el gate real de asentamiento.
+5. **El drape a 10s es NO-DETERMINISTA y bistable.** Tres runs de código idéntico
+   dieron a 10s: `belowHipPct` 7.59% / 37.13% / **100%**, con `maxY` 1.576 / 1.572 /
+   **0.536** — el último es **colapso total** (prenda entera en el suelo, torso
+   desnudo; `nan=0`, fps sano → slide-off real, no blow-up numérico). El estado
+   "sostenida" es **metaestable**: μ=0.4 cae justo en el margen de las pendientes
+   del torso, así que held↔collapsed lo decide el no-determinismo de float del GPU
+   (orden de atomics). Consecuencia: **ningún assert de forma a 10s es confiable**
+   —ni siquiera anti-colapso (`maxY>1.3`) — porque el colapso mismo es intermitente.
+   La red de regresión #912 quedó por tanto en **log-only** a 10s (solo se afirma
+   el invariante determinista `nan=0`); el checkpoint de 2.5s sigue siendo el gate
+   real de asentamiento. Esto además es un problema de **confiabilidad del default
+   tier #897** (a veces deja caer la prenda al suelo a los ~10s), mayor que #902.
 
-**Estado de cierre:** #902 (slide-off catastrófico + regresión de asentamiento)
-RESUELTO por el hybrid. Creep progresivo sobre pendientes empinadas → follow-up
-estructural. Verificado en GPU real.
+**Estado de cierre:** lo que el hybrid resuelve con certeza — la regresión de
+asentamiento de A1 y el slide-off *durante* el settling (2.5s consistente en los 3
+runs), y por construcción no crepa más que el viejo. Lo que NO resuelve — la
+estabilidad del drape a largo horizonte, que es **no-determinista hasta el colapso
+total**. Eso se re-scopea como **follow-up de alta prioridad** (bistabilidad +
+estructura de carga del peso por hombros/tubo cerrado + determinismo del contacto
+GPU). Decisión del usuario: cerrar la ganancia segura (hybrid) + escalar.
