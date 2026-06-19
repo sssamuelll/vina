@@ -9,6 +9,19 @@
 
 ---
 
+> ### ⚠️ Enmienda 2026-06-19 (#897 + #901) — el estado de WebGPU cambió
+>
+> La sub-decisión **3.3** (WebGPU feature-flag) describe el estado de 2026-05-02 y **ya no refleja el código**. La **3.2** conserva el orden de cascada GPU→WASM→CPU→Neural, pero su gate de GPU pasó a default-ON y ahora re-entra ante device loss. Se conservan como registro histórico; lo vigente:
+>
+> - **WebGPU es el tier por defecto (opt-OUT), no opt-in.** `#897` (2026-06-12) flipeó `WEBGPU_FEATURE_FLAG_KEY` a default-ON tras verificar ≥30fps en la fixture María (seams + body + self collision cierran en GPU). `isWebGPUFeatureEnabled()` ahora es `!== 'false'`. El "opt-in localStorage, default false" ratificado en **3.3.A** queda **superseded**; la escotilla de salida es `'false'` explícito.
+> - **El bug `atomicAdd` (#554) ya no bloquea.** Está workaroundeado en `src/utils/cloth/gpu/atomicStorage.ts` (`storage(...).setAtomic(true)` → `array<atomic<T>>`). Three.js subió a `^0.184` (§ 2.8 dice `^0.183.2` — stale). No hay fix upstream; el workaround es load-bearing con guarda de carga.
+> - **WASM = fallback, no default.** El cascade GPU→WASM→CPU→Neural sigue, pero WASM ya no es el tier primario; es el fallback CPU-side para navegadores sin WebGPU y el oráculo determinista de paridad en CI.
+> - **Pérdida de device → auto-cascada del SOLVER (#901, 2026-06-19).** El cascade ratificado aquí asumía recovery por restart manual. Ahora `useSimulationLifecycle` expone `handleGpuDeviceLost`; GarmentSimulation lo dispara desde el `device.lost` del device del **renderer** (no del señuelo que pedía el lifecycle con su propio `requestDevice()`), el cascade re-entra vía un contador de estado reactivo y cae a WASM/CPU solo, con un latch que corta el `useFrame` al instante. Un registro a nivel de módulo (keyado por el device del renderer) hace que el downgrade sobreviva al remount de GarmentSimulation en cada Stop→Start (resetea refs por-montaje, pero NO el `<Canvas>`/renderer). **Límite honesto:** un device WebGPU perdido no revive in-place — el solver sigue (re-drapeando desde la pose colocada; NO hay warm-start de los buffers GPU perdidos), pero recuperar la vista 3D viva requiere reload; la recuperación del renderer in-place es follow-up aparte.
+>
+> La estructura de 4 tiers + hook composition (sin `TierCoordinator`) ratificada en **3.4/3.5** sigue vigente — esta enmienda solo corrige el estado del flag y el recovery de device loss.
+
+---
+
 ## Sección 1 — Decide / NO decide
 
 ### Decide en este eje
@@ -17,7 +30,7 @@ C4 RFC decide cinco cosas, organizadas como sub-decisiones ortogonales en Sec 3:
 
 1. **Tool dispatch shape** for the 11 `if (solver) / else if (wasmClient)` bifurcations en `GarmentSimulation.tsx` (steam brush + mesh grab). Pattern 2.5 lite helper, Pattern 2.5 extend (capability flags only), Pattern 1 (interface `runTool` method), o ratify-as-is.
 2. **Tier selection / activation policy** — status quo cascade GPU→WASM→CPU→Neural (`useSimulationLifecycle.ts:297-438`) vs capability-driven cascade vs user-driven explicit selection.
-3. **WebGPU feature-flag hierarchy** — TSL/WebGPU está blocked por Three.js 0.183 atomicAdd bug (project memory `webgpu_blocked` verified — package.json sigue en `^0.183.2`). ¿localStorage opt-in (current) vs build-time flag vs auto-disable on detected version?
+3. **WebGPU feature-flag hierarchy** — TSL/WebGPU está blocked por Three.js 0.183 atomicAdd bug (project memory `webgpu_blocked` verified — package.json sigue en `^0.183.2`). ¿localStorage opt-in (current) vs build-time flag vs auto-disable on detected version? _(SUPERSEDED #897 — ya no blocked: default ON, Three.js `^0.184`, atomicAdd workaroundeado; ver enmienda al tope.)_
 4. **Deprecation roadmap** — long-term, ¿4 tiers permanentes (cada uno con role distinto) o roadmap a fewer tiers (e.g., WASM reemplaza CPU TS, Neural reemplaza ambos)?
 5. **TierCoordinator class introduction** — formalizar el de facto coordinator pattern (3 hooks: `useSimulationLifecycle` + `useCollisionBodies` + `useMeshing`) como class explicit, o ratificar status quo de hook composition.
 
@@ -93,7 +106,7 @@ Conclusion (regla 1): pre-existing canonical for **solver lifecycle + capability
 | Inventory claim | Reality post-sweep | Verdict |
 |---|---|---|
 | "3 paths activos simultáneamente (WebGPU/TSL feature-flagged off, WASM default, CPU TS fallback)" | **4 tiers** activos por design: CPU + WASM + GPU + Neural. Cascade GPU→WASM→CPU→Neural en `useSimulationLifecycle.ts:295-438`. Neural agregado post-A6 (`NeuralDrapeClient` 355L `src/utils/cloth/neural/neuralDrapeClient.ts`). | **Outdated — 4 tiers, no 3.** Regla 13 reformulation (7° caso del audit). |
-| "WebGPU/TSL feature-flagged off" | Confirmed: `WEBGPU_FEATURE_FLAG_KEY = 'openclo-use-webgpu'` localStorage; `useSimulationLifecycle.ts:130-132 isWebGPUFeatureEnabled() returns localStorage === 'true'` (default false). Comentario JSDoc explica "Three.js 0.183 TSL atomicAdd doesn't propagate isAtomic to StorageBufferNode → WGSL declares array<i32> instead of array<atomic<i32>>. All compute shaders silently fail. WASM XPBD solver is used until a Three.js upstream fix lands." | Confirmed. **Three.js 0.183.2** still active per `package.json`. |
+| "WebGPU/TSL feature-flagged off" | Confirmed: `WEBGPU_FEATURE_FLAG_KEY = 'openclo-use-webgpu'` localStorage; `useSimulationLifecycle.ts:130-132 isWebGPUFeatureEnabled() returns localStorage === 'true'` (default false). Comentario JSDoc explica "Three.js 0.183 TSL atomicAdd doesn't propagate isAtomic to StorageBufferNode → WGSL declares array<i32> instead of array<atomic<i32>>. All compute shaders silently fail. WASM XPBD solver is used until a Three.js upstream fix lands." | Confirmed (a 2026-05-02). **Three.js 0.183.2** still active per `package.json`. **— SUPERSEDED #897 (2026-06-12):** ahora `isWebGPUFeatureEnabled()` es `!== 'false'` (default ON), Three.js `^0.184`, atomicAdd workaroundeado en `gpu/atomicStorage.ts`. Ver enmienda al tope. |
 | "WASM default" | Confirmed: cascade fall-through encuentra WASM segundo (línea 360-398). `isWasmSolverAvailable()` async check con timeout 5s. | Confirmed. |
 | "CPU TS fallback" | Confirmed: tercer en cascade (líneas 400-428). `ClothWorkerClient` Web Worker tier. | Confirmed. |
 | "GarmentSimulation.tsx:380-493" | `useFrame` body actually 379-498. `if (solver) { TSL substeps }` block lines 386-454. CPU readback path 457-498. Inventory cited 380-493 — minor line drift (~2 líneas), substantive shape correct. | **Minor line drift**, framing intact. |
@@ -664,6 +677,8 @@ Razones:
 **Pregunta:** ¿status quo localStorage opt-in, build-time flag, o auto-disable on detected blocking version?
 
 #### Opción 3.3.A — Status quo localStorage opt-in (RECOMENDADA)
+
+> **Superseded 2026-06-12 (#897):** flag flipeado a opt-OUT default-ON; el "default false" de abajo ya no aplica. Ver la enmienda al tope del doc.
 
 **Shape:** ratify `WEBGPU_FEATURE_FLAG_KEY = 'openclo-use-webgpu'` localStorage. Default false. JSDoc explanation lines 125-132 explica Three.js 0.183 atomicAdd bug. Add tracking follow-up issue para Three.js 0.184+ upstream fix.
 

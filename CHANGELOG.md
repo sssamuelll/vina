@@ -3,7 +3,15 @@
 All notable changes to OpenClo are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [0.11.0] — 2026-06-11 (Current)
+## [Unreleased]
+
+### Changed
+- **WebGPU promoted to the default solver tier (#897)** — the cascade runs GPU → WASM → CPU → Neural with WebGPU **on by default** (opt-out via `localStorage 'openclo-use-webgpu' = 'false'`), after the TSL tier reached ≥30fps prod-verified on the María fixture with seams, body and self collision all closing on GPU. Three.js bumped to `^0.184`; the upstream `atomicAdd` bug (#554) is worked around in `src/utils/cloth/gpu/atomicStorage.ts` (storage `setAtomic(true)` → `array<atomic<T>>`), so it no longer blocks the tier. **WASM is now the fallback, not the default** — kept as the CPU-side solver for browsers without WebGPU and as the deterministic CI parity oracle.
+
+### Fixed
+- **WebGPU device loss now auto-falls-back to the WASM/CPU solver (#901)** — when the renderer's WebGPU device is lost mid-simulation the solver cascade re-runs automatically and the simulation continues on WASM/CPU; previously the frame loop kept calling `renderer.compute()` on the dead device and the only "recovery" (a manual stop/restart) re-entered the dead GPU tier anyway. Loss is now detected on the renderer's device — the one the TSL kernels actually run on — instead of the lifecycle's own decoy `requestDevice()`, so the fallback actually fires: `useSimulationLifecycle` exposes `handleGpuDeviceLost`, the cascade re-enters on a reactive generation counter, a renderer-device latch stops the frame loop the instant loss is observed, and a module-level registry keyed by the renderer device carries the downgrade across the Stop→Start remount (which resets per-mount refs but not the `<Canvas>`/renderer). **Caveat:** a lost WebGPU device cannot be revived in place — the solver keeps running (re-draping from the placed pose; there is no warm-start from the lost GPU buffers), but restoring the live 3D view still requires a page reload; in-place renderer recovery is a separate follow-up.
+
+## [0.11.0] — 2026-06-11
 
 CLO3D seam/sewing parity release — the full parity plan (`docs/plans/2026-06-11-clo3d-seam-sewing-parity-plan.md`, Fases 0-6) shipped as PRs #871-#876. Garments now actually sew in the default solver tier: two curved pieces close in ≤2s on WASM, every seam pair has a stable identity color, sewing direction is real (crossed-X warning + Ctrl+B), and unresolvable seams warn instead of silently falling.
 
@@ -28,7 +36,7 @@ CLO3D seam/sewing parity release — the full parity plan (`docs/plans/2026-06-1
 ### Known Issues (deferred by plan § 5, tracked post-ship)
 - Partial-edge sewing (tStart/tEnd) — only as an atomic pair with solver renormalization (#486).
 - SeamGroup M:N proportional subdivision — needs the t-range substrate (épica #878).
-- WebGPU/Neural tiers do not close seams — honestly capability-gated; WebGPU itself blocked by Three.js 0.183 `atomicAdd` upstream (#708, #731).
+- WebGPU/Neural tiers do not close seams — honestly capability-gated; WebGPU itself blocked by Three.js 0.183 `atomicAdd` upstream (#708, #731). _(Superseded 2026-06-12 by #897: WebGPU closes seams and is now the **default** tier — the atomicAdd bug is worked around in `atomicStorage.ts`, Three.js on `^0.184`. Neural still cannot sew. See [Unreleased].)_
 - Seam lines not yet drawn over the simulated garment — `SeamRenderer3D` renders in arrange mode only (#880).
 - Editing seams during simulation requires a restart (live edit deferred).
 - Corner types on curved outlines (partial fix in #859), typographic polish, Clipper2 SA-offset memoization in `PieceRenderer` — deferred polish batch.
