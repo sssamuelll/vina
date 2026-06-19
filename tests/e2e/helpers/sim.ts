@@ -87,6 +87,21 @@ export async function getSimulationState(page: Page): Promise<string> {
   });
 }
 
+/**
+ * Read the active solver tier from the store
+ * (`'none' | 'webgpu' | 'wasm' | 'cpu-worker' | 'neural-drape'`). Live wind is
+ * only applied by the `wasm` and `webgpu` tiers — the CPU worker has no
+ * `setWind` (useSimulationLifecycle.ts:699) — so wind tests gate on this.
+ */
+export async function getSolverTier(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const store = (window as unknown as { __OPENCLO_STORE__?: {
+      getState: () => { simulation?: { solverTier?: string } };
+    } }).__OPENCLO_STORE__;
+    return store?.getState().simulation?.solverTier ?? 'none';
+  });
+}
+
 /** Start the simulation via store dispatch and poll until it reports 'running'. */
 export async function startSimulation(page: Page) {
   await page.evaluate(() => {
@@ -137,13 +152,13 @@ export async function readMeshPositions(page: Page) {
     if (!mesh?.geometry) return { found: false as const };
     const pos = mesh.geometry.getAttribute('position');
     if (!pos || pos.count === 0) return { found: false as const };
-    let nanCount = 0, infCount = 0, zeroCount = 0, sumX = 0, sumY = 0;
+    let nanCount = 0, infCount = 0, zeroCount = 0, sumX = 0, sumY = 0, sumZ = 0;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
       if (isNaN(x) || isNaN(y) || isNaN(z)) nanCount++;
       if (!isFinite(x) || !isFinite(y) || !isFinite(z)) infCount++;
       if (x === 0 && y === 0 && z === 0) zeroCount++;
-      sumX += x; sumY += y;
+      sumX += x; sumY += y; sumZ += z;
     }
     return {
       found: true as const,
@@ -154,6 +169,7 @@ export async function readMeshPositions(page: Page) {
       allZeros: zeroCount === pos.count,
       avgX: sumX / pos.count,
       avgY: sumY / pos.count,
+      avgZ: sumZ / pos.count,
     };
   });
 }

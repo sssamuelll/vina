@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   waitForApp, addRectanglePiece, switchView, startSimulation,
-  waitForClothMesh, readMeshPositions, getSimulationState, dispatch,
+  waitForClothMesh, readMeshPositions, getSimulationState, getSolverTier, dispatch,
 } from './helpers/sim';
 
 /**
@@ -51,7 +51,7 @@ test.describe('Wind Force (engine-level, issue #241)', () => {
     expect(windErrors).toHaveLength(0);
   });
 
-  test('cloth responds to wind force — positions shift laterally', async ({ page }) => {
+  test('cloth responds to wind force — positions shift under a perpendicular gust', async ({ page }) => {
     await waitForApp(page);
     await addRectanglePiece(page);
     await switchView(page, '3D');
@@ -59,34 +59,45 @@ test.describe('Wind Force (engine-level, issue #241)', () => {
 
     expect(await waitForClothMesh(page)).toBe(true);
 
+    // Live wind is applied only by the WASM and WebGPU tiers; the CPU worker
+    // (ClothWorkerClient) has no setWind (useSimulationLifecycle.ts:699). Under
+    // SwiftShader the GPU tier is unavailable so this normally runs on WASM —
+    // but if WASM availability flaps to the CPU tier under load, the dispatched
+    // wind is silently ignored. Skip rather than assert a force the tier never
+    // applies (a hard zero-displacement flake otherwise).
+    const tier = await getSolverTier(page);
+    test.skip(tier !== 'wasm' && tier !== 'webgpu', `solver tier '${tier}' does not apply live wind`);
+
     // Let cloth settle under gravity (no wind yet).
     await page.waitForTimeout(4000);
     const before = await readMeshPositions(page);
     expect(before.found).toBe(true);
     if (!before.found) return;
 
-    // Now enable wind with a strong +X force.
+    // Push wind with a strong component NORMAL to the draped panel. The single
+    // unknown rectangle is placed as a vertical front-torso panel (Rx=-π/2), so
+    // it lies in the XY plane with its normal ~along ∓Z. A pure lateral +X gust
+    // (the old signal) is nearly tangent — dot(wind,normal)≈0 → near-zero force,
+    // the flake. We use a Z-dominant gust that hits the face head-on (dot≈1),
+    // keeping an X component so it still catches the panel under any resting
+    // orientation, and measure displacement in the horizontal plane (X-Z),
+    // which is clean of the gravity settle (Y).
     await dispatch(page, { type: 'simulation/setWindEnabled', payload: true });
-    await dispatch(page, { type: 'simulation/setWindForce', payload: [25, 0, 0] });
+    await dispatch(page, { type: 'simulation/setWindForce', payload: [20, 0, 30] });
 
-    // Let wind push the cloth. Poll the cumulative lateral shift until it
-    // clears the noise floor. The CPU/WASM fallback applies wind per-frame and
-    // the observed real displacement is ~0.006–0.024 m; the resting noise floor
-    // (no wind) is ~1e-7 m, so a 5e-4 threshold cleanly separates signal from
-    // noise while tolerating slow-runner settle variance.
-    let deltaX = 0;
+    let shift = 0;
     await expect
       .poll(
         async () => {
           const after = await readMeshPositions(page);
           if (!after.found) return 0;
-          deltaX = after.avgX - before.avgX;
-          return Math.abs(deltaX);
+          shift = Math.hypot(after.avgX - before.avgX, after.avgZ - before.avgZ);
+          return shift;
         },
         { timeout: 18_000, intervals: [500, 1000, 1500, 2000] },
       )
       .toBeGreaterThan(0.0005);
-    console.log(`Wind X displacement: ${deltaX.toFixed(4)} (before=${before.avgX})`);
+    console.log(`Wind horizontal displacement: ${shift.toFixed(4)} m (tier=${tier})`);
   });
 
   test('no NaN positions with wind active', async ({ page }) => {
