@@ -612,7 +612,11 @@ export function createTslCollisionBody(
           posBuf.element(i).y.addAssign(nny.mul(pushDist));
           posBuf.element(i).z.addAssign(nnz.mul(pushDist));
 
-          // Position-based friction (matches CPU triangleCollision.ts:312–323).
+          // Coulomb position-based friction con stiction (#902) — espejo de CPU
+          // triangleCollision.ts. Presupuesta la corrección tangencial por la
+          // profundidad de corrección normal (pushDist): scale = min(μ·depth/|t|, 1).
+          // scale==1 ⇒ stick total (sin creep); <1 ⇒ deslizamiento cinético.
+          // Div-guard branch-free vía max(|t|, 1e-8) (si |t|→0 el slide ya es ~0).
           If(uFriction.greaterThan(float(0)), () => {
             const dx = posBuf.element(i).x.sub(prevPosBuf.element(i).x);
             const dy = posBuf.element(i).y.sub(prevPosBuf.element(i).y);
@@ -623,9 +627,12 @@ export function createTslCollisionBody(
             const ty = dy.sub(vn.mul(nny));
             const tz = dz.sub(vn.mul(nnz));
 
-            posBuf.element(i).x.subAssign(uFriction.mul(tx));
-            posBuf.element(i).y.subAssign(uFriction.mul(ty));
-            posBuf.element(i).z.subAssign(uFriction.mul(tz));
+            const tLen = tx.mul(tx).add(ty.mul(ty)).add(tz.mul(tz)).sqrt();
+            const scale = uFriction.mul(pushDist).div(tLen.max(float(1e-8))).min(float(1.0));
+
+            posBuf.element(i).x.subAssign(tx.mul(scale));
+            posBuf.element(i).y.subAssign(ty.mul(scale));
+            posBuf.element(i).z.subAssign(tz.mul(scale));
           });
         });
       });
