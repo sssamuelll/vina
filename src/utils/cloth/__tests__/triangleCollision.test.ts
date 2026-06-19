@@ -165,8 +165,9 @@ describe('solveTriangleCollision', () => {
     solveTriangleCollision(pos, invMass, 1, mesh, hash, margin, 0.5, prevPos);
     // Y should be pushed to margin
     expect(pos[1]).toBeCloseTo(margin, 3);
-    // X should be partially dampened: original slide was 1.0, friction 0.5 removes half
-    expect(pos[0]).toBeCloseTo(0.5, 1);
+    // DESPUÉS (Coulomb #902): cinético = friction*pushDist removido del slide.
+    // pushDist = margin + 0.01 = 0.015, |t| = 1.0 ⇒ removido = 0.5*0.015 = 0.0075.
+    expect(pos[0]).toBeCloseTo(1.0 - 0.5 * 0.015, 3); // 0.9925
   });
 
   it('zero friction preserves tangential velocity', () => {
@@ -234,12 +235,11 @@ describe('solveTriangleCollision — friction kernel (regression for BUG-2 #605)
     solveTriangleCollision(pos, invMass, 1, mesh, hash, MARGIN, 0.5, prevPos);
 
     expect(pos[1]).toBeCloseTo(MARGIN, 3);
-    // friction = 0.5 removes 0.5 * tangent. tangent ≈ SLIDE_X (the y-component
-    // of the post-push displacement projects onto the normal, leaving x ≈ 1.0
-    // on the tangent plane). Final x ≈ SLIDE_X * (1 - friction).
-    expect(pos[0]).toBeLessThan(SLIDE_X); // attenuated
-    expect(pos[0]).toBeGreaterThan(0); // not over-clamped to zero or beyond
-    expect(pos[0]).toBeCloseTo(SLIDE_X * 0.5, 2);
+    // Coulomb (#902): régimen cinético (slide 1.0 ≫ depth 0.015). Atenúa, pero
+    // NO con el viejo 60%-pass — lo removido es friction*pushDist.
+    expect(pos[0]).toBeLessThan(SLIDE_X); // atenuado
+    expect(pos[0]).toBeGreaterThan(0);    // no sobre-clampeado
+    expect(pos[0]).toBeCloseTo(SLIDE_X - 0.5 * 0.015, 3); // 0.9925
   });
 
   it('friction = 0 with prevPos provided leaves tangent unchanged (gate predicate)', () => {
@@ -298,7 +298,42 @@ describe('solveTriangleCollision — friction kernel (regression for BUG-2 #605)
     expect(withFriction[1]).toBeCloseTo(MARGIN, 3);
     expect(withoutFriction[1]).toBeCloseTo(MARGIN, 3);
     expect(withFriction[0]).toBeLessThan(withoutFriction[0]);
-    expect(withoutFriction[0]).toBeCloseTo(1.0, 5); // 5 * 0.2 with no damping
-    expect(withFriction[0]).toBeCloseTo(0.5, 2);    // half-attenuated each pass
+    expect(withoutFriction[0]).toBeCloseTo(1.0, 5); // 5 * 0.2 sin damping
+    // Coulomb (#902): cada pase remueve friction*pushDist = 0.5*0.015 = 0.0075
+    // del slide de 0.2 (régimen cinético). 1.0 − 5*0.0075 = 0.9625.
+    expect(withFriction[0]).toBeCloseTo(0.9625, 3);
+  });
+});
+
+// El fix de #902: la fricción de contacto pasa de un filtro 60%-pass (que deja
+// creep monótono) a Coulomb position-based con stiction. El presupuesto de la
+// corrección tangencial es friction*pushDist; cuando supera el slide tangencial,
+// se remueve el 100% (la tela se pega en vez de reptar).
+describe('solveTriangleCollision — Coulomb stiction (#902)', () => {
+  it('removes a small tangential slide entirely (stiction — no creep)', () => {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const margin = 0.005;
+    // Penetración 0.01 ⇒ pushDist = margin + 0.01 = 0.015.
+    // Slide tangencial 0.003 < friction*pushDist (0.4*0.015 = 0.006) ⇒ scale=1 ⇒ stick.
+    const pos = new Float32Array([0.003, -0.01, 0]);
+    const prevPos = new Float32Array([0.0, -0.01, 0]);
+    const invMass = new Float32Array([1.0]);
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, margin, 0.4, prevPos);
+    expect(pos[1]).toBeCloseTo(margin, 3);
+    expect(pos[0]).toBeCloseTo(0, 4); // pegado — sin creep
+  });
+
+  it('lets a large tangential slide slip kinetically (scale = friction*pushDist/|t|)', () => {
+    const mesh = makeFloorPlane();
+    const hash = new TriangleSpatialHash(mesh, 2.0);
+    const margin = 0.005;
+    // Slide 1.0 ≫ pushDist 0.015 ⇒ scale = 0.4*0.015/1 = 0.006 (régimen cinético).
+    const pos = new Float32Array([1.0, -0.01, 0]);
+    const prevPos = new Float32Array([0.0, -0.01, 0]);
+    const invMass = new Float32Array([1.0]);
+    solveTriangleCollision(pos, invMass, 1, mesh, hash, margin, 0.4, prevPos);
+    expect(pos[1]).toBeCloseTo(margin, 3);
+    expect(pos[0]).toBeCloseTo(1.0 - 0.4 * 0.015, 4); // 0.994 — lejos del viejo 0.6
   });
 });

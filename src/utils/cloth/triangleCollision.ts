@@ -308,7 +308,12 @@ export function solveTriangleCollision(
       pos[pi + 1] += bestNy * pushDist;
       pos[pi + 2] += bestNz * pushDist;
 
-      // Position-based friction: dampen tangential displacement
+      // Coulomb position-based friction con stiction (#902). La corrección
+      // tangencial se presupuesta por la profundidad de corrección normal
+      // (pushDist): cuando friction*pushDist ≥ |t|, se remueve el slide
+      // tangencial completo (contacto estático — la tela se pega en vez de
+      // reptar); si no, desliza cinéticamente. min(·,1) mantiene la corrección
+      // ≤ el slide → no inyecta energía (PBD-safe). Espejo: gpu/tslCollision.ts.
       if (friction > 0 && prevPos) {
         const dx = pos[pi] - prevPos[pi];
         const dy = pos[pi + 1] - prevPos[pi + 1];
@@ -317,9 +322,11 @@ export function solveTriangleCollision(
         const tx = dx - vn * bestNx;
         const ty = dy - vn * bestNy;
         const tz = dz - vn * bestNz;
-        pos[pi]     -= friction * tx;
-        pos[pi + 1] -= friction * ty;
-        pos[pi + 2] -= friction * tz;
+        const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        const scale = Math.min((friction * pushDist) / Math.max(tLen, 1e-8), 1);
+        pos[pi]     -= tx * scale;
+        pos[pi + 1] -= ty * scale;
+        pos[pi + 2] -= tz * scale;
       }
     }
   }
