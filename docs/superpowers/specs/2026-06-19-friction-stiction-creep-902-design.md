@@ -172,3 +172,45 @@ sin sync de binarios.
   profundidad) es el fallback — pero se confirma con el run, no se asume.
 - **Varianza run-to-run del E2E:** mitigada por la banda de tolerancia (no un
   umbral absoluto apretado).
+
+## Enmienda 2026-06-19 (resultado empírico — el riesgo se materializó)
+
+El riesgo de arriba **se materializó, y peor de lo previsto.** Lo que el E2E en
+GPU real reveló, y cómo cerró el trabajo:
+
+1. **A1 (Coulomb puro) rompió el asentamiento.** En régimen cinético (slides
+   grandes durante el settling, `|t| ≫ pushDist`), `scale = friction·pushDist/|t|`
+   da fricción casi nula. La prenda se escurrió DURANTE el asentamiento:
+   `belowHipPct = 54%` a 2.5s (estándar M4: <5%). A1 cambió creep-lento por
+   caída-rápida. **Descartado.**
+
+2. **El fallback A2 del spec tampoco servía.** A2 (umbral estático μ_s explícito)
+   ataca el *techo* de stiction, pero el fallo era el *piso* cinético — su término
+   cinético `μ_k·pushDist/|t|` es igual de débil que A1 para `|t|` grande.
+
+3. **Adoptado: modelo HYBRID** — `scale = min(1, max(friction, friction·pushDist/|t|))`.
+   El `max(friction, …)` recupera el piso cinético del 60%-pass viejo (el
+   asentamiento sostiene: 2.5s volvió a `belowHipPct ≈ 0`), y el término Coulomb
+   sube `scale → 1` en reposo (stiction). `scale ∈ [friction, 1] ≥` la remoción
+   del modelo viejo ⇒ **por construcción nunca crepa más que el viejo**, y es
+   estrictamente mejor donde el stiction engancha (no se corrió baseline GPU del
+   viejo: la prueba analítica es más fuerte que un run dominado por la varianza).
+
+4. **El creep profundo es ESTRUCTURAL, no de fricción.** Con el hybrid, el
+   asentamiento es limpio pero el creep **progresivo** persiste sobre superficies
+   empinadas: trayectoria medida `belowHipPct` 0.19 → 6.2 → 22.8 → 37.1 (2.5/5/7.5/10s),
+   con `maxY` clavado en 1.572 (los hombros sostienen). Física: la fricción de
+   Coulomb solo sostiene tela en pendientes `< arctan(μ)`; con μ=0.4 eso es ~22°.
+   El frente del pecho y los costados del torso superan los 22°, así que **ninguna
+   fricción realista lo arregla** — la prenda debe cargar el peso por estructura
+   (hombros + tubo cerrado), no por fricción. Re-scoped como follow-up estructural.
+
+5. **Varianza caótica.** El drape a 10s dio `belowHipPct` 7.59% y 37.13% en dos
+   runs de código idéntico. Una banda apretada a 10s sería flaky. Por eso la red
+   de regresión #912 quedó en **modo anti-colapso**: `nan=0` + `maxY > 1.3`
+   (hombros arriba — estable ~1.57 en todos los runs). El checkpoint de 2.5s sigue
+   siendo el gate real de asentamiento.
+
+**Estado de cierre:** #902 (slide-off catastrófico + regresión de asentamiento)
+RESUELTO por el hybrid. Creep progresivo sobre pendientes empinadas → follow-up
+estructural. Verificado en GPU real.
