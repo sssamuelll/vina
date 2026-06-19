@@ -11,11 +11,9 @@
  * de F2.6 a ~5fps, ~2s; a los ~31fps actuales serían ~13s. Toda la
  * verificación histórica del estándar M4 quedó a ≤2.5s de SIM — ese es el
  * checkpoint real del estándar (la prenda asentada tras cerrar costuras),
- * y ahí se ancla el assert: 150 frames acumulados = 2.5s de sim. Más allá
- * existe un creep lento pre-existente e independiente del margen AABB
- * (belowHip cruza 5% a ~3s de sim, slide-off en banda ~9.5-13.5s),
- * invisible hasta tener sim a tiempo real: se REGISTRA a 10s de sim sin
- * assert como evidencia → issue #902.
+ * y ahí se ancla el assert: 150 frames acumulados = 2.5s de sim. El creep
+ * lento (#902) se ARREGLÓ con stiction de Coulomb; a 10s de sim hay una red
+ * de regresión con banda de tolerancia relativa al checkpoint de 2.5s (#912).
  *
  * Correr: npm run test:e2e:gpu -- webgpu-maria-replay
  * (config webgpu: headed, GPU real, sin SwiftShader; @gpu-local ⇒ CI nunca
@@ -193,15 +191,21 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[drape-m4] simSeconds=2.5 belowHipPct=${drape!.belowHipPct.toFixed(2)} minY=${drape!.minY.toFixed(3)} maxY=${drape!.maxY.toFixed(3)} nan=${drape!.nan}`,
     );
 
-    // Largo horizonte (600 frames = 10s de sim): SOLO registro, sin assert.
-    // El creep lento pre-existente (issue #902) hace que belowHip/minY
-    // degraden a partir de ~3s de sim en todos los márgenes — esto es la
-    // evidencia que lo monitorea, no un veredicto del tier GPU.
+    // Largo horizonte (600 frames = 10s de sim): RED DE REGRESIÓN del fix de
+    // stiction (#902 / #912). Banda de tolerancia relativa al checkpoint M4 de
+    // 2.5s (`drape`): la prenda asentada NO debe degradarse a 10s. Banda (no
+    // umbral absoluto) para sobrevivir el caos de float run-to-run en la
+    // selección de triángulo de contacto.
     await waitForSimWindows(page, 20, 120_000);
     const creep = await readDrape(page);
     console.log(
       `[creep-watch] simSeconds=10 belowHipPct=${creep!.belowHipPct.toFixed(2)} minY=${creep!.minY.toFixed(3)} maxY=${creep!.maxY.toFixed(3)} nan=${creep!.nan} (issue #902)`,
     );
+    expect(creep).not.toBeNull();
+    expect(creep!.nan).toBe(0);
+    expect(creep!.belowHipPct).toBeLessThanOrEqual(drape!.belowHipPct + 3);
+    expect(creep!.minY).toBeGreaterThanOrEqual(drape!.minY - 0.1);
+    expect(creep!.maxY).toBeGreaterThan(1.3);
   });
 
   test('DoD #897: ≥30fps sostenidos', async ({ page }) => {
