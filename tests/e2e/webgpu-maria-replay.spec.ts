@@ -11,11 +11,12 @@
  * de F2.6 a ~5fps, ~2s; a los ~31fps actuales serían ~13s. Toda la
  * verificación histórica del estándar M4 quedó a ≤2.5s de SIM — ese es el
  * checkpoint real del estándar (la prenda asentada tras cerrar costuras),
- * y ahí se ancla el assert: 150 frames acumulados = 2.5s de sim. Más allá
- * existe un creep lento pre-existente e independiente del margen AABB
- * (belowHip cruza 5% a ~3s de sim, slide-off en banda ~9.5-13.5s),
- * invisible hasta tener sim a tiempo real: se REGISTRA a 10s de sim sin
- * assert como evidencia → issue #902.
+ * y ahí se ancla el assert: 150 frames acumulados = 2.5s de sim. El fix de
+ * stiction de Coulomb (#902) detuvo el slide-off durante el asentamiento y lo
+ * limpió; pero el drape a 10s es NO-DETERMINISTA y bistable (de "sostenida" a
+ * colapso total en runs idénticos — μ=0.4 en el margen de las pendientes del
+ * torso), así que a 10s NO hay assert: se registra como evidencia. La
+ * estabilidad/estructura del drape largo es follow-up de alta prioridad (#912).
  *
  * Correr: npm run test:e2e:gpu -- webgpu-maria-replay
  * (config webgpu: headed, GPU real, sin SwiftShader; @gpu-local ⇒ CI nunca
@@ -193,15 +194,25 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[drape-m4] simSeconds=2.5 belowHipPct=${drape!.belowHipPct.toFixed(2)} minY=${drape!.minY.toFixed(3)} maxY=${drape!.maxY.toFixed(3)} nan=${drape!.nan}`,
     );
 
-    // Largo horizonte (600 frames = 10s de sim): SOLO registro, sin assert.
-    // El creep lento pre-existente (issue #902) hace que belowHip/minY
-    // degraden a partir de ~3s de sim en todos los márgenes — esto es la
-    // evidencia que lo monitorea, no un veredicto del tier GPU.
+    // Largo horizonte (600 frames = 10s de sim): SOLO REGISTRO, sin assert de
+    // forma. El fix de stiction (#902) detuvo el slide-off durante el
+    // asentamiento (checkpoint de 2.5s arriba), pero a 10s el drape es
+    // NO-DETERMINISTA y bistable: en runs de código idéntico el resultado va de
+    // "mayormente sostenida" (belowHip ~7%) a COLAPSO TOTAL (belowHip 100%,
+    // maxY 0.54 — prenda entera en el suelo). El estado "sostenida" es
+    // metaestable: μ=0.4 está en el margen de las pendientes del torso, así que
+    // held↔collapsed lo decide el no-determinismo de float del GPU. Ningún
+    // assert de forma a 10s (ni siquiera anti-colapso) es confiable → se REGISTRA
+    // como evidencia. La bistabilidad/estructura es un follow-up de alta
+    // prioridad (afecta el default tier #897). Solo se afirma el invariante
+    // determinista: sin NaN.
     await waitForSimWindows(page, 20, 120_000);
     const creep = await readDrape(page);
+    expect(creep).not.toBeNull();
     console.log(
-      `[creep-watch] simSeconds=10 belowHipPct=${creep!.belowHipPct.toFixed(2)} minY=${creep!.minY.toFixed(3)} maxY=${creep!.maxY.toFixed(3)} nan=${creep!.nan} (issue #902)`,
+      `[creep-watch] simSeconds=10 belowHipPct=${creep!.belowHipPct.toFixed(2)} minY=${creep!.minY.toFixed(3)} maxY=${creep!.maxY.toFixed(3)} nan=${creep!.nan} (issue #902 — non-deterministic, log-only)`,
     );
+    expect(creep!.nan).toBe(0);
   });
 
   test('DoD #897: ≥30fps sostenidos', async ({ page }) => {

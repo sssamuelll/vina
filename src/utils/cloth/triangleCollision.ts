@@ -308,7 +308,14 @@ export function solveTriangleCollision(
       pos[pi + 1] += bestNy * pushDist;
       pos[pi + 2] += bestNz * pushDist;
 
-      // Position-based friction: dampen tangential displacement
+      // Hybrid Coulomb friction with stiction (#902).
+      //   scale = min(1, max(friction, friction*pushDist/|t|))
+      // The max(friction, …) keeps the old kinetic floor (≥friction of the
+      // tangential slide is always removed) so the garment doesn't slide off
+      // during the high-motion settling phase. The depth-budgeted Coulomb term
+      // raises scale toward 1 as motion slows: at rest the residual slide is
+      // removed in full (stiction), killing the creep. scale ∈ [friction, 1]
+      // ≤ 1 → never injects energy (PBD-safe). Mirror: gpu/tslCollision.ts.
       if (friction > 0 && prevPos) {
         const dx = pos[pi] - prevPos[pi];
         const dy = pos[pi + 1] - prevPos[pi + 1];
@@ -317,9 +324,11 @@ export function solveTriangleCollision(
         const tx = dx - vn * bestNx;
         const ty = dy - vn * bestNy;
         const tz = dz - vn * bestNz;
-        pos[pi]     -= friction * tx;
-        pos[pi + 1] -= friction * ty;
-        pos[pi + 2] -= friction * tz;
+        const tLen = Math.sqrt(tx * tx + ty * ty + tz * tz);
+        const scale = Math.min(1, Math.max(friction, (friction * pushDist) / Math.max(tLen, 1e-8)));
+        pos[pi]     -= tx * scale;
+        pos[pi + 1] -= ty * scale;
+        pos[pi + 2] -= tz * scale;
       }
     }
   }
