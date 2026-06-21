@@ -39,7 +39,7 @@ export interface PlacementResult {
 // ── Piece geometry helpers ───────────────────────────────────────────────────
 
 /** Compute bounding box of outline in mm */
-function outlineBBox(outline: PathCommand[]): { width: number; height: number } {
+export function outlineBBox(outline: PathCommand[]): { width: number; height: number } {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const cmd of outline) {
     for (let i = 0; i < cmd.values.length - 1; i += 2) {
