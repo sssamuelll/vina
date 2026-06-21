@@ -359,6 +359,7 @@ git commit -m "feat(arrangement): collision-aware computePlacement — pieces st
 
 **Files:**
 - Create: `src/utils/cloth/arrangement/arrangementBinding.ts`
+- Modify: `src/utils/cloth/garmentPlacement.ts` (export the existing `outlineBBox` helper at line ~41 — change `function outlineBBox` to `export function outlineBBox` — so the binding module reuses it instead of duplicating the bbox computation)
 - Test: `src/utils/cloth/arrangement/__tests__/arrangementBinding.test.ts`
 
 **Interfaces:**
@@ -454,7 +455,7 @@ Create `src/utils/cloth/arrangement/arrangementBinding.ts`:
  */
 import * as THREE from 'three';
 import type { BodyMeasurements, PatternPiece } from '../../../types/types';
-import { computeAutoFrame, detectBodyRegion, type PlacementResult } from '../garmentPlacement';
+import { computeAutoFrame, detectBodyRegion, outlineBBox, type PlacementResult } from '../garmentPlacement';
 import type { V3 } from './surfaceFrame';
 
 export interface ArrangementBinding {
@@ -470,15 +471,8 @@ function isBinding(o: ArrangementOverride): o is ArrangementBinding {
 }
 
 function pieceGeometryOf(p: PatternPiece): { widthMm: number; heightMm: number } {
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const cmd of p.outline) {
-    for (let i = 0; i < cmd.values.length - 1; i += 2) {
-      const x = cmd.values[i], y = cmd.values[i + 1];
-      if (x < minX) minX = x; if (x > maxX) maxX = x;
-      if (y < minY) minY = y; if (y > maxY) maxY = y;
-    }
-  }
-  return { widthMm: maxX > minX ? maxX - minX : 0, heightMm: maxY > minY ? maxY - minY : 0 };
+  const { width, height } = outlineBBox(p.outline); // reuse garmentPlacement helper (no duplication)
+  return { widthMm: width, heightMm: height };
 }
 
 export function resolveArrangement(
