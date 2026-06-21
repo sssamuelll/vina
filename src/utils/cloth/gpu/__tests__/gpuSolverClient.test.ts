@@ -554,13 +554,13 @@ describe('dispose mid-readback (behavior #3)', () => {
 //
 // `setTslCollisionBody(id, mesh)` allocates 3 BVH SBAs (covered by #771) plus
 // 2 per-body atomic scratch SBAs inside `createTslCollisionBody`
-// (`bestDistSBA` filled with INT32_MAX, `bestTriIdxSBA` filled with -1).
+// (`bestDistSBA` filled with INT32_MAX — #921 Eje A folded bestTriIdx into it).
 // PR #772 extended the dispose chain so a second `setTslCollisionBody` call
 // for the same id releases BOTH sets. This guard verifies the scratch SBAs
 // specifically — the BVH disposal is already covered by #771 elsewhere.
 
 describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', () => {
-  it('routes the previous body scratch SBAs (bestDist + bestTriIdx) through renderer._attributes.delete on replace', async () => {
+  it('routes the previous body composite-key scratch SBA through renderer._attributes.delete on replace', async () => {
     const device = new FakeGPUDevice();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const client = new GpuSolverClient(device as any);
@@ -581,16 +581,14 @@ describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', 
       .map((c) => c.sba as TestSBA)
       .filter((sba) => sba.array instanceof Int32Array);
     const firstBestDist = firstBodyAtomicSBAs.find((s) => (s.array as Int32Array)[0] === 0x7fffffff);
-    const firstBestTriIdx = firstBodyAtomicSBAs.find((s) => (s.array as Int32Array)[0] === -1);
     expect(firstBestDist).toBeDefined();
-    expect(firstBestTriIdx).toBeDefined();
 
     // Replace the body with the same id — the previous body's dispose must
-    // route the two scratch SBAs through renderer._attributes.delete.
+    // route the composite-key scratch SBA through renderer._attributes.delete
+    // (#921 Eje A folded bestTriIdx into the key buffer, so there is one now).
     client.setTslCollisionBody('avatar', makeTriCollisionMesh());
 
     expect(renderer._attributes.delete).toHaveBeenCalledWith(firstBestDist);
-    expect(renderer._attributes.delete).toHaveBeenCalledWith(firstBestTriIdx);
   });
 
   it('removeTslCollisionBody also disposes scratch SBAs', async () => {
@@ -611,12 +609,10 @@ describe('setTslCollisionBody dispose chain (behavior #8 — #772 regression)', 
       .map((c) => c.sba as TestSBA)
       .filter((sba) => sba.array instanceof Int32Array);
     const bestDist = atomicSBAs.find((s) => (s.array as Int32Array)[0] === 0x7fffffff);
-    const bestTriIdx = atomicSBAs.find((s) => (s.array as Int32Array)[0] === -1);
 
     client.removeTslCollisionBody('prop');
 
     expect(renderer._attributes.delete).toHaveBeenCalledWith(bestDist);
-    expect(renderer._attributes.delete).toHaveBeenCalledWith(bestTriIdx);
   });
 
   // #897 F4.3b: setTslCollisionBody now allocates a 4th BVH SBA — the

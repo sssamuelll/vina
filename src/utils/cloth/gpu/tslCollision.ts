@@ -1,11 +1,12 @@
 /**
  * TSL Collision Kernel — BVH-accelerated body collision via atomic emulation.
  *
- * **Algorithm (atomic emulation)**: 2-pass per-particle kernel with per-body
- * atomic scratch buffers. Sidesteps the TSL `outer-toVar.assign(
- * storage-derived-value)` codegen pitfall by using `atomicMin` + `atomicStore`
- * directly on storage instead of accumulating "best so far" into outer-scope
- * `toVar` slots inside nested `If`s. See
+ * **Algorithm (atomic emulation)**: 2-pass per-particle kernel with a per-body
+ * atomic scratch buffer. Sidesteps the TSL `outer-toVar.assign(
+ * storage-derived-value)` codegen pitfall by using `atomicMin` directly on
+ * storage instead of accumulating "best so far" into outer-scope `toVar` slots
+ * inside nested `If`s. The winner is recorded as a composite sort key (#921
+ * Eje A — see the `TRI_BITS` block) so contact selection is order-independent. See
  * `docs/reports/2026-05-04-733-gpu-body-collision-design.md` for the rationale
  * (a prior toVar-based attempt produced ~200 WGSL validation warnings; the
  * atomic-emulation pattern below was the recommended fix).
@@ -18,20 +19,20 @@
  *   preorder = parent+1); AABB miss — or a processed leaf — jumps to
  *   `skip[i]`, the first preorder node outside i's subtree (see bvh.ts). For
  *   each leaf-matched triangle compute closest-point distance with edge
- *   fallback. Issue `atomicMin` against `bestDistBuf[i]` (fixed-point i32
- *   distance scaled by 1e6); when this thread's value won the min,
- *   `atomicStore` the triangle index into `bestTriIdxBuf[i]`. Distance is
- *   computed via two branches (inside-projection vs. edge-min); only the
- *   chosen branch issues an atomicMin, so the per-triangle work is O(1)
- *   atomics. Parent AABBs contain child AABBs, so gating descent on the same
- *   margin-expanded test reaches exactly the leaves the flat scan matched.
+ *   fallback, pack it into the composite key `(distQ << TRI_BITS) | triIdx`, and
+ *   `atomicMin` that against `bestDistBuf[i]` (which now holds the sort KEY, not a
+ *   raw distance). Distance is computed via two branches (inside-projection vs.
+ *   edge-min); only the chosen branch issues an atomicMin, so the per-triangle
+ *   work is O(1) atomics. Parent AABBs contain child AABBs, so gating descent on
+ *   the same margin-expanded test reaches exactly the leaves the flat scan matched.
  *
- * Pass 2 — `applyPushNode`: per particle, `atomicLoad bestTriIdx` at function
- *   top (avoids the nested-If pitfall). When a triangle was found, re-read its
- *   vertices + normal, recompute signed plane distance + edge fallback for
- *   SIDE determination, push particle along normal, apply position-based
- *   friction. Always reset atomic scratch (`bestDistBuf[i] = INT32_MAX`,
- *   `bestTriIdxBuf[i] = -1`) for the next substep, regardless of collision.
+ * Pass 2 — `applyPushNode`: per particle, `atomicLoad bestDistBuf` at function
+ *   top (avoids the nested-If pitfall). When a key < sentinel was recorded,
+ *   decode `triIdx = key & TRI_MASK`, re-read the winning triangle's vertices +
+ *   normal, recompute signed plane distance + edge fallback for SIDE
+ *   determination, push particle along normal, apply position-based friction.
+ *   Always reset scratch (`bestDistBuf[i] = INT32_MAX`) for the next substep,
+ *   regardless of collision.
  *
  * Detection semantics match `triangleCollision.ts:solveTriangleCollision`
  * (CPU+WASM reference): push when `bestSide < 0` (penetrating) OR
@@ -54,10 +55,11 @@
  * Triangle format (9 floats per triangle): [v0x,v0y,v0z, v1x,v1y,v1z, v2x,v2y,v2z]
  * Normal format (3 floats per triangle): [nx,ny,nz]
  *
- * Distance scaling: float dist (meters) → i32 fixed-point via `× 1e6`, mirroring
- * the precedent in `tslSelfCollision.ts` (`COLLISION_SCALE = 1e6`). Precision
- * 1 µm; range up to ~2100 m before i32 overflow (well beyond any realistic
- * body collision distance).
+ * Selection key: the winning triangle is a composite i32 sort key
+ * `(distQ << TRI_BITS) | triIdx` (#921 Eje A — see the `TRI_BITS` block). distQ is
+ * the closest-point distance clamped to 2.0 m and quantized to ~244 µm/level; pass 2
+ * recomputes the exact distance, so the quantization is selection-only (it only
+ * breaks near-equidistant ties deterministically by lowest triIdx).
  *
  * @module tslCollision
  */
@@ -91,16 +93,16 @@ type TslNode = any;
 
 export interface TslCollisionBody {
   id: string;
-  /** Pass 1: per-particle threaded BVH traversal (escape pointers), atomic min on distance, atomic store on tri idx. */
+  /** Pass 1: per-particle threaded BVH traversal (escape pointers), atomic min on the composite contact key. */
   findBestNode: ComputeNode;
-  /** Pass 2: per-particle apply push using atomic load on best tri idx, then reset scratch. */
+  /** Pass 2: per-particle apply push using atomic load of the best-contact key, then reset scratch. */
   applyPushNode: ComputeNode;
   margin: number;
   friction: number;
   nodeCount: number;
   triCount: number;
   /**
-   * Release the per-body atomic scratch SBAs (`bestDistSBA`, `bestTriIdxSBA`)
+   * Release the per-body atomic scratch SBA (`bestDistSBA`, the composite-key buffer)
    * created inside `createTslCollisionBody`. Best-effort without a renderer
    * (mirrors `disposeStorageBufferAttribute`): drops references only — the
    * GPUBuffer is freed when the renderer's `_attributes` WeakMap entry is
@@ -119,17 +121,44 @@ export interface TslCollisionBody {
 const MAX_PUSH_DIST = 0.05;
 
 /**
- * Fixed-point scale for atomic<i32> distance accumulation (WGSL has no atomic<f32>).
- * Matches `COLLISION_SCALE` in `tslSelfCollision.ts`. Precision 1 µm; range up
- * to ~2100 m before i32 overflow.
+ * #921 Eje A — deterministic contact selection via a single composite-key atomicMin.
+ *
+ * The old design recorded the winner as TWO unfused atomics: `atomicMin` on the i32
+ * distance, then a disjoint `If(oldDist > distI32) atomicStore(bestTriIdx)`. That was
+ * non-deterministic two ways: (1) on an EXACT quantized-distance tie neither writer
+ * stores, so the recorded index is whichever thread first reached that distance; and
+ * (2) across DISTINCT distances the min and the store are not atomic together, so a
+ * thread that improved the distance can still have its index overwritten by a slower
+ * thread from a WORSE distance (the store-vs-min window). Identical input → different
+ * winning triangle → different push normal, amplified over ~15 substeps × ~9000 frames.
+ *
+ * Fix: pack the winner into one i32 sort key — `key = (distQ << TRI_BITS) | triIdx` —
+ * and `atomicMin` that. `atomicMin` is order-independent, so the GPU now selects the
+ * same winner (min distQ, then LOWEST triIdx on ties) on every run of a given device —
+ * making contact selection DETERMINISTIC, the prerequisite for the parity-oracle role.
+ * It does NOT make selection bit-identical to CPU/WASM: the CPU breaks ties by
+ * spatial-hash scan order with a strict `<` on UNquantized distance, and the two tiers
+ * walk different acceleration structures (BVH vs hash). The win here is run-to-run
+ * reproducibility on the default tier, not exact cross-tier equality. Pass 2 decodes
+ * `triIdx = key & TRI_MASK`; it recomputes the distance itself, so the coarse `distQ`
+ * quantization is selection-only (≈244 µm/level — it merely turns near-equidistant
+ * non-deterministic flips into deterministic lowest-index ties).
  */
-const DIST_SCALE = 1000000.0;
+const TRI_BITS = 18; // ≤ 262 144 collision triangles packed in the low bits
+const TRI_MASK = 0x3ffff; // (1 << TRI_BITS) - 1
+const MAX_PACKABLE_TRI = 1 << TRI_BITS;
+const DIST_QUANT_MAX = 8190; // 13 bits; max key = (8190<<18)|TRI_MASK < INT32_MAX
+const DIST_PACK_SCALE = DIST_QUANT_MAX / 2.0; // distClamped ∈ [0,2.0] m → distQ ∈ [0,8190]
 
-/** Sentinel for "no triangle found" in the atomic best-tri-idx scratch buffer. */
-const NO_TRI = -1;
+/** Sentinel "no contact": the max key; nothing wins `atomicMin` against it. */
+const INT32_MAX = 0x7fffffff;
 
-/** Sentinel for "no distance recorded" in the atomic best-dist scratch buffer. */
-const INT32_MAX = 0x7FFFFFFF;
+// Static invariant (#921 Eje A): the largest packable key must stay strictly below
+// the sentinel so a real contact always wins atomicMin against "no contact". Guards
+// future edits to TRI_BITS / DIST_QUANT_MAX from silently colliding with the sentinel.
+if (((DIST_QUANT_MAX << TRI_BITS) | TRI_MASK) >= INT32_MAX) {
+  throw new Error('tslCollision: composite-key range overflows the INT32_MAX sentinel (#921 Eje A)');
+}
 
 // ─── Kernel factory ─────────────────────────────────────────────────────────
 
@@ -138,7 +167,7 @@ const INT32_MAX = 0x7FFFFFFF;
  * atomic-emulation pattern. Returns two compute nodes that
  * MUST be dispatched in order per substep: `findBestNode` first, then
  * `applyPushNode`. The pair shares per-body atomic scratch buffers
- * (`bestDistBuf`, `bestTriIdxBuf`) sized `numParticles` × i32. Reset is
+ * (`bestDistBuf`, the composite-key buffer) sized `numParticles` × i32. Reset is
  * folded into `applyPushNode`'s tail, so the next substep always sees a
  * clean scratch state.
  *
@@ -171,13 +200,19 @@ export function createTslCollisionBody(
   margin: number = 0.005,
   friction: number = 0.3,
 ): TslCollisionBody {
-  // ─── Per-body atomic scratch SBAs (sentinel-initialized) ────────────────
-  // bestDist init = INT32_MAX so any candidate distance wins atomicMin on first call.
-  // bestTriIdx init = -1 so "no collision found" is the natural sentinel for pass 2.
+  // ─── Per-body atomic scratch SBA (sentinel-initialized) ─────────────────
+  // Holds the composite contact key (distQ<<TRI_BITS | triIdx), NOT a raw distance.
+  // init = INT32_MAX (sentinel "no contact") so any real candidate key wins atomicMin.
+  // #921 Eje A: triIdx is packed into the low TRI_BITS, so the collision mesh must fit —
+  // guard here rather than silently corrupting the distance bits on overflow.
+  if (numTris > MAX_PACKABLE_TRI) {
+    throw new Error(
+      `tslCollision: ${numTris} collision triangles exceed the composite-key cap ` +
+        `${MAX_PACKABLE_TRI} (#921 Eje A). Raise TRI_BITS or fall back to WASM/CPU.`,
+    );
+  }
   const bestDistInit = new Int32Array(numParticles).fill(INT32_MAX);
-  const bestTriIdxInit = new Int32Array(numParticles).fill(NO_TRI);
   const bestDistSBA = new StorageBufferAttribute(bestDistInit, 1);
-  const bestTriIdxSBA = new StorageBufferAttribute(bestTriIdxInit, 1);
 
   // Wrap input SBAs as storage nodes (flat float access — itemSize=1, no vec4 padding).
   const bvhBuf = storage(bvhNodesSBA, 'float', numNodes * 8);
@@ -191,11 +226,10 @@ export function createTslCollisionBody(
   // makes the atomic-emulation pattern work (sidesteps the outer-toVar /
   // storage-derived codegen pitfall described in the file-header rationale).
   const bestDistBuf = makeAtomicStorage(bestDistSBA, 'int', numParticles);
-  const bestTriIdxBuf = makeAtomicStorage(bestTriIdxSBA, 'int', numParticles);
 
   const uMargin = uniform(margin);
   const uFriction = uniform(friction);
-  const uDistScale = uniform(DIST_SCALE);
+  const uDistScale = uniform(DIST_PACK_SCALE);
   // BVH AABB query expansion — the breadth driver of the traversal: wider
   // margin ⇒ more subtree visited per particle per substep (same hits; the
   // per-triangle exact distance test inside the leaf is unchanged).
@@ -235,8 +269,8 @@ export function createTslCollisionBody(
   // Per particle: threaded BVH traversal via escape pointers (#897 F4.3b).
   // Internal-node AABB hit → descend (left child, slot 6); miss or processed
   // leaf → jump to skipBuf[node] (past the subtree). For each candidate
-  // triangle compute distance, atomicMin on bestDistBuf[i], atomicStore
-  // triIdx if won.
+  // triangle compute distance, pack (distQ<<TRI_BITS | triIdx) into a composite
+  // key, and atomicMin that key on bestDistBuf[i] (no separate index store).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const findBestFn = (Fn as any)(() => {
     const i = instanceIndex;
@@ -352,7 +386,7 @@ export function createTslCollisionBody(
                     // no outer-scope toVar tracking, no cross-branch select()
                     // (the value-level select() below is a per-branch NaN guard,
                     // not branch selection). Storage WRITES
-                    // (atomicMin / atomicStore) inside nested Ifs DO propagate
+                    // (atomicMin) inside nested Ifs DO propagate
                     // (mirrors the tslSelfCollision precedent).
                     // greaterThanEqual/lessThanEqual missing from @types/three at runtime.
                     If(
@@ -365,21 +399,26 @@ export function createTslCollisionBody(
                       () => {
                         // Inside-projection: dist = |dot|.
                         // §9 cand. 5+6 (#897 F2): NaN→i32 es UB en WGSL — un triángulo
-                        // degenerado envenenaría el atomicMin con un mínimo fantasma; y
-                        // >2.147m desborda i32 a escala 1e6. NaN ≠ NaN ⇒ equal(self) falso.
+                        // degenerado envenenaría el atomicMin con un mínimo fantasma.
+                        // distClamped acota a 2.0m (distQ ∈ [0,8190]). NaN ≠ NaN ⇒ equal(self) falso.
                         // TSL select(cond, ifTrue, ifFalse) — cond va PRIMERO
                         // (ConditionalNode), orden opuesto al select(f, t, cond) de WGSL.
                         const distFloat = dot.abs();
                         const distClamped = distFloat.min(float(2.0));
-                        const distI32 = select(
+                        // Composite key: distQ in the high bits, triIdx in the low
+                        // TRI_BITS, so atomicMin selects min distance then LOWEST triIdx
+                        // on ties — order-independent (#921 Eje A). NaN guard
+                        // (NaN ≠ NaN ⇒ equal(self) false) maps to the sentinel so a
+                        // degenerate triangle never wins.
+                        const distQ = int(distClamped.mul(uDistScale));
+                        const key = select(
                           distFloat.equal(distFloat),
-                          int(distClamped.mul(uDistScale)),
+                          // greaterThanEqual/lessThanEqual/bit-ops missing from @types/three at runtime.
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          (distQ as any).shiftLeft(int(TRI_BITS)).bitOr(int(triIdx)),
                           int(INT32_MAX),
                         );
-                        const oldDist = atomicMin(bestDistBuf.element(i), distI32);
-                        If(oldDist.greaterThan(distI32), () => {
-                          atomicStore(bestTriIdxBuf.element(i), int(triIdx));
-                        });
+                        atomicMin(bestDistBuf.element(i), key);
                       },
                     ).Else(() => {
                       // Outside-projection: closest point on each edge with
@@ -419,22 +458,23 @@ export function createTslCollisionBody(
                       const dBCx = px.sub(eBCx); const dBCy = py.sub(eBCy); const dBCz = pz.sub(eBCz);
                       const dsqBC = dBCx.mul(dBCx).add(dBCy.mul(dBCy)).add(dBCz.mul(dBCz));
 
-                      // Min of the three edge dsq, sqrt'd, atomicMin'd.
+                      // Min of the three edge dsq, sqrt'd, packed + atomicMin'd.
                       // §9 cand. 5+6 (#897 F2): mismo guard que la rama
-                      // inside-projection — NaN→i32 es UB en WGSL; >2.147m
-                      // desborda i32 a escala 1e6. NaN ≠ NaN ⇒ equal(self) falso.
+                      // inside-projection — NaN→i32 es UB en WGSL; distClamped acota
+                      // a 2.0m (distQ ∈ [0,8190]). NaN ≠ NaN ⇒ equal(self) falso.
                       const minEdgeDsq = dsqAB.min(dsqAC).min(dsqBC);
                       const distFloat = minEdgeDsq.sqrt();
                       const distClamped = distFloat.min(float(2.0));
-                      const distI32 = select(
+                      // Composite key — same packing as the inside-projection branch
+                      // (#921 Eje A): min distance, then lowest triIdx on ties.
+                      const distQ = int(distClamped.mul(uDistScale));
+                      const key = select(
                         distFloat.equal(distFloat),
-                        int(distClamped.mul(uDistScale)),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        (distQ as any).shiftLeft(int(TRI_BITS)).bitOr(int(triIdx)),
                         int(INT32_MAX),
                       );
-                      const oldDist = atomicMin(bestDistBuf.element(i), distI32);
-                      If(oldDist.greaterThan(distI32), () => {
-                        atomicStore(bestTriIdxBuf.element(i), int(triIdx));
-                      });
+                      atomicMin(bestDistBuf.element(i), key);
                     });
                   });
                 });
@@ -458,7 +498,8 @@ export function createTslCollisionBody(
   const findBestNode = compute(findBestFn, numParticles, [64]);
 
   // ─── Pass 2: applyPushNode ──────────────────────────────────────────────
-  // Per particle: atomicLoad bestTriIdx; if found, re-read winning triangle,
+  // Per particle: atomicLoad the composite key from bestDistBuf; if a contact was
+  // recorded (key < sentinel), decode triIdx and re-read the winning triangle,
   // compute SIDE, push, friction. Always reset atomic scratch for next substep.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyPushFn = (Fn as any)(() => {
@@ -468,15 +509,18 @@ export function createTslCollisionBody(
     // Atomic load at function-top — direct WGSL atomicLoad call, not a nested
     // toVar.assign(storage_read). Safe per the codegen analysis in the design
     // doc referenced at the top of this file.
-    const bestTriIdxLoaded = atomicLoad(bestTriIdxBuf.element(i));
+    const bestKeyLoaded = atomicLoad(bestDistBuf.element(i));
 
-    If(w.greaterThan(float(0.0)).and(bestTriIdxLoaded.greaterThanEqual(int(0))), () => {
+    // key < sentinel ⇒ a contact was recorded. Decode triIdx from the low TRI_BITS
+    // (#921 Eje A — bestDistBuf holds the composite key, not a raw distance).
+    If(w.greaterThan(float(0.0)).and(bestKeyLoaded.lessThan(int(INT32_MAX))), () => {
       const px = posBuf.element(i).x.toVar('apx');
       const py = posBuf.element(i).y.toVar('apy');
       const pz = posBuf.element(i).z.toVar('apz');
 
       // Re-read winning triangle's vertices + normal via dynamic indexing.
-      const triIdxU = uint(bestTriIdxLoaded);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const triIdxU = uint((bestKeyLoaded as any).bitAnd(int(TRI_MASK)));
       const tvBase = triIdxU.mul(uint(9));
       const ax = triVertBuf.element(tvBase);
       const ay = triVertBuf.element(tvBase.add(uint(1)));
@@ -642,7 +686,6 @@ export function createTslCollisionBody(
     // Reset atomic scratch for next substep — always, even when no collision.
     // Direct atomicStore at function-tail; same pattern as tslSelfCollision's
     // applyCorrections reset block.
-    atomicStore(bestTriIdxBuf.element(i), int(NO_TRI));
     atomicStore(bestDistBuf.element(i), int(INT32_MAX));
   })();
 
@@ -657,12 +700,11 @@ export function createTslCollisionBody(
     nodeCount: numNodes,
     triCount: numTris,
     dispose(renderer?: unknown): void {
-      // Release the per-body atomic scratch SBAs captured by closure. These are
-      // the only SBAs created inside the factory; bvh/triVerts/triNormals are
+      // Release the per-body atomic scratch SBA captured by closure. This is
+      // the only SBA created inside the factory; bvh/triVerts/triNormals are
       // caller-owned. Routes through `disposeStorageBufferAttribute` for the
       // same renderer-routing rationale documented in tslBuffers.ts.
       disposeStorageBufferAttribute(bestDistSBA, renderer);
-      disposeStorageBufferAttribute(bestTriIdxSBA, renderer);
     },
   };
 }
