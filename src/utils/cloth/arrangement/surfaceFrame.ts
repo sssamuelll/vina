@@ -86,7 +86,10 @@ export function frameToEulerXYZ(normal: V3, tangent: V3): V3 {
   const t = v(...tangent).normalize();
   // Gram-Schmidt: orthogonalize tangent against normal.
   t.sub(n.clone().multiplyScalar(t.dot(n)));
-  if (t.lengthSq() < 1e-8) t.copy(Math.abs(n.y) < 0.9 ? v(0, 1, 0) : v(1, 0, 0)).sub(n.clone().multiplyScalar(n.dot(v(0, 1, 0))));
+  if (t.lengthSq() < 1e-8) {
+    const alt = Math.abs(n.y) < 0.9 ? v(0, 1, 0) : v(1, 0, 0);
+    t.copy(alt).sub(n.clone().multiplyScalar(n.dot(alt)));
+  }
   t.normalize();
   const b = new THREE.Vector3().crossVectors(n, t).normalize(); // local +X (width)
   const m = new THREE.Matrix4().makeBasis(b, n, t);             // cols = images of local X,Y,Z

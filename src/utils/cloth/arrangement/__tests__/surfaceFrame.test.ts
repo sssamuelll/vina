@@ -46,4 +46,12 @@ describe('surfaceFrame', () => {
     expect(localY.z).toBeCloseTo(1, 5);  // local +Y → world normal (+Z)
     expect(localZ.y).toBeCloseTo(1, 5);  // local +Z → world tangent (+Y)
   });
+
+  it('frameToEulerXYZ handles a degenerate tangent (collinear with a near-+Y normal)', () => {
+    const e = frameToEulerXYZ([0, 1, 0], [0, 1, 0]); // tangent parallel to normal → fallback path
+    expect(e.every((n) => Number.isFinite(n))).toBe(true);
+    const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0], e[1], e[2], 'XYZ'));
+    const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+    expect(localY.dot(new THREE.Vector3(0, 1, 0))).toBeCloseTo(1, 5); // local +Y → normal (+Y)
+  });
 });
