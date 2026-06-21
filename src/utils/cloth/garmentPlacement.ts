@@ -255,7 +255,7 @@ export function computeAutoFrame(
   const frame = surfaceFrame(region, d, axisHint);
   const pH = mmToM(pieceGeometry.heightMm);
 
-  // Hang skirts/hoods/cuffs from their landmark by half the piece height along
+  // Hang skirts only from their landmark by half the piece height along
   // the tangent, matching the old vertical-centering behaviour.
   const hang = (region === 'front-skirt' || region === 'back-skirt') ? pH / 2 : 0;
 

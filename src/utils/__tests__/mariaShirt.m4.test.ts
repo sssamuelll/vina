@@ -30,7 +30,7 @@ import { detectSemanticEdges } from '../semanticEdges';
 import { classifyPiecesGeometric } from '../geometricClassifier';
 import { autoSew } from '../autoSew';
 import { meshPiece } from '../mesh';
-import { placeGarmentPieces } from '../cloth/garmentPlacement';
+import { resolveArrangement } from '../cloth/arrangement/arrangementBinding';
 import { refineSeamsInWorld } from '../autoSew/worldRefine';
 import { mergeMeshes, buildSeamConstraints } from '../cloth/seamAssembly';
 import type { PatternPiece, Seam } from '../../types/types';
@@ -103,7 +103,7 @@ interface WorldSeam {
 
 /** Construye el estado mundo de producción y mide cada costura propuesta. */
 function probeSeams(pieces: PatternPiece[], seams: Seam[]): { worldSeams: WorldSeam[]; particleCount: number } {
-  const placements = placeGarmentPieces(pieces, MEASUREMENTS);
+  const placements = resolveArrangement(pieces, MEASUREMENTS, undefined);
   const meshed = pieces.map((p, i) => {
     const mesh = meshPiece(p, MESH_OPTIONS);
     return {
@@ -181,11 +181,13 @@ function getProbe() {
     const pieces = importClassified();
     const result = autoSew(pieces, { minConfidence: 0.3 });
     // Mismo camino que el thunk runAutoSew (M4-C): refinado en mundo de
-    // partners + reversed contra los placements normalizados.
+    // partners + reversed contra los placements normalizados. Se usa
+    // resolveArrangement (sin overrides) para que la sonda guarde el
+    // camino de producción EXACTO (includes M4-C normalize + reset de toggles).
     const refined = refineSeamsInWorld(
       result.seams.map(s => s.seam),
       pieces,
-      placeGarmentPieces(pieces, MEASUREMENTS),
+      resolveArrangement(pieces, MEASUREMENTS, undefined),
     );
     const { worldSeams, particleCount } = probeSeams(pieces, refined);
     probeCache = { seamCount: refined.length, worldSeams, particleCount };
