@@ -298,8 +298,15 @@ export function computePlacement(
       };
     case 'collar':
       return {
-        // Collar in front of neck, standing vertical like front-torso
-        position: [0, d.neckHeight, d.chestRadius * 0.5 + GAP],
+        // Collar at the neck BASE (shoulder line), pulled toward the neck so the
+        // solver drapes it onto the neck cylinder instead of leaving it as a flat
+        // strip floating ~0.10m in front. The old pose [neckHeight, chestRadius*0.5+GAP]
+        // sat ABOVE the shoulders and shed load forward (it drooped — #921 Eje B).
+        // Start-pose HYGIENE, not an anti-collapse fix: rigid reposition only — z keeps
+        // a GAP clear of the neck (~chestRadius*0.4 > neck radius). Pre-curving the
+        // strip around the neck is FORMING (out of #921 scope). Efficacy is gated on a
+        // GPU-local drape run (no committed measurement yet).
+        position: [0, d.shoulderHeight + 0.02, d.chestRadius * 0.4 + GAP],
         rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
       };
     case 'waistband':
