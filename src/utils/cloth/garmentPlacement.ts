@@ -13,6 +13,7 @@ import type { PatternPiece, PathCommand } from '../../types/types';
 import type { BodyMeasurements } from '../../types/types';
 import { mmToM, cmToM } from '../geometry';
 import { flattenPath, commandRangeToFlattened } from '../seam/index';
+import { surfaceFrame, frameToEulerXYZ, type SurfaceFrame, type V3 } from './arrangement/surfaceFrame';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -235,107 +236,45 @@ export function deriveDimensions(m: BodyMeasurements): BodyDimensions {
 
 const GAP = 0.03; // 3cm from body surface
 
+// Re-export V3 and SurfaceFrame so callers don't need to reach into surfaceFrame.ts.
+export type { V3, SurfaceFrame };
+
+/**
+ * Collision-aware auto pose for a region (#887 Phase 1): position = surface
+ * landmark + outward normal · (radius + GAP) — tangent to and OUTSIDE the body
+ * cylinder — and orientation from the surface frame (replaces the old hard-coded
+ * per-region rotation that placed sleeves as a flat z=0 plane through the arm).
+ */
+export function computeAutoFrame(
+  region: BodyRegion,
+  measurements: BodyMeasurements,
+  pieceGeometry: { widthMm: number; heightMm: number },
+  axisHint?: V3,
+): { placement: PlacementResult; frame: SurfaceFrame } {
+  const d = deriveDimensions(measurements);
+  const frame = surfaceFrame(region, d, axisHint);
+  const pH = mmToM(pieceGeometry.heightMm);
+
+  // Hang skirts/hoods/cuffs from their landmark by half the piece height along
+  // the tangent, matching the old vertical-centering behaviour.
+  const hang = (region === 'front-skirt' || region === 'back-skirt') ? pH / 2 : 0;
+
+  const offset = frame.radius + GAP;
+  const position: [number, number, number] = [
+    frame.point[0] + frame.normal[0] * offset - frame.tangent[0] * hang,
+    frame.point[1] + frame.normal[1] * offset - frame.tangent[1] * hang,
+    frame.point[2] + frame.normal[2] * offset - frame.tangent[2] * hang,
+  ];
+  const rotation = frameToEulerXYZ(frame.normal, frame.tangent);
+  return { placement: { position, rotation }, frame };
+}
+
 export function computePlacement(
   region: BodyRegion,
   measurements: BodyMeasurements,
   pieceGeometry: { widthMm: number; heightMm: number },
 ): PlacementResult {
-  const d = deriveDimensions(measurements);
-  const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
-
-  // Piece height in meters (for vertical centering)
-  const pH = mmToM(pieceGeometry.heightMm);
-
-  // Both PieceMesh and CDT mesher now output pieces in XZ plane (Y=0).
-  // Pattern X → 3D X (width), Pattern Y → 3D Z (height/length).
-  // Pieces are flat/horizontal. Need rotation to stand them up.
-  //
-  // To stand up a piece: rotate -π/2 around X (Z becomes Y, -Y becomes Z)
-
-  // FORWARD CONVENTION: the avatar's front faces +Z (AvatarModel declares
-  // "Z=forward") and the default camera sits at +Z looking toward it. So a
-  // FRONT piece lands on the +Z side (toward camera) and a BACK piece on -Z.
-  //
-  // UP is NOT guaranteed by these rotations. Whether "pattern-up" lands
-  // world-up depends on the 2D drawing's y direction, which real CAD does
-  // not promise (María's DXF draws anatomy toward negative y — SVG y-down —
-  // so [-π/2, 0, 0] landed the front upside-down while the back's in-plane π
-  // happened to un-invert it). The anatomical orientation pass
-  // (normalizeInPlaneOrientation, M4-C) measures where the classified
-  // anatomy actually lands and flips in-plane when inverted — these base
-  // rotations only fix FACING (+Z / −Z / ±X).
-  switch (region) {
-    case 'front-torso':
-      return {
-        position: [0, midTorso, d.chestRadius + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
-      };
-    case 'back-torso':
-      return {
-        position: [0, midTorso, -(d.chestRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face backward (-Z)
-      };
-    case 'left-sleeve':
-      return {
-        // Offset from shoulder, stand up, rotate to point left
-        position: [-(d.shoulderWidth / 2 + 0.12), d.shoulderHeight - 0.03, 0],
-        rotation: [-Math.PI / 2, Math.PI / 2, 0], // stand up, face left (-X)
-      };
-    case 'right-sleeve':
-      return {
-        position: [d.shoulderWidth / 2 + 0.12, d.shoulderHeight - 0.03, 0],
-        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // stand up, face right (+X)
-      };
-    case 'front-skirt':
-      return {
-        position: [0, d.waistHeight - pH / 2, d.hipRadius + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face front (+Z)
-      };
-    case 'back-skirt':
-      return {
-        position: [0, d.waistHeight - pH / 2, -(d.hipRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face back (-Z)
-      };
-    case 'collar':
-      return {
-        // Collar in front of neck, standing vertical like front-torso
-        position: [0, d.neckHeight, d.chestRadius * 0.5 + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
-      };
-    case 'waistband':
-      return {
-        // Waistband in front of waist, standing vertical
-        position: [0, d.waistHeight, d.hipRadius * 0.5 + GAP],
-        rotation: [-Math.PI / 2, 0, 0], // stand up, face forward (+Z)
-      };
-    case 'hood':
-      return {
-        // Behind head, standing vertical facing backward (-Z)
-        position: [0, d.neckHeight + 0.05, -(d.chestRadius + GAP)],
-        rotation: [-Math.PI / 2, 0, Math.PI], // stand up, face backward (-Z)
-      };
-    case 'cuff-left':
-      return {
-        // At wrist, standing vertical facing outward
-        position: [-(d.shoulderWidth / 2 + d.armLength * 0.9), d.shoulderHeight - d.armLength * 0.85, 0],
-        rotation: [-Math.PI / 2, Math.PI / 2, 0], // stand up, face left
-      };
-    case 'cuff-right':
-      return {
-        position: [d.shoulderWidth / 2 + d.armLength * 0.9, d.shoulderHeight - d.armLength * 0.85, 0],
-        rotation: [-Math.PI / 2, -Math.PI / 2, 0], // stand up, face right
-      };
-    case 'unknown':
-    default: {
-      // Fallback: arrange in a circle around the torso, standing up.
-      // Place toward camera (+Z) so a lone unclassified piece is visible.
-      const radius = Math.max(d.chestRadius, d.hipRadius) + 0.12;
-      return {
-        position: [0, midTorso, radius],
-        rotation: [-Math.PI / 2, 0, 0], // stand up
-      };
-    }
-  }
+  return computeAutoFrame(region, measurements, pieceGeometry).placement;
 }
 
 // ── Placement transform (shared) ─────────────────────────────────────────────

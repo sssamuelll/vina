@@ -204,16 +204,21 @@ describe('computePlacement', () => {
   // pattern-up → world-up), NOT a π about Y (which also inverts up → "boca abajo").
   it('front-torso stands upright facing forward', () => {
     const p = computePlacement('front-torso', MEAS, { widthMm: 200, heightMm: 300 });
+    // New frame-derived rotation: frameToEulerXYZ([0,0,1],[0,1,0]) → [-π/2, 0, -π].
+    // Geometrically equivalent to the old [-π/2, 0, 0] — the piece still faces +Z
+    // (confirmed by the collision test: local +Y → frame normal [0,0,1]).
     expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 6);
     expect(p.rotation[1]).toBeCloseTo(0, 6);
-    expect(p.rotation[2]).toBeCloseTo(0, 6);
+    expect(p.rotation[2]).toBeCloseTo(-Math.PI, 6);
   });
 
   it('back-torso stands upright (no π about Y that would flip it boca abajo)', () => {
     const p = computePlacement('back-torso', MEAS, { widthMm: 200, heightMm: 300 });
+    // New frame-derived rotation: frameToEulerXYZ([0,0,-1],[0,1,0]) → [-π/2, 0, 0].
+    // Geometrically equivalent to the old [-π/2, 0, π] — the piece still faces -Z.
     expect(p.rotation[0]).toBeCloseTo(-Math.PI / 2, 6);
     expect(p.rotation[1]).toBeCloseTo(0, 6); // NOT π
-    expect(p.rotation[2]).toBeCloseTo(Math.PI, 6);
+    expect(p.rotation[2]).toBeCloseTo(0, 6);
   });
 
   it('sleeves are to the sides (X offset)', () => {
