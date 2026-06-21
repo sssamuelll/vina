@@ -193,7 +193,7 @@ export function frameToEulerXYZ(normal: V3, tangent: V3): V3 {
   t.sub(n.clone().multiplyScalar(t.dot(n)));
   if (t.lengthSq() < 1e-8) t.copy(Math.abs(n.y) < 0.9 ? v(0, 1, 0) : v(1, 0, 0)).sub(n.clone().multiplyScalar(n.dot(v(0, 1, 0))));
   t.normalize();
-  const b = new THREE.Vector3().crossVectors(t, n).normalize(); // local +X (width)
+  const b = new THREE.Vector3().crossVectors(n, t).normalize(); // local +X (width)
   const m = new THREE.Matrix4().makeBasis(b, n, t);             // cols = images of local X,Y,Z
   const e = new THREE.Euler().setFromRotationMatrix(m, 'XYZ');
   return [e.x, e.y, e.z];
@@ -498,7 +498,7 @@ export function resolveArrangement(
     // Frame-delta compose: posDelta in the frame basis, rotDelta relative to the frame.
     const n = new THREE.Vector3(...frame.normal).normalize();
     const t = new THREE.Vector3(...frame.tangent).normalize();
-    const b = new THREE.Vector3().crossVectors(t, n).normalize();
+    const b = new THREE.Vector3().crossVectors(n, t).normalize();
     const worldPosDelta = b.clone().multiplyScalar(ov.posDelta[0])
       .add(n.clone().multiplyScalar(ov.posDelta[1]))
       .add(t.clone().multiplyScalar(ov.posDelta[2]));
