@@ -16,7 +16,7 @@ import { addSeam } from './projectSlice';
 import { showSuccessToast, showInfoToast } from './copilotUISlice';
 import { autoSew } from '../utils/autoSew';
 import { refineSeamsInWorld } from '../utils/autoSew/worldRefine';
-import { placeGarmentPieces, applyArrangementOverrides } from '../utils/cloth/garmentPlacement';
+import { resolveArrangement } from '../utils/cloth/arrangement/arrangementBinding';
 import type { PatternPiece, Seam } from '../types/types';
 
 /**
@@ -31,9 +31,9 @@ export function refineProposalsAgainstState(
   pieces: PatternPiece[],
   state: RootState,
 ): Seam[] {
-  const placements = applyArrangementOverrides(
-    placeGarmentPieces(pieces, state.project.avatar.measurements),
+  const placements = resolveArrangement(
     pieces,
+    state.project.avatar.measurements,
     state.project.arrangementOverrides,
   );
   return refineSeamsInWorld(seams, pieces, placements);

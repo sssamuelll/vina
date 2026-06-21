@@ -26,7 +26,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../../store';
 import { PatternPiece, Seam, SeamGroup } from '../../types/types';
 import type { SeamInitData } from '../../utils/cloth/clothWorker';
-import { placeGarmentPieces, applyArrangementOverrides } from '../../utils/cloth/garmentPlacement';
+import { resolveArrangement } from '../../utils/cloth/arrangement/arrangementBinding';
 import { computeFitMapData, fabricToFitParams } from '../../utils/cloth/fitMaps';
 import { PHYSICAL_FABRIC_LIBRARY, getPhysicalFabric, toMeshPhysicalParams } from '../../utils/cloth/physicalFabric';
 import { addPin, setFitMapStats, setPieceOpacity } from '../../store/simulationSlice';
@@ -234,9 +234,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
   const { staticGeometry } = useMemo(() => {
     if (pieceMeshes.length === 0) return { staticGeometry: null };
 
-    const placements = applyArrangementOverrides(
-      placeGarmentPieces(activePieces, avatarMeasurements), activePieces, arrangementOverrides,
-    );
+    const placements = resolveArrangement(activePieces, avatarMeasurements, arrangementOverrides);
 
     let totalVerts = 0;
     for (const p of pieceMeshes) {
@@ -314,9 +312,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
 
     // M2: arrange-mode drags apply here too — what the user sees in the
     // arrange view is EXACTLY where the solver starts.
-    const placements = applyArrangementOverrides(
-      placeGarmentPieces(activePieces, avatarMeasurements), activePieces, arrangementOverrides,
-    );
+    const placements = resolveArrangement(activePieces, avatarMeasurements, arrangementOverrides);
 
     return pieceMeshes.map((pm, i) => {
       const placement = placements[i] || { position: [0, 1.0, -0.2], rotation: [0, 0, 0] };
