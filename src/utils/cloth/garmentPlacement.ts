@@ -197,7 +197,7 @@ export function detectBodyRegion(piece: PatternPiece): BodyRegion {
 
 // ── Derived body dimensions (cm → meters) ────────────────────────────────────
 
-interface BodyDimensions {
+export interface BodyDimensions {
   heightM: number;
   waistHeight: number;
   shoulderHeight: number;
