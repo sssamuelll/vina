@@ -391,13 +391,24 @@ git commit -m "feat(wrap): wrapPlacedMesh + resolveArrangementWithFrames"
 
 ### Task 5: Wire the wrap into both `GarmentSimulation` placement loops
 
+**M4-C ORIENTATION (added during execution — Samuel-approved resolution of the §12 audit):**
+María's front + both sleeves are drawn anatomy-DOWN; the rigid placement rights them via `normalizeInPlaneOrientation` (an in-plane 180° flip baked into `placement.rotation`). The wrap replaces `placement.rotation`, so it would lose that flip → pieces wrap upside-down (neckline at hem, sleeveCap at elbow). Resolution:
+1. **Expose the flip flag per piece.** Add an exported `computeFlipFlags(pieces, placements): boolean[]` to `garmentPlacement.ts` that runs the same `meanEdgeWorldY(top) < meanEdgeWorldY(bottom)` test `normalizeInPlaneOrientation` uses; have `normalizeInPlaneOrientation` delegate to it (behavior byte-identical; M4 sonda pins this).
+2. **Pre-flip in the wrap.** Extend `wrapPlacedMesh(localVertices, frame, params, flip = false)`: when `flip`, transform each local vertex `[x, y, z] → [-x, y, -z]` (in-plane 180°) BEFORE `wrapPanel`. `wrapPanel` itself unchanged.
+3. **Thread the flag.** `resolveArrangementWithFrames` additionally returns `flip: boolean` per piece (from `computeFlipFlags` against the placements it already computes); `PlacementWithFrame` gains `flip`.
+4. **CI orientation test (the safety net — catches upside-down without the maintainer E2E):** with María's 5 real pieces, after wrap, assert anatomy-TOP edges (`neckline`/`shoulder`/`sleeveCap`) land at higher world-Y (torso) / more proximal (sleeves) than anatomy-BOTTOM (`hemline`/`cuffEdge`), reusing `meanEdgeWorldY` on the wrapped vertices.
+
 **Files:**
-- Modify: `src/components/Viewport3D/GarmentSimulation.tsx` (render geometry `:257-271`, solver `placedMeshes` `:319-335`)
+- Modify: `src/components/Viewport3D/GarmentSimulation.tsx` (render geometry `:257-271`, solver `placedMeshes` `:319-335`) — per piece, `wrapPlacedMesh(p.vertices, frame, DEFAULT_WRAP, flip)` from `resolveArrangementWithFrames`, replacing the rigid loop.
+- Modify: `src/utils/cloth/garmentPlacement.ts` — `computeFlipFlags` export; `normalizeInPlaneOrientation` delegates.
+- Modify: `src/utils/cloth/arrangement/wrapPlacedMesh.ts` — `flip` param.
+- Modify: `src/utils/cloth/arrangement/arrangementBinding.ts` — `resolveArrangementWithFrames` returns `flip`; `PlacementWithFrame` gains `flip`.
+- Test: `src/utils/cloth/arrangement/__tests__/wrapOrientation.test.ts` (create); extend `wrapPlacedMesh.test.ts` for `flip`.
 - Audit (read-only): `src/utils/cloth/seamAssembly.ts` — confirm `matchVertices` pairs by parameter/t, not raw 3D distance (spec §12). If raw-distance, STOP and flag (curvature would re-pair seams).
 
 **Interfaces:**
-- Consumes: `wrapPlacedMesh` (Task 4), `resolveArrangementWithFrames` (Task 4), `WrapParams`.
-- Produces: both render and solver vertices are curved by the SAME `wrapPlacedMesh` call.
+- Consumes: `wrapPlacedMesh` (Task 4, +`flip`), `resolveArrangementWithFrames` (Task 4, +`flip`), `WrapParams`, `computeFlipFlags`.
+- Produces: both render and solver vertices are curved by the SAME `wrapPlacedMesh` call, with the M4-C flip applied so anatomy lands upright.
 
 - [ ] **Step 1: Audit matchVertices**
 
