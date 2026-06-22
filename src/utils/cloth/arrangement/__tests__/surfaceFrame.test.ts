@@ -6,6 +6,7 @@ import type { BodyDimensions } from '../../garmentPlacement';
 const D: BodyDimensions = {
   heightM: 1.68, waistHeight: 0.924, shoulderHeight: 1.3776, neckHeight: 1.4616,
   chestRadius: 0.14, hipRadius: 0.1528, shoulderWidth: 0.4, armLength: 0.6,
+  neckR: 0.056, armR: 0.05,
 };
 
 const len = (v: [number, number, number]) => Math.hypot(v[0], v[1], v[2]);

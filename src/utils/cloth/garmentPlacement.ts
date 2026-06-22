@@ -207,21 +207,26 @@ export interface BodyDimensions {
   hipRadius: number;
   shoulderWidth: number;
   armLength: number;
+  neckR: number;
+  armR: number;
 }
 
 export function deriveDimensions(m: BodyMeasurements): BodyDimensions {
   const h = cmToM(m.height);
   const chestCirc = cmToM(m.chest);
   const hipCirc = cmToM(m.hips);
+  const chestRadius = chestCirc / (2 * Math.PI);
   return {
     heightM: h,
     waistHeight: m.waistHeight ? cmToM(m.waistHeight) : h * 0.55,
     shoulderHeight: h * 0.82,
     neckHeight: h * 0.87,
-    chestRadius: chestCirc / (2 * Math.PI),
+    chestRadius,
     hipRadius: hipCirc / (2 * Math.PI),
     shoulderWidth: m.shoulderWidth ? cmToM(m.shoulderWidth) : cmToM(m.shoulder),
     armLength: m.armLength ? cmToM(m.armLength) : h * 0.33,
+    neckR: m.neckCirc ? cmToM(m.neckCirc) / (2 * Math.PI) : chestRadius * 0.4,
+    armR: m.upperArmCirc ? cmToM(m.upperArmCirc) / (2 * Math.PI) : 0.05,
   };
 }
 
