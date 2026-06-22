@@ -431,16 +431,54 @@ export function normalizeInPlaneOrientation(
 // `flippedPieceIds` (DraggablePiece scale-z) remains the human override for
 // true reflections.
 
+/**
+ * Toggle-reset + single deterministic `detectBodyRegion` pass — the ONE place
+ * the side-effecting L/R toggles are exercised for a batch. Returns the RAW
+ * regions (with `'unknown'` preserved); callers layer the `allUnknown`
+ * alternation on top. Private so the toggle reset is never duplicated.
+ */
+function rawRegions(pieces: PatternPiece[]): BodyRegion[] {
+  _sleeveToggle = false;
+  _cuffToggle = false;
+  // Compute regions ONCE to avoid double-calling detectBodyRegion
+  // (it has toggle side effects for sleeve/cuff L/R assignment).
+  return pieces.map(p => detectBodyRegion(p));
+}
+
+/**
+ * The EFFECTIVE per-piece regions a batch placement uses — the deterministic
+ * region assignment, NOT a fresh per-piece `detectBodyRegion`.
+ *
+ * `detectBodyRegion` has toggle side-effects (`_sleeveToggle`/`_cuffToggle`)
+ * for L/R assignment of side-less sleeve/cuff pairs, so calling it per piece
+ * out of band can flip L↔R relative to what the batch assigned. This helper is
+ * the single deterministic source: toggle reset + one mapping pass (via
+ * `rawRegions`, shared with `placeGarmentPieces`), then the same `allUnknown`
+ * front/back alternation `placeGarmentPieces` uses (so a fully-unclassified
+ * pattern reports the same regions it's placed with, not a row of `'unknown'`).
+ * The placement path stays byte-identical (pinned by the mariaShirt.m4 sonda).
+ */
+export function computeEffectiveRegions(pieces: PatternPiece[]): BodyRegion[] {
+  const regions = rawRegions(pieces);
+  const unknownCount = regions.filter(r => r === 'unknown').length;
+  const allUnknown = unknownCount === pieces.length && pieces.length > 0;
+  if (!allUnknown) return regions;
+
+  // Fully-unclassified pattern: the placement alternates front/back torso by
+  // index (see placeGarmentPieces). Reflect that here so the effective region
+  // matches the pose actually used, instead of leaving them all 'unknown'.
+  return regions.map((_, i) => (i % 2 === 0 ? 'front-torso' : 'back-torso'));
+}
+
 export function placeGarmentPieces(
   pieces: PatternPiece[],
   measurements: BodyMeasurements,
 ): PlacementResult[] {
-  _sleeveToggle = false;
-  _cuffToggle = false;
-
-  // Compute regions ONCE to avoid double-calling detectBodyRegion
-  // (it has toggle side effects for sleeve/cuff L/R assignment)
-  const regions = pieces.map(p => detectBodyRegion(p));
+  // Raw regions (toggle reset + single detectBodyRegion pass) — same source as
+  // computeEffectiveRegions. The loop below still needs the raw 'unknown'
+  // marker to stagger X / pick the circle fallback, so it works off the raw
+  // regions and applies the allUnknown alternation itself.
+  const regions = rawRegions(pieces);
   const unknownCount = regions.filter(r => r === 'unknown').length;
   // When EVERY piece is unknown, the pattern came from a source that doesn't
   // expose category metadata (notably the Seamly2D converter, which produces

@@ -11,8 +11,8 @@
  */
 import * as THREE from 'three';
 import type { BodyMeasurements, PatternPiece } from '../../../types/types';
-import { computeAutoFrame, detectBodyRegion, outlineBBox, placeGarmentPieces, type PlacementResult } from '../garmentPlacement';
-import type { V3 } from './surfaceFrame';
+import { computeAutoFrame, computeEffectiveRegions, deriveDimensions, detectBodyRegion, outlineBBox, placeGarmentPieces, type PlacementResult } from '../garmentPlacement';
+import { surfaceFrame, type SurfaceFrame, type V3 } from './surfaceFrame';
 
 export interface ArrangementBinding {
   space: 'frame';
@@ -86,5 +86,40 @@ export function resolveArrangement(
     const deltaQ = new THREE.Quaternion(ov.rotDelta[0], ov.rotDelta[1], ov.rotDelta[2], ov.rotDelta[3]);
     const e = new THREE.Euler().setFromQuaternion(autoQ.multiply(deltaQ), 'XYZ');
     return { position, rotation: [e.x, e.y, e.z] };
+  });
+}
+
+export interface PlacementWithFrame {
+  placement: PlacementResult;
+  frame: SurfaceFrame;
+}
+
+/**
+ * Sibling of `resolveArrangement` that also returns the per-piece body
+ * `SurfaceFrame` (#887 / envelope-wrap Task 4), so the wrap step (Task 5) can
+ * curve each piece's vertices over the region cylinder.
+ *
+ * The placement is `resolveArrangement`'s OWN output (reused verbatim — no
+ * divergence: the M4 sonda, GarmentSimulation and autoSewThunk all key off
+ * `resolveArrangement`, so this must not re-derive a parallel pose). The frame
+ * is `surfaceFrame(region, dims, axisHint)` using the SAME deterministic
+ * regions `placeGarmentPieces` assigns (`computeEffectiveRegions`) — NOT a
+ * fresh per-piece `detectBodyRegion`, which would re-run the L/R toggles and
+ * could curve the left sleeve onto the right arm (the bug arrangementBinding.ts
+ * already warns about). `axisHint` is gated identically to `resolveArrangement`.
+ */
+export function resolveArrangementWithFrames(
+  pieces: PatternPiece[],
+  measurements: BodyMeasurements,
+  overrides: Record<string, ArrangementOverride> | undefined,
+  opts?: { skeletonReady?: boolean; axisHints?: Record<string, V3> },
+): PlacementWithFrame[] {
+  const regions = computeEffectiveRegions(pieces);
+  const placements = resolveArrangement(pieces, measurements, overrides, opts);
+  const dims = deriveDimensions(measurements);
+
+  return pieces.map((p, i) => {
+    const axisHint = opts?.skeletonReady === false ? undefined : opts?.axisHints?.[p.id];
+    return { placement: placements[i], frame: surfaceFrame(regions[i], dims, axisHint) };
   });
 }

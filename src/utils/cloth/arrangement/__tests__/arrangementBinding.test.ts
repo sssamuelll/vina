@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { resolveArrangement, type ArrangementBinding } from '../arrangementBinding';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { resolveArrangement, resolveArrangementWithFrames, type ArrangementBinding } from '../arrangementBinding';
+import { importDXFContent } from '../../../dxf';
+import { classifyPiecesGeometric } from '../../../geometricClassifier';
+import { detectSemanticEdges } from '../../../semanticEdges';
+import { computeEffectiveRegions } from '../../garmentPlacement';
 import type { BodyMeasurements, PatternPiece } from '../../../../types/types';
 
 const MEAS_A = { height: 168, chest: 88, waist: 72, hips: 96, shoulder: 40, armLength: 60, inseam: 80 } as BodyMeasurements;
@@ -51,5 +57,63 @@ describe('resolveArrangement', () => {
     const [p] = resolveArrangement([piece('s1', 'Left Sleeve')], MEAS_A, {}, { skeletonReady: false });
     expect(p.position.every((n) => Number.isFinite(n))).toBe(true);
     expect(p.position).not.toEqual([0, 0, 0]);
+  });
+});
+
+// ── resolveArrangementWithFrames (#887 / envelope-wrap Task 4) ────────────────
+
+const MARIA_FIXTURE = resolve(__dirname, '../../../../../tests/fixtures/garments/maria_patrones_samuel_2M.dxf');
+const MARIA_MEAS = { height: 180, chest: 96, waist: 82, hips: 96, shoulder: 44, armLength: 64, inseam: 82 } as BodyMeasurements;
+
+function importMariaClassified(): PatternPiece[] {
+  const pieces = importDXFContent(readFileSync(MARIA_FIXTURE, 'utf-8'), { unit: 'auto', autoDetect: true }).pieces;
+  const map = classifyPiecesGeometric(pieces);
+  for (const p of pieces) {
+    const c = map.get(p.id)!;
+    if (c.category !== 'other') { p.category = c.category; if (c.side) p.side = c.side; }
+    p.edges = detectSemanticEdges(p);
+  }
+  return pieces;
+}
+
+describe('resolveArrangementWithFrames', () => {
+  const front = piece('p1', 'Front');
+  const back = piece('p2', 'Back');
+
+  it('returns one {placement, frame} per piece', () => {
+    const out = resolveArrangementWithFrames([front, back], MEAS_A, undefined);
+    expect(out.length).toBe(2);
+    for (const o of out) {
+      expect(o.placement).toBeDefined();
+      expect(o.frame).toBeDefined();
+      expect(o.frame.point.every(Number.isFinite)).toBe(true);
+      expect(Number.isFinite(o.frame.radius)).toBe(true);
+    }
+  });
+
+  it('placement equals resolveArrangement for the same input (no divergence)', () => {
+    const pieces = [front, back];
+    const overrides = { p1: [0.1, 1.0, 0.2] as [number, number, number] };
+    const plain = resolveArrangement(pieces, MEAS_A, overrides);
+    const withFrames = resolveArrangementWithFrames(pieces, MEAS_A, overrides);
+    expect(withFrames.map(o => o.placement)).toEqual(plain);
+  });
+
+  it("María's 5 pieces: sleeve frames are L/R-correct (regions did not toggle-diverge)", () => {
+    const pieces = importMariaClassified();
+    expect(pieces.length).toBe(5);
+    const regions = computeEffectiveRegions(pieces);
+    const out = resolveArrangementWithFrames(pieces, MARIA_MEAS, undefined);
+
+    const li = regions.indexOf('left-sleeve');
+    const ri = regions.indexOf('right-sleeve');
+    expect(li).toBeGreaterThanOrEqual(0);
+    expect(ri).toBeGreaterThanOrEqual(0);
+
+    // Left sleeve frame sits on the −X arm, right sleeve on +X. A fresh
+    // detectBodyRegion per piece would re-run the L/R toggle and could swap
+    // these — proving the effective regions are reused, not re-detected.
+    expect(out[li].frame.point[0]).toBeLessThan(0);
+    expect(out[ri].frame.point[0]).toBeGreaterThan(0);
   });
 });
