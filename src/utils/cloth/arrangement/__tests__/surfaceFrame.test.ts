@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import * as THREE from 'three';
 import { surfaceFrame, frameToEulerXYZ } from '../surfaceFrame';
 import type { BodyDimensions } from '../../garmentPlacement';
+import { deriveDimensions } from '../../garmentPlacement';
 
 const D: BodyDimensions = {
   heightM: 1.68, waistHeight: 0.924, shoulderHeight: 1.3776, neckHeight: 1.4616,
@@ -9,8 +10,24 @@ const D: BodyDimensions = {
   neckR: 0.056, armR: 0.05,
 };
 
+// Measurements with explicit neckCirc / upperArmCirc so neckR / armR differ
+// from the fallback formulas (chestRadius*0.4 and 0.05).
+// neckCirc=40 → neckR = 0.40/(2π) ≈ 0.0637  (fallback would be 0.14*0.4=0.056)
+// upperArmCirc=32 → armR = 0.32/(2π) ≈ 0.0509 (fallback is exactly 0.05)
+// Use upperArmCirc=34 → armR = 0.34/(2π) ≈ 0.0541  so it diverges clearly.
+const D2 = deriveDimensions({
+  height: 168, chest: 88, waist: 72, hips: 96,
+  shoulder: 40, armLength: 60, inseam: 79,
+  neckCirc: 40, upperArmCirc: 34,
+});
+
 const len = (v: [number, number, number]) => Math.hypot(v[0], v[1], v[2]);
 const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: number[], b: number[]): number[] => [
+  a[1] * b[2] - a[2] * b[1],
+  a[2] * b[0] - a[0] * b[2],
+  a[0] * b[1] - a[1] * b[0],
+];
 
 describe('surfaceFrame', () => {
   it('returns an orthonormal outward frame for the front torso', () => {
@@ -54,5 +71,26 @@ describe('surfaceFrame', () => {
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(e[0], e[1], e[2], 'XYZ'));
     const localY = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
     expect(localY.dot(new THREE.Vector3(0, 1, 0))).toBeCloseTo(1, 5); // local +Y → normal (+Y)
+  });
+
+  // Task 2: anatomical radii + non-degenerate frames (axis × normal ≠ 0 for all regions).
+  // D2 uses explicit neckCirc/upperArmCirc so D2.neckR / D2.armR differ from the
+  // hardcoded fallbacks (chestRadius*0.4 and 0.05) — making these tests meaningful.
+  it('collar wraps around the vertical axis with a horizontal binormal and uses neckR', () => {
+    const f = surfaceFrame('collar', D2);
+    const c = cross(f.axis, f.normal);
+    const cLen = Math.hypot(c[0], c[1], c[2]);
+    expect(cLen).toBeGreaterThan(0.99); // axis × normal is a valid horizontal binormal
+    expect(f.radius).toBeCloseTo(D2.neckR, 4);
+  });
+
+  it('sleeve frame uses armR, axis runs along the arm, and axis × normal is non-degenerate', () => {
+    const f = surfaceFrame('left-sleeve', D2);
+    expect(f.radius).toBeCloseTo(D2.armR, 4);
+    expect(Math.abs(dot(f.axis, f.tangent))).toBeGreaterThan(0.99); // tangent IS the arm axis
+    expect(Math.abs(dot(f.axis, f.normal))).toBeLessThan(0.01);     // normal ⊥ axis
+    const c = cross(f.axis, f.normal);
+    const cLen = Math.hypot(c[0], c[1], c[2]);
+    expect(cLen).toBeGreaterThan(0.99); // axis × normal non-degenerate
   });
 });

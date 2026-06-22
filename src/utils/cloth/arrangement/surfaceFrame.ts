@@ -37,8 +37,8 @@ function radialNormal(axis: THREE.Vector3, prefer = v(0, 0, 1)): THREE.Vector3 {
 
 export function surfaceFrame(region: BodyRegion, d: BodyDimensions, axisHint?: V3): SurfaceFrame {
   const midTorso = (d.shoulderHeight + d.waistHeight) / 2;
-  const armR = 0.05; // parametric arm radius (Phase 1 constant; mirrors AnchorPoints armR scale)
-  const neckR = d.chestRadius * 0.4;
+  const armR = d.armR;
+  const neckR = d.neckR;
 
   switch (region) {
     case 'front-torso':
