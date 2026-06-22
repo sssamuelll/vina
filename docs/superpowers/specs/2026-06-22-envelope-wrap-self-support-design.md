@@ -45,17 +45,18 @@ The pin resolves the torso but never puts the sleeves **on the arm** (a pinned f
 
 v1 wrongly claimed the wrap rides the existing pipeline "untouched." It cannot: `PlacementResult` is a **rigid** `{position:[3], rotation:[3]}` per piece (`garmentPlacement.ts:34-37`); the mesh is baked **flat** (`cdtMesher.ts:465`, `y = const`); both render and solver paths apply that one rigid transform to **every** vertex (`GarmentSimulation.tsx:257-271, :319-330`). **Per-vertex curvature cannot be expressed by a rigid transform.**
 
-**Decision: the wrap materializes curved vertices in the mesher.** Pieces are *born curved*.
+**Decision: the wrap replaces the rigid per-vertex transform at placement time** (council option (b)). The mesher (`cdtMesher.meshPiece`) runs per-piece in a worker **before** region detection — it does not know the piece's region/frame, so it cannot curve. The frame *is* known at `placedMeshes` build time. Today both paths apply a rigid rotate+translate to every vertex (`GarmentSimulation.tsx:257-271` render, `:319-335` solver, math mirrored in `garmentPlacement.placementLocalToWorld`); the wrap **replaces that rigid loop with a wrap+place loop**, materializing curved vertices. The mesher keeps emitting flat panels; the curvature lands in the **placed** vertices (which become the solver's `this.pos` and the source of rest-lengths, `xpbdSolver.ts:561-566`).
 
 | Unit | Responsibility | Status |
 |---|---|---|
-| `wrapPanel(local2D, frame, params)` → `V3` | **NEW, pure.** Map a panel-local 2D point to a curved 3D point over the region's cylinder. | new, `cloth/arrangement/wrapPanel.ts` |
-| `cdtMesher.convertToClothMeshData` | Apply `wrapPanel` when emitting vertices, so cloth meshes are born curved (`y ≠ const`). The curve is baked into the **rest positions**. | **MODIFIED** |
-| `surfaceFrame` | Return a **non-degenerate** frame per region: a distinct ring-axis vs tangent for collar/torso (today `axis==tangent==[0,1,0]`, §5). | **MODIFIED** (was "Unchanged") |
-| `placeGarmentPieces` / `PlacementResult` | Still emits the rigid per-piece `{position, rotation}` for gross placement; the per-vertex curve is now in the mesh, so the rigid transform composes on top. | reused |
-| seam matching (`worldRefine`, `autoSew`) | **Must be reconciled:** these compute seam partners on **flat** edges. State explicitly whether they run before the curve (on flat geometry) or need the curved positions. | **audit required** |
+| `wrapPanel(localVert, frame, params)` → `V3` | **NEW, pure.** Map a flat panel-local vertex to a curved-then-placed 3D point over the region cylinder (arc-length-preserving). | new, `cloth/arrangement/wrapPanel.ts` |
+| placement loops in `GarmentSimulation.tsx` (render `:257-271` + solver `:319-335`) | Replace the rigid rotate+translate per vertex with `wrapPanel`. **Both paths must use the SAME map** or render and solver diverge. | **MODIFIED** |
+| `surfaceFrame` | Non-degenerate frame per region (distinct ring-axis vs tangent for collar/torso — today `axis==tangent==[0,1,0]`) + anatomical radii. | **MODIFIED** |
+| `deriveDimensions` / `BodyDimensions` | Surface `neckR = neckCirc/2π` and `armR = upperArmCirc/2π` (both optional in `BodyMeasurements`; parametric fallback when absent). | **MODIFIED** |
+| `cdtMesher` | **Unchanged** — keeps emitting flat panels (`y = const`); the curve is applied downstream where the frame is known. | reused |
+| seam matching (`worldRefine`, `seamInitDataToPairs`) | Verified flat/index-based (2D outline + `boundaryOrig` provenance, not 3D positions) → curvature does NOT break partner assignment. **One audit:** confirm `matchVertices` (`seamAssembly`) is t-based, not raw-distance. | audit |
 
-This is the structural change v1 missed: the wrap is a **mesh-generation** change, not a placement transform. `resolveArrangement` and the rigid placement stay; the curvature is in the rest mesh.
+This is the structural change v1 missed: the wrap is a **placed-vertex** change applied where the frame is known, NOT a rigid placement transform. `resolveArrangement` and the gross placement position stay; the per-vertex curve replaces the rigid orientation loop.
 
 ## 5. The wrap mechanism
 
@@ -140,7 +141,9 @@ Each rung is measured by §8 before taking the next. **A (full tube) is the desi
 
 ## 12. Open audit items (resolve during implementation-planning)
 
-- Seam matching (`worldRefine`/`autoSew`) on flat vs curved geometry (§4) — does partner assignment still hold when rest mesh is curved?
+- Seam matching: **mostly resolved** — `worldRefine` + `seamInitDataToPairs` use the flat 2D outline + `boundaryOrig` index provenance, not 3D positions, so curvature does not break partner assignment. **Remaining audit:** confirm `matchVertices` (`seamAssembly.ts`) pairs by parameter/t, not raw 3D distance (raw distance would re-pair under curvature).
+- **Warm-start divergence:** the re-mesh path (`restLengthComputer` on the flat mesher output, `useMeshing.ts:176`) does NOT see the placement-time wrap → rest-lengths from a flat mesh while the live solver has a curved one. Moot for the María single-drape beachhead; flag as follow-up if warm-start-during-sim is exercised.
+- Arc-length: `xpbdSolver.ts:565` builds rest-lengths as straight-line distance between placed (curved) vertices — so `wrapPanel` MUST be arc-length-preserving or the solver bakes in shrinkage that relaxes and opens the ring.
 - `wrapPanel` vs `normalizeInPlaneOrientation` (the 180° in-plane flip) order — does the flip invert the arc into the body?
 - Collar-vs-head: does the T-pose bake have a head collider giving the ring an upper stop? Without it the ring can slide *up* off the neck, defeating the catch.
 - Seam vs self-collision contention at the closing lip (both run per-substep; candidate minY-instability source).
