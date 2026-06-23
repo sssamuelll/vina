@@ -257,14 +257,19 @@ describe('seamInitDataToPairs', () => {
 
   // ─── Defensive guards (#736) ──────────────────────────────────────────
 
-  it('skips self-seam (pieceAId === pieceBId) with warning', () => {
+  it('resolves self-seam (pieceAId === pieceBId) to real vertex pairs — sleeve tube closure', () => {
+    // Same-piece seams (e.g. underarmSeam↔underarmSeam-2) are now valid on the
+    // GPU tier. The piece has both 'top' and 'bottom' edges; they pair like a
+    // cross-piece seam, just with both halves coming from the same piece object.
     const result = seamInitDataToPairs(
-      [makeSeam({ pieceBId: 'A' })],
+      [makeSeam({ pieceBId: 'A', pieceBEdgeName: 'bottom' })],
       [makeSquarePiece('A'), makeSquarePiece('B')],
     );
-    expect(result).toEqual([]);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toContain('self-seam');
+    expect(result).toHaveLength(1);
+    expect(result[0].pieceAId).toBe('A');
+    expect(result[0].pieceBId).toBe('A');
+    expect(result[0].vertexPairs.length).toBeGreaterThan(0);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('warns on duplicate pieceId in input array (last entry wins)', () => {
@@ -373,19 +378,22 @@ describe('summarizeSeamResolution', () => {
     ]);
   });
 
-  it('reports missing-piece and self-seam failures', () => {
+  it('reports missing-piece failure; self-seam now resolves successfully', () => {
+    // Since same-piece seams are valid (sleeve tube closure), the 's-self' case
+    // resolves to real constraints rather than failing with 'self-seam'.
     const pieces = [makeSquarePiece('A'), makeSquarePiece('B')];
     const entries = summarizeSeamResolution(
       [
         makeSeam({ id: 's-missing', pieceBId: 'ghost' }),
-        makeSeam({ id: 's-self', pieceBId: 'A' }),
+        makeSeam({ id: 's-self', pieceBId: 'A', pieceBEdgeName: 'bottom' }),
       ],
       pieces,
     );
-    expect(entries).toEqual([
-      { seamId: 's-missing', constraintCount: 0, failure: 'missing-piece' },
-      { seamId: 's-self', constraintCount: 0, failure: 'self-seam' },
-    ]);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toEqual({ seamId: 's-missing', constraintCount: 0, failure: 'missing-piece' });
+    expect(entries[1].seamId).toBe('s-self');
+    expect(entries[1].constraintCount).toBeGreaterThan(0);
+    expect(entries[1].failure).toBeNull();
   });
 
   it('is silent on console — failures surface via toast/inspector, not warns', () => {
