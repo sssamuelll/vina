@@ -39,6 +39,9 @@ describe('autoSew self-close pass', () => {
     expect([s.pieceA.edgeName, s.pieceB.edgeName].sort())
       .toEqual(['underarmSeam', 'underarmSeam-2']);
     expect(s.type).toBe('standard');
+    // The symmetric fixture makes the exact value of reversed degenerate; assert
+    // type presence so the field is confirmed set by the self-close pass.
+    expect(typeof s.pieceB.reversed).toBe('boolean');
     // No self-seam for the bodice (no self-close edges).
     expect(selfSeams.every(x => x.seam.pieceA.pieceId === 'sleeve-1')).toBe(true);
   });

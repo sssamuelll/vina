@@ -256,18 +256,15 @@ export function autoSew(
   // emit one same-piece underarm seam per piece that has exactly two such
   // edges. buildSeamConstraints supports same-piece seams; worldRefine passes
   // them through (Task 1). See the sleeve-tube-closure design doc.
+  //
+  // NOTE: onlyPairs is a CROSS-PIECE pairing whitelist — a same-piece tube
+  // closure cannot be expressed as a pair, so onlyPairs must NOT gate this
+  // pass. Every activePiece with exactly two self-close edges gets a seam.
   const d2 = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot(a.x - b.x, a.y - b.y);
   const selfCloseSeams: ProposedSeam[] = [];
   const selfCloseEdgeKeys = new Set<string>();
-  // When onlyPairs restricts cross-piece matching, honour the same restriction
-  // for same-piece seams: only process pieces that appear in at least one
-  // listed pair (a sleeve not in any listed pair is intentionally excluded).
-  const onlyPairsPieceIds = onlyPairs
-    ? new Set(onlyPairs.flat())
-    : null;
   for (const piece of activePieces) {
-    if (onlyPairsPieceIds && !onlyPairsPieceIds.has(piece.id)) continue;
     const sc = (pieceEdges.get(piece.id) ?? []).filter(e => e.matchHint === 'self-close');
     if (sc.length !== 2) {
       if (sc.length > 0) {
