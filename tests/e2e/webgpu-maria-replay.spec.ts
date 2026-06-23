@@ -213,6 +213,73 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
       `[creep-watch] simSeconds=10 belowHipPct=${creep!.belowHipPct.toFixed(2)} minY=${creep!.minY.toFixed(3)} maxY=${creep!.maxY.toFixed(3)} nan=${creep!.nan} (issue #902 — non-deterministic, log-only)`,
     );
     expect(creep!.nan).toBe(0);
+
+    // ── §8 envelope-wrap checkpoints (maintainer-run) ────────────────────────
+    // These checkpoints measure the auto-support bet from the envelope-wrap
+    // spec §8: wrapping panels over body cylinders holds the garment without
+    // structural pins. Targets: minY ≥ 0.5m primary, belowHip ≤ 0.5%,
+    // interpenetration count = 0. The 10s self-support bet is MEASURED BY THE
+    // MAINTAINER (npm run test:e2e:gpu -- webgpu-maria-replay -g "drape M4"
+    // --repeat-each=3). CI does not execute @gpu-local; only deterministic
+    // invariants are asserted here (nan=0, structural presence).
+
+    // §8 pin-disabled assert: computeShoulderAnchors is NOT wired on this
+    // branch (it lives on exp/anchor-on-arrangement). The solver must be
+    // running in un-pinned envelope-wrap mode. // maintainer-run
+    const pinCount = await getState<number>(page, 'simulation.pinnedVertexCount');
+    // The wrap mechanism holds geometry — no structural shoulder pins expected.
+    // If pinCount > 0 something wired computeShoulderAnchors unexpectedly.
+    expect(pinCount ?? 0).toBe(0);
+
+    // §8 t=0 penetration count: cloth verts inside the baked body mesh at
+    // sim start. With envelope-wrap placement the panels are tangent-to and
+    // outside the body cylinders, so interpenetration at t=0 should be zero.
+    // Log-only: deterministic only if the baked mesh is loaded by t=0. // maintainer-run
+    const penetrationCount = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      // __OPENCLO_PENETRATION_COUNT__ is published by the collision subsystem
+      // after the first solver step; undefined = not yet available.
+      return (w.__OPENCLO_PENETRATION_COUNT__ as number | undefined) ?? null;
+    });
+    console.log(
+      `[wrap-spec-§8] t=0 penetrationCount=${penetrationCount ?? 'not-published'} (target=0)`,
+    );
+    if (penetrationCount !== null) {
+      // Only assert when the subsystem published the value. // maintainer-run
+      expect(penetrationCount).toBe(0);
+    }
+
+    // §8 early-collapse sampling at t=0.5s and t=1s — log belowHip/minY.
+    // The wrap bet says the ring catches on the shoulders and the garment
+    // holds; early collapse (belowHip > 0.5% at t=0.5s) would mean the
+    // ring slipped through. Logged for the maintainer; not CI-asserted. // maintainer-run
+    await waitForSimWindows(page, 1, 30_000); // t≈0.5s
+    const earlyA = await readDrape(page);
+    console.log(
+      `[wrap-spec-§8] t=0.5s belowHipPct=${earlyA?.belowHipPct.toFixed(2) ?? 'n/a'} minY=${earlyA?.minY.toFixed(3) ?? 'n/a'} (target: belowHip≤0.5%)`,
+    );
+
+    await waitForSimWindows(page, 2, 30_000); // t≈1s
+    const earlyB = await readDrape(page);
+    console.log(
+      `[wrap-spec-§8] t=1s belowHipPct=${earlyB?.belowHipPct.toFixed(2) ?? 'n/a'} minY=${earlyB?.minY.toFixed(3) ?? 'n/a'} (target: minY≥0.5m)`,
+    );
+
+    // §8 collar-height + sleeve-on-arm logs (structural presence). // maintainer-run
+    const collarHeight = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return (w.__OPENCLO_COLLAR_HEIGHT__ as number | undefined) ?? null;
+    });
+    const sleeveOnArm = await page.evaluate(() => {
+      const w = window as unknown as Record<string, unknown>;
+      return (w.__OPENCLO_SLEEVE_ON_ARM__ as boolean | undefined) ?? null;
+    });
+    console.log(
+      `[wrap-spec-§8] collarHeight=${collarHeight ?? 'not-published'} sleeveOnArm=${sleeveOnArm ?? 'not-published'}`,
+    );
+    // Structural NaN guard on early samples is deterministic. // maintainer-run
+    expect(earlyA?.nan ?? 0).toBe(0);
+    expect(earlyB?.nan ?? 0).toBe(0);
   });
 
   test('DoD #897: ≥30fps sostenidos', async ({ page }) => {
