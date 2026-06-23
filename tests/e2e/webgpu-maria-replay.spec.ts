@@ -256,6 +256,33 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     );
     expect(creep!.nan).toBe(0);
 
+    // Tube-closure check (maintainer-run): the sleeve must STAY on the arm.
+    // Before tube closure, sleeve verts (|x|>0.25) collapsed 993→~2 over 10s
+    // as the open sleeve slid off. With the underarm seam closing the tube the
+    // on-arm population persists. The 10s drape is non-deterministic (#902), so
+    // this is a loose ANTI-COLLAPSE floor, not a tight bound — the maintainer
+    // runs --repeat-each=3 and reads the logged counts. // maintainer-run
+    const sleeveAt10 = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mesh = (window as any).__OPENCLO_CLOTH_MESH__;
+      if (!mesh) return null;
+      const pos = mesh.geometry.attributes.position;
+      let count = 0, maxAbsX = 0;
+      for (let i = 0; i < pos.count; i++) {
+        const ax = Math.abs(pos.getX(i));
+        if (ax > maxAbsX) maxAbsX = ax;
+        if (ax > 0.25) count++;
+      }
+      return { count, maxAbsX };
+    });
+    console.log(
+      `[sleeve-persist] simSeconds=10 sleeveVertCount=${sleeveAt10?.count ?? 'n/a'} maxAbsX=${sleeveAt10?.maxAbsX?.toFixed(3) ?? 'n/a'} (anti-collapse floor: count≥50)`,
+    );
+    expect(sleeveAt10, 'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ not published').not.toBeNull();
+    // Anti-collapse floor: well above the pre-fix collapse (~2), loose enough
+    // for the non-deterministic 10s drape. // maintainer-run
+    expect(sleeveAt10!.count).toBeGreaterThanOrEqual(50);
+
     // ── §8 envelope-wrap checkpoints (maintainer-run) ────────────────────────
     // These checkpoints measure the auto-support bet from the envelope-wrap
     // spec §8: wrapping panels over body cylinders holds the garment without
