@@ -233,28 +233,27 @@ export function validateMeshData(meshData: ExtractedMeshData): {
 // ─── A-Pose helpers ──────────────────────────────────────────────────────────
 
 /**
- * Apply the same A-pose bone rotations that AvatarModel.tsx applies.
- * Uses the same Euler rotation approach for consistency.
+ * Apply per-bone rotations (degrees, Euler ZYX, post-multiplied onto the bind quaternion).
+ *
+ * @param scene - Three.js scene containing bones
+ * @param joints - Record mapping bone names to rotation in degrees { x, y, z }
  */
-export function applyAPose(scene: THREE.Object3D): void {
+export function applyPose(
+  scene: THREE.Object3D,
+  joints: Record<string, { x: number; y: number; z: number }>,
+): void {
   const boneMap = new Map<string, THREE.Bone>();
   const bindPoses = new Map<string, THREE.Quaternion>();
-
-  // Collect bones
   scene.traverse((obj) => {
     if (!(obj as THREE.Bone).isBone) return;
     const bone = obj as THREE.Bone;
     boneMap.set(bone.name, bone);
     bindPoses.set(bone.name, bone.quaternion.clone());
   });
-
-  // Apply A-pose rotations using the same logic as AvatarModel.tsx
-  const aPoseJoints = POSE_PRESETS['A-pose'];
   boneMap.forEach((bone, name) => {
     const bindPose = bindPoses.get(name);
     if (!bindPose) return;
-
-    const jointRot = aPoseJoints[name];
+    const jointRot = joints[name];
     if (jointRot) {
       const euler = new THREE.Euler(jointRot.x * DEG2RAD, jointRot.y * DEG2RAD, jointRot.z * DEG2RAD, 'ZYX');
       const rotQ = new THREE.Quaternion().setFromEuler(euler);
@@ -263,6 +262,11 @@ export function applyAPose(scene: THREE.Object3D): void {
       bone.quaternion.copy(bindPose);
     }
   });
+}
+
+/** Back-compat: A-pose from the static preset. */
+export function applyAPose(scene: THREE.Object3D): void {
+  applyPose(scene, POSE_PRESETS['A-pose']);
 }
 
 // ─── Mesh extraction (with skinning support) ─────────────────────────────────
