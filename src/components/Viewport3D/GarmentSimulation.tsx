@@ -319,7 +319,7 @@ const MergedSimulation = forwardRef<GarmentSimulationHandle, GarmentSimulationPr
       // and solver must not diverge. `frame.point` carries the landmark; `flip`
       // is the M4-C anatomy-up correction.
       const transformed = wrapPlacedMesh(pm.vertices, frame, DEFAULT_WRAP, flip);
-      const piece = activePieces[i];
+      const piece = activePieces.find(p => p.id === pm.pieceId);
       const stiffnessMultiplier = computeStiffnessMultiplier(piece?.interfacingType, piece?.solidifyFactor);
       const pressurePa = piece?.pressurePa ?? 0;
       const foldInternals = piece?.internals?.filter(l => l.type === 'fold' && l.foldOptions);
