@@ -248,12 +248,73 @@ export function autoSew(
     breakdown: candidate.breakdown,
   }));
 
-  // Find unmatched edges
+  // ── Self-close pass (sleeve tube closure) ─────────────────────────────────
+  // The pipeline above pairs only DISTINCT pieces (the i<j loop + the
+  // same-piece filter), so a sleeve's two underarm edges — which must seam to
+  // EACH OTHER to close the tube around the arm — are never paired. This
+  // additive pass consumes the 'self-close' matchHint (semanticEdges.ts) to
+  // emit one same-piece underarm seam per piece that has exactly two such
+  // edges. buildSeamConstraints supports same-piece seams; worldRefine passes
+  // them through (Task 1). See the sleeve-tube-closure design doc.
+  const d2 = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+  const selfCloseSeams: ProposedSeam[] = [];
+  const selfCloseEdgeKeys = new Set<string>();
+  // When onlyPairs restricts cross-piece matching, honour the same restriction
+  // for same-piece seams: only process pieces that appear in at least one
+  // listed pair (a sleeve not in any listed pair is intentionally excluded).
+  const onlyPairsPieceIds = onlyPairs
+    ? new Set(onlyPairs.flat())
+    : null;
+  for (const piece of activePieces) {
+    if (onlyPairsPieceIds && !onlyPairsPieceIds.has(piece.id)) continue;
+    const sc = (pieceEdges.get(piece.id) ?? []).filter(e => e.matchHint === 'self-close');
+    if (sc.length !== 2) {
+      if (sc.length > 0) {
+        console.warn(`[autoSew] piece ${piece.id} has ${sc.length} self-close edges (expected 2); skipping tube closure`);
+      }
+      continue;
+    }
+    const [eA, eB] = sc;
+    // reversed: the two underarm edges traverse the outline loop in opposite
+    // directions, so pairing start↔start joins diagonal corners. Pick the
+    // pairing (straight vs crossed) with the smaller endpoint distance so the
+    // cap end of A meets the cap end of B (a straight seam, not an X).
+    const straight = d2(eA.start, eB.start) + d2(eA.end, eB.end);
+    const crossed = d2(eA.start, eB.end) + d2(eA.end, eB.start);
+    const reversed = crossed < straight;
+    selfCloseEdgeKeys.add(`${piece.id}:${eA.edgeIndex}`);
+    selfCloseEdgeKeys.add(`${piece.id}:${eB.edgeIndex}`);
+    selfCloseSeams.push({
+      seam: {
+        // state-encoded ID — see B10-state; do NOT migrate to newId().
+        id: `auto-seam-selfclose-${Date.now()}-${piece.id}`,
+        pieceA: { pieceId: piece.id, edgeName: eA.name, tStart: 0, tEnd: 1 },
+        pieceB: { pieceId: piece.id, edgeName: eB.name, tStart: 0, tEnd: 1, reversed },
+        type: 'standard' as const,
+        tension: 100,
+        strength: 1.0,
+        active: true,
+        taped: false,
+        tapeWidth: 10,
+        createdBy: 'ai' as const,
+      },
+      confidence: 1.0,
+      reason: 'sleeve underarm tube closure (self-seam)',
+      breakdown: {
+        naming: null, lengthSimilarity: 1, proximity: 1,
+        edgePosition: 1, semanticMatch: 1, reason: 'self-close',
+      },
+    });
+  }
+
+  // Find unmatched edges (exclude self-close edges already claimed above)
   const matchedEdgeKeys = new Set<string>();
   for (const s of finalRanked) {
     matchedEdgeKeys.add(`${s.edgeA.pieceId}:${s.edgeA.edgeIndex}`);
     matchedEdgeKeys.add(`${s.edgeB.pieceId}:${s.edgeB.edgeIndex}`);
   }
+  for (const key of selfCloseEdgeKeys) matchedEdgeKeys.add(key);
   const unmatchedEdges: Edge[] = [];
   for (const edges of pieceEdges.values()) {
     for (const edge of edges) {
@@ -264,7 +325,7 @@ export function autoSew(
   }
 
   return {
-    seams,
+    seams: [...seams, ...selfCloseSeams],
     unmatchedEdges,
     piecesAnalyzed: activePieces.length,
     edgesExtracted: totalEdges,

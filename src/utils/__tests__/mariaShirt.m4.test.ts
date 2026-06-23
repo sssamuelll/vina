@@ -226,6 +226,16 @@ describe('M4 — sonda de dirección: las costuras propuestas cosen derechas en 
     // CONTRATO M4 (dirección): cero costuras cruzadas dentro de sí mismas.
     const crossed = worldSeams.filter(ws => ws.crossed);
     expect(crossed.map(ws => ws.label)).toEqual([]);
+
+    // Tube closure: each sleeve's underarm self-seam is proposed, resolves to
+    // real constraints, and sews straight (not crossed). With the fuller sleeve
+    // wrap (Task 2) the two underarm edges start close, so meanPairDist is small.
+    const underarmSeams = worldSeams.filter(ws => /underarmSeam/.test(ws.label));
+    expect(underarmSeams.length).toBeGreaterThanOrEqual(2); // one per sleeve
+    for (const ws of underarmSeams) {
+      expect(ws.pairCount).toBeGreaterThan(0);
+      expect(ws.crossed, ws.label).toBe(false);
+    }
   });
 
   // ── CONTRATO M4-C: emparejamiento en espacio mundo ───────────────────────
