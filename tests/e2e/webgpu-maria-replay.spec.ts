@@ -221,6 +221,8 @@ test.describe('WebGPU María replay @gpu-local — DoD #897 (F4)', () => {
     console.log(
       `[apose-sleeve] simSeconds=2.5 sleeveMeanY=${sleeveMeanY?.meanY?.toFixed(3) ?? 'n/a'} sleeveVertCount=${sleeveMeanY?.count ?? 0} (target: meanY<1.476)`,
     );
+    // Detect global publish failure separately from empty sleeve segment.
+    expect(sleeveMeanY, 'Cloth mesh not found — __OPENCLO_CLOTH_MESH__ global not published').not.toBeNull();
     // Guard against empty sleeve segment — fails loudly with a clear message.
     expect(
       sleeveMeanY?.count ?? 0,
